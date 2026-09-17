@@ -32,7 +32,7 @@ import { applicationWorkspaceSource } from "../../../src/server/pi-workspace-sou
 
 let root: string, app: string;
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "sg-workspace-source-"));
+  root = mkdtempSync(join(tmpdir(), "hd-workspace-source-"));
   vi.stubEnv("HALDUR_DB_PATH", join(root, "db.sqlite"));
   vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "config"));
   pushTestDatabase(process.env.HALDUR_DB_PATH!);

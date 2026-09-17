@@ -59,7 +59,7 @@
         "volumes": [
           {
             "name": "database",
-            "dockerName": "sg-3f2b1c4d_database",
+            "dockerName": "hd-3f2b1c4d_database",
             "kind": "database",
             "sqlite": null,
             "mounts": [
@@ -285,7 +285,7 @@
         "volumes": [
           {
             "name": "data",
-            "dockerName": "sg-3f2b1c4d_data",
+            "dockerName": "hd-3f2b1c4d_data",
             "kind": "database",
             "sqlite": "kuma.db",
             "mounts": [
@@ -478,7 +478,7 @@
         "volumes": [
           {
             "name": "data",
-            "dockerName": "sg-3f2b1c4d_data",
+            "dockerName": "hd-3f2b1c4d_data",
             "kind": "database",
             "sqlite": "grafana.db",
             "mounts": [
@@ -492,7 +492,7 @@
           },
           {
             "name": "metrics",
-            "dockerName": "sg-3f2b1c4d_metrics",
+            "dockerName": "hd-3f2b1c4d_metrics",
             "kind": "files",
             "sqlite": null,
             "mounts": [
@@ -832,7 +832,7 @@
         "volumes": [
           {
             "name": "queue-data",
-            "dockerName": "sg-3f2b1c4d_queue-data",
+            "dockerName": "hd-3f2b1c4d_queue-data",
             "kind": "database",
             "sqlite": null,
             "mounts": [
@@ -1270,7 +1270,7 @@
         "volumes": [
           {
             "name": "documents",
-            "dockerName": "sg-3f2b1c4d_documents",
+            "dockerName": "hd-3f2b1c4d_documents",
             "kind": "files",
             "sqlite": null,
             "mounts": [
@@ -1713,7 +1713,7 @@
         "volumes": [
           {
             "name": "database",
-            "dockerName": "sg-3f2b1c4d_database",
+            "dockerName": "hd-3f2b1c4d_database",
             "kind": "database",
             "sqlite": null,
             "mounts": [
@@ -1727,7 +1727,7 @@
           },
           {
             "name": "queue-data",
-            "dockerName": "sg-3f2b1c4d_queue-data",
+            "dockerName": "hd-3f2b1c4d_queue-data",
             "kind": "database",
             "sqlite": null,
             "mounts": [
@@ -2180,7 +2180,7 @@
         "volumes": [
           {
             "name": "state",
-            "dockerName": "sg-3f2b1c4d_state",
+            "dockerName": "hd-3f2b1c4d_state",
             "kind": "database",
             "capture": "quiesced-files",
             "sqlite": "app.sqlite3",

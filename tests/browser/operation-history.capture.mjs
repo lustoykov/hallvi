@@ -20,7 +20,7 @@ try {
   await page.goto(
     `${base}/prototype/app?scenario=rich&step=27&section=history`,
   );
-  const history = page.locator(".sg-operation-history");
+  const history = page.locator(".hd-operation-history");
   await expect(history).toBeVisible();
   await expect(history.locator("li").first()).toContainText(
     "Restart the worker",

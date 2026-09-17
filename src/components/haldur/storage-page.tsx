@@ -72,7 +72,7 @@ export function StoragePage({
     return (
       <div className="ax-root" data-variant="flow">
         {head}
-        <div className="sg-deploy-none">
+        <div className="hd-deploy-none">
           <h2>Nothing here has been looked at yet.</h2>
           <p>
             No record names a volume for this application. That is not a claim
@@ -86,7 +86,7 @@ export function StoragePage({
           </p>
           <button
             type="button"
-            className="sg-primary-button"
+            className="hd-primary-button"
             onClick={() =>
               onAsk(
                 "Where does this application keep data that has to survive the container being replaced, and does it actually survive?",

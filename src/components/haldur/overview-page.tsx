@@ -133,7 +133,7 @@ export function OverviewPage({
   if (model) {
     const live: LiveRecord = { application };
     return (
-      <div className="sg-section-page sg-section-overview">
+      <div className="hd-section-page hd-section-overview">
         <OverviewDirection
           model={{ ...model, condition, log: logFromRecords(records) }}
           record={live}
@@ -162,12 +162,12 @@ export function OverviewPage({
 
   // No map on record. Everything else still reads, so it is drawn.
   return (
-    <div className="sg-section-page sg-section-overview">
+    <div className="hd-section-page hd-section-overview">
       {chrome.bar}
       {chrome.header}
-      <div className="sg-section-content">
-        <div className="sg-overview-plain">
-          <p className="sg-overview-condition">
+      <div className="hd-section-content">
+        <div className="hd-overview-plain">
+          <p className="hd-overview-condition">
             <Tag tone={tone[condition.certainty]}>
               {condition.certainty === "verified"
                 ? "Verified"
@@ -204,7 +204,7 @@ export function OverviewPage({
 
           <section>
             <h2>What is true now</h2>
-            <ul className="sg-overview-vitals">
+            <ul className="hd-overview-vitals">
               {built.vitals.map((vital) => (
                 <li key={vital.id}>
                   <button
@@ -228,7 +228,7 @@ export function OverviewPage({
             </p>
             <button
               type="button"
-              className="sg-primary-button"
+              className="hd-primary-button"
               onClick={() =>
                 onAsk(
                   "Work out how this application is put together — its pieces, how they connect, and what you can verify about each — and record it.",
@@ -242,7 +242,7 @@ export function OverviewPage({
           {built.recent.length > 0 && (
             <section>
               <h2>What happened</h2>
-              <ul className="sg-overview-recent">
+              <ul className="hd-overview-recent">
                 {built.recent.map((item) => (
                   <li key={item.id}>
                     <b>{item.title}</b>

@@ -30,7 +30,7 @@ export function ExternalLink({
   if (demo)
     return (
       <span
-        className={`sg-demo-link${className ? ` ${className}` : ""}`}
+        className={`hd-demo-link${className ? ` ${className}` : ""}`}
         title="Demo repository: this page does not exist on GitHub"
       >
         {children} <em>demo · not a real link</em>

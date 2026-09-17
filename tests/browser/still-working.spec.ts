@@ -109,13 +109,13 @@ test(
 
     // The transcript says which machine, and that the command has gone quiet,
     // rather than "Working for 2m 30s" over a command that may be wedged.
-    const status = page.locator(".sg-run-status");
+    const status = page.locator(".hd-run-status");
     await expect(status).toContainText("Running a command on the server");
     await expect(status).toContainText("quiet for");
 
     // With the turn on screen the composer says nothing: the status line is
     // right there and repeating it would be the same sentence twice.
-    const bar = page.locator(".sg-still-working");
+    const bar = page.locator(".hd-still-working");
     await expect(bar).toHaveCount(0);
 
     // Scroll it away — which is how the owner met this, having read an answer
@@ -128,12 +128,12 @@ test(
     await page.screenshot({ path: "tests/results/still-working-desktop.png" });
     // It points at the turn rather than leaving the reader to find it.
     await bar.getByRole("button", { name: "Show", exact: true }).click();
-    await expect(page.locator(`#sg-message-${runId}`)).toBeInViewport();
+    await expect(page.locator(`#hd-message-${runId}`)).toBeInViewport();
 
     // A decision nobody has made is not the turn working. It outranks
     // everything else and says who it is waiting on.
     update({ status: "awaiting-approval" });
-    await expect(page.locator(".sg-run-status")).toContainText(
+    await expect(page.locator(".hd-run-status")).toContainText(
       "Waiting for you to approve a command",
     );
 
@@ -165,11 +165,11 @@ test(
       }),
     ).toBeVisible({ timeout: 30_000 });
     // Never the sentence the owner used to meet at this point.
-    await expect(page.locator(".sg-error")).toHaveCount(0);
+    await expect(page.locator(".hd-error")).toHaveCount(0);
 
     // And it is still true after a reload, not just in this render.
     await page.reload();
-    await expect(page.locator(".sg-still-working")).toHaveCount(0);
+    await expect(page.locator(".hd-still-working")).toHaveCount(0);
     await expect(
       page.getByText("[QA fixture reply] Now deploy the new revision.", {
         exact: true,
@@ -230,7 +230,7 @@ test(
     );
 
     await page.goto(`/applications/${appId}`);
-    const chip = page.locator(".sg-secrets-chip");
+    const chip = page.locator(".hd-secrets-chip");
     const request = page.getByText("GF_SECURITY_ADMIN_PASSWORD").first();
     await expect(request).toBeVisible();
     // In view, so the chip stays out of the way.

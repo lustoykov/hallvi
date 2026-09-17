@@ -135,12 +135,12 @@ export function RevealSecret({
   if (!revealable && !changing) return null;
 
   return (
-    <div className="sg-reveal">
+    <div className="hd-reveal">
       {revealable && (
-        <div className="sg-reveal-row">
+        <div className="hd-reveal-row">
           {/* Masked by default, and the mask is not the value: there is no
             plaintext in the DOM until the reader asks for it. */}
-          <code className="sg-reveal-value" data-shown={value ? "" : undefined}>
+          <code className="hd-reveal-value" data-shown={value ? "" : undefined}>
             {/* The mask says "hidden"; it deliberately does not match the
               value's length, which is not the reader's business and wrapped
               onto two lines in a narrow column. */}
@@ -148,7 +148,7 @@ export function RevealSecret({
           </code>
           <button
             type="button"
-            className="sg-reveal-button"
+            className="hd-reveal-button"
             onClick={value ? hide : reveal}
             disabled={busy}
             aria-label={value ? `Hide ${name}` : `Reveal ${name}`}
@@ -162,7 +162,7 @@ export function RevealSecret({
           </button>
           <button
             type="button"
-            className="sg-reveal-button"
+            className="hd-reveal-button"
             onClick={copy}
             disabled={busy}
             aria-label={`Copy ${name}`}
@@ -177,20 +177,20 @@ export function RevealSecret({
         </div>
       )}
       {changing && (
-        <p className="sg-reveal-note" data-held="">
+        <p className="hd-reveal-note" data-held="">
           A replacement is part-way through and not in use yet. The value that
           still works is being kept until the new one is proved.
         </p>
       )}
       {value && (
-        <p className="sg-reveal-note">
+        <p className="hd-reveal-note">
           On screen for {VISIBLE_MS / 1000} seconds, then hidden again. Server
           Guy generated this and keeps it sealed; it is not in the conversation,
           the records or any log.
         </p>
       )}
       {error && (
-        <p className="sg-reveal-error" role="alert">
+        <p className="hd-reveal-error" role="alert">
           {error}
         </p>
       )}

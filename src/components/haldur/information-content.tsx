@@ -46,7 +46,7 @@ export function InformationContent({
   const details =
     content.kind === "deployment" ? (
       <>
-        <dl className="sg-record-facts">
+        <dl className="hd-record-facts">
           <div>
             <dt>Source</dt>
             <dd>
@@ -75,7 +75,7 @@ export function InformationContent({
           </div>
         </dl>
         {content.changes.length > 0 && (
-          <div className="sg-record-changes">
+          <div className="hd-record-changes">
             <h4>Changes made for this deployment</h4>
             <ul>
               {content.changes.map((change) => (
@@ -87,7 +87,7 @@ export function InformationContent({
       </>
     ) : null;
   const checks = presentation.checks.length > 0 && (
-    <ul className="sg-record-checks">
+    <ul className="hd-record-checks">
       {presentation.checks.map((check, index) => (
         <li key={index} data-status={check.status}>
           {check.status === "passed" ? (
@@ -124,30 +124,30 @@ export function InformationContent({
   if (superseded)
     return (
       <article
-        className="sg-result"
+        className="hd-result"
         data-kind={content.kind}
         data-tone={tone}
         data-quiet=""
         data-information-id={record.id}
       >
-        <div className="sg-result-head">
-          <span className="sg-result-dot" data-tone={tone} aria-hidden="true" />
+        <div className="hd-result-head">
+          <span className="hd-result-dot" data-tone={tone} aria-hidden="true" />
           <h3 title={record.title}>{record.title}</h3>
-          <span className="sg-result-then">
+          <span className="hd-result-then">
             <LocalTime
               value={record.establishedAt ?? record.updatedAt}
               variant="compact"
             />
           </span>
         </div>
-        <p className="sg-result-alone">
+        <p className="hd-result-alone">
           {/* The same rule as the generic card: a repeat goes to the page
               that renders the record, because the first appearance is often
               just as compact and "in full" delivered nothing. */}
           {onOpen && elsewhere ? (
             <button
               type="button"
-              className="sg-result-elsewhere"
+              className="hd-result-elsewhere"
               onClick={() => onOpen(elsewhere.id)}
             >
               {word} · open {elsewhere.label}
@@ -163,18 +163,18 @@ export function InformationContent({
     return (
       <article
         id={`record-${record.id}`}
-        className="sg-result"
+        className="hd-result"
         data-kind={content.kind}
         data-context="chat"
         data-tone={tone}
         data-information-id={record.id}
       >
-        <div className="sg-result-head">
-          <Check className="sg-result-mark" aria-hidden="true" weight="bold" />
+        <div className="hd-result-head">
+          <Check className="hd-result-mark" aria-hidden="true" weight="bold" />
           <h3 title={record.title}>{record.title}</h3>
           {access && presentation.url && reachable !== "closed" && (
             <a
-              className="sg-result-open"
+              className="hd-result-open"
               href={presentation.url}
               target="_blank"
               rel="noreferrer"
@@ -183,12 +183,12 @@ export function InformationContent({
             </a>
           )}
           {access && presentation.url && reachable === "closed" && (
-            <span className="sg-result-shut">Tunnel closed</span>
+            <span className="hd-result-shut">Tunnel closed</span>
           )}
         </div>
         {/* The limitation stays on the face. Compactness must not hide the
             thing that decides whether the link will work tomorrow. */}
-        <p className="sg-result-scope">
+        <p className="hd-result-scope">
           {access
             ? content.mode === "private"
               ? "Only on this PC, while the tunnel is open"
@@ -197,7 +197,7 @@ export function InformationContent({
               ? `${content.server} · ${content.revision.slice(0, 7)}`
               : ""}
         </p>
-        <div className="sg-result-meta">
+        <div className="hd-result-meta">
           <span>
             {record.establishedAt ? "Checked" : "Saved"}{" "}
             <LocalTime
@@ -207,14 +207,14 @@ export function InformationContent({
             {passed > 0 &&
               ` · ${passed} check${passed === 1 ? "" : "s"} passed`}
           </span>
-          <details className="sg-result-more">
+          <details className="hd-result-more">
             <summary>Details</summary>
-            <div className="sg-result-inside">
-              <div className="sg-record-body">
+            <div className="hd-result-inside">
+              <div className="hd-record-body">
                 <InformationBody source={record.body} />
               </div>
               {access && presentation.url && (
-                <p className="sg-result-url">
+                <p className="hd-result-url">
                   <code>{presentation.url}</code>
                 </p>
               )}
@@ -223,7 +223,7 @@ export function InformationContent({
               {onOpen && presentation.views.includes("deployment") && (
                 <button
                   type="button"
-                  className="sg-info-go"
+                  className="hd-info-go"
                   onClick={() => onOpen("deployment")}
                 >
                   View deployment <ArrowRight aria-hidden="true" />
@@ -238,13 +238,13 @@ export function InformationContent({
   return (
     <article
       id={`record-${record.id}`}
-      className="sg-record"
+      className="hd-record"
       data-kind={content.kind}
       data-context={currentView ?? "chat"}
       data-tone={tone}
       data-information-id={record.id}
     >
-      <header className="sg-record-head">
+      <header className="hd-record-head">
         <Tag tone={tone}>{word}</Tag>
         <span>
           {record.establishedAt ? "Established" : "Saved"}{" "}
@@ -255,12 +255,12 @@ export function InformationContent({
         </span>
       </header>
       <h3>{record.title}</h3>
-      <div className="sg-record-body">
+      <div className="hd-record-body">
         <InformationBody source={record.body} />
       </div>
       {access && (
         <>
-          <div className="sg-record-access">
+          <div className="hd-record-access">
             <span>
               {content.mode === "private" ? (
                 <LockSimple aria-hidden="true" />
@@ -271,7 +271,7 @@ export function InformationContent({
             </span>
             <code>{presentation.url}</code>
             <a
-              className="sg-info-open"
+              className="hd-info-open"
               href={presentation.url}
               target="_blank"
               rel="noreferrer"
@@ -282,7 +282,7 @@ export function InformationContent({
           {!compact && content.mode === "private" && (
             <>
               <div
-                className="sg-record-route"
+                className="hd-record-route"
                 aria-label="Private access route"
               >
                 <div>
@@ -300,7 +300,7 @@ export function InformationContent({
                   <span>Loopback port {content.remotePort}</span>
                 </div>
               </div>
-              <p className="sg-record-note">
+              <p className="hd-record-note">
                 This link works on the PC running Haldur while its SSH tunnel is
                 open. If it stops working, ask Pi to reopen private access.
               </p>
@@ -309,7 +309,7 @@ export function InformationContent({
         </>
       )}
       {compact && details ? (
-        <details className="sg-record-details">
+        <details className="hd-record-details">
           <summary>Deployment details</summary>
           {details}
           {checks}
@@ -318,7 +318,7 @@ export function InformationContent({
         <>
           {details}
           {primary ? (
-            <details className="sg-record-details">
+            <details className="hd-record-details">
               <summary>What was verified</summary>
               {checks}
             </details>
@@ -328,19 +328,19 @@ export function InformationContent({
         </>
       )}
       {presentation.nextStep && (
-        <p className="sg-record-next">{presentation.nextStep}</p>
+        <p className="hd-record-next">{presentation.nextStep}</p>
       )}
       {onOpen && compact && presentation.views.includes("deployment") && (
         <button
           type="button"
-          className="sg-info-go"
+          className="hd-info-go"
           onClick={() => onOpen("deployment")}
         >
           View deployment <ArrowRight aria-hidden="true" />
         </button>
       )}
       {record.evidence.length > 0 && (
-        <details className="sg-record-evidence">
+        <details className="hd-record-evidence">
           <summary>Evidence · {record.evidence.length}</summary>
           <ul>
             {record.evidence.map((item, index) => (

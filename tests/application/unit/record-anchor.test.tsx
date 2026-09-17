@@ -48,7 +48,7 @@ const link = (markup: string) => markup.match(/href="#(record-[^"]+)"/)?.[1];
 describe("the anchor a repeated record points at", () => {
   it("is carried by a compact first appearance, and the repeat links to it", () => {
     const first = renderToStaticMarkup(<InformationCard record={routine()} />);
-    expect(first).toContain("sg-result");
+    expect(first).toContain("hd-result");
     expect(anchor(first)).toBe(`record-${ID}`);
     const again = renderToStaticMarkup(
       <InformationCard record={routine()} superseded />,

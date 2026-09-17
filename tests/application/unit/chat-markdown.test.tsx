@@ -42,7 +42,7 @@ describe("chat markdown", () => {
     expect(html).toContain("<pre><code>npm test &lt;x&gt;</code></pre>");
     expect(html).toContain("<blockquote>quoted</blockquote>");
     expect(html).toContain(
-      '<p class="sg-md-heading"><strong>Next</strong></p>',
+      '<p class="hd-md-heading"><strong>Next</strong></p>',
     );
     expect(html).toContain(
       '<a href="https://example.com/docs" rel="noreferrer" target="_blank">the docs</a>',

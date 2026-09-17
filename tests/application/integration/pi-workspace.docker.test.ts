@@ -84,7 +84,7 @@ describe.skipIf(process.env.HALDUR_DOCKER_TESTS !== "1")(
                   .join("\n"),
               (error: Error) => `Error: ${error.message}`,
             );
-        const container = `sg-pi-${workspace.id}`;
+        const container = `hd-pi-${workspace.id}`;
         try {
           // The selected snapshot, described, without credential files.
           const listing = await run("ls", { path: "." });

@@ -234,7 +234,7 @@ export async function captureControllerPayload(): Promise<{
 }> {
   const entries: TarFile[] = [];
   const database = databasePath();
-  const staging = mkdtempSync(join(tmpdir(), "sg-controller-copy-"));
+  const staging = mkdtempSync(join(tmpdir(), "hd-controller-copy-"));
   try {
     const target = join(staging, "haldur.db");
     const reader = new Database(database, { readonly: true });

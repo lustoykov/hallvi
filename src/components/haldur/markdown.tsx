@@ -125,7 +125,7 @@ function renderBlock(block: Block, key: number): ReactNode {
       );
     case "heading":
       return (
-        <p className="sg-md-heading" key={key}>
+        <p className="hd-md-heading" key={key}>
           <strong>{renderInline(block.text)}</strong>
         </p>
       );

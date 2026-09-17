@@ -174,7 +174,7 @@
     transform: scale(2.2);
   }
 }
-.axt-console > .sg-term-bar {
+.axt-console > .hd-term-bar {
   margin: -2px 0 6px;
   padding: 6px 8px 10px;
 }
@@ -506,7 +506,7 @@
   min-height: 0;
   overflow: hidden;
 }
-.axt-log-lines > .sg-term-bar {
+.axt-log-lines > .hd-term-bar {
   margin: -2px 0 6px;
   padding: 6px 8px 10px;
 }

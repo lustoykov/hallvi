@@ -93,7 +93,7 @@ function GenericInformationCard({
   const foldFacts = !currentView && facts.length > 4;
   const factList = (
     <>
-      <dl className="sg-info-facts">
+      <dl className="hd-info-facts">
         {facts.map((fact, index) => (
           // A value too long for a column takes the whole row rather
           // than breaking an identifier across two lines.
@@ -106,12 +106,12 @@ function GenericInformationCard({
       {/* Said once for the whole card. Repeating it under every value
           turns one honest qualification into five lines of noise. */}
       {told.length > 0 && (
-        <p className="sg-info-basis">
+        <p className="hd-info-basis">
           As reported, not measured here: {told.join(", ")}.
         </p>
       )}
       {intended.length > 0 && (
-        <p className="sg-info-basis">
+        <p className="hd-info-basis">
           Planned, not in place yet: {intended.join(", ")}.
         </p>
       )}
@@ -129,7 +129,7 @@ function GenericInformationCard({
         // destination the record belongs to they stay open — that page is
         // about them; in a transcript they fold.
         (foldFacts ? (
-          <details className="sg-info-more">
+          <details className="hd-info-more">
             <summary>{facts.length} details</summary>
             {factList}
           </details>
@@ -138,7 +138,7 @@ function GenericInformationCard({
         ))}
 
       {presentation.checks.length > 0 && (
-        <ul className="sg-info-checks">
+        <ul className="hd-info-checks">
           {presentation.checks.map((check, index) => (
             <li key={index} data-status={check.status}>
               <span aria-hidden="true" />
@@ -149,17 +149,17 @@ function GenericInformationCard({
       )}
 
       {presentation.nextStep && !retired && (
-        <p className="sg-info-next">
+        <p className="hd-info-next">
           <span>{recommendation ? "What Pi suggests" : "Next"}</span>
           {presentation.nextStep}
         </p>
       )}
 
       {(presentation.url || destinations.length > 0) && (
-        <footer className="sg-info-foot">
+        <footer className="hd-info-foot">
           {presentation.url && (
             <a
-              className="sg-info-open"
+              className="hd-info-open"
               href={presentation.url}
               target="_blank"
               rel="noreferrer"
@@ -172,7 +172,7 @@ function GenericInformationCard({
             destinations.map((view) => (
               <button
                 type="button"
-                className="sg-info-go"
+                className="hd-info-go"
                 key={view.id}
                 onClick={() => onOpen(view.id)}
               >
@@ -183,7 +183,7 @@ function GenericInformationCard({
       )}
 
       {record.evidence.length > 0 && (
-        <details className="sg-info-evidence">
+        <details className="hd-info-evidence">
           <summary>
             What this rests on
             <em>{record.evidence.length}</em>
@@ -246,19 +246,19 @@ function GenericInformationCard({
            record went nowhere, including after a reload. A superseded copy
            must not claim it either, or the link would scroll to itself. */
         id={superseded ? undefined : `record-${record.id}`}
-        className="sg-result"
+        className="hd-result"
         data-tone={tone}
         data-quiet=""
         data-information-id={record.id}
       >
-        <div className="sg-result-head">
+        <div className="hd-result-head">
           {retired ? (
             /* The tag rather than the dot: "No longer current" is the whole
                point of this card, and a grey dot does not say it. */
             <Tag tone={tone}>{word}</Tag>
           ) : (
             <span
-              className="sg-result-dot"
+              className="hd-result-dot"
               data-tone={tone}
               aria-hidden="true"
             />
@@ -271,7 +271,7 @@ function GenericInformationCard({
             presentation.url &&
             reachable !== "closed" && (
               <a
-                className="sg-result-open"
+                className="hd-result-open"
                 href={presentation.url}
                 target="_blank"
                 rel="noreferrer"
@@ -280,9 +280,9 @@ function GenericInformationCard({
               </a>
             )}
           {routine && presentation.url && reachable === "closed" && (
-            <span className="sg-result-shut">Tunnel closed</span>
+            <span className="hd-result-shut">Tunnel closed</span>
           )}
-          <span className="sg-result-then">
+          <span className="hd-result-then">
             <LocalTime value={established} variant="compact" />
           </span>
         </div>
@@ -298,11 +298,11 @@ function GenericInformationCard({
              full card's pills come from — so that is where the repeat goes.
              Without a view, or without a shell to switch, the anchor is
              still the best there is. */
-          <p className="sg-result-alone">
+          <p className="hd-result-alone">
             {onOpen && elsewhere ? (
               <button
                 type="button"
-                className="sg-result-elsewhere"
+                className="hd-result-elsewhere"
                 onClick={() => onOpen(elsewhere.id)}
               >
                 {word} · open {elsewhere.label}
@@ -312,13 +312,13 @@ function GenericInformationCard({
             )}
           </p>
         ) : (
-          <details className="sg-result-more sg-result-alone">
+          <details className="hd-result-more hd-result-alone">
             <summary>
               {passed > 0
                 ? `${passed} check${passed === 1 ? "" : "s"} passed · details`
                 : "Details"}
             </summary>
-            <div className="sg-result-inside">{body}</div>
+            <div className="hd-result-inside">{body}</div>
           </details>
         )}
       </article>
@@ -327,15 +327,15 @@ function GenericInformationCard({
   return (
     <article
       id={`record-${record.id}`}
-      className="sg-info"
+      className="hd-info"
       data-tone={tone}
       data-role={presentation.role}
       data-information-id={record.id}
     >
-      <header className="sg-info-head">
+      <header className="hd-info-head">
         <Tag tone={tone}>{word}</Tag>
         <h3>{record.title}</h3>
-        <span className="sg-info-when">
+        <span className="hd-info-when">
           {record.establishedAt ? "Established" : "Saved"}{" "}
           <LocalTime value={established} variant="compact" />
         </span>

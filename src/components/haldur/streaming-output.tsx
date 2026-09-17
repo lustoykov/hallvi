@@ -123,24 +123,24 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   return (
     <>
       {awaiting && (
-        <div className="sg-ask">
-          <p className="sg-ask-what">
+        <div className="hd-ask">
+          <p className="hd-ask-what">
             Haldur wants to run a command on your server.
           </p>
-          <code className="sg-ask-command">
+          <code className="hd-ask-command">
             {clip(essence(commandOf(item.input)), 120)}
           </code>
           {/* Scoped to this command, and only this command. "Nothing has
               run yet" is a claim about the whole turn, and it is false the
               moment an earlier command in the same turn has already
               executed — which is the ordinary case by the time Pi asks. */}
-          <p className="sg-ask-safe">
+          <p className="hd-ask-safe">
             This command has not run. It starts only if you approve.
           </p>
         </div>
       )}
       <details
-        className="sg-stream"
+        className="hd-stream"
         open={open}
         onToggle={(event) => setOpen(event.currentTarget.open)}
       >
@@ -151,7 +151,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
               ? "Live output"
               : "Command and output"}
         </summary>
-        <div className="sg-stream-terminal">
+        <div className="hd-stream-terminal">
           <TerminalBar title={running ? "Running" : "Command"} />
           {/* One line, in a strip, deliberately not a <pre>.
               This used to be a second scrolling dark pane above the output
@@ -159,15 +159,15 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
               terminals running two things. The command still has to be here —
               output without it is unattributable — but it is a caption, and
               the whole of it is one click away. */}
-          <div className="sg-stream-ran">
-            <span className="sg-stream-prompt" aria-hidden="true">
+          <div className="hd-stream-ran">
+            <span className="hd-stream-prompt" aria-hidden="true">
               $
             </span>
             <code title={line}>{line}</code>
             {more && (
               <button
                 type="button"
-                className="sg-stream-more"
+                className="hd-stream-more"
                 aria-expanded={showCommand}
                 onClick={() => setShowCommand(!showCommand)}
               >
@@ -180,12 +180,12 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
             )}
           </div>
           {showCommand && more && (
-            <pre className="sg-stream-command" aria-label="Full command">
+            <pre className="hd-stream-command" aria-label="Full command">
               <code>{command}</code>
             </pre>
           )}
           <pre
-            className="sg-stream-output"
+            className="hd-stream-output"
             ref={viewport}
             role="region"
             aria-label="Command output"
@@ -201,7 +201,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
             }}
           >
             {output || (
-              <span className="sg-stream-empty">
+              <span className="hd-stream-empty">
                 {awaiting
                   ? "Waiting for approval. The command has not started."
                   : running
@@ -214,7 +214,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
           </pre>
           {/* Nothing to follow and nothing worth copying until something has
             run; offering both beside an empty pane is two dead controls. */}
-          <div className="sg-stream-controls">
+          <div className="hd-stream-controls">
             {Boolean(output) && (
               <button
                 type="button"
@@ -232,7 +232,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
                 long since it last spoke, so silence is legible as silence
                 rather than as a stall. */}
             {running && (
-              <span className="sg-stream-pulse" role="status">
+              <span className="hd-stream-pulse" role="status">
                 {pulse(item, now)}
               </span>
             )}

@@ -46,11 +46,11 @@ function Mark({
   return (
     <>
       <i
-        className={`sg-nav-indicator ${indicator.tone}${indicator.primary ? " primary" : ""}`}
+        className={`hd-nav-indicator ${indicator.tone}${indicator.primary ? " primary" : ""}`}
         title={indicator.label}
         aria-hidden="true"
       />
-      <span id={id} className="sg-visually-hidden" aria-hidden="true">
+      <span id={id} className="hd-visually-hidden" aria-hidden="true">
         {indicator.label}
       </span>
     </>
@@ -80,7 +80,7 @@ function Reveal({
     <>
       <button
         type="button"
-        className="sg-nav-reveal sg-nav-group-start"
+        className="hd-nav-reveal hd-nav-group-start"
         aria-expanded={revealed}
         onClick={() => onReveal?.(!revealed)}
       >
@@ -95,7 +95,7 @@ function Reveal({
         hidden.map((item) => (
           <button
             key={item.id}
-            className={`sg-nav-unused ${section === item.id ? "selected" : ""}`}
+            className={`hd-nav-unused ${section === item.id ? "selected" : ""}`}
             aria-current={section === item.id ? "page" : undefined}
             onClick={() => onSection(item.id)}
           >
@@ -150,7 +150,7 @@ function Activity({
     <>
       <button
         type="button"
-        className={`sg-nav-activity sg-nav-group-start ${
+        className={`hd-nav-activity hd-nav-group-start ${
           inside && !open ? "selected" : ""
         }`}
         aria-expanded={open}
@@ -167,11 +167,11 @@ function Activity({
       {open &&
         sections.map((item) => {
           const indicator = indicators?.[item.id];
-          const markId = `sg-mark-${item.id}`;
+          const markId = `hd-mark-${item.id}`;
           return (
             <button
               key={item.id}
-              className={`sg-nav-inside ${section === item.id ? "selected" : ""}`}
+              className={`hd-nav-inside ${section === item.id ? "selected" : ""}`}
               aria-current={section === item.id ? "page" : undefined}
               aria-describedby={indicator ? markId : undefined}
               onClick={() => onSection(item.id)}
@@ -227,32 +227,32 @@ export function ApplicationNavigation({
   const activity = sections.filter((item) => item.group === "activity");
   return (
     <aside
-      className="sg-application-navigation"
+      className="hd-application-navigation"
       aria-label="Application navigation"
     >
       {head ? (
-        <div className="sg-navigation-head">
-          <Link href="/applications" className="sg-navigation-home">
+        <div className="hd-navigation-head">
+          <Link href="/applications" className="hd-navigation-home">
             Haldur
           </Link>
           {head}
         </div>
       ) : (
-        <Link href="/applications" className="sg-navigation-brand">
+        <Link href="/applications" className="hd-navigation-brand">
           <span>sg</span>Haldur
         </Link>
       )}
       <nav aria-label="Application workspace">
-        <div className="sg-destinations">
+        <div className="hd-destinations">
           {primary.map((item, index) => {
             const indicator = indicators?.[item.id];
-            const markId = `sg-mark-${item.id}`;
+            const markId = `hd-mark-${item.id}`;
             const groupStart =
               index > 0 && item.group !== primary[index - 1].group;
             const row = (
               <button
                 key={item.id}
-                className={`${section === item.id ? "selected" : ""} ${groupStart ? "sg-nav-group-start" : ""}`}
+                className={`${section === item.id ? "selected" : ""} ${groupStart ? "hd-nav-group-start" : ""}`}
                 aria-current={section === item.id ? "page" : undefined}
                 aria-describedby={indicator ? markId : undefined}
                 onClick={() => onSection(item.id)}
@@ -280,7 +280,7 @@ export function ApplicationNavigation({
             onSection={onSection}
           />
         </div>
-        <div className="sg-conversations-heading">
+        <div className="hd-conversations-heading">
           <span>Conversations</span>
           <button
             disabled={busy}
@@ -299,7 +299,7 @@ export function ApplicationNavigation({
               !section && chat.id === selectedChatId ? "page" : undefined
             }
             aria-describedby={
-              chatMarks?.[chat.id] ? `sg-mark-chat-${chat.id}` : undefined
+              chatMarks?.[chat.id] ? `hd-mark-chat-${chat.id}` : undefined
             }
             onClick={() => onChat(chat.id)}
           >
@@ -310,14 +310,14 @@ export function ApplicationNavigation({
             </span>
             {chatMarks?.[chat.id] && (
               <Mark
-                id={`sg-mark-chat-${chat.id}`}
+                id={`hd-mark-chat-${chat.id}`}
                 indicator={chatMarks[chat.id]}
               />
             )}
           </button>
         ))}
       </nav>
-      <Link className="sg-navigation-settings" href="/setup/pi">
+      <Link className="hd-navigation-settings" href="/setup/pi">
         <GearSix /> Settings
       </Link>
     </aside>

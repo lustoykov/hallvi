@@ -79,7 +79,7 @@ function readSeen(applicationId: string | undefined) {
     ) as Partial<Record<ApplicationSection, string>>;
   if (typeof window === "undefined" || !applicationId) return all();
   try {
-    const stored = localStorage.getItem(`sg-seen:${applicationId}`);
+    const stored = localStorage.getItem(`hd-seen:${applicationId}`);
     return stored
       ? (JSON.parse(stored) as Partial<Record<ApplicationSection, string>>)
       : all();
@@ -98,7 +98,7 @@ function readSeen(applicationId: string | undefined) {
  * sent anywhere, and it is dropped the moment the message goes.
  */
 function draftKey(chatId: string) {
-  return `sg-draft:${chatId}`;
+  return `hd-draft:${chatId}`;
 }
 function readDraft(chatId: string) {
   try {
@@ -189,7 +189,7 @@ export function OperatorShell({
     const id = initialView.application?.id;
     if (!id || !seenLoaded) return;
     try {
-      localStorage.setItem(`sg-seen:${id}`, JSON.stringify(seen));
+      localStorage.setItem(`hd-seen:${id}`, JSON.stringify(seen));
     } catch {
       /* a browser without storage simply forgets what was looked at */
     }
@@ -763,19 +763,19 @@ export function OperatorShell({
   return (
     <DemoContext.Provider value={demo}>
       <main
-        className="sg-shell sg-adaptive-shell"
+        className="hd-shell hd-adaptive-shell"
         data-terminal={terminal.open ? "open" : undefined}
       >
-        <header className="sg-topbar">
+        <header className="hd-topbar">
           {identityVariant !== "navigation" && identity}
-          <div className="sg-topbar-where">
+          <div className="hd-topbar-where">
             <strong>{where.title}</strong>
             {where.detail && <span>{where.detail}</span>}
           </div>
           {activeSection && featured && (
             <button
               type="button"
-              className="sg-workstrip"
+              className="hd-workstrip"
               onClick={() =>
                 featured.origin
                   ? openConversation(
@@ -793,7 +793,7 @@ export function OperatorShell({
           {applicationId && (
             <button
               type="button"
-              className="sg-topbar-terminal"
+              className="hd-topbar-terminal"
               aria-pressed={terminal.open}
               onClick={() =>
                 setTerminal((current) =>
@@ -814,7 +814,7 @@ export function OperatorShell({
               Studio has no address for a table or a row, so it opens whole
               and you find the application inside it. */}
           {process.env.NODE_ENV === "development" && applicationId && (
-            <span className="sg-topbar-debug">
+            <span className="hd-topbar-debug">
               {activeChat && (
                 <a
                   href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}
@@ -856,7 +856,7 @@ export function OperatorShell({
           onReveal={setStackRevealed}
         />
         <section
-          className={`sg-workspace${recordVisible ? " sg-dashboard-open" : ""}`}
+          className={`hd-workspace${recordVisible ? " hd-dashboard-open" : ""}`}
         >
           {activeSection && (
             <ApplicationSectionView
@@ -872,10 +872,10 @@ export function OperatorShell({
               onOpenConversation={openConversation}
               onAsk={askInConversation}
               bar={
-                <div className="sg-view-bar">
+                <div className="hd-view-bar">
                   <button
                     type="button"
-                    className="sg-view-back"
+                    className="hd-view-back"
                     onClick={closeSection}
                   >
                     <ArrowLeft aria-hidden="true" />
@@ -885,7 +885,7 @@ export function OperatorShell({
                     !featured.destinations.includes(activeSection) && (
                       <button
                         type="button"
-                        className="sg-suggest"
+                        className="hd-suggest"
                         onClick={() => selectSection(featured.destinations[0])}
                       >
                         Haldur is in {labelOf(featured.destinations[0])} · show
@@ -904,13 +904,13 @@ export function OperatorShell({
             </ApplicationSectionView>
           )}
           <div
-            className={`sg-chat-column${recordVisible ? " sg-chat-parked" : ""}`}
+            className={`hd-chat-column${recordVisible ? " hd-chat-parked" : ""}`}
             inert={recordVisible || undefined}
           >
             {application &&
               view.repository &&
               view.repository.status !== "passed" && (
-                <div className="sg-repository-notice" role="status">
+                <div className="hd-repository-notice" role="status">
                   <p>
                     <strong>Repository access:</strong> {view.repository.result}
                   </p>

@@ -73,7 +73,7 @@ export function ProcessesPage({
     return (
       <div className="ax-root" data-variant="line">
         {head}
-        <div className="sg-deploy-none">
+        <div className="hd-deploy-none">
           <h2>Nothing here has been looked at yet.</h2>
           <p>
             No record names a process for this application. That is not a claim
@@ -86,7 +86,7 @@ export function ProcessesPage({
           </p>
           <button
             type="button"
-            className="sg-primary-button"
+            className="hd-primary-button"
             onClick={() =>
               onAsk(
                 "What processes is this application running, and is each one healthy right now?",

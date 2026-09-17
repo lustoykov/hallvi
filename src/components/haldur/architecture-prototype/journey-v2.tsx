@@ -66,7 +66,7 @@ import { TactileSlider } from "./tactile-slider";
 import "./journey-v2.css";
 
 /** Session key: a part another page asked Architecture to open. */
-export const ARCHITECTURE_FOCUS = "sg-prototype:architecture-focus";
+export const ARCHITECTURE_FOCUS = "hd-prototype:architecture-focus";
 
 const W = 1120;
 /**

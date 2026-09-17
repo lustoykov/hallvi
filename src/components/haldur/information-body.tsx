@@ -26,7 +26,7 @@ export function InformationBody({ source }: { source: string }) {
   return (
     <>
       <div
-        className="sg-info-body"
+        className="hd-info-body"
         ref={body}
         data-folded={open ? undefined : ""}
       >
@@ -35,7 +35,7 @@ export function InformationBody({ source }: { source: string }) {
       {long && (
         <button
           type="button"
-          className="sg-info-unfold"
+          className="hd-info-unfold"
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >

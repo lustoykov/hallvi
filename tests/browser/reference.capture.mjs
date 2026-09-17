@@ -33,7 +33,7 @@ async function shot(name, options = {}) {
 async function open(query, ready) {
   await page.goto(`${base}/prototype/app?${query}`);
   if (ready) await page.getByRole(ready.role, ready).first().waitFor();
-  else await page.waitForSelector(".sg-adaptive-shell");
+  else await page.waitForSelector(".hd-adaptive-shell");
 }
 const nav = () =>
   page.getByRole("navigation", { name: "Application workspace" });

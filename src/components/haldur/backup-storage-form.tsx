@@ -8,7 +8,7 @@ import { useState } from "react";
  */
 export function BackupStorageForm({
   onConnected,
-  className = "sg-op-approval",
+  className = "hd-op-approval",
 }: {
   onConnected?: () => Promise<void>;
   /** The surrounding surface. Backups and Settings host the same form. */
@@ -66,7 +66,7 @@ export function BackupStorageForm({
       }}
     >
       <strong>Connect backup storage</strong>
-      <p className="sg-section-note">
+      <p className="hd-section-note">
         One Cloudflare R2 or Amazon S3 bucket with an access key limited to it.
         The key is stored on this controller and copied only to the application
         host that uploads the backups.
@@ -92,11 +92,11 @@ export function BackupStorageForm({
       {field("accessKeyId", "Access key ID")}
       {field("secretAccessKey", "Secret access key", true)}
       {error && (
-        <p role="alert" className="sg-deployment-error">
+        <p role="alert" className="hd-deployment-error">
           {error}
         </p>
       )}
-      <button type="submit" className="sg-primary-button" disabled={saving}>
+      <button type="submit" className="hd-primary-button" disabled={saving}>
         {saving ? "Connecting…" : "Connect storage"}
       </button>
     </form>

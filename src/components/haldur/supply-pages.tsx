@@ -179,12 +179,12 @@ function Nothing({
   };
   const said = copy[page];
   return (
-    <div className="sg-deploy-none">
+    <div className="hd-deploy-none">
       <h2>{said.title}</h2>
       <p>{said.body}</p>
       <button
         type="button"
-        className="sg-primary-button"
+        className="hd-primary-button"
         onClick={() => onAsk(said.draft)}
       >
         {said.button}

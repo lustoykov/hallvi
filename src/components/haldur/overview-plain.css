@@ -3,13 +3,13 @@
    the app's plain voice, so an application nobody has looked at is still a
    page rather than a shrug. */
 
-.sg-overview-plain {
+.hd-overview-plain {
   display: grid;
   gap: 26px;
   max-width: 74ch;
   padding: 4px 0 0;
 }
-.sg-overview-condition {
+.hd-overview-condition {
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -18,7 +18,7 @@
   font-size: 14px;
   line-height: 1.7;
 }
-.sg-overview-plain h2 {
+.hd-overview-plain h2 {
   margin: 0 0 12px;
   color: var(--muted, #687183);
   font-size: 11.5px;
@@ -26,26 +26,26 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.sg-overview-plain p {
+.hd-overview-plain p {
   margin: 0 0 14px;
   color: var(--ink-2, #3e4a60);
   font-size: 14px;
   line-height: 1.7;
   text-wrap: pretty;
 }
-.sg-overview-plain ul {
+.hd-overview-plain ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 /* The four lanes, as rows you can open. */
-.sg-overview-vitals {
+.hd-overview-vitals {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 8px;
 }
-.sg-overview-vitals button {
+.hd-overview-vitals button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
@@ -59,48 +59,48 @@
   text-align: left;
   cursor: pointer;
 }
-.sg-overview-vitals button:hover {
+.hd-overview-vitals button:hover {
   border-color: #c3ccdb;
   background: var(--context, #fafbfc);
 }
-.sg-overview-vitals b {
+.hd-overview-vitals b {
   grid-column: 2;
   color: var(--ink, #202838);
   font-size: 13.5px;
   font-weight: 600;
 }
-.sg-overview-vitals span {
+.hd-overview-vitals span {
   grid-column: 2;
   color: var(--muted, #687183);
   font-size: 12.5px;
   line-height: 1.5;
 }
-.sg-overview-vitals .sg-tag {
+.hd-overview-vitals .hd-tag {
   grid-row: 1 / span 2;
   justify-self: start;
 }
 
 /* What wants you, when anything does. */
-.sg-overview-plain li[data-tone] {
+.hd-overview-plain li[data-tone] {
   display: grid;
   gap: 3px;
   padding: 11px 0 11px 13px;
   border-left: 3px solid var(--failed, #a6312b);
   margin-bottom: 8px;
 }
-.sg-overview-plain li[data-tone="waiting"] {
+.hd-overview-plain li[data-tone="waiting"] {
   border-left-color: var(--waiting-text, #9a4b10);
 }
-.sg-overview-plain li[data-tone] b {
+.hd-overview-plain li[data-tone] b {
   color: var(--ink, #202838);
   font-size: 13.5px;
 }
-.sg-overview-plain li[data-tone] span {
+.hd-overview-plain li[data-tone] span {
   color: var(--ink-2, #3e4a60);
   font-size: 13px;
   line-height: 1.6;
 }
-.sg-overview-plain li[data-tone] button {
+.hd-overview-plain li[data-tone] button {
   justify-self: start;
   margin-top: 4px;
   padding: 0;
@@ -115,7 +115,7 @@
 }
 
 /* What happened, newest first. */
-.sg-overview-recent li {
+.hd-overview-recent li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -123,17 +123,17 @@
   padding: 7px 0;
   border-bottom: 1px solid var(--line, #e7e9ee);
 }
-.sg-overview-recent li:last-child {
+.hd-overview-recent li:last-child {
   border-bottom: 0;
 }
-.sg-overview-recent b {
+.hd-overview-recent b {
   min-width: 0;
   color: var(--ink-2, #3e4a60);
   font-size: 13px;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
-.sg-overview-recent span {
+.hd-overview-recent span {
   flex-shrink: 0;
   color: var(--faint, #8b95a5);
   font-size: 12px;

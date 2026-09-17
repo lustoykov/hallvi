@@ -116,7 +116,7 @@ export function NewApplicationScreen({
     <main className={s.page}>
       <header className={s.topbar}>
         <Link className={s.brand} href={applicationsHref}>
-          <span className="sg-app-mark">H</span>Haldur
+          <span className="hd-app-mark">H</span>Haldur
         </Link>
         <Link href={applicationsHref}>All applications</Link>
       </header>

@@ -158,7 +158,7 @@ export function PerimeterDirection({
   return (
     <div className="pm">
       {head}
-      <div className="sg-section-content">
+      <div className="hd-section-content">
         <header className="pm-head">
           <div>
             <h2>What is let in, and from where.</h2>

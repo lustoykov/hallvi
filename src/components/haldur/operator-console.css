@@ -1,7 +1,7 @@
-.sg-operator-console {
+.hd-operator-console {
   font-size: 13px;
 }
-.sg-operator-toolbar {
+.hd-operator-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -9,7 +9,7 @@
   padding: 12px 20px;
   border-bottom: 1px solid var(--border, #e6e6e6);
 }
-.sg-modes {
+.hd-modes {
   margin-left: auto;
   display: flex;
   gap: 10px;
@@ -17,14 +17,14 @@
   color: var(--muted);
   font-size: 12.5px;
 }
-.sg-modes [role="radiogroup"] {
+.hd-modes [role="radiogroup"] {
   display: inline-flex;
   padding: 2px;
   border-radius: 999px;
   background: #eceff5;
   box-shadow: inset 0 1px 2px rgb(23 34 56 / 10%);
 }
-.sg-modes button {
+.hd-modes button {
   padding: 4px 11px;
   border: 0;
   border-radius: 999px;
@@ -37,39 +37,39 @@
     background-color var(--base) var(--ease-out),
     color var(--base) var(--ease-out);
 }
-.sg-modes button:hover:not([aria-checked="true"]) {
+.hd-modes button:hover:not([aria-checked="true"]) {
   color: var(--ink-2);
 }
-.sg-modes button[aria-checked="true"] {
+.hd-modes button[aria-checked="true"] {
   background: #fff;
   color: var(--ink);
   box-shadow:
     0 1px 1px rgb(23 34 56 / 10%),
     inset 0 0 0 1px rgb(40 90 216 / 10%);
 }
-.sg-modes button[disabled] {
+.hd-modes button[disabled] {
   cursor: default;
 }
-.sg-execution {
+.hd-execution {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 14px;
   margin: 12px 0;
   background: #fff;
 }
-.sg-execution header {
+.hd-execution header {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 10px;
   margin-bottom: 10px;
 }
-.sg-execution header strong {
+.hd-execution header strong {
   font-size: 13px;
   font-weight: 620;
   color: var(--ink);
 }
-.sg-execution-where {
+.hd-execution-where {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--faint);
@@ -77,19 +77,19 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.sg-execution-state {
+.hd-execution-state {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   flex-shrink: 0;
 }
-.sg-execution-state em {
+.hd-execution-state em {
   color: var(--faint);
   font-family: var(--mono);
   font-size: 11.5px;
   font-style: normal;
 }
-.sg-execution pre {
+.hd-execution pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 320px;
@@ -100,39 +100,39 @@
   font-size: 12px;
   margin-top: 8px;
 }
-.sg-execution.awaiting-approval {
+.hd-execution.awaiting-approval {
   border-color: var(--waiting-line);
   background: var(--waiting-bg);
 }
-.sg-execution.failed,
-.sg-execution.interrupted {
+.hd-execution.failed,
+.hd-execution.interrupted {
   border-color: var(--failed-line);
 }
-.sg-execution-actions {
+.hd-execution-actions {
   display: flex;
   gap: 8px;
   margin-top: 12px;
 }
 
-.sg-execution .sg-stream {
+.hd-execution .hd-stream {
   padding: 0;
   border: 0;
   background: transparent;
 }
-.sg-stream > summary {
+.hd-stream > summary {
   cursor: pointer;
   padding: 6px 0;
   color: var(--link);
   width: fit-content;
 }
-.sg-stream-terminal {
+.hd-stream-terminal {
   margin-top: 8px;
   overflow: hidden;
   border-radius: 7px;
   background: var(--ink);
   color: #f7f8fa;
 }
-.sg-stream pre {
+.hd-stream pre {
   margin: 0;
   padding: 12px 14px;
   border-radius: 0;
@@ -147,7 +147,7 @@
 }
 /* What ran, as one line of caption above its output. Not a pane: no scroll,
    no height of its own, nothing that competes with the output below it. */
-.sg-stream-ran {
+.hd-stream-ran {
   display: flex;
   gap: 8px;
   align-items: baseline;
@@ -157,7 +157,7 @@
   font-size: 12px;
   line-height: 1.5;
 }
-.sg-stream-ran > code {
+.hd-stream-ran > code {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -165,11 +165,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sg-stream-prompt {
+.hd-stream-prompt {
   flex: none;
   color: #8792a6;
 }
-.sg-stream-more {
+.hd-stream-more {
   flex: none;
   padding: 2px 8px;
   border: 1px solid #687183;
@@ -180,27 +180,27 @@
   font: inherit;
   white-space: nowrap;
 }
-.sg-stream-more:hover {
+.hd-stream-more:hover {
   background: #39465d;
 }
 /* The whole script, only once it has been asked for. */
-.sg-stream .sg-stream-command {
+.hd-stream .hd-stream-command {
   max-height: 220px;
   overflow: auto;
   border-bottom: 1px solid #475267;
   background: #171e2b;
   color: #b8ceff;
 }
-.sg-stream .sg-stream-output {
+.hd-stream .hd-stream-output {
   min-height: 120px;
   max-height: 320px;
   overflow: auto;
   overflow-anchor: none;
 }
-.sg-stream-empty {
+.hd-stream-empty {
   color: #bec6d4;
 }
-.sg-stream-controls {
+.hd-stream-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
@@ -209,7 +209,7 @@
   border-top: 1px solid #475267;
   font-size: 12px;
 }
-.sg-stream-controls button {
+.hd-stream-controls button {
   min-height: 32px;
   padding: 4px 8px;
   border: 1px solid #687183;
@@ -219,31 +219,31 @@
   cursor: pointer;
   font: inherit;
 }
-.sg-stream-controls button:hover {
+.hd-stream-controls button:hover {
   background: #39465d;
 }
-.sg-stream-controls button[aria-pressed="true"] {
+.hd-stream-controls button[aria-pressed="true"] {
   color: #b8ceff;
   border-color: #8aaaf0;
 }
-.sg-stream-controls span {
+.hd-stream-controls span {
   color: #bec6d4;
 }
 /* The clock sits away from the buttons: it is read, not pressed. */
-.sg-stream-pulse {
+.hd-stream-pulse {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
-.sg-stream :focus-visible {
+.hd-stream :focus-visible {
   outline: 2px solid #8aaaf0;
   outline-offset: -2px;
 }
-.sg-stream ::selection {
+.hd-stream ::selection {
   background: #b8ceff;
   color: #202838;
 }
 @media (max-width: 600px) {
-  .sg-stream .sg-stream-output {
+  .hd-stream .hd-stream-output {
     max-height: 180px;
   }
 }
@@ -254,22 +254,22 @@
    exactly like a view filter. Bypass is not an error and does not get the
    failure colour; it is the one mode where nothing will stop to ask, and it
    is marked so that reading the header tells you so. */
-.sg-modes-means {
+.hd-modes-means {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   color: var(--muted);
   font-size: 12.5px;
 }
-.sg-modes-means[data-loud] {
+.hd-modes-means[data-loud] {
   color: var(--waiting-text, #9a4b10);
   font-weight: 560;
 }
-.sg-modes-means svg {
+.hd-modes-means svg {
   font-size: 12px;
 }
 @media (max-width: 1100px) {
-  .sg-modes-means {
+  .hd-modes-means {
     display: none;
   }
 }
@@ -280,19 +280,19 @@
    buttons. What it wants to do goes first, the command's own first line goes
    next so it can be read without opening anything, and the full payload waits
    behind the disclosure. */
-.sg-ask {
+.hd-ask {
   display: grid;
   gap: 7px;
   margin: 2px 0 10px;
 }
-.sg-ask-what {
+.hd-ask-what {
   margin: 0;
   color: var(--ink);
   font-size: 13.5px;
   font-weight: 560;
   line-height: 1.5;
 }
-.sg-ask-command {
+.hd-ask-command {
   display: block;
   overflow-x: auto;
   padding: 9px 11px;
@@ -311,7 +311,7 @@
   line-height: 1.5;
   white-space: pre;
 }
-.sg-ask-safe {
+.hd-ask-safe {
   margin: 0;
   color: var(--muted);
   font-size: 12.5px;

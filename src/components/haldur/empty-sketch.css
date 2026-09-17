@@ -61,27 +61,27 @@
 }
 
 /* Beside an empty destination's words, when there is room. */
-.sg-deploy-none:has(> .sgk) {
+.hd-deploy-none:has(> .sgk) {
   display: grid;
   grid-template-columns: minmax(0, 62ch) minmax(240px, 360px);
   align-items: center;
   gap: 8px 48px;
   max-width: none;
 }
-.sg-deploy-none:has(> .sgk) > * {
+.hd-deploy-none:has(> .sgk) > * {
   grid-column: 1;
   justify-self: start;
 }
-.sg-deploy-none:has(> .sgk) > .sgk {
+.hd-deploy-none:has(> .sgk) > .sgk {
   grid-column: 2;
   grid-row: 1 / span 6;
   justify-self: stretch;
 }
 @media (max-width: 1000px) {
-  .sg-deploy-none:has(> .sgk) {
+  .hd-deploy-none:has(> .sgk) {
     grid-template-columns: minmax(0, 1fr);
   }
-  .sg-deploy-none:has(> .sgk) > .sgk {
+  .hd-deploy-none:has(> .sgk) > .sgk {
     grid-column: 1;
     grid-row: auto;
     max-width: 360px;

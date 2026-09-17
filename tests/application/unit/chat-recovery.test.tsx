@@ -139,7 +139,7 @@ describe("conversation recovery and assistant branding", () => {
       "The turn ended before it finished, and no command recorded why.",
     );
     expect(html).toMatch(
-      /<details class="sg-run-draft"><summary>Show unfinished draft<\/summary>/,
+      /<details class="hd-run-draft"><summary>Show unfinished draft<\/summary>/,
     );
     expect(html).toContain("Saved: hosting budget €30/month.");
     expect(html).not.toContain("Commit failed");

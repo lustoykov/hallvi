@@ -1,7 +1,7 @@
 /* Operator workspace: the application shell, its conversation and the
    destination views. Tokens live in globals.css. */
 
-.sg-shell {
+.hd-shell {
   height: 100vh;
   min-width: 1060px;
   overflow: hidden;
@@ -14,7 +14,7 @@
 
 /* ---------- Top bar: identity, quiet context, Settings ---------- */
 
-.sg-topbar {
+.hd-topbar {
   height: 52px;
   padding: 0 14px;
   display: flex;
@@ -24,20 +24,20 @@
   background: var(--navy);
   color: #fff;
 }
-.sg-app-identity {
+.hd-app-identity {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
-.sg-brand {
+.hd-brand {
   display: inline-flex;
   margin-right: 6px;
   border-radius: 8px;
   color: #fff;
   text-decoration: none;
 }
-.sg-app-mark {
+.hd-app-mark {
   width: 32px;
   height: 32px;
   border: 1px solid rgb(255 255 255 / 24%);
@@ -49,7 +49,7 @@
 }
 /* The application name opens the switcher; its repository sits beneath.
    No select-box chrome at rest. */
-.sg-application-picker {
+.hd-application-picker {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -65,12 +65,12 @@
     background-color var(--fast) var(--ease),
     border-color var(--fast) var(--ease);
 }
-.sg-application-picker > span {
+.hd-application-picker > span {
   display: grid;
   min-width: 0;
   text-align: left;
 }
-.sg-application-picker strong {
+.hd-application-picker strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -79,7 +79,7 @@
   line-height: 1.2;
   letter-spacing: -0.01em;
 }
-.sg-application-picker small {
+.hd-application-picker small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -87,36 +87,36 @@
   font-size: 11.5px;
   line-height: 1.3;
 }
-.sg-application-picker svg {
+.hd-application-picker svg {
   flex-shrink: 0;
   width: 13px;
   height: 13px;
   color: #aeb8ca;
   transition: transform var(--fast) var(--ease);
 }
-.sg-application-picker:hover {
+.hd-application-picker:hover {
   background: rgb(255 255 255 / 8%);
 }
-.sg-application-picker:has(~ .sg-application-menu:popover-open) {
+.hd-application-picker:has(~ .hd-application-menu:popover-open) {
   background: rgb(255 255 255 / 10%);
   border-color: rgb(255 255 255 / 14%);
 }
-.sg-application-picker:has(~ .sg-application-menu:popover-open) svg {
+.hd-application-picker:has(~ .hd-application-menu:popover-open) svg {
   transform: rotate(180deg);
 }
-.sg-application-picker:disabled {
+.hd-application-picker:disabled {
   opacity: 0.65;
   cursor: wait;
 }
-.sg-application-picker:focus-visible,
-.sg-brand:focus-visible,
-.sg-settings-link:focus-visible {
+.hd-application-picker:focus-visible,
+.hd-brand:focus-visible,
+.hd-settings-link:focus-visible {
   outline: 2px solid #b1c8ff;
   outline-offset: 3px;
 }
 /* Top-layer menu: the picker positions it on open (positionApplicationMenu);
    the inset below is only a fallback. */
-.sg-application-menu {
+.hd-application-menu {
   position: fixed;
   inset: 52px auto auto 60px;
   width: 320px;
@@ -136,17 +136,17 @@
     transform 140ms var(--ease);
 }
 @starting-style {
-  .sg-application-menu:popover-open {
+  .hd-application-menu:popover-open {
     opacity: 0;
     transform: translateY(-4px);
   }
 }
-.sg-application-menu .sg-application-menu-label {
+.hd-application-menu .hd-application-menu-label {
   display: block;
   padding: 8px 10px 6px;
 }
-.sg-application-menu a,
-.sg-application-menu button {
+.hd-application-menu a,
+.hd-application-menu button {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
@@ -164,37 +164,37 @@
   line-height: 1.35;
   transition: background-color var(--fast) var(--ease);
 }
-.sg-application-menu a:hover,
-.sg-application-menu button:hover {
+.hd-application-menu a:hover,
+.hd-application-menu button:hover {
   background: #f1f4f9;
 }
-.sg-application-menu :is(a, button):focus-visible {
+.hd-application-menu :is(a, button):focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: -2px;
 }
-.sg-application-menu a[aria-current] {
+.hd-application-menu a[aria-current] {
   background: var(--blue-soft);
 }
-.sg-application-menu a div {
+.hd-application-menu a div {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
-.sg-application-menu a strong {
+.hd-application-menu a strong {
   font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sg-application-menu small {
+.hd-application-menu small {
   color: var(--muted);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sg-application-menu-mark {
+.hd-application-menu-mark {
   width: 22px;
   height: 22px;
   display: grid;
@@ -204,32 +204,32 @@
   color: #fff;
   font: 600 11px var(--mono);
 }
-.sg-application-menu :is(a, button) > svg {
+.hd-application-menu :is(a, button) > svg {
   width: 15px;
   height: 15px;
   justify-self: center;
   color: #53617a;
 }
-.sg-application-menu a[aria-current] > svg {
+.hd-application-menu a[aria-current] > svg {
   color: var(--blue);
 }
-.sg-application-menu hr {
+.hd-application-menu hr {
   margin: 6px 4px;
   border: 0;
   border-top: 1px solid #e3e8f0;
 }
-.sg-application-menu .sg-remove-application {
+.hd-application-menu .hd-remove-application {
   color: var(--red);
 }
-.sg-application-menu .sg-remove-application > svg {
+.hd-application-menu .hd-remove-application > svg {
   color: inherit;
 }
-.sg-application-menu .sg-remove-application:hover {
+.hd-application-menu .hd-remove-application:hover {
   background: var(--red-soft);
 }
 
 /* Settings names the connection it needs in words; no colour-only dot. */
-.sg-settings-link {
+.hd-settings-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -247,19 +247,19 @@
     background-color var(--fast) var(--ease),
     border-color var(--fast) var(--ease);
 }
-.sg-settings-link svg {
+.hd-settings-link svg {
   width: 15px;
   height: 15px;
   color: #aeb8ca;
   flex: none;
 }
-.sg-settings-link:hover {
+.hd-settings-link:hover {
   border-color: rgb(255 255 255 / 30%);
   background: var(--navy-2);
 }
 
 /* Section labels for record views and menus. */
-.sg-eyebrow {
+.hd-eyebrow {
   font-size: 11px;
   font-weight: 600;
   line-height: 1.3;
@@ -270,25 +270,25 @@
 
 /* ---------- Workspace columns ---------- */
 
-.sg-workspace {
+.hd-workspace {
   min-height: 0;
   display: grid;
   grid-template-columns: 220px minmax(380px, 1fr) 400px;
 }
-.sg-chat-pane {
+.hd-chat-pane {
   min-height: 0;
   min-width: 0;
 }
 
 /* ---------- Chat ---------- */
 
-.sg-chat-pane {
+.hd-chat-pane {
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: #fff;
 }
-.sg-pane-title {
+.hd-pane-title {
   min-height: 56px;
   padding: 10px 24px;
   border-bottom: 1px solid var(--line);
@@ -297,12 +297,12 @@
   justify-content: space-between;
   gap: 16px;
 }
-.sg-pane-title > div {
+.hd-pane-title > div {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
-.sg-pane-title strong {
+.hd-pane-title strong {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -310,15 +310,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sg-pane-title span {
+.hd-pane-title span {
   font-size: 12px;
   color: var(--muted);
 }
-.sg-pane-title span.ready {
+.hd-pane-title span.ready {
   color: var(--green-text);
 }
 /* Indeterminate progress under the chat header while a request runs. */
-.sg-busy-bar {
+.hd-busy-bar {
   position: absolute;
   z-index: 2;
   top: 55px;
@@ -328,16 +328,16 @@
   overflow: hidden;
   pointer-events: none;
 }
-.sg-busy-bar::after {
+.hd-busy-bar::after {
   content: "";
   position: absolute;
   inset: 0;
   width: 40%;
   border-radius: 2px;
   background: var(--blue);
-  animation: sg-busy 1.1s var(--ease) infinite;
+  animation: hd-busy 1.1s var(--ease) infinite;
 }
-@keyframes sg-busy {
+@keyframes hd-busy {
   from {
     transform: translateX(-100%);
   }
@@ -345,7 +345,7 @@
     transform: translateX(260%);
   }
 }
-.sg-text-button {
+.hd-text-button {
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -359,22 +359,22 @@
   cursor: pointer;
   transition: background-color var(--fast) var(--ease);
 }
-.sg-text-button:hover:not(:disabled) {
+.hd-text-button:hover:not(:disabled) {
   background: var(--blue-soft);
 }
-.sg-text-button:disabled {
+.hd-text-button:disabled {
   color: var(--muted);
   cursor: not-allowed;
 }
-.sg-text-button svg {
+.hd-text-button svg {
   width: 14px;
 }
-.sg-conversation {
+.hd-conversation {
   position: relative;
   min-height: 0;
   overflow-y: auto;
 }
-.sg-messages {
+.hd-messages {
   max-width: 780px;
   width: 100%;
   margin: 0 auto;
@@ -383,23 +383,23 @@
   flex-direction: column;
   gap: 22px;
 }
-.sg-message {
+.hd-message {
   width: 100%;
   max-width: 92%;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.sg-message-user {
+.hd-message-user {
   margin-left: auto;
   align-items: flex-end;
 }
-.sg-message-heading {
+.hd-message-heading {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.sg-avatar {
+.hd-avatar {
   width: 22px;
   height: 22px;
   display: grid;
@@ -409,20 +409,20 @@
   color: #fff;
   font: 600 9px var(--mono);
 }
-.sg-avatar.user {
+.hd-avatar.user {
   background: var(--blue);
   font-size: 8px;
 }
-.sg-message-heading strong {
+.hd-message-heading strong {
   font-size: 12px;
   font-weight: 600;
 }
-.sg-message-heading time {
+.hd-message-heading time {
   color: var(--muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.sg-source-tag {
+.hd-source-tag {
   border-radius: 5px;
   padding: 2px 6px;
   background: #eef1f6;
@@ -430,76 +430,76 @@
   font-size: 11px;
   font-weight: 500;
 }
-.sg-message-content {
+.hd-message-content {
   min-width: 0;
   max-width: 100%;
   color: var(--ink);
   font-size: 14px;
   line-height: 1.55;
 }
-.sg-message-user .sg-message-content {
+.hd-message-user .hd-message-content {
   margin-left: auto;
   padding: 10px 14px;
   border-radius: 12px 12px 4px 12px;
   background: var(--blue-soft);
 }
-.sg-message-response {
+.hd-message-response {
   overflow-wrap: anywhere;
 }
-.sg-message-response > :first-child {
+.hd-message-response > :first-child {
   margin-top: 0;
 }
-.sg-message-response > :last-child {
+.hd-message-response > :last-child {
   margin-bottom: 0;
 }
-.sg-message-response p,
-.sg-message-response ul,
-.sg-message-response ol,
-.sg-message-response blockquote,
-.sg-message-response pre {
+.hd-message-response p,
+.hd-message-response ul,
+.hd-message-response ol,
+.hd-message-response blockquote,
+.hd-message-response pre {
   margin: 0 0 10px;
 }
-.sg-message-response .sg-md-heading {
+.hd-message-response .hd-md-heading {
   margin-top: 14px;
 }
-.sg-message-response ul,
-.sg-message-response ol {
+.hd-message-response ul,
+.hd-message-response ol {
   padding-left: 22px;
 }
-.sg-message-response li {
+.hd-message-response li {
   margin: 3px 0;
 }
-.sg-message-response li::marker {
+.hd-message-response li::marker {
   color: var(--muted);
 }
-.sg-message-response code {
+.hd-message-response code {
   padding: 1px 5px;
   border-radius: 4px;
   background: #eef1f6;
   color: #2c3852;
   font: 12.5px/1.45 var(--mono);
 }
-.sg-message-user .sg-message-response code {
+.hd-message-user .hd-message-response code {
   background: rgb(40 90 216 / 10%);
 }
-.sg-message-response pre {
+.hd-message-response pre {
   padding: 12px 14px;
   border: 1px solid var(--line-2);
   border-radius: var(--radius);
   background: #f3f5f9;
   overflow-x: auto;
 }
-.sg-message-response pre code {
+.hd-message-response pre code {
   padding: 0;
   background: none;
   white-space: pre;
 }
-.sg-message-response blockquote {
+.hd-message-response blockquote {
   padding: 2px 0 2px 12px;
   border-left: 2px solid #c9d4e4;
   color: var(--ink-2);
 }
-.sg-message-response a {
+.hd-message-response a {
   color: var(--blue-text);
   text-underline-offset: 3px;
 }
@@ -511,7 +511,7 @@
    side of it — the control belongs there, where it can be reached without
    covering a word. It also says what it does now; an unlabelled circle
    floating over prose is a guess. */
-.sg-conversation-scroll {
+.hd-conversation-scroll {
   position: absolute;
   right: 24px;
   bottom: 16px;
@@ -532,56 +532,56 @@
     color 120ms ease,
     border-color 120ms ease;
 }
-.sg-conversation-scroll:hover {
+.hd-conversation-scroll:hover {
   color: var(--blue, #285ad8);
   border-color: #cad4e4;
 }
-.sg-conversation-scroll svg {
+.hd-conversation-scroll svg {
   width: 13px;
   height: 13px;
 }
-.sg-reply-pending {
+.hd-reply-pending {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--muted);
   font-size: 13px;
 }
-.sg-reply-pending svg {
+.hd-reply-pending svg {
   width: 15px;
 }
 /* What is still running, on the same measure as the composer under it.
    Quiet on purpose: this is Haldur working, not a problem. */
-.sg-still-working {
+.hd-still-working {
   display: flex;
   gap: 9px;
   align-items: center;
-  width: min(100%, var(--sg-measure, 760px));
+  width: min(100%, var(--hd-measure, 760px));
   margin: 0 auto 8px;
   padding: 7px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--sg-surface, #fff);
+  background: var(--hd-surface, #fff);
   color: var(--muted);
   font-size: 12.5px;
 }
-.sg-still-working svg {
+.hd-still-working svg {
   width: 13px;
   flex: none;
 }
-.sg-still-what {
+.hd-still-what {
   flex: 1;
   min-width: 0;
   display: flex;
   gap: 8px;
   align-items: baseline;
 }
-.sg-still-what small {
+.hd-still-what small {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
 }
-.sg-still-show {
+.hd-still-show {
   flex: none;
   padding: 3px 9px;
   border: 1px solid var(--line);
@@ -591,10 +591,10 @@
   cursor: pointer;
   font: inherit;
 }
-.sg-still-show:hover {
-  background: var(--sg-hover, rgba(25, 35, 56, 0.05));
+.hd-still-show:hover {
+  background: var(--hd-hover, rgba(25, 35, 56, 0.05));
 }
-.sg-error {
+.hd-error {
   padding: 10px 12px;
   border: 1px solid #efb9b5;
   border-radius: var(--radius);
@@ -606,7 +606,7 @@
 
 /* ---------- Durable replies: queued, streaming, failed ---------- */
 
-.sg-stream-notice {
+.hd-stream-notice {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -619,27 +619,27 @@
   font-size: 12px;
   line-height: 1.5;
 }
-.sg-stream-notice svg {
+.hd-stream-notice svg {
   width: 14px;
   flex: none;
   color: var(--amber);
 }
-.sg-source-tag.live {
+.hd-source-tag.live {
   background: var(--blue-soft);
   color: var(--blue-text);
 }
-.sg-source-tag.failed {
+.hd-source-tag.failed {
   background: var(--amber-soft);
   color: var(--amber-text);
 }
-.sg-run-progress {
+.hd-run-progress {
   display: grid;
   gap: 4px;
   overflow-wrap: anywhere;
 }
 /* While Pi works this is the whole announcement: a pulse, how long, and a
    quiet way to stop. It should read as a status line, not as an alert. */
-.sg-run-status {
+.hd-run-status {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -650,25 +650,25 @@
 }
 /* The elapsed time, set apart from the sentence. It is the half that moves,
    and a reader checking on a long turn is looking for whether it still is. */
-.sg-run-elapsed {
+.hd-run-elapsed {
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
 }
 /* A turn stopped on the reader is not a turn that is working. */
-.sg-run-status [data-waiting] {
+.hd-run-status [data-waiting] {
   color: var(--ink);
   font-weight: 500;
 }
-.sg-run-status svg {
+.hd-run-status svg {
   width: 12px;
   flex: none;
   color: var(--muted);
   opacity: 0.85;
-  animation: sg-run-pulse 1.6s ease-in-out infinite;
+  animation: hd-run-pulse 1.6s ease-in-out infinite;
 }
-@keyframes sg-run-pulse {
+@keyframes hd-run-pulse {
   0%,
   100% {
     opacity: 0.35;
@@ -678,14 +678,14 @@
   }
 }
 /* Stopping is available, never loud: a word, at the end of the status line. */
-.sg-run-progress:has(.sg-run-stop) {
+.hd-run-progress:has(.hd-run-stop) {
   grid-auto-flow: column;
   grid-template-columns: max-content max-content;
   justify-content: start;
   align-items: baseline;
   gap: 12px;
 }
-.sg-run-stop {
+.hd-run-stop {
   align-self: baseline;
   justify-self: start;
   margin: 0;
@@ -700,18 +700,18 @@
   text-underline-offset: 3px;
   text-decoration-color: var(--line-2, #d8dee8);
 }
-.sg-run-stop:hover {
+.hd-run-stop:hover {
   color: var(--ink, #202838);
 }
-.sg-run-stop[disabled] {
+.hd-run-stop[disabled] {
   opacity: 0.5;
   cursor: default;
 }
-.sg-message-failed .sg-run-status {
+.hd-message-failed .hd-run-status {
   color: var(--amber-text);
 }
 /* A caret at the end of a draft says "still writing" without any copy. */
-.sg-message-live .sg-message-response > :last-child::after {
+.hd-message-live .hd-message-response > :last-child::after {
   content: "";
   display: inline-block;
   width: 6px;
@@ -720,46 +720,46 @@
   border-radius: 1px;
   background: var(--blue);
   vertical-align: -2px;
-  animation: sg-blink 1s steps(2, jump-none) infinite;
+  animation: hd-blink 1s steps(2, jump-none) infinite;
 }
-@keyframes sg-blink {
+@keyframes hd-blink {
   to {
     opacity: 0;
   }
 }
-.sg-run-draft {
+.hd-run-draft {
   padding: 8px 12px;
   border: 1px dashed #c9d4e3;
   border-radius: var(--radius);
   color: var(--ink-2);
 }
-.sg-run-draft summary {
+.hd-run-draft summary {
   cursor: pointer;
   color: var(--blue-text);
   font-size: 12px;
   font-weight: 500;
 }
-.sg-run-draft[open] summary {
+.hd-run-draft[open] summary {
   margin-bottom: 8px;
 }
-.sg-run-action {
+.hd-run-action {
   justify-self: start;
   min-height: 30px;
   padding: 0 12px;
   font-size: 12px;
 }
-.sg-run-action svg {
+.hd-run-action svg {
   width: 13px;
 }
 
 /* ---------- Composer ---------- */
 
-.sg-composer {
+.hd-composer {
   padding: 12px 24px 16px;
   border-top: 1px solid var(--line);
   background: #fff;
 }
-.sg-composer-box {
+.hd-composer-box {
   border: 1px solid #c9d4e4;
   border-radius: 12px;
   background: #fff;
@@ -767,14 +767,14 @@
     border-color var(--fast) var(--ease),
     box-shadow var(--fast) var(--ease);
 }
-.sg-composer-box:focus-within {
+.hd-composer-box:focus-within {
   border-color: var(--blue);
   box-shadow: var(--ring);
 }
-.sg-composer-box.disabled {
+.hd-composer-box.disabled {
   background: var(--panel);
 }
-.sg-composer textarea {
+.hd-composer textarea {
   display: block;
   width: 100%;
   min-height: 44px;
@@ -789,30 +789,30 @@
   outline: none;
   field-sizing: content;
 }
-.sg-composer textarea::placeholder {
+.hd-composer textarea::placeholder {
   color: #6f7a90;
 }
-.sg-composer textarea:disabled {
+.hd-composer textarea:disabled {
   color: var(--muted);
   cursor: not-allowed;
 }
-.sg-composer-bar {
+.hd-composer-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 4px 8px 8px 14px;
 }
-.sg-composer-hint {
+.hd-composer-hint {
   color: var(--muted);
   font-size: 11px;
 }
-.sg-composer-hint kbd {
+.hd-composer-hint kbd {
   font: inherit;
   font-weight: 600;
   color: var(--ink-2);
 }
-.sg-send {
+.hd-send {
   min-width: 72px;
   height: 32px;
   padding: 0 12px;
@@ -831,23 +831,23 @@
     background-color var(--fast) var(--ease),
     transform var(--fast) var(--ease);
 }
-.sg-send svg {
+.hd-send svg {
   width: 14px;
   height: 14px;
 }
-.sg-send:hover:not(:disabled) {
+.hd-send:hover:not(:disabled) {
   background: var(--blue-hover);
 }
-.sg-send:active:not(:disabled) {
+.hd-send:active:not(:disabled) {
   transform: translateY(1px);
 }
-.sg-send:disabled {
+.hd-send:disabled {
   background: #dfe5ef;
   color: #7d889d;
   cursor: not-allowed;
 }
-.sg-archived-notice,
-.sg-pi-required {
+.hd-archived-notice,
+.hd-pi-required {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -860,32 +860,32 @@
   font-size: 13px;
   line-height: 1.5;
 }
-.sg-pi-required {
+.hd-pi-required {
   border-color: #e7c9a3;
   background: var(--amber-soft);
   color: var(--ink);
 }
-.sg-pi-required > svg {
+.hd-pi-required > svg {
   width: 18px;
   height: 18px;
   color: var(--amber);
   flex: none;
 }
-.sg-pi-required strong {
+.hd-pi-required strong {
   font-weight: 600;
 }
-.sg-pi-required p {
+.hd-pi-required p {
   margin: 0;
   color: #79563b;
   font-size: 12px;
 }
-.sg-pi-required code {
+.hd-pi-required code {
   padding: 1px 4px;
   border-radius: 4px;
   background: #f4e3cd;
   font-size: 11px;
 }
-.sg-pi-required a {
+.hd-pi-required a {
   margin-left: auto;
   color: #784112;
   font-weight: 600;
@@ -896,11 +896,11 @@
 /* Block flow, not a grid: sections keep their content height inside the
    scrolling column even though they clip horizontally. */
 
-.sg-check-list {
+.hd-check-list {
   display: grid;
   gap: 6px;
 }
-.sg-check {
+.hd-check {
   width: 100%;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto 12px;
@@ -917,16 +917,16 @@
     border-color var(--fast) var(--ease),
     box-shadow var(--fast) var(--ease);
 }
-.sg-check:hover {
+.hd-check:hover {
   border-color: #9eb6e7;
   box-shadow: var(--shadow-s);
 }
-.sg-check > svg {
+.hd-check > svg {
   width: 12px;
   color: #9aa6ba;
   justify-self: end;
 }
-.sg-check-icon {
+.hd-check-icon {
   width: 20px;
   height: 20px;
   display: grid;
@@ -935,40 +935,40 @@
   border-radius: 50%;
   color: #fff;
 }
-.sg-check-icon svg {
+.hd-check-icon svg {
   width: 11px;
 }
-.sg-check-icon.passed {
+.hd-check-icon.passed {
   border-color: var(--green);
   background: var(--green);
 }
-.sg-check-icon.blocked {
+.hd-check-icon.blocked {
   border-color: var(--amber);
   background: var(--amber);
 }
-.sg-check-copy {
+.hd-check-copy {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
-.sg-check-copy small {
+.hd-check-copy small {
   color: var(--muted);
   font-size: 11px;
   font-weight: 500;
 }
-.sg-check-copy strong {
+.hd-check-copy strong {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
 }
-.sg-check-result {
+.hd-check-result {
   color: var(--ink-2);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sg-check-status {
+.hd-check-status {
   align-self: start;
   margin-top: 1px;
   color: var(--muted);
@@ -976,14 +976,14 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.sg-check-status.passed {
+.hd-check-status.passed {
   color: var(--green-text);
 }
-.sg-check-status.blocked {
+.hd-check-status.blocked {
   color: var(--amber-text);
 }
 
-.sg-decision-list {
+.hd-decision-list {
   display: grid;
   border: 1px solid #d6dee9;
   border-radius: var(--radius);
@@ -991,7 +991,7 @@
   background: #fff;
 }
 
-.sg-decision-list a {
+.hd-decision-list a {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 14px;
   gap: 3px 8px;
@@ -1002,55 +1002,55 @@
   border-bottom: 1px solid var(--line-2);
   transition: background-color var(--fast) var(--ease);
 }
-.sg-decision-list a:hover {
+.hd-decision-list a:hover {
   background: #f6f8fb;
 }
-.sg-decision-list a:last-child {
+.hd-decision-list a:last-child {
   border-bottom: 0;
 }
-.sg-decision-list strong {
+.hd-decision-list strong {
   grid-column: 1;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
-.sg-decision-list svg {
+.hd-decision-list svg {
   grid-column: 2;
   grid-row: 1;
   width: 13px;
   color: var(--muted);
 }
 
-.sg-receipt {
+.hd-receipt {
   border: 1px solid #d4dde9;
   border-radius: var(--radius);
   padding: 12px;
   background: #fff;
 }
-.sg-receipt > div:first-child {
+.hd-receipt > div:first-child {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.sg-receipt > div:first-child > svg {
+.hd-receipt > div:first-child > svg {
   width: 18px;
   color: var(--ink-2);
 }
-.sg-receipt > div:first-child span {
+.hd-receipt > div:first-child span {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
-.sg-receipt strong {
+.hd-receipt strong {
   font-size: 13px;
   font-weight: 600;
 }
-.sg-receipt small {
+.hd-receipt small {
   color: var(--muted);
   font-size: 11px;
 }
-.sg-receipt em {
+.hd-receipt em {
   margin-left: auto;
   font-size: 11px;
   font-weight: 600;
@@ -1058,16 +1058,16 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.sg-receipt em.passed {
+.hd-receipt em.passed {
   color: var(--green-text);
 }
-.sg-receipt em.failed {
+.hd-receipt em.failed {
   color: var(--amber-text);
 }
-.sg-receipt em.unavailable {
+.hd-receipt em.unavailable {
   color: var(--muted);
 }
-.sg-receipt p {
+.hd-receipt p {
   margin: 8px 0;
   color: var(--ink-2);
   font-size: 12px;
@@ -1076,8 +1076,8 @@
 
 /* ---------- Buttons ---------- */
 
-.sg-primary-button,
-.sg-secondary-button {
+.hd-primary-button,
+.hd-secondary-button {
   min-height: 36px;
   padding: 0 14px;
   border-radius: var(--radius);
@@ -1095,24 +1095,24 @@
     background-color var(--fast) var(--ease),
     border-color var(--fast) var(--ease);
 }
-.sg-primary-button:disabled {
+.hd-primary-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.sg-primary-button svg,
-.sg-secondary-button svg {
+.hd-primary-button svg,
+.hd-secondary-button svg {
   width: 15px;
 }
-.sg-secondary-button {
+.hd-secondary-button {
   border-color: #c9d4e3;
   background: #fff;
   color: var(--ink);
 }
-.sg-primary-button:hover:not(:disabled) {
+.hd-primary-button:hover:not(:disabled) {
   background: var(--blue-hover);
   border-color: var(--blue-hover);
 }
-.sg-secondary-button:hover:not(:disabled) {
+.hd-secondary-button:hover:not(:disabled) {
   background: #f4f7fb;
   border-color: #b4c2d6;
 }
@@ -1121,41 +1121,41 @@
    once, from the edge it belongs to. */
 
 @starting-style {
-  .sg-drawer-layer[open]::backdrop {
+  .hd-drawer-layer[open]::backdrop {
     background: rgb(19 29 48 / 0%);
   }
-  .sg-drawer-layer[open] .sg-detail-drawer {
+  .hd-drawer-layer[open] .hd-detail-drawer {
     transform: translateX(40px);
     opacity: 0;
   }
 }
 
 .spin {
-  animation: sg-spin 0.8s linear infinite;
+  animation: hd-spin 0.8s linear infinite;
 }
-@keyframes sg-spin {
+@keyframes hd-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
 @media (max-width: 1280px) {
-  .sg-workspace {
+  .hd-workspace {
     grid-template-columns: 190px minmax(360px, 1fr) 360px;
   }
-  .sg-messages {
+  .hd-messages {
     padding-inline: 20px;
   }
 }
 
 /* ---------- Settings and list pages share the top bar ---------- */
 
-.sg-setup-shell {
+.hd-setup-shell {
   min-height: 100vh;
   color: var(--ink);
   background: var(--canvas);
 }
-.sg-setup-topbar {
+.hd-setup-topbar {
   height: 56px;
   padding: 0 20px;
   display: flex;
@@ -1164,19 +1164,19 @@
   background: var(--navy);
   color: #fff;
 }
-.sg-setup-brand,
-.sg-setup-back {
+.hd-setup-brand,
+.hd-setup-back {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   color: inherit;
   text-decoration: none;
 }
-.sg-setup-brand {
+.hd-setup-brand {
   font-size: 14px;
   font-weight: 600;
 }
-.sg-setup-back {
+.hd-setup-back {
   padding: 6px 8px;
   border-radius: 6px;
   color: #cad3e3;
@@ -1185,33 +1185,33 @@
     color var(--fast) var(--ease),
     background-color var(--fast) var(--ease);
 }
-.sg-setup-back:hover {
+.hd-setup-back:hover {
   color: #fff;
   background: rgb(255 255 255 / 8%);
 }
-.sg-setup-back svg {
+.hd-setup-back svg {
   width: 15px;
 }
 
 @media (max-width: 540px) {
-  .sg-setup-topbar {
+  .hd-setup-topbar {
     padding: 0 15px;
   }
-  .sg-setup-brand > span:last-child {
+  .hd-setup-brand > span:last-child {
     display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sg-setup-shell *,
-  .sg-setup-shell *::before,
-  .sg-setup-shell *::after {
+  .hd-setup-shell *,
+  .hd-setup-shell *::before,
+  .hd-setup-shell *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
   }
-  .sg-application-menu,
-  .sg-application-picker svg,
-  .sg-busy-bar::after {
+  .hd-application-menu,
+  .hd-application-picker svg,
+  .hd-busy-bar::after {
     transition: none;
     animation: none;
   }
@@ -1219,32 +1219,32 @@
 
 /* ---------- Transcript: requests Haldur started ---------- */
 
-.sg-message-request {
+.hd-message-request {
   opacity: 0.92;
 }
 
 /* ---------- Reply cards: a request's state and its actions ---------- */
 
-.sg-run-card-heading small {
+.hd-run-card-heading small {
   color: #536078;
   font-size: 12px;
 }
 
-.sg-run-card-actions a {
+.hd-run-card-actions a {
   color: #2852a6;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.sg-run-card-actions {
+.hd-run-card-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.sg-run-card {
+.hd-run-card {
   border: 1px solid var(--line, #d8e0ec);
   border-radius: 10px;
   padding: 12px 14px;
@@ -1252,20 +1252,20 @@
   display: grid;
   gap: 8px;
 }
-.sg-check-result-details summary {
+.hd-check-result-details summary {
   cursor: pointer;
   font-size: 13px;
   color: #2852a6;
 }
-.sg-check-results,
-.sg-check-steps {
+.hd-check-results,
+.hd-check-steps {
   margin: 0;
   padding-left: 18px;
   font-size: 13px;
   line-height: 1.5;
 }
 
-.sg-outcome {
+.hd-outcome {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1277,70 +1277,70 @@
   color: #3a4660;
   text-transform: capitalize;
 }
-.sg-outcome.passed {
+.hd-outcome.passed {
   background: #e3f5ec;
   color: #0c7248;
 }
-.sg-outcome.failed {
+.hd-outcome.failed {
   background: #fde8e6;
   color: #9c312a;
 }
-.sg-outcome.running {
+.hd-outcome.running {
   background: #e4ecfb;
   color: #285ad8;
 }
-.sg-outcome.not-run,
-.sg-outcome.not-applicable {
+.hd-outcome.not-run,
+.hd-outcome.not-applicable {
   background: #eef2f8;
   color: #536078;
 }
-.sg-run-card.passed {
+.hd-run-card.passed {
   border-color: #9fd3b7;
 }
-.sg-run-card.failed {
+.hd-run-card.failed {
   border-color: #efb0aa;
 }
-.sg-run-card-heading {
+.hd-run-card-heading {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
-.sg-run-card-summary {
+.hd-run-card-summary {
   margin: 0;
   font-size: 13px;
 }
-.sg-check-results {
+.hd-check-results {
   list-style: none;
   padding: 0;
   display: grid;
   gap: 6px;
 }
-.sg-check-result-row {
+.hd-check-result-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px 8px;
 }
-.sg-check-result-summary {
+.hd-check-result-summary {
   color: #3a4660;
 }
-.sg-check-steps {
+.hd-check-steps {
   list-style: none;
   padding-left: 12px;
 }
-.sg-check-steps li {
+.hd-check-steps li {
   display: flex;
   gap: 6px;
   align-items: center;
 }
-.sg-check-steps li.failed {
+.hd-check-steps li.failed {
   color: #9c312a;
 }
-.sg-check-steps li.passed {
+.hd-check-steps li.passed {
   color: #0c7248;
 }
-.sg-check-output {
+.hd-check-output {
   margin: 6px 0 0;
   max-height: 320px;
   overflow: auto;
@@ -1357,17 +1357,17 @@
 
 /* ---------- Chat column: an optional notice above the conversation ---------- */
 
-.sg-chat-column {
+.hd-chat-column {
   min-height: 0;
   min-width: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
-.sg-chat-column > .sg-chat-pane {
+.hd-chat-column > .hd-chat-pane {
   grid-row: 2;
 }
 /* Repository access that has not passed, with the way to check it again. */
-.sg-repository-notice {
+.hd-repository-notice {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1379,10 +1379,10 @@
   font-size: 13px;
   line-height: 1.5;
 }
-.sg-repository-notice p {
+.hd-repository-notice p {
   margin: 0;
 }
-.sg-repository-notice button {
+.hd-repository-notice button {
   flex: none;
   padding: 4px 10px;
   border: 1px solid var(--line);
@@ -1391,29 +1391,29 @@
   color: var(--ink);
   cursor: pointer;
 }
-.sg-repository-notice button:disabled {
+.hd-repository-notice button:disabled {
   cursor: default;
   opacity: 0.6;
 }
-.sg-repository-notice a {
+.hd-repository-notice a {
   flex: none;
 }
 
 /* Quiet controls: small buttons, one solid primary at a time. */
 
-@keyframes sg-pulse {
+@keyframes hd-pulse {
   50% {
     opacity: 0.3;
   }
 }
 
-.sg-demo-link {
+.hd-demo-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--ink-2);
 }
-.sg-demo-link em {
+.hd-demo-link em {
   padding: 1px 6px;
   border-radius: 999px;
   background: #fff1d6;
@@ -1426,21 +1426,21 @@
 
 /* ---------- Reply references: what a reply saved, pointing at History ---------- */
 
-.sg-message-refs {
+.hd-message-refs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-top: 8px;
 }
-.sg-message-refs > span {
+.hd-message-refs > span {
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.sg-message-ref {
+.hd-message-ref {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1453,32 +1453,32 @@
   cursor: pointer;
   transition: border-color var(--fast) var(--ease);
 }
-.sg-message-ref:hover {
+.hd-message-ref:hover {
   border-color: #9eb6e7;
 }
-.sg-message-ref em {
+.hd-message-ref em {
   font-style: normal;
   font-weight: 600;
   color: var(--blue-text);
 }
-.sg-message-ref.done em {
+.hd-message-ref.done em {
   color: var(--green-text);
 }
-.sg-message-ref.replaced {
+.hd-message-ref.replaced {
   border-style: dashed;
 }
-.sg-message-ref.replaced em {
+.hd-message-ref.replaced em {
   color: var(--muted);
 }
 
 /* ---------- History: filters and grouped operations ---------- */
 
-.sg-history-filters {
+.hd-history-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.sg-history-filters button {
+.hd-history-filters button {
   padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1487,14 +1487,14 @@
   font-size: 12px;
   cursor: pointer;
 }
-.sg-history-filters button[aria-pressed="true"] {
+.hd-history-filters button[aria-pressed="true"] {
   border-color: var(--blue);
   background: var(--blue-soft);
   color: var(--blue-text);
   font-weight: 600;
 }
 
-.sg-section-reading {
+.hd-section-reading {
   margin: 0;
   color: var(--ink-2);
   font-size: 13px;

@@ -6,7 +6,7 @@ import "./terminal-lights.css";
 
 export function TerminalLights() {
   return (
-    <span className="sg-term-lights" aria-hidden="true">
+    <span className="hd-term-lights" aria-hidden="true">
       <i />
       <i />
       <i />
@@ -21,7 +21,7 @@ export function TerminalLights() {
  */
 export function TerminalBar({ title }: { title: string }) {
   return (
-    <div className="sg-term-bar" aria-hidden="true">
+    <div className="hd-term-bar" aria-hidden="true">
       <TerminalLights />
       <span>{title}</span>
     </div>

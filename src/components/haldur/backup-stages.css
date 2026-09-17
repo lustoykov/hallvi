@@ -1,6 +1,6 @@
 /* Application-first backup view. Prefix: bs-. */
 
-.sg-backups {
+.hd-backups {
   display: grid;
   gap: 18px;
   align-content: start;

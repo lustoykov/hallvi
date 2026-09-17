@@ -47,7 +47,7 @@ function entries(archive: Buffer) {
 }
 
 beforeAll(async () => {
-  root = mkdtempSync(join(tmpdir(), "sg-controller-protection-"));
+  root = mkdtempSync(join(tmpdir(), "hd-controller-protection-"));
   vi.stubEnv("HALDUR_DB_PATH", join(root, "state", "haldur.db"));
   vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "state"));
   vi.stubEnv("HALDUR_PI_CONFIG_DIR", join(root, "state"));

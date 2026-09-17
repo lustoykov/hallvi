@@ -318,14 +318,14 @@ export function PiSetupScreen({
   }
 
   return (
-    <main className={"sg-setup-shell " + s.root}>
-      <header className="sg-setup-topbar">
-        <Link className="sg-setup-brand" href="/">
-          <span className="sg-app-mark">H</span>
+    <main className={"hd-setup-shell " + s.root}>
+      <header className="hd-setup-topbar">
+        <Link className="hd-setup-brand" href="/">
+          <span className="hd-app-mark">H</span>
           <span>Haldur</span>
         </Link>
         <Link
-          className="sg-setup-back"
+          className="hd-setup-back"
           href={returnTo?.href ?? "/applications"}
         >
           <ArrowLeft /> {returnTo?.label ?? "All applications"}

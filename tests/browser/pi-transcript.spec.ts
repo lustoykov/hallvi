@@ -54,7 +54,7 @@ test("Pi text stays once in order through completion and reload @journey-streami
   save(record.id, record);
   try {
     await page.goto(`/applications/${appId}`);
-    const message = page.locator(`#sg-message-${runId}`);
+    const message = page.locator(`#hd-message-${runId}`);
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
     // What the group line actually says. It counts and pluralises — "1 file
     // read" — and this asked for "File reads", so the one spec guarding the

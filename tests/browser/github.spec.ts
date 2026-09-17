@@ -86,7 +86,7 @@ test(
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".sg-repository-notice");
+    const notice = page.locator(".hd-repository-notice");
     await expect(notice).toContainText(
       "Connect GitHub, then run the repository check.",
     );
@@ -137,7 +137,7 @@ test(
     ).toEqual(refreshed.repository);
     await page.goto(path);
     await openConversation(page);
-    await expect(page.locator(".sg-repository-notice")).toHaveCount(0);
+    await expect(page.locator(".hd-repository-notice")).toHaveCount(0);
   },
 );
 
@@ -281,7 +281,7 @@ test(
     writeFileSync(join(fixture.state, "github-scenario.json"), "{}");
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".sg-repository-notice");
+    const notice = page.locator(".hd-repository-notice");
     await expect(notice).toContainText("read access");
     await notice
       .getByRole("button", { name: "Check again", exact: true })
@@ -327,7 +327,7 @@ test(
     const old = expireAccess();
     await page.reload();
     await openConversation(page);
-    await expect(page.locator(".sg-repository-notice")).toHaveCount(0);
+    await expect(page.locator(".hd-repository-notice")).toHaveCount(0);
     // Checking again renews the expired access without another login.
     expect((await checkAgain()).status()).toBe(200);
     expect(
@@ -360,7 +360,7 @@ test(
     await checkAgain();
     await page.goto(appUrl);
     await openConversation(page);
-    await expect(page.locator(".sg-repository-notice")).toBeVisible();
+    await expect(page.locator(".hd-repository-notice")).toBeVisible();
     await page.goto("/setup/github");
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
       "Sign in again",

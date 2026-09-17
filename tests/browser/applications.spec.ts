@@ -83,7 +83,7 @@ test(
     ).toBeVisible();
     await openConversation(page);
     await expect(
-      page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
+      page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
 
     await page
@@ -93,14 +93,14 @@ test(
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
     await openConversation(page);
-    await expect(page.locator(".sg-did").last()).toContainText(
+    await expect(page.locator(".hd-did").last()).toContainText(
       "[QA fixture reply]",
     );
     // The HTTP acceptance has finished, but the saved run is still active.
     await expect(
       page.getByRole("textbox", { name: "Message Haldur" }),
     ).toBeEnabled();
-    await expect(page.locator(".sg-busy-bar")).toBeVisible();
+    await expect(page.locator(".hd-busy-bar")).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("durable-reply-in-progress.png"),
       fullPage: true,
@@ -116,10 +116,10 @@ test(
     await expect(
       page.getByRole("button", { name: "Retry reply" }),
     ).toBeVisible();
-    await expect(page.locator(".sg-busy-bar")).toHaveCount(0);
+    await expect(page.locator(".hd-busy-bar")).toHaveCount(0);
     await page.getByText("Show unfinished draft", { exact: true }).click();
     await openConversation(page);
-    await expect(page.locator(".sg-run-progress details")).toContainText(
+    await expect(page.locator(".hd-run-progress details")).toContainText(
       "[QA fixture reply]",
     );
     await page.getByText("Show unfinished draft", { exact: true }).click();
@@ -137,12 +137,12 @@ test(
     await openConversation(page);
     await expect(
       page
-        .locator(".sg-messages")
+        .locator(".hd-messages")
         .getByText("Cancel me [slow-cancel]", { exact: true }),
     ).toHaveCount(1);
     await openConversation(page);
     await expect(
-      page.locator(".sg-messages strong:visible").filter({ hasText: /^me$/ }),
+      page.locator(".hd-messages strong:visible").filter({ hasText: /^me$/ }),
     ).toHaveCount(2); // Original user message and successful assistant answer.
     const saved = await (await page.request.get(endpoint)).json();
     expect(saved.runs.map((run: { status: string }) => run.status)).toEqual([
@@ -256,7 +256,7 @@ test(
     await openConversation(page);
     await expect(
       page
-        .locator(".sg-messages")
+        .locator(".hd-messages")
         .getByText("Hello [fail-once]", { exact: true }),
     ).toHaveCount(1);
     expect((await view(page)).messages).toHaveLength(
@@ -271,7 +271,7 @@ test(
     await openConversation(page);
     await expect(
       page
-        .locator(".sg-messages")
+        .locator(".hd-messages")
         .getByText("Hello [fail-once]", { exact: true }),
     ).toHaveCount(1);
     expect((await view(page)).messages).toHaveLength(
@@ -418,11 +418,11 @@ test(
       await composer.press("Enter");
       await openConversation(page);
       await expect(
-        page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
+        page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
       ).toBeVisible();
       await openConversation(page);
       await expect(
-        page.locator(".sg-messages").getByText("Pending", { exact: true }),
+        page.locator(".hd-messages").getByText("Pending", { exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole("status").filter({ hasText: "Saving message" }),
@@ -450,11 +450,11 @@ test(
     ).toBeVisible();
     await openConversation(page);
     await expect(
-      page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
+      page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
     await openConversation(page);
     await expect(
-      page.locator(".sg-messages").getByText("Pending", { exact: true }),
+      page.locator(".hd-messages").getByText("Pending", { exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("status").filter({ hasText: "Saving message" }),
