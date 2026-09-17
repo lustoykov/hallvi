@@ -69,7 +69,7 @@ const conversation = db.prepare(
 );
 const message = db.prepare(
   `insert into messages (id, conversation_id, role, body, blocks, source, status, created_at, updated_at)
-   values (?, ?, 'assistant', ?, '[]', 'haldur', 'completed', ?, ?)`,
+   values (?, ?, 'assistant', ?, '[]', 'server-guy', 'completed', ?, ?)`,
 );
 const information = db.prepare(
   `insert into saved_information (id, application_id, title, body, evidence, established_at, presentation, created_at, updated_at, retired_at)

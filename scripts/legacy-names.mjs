@@ -27,11 +27,16 @@ export function stateFiles(directory) {
   const legacyDatabase = existsSync(/* turbopackIgnore: true */ legacy);
   if (legacyDatabase && existsSync(/* turbopackIgnore: true */ current))
     throw twoDatabases(current, legacy);
-  const name = legacyDatabase ? "server-guy" : "haldur";
+  const settings = join(directory, "haldur.env");
+  const legacySettings = join(directory, "server-guy.env");
   return {
     directory,
-    database: join(directory, `${name}.db`),
-    settings: join(directory, `${name}.env`),
+    database: legacyDatabase ? legacy : current,
+    settings:
+      !existsSync(/* turbopackIgnore: true */ settings) &&
+      existsSync(/* turbopackIgnore: true */ legacySettings)
+        ? legacySettings
+        : settings,
   };
 }
 

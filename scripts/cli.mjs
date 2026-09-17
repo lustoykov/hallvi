@@ -33,11 +33,17 @@ import {
 const app = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const home = homedir();
 adoptLegacyEnvironment();
-// An installation from before the rename keeps ~/.local/share/server-guy.
-const chosen = process.env.HALDUR_DATA_DIR?.trim();
-const state = chosen
-  ? stateFiles(resolve(chosen))
-  : stateLocation(join(home, ".local", "share"));
+let state;
+try {
+  // An installation from before the rename keeps ~/.local/share/server-guy.
+  const chosen = process.env.HALDUR_DATA_DIR?.trim();
+  state = chosen
+    ? stateFiles(resolve(chosen))
+    : stateLocation(join(home, ".local", "share"));
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
 const data = state.directory;
 const mac = process.platform === "darwin";
 const LABEL = "com.haldur";

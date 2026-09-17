@@ -244,7 +244,7 @@ export function ChatPane({
       view.messages.find(
         (message) =>
           message.role === "assistant" &&
-          message.source === "haldur" &&
+          message.source === "server-guy" &&
           message.createdAt >= operation.startedAt,
       )?.id;
     if (messageId && messageIds.has(messageId))
@@ -549,7 +549,7 @@ export function ChatPane({
                       {engineer ? "You" : "H"}
                     </span>
                     <strong>{engineer ? "You" : "Haldur"}</strong>
-                    {message.source === "haldur" && (
+                    {message.source === "server-guy" && (
                       <span className="sg-source-tag">
                         {message.role === "user"
                           ? "Started automatically"

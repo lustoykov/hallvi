@@ -106,7 +106,7 @@ the provider supports labels. Preserve unrelated labels when updating them.
 
 | Label | Value |
 | --- | --- |
-| `sg-project` | `haldur` |
+| `sg-project` | `server-guy` |
 | `sg-environment` | `development` |
 | `sg-lifecycle` | `temporary` |
 | `sg-owner` | Unique task UUID, retained for the task's lifetime |

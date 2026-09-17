@@ -60,6 +60,11 @@ it("finds a Server Guy checkout, installation and model account where they are",
   );
   // The service is told its directory; the files in it keep their names.
   expect(stateFiles(installed.directory)).toEqual(installed);
+  // Settings count even before the service has ever written a database.
+  file("unstarted", "server-guy.env");
+  expect(stateFiles(join(root, "unstarted")).settings).toBe(
+    join(root, "unstarted", "server-guy.env"),
+  );
 
   file(".config", "server-guy", "pi", "auth.json");
   expect(piAccountLocation(root)).toBe(

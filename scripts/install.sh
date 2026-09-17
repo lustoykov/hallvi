@@ -133,6 +133,8 @@ if [ "$legacy_running" = yes ]; then
       launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 || break
       sleep 0.2
     done
+    ! launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 ||
+      fail "Server Guy did not stop in time and was not replaced. Run install.sh again, then: haldur start"
   else
     systemctl --user disable --now server-guy.service || true
   fi
