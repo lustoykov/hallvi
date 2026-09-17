@@ -74,7 +74,7 @@ function rewrite(value, from, to) {
   return value.startsWith(`${from}/`) ? to + value.slice(from.length) : value;
 }
 
-/** Any process with a file open under `path`. Without lsof, nothing is certain. */
+/** Any process with a file open under `path`; without lsof, refuse. */
 function inUse(path) {
   const found = spawnSync("lsof", ["-t", "+D", path], { encoding: "utf8" });
   if (found.error)
