@@ -18,6 +18,7 @@ import type {
 } from "@/server/github-setup";
 import type { GithubRepositoryCheckResult } from "@/server/applications";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
+import type { SetupReturn } from "@/server/setup-return";
 import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
 
@@ -48,7 +49,9 @@ const waiting = (attempt: GithubLoginAttempt | null) =>
 export function GithubSetupScreen({
   initialStatus,
   returnToAdd = false,
+  returnTo,
 }: {
+  returnTo?: SetupReturn;
   initialStatus: GithubSetupStatus;
   returnToAdd?: boolean;
 }) {
@@ -235,12 +238,15 @@ export function GithubSetupScreen({
           <span className="sg-app-mark">H</span>
           <span>Haldur</span>
         </Link>
-        <Link className="sg-setup-back" href="/applications">
-          <ArrowLeft /> All applications
+        <Link
+          className="sg-setup-back"
+          href={returnTo?.href ?? "/applications"}
+        >
+          <ArrowLeft /> {returnTo?.label ?? "All applications"}
         </Link>
       </header>
       <div className={s.page}>
-        <SettingsNav current="github" />
+        <SettingsNav current="github" returnTo={returnTo} />
         <div className={s.heading}>
           <h1>Connect GitHub</h1>
           <p>

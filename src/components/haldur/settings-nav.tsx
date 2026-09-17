@@ -3,27 +3,31 @@ import s from "./pi-setup-screen.module.css";
 
 export function SettingsNav({
   current,
+  returnTo,
 }: {
   current: "pi" | "github" | "connections";
+  /** The conversation Settings was opened from; every tab keeps it. */
+  returnTo?: { query: string };
 }) {
+  const query = returnTo?.query ?? "";
   return (
     <nav className={s.settingsNav} aria-label="Settings">
       {/* Connections is a real page now: it asks each provider whether the
           credential works rather than reporting that a variable is set. */}
       <Link
-        href="/setup/connections"
+        href={`/setup/connections${query}`}
         aria-current={current === "connections" ? "page" : undefined}
       >
         Connections
       </Link>
       <Link
-        href="/setup/pi"
+        href={`/setup/pi${query}`}
         aria-current={current === "pi" ? "page" : undefined}
       >
         ChatGPT &amp; model
       </Link>
       <Link
-        href="/setup/github"
+        href={`/setup/github${query}`}
         aria-current={current === "github" ? "page" : undefined}
       >
         GitHub

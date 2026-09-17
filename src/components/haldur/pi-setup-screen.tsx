@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import type { DetectedPiSetup } from "@/server/pi-configuration";
 import type { PiLoginAttempt, PiSetupStatus } from "@/server/pi-setup";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
+import type { SetupReturn } from "@/server/setup-return";
 import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
 
@@ -54,7 +55,7 @@ export function PiSetupScreen({
    * records by the page. Setup is a detour, and both ways out of it — a
    * saved login and a cancelled one — lead back here.
    */
-  returnTo?: { href: string; label: string };
+  returnTo?: SetupReturn;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
@@ -331,7 +332,7 @@ export function PiSetupScreen({
         </Link>
       </header>
       <div className={s.page}>
-        <SettingsNav current="pi" />
+        <SettingsNav current="pi" returnTo={returnTo} />
         <header className={s.heading}>
           <h1>Settings</h1>
           <p>ChatGPT account and model preferences.</p>
