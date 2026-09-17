@@ -204,6 +204,14 @@ function sourceRevision() {
       sourceDirty: Boolean(git(["status", "--porcelain"])),
     };
   } catch {
+    // An installation is not a checkout; its package names what built it.
+    try {
+      const release = JSON.parse(
+        readFileSync(join(process.cwd(), "dist", "release.json"), "utf8"),
+      ) as { revision?: string };
+      if (release.revision && release.revision !== "unknown")
+        return { sourceRevision: release.revision, sourceDirty: false };
+    } catch {}
     return { sourceRevision: null, sourceDirty: null };
   }
 }

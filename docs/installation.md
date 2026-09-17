@@ -12,7 +12,8 @@ checkout do not share a database.
 
 ## What you need
 
-- macOS (Apple silicon or Intel) or a Linux with systemd (x64 or arm64).
+- macOS (Apple silicon or Intel) or a glibc Linux with systemd (x64 or
+  arm64). Alpine and other musl systems are not supported.
 - A C/C++ compiler, `make` and `python3`, because two dependencies compile on
   installation. On macOS: `xcode-select --install`. On Debian or Ubuntu:
   `sudo apt-get install -y build-essential python3 curl openssh-client`.
@@ -46,7 +47,7 @@ tar -xzf server-guy-0.1.0.tgz
 ./server-guy-0.1.0/install.sh
 ```
 
-Nothing needs root. The first installation starts the service and prints its
+Nothing needs root. A new installation starts the service and prints its
 status. Open <http://127.0.0.1:4747>.
 
 | What | Where | On upgrade or uninstall |
@@ -80,8 +81,9 @@ Guy is stopped now and comes back by itself later.
   sleeps and continues on wake.
 - **Linux** runs it as a systemd user unit and turns on lingering for your
   user, so it starts at boot without anyone logging in and survives the end of
-  your SSH session. If lingering could not be enabled without root, `status`
-  says so and prints the one command that needs `sudo`.
+  your SSH session. If lingering could not be enabled without root, the
+  status of a running service says so and prints the one command that needs
+  `sudo`.
 
 If the interface or the worker stops unexpectedly, the service exits and the
 service manager starts both again within a few seconds. A conversation that was
@@ -134,9 +136,12 @@ note explains why.
 
 ## Upgrade
 
-Build or obtain the new archive and run its `install.sh`. It stops the service,
-replaces the program, and returns the service to the state it found. State is
-not touched.
+Build or obtain the new archive and run its `install.sh`. It prepares the new
+program completely — download, dependencies, native compiles — while the old
+one keeps serving, then stops the service, swaps the program and returns the
+service to the state it found: running if it was running, stopped if you had
+stopped it. A failure before the swap leaves the old installation as it was.
+State is not touched.
 
 A new version that changes the database schema refuses to start on an older
 database, says which versions are involved and changes nothing. Until schema
@@ -164,3 +169,7 @@ discard the state as well, delete those two directories yourself.
 - Private application links close when the service restarts or the machine
   reboots. The Overview shows the link as closed; ask Pi to open it again.
 - One installation per user account.
+- A laptop that runs its own installation and also forwards one from a virtual
+  machine needs them on different ports: set `SERVER_GUY_PORT` on one of them.
+- macOS keeps one service log, `~/.local/share/server-guy/logs/service.log`,
+  rotated only when it passes 10 MB at a `server-guy start`.

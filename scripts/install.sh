@@ -54,13 +54,17 @@ fi
 [ -f "$source_dir/scripts/serve.mjs" ] ||
   fail "run this from the unpacked Server Guy archive."
 
-# A running service keeps files open in the program directory it is about to
-# lose. Its state is elsewhere and is not touched.
-was_running=no
-if [ -x "$bin/server-guy" ] && "$bin/server-guy" status --quiet; then
-  was_running=yes
-  "$bin/server-guy" stop
+# Ask the service manager, not the old command: a command that cannot run
+# would otherwise read as "not running" and lose its program while serving.
+if [ "$os" = darwin ]; then
+  launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 &&
+    was_running=yes || was_running=no
+else
+  systemctl --user is-enabled server-guy.service >/dev/null 2>&1 &&
+    was_running=yes || was_running=no
 fi
+upgrade=no
+[ -d "$home" ] && upgrade=yes
 
 staging="$home.installing"
 rm -rf "$staging"
@@ -85,8 +89,8 @@ tar -xzf "$staging/node.tar.gz" -C "$staging/node" --strip-components 1
 rm "$staging/node.tar.gz"
 
 say "Copying Server Guy"
-(cd "$source_dir" && tar -cf - --exclude ./install.sh .) |
-  tar -xf - -C "$staging/app"
+cp -RP "$source_dir/." "$staging/app/"
+rm -f "$staging/app/install.sh"
 
 say "Installing dependencies (this compiles two native modules)"
 (
@@ -95,6 +99,18 @@ say "Installing dependencies (this compiles two native modules)"
     --loglevel=error
 )
 
+# Everything that can fail has happened. Only now does a running service stop,
+# so a failed upgrade leaves the old one serving. Its state is elsewhere and is
+# not touched.
+if [ "$was_running" = yes ]; then
+  "$bin/server-guy" stop || {
+    if [ "$os" = darwin ]; then
+      launchctl bootout "gui/$(id -u)/com.server-guy" || true
+    else
+      systemctl --user disable --now server-guy.service || true
+    fi
+  }
+fi
 rm -rf "$home"
 mv "$staging" "$home"
 
@@ -104,9 +120,10 @@ exec "$home/node/bin/node" "$home/app/scripts/cli.mjs" "\$@"
 EOF
 chmod +x "$bin/server-guy"
 
-# A first installation starts. An upgrade returns to the state it found.
-if [ "$was_running" = yes ] || [ ! -d "$HOME/.local/share/server-guy" ]; then
-  "$bin/server-guy" start
+# A new installation starts. An upgrade returns to the state it found.
+if [ "$upgrade" = no ] || [ "$was_running" = yes ]; then
+  "$bin/server-guy" start ||
+    say "Installed, but Server Guy is not answering yet: server-guy logs"
 else
   say "Installed. Server Guy was stopped before and stays stopped: server-guy start"
 fi

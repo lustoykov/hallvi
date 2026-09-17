@@ -103,7 +103,6 @@ function systemdDefinition() {
   const quoted = (value) => `"${value.replace(/(["\\])/g, "\\$1")}"`;
   return `[Unit]
 Description=Server Guy
-After=network-online.target
 
 [Service]
 ExecStart=${quoted(process.execPath)} ${quoted(join(app, "scripts", "serve.mjs"))}
@@ -123,7 +122,9 @@ function loaded() {
   return mac
     ? run("launchctl", ["print", `${domain}/${LABEL}`], { quiet: true })
         .status === 0
-    : run("systemctl", ["--user", "is-active", UNIT], { quiet: true })
+    : // Enabled is the question, as on macOS: a unit that is failing and being
+      // restarted is still a service the owner started.
+      run("systemctl", ["--user", "is-enabled", UNIT], { quiet: true })
         .status === 0;
 }
 
@@ -309,6 +310,14 @@ ${forwardedPorts(ports)
 }
 
 function uninstall() {
+  // This removes the directory above the program, so be certain that is an
+  // installation: run from an unpacked archive or a checkout it would
+  // otherwise delete whatever happens to contain them.
+  const installed = join(home, ".local", "lib", "server-guy");
+  if (app !== join(installed, "app"))
+    throw new Error(
+      `This is not the installed copy (${join(installed, "app")}); nothing was removed.`,
+    );
   stop();
   if (!mac) {
     rmSync(unit, { force: true });
@@ -316,7 +325,7 @@ function uninstall() {
   }
   rmSync(join(home, ".local", "bin", "server-guy"), { force: true });
   // This file is inside what it removes; Node has already read it.
-  rmSync(resolve(app, ".."), { recursive: true, force: true });
+  rmSync(installed, { recursive: true, force: true });
   console.log(`Server Guy is removed. Everything it knew is kept:
   ${data}
   ${join(home, ".config", "server-guy")}
