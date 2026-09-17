@@ -121,7 +121,12 @@ page stands in.
   piece of data and whether each copy holds it, and the restore tests. A
   day opens what is on record for it.
 
-## Logs: Paper, and Monitoring: Tuner (`signal-prototype/`)
+## Logs: Paper, and Monitoring: Tuner (`signal-prototype/`, retired 17 Sep)
+
+The Tuner was replaced on 17 Sep 2026 by the Watching map
+(`monitoring-watching.tsx`): the dial read as dated, stations showed raw
+container ids and "Passed" never said how long it counted. The three
+directions compared are on branch `prototype/monitoring-watching`.
 
 Chosen from three directions that each drew both pages from the same
 record: the output Server Guy read from each process (the last 100 lines of

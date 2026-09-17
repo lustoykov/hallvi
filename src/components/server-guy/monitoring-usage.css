@@ -1,5 +1,5 @@
 /* Traffic and load on Monitoring. Prefix: axmu-.
-   A section header shared with Watching (.axtu-section-head, tuner.css),
+   A section header shared with Watching (.axmw-section-head),
    then two flat cards. Nothing animates in; the only motion is the hover
    layer following the pointer. */
 
@@ -27,7 +27,7 @@
   background: #ffffff;
   box-shadow: 0 1px 2px rgb(23 34 56 / 4%);
 }
-.axmu-card > .axtu-ask-small {
+.axmu-card > .axmw-ask {
   align-self: flex-start;
   margin-top: auto;
 }

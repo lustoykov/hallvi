@@ -8,12 +8,11 @@
 // that was — a chart that looks live but stopped at the last read would be
 // the Monitoring page implying a watch that does not exist.
 
-import { ChatCircleText } from "@phosphor-icons/react";
 import { useState, type PointerEvent, type ReactNode } from "react";
 
 import { Tag } from "./deployment-prototype/tag";
 import type { Usage } from "./monitoring-records";
-import { toneOf } from "./signal-prototype/signal-model";
+import { AskButton, toneOf } from "./monitoring-watching";
 import { ago, clock } from "./stack-prototype/stack-model";
 import "./monitoring-usage.css";
 
@@ -122,14 +121,7 @@ function Card({
       <p className="axmu-say">{say}</p>
       {children}
       {ask && (
-        <button
-          type="button"
-          className="axtu-ask-small"
-          onClick={() => onAsk(ask.draft)}
-        >
-          <ChatCircleText weight="bold" />
-          {ask.label}
-        </button>
+        <AskButton onClick={() => onAsk(ask.draft)}>{ask.label}</AskButton>
       )}
     </article>
   );
@@ -473,7 +465,7 @@ function Host({
   );
 }
 
-export function UsagePanel({
+export function MonitoringUsage({
   usage,
   name,
   now,
@@ -498,14 +490,9 @@ export function UsagePanel({
               samples — so there is nothing to install.
             </p>
           </div>
-          <button
-            type="button"
-            className="axtu-ask-small"
-            onClick={() => onAsk(read)}
-          >
-            <ChatCircleText weight="bold" />
+          <AskButton onClick={() => onAsk(read)}>
             Ask Server Guy to read it
-          </button>
+          </AskButton>
         </div>
       </section>
     );
@@ -513,7 +500,7 @@ export function UsagePanel({
   const fresh = toneOf(usage.at, now) === "verified";
   return (
     <section className="axmu" aria-labelledby="axmu-title">
-      <header className="axtu-section-head">
+      <header className="axmw-section-head">
         <div>
           <h2 id="axmu-title">Traffic and load</h2>
           <p>
@@ -525,14 +512,7 @@ export function UsagePanel({
         {usage.at && !fresh && (
           <Tag tone="stale">Read {ago(usage.at, now)}</Tag>
         )}
-        <button
-          type="button"
-          className="axtu-ask-small"
-          onClick={() => onAsk(read)}
-        >
-          <ChatCircleText weight="bold" />
-          Read it again
-        </button>
+        <AskButton onClick={() => onAsk(read)}>Read it again</AskButton>
       </header>
       <div className="axmu-cards">
         {usage.traffic && (
