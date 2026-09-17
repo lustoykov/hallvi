@@ -190,7 +190,8 @@ async function answers(url) {
         signal: AbortSignal.timeout(2000),
       });
       await response.body?.cancel();
-      return true;
+      // A page that cannot load its database or modules answers 500.
+      return response.status < 500;
     } catch {
       if (!loaded()) return false;
       await new Promise((done) => setTimeout(done, 500));
@@ -230,7 +231,7 @@ async function status() {
     console.log(`  state      ${data}`);
     return 1;
   }
-  const up = await answers(url);
+  const up = await answers(`${url}/applications`);
   // The worker writes its first beat a moment after the interface answers.
   for (let wait = 0; up && !workerAlive() && wait < 20; wait++)
     await new Promise((done) => setTimeout(done, 500));
@@ -239,7 +240,9 @@ async function status() {
       ? "  service    running; starts when you log in to this Mac"
       : `  service    running; starts when this machine boots${lingering() ? "" : " — once you log in. For boot without login run: sudo loginctl enable-linger " + userInfo().username}`,
   );
-  console.log(`  interface  ${up ? url : "not answering yet"}`);
+  console.log(
+    `  interface  ${up ? url : "not answering, or answering with errors"}`,
+  );
   console.log(`  Pi worker  ${workerAlive() ? "running" : "not running yet"}`);
   console.log(`  state      ${data}`);
   console.log(`  logs       server-guy logs`);

@@ -91,7 +91,7 @@ say "Copying Server Guy"
 say "Installing dependencies (this compiles two native modules)"
 (
   cd "$staging/app"
-  PATH="$staging/node/bin:$PATH" npm ci --omit=dev --no-audit --no-fund \
+  PATH="$staging/node/bin:$PATH" npm ci --omit=dev --no-audit --no-fund --no-update-notifier \
     --loglevel=error
 )
 
