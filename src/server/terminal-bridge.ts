@@ -89,7 +89,13 @@ async function start(): Promise<Bridge> {
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
+    // An installation fixes this port so an owner reaching Server Guy over
+    // SSH can forward it; development takes whichever is free.
+    server.listen(
+      Number(process.env.SERVER_GUY_TERMINAL_PORT) || 0,
+      "127.0.0.1",
+      resolve,
+    );
   });
   const address = server.address();
   bridge.port = typeof address === "object" && address ? address.port : 0;
@@ -97,7 +103,12 @@ async function start(): Promise<Bridge> {
 }
 
 function bridge() {
-  store.__sgTerminal ??= start();
+  // A fixed port can be taken. Forget the failure so the next request tries
+  // again instead of every terminal failing until the service restarts.
+  store.__sgTerminal ??= start().catch((error) => {
+    store.__sgTerminal = undefined;
+    throw error;
+  });
   return store.__sgTerminal;
 }
 

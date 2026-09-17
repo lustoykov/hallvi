@@ -17,6 +17,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -191,6 +192,13 @@ function sourceRevision() {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
       }).trim();
+    // An installed copy unpacked inside some other repository is not a
+    // checkout of this one, and must not borrow that repository's revision.
+    if (
+      realpathSync(git(["rev-parse", "--show-toplevel"])) !==
+      realpathSync(process.cwd())
+    )
+      throw new Error("not a checkout");
     return {
       sourceRevision: git(["rev-parse", "HEAD"]),
       sourceDirty: Boolean(git(["status", "--porcelain"])),
@@ -319,11 +327,17 @@ export async function captureControllerPayload(): Promise<{
         "The model credential file was not readable; reconnect after recovery.",
       );
   }
-  for (const name of [".env", ".env.local"])
-    if (existsSync(join(process.cwd(), name)))
+  // A checkout keeps its settings beside the code; an installation keeps
+  // them beside its database, in the file `scripts/serve.mjs` loads.
+  for (const [name, path] of [
+    [".env", join(process.cwd(), ".env")],
+    [".env.local", join(process.cwd(), ".env.local")],
+    ["server-guy.env", join(dirname(database), "server-guy.env")],
+  ])
+    if (existsSync(path))
       entries.push({
         path: `payload/environment/${name}.disabled`,
-        content: readFileSync(join(process.cwd(), name)),
+        content: readFileSync(path),
         mode: 0o600,
       });
   for (const directory of ["database", "config"])
