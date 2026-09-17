@@ -148,6 +148,30 @@ database, says which versions are involved and changes nothing. Until schema
 migrations exist, the choices are to reinstall the version that wrote the
 database or to move the database aside and start fresh.
 
+## Haldur was Server Guy
+
+Haldur was called Server Guy until 17 September 2026. Installing Haldur over
+a Server Guy installation is an ordinary upgrade: `install.sh` stops the
+`com.server-guy` launchd agent or `server-guy.service` unit, removes it with the
+`server-guy` command and `~/.local/lib/server-guy`, installs `haldur`, and
+returns the service to the state it found.
+
+Nothing that holds records moves. Haldur uses `~/.local/share/haldur` and
+`~/.config/haldur/pi` when they exist, and otherwise the Server Guy directories
+(`~/.local/share/server-guy`, with its `server-guy.db` and `server-guy.env`, and
+`~/.config/server-guy/pi`), so applications, conversations, credentials and the
+ChatGPT connection are where they were. `SERVER_GUY_*` settings still apply; a
+`HALDUR_*` setting of the same name wins. If both a Haldur and a Server Guy
+database exist, Haldur refuses to start and names both files rather than
+choosing one.
+
+Some names are written outside this installation and stay as they are, so that
+running servers and earlier copies still match: `server-guy.*` Docker labels
+and the `/opt/server-guy`, `/var/lib/server-guy/backups` and scheduled-backup
+names on application servers, the `server-guy-application` provider label, the
+`/tmp/server-guy-ssh-*` tunnel sockets, and the database's path inside a
+controller copy.
+
 ## Uninstall
 
 ```bash

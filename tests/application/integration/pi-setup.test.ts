@@ -9,6 +9,8 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { piAccountLocation } from "../../../scripts/legacy-names.mjs";
+
 import {
   choosePiSetup,
   choosePiSetupSchema,
@@ -763,7 +765,8 @@ describe("Pi login across development previews", () => {
       const first = piAccountDir();
       cwd.mockReturnValue(join(directory, "preview-two"));
       expect(piAccountDir()).toBe(first);
-      expect(first).toBe(join(homedir(), ".config", "haldur", "pi"));
+      // ~/.config/haldur/pi, or the Server Guy one this machine already has.
+      expect(first).toBe(piAccountLocation(homedir()));
     } finally {
       cwd.mockRestore();
     }

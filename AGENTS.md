@@ -50,7 +50,8 @@ bar and commands. Choose checks proportionate to the change. Documentation
 changes need document/link review, not a browser suite. Run `npm run format` before finishing. Verify host tools and
 provider access before claiming support; unit tests do not prove deployment.
 
-`.haldur/`, `.next/` and `tests/results/` are local data; never commit them.
+`.haldur/` (`.server-guy/` in a checkout from before the rename), `.next/` and
+`tests/results/` are local data; never commit them.
 Keep decisions in their owning documents and update current wording instead
 of appending handoffs. Documentation does not establish shipped support.
 

@@ -82,12 +82,13 @@ access before any provider mutation. Inaccessible resources are a coverage gap.
 ## Ownership and durable records
 
 Keep one inventory and dated audit records outside all worktrees at
-`~/Library/Application Support/Server Guy/development-cleanup/` on the local Mac.
+`~/Library/Application Support/Server Guy/development-cleanup/` on the local Mac
+(named before the rename to Haldur; the Dev Cleanup task reads it there).
 Use owner-only permissions (directory 0700, files 0600), with no secret values.
 Record resource identity, machine/project, task UUID/link, exact branch and tip,
 worktree, purpose, lifetime, retention decision and verification evidence.
 
-Reconcile any legacy `~/.codex/haldur-development-resources/` records from
+Reconcile any legacy `~/.codex/server-guy-development-resources/` records from
 accessible machines into this inventory by exact resource ID, retaining their
 provenance. Do not erase originals until the transfer is verified. Conflicting
 records mean retain and report, not that the newest timestamp wins.

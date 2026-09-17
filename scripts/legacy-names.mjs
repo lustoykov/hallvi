@@ -24,8 +24,8 @@ const twoDatabases = (current, legacy) =>
 export function stateFiles(directory) {
   const current = join(directory, "haldur.db");
   const legacy = join(directory, "server-guy.db");
-  const legacyDatabase = existsSync(legacy);
-  if (legacyDatabase && existsSync(current))
+  const legacyDatabase = existsSync(/* turbopackIgnore: true */ legacy);
+  if (legacyDatabase && existsSync(/* turbopackIgnore: true */ current))
     throw twoDatabases(current, legacy);
   const name = legacyDatabase ? "server-guy" : "haldur";
   return {
@@ -47,10 +47,15 @@ export function stateLocation(parent, { hidden = false } = {}) {
   const dot = hidden ? "." : "";
   const current = stateFiles(join(parent, `${dot}haldur`));
   const legacy = stateFiles(join(parent, `${dot}server-guy`));
-  if (!existsSync(legacy.directory)) return current;
-  if (!existsSync(current.directory)) return legacy;
-  const legacyDatabase = existsSync(legacy.database);
-  if (legacyDatabase && existsSync(current.database))
+  if (!existsSync(/* turbopackIgnore: true */ legacy.directory)) return current;
+  if (!existsSync(/* turbopackIgnore: true */ current.directory)) return legacy;
+  const legacyDatabase = existsSync(
+    /* turbopackIgnore: true */ legacy.database,
+  );
+  if (
+    legacyDatabase &&
+    existsSync(/* turbopackIgnore: true */ current.database)
+  )
     throw twoDatabases(current.database, legacy.database);
   return legacyDatabase ? legacy : current;
 }
@@ -59,5 +64,8 @@ export function stateLocation(parent, { hidden = false } = {}) {
 export function piAccountLocation(home) {
   const current = join(home, ".config", "haldur", "pi");
   const legacy = join(home, ".config", "server-guy", "pi");
-  return !existsSync(current) && existsSync(legacy) ? legacy : current;
+  return !existsSync(/* turbopackIgnore: true */ current) &&
+    existsSync(/* turbopackIgnore: true */ legacy)
+    ? legacy
+    : current;
 }

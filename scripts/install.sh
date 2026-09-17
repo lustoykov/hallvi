@@ -64,15 +64,16 @@ fi
 legacy_home="$HOME/.local/lib/server-guy"
 if [ "$os" = darwin ]; then
   launchctl print "gui/$(id -u)/com.haldur" >/dev/null 2>&1 &&
-    was_running=yes || was_running=no
+    running=yes || running=no
   launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 &&
     legacy_running=yes || legacy_running=no
 else
   systemctl --user is-enabled haldur.service >/dev/null 2>&1 &&
-    was_running=yes || was_running=no
+    running=yes || running=no
   systemctl --user is-enabled server-guy.service >/dev/null 2>&1 &&
     legacy_running=yes || legacy_running=no
 fi
+was_running=$running
 [ "$legacy_running" = yes ] && was_running=yes
 upgrade=no
 if [ -d "$home" ] || [ -d "$legacy_home" ]; then upgrade=yes; fi
@@ -113,7 +114,7 @@ say "Installing dependencies (this compiles two native modules)"
 # Everything that can fail has happened. Only now does a running service stop,
 # so a failed upgrade leaves the old one serving. Its state is elsewhere and is
 # not touched.
-if [ "$was_running" = yes ]; then
+if [ "$running" = yes ]; then
   "$bin/haldur" stop || {
     if [ "$os" = darwin ]; then
       launchctl bootout "gui/$(id -u)/com.haldur" || true
