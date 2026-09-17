@@ -8,6 +8,7 @@
     "worker": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx src/worker.ts",
     "build": "node scripts/build.mjs",
     "start": "node scripts/serve.mjs",
+    "package": "node scripts/package.mjs",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
