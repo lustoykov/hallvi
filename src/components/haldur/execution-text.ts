@@ -121,7 +121,7 @@ const PLACES: Record<string, { said: string; detail?: string }> = {
   set_domain_record: { said: "At the DNS provider" },
   // Each of these runs here and reaches outward: a tunnel this PC holds
   // open, a key this PC keeps, an SSH check this PC makes, a request this
-  // Mac sends. None of them changes anything on the application's server.
+  // PC sends. None of them changes anything on the application's server.
   open_server_port: { said: "On this PC" },
   server_public_key: { said: "On this PC" },
   connect_server: { said: "On this PC" },
