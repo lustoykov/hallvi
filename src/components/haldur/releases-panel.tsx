@@ -36,6 +36,7 @@ import {
 } from "./release-records";
 
 import "./releases-panel.css";
+import { TerminalLights } from "./terminal-lights";
 
 function ago(at: string, now: number) {
   const ms = now - Date.parse(at);
@@ -155,11 +156,7 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
       </ol>
       <div className="rp-output" ref={pane} data-outcome={step?.outcome}>
         <header>
-          <span className="rp-lights" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
+          <TerminalLights />
           <b>{step ? step.title : "No step picked"}</b>
           {step && (
             <small>

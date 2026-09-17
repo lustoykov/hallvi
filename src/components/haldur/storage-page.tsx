@@ -18,6 +18,7 @@ import { FlowDirection } from "./backup-prototype/flow";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { storageFromRecords } from "./storage-records";
 import "./backup-prototype/flow.css";
+import { EmptySketch } from "./empty-sketch";
 
 export function StoragePage({
   records,
@@ -94,6 +95,7 @@ export function StoragePage({
           >
             Ask Haldur what is on disk
           </button>
+          <EmptySketch kind="flow" />
         </div>
       </div>
     );

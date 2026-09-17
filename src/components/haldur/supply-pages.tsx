@@ -25,6 +25,7 @@ import "./supply-prototype/manifest.css";
 import "./supply-prototype/origin.css";
 import "./supply-prototype/queue.css";
 import "./supply-prototype/rota.css";
+import { EmptySketch } from "./empty-sketch";
 
 const titles: Record<SupplyPage, string> = {
   cache: "Cache & queue",
@@ -188,6 +189,11 @@ function Nothing({
       >
         {said.button}
       </button>
+      <EmptySketch
+        kind={
+          page === "variables" ? "list" : page === "jobs" ? "timeline" : "bars"
+        }
+      />
     </div>
   );
 }

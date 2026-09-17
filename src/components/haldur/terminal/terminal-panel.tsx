@@ -16,6 +16,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import "./terminal-panel.css";
+import { TerminalLights } from "../terminal-lights";
 
 export interface TerminalTarget {
   user: string;
@@ -302,6 +303,7 @@ export function TerminalPanel({
       aria-label="Application server terminal"
     >
       <header className="sg-terminal-bar">
+        <TerminalLights />
         <strong>Terminal</strong>
         <span className="sg-terminal-target">
           Application server · <code>{label}</code>

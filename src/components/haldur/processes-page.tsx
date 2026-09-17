@@ -18,6 +18,7 @@ import { processesFromRecords } from "./processes-records";
 import { LineDirection } from "./stack-prototype/line";
 import "./deployment-prototype/transit.css";
 import "./stack-prototype/line.css";
+import { EmptySketch } from "./empty-sketch";
 
 export function ProcessesPage({
   records,
@@ -94,6 +95,7 @@ export function ProcessesPage({
           >
             Ask Haldur what is running
           </button>
+          <EmptySketch kind="timeline" />
         </div>
       </div>
     );

@@ -245,6 +245,10 @@
   line-height: 1.5;
   color: var(--ax-muted);
 }
+.axh-console > .sg-term-bar {
+  margin: -2px 0 6px;
+  padding: 6px 8px 10px;
+}
 .axh-console {
   display: grid;
   margin-top: 8px;

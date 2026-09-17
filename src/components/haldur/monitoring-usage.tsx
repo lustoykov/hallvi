@@ -11,6 +11,7 @@
 import { useState, type PointerEvent, type ReactNode } from "react";
 
 import { Tag } from "./deployment-prototype/tag";
+import { EmptySketch } from "./empty-sketch";
 import type { Usage } from "./monitoring-records";
 import { AskButton, toneOf } from "./monitoring-watching";
 import { ago, clock } from "./stack-prototype/stack-model";
@@ -493,6 +494,10 @@ export function MonitoringUsage({
           <AskButton onClick={() => onAsk(read)}>
             Ask Haldur to read it
           </AskButton>
+          <div className="axmu-sketches">
+            <EmptySketch kind="bars" caption="Traffic, once it is read" />
+            <EmptySketch kind="lines" caption="CPU and memory, once read" />
+          </div>
         </div>
       </section>
     );
