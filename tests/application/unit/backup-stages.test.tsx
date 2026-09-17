@@ -186,6 +186,15 @@ describe("application-first backup truth", () => {
     expect(html.match(/Latest copy contents unknown/g)).toHaveLength(2);
   });
 
+  it("does not count a merely mentioned volume as included in a copy", () => {
+    const completed = copy("shop-db");
+    completed.presentation!.about = [{ kind: "volume", id: "uninspected" }];
+    const html = draw([volume("shop-db", "PostgreSQL's data"), completed]);
+    expect(html).toContain("Everything in uninspected");
+    expect(html.match(/In the latest copy/g)).toHaveLength(1);
+    expect(html).toContain("Latest copy contents unknown");
+  });
+
   it("does not promote the plan into evidence for a short copy", () => {
     const html = draw([
       plan,

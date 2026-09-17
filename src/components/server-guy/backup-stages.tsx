@@ -74,7 +74,12 @@ function sizeOf(volume: Vol | undefined) {
 
 function inNewestCopy(protection: Protection, id: string) {
   const { basis, missing } = protection.newestCopyCoverage;
-  if (basis === "unrecorded")
+  // The missing list only compares presence-confirmed volumes. A volume
+  // merely mentioned by another record is outside that comparison.
+  if (
+    basis === "unrecorded" ||
+    !protection.requiredData.some((item) => item.id === id)
+  )
     return {
       held: null,
       says: "The latest copy does not say whether it contains this.",
@@ -221,7 +226,12 @@ function Inventory({
             </div>
             <div>
               <dt>Backup plan</dt>
-              <dd>{item.method ?? "Not included"}</dd>
+              <dd>
+                {item.method ??
+                  (protection.planned || protection.declaredAbsent
+                    ? "Not included"
+                    : "Not known")}
+              </dd>
             </div>
           </dl>
           <button
