@@ -69,6 +69,7 @@ const laneWords: Record<Lane["id"], [question: string, plain: string]> = {
     "How you reach the app: your private connection, the web address and the firewall.",
   ],
 };
+import { TerminalBar } from "../terminal-lights";
 
 const HOUR = 3_600_000;
 const WEEK = 7 * 86_400_000;
@@ -246,6 +247,7 @@ function EventPop({
         </button>
       </header>
       <div className="axt-console" role="log">
+        <TerminalBar title="What it did" />
         {event.lines.map((line) => (
           <div key={line.id} className="axt-console-line" data-tone={line.tone}>
             <time>{clock(line.at)}</time>
@@ -798,6 +800,7 @@ export function TimelineHero({
               aria-live="off"
               aria-label="Little Server's log"
             >
+              <TerminalBar title="Little Server's log" />
               {lines.length === 0 && (
                 <div className="axt-log-line" data-tone="info">
                   <time>--:--</time>

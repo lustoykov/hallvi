@@ -174,6 +174,11 @@
     transform: scale(2.2);
   }
 }
+.axt-console > .sg-term-bar {
+  margin: -2px 0 6px;
+  padding: 6px 8px 10px;
+}
+
 .axt-console {
   display: grid;
   gap: 1px;
@@ -500,6 +505,10 @@
 .axt-log > div {
   min-height: 0;
   overflow: hidden;
+}
+.axt-log-lines > .sg-term-bar {
+  margin: -2px 0 6px;
+  padding: 6px 8px 10px;
 }
 .axt-log-lines {
   display: grid;

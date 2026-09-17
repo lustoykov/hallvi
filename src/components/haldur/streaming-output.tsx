@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { clip, commandOf, essence, plainText } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
+import { TerminalBar } from "./terminal-lights";
 
 function outputText(item: ExecutionRecord) {
   // Earlier execution records stored the whole command result as JSON.
@@ -151,6 +152,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
               : "Command and output"}
         </summary>
         <div className="sg-stream-terminal">
+          <TerminalBar title={running ? "Running" : "Command"} />
           {/* One line, in a strip, deliberately not a <pre>.
               This used to be a second scrolling dark pane above the output
               pane, and two clipped panes in one dark box read as two

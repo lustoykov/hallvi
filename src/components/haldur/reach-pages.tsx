@@ -18,6 +18,7 @@ import { CallersDirection } from "./reach-prototype/callers";
 import { PerimeterDirection } from "./reach-prototype/perimeter";
 import { reachFromRecords } from "./reach-records";
 import "./reach-prototype/callers.css";
+import { EmptySketch } from "./empty-sketch";
 
 export function ReachPageView({
   page,
@@ -112,6 +113,7 @@ export function ReachPageView({
               ? "Ask Haldur how it is reached"
               : "Ask Haldur what can reach in"}
           </button>
+          <EmptySketch kind={page === "domains" ? "flow" : "rings"} />
         </div>
       </div>
     );

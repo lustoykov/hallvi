@@ -22,6 +22,7 @@ import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { releasesFromRecords } from "./release-records";
 import { ReleasesPanel } from "./releases-panel";
+import { EmptySketch } from "./empty-sketch";
 
 export function DeploymentPage({
   records,
@@ -74,6 +75,7 @@ export function DeploymentPage({
         Follow the current work in the conversation. Recorded releases will
         appear here.
       </p>
+      <EmptySketch kind="flow" />
     </div>
   ) : (
     <div className="sg-deploy-none">
@@ -90,6 +92,7 @@ export function DeploymentPage({
       >
         Ask Haldur to deploy this application
       </button>
+      <EmptySketch kind="flow" />
     </div>
   );
 

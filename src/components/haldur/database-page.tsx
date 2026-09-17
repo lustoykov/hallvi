@@ -16,6 +16,7 @@ import { databaseAssessed, databaseFromRecords } from "./database-records";
 import { TimelineDirection } from "./data-prototype/timeline";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import "./data-prototype/timeline.css";
+import { EmptySketch } from "./empty-sketch";
 
 export function DatabasePage({
   records,
@@ -81,6 +82,7 @@ export function DatabasePage({
           >
             Ask Haldur where the data lives
           </button>
+          <EmptySketch kind="timeline" />
         </div>
       </div>
     );

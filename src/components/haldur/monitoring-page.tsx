@@ -20,6 +20,7 @@ import {
 } from "./monitoring-records";
 import { MonitoringUsage } from "./monitoring-usage";
 import { AskButton, MonitoringLede, WatchingMap } from "./monitoring-watching";
+import { EmptySketch } from "./empty-sketch";
 
 export function MonitoringPage({
   records,
@@ -109,6 +110,7 @@ export function MonitoringPage({
             >
               Ask Haldur to check it now
             </AskButton>
+            <EmptySketch kind="rings" />
           </div>
         )}
         {/* How much it is used stands whether or not anything is watching. */}

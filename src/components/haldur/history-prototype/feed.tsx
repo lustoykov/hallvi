@@ -26,6 +26,7 @@ import {
   type HistoryRecord,
 } from "./history-model";
 import "./feed.css";
+import { TerminalBar } from "../terminal-lights";
 
 const stepGlyph: Record<OperationStep["state"], string> = {
   done: "✓",
@@ -189,6 +190,7 @@ export function FeedRow({
               )}
               {op.steps && op.steps.length > 0 && (
                 <div className="axh-console" role="list">
+                  <TerminalBar title="Steps" />
                   {op.steps.map((step, index) => {
                     // Finished work has no step still in progress.
                     const state =
