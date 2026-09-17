@@ -35,6 +35,11 @@ The old deployment/operation workers, mutation endpoints and approval cards have
 
 ## Run
 
+To use Server Guy rather than develop it, install it as a background service:
+[Installing Server Guy](docs/installation.md). `npm run package` builds the
+archive, and `npm start` runs the same production pair in the foreground. The
+rest of this section is development.
+
 Development runs locally on the owner's MacBook; the Mac mini is retired from development.
 Before creating or retiring a branch, worktree, local runtime or cloud test resource,
 read [development resource ownership and cleanup](docs/development-resources.md).
