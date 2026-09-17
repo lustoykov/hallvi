@@ -10,7 +10,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Presentation contract](presentation-contract.md) | How a record becomes a designed page: what Pi writes, how it is read, and what Architecture needs. Later destinations' vocabulary is kept separate under Deferred. |
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
-| [Always-on concept](design/always-on-concept.md) | Concept note comparing where the controller lives (owner's Mac, co-located, management host); provisional recommendation and open decisions, nothing implemented. |
+| [Always-on concept](design/always-on-concept.md) | Where Server Guy itself runs, as a ladder the user climbs: their own Mac or Linux PC first, then a virtual machine they provide and reach through their own tunnel, later a hosted service; the failure table behind each rung and the packaging spike to come. Nothing implemented. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
 | [Development resources](development-resources.md) | Local development, resource ownership, task completion and scheduled cleanup safeguards. |
 | [GitHub setup](integrations/github.md) | Connection and credential setup that still applies. |

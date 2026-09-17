@@ -1,133 +1,126 @@
-# Always-on Server Guy: where the controller lives
+# Always-on Server Guy: a ladder of placements
 
-A concept note, 17 September 2026. Nothing here is implemented or provisioned.
-It compares three placements for the controller (the Next.js UI/API plus the
-Pi worker, their SQLite records, credentials and native sessions) and asks
-what each one means for care that continues when nobody is looking. The
-[product](../../PRODUCT.md) already allows the controller on the application
-host or separately; this note is about choosing.
+A concept note, updated 17 September 2026 to the owner's decision that
+morning. Nothing here is implemented. It describes where Server Guy itself
+runs — the web interface, the Pi worker, and the records, credentials and
+native sessions they keep — and what each place means for care that continues
+when nobody is looking.
+
+Placement is a ladder the user climbs, not a recommendation we make. Each rung
+adds a use case and removes none of the earlier ones.
 
 Two different things are reached, and they must not be confused:
 
-- **Reaching Server Guy**: opening the controller's UI and talking to Pi.
+- **Reaching Server Guy**: opening its interface and talking to Pi.
 - **Reaching a private application**: the application is bound to loopback on
   its host and reached through an SSH tunnel that Pi opens
-  (`open_server_port`). Today that tunnel ends on the machine running the
-  controller, so wherever the controller lives is where the private link works.
+  (`open_server_port`). That tunnel ends on the machine running the
+  installation, so wherever the installation runs is where the private link
+  works.
 
-## Placement 1: the owner's Mac, with managed background processes
+## Rung 1: the user's own Mac or Linux PC
 
-Today's shape, made durable: the web and worker processes run under launchd
-instead of two terminals, restart after a crash, and reopen tunnels after wake.
-
-```mermaid
-flowchart LR
-  B[Browser on the Mac] --> UI[UI/API on the Mac]
-  UI --> W[Pi worker on the Mac]
-  W --> C[(Credentials and records on the Mac)]
-  W -- SSH --> H[Application host]
-  B -- tunnel via the Mac --> H
-  W -- encrypted copies --> R[(Recovery storage, R2/S3)]
-```
-
-Nothing new to authenticate: the controller binds to loopback and the browser
-is on the same machine. Failures: a closed lid stops care, scheduled backups
-and any heartbeat until the Mac wakes; a lost connection ends running commands
-with unknown outcomes, which Pi already handles by reading the host; losing
-the application host loses the application, and recovery runs from the Mac;
-losing the Mac loses the controller, recoverable from the R2 kit. Always-on
-means always-on while the Mac is awake, which is not always-on.
-
-## Placement 2: co-located on the application server
-
-The controller runs on the same host as the application it manages.
+The first supported case. The installation and the browser are on the same
+machine, so no remote access is needed: the interface binds to loopback, and
+there is nothing new to authenticate.
 
 ```mermaid
 flowchart LR
-  B[Browser anywhere] -- authenticated HTTPS --> UI[UI/API on the app host]
-  UI --> W[Pi worker on the app host]
-  W --> C[(Credentials and records on the app host)]
-  W -- local shell --> A[Application on the same host]
-  B -- via the controller --> A
-  W -- encrypted copies --> R[(Recovery storage)]
-```
-
-Cheapest: no second machine, no tunnel for the private application because
-the controller is already inside. Care continues while the host is up.
-Failures couple: losing the host loses the application, the controller and
-the credentials at once, and the recovery kit in R2 becomes the only way back.
-Reaching Server Guy now means a public, authenticated URL, which is a product
-capability that does not exist yet (login, session, rate limits, exposure of
-the Pi runtime). A compromised application is one hop from the credentials
-that manage it.
-
-## Placement 3: a separate management host
-
-A small always-on machine runs the controller for one or several
-applications; application hosts stay as they are.
-
-```mermaid
-flowchart LR
-  B[Browser anywhere] -- private path or authenticated HTTPS --> UI[UI/API on the management host]
+  B[Browser] --> UI[Web interface]
   UI --> W[Pi worker]
-  W --> C[(Credentials and records)]
-  W -- SSH --> H1[Application host 1]
-  W -- SSH --> H2[Application host 2]
-  B -- tunnel via the management host --> H1
+  W --> C[(Records and credentials)]
+  W -- SSH --> H[Application host]
+  B -- tunnel from this machine --> H
   W -- encrypted copies --> R[(Recovery storage)]
+  subgraph The user's Mac or PC
+    B
+    UI
+    W
+    C
+  end
 ```
 
-Care continues independently of both the laptop and any one application
-host. Failures stay separate: an application host can be rebuilt from the
-controller; the controller can be rebuilt from its kit while applications keep
-serving. The costs are a second machine, the same remote-access story as
-placement 2 (a private path such as an SSH tunnel or a VPN can defer the public
-login), and the controller host's own updates and protection become
-first-class work.
+Its honest limit is that care runs while the machine is awake. A closed lid
+pauses scheduled work and drops tunnels until the machine wakes, and losing the
+machine means rebuilding Server Guy from its recovery kit while the
+applications keep serving.
+
+## Rung 2: a virtual machine the user provides
+
+The installation runs on a machine that stays on, and the user reaches it
+through a tunnel they open from their own machine. Remote access is the user's
+decision and the user's setup: the product does not pick a tunnel, a VPN or a
+public login for them, and it keeps binding to loopback so that whatever the
+user chooses is the only way in.
+
+```mermaid
+flowchart LR
+  B[Browser on the user's machine] -- tunnel the user opens --> UI[Web interface]
+  UI --> W[Pi worker]
+  W --> C[(Records and credentials)]
+  W -- SSH --> H[Application host]
+  W -- encrypted copies --> R[(Recovery storage)]
+  subgraph The user's virtual machine
+    UI
+    W
+    C
+  end
+```
+
+Care now continues while the user's laptop sleeps. The private application
+link ends on the virtual machine, so the user reaches it through the same
+tunnel they already opened. Keeping that machine updated and protected is part
+of what the user takes on at this rung.
+
+## Rung 3, later: a hosted service we run
+
+We run the installation for the user. This rung needs what the first two
+deliberately avoid — a real login, and custody of other people's credentials
+and records — so it comes after them, not instead of them.
+
+```mermaid
+flowchart LR
+  B[Browser anywhere] -- authenticated HTTPS --> S[Hosted Server Guy]
+  S -- SSH --> H[The user's application host]
+  S -- encrypted copies --> R[(Recovery storage)]
+```
+
+## A caution: running it on the application server
+
+Nothing stops a user placing the installation on the same host as the
+application it manages, and it saves a machine. It couples the two failures
+the recovery work exists to separate: losing that host loses the application,
+Server Guy and the credentials at once, leaving the recovery kit as the only
+way back. It also makes reaching Server Guy a public login problem immediately,
+and puts a compromised application one hop from the credentials that manage
+it. This is a caution to explain to the user, not a rule to enforce.
 
 ## Failure cases side by side
 
-| Event | Mac with launchd | Co-located | Management host |
-| --- | --- | --- | --- |
-| Laptop sleeps | Care pauses; tunnels drop | Unaffected | Unaffected |
-| Connection lost mid-command | Unknown outcome, read the host later | Local, unaffected | Unknown outcome, read the host later |
-| Application host lost | App down; controller intact, recovers it | App, controller and credentials all lost together | App down; controller intact, recovers it |
-| Management host lost | The Mac is the host: rebuild from kit | Same host as the app | Apps keep serving; rebuild controller from kit |
-| Reaching Server Guy | Loopback, no login | Public login required | Private path first, login later |
-| Reaching a private app | Tunnel ends on the Mac | Direct | Tunnel ends on the management host, then to you |
+| Event | Rung 1: own Mac or PC | Rung 2: user's VM | Rung 3: hosted | On the application server |
+| --- | --- | --- | --- | --- |
+| User's laptop sleeps | Care pauses; tunnels drop | Unaffected | Unaffected | Unaffected |
+| Connection lost mid-command | Unknown outcome; Pi reads the host later | Unknown outcome; Pi reads the host later | Unknown outcome; Pi reads the host later | Local; unaffected |
+| Application host lost | App down; Server Guy intact and recovers it | App down; Server Guy intact and recovers it | App down; Server Guy intact and recovers it | App, Server Guy and credentials lost together |
+| Machine running Server Guy lost | Rebuild from kit; apps keep serving | Rebuild from kit; apps keep serving | Our incident; apps keep serving | Same host as the app |
+| Reaching Server Guy | Same machine, no login | The user's own tunnel | Login we must build | Public login needed at once |
+| Reaching a private app | Tunnel ends on the Mac or PC | Tunnel ends on the VM, then the user's tunnel | Needs a design of its own | Direct on the host |
 
-## Provisional recommendation
+## Packaging
 
-Aim at placement 3 for always-on care, reached over a private path first, and
-keep placement 1 as the development and single-owner default until the
-management host exists. Placement 2 is the tempting shortcut and the one to
-avoid as a default: it saves a machine by coupling the two failures the
-self-backup work exists to separate, and it forces the public login problem
-immediately.
+Rungs 1 and 2 ship the same thing: a background service installed from the
+command line, launchd on macOS and systemd on Linux, serving the web interface
+on loopback. The service keeps the worker running, restarts it after a crash
+and survives a reboot, which today takes two terminals.
 
-The strongest drawback of the recommendation is that it makes the controller
-host a second thing the product must keep healthy, updated and backed up, and
-it adds a recurring cost per user or per account. A successful recovery test
-of a hosted controller does not prove hosting is safer; it proves the kit
-works.
+A packaging spike comes next, and should settle:
 
-## Decisions the owner needs to make
+- an installer script, a single binary or a container image;
+- how the two native modules, `node-pty` and `better-sqlite3`, are built or
+  shipped for each platform;
+- whether Docker stays a requirement. Pi's repository workspace is a local
+  container today; it could instead move to the application host over the SSH
+  connection Server Guy already holds.
 
-1. Is always-on care worth a small dedicated machine, and is it one per
-   account or one per application?
-2. Which remote access path comes first: a private tunnel or VPN to the
-   management host, or a public authenticated URL with a real login story?
-3. Does the laptop placement remain a supported product mode or become
-   development-only once a hosted mode exists?
-4. Who updates and protects the management host: Pi itself, under the same
-   permission modes, or a fixed installer script outside Pi's reach?
-
-## Cheapest useful next experiment
-
-After discussion, run the existing controller under launchd on a machine the
-owner already has (the retired Mac mini qualifies), bound to loopback, reached
-from the laptop through an SSH tunnel, against the fixture application only.
-That answers whether care continues when the laptop sleeps, how tunnels behave
-from a machine you are not sitting at, and whether the self-backup runs
-unattended, with no billed host, no public exposure, no new login and no owner
-data. If it works, the next question is the access path, not the placement.
+A desktop wrapper is worth building only if the Mac rung turns out to need
+one.
