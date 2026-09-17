@@ -546,7 +546,7 @@ export function ChatPane({
                       className={`sg-avatar ${engineer ? "user" : ""}`}
                       aria-hidden="true"
                     >
-                      {engineer ? "You" : "SG"}
+                      {engineer ? "You" : "H"}
                     </span>
                     <strong>{engineer ? "You" : "Haldur"}</strong>
                     {message.source === "haldur" && (

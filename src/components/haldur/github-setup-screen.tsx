@@ -232,7 +232,7 @@ export function GithubSetupScreen({
     <main className={`sg-setup-shell ${s.root}`}>
       <header className="sg-setup-topbar">
         <Link className="sg-setup-brand" href="/applications">
-          <span className="sg-app-mark">SG</span>
+          <span className="sg-app-mark">H</span>
           <span>Haldur</span>
         </Link>
         <Link className="sg-setup-back" href="/applications">
