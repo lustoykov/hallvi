@@ -274,7 +274,7 @@ class BackupProofTest(unittest.TestCase):
                 return b""
 
             def path(value):
-                if value == "/opt/server-guy":
+                if value == "/opt/haldur":
                     return temp / "sources"
                 if value == "/var/tmp":
                     return temp

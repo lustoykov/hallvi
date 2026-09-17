@@ -11,7 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
-import { adoptLegacyEnvironment, stateLocation } from "./legacy-names.mjs";
+import { stateLocation } from "./state-location.mjs";
 import { exportFromFile } from "../node_modules/@earendil-works/pi-coding-agent/dist/core/export-html/index.js";
 
 const { values } = parseArgs({
@@ -29,9 +29,7 @@ const port = Number(values.port);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error("Invalid port.");
 const state = () => stateLocation(process.cwd(), { hidden: true });
-const databasePath = resolve(
-  adoptLegacyEnvironment().HALDUR_DB_PATH ?? state().database,
-);
+const databasePath = resolve(process.env.HALDUR_DB_PATH ?? state().database);
 const database = new Database(databasePath, {
   readonly: true,
   fileMustExist: true,

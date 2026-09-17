@@ -5,9 +5,6 @@ import {
   WORKER_BUSY_EXIT,
 } from "./server/pi-worker";
 import { shutdownTracing } from "./server/tracing";
-import { adoptLegacyEnvironment } from "../scripts/legacy-names.mjs";
-
-adoptLegacyEnvironment();
 
 const controller = new AbortController();
 for (const signal of ["SIGINT", "SIGTERM"] as const)

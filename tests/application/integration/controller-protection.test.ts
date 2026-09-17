@@ -123,7 +123,7 @@ it("copies the controller while it runs, including committed WAL data", async ()
   );
   const { entries: files, capturedAt } = await captureControllerPayload();
   const names = files.map((file) => file.path);
-  expect(names).toContain("payload/database/server-guy.db");
+  expect(names).toContain("payload/database/haldur.db");
   expect(names).toContain("payload/database/RECOVERY_QUARANTINE");
   expect(names).toContain("payload/config/RECOVERY_QUARANTINE");
   expect(names).toContain("payload/config/backup-destinations/default.json");
@@ -136,8 +136,7 @@ it("copies the controller while it runs, including committed WAL data", async ()
   const copy = join(root, "captured.db");
   writeFileSync(
     copy,
-    files.find((file) => file.path === "payload/database/server-guy.db")!
-      .content,
+    files.find((file) => file.path === "payload/database/haldur.db")!.content,
   );
   const captured = new Database(copy, { readonly: true });
   expect(captured.prepare("SELECT count(*) AS c FROM messages").get()).toEqual({
@@ -177,7 +176,7 @@ it("uploads a copy the owner can open, and offers the kit once", async () => {
   expect(stored.length).toBe(copy!.bytes);
   const kit = recoveryKit()!;
   const opened = entries(decryptArchive(stored, kit.passphrase));
-  expect(opened.has("payload/database/server-guy.db")).toBe(true);
+  expect(opened.has("payload/database/haldur.db")).toBe(true);
   const manifest = JSON.parse(
     opened.get("payload/manifest.json")!.toString("utf8"),
   );
@@ -295,12 +294,9 @@ it("opens a copy again through the recovery command, and refuses a damaged one",
     true,
   );
   // The restored database is the controller's own, openable and complete.
-  const restored = new Database(
-    join(target, "payload/database/server-guy.db"),
-    {
-      readonly: true,
-    },
-  );
+  const restored = new Database(join(target, "payload/database/haldur.db"), {
+    readonly: true,
+  });
   expect(restored.prepare("PRAGMA integrity_check").get()).toEqual({
     integrity_check: "ok",
   });

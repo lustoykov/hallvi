@@ -2,7 +2,7 @@
 .claude/
 .env
 .haldur/
-# State from before the rename to Haldur, still in use where it exists.
+# Server Guy state not yet moved (docs/installation.md): never commit its credentials.
 .server-guy/
 data/
 node_modules

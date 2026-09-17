@@ -16,7 +16,7 @@ import {
 import {
   piAccountLocation,
   stateLocation,
-} from "../../../scripts/legacy-names.mjs";
+} from "../../../scripts/state-location.mjs";
 import { databasePath } from "../../../src/server/db";
 import { diagnosticLogPath } from "../../../src/server/diagnostics";
 import {
@@ -65,8 +65,7 @@ function asChild(environment: Record<string, string> = {}) {
 // isolate the owner's ChatGPT connection and ask them to sign in again.
 it("hands every child the directories the application would have chosen", () => {
   const plain = asChild();
-  // `.haldur` and ~/.config/haldur/pi, or their Server Guy names where those
-  // are what this machine already has.
+  // `.haldur` and ~/.config/haldur/pi.
   expect(plain.database).toBe(
     stateLocation(process.cwd(), { hidden: true }).database,
   );

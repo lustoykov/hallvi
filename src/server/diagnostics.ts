@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { stateLocation } from "../../scripts/legacy-names.mjs";
+import { stateLocation } from "../../scripts/state-location.mjs";
 import type { PiRun } from "./types";
 
 export const MAX_DIAGNOSTIC_STEPS = 128;

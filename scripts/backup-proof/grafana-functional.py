@@ -37,7 +37,7 @@ def source_api(run, ssh, deployment_id, method, path, body=None):
             "python3 -c " + shlex.quote(SOURCE_API),
             input=json.dumps(
                 {
-                    "compose": f"/opt/server-guy/{deployment_id}/compose.json",
+                    "compose": f"/opt/haldur/{deployment_id}/compose.json",
                     "path": path,
                     "method": method,
                     "body": body,
@@ -175,7 +175,7 @@ def setup(run, ssh, deployment_id, proof, directory, fixture):
     dashboard = {
         "uid": fixture["uid"],
         "title": "Haldur restore verification",
-        "tags": ["server-guy-restore-proof"],
+        "tags": ["haldur-restore-proof"],
         "schemaVersion": 40,
         "panels": panels,
         "time": {"from": "now-1h", "to": "now"},

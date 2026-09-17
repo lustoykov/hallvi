@@ -165,7 +165,7 @@ describe.skipIf(process.env.HALDUR_DOCKER_TESTS !== "1")(
           expect
             .soft(
               await docker.listContainers({
-                "server-guy.pi-workspace": workspace.id,
+                "haldur.pi-workspace": workspace.id,
               }),
             )
             .toHaveLength(1);

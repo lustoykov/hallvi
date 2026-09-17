@@ -32,7 +32,8 @@ for (const path of [
   "scripts/serve.mjs",
   "scripts/cli.mjs",
   "scripts/dev-environment.mjs",
-  "scripts/legacy-names.mjs",
+  "scripts/state-location.mjs",
+  "scripts/move-from-server-guy.mjs",
   "scripts/installed-ports.mjs",
   // Pi's workspace image is built from these files at run time.
   "scripts/pi-workspace",
