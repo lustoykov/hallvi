@@ -17,6 +17,11 @@ import {
 } from "../../../src/server/operator-execution";
 import { pushTestDatabase } from "../../test-database";
 import type { PiRun } from "../../../src/server/types";
+import {
+  startActivity,
+  endActivity,
+  listActivity,
+} from "../../../src/server/pi-activity";
 let root: string;
 let run: PiRun;
 beforeAll(() => {
@@ -53,6 +58,8 @@ it("pauses the actual call until approved, then records its output and failure c
     "test host",
     "systemctl status app",
     work,
+    false,
+    "host-call",
   );
   const [receipt] = listExecutions(run.applicationId);
   expect(receipt.status).toBe("awaiting-approval");
@@ -74,11 +81,21 @@ it("pauses the actual call until approved, then records its output and failure c
 it("declining or cancelling an approval never starts the command", async () => {
   settings("always-ask");
   const work = vi.fn(async () => "should not run");
+  startActivity({
+    applicationId: run.applicationId,
+    runId: run.id,
+    sequence: 1,
+    id: "declined-call",
+    tool: "bash",
+    args: { command: "example" },
+  });
   const declined = executionContext(run).execute(
     "bash",
     "workspace",
     "example",
     work,
+    false,
+    "declined-call",
   );
   decideExecution(
     run.applicationId,
@@ -86,12 +103,26 @@ it("declining or cancelling an approval never starts the command", async () => {
     false,
   );
   expect(await declined).toEqual({ declined: true });
+  // The SDK completes normally after a decline; the linked activity must
+  // still agree with the executor that no command ran.
+  endActivity({
+    applicationId: run.applicationId,
+    id: "declined-call",
+    result: { declined: true },
+    isError: false,
+  });
+  expect(listActivity(run.applicationId)[0]).toMatchObject({
+    executionId: listExecutions(run.applicationId)[0].id,
+    status: "declined",
+  });
   const controller = new AbortController();
   const cancelled = executionContext(run, controller.signal).execute(
     "bash",
     "workspace",
     "example",
     work,
+    false,
+    "cancelled-call",
   );
   controller.abort();
   await expect(cancelled).rejects.toThrow();
@@ -105,7 +136,14 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
   settings("pi-decides");
   const context = executionContext(run);
   expect(
-    await context.execute("bash", "workspace", "example", async () => "done"),
+    await context.execute(
+      "bash",
+      "workspace",
+      "example",
+      async () => "done",
+      false,
+      "ordinary-call",
+    ),
   ).toBe("done");
   const question = context.execute(
     "request_approval",
@@ -113,6 +151,7 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
     "Remove database?",
     async () => ({ approved: true }),
     true,
+    "approval-call",
   );
   const receipt = listExecutions(run.applicationId).find(
     (item) => item.status === "awaiting-approval",
@@ -124,6 +163,8 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
     "workspace",
     "approved work",
     async () => "done",
+    false,
+    "approved-call",
   );
   expect(listExecutions(run.applicationId).at(-1)?.approvalId).toBe(receipt.id);
   settings("bypass");
@@ -134,6 +175,7 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
       "An action",
       async () => "done",
       true,
+      "bypass-call",
     ),
   ).toBe("done");
   expect(
@@ -150,6 +192,8 @@ it("side chats cannot execute and a stopped turn's pending command cannot be app
       "workspace",
       "anything",
       async () => "bad",
+      false,
+      "side-call",
     ),
   ).rejects.toThrow("read-only");
   settings("always-ask");
@@ -159,6 +203,8 @@ it("side chats cannot execute and a stopped turn's pending command cannot be app
     "workspace",
     "example",
     work,
+    false,
+    "stopped-call",
   );
   const receipt = listExecutions(run.applicationId)[0];
   finishPiRun(run.id, "interrupted", "Stopped");

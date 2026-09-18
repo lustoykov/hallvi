@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import { operatorSettings } from "./operator-execution";
+import { managedSshOptions } from "./managed-ssh";
 
 const exec = promisify(execFile);
 const optionsSchema = z.object({
@@ -133,22 +134,9 @@ export async function openServerPort(
   }
   const socket = controlSocket(applicationId, host, remotePort, localPort);
   const connection = [
-    "-F",
-    "/dev/null",
+    ...managedSshOptions(host),
     "-S",
     socket,
-    "-i",
-    host.privateKeyPath,
-    "-p",
-    String(host.port),
-    "-o",
-    `UserKnownHostsFile=${host.knownHostsPath}`,
-    "-o",
-    "StrictHostKeyChecking=yes",
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "IdentitiesOnly=yes",
     "-o",
     "ConnectTimeout=10",
   ];
