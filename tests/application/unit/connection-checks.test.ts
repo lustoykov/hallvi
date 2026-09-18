@@ -180,8 +180,11 @@ it("labels a machine key and collapses prior copies to that exact line", () => {
   expect(machineKeyLabel(otherPublicKey)).not.toBe(label);
   expect(command).toContain(`replacement='${publicKey} ${label}'`);
   expect(command).toContain("$1 == kind && $2 == encoded");
-  expect(command).toContain("mktemp ~/.ssh/authorized_keys.hallvi.XXXXXX");
+  expect(command).toContain(
+    "(tmp=$(mktemp ~/.ssh/authorized_keys.hallvi.XXXXXX)",
+  );
   expect(command).toContain('chmod 600 "$tmp" && mv "$tmp"');
+  expect(command).toContain('mv "$tmp" ~/.ssh/authorized_keys)');
   expect(command).not.toContain(`echo '${publicKey}' >>`);
 
   const install = command.split(" && set --")[0]!;

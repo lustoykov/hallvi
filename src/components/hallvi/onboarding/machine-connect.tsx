@@ -43,7 +43,7 @@ export function machineCommand(publicKey: string) {
   return [
     `mkdir -p ~/.ssh && chmod 700 ~/.ssh`,
     `touch ~/.ssh/authorized_keys`,
-    `tmp=$(mktemp ~/.ssh/authorized_keys.hallvi.XXXXXX) && trap 'rm -f "$tmp"' EXIT && awk -v kind='${kind}' -v encoded='${encoded}' -v replacement='${taggedKey}' '$1 == kind && $2 == encoded { if (!seen++) print replacement; next } { print } END { if (!seen) print replacement }' ~/.ssh/authorized_keys > "$tmp" && chmod 600 "$tmp" && mv "$tmp" ~/.ssh/authorized_keys`,
+    `(tmp=$(mktemp ~/.ssh/authorized_keys.hallvi.XXXXXX) && trap 'rm -f "$tmp"' EXIT && awk -v kind='${kind}' -v encoded='${encoded}' -v replacement='${taggedKey}' '$1 == kind && $2 == encoded { if (!seen++) print replacement; next } { print } END { if (!seen) print replacement }' ~/.ssh/authorized_keys > "$tmp" && chmod 600 "$tmp" && mv "$tmp" ~/.ssh/authorized_keys)`,
     `chmod 600 ~/.ssh/authorized_keys`,
     `set -- $SSH_CONNECTION; echo "hallvi-machine user=$(whoami) port=\${4:-22} key=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}') os=$(. /etc/os-release; echo $ID-$VERSION_ID) arch=$(uname -m) addrs=$3,$(hostname -I | tr -s ' ' ',')"`,
   ].join(" && ");
