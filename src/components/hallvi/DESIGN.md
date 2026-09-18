@@ -290,9 +290,17 @@ a row list tints only when something is wrong.
 The application name, its repository and the switcher sit in the sidebar
 head, above the destinations they scope, with a small “Hallvi” link back
 to all applications. The top bar then carries where you are — the open
-destination, or the current conversation — and the active work strip. There
+destination, or the current conversation. There
 is one place to switch application. `application-identity.tsx` also carries
 `topbar` and `breadcrumb` placements, compared live in `/prototype/shell`.
+
+Conversation progress stays beside the composer. Before the first request,
+the welcome explains the next action. During first setup, a compact row shows
+the four recorded milestones: Read it, A place to run, Deploy, Open it. A
+separate live line immediately below says what Hallvi is doing now, with
+elapsed time and Stop. That live status has one visible owner; it does not
+repeat above the transcript or inside the active reply. Completed setup removes
+the milestones, while later turns keep the same live activity position.
 
 ## Conversation-first design language from Fable
 

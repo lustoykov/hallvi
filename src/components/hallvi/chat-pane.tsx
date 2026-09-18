@@ -416,7 +416,6 @@ export function ChatPane({
   const canWrite = Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || readOnly;
   const sendDisabled = composerDisabled || !piReady;
-  const clockReady = useClockReady();
   /**
    * The turn this conversation is still finishing, if there is one.
    *
@@ -428,21 +427,28 @@ export function ChatPane({
       message.role === "assistant" &&
       (message.status === "queued" || message.status === "running"),
   );
+  const inFlightRun = runs.find(
+    (run) => run.assistantMessageId === inFlight?.id,
+  );
+  const queuedFollowUps = inFlight
+    ? view.messages.filter(
+        (message) =>
+          message.role === "assistant" &&
+          message.status === "queued" &&
+          message.id !== inFlight.id,
+      ).length
+    : 0;
   const inFlightActivity = runActivity({
     runId: inFlight?.id,
     status: inFlight?.status ?? "",
     workerAlive,
-    startedAt: runs.find((item) => item.assistantMessageId === inFlight?.id)
-      ?.startedAt,
+    startedAt: inFlightRun?.startedAt,
     hasDraft: Boolean(inFlight?.body?.trim()),
     executions: view.executions ?? [],
     activity: view.piActivity ?? [],
     now,
   });
-  /**
-   * Only while the turn it describes is not on screen. With the running
-   * message in view this is the same sentence twice, one above the other.
-   */
+  /** Whether the transcript shortcut is useful beside the persistent status. */
   const inFlightAway = useOffScreen(
     inFlight ? `hv-message-${inFlight.id}` : null,
     Boolean(inFlight),
@@ -528,24 +534,6 @@ export function ChatPane({
     };
   }, [applicationId, requestPending]);
 
-  // The running turn, said the same way its own status line says it.
-  const running = view.messages.find(
-    (message) => message.status === "queued" || message.status === "running",
-  );
-  const railActivity = running
-    ? runActivity({
-        runId: running.id,
-        status: running.status as "queued" | "running",
-        startedAt: runs.find((run) => run.assistantMessageId === running.id)
-          ?.startedAt,
-        hasDraft: Boolean(running.body?.trim()),
-        workerAlive,
-        executions: view.executions ?? [],
-        activity: view.piActivity ?? [],
-        now,
-      })
-    : null;
-
   const firstConversation =
     secretsHere &&
     Boolean(connections.journey) &&
@@ -553,6 +541,8 @@ export function ChatPane({
     !archived &&
     !view.messages.some((message) => message.role === "user") &&
     !connections.journey?.read;
+  const showFirstWelcome =
+    firstConversation && !requestPending && pendingMessage === null;
 
   return (
     <section className="hv-chat-pane">
@@ -573,25 +563,17 @@ export function ChatPane({
           )}
         </header>
       )}
-      {/* The pane's first row. It is always here in the main conversation,
-          because the grid below it counts rows; it is empty once the first
-          deployment has arrived. */}
-      {secretsHere && (
+      {/* Before the first request, the welcome has room to explain the next
+          useful action. Once work starts, progress moves beside the composer
+          and this row leaves the conversation to the transcript. */}
+      {showFirstWelcome && (
         <div className="hv-chat-top">
           {connections.journey && view.application && (
             <JourneyRail
               application={view.application.name}
               facts={connections.journey}
-              working={requestPending || Boolean(pendingMessage)}
-              says={
-                railActivity?.says ??
-                (pendingMessage ? "Saving your message" : null)
-              }
-              waitingOnYou={
-                Boolean(railActivity?.waitingOnYou) ||
-                secrets.some((secret) => !secret.establishedAt)
-              }
-              started={view.messages.some((message) => message.role === "user")}
+              waitingOnYou={secrets.some((secret) => !secret.establishedAt)}
+              placement="welcome"
               canStart={piReady && !busy && !requestPending && Boolean(onTell)}
               connectHref={
                 !piReady && chatId
@@ -619,14 +601,8 @@ export function ChatPane({
             const provisional = message.status !== "completed";
             const inProgress =
               message.status === "queued" || message.status === "running";
-            const queuedFollowUps =
-              message.status === "running"
-                ? view.messages.filter(
-                    (candidate) =>
-                      candidate.role === "assistant" &&
-                      candidate.status === "queued",
-                  ).length
-                : 0;
+            const queuedFollowUp =
+              message.status === "queued" && message.id !== inFlight?.id;
             const retried =
               run !== undefined &&
               runs.some((attempt) => attempt.retryOfId === run.id);
@@ -695,43 +671,22 @@ export function ChatPane({
                             <Markdown source={message.body} />
                           </MessageResponse>
                         )}
-                        <p className="hv-run-status" role="status">
-                          {/* A spinner beside "nothing is running" is the
-                              contradiction this change exists to remove. */}
-                          {inProgress && workerAlive !== false && (
-                            <SpinnerGap className="spin" aria-hidden="true" />
-                          )}
-                          {message.status === "queued" ||
-                          message.status === "running" ? (
-                            <Doing
-                              activity={runActivity({
-                                runId: message.id,
-                                status: message.status,
-                                startedAt: run?.startedAt,
-                                hasDraft: Boolean(message.body?.trim()),
-                                workerAlive,
-                                executions: view.executions ?? [],
-                                activity: view.piActivity ?? [],
-                                now,
-                              })}
-                            />
-                          ) : run?.error?.startsWith(
+                        {!inProgress && (
+                          <p className="hv-run-status" role="status">
+                            {run?.error?.startsWith(
                               "Conversation history unavailable.",
-                            ) ? (
-                            run.error
-                          ) : message.status === "cancelled" ||
-                            message.status === "interrupted" ? (
-                            message.status === "cancelled" &&
-                            !run?.startedAt &&
-                            run?.error ? (
-                              run.error
-                            ) : (
-                              stopOutcome(view.executions, message.id)
                             )
-                          ) : (
-                            failure.says
-                          )}
-                        </p>
+                              ? run.error
+                              : message.status === "cancelled" ||
+                                  message.status === "interrupted"
+                                ? message.status === "cancelled" &&
+                                  !run?.startedAt &&
+                                  run?.error
+                                  ? run.error
+                                  : stopOutcome(view.executions, message.id)
+                                : failure.says}
+                          </p>
+                        )}
                         {message.body && !inProgress && (
                           <details className="hv-run-draft">
                             <summary>Show unfinished draft</summary>
@@ -740,45 +695,44 @@ export function ChatPane({
                             </MessageResponse>
                           </details>
                         )}
-                        {run && !readOnly && !retried && (
-                          <button
-                            className={
-                              inProgress
-                                ? "hv-run-stop"
-                                : "hv-run-action hv-primary-button"
-                            }
-                            disabled={busy !== null}
-                            onClick={() => {
-                              if (historyUnavailable) onNewChat();
-                              else if (inProgress)
-                                onRunAction(run.id, "cancel");
-                              else if (failure.action.kind === "ask")
-                                continueAfterSecrets(failure.action.draft!);
-                              else onRunAction(run.id, "retry");
-                            }}
-                            type="button"
-                          >
-                            {!inProgress && (
-                              <ArrowClockwise
-                                aria-hidden="true"
-                                weight="bold"
-                              />
-                            )}
-                            {inProgress
-                              ? message.status === "queued"
+                        {run &&
+                          !readOnly &&
+                          !retried &&
+                          (!inProgress || queuedFollowUp) && (
+                            <button
+                              className={
+                                queuedFollowUp
+                                  ? "hv-run-stop"
+                                  : "hv-run-action hv-primary-button"
+                              }
+                              disabled={busy !== null}
+                              onClick={() => {
+                                if (queuedFollowUp)
+                                  onRunAction(run.id, "cancel");
+                                else if (historyUnavailable) onNewChat();
+                                else if (failure.action.kind === "ask")
+                                  continueAfterSecrets(failure.action.draft!);
+                                else onRunAction(run.id, "retry");
+                              }}
+                              type="button"
+                            >
+                              {!inProgress && (
+                                <ArrowClockwise
+                                  aria-hidden="true"
+                                  weight="bold"
+                                />
+                              )}
+                              {queuedFollowUp
                                 ? "Cancel queued message"
-                                : queuedFollowUps
-                                  ? `Stop + cancel ${queuedFollowUps} queued`
-                                  : "Stop"
-                              : historyUnavailable
-                                ? "Start a new chat"
-                                : // A command that exited non-zero will exit
-                                  // non-zero again, so retrying it is a way
-                                  // of not reading the error. The control
-                                  // follows what actually failed.
-                                  failure.action.label}
-                          </button>
-                        )}
+                                : historyUnavailable
+                                  ? "Start a new chat"
+                                  : // A command that exited non-zero will exit
+                                    // non-zero again, so retrying it is a way
+                                    // of not reading the error. The control
+                                    // follows what actually failed.
+                                    failure.action.label}
+                            </button>
+                          )}
                       </div>
                     ) : view.piActivity &&
                       hasActivity(view.piActivity, message.id) ? null : (
@@ -969,54 +923,69 @@ export function ChatPane({
         <ConversationScrollButton />
       </Conversation>
 
-      {/* A request for a value belongs where you act on it, not above the
-          conversation. It used to be the first thing in the chat pane — a
-          full-bleed 563px wall stacked above every message, pushing the
-          transcript down and colliding with the permissions strip. It sits
-          with the composer now, on the same measure as the messages. */}
-      {/* The only thing between the transcript and the composer, and only
-          while the request has scrolled out of sight. */}
+      {/* A request for a value belongs where you act on it, beside the
+          deployment progress and live work status above the composer. */}
       {view.application && chatId && view.chats[0]?.id === chatId && (
         <SecretRequestsChip secrets={secrets} />
       )}
 
-      {/* What is still running, said before the reader finds out by being
-          refused.
-          Sending while a turn is in flight is rejected by the backend with
-          "Pi is still working in this conversation", and the owner meets that
-          sentence after typing — having read a finished-looking answer and
-          scrolled past a request Hallvi started for itself. The guard is
-          right and stays; what was missing is that the conversation never
-          said so where the typing happens. */}
-      {inFlight && inFlightAway && (
-        <div className="hv-still-working" role="status">
+      {secretsHere &&
+        !showFirstWelcome &&
+        connections.journey &&
+        view.application && (
+          <JourneyRail
+            application={view.application.name}
+            facts={connections.journey}
+            waitingOnYou={secrets.some((secret) => !secret.establishedAt)}
+            placement="progress"
+          />
+        )}
+
+      {/* One persistent owner for live turn status and its stop action. It
+          follows the deployment phases so the current work is nearest the
+          composer even when a long reply has scrolled its heading away. */}
+      {inFlight && (
+        <div className="hv-still-working">
           {workerAlive !== false && (
             <SpinnerGap className="spin" aria-hidden="true" />
           )}
-          <span className="hv-still-what">
-            {inFlightActivity.says}
-            {clockReady && inFlightActivity.since && (
-              <small>{inFlightActivity.since}</small>
-            )}
+          <span className="hv-still-what" role="status">
+            <Doing activity={inFlightActivity} />
           </span>
-          <button
-            type="button"
-            className="hv-still-show"
-            onClick={() =>
-              document
-                .getElementById(`hv-message-${inFlight.id}`)
-                ?.scrollIntoView({
-                  block: "center",
-                  behavior: window.matchMedia(
-                    "(prefers-reduced-motion: reduce)",
-                  ).matches
-                    ? "auto"
-                    : "smooth",
-                })
-            }
-          >
-            Show
-          </button>
+          {inFlightAway && (
+            <button
+              type="button"
+              className="hv-still-show"
+              onClick={() =>
+                document
+                  .getElementById(`hv-message-${inFlight.id}`)
+                  ?.scrollIntoView({
+                    block: "center",
+                    behavior: window.matchMedia(
+                      "(prefers-reduced-motion: reduce)",
+                    ).matches
+                      ? "auto"
+                      : "smooth",
+                  })
+              }
+            >
+              Show
+            </button>
+          )}
+          {inFlightRun && !readOnly && (
+            <button
+              type="button"
+              className="hv-run-stop"
+              disabled={busy !== null}
+              onClick={() => onRunAction(inFlightRun.id, "cancel")}
+            >
+              {inFlight.status === "queued"
+                ? "Cancel queued message"
+                : queuedFollowUps > 0
+                  ? `Stop + cancel ${queuedFollowUps} queued`
+                  : "Stop"}
+            </button>
+          )}
         </div>
       )}
 

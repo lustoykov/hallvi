@@ -1,6 +1,6 @@
 "use client";
 
-// Hallvi, and where the first deployment has got to, above the conversation.
+// Hallvi's welcome, then the four quiet stops of the first deployment.
 //
 // A new application's conversation was one grey sentence on an empty page,
 // and while Pi worked the only sign of life was a small spinner. This keeps
@@ -9,12 +9,11 @@
 //
 // Every stop is read from what is recorded — a request, an attached host, a
 // deployment record, an access record — never from a timer or a guess at how
-// far along Pi is. While Pi works there is a small spinner beside the turn's
-// own status line and nothing else moves: work of unknown length gets no bar.
-// It lives in the pane's top row, small, so it keeps no room from the
-// conversation; permissions moved to the composer to make that row free.
+// far along Pi is. The compact stops live beside the composer, while live
+// activity stays in the transcript where Hallvi is thinking. Once access is
+// recorded, the first-deployment rail is finished and does not return.
 
-import { ArrowRight, Check, SpinnerGap } from "@phosphor-icons/react";
+import { ArrowRight, Check } from "@phosphor-icons/react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
@@ -43,39 +42,30 @@ export interface JourneyFacts {
 }
 
 const STOPS = [
-  { id: "read", label: "Read it", doing: "Reading the repository" },
-  { id: "place", label: "A place to run", doing: "Arranging where it runs" },
-  { id: "deploy", label: "Deploy", doing: "Deploying and checking it" },
-  { id: "open", label: "Open it", doing: "Opening a way in" },
+  { id: "read", label: "Read it" },
+  { id: "place", label: "A place to run" },
+  { id: "deploy", label: "Deploy" },
+  { id: "open", label: "Open it" },
 ] as const;
-
-const needsYouLater = (waiting: boolean) =>
-  waiting ? ("pointing" as const) : ("working" as const);
 
 export function JourneyRail({
   application,
   facts,
-  working,
-  says,
   waitingOnYou,
-  started,
+  placement,
   canStart,
   onStart,
   connectHref,
 }: {
   application: string;
   facts: JourneyFacts;
-  /** A turn is running right now. */
-  working: boolean;
-  /** The most specific true thing about that turn, in plain words. */
-  says: string | null;
-  /** The running turn, or an open card, is waiting for the owner. */
+  /** An open card or request is waiting for the owner. */
   waitingOnYou: boolean;
-  /** The owner has said something in this conversation. */
-  started: boolean;
+  /** The first welcome is spacious; progress beside the composer is compact. */
+  placement: "welcome" | "progress";
   /** A message can be sent: the model is connected and nothing is running. */
-  canStart: boolean;
-  onStart: () => void;
+  canStart?: boolean;
+  onStart?: () => void;
   connectHref?: string;
 }) {
   const done = [facts.read, facts.placed, facts.deployed, facts.opens];
@@ -84,48 +74,10 @@ export function JourneyRail({
     if (done[index + 1]) done[index] = true;
   const at = done.indexOf(false);
   const finished = at === -1;
-
-  // Shown for the first deployment and its arrival, not on every later visit:
-  // whether it was unfinished when this page opened is decided once.
-  const [watched] = useState(!finished);
   const [dances, setDances] = useState(0);
-  // After that, Hallvi is only in the row while there is something to say:
-  // a turn running, or something waiting. The stops have served their turn.
-  const later = finished && !watched;
-  if (later && !working && !waitingOnYou) return null;
+  const needsYou = waitingOnYou || facts.placeWaiting;
 
-  const needsYou = waitingOnYou || (facts.placeWaiting && !working);
-  const mood = later
-    ? needsYouLater(waitingOnYou)
-    : finished
-      ? "celebrating"
-      : needsYou
-        ? "pointing"
-        : working
-          ? "working"
-          : started
-            ? "ready"
-            : "waving";
-  const line = later
-    ? waitingOnYou
-      ? "Your turn: something below is waiting for you."
-      : `${says ?? "Working"}…`
-    : finished
-      ? `${application} is running. Open it from the card below.`
-      : needsYou
-        ? facts.placeWaiting
-          ? "Your turn: the card below asks where it should run."
-          : "Your turn: something below is waiting for you."
-        : working
-          ? `${says ?? STOPS[at]!.doing}…`
-          : started
-            ? "I’m here. Tell me what you’d like next."
-            : canStart
-              ? `I’ve added ${application}. Ready to read its repository.`
-              : `I’ve added ${application}. Connect ChatGPT to continue.`;
-
-  const intro = !started && !working && !needsYou && !facts.read && !finished;
-  if (intro)
+  if (placement === "welcome")
     return (
       <section
         className="hv-first-app"
@@ -176,77 +128,42 @@ export function JourneyRail({
       </section>
     );
 
+  if (finished) return null;
+
   return (
-    <section
-      className="hv-rail"
-      data-tone={
-        later
-          ? waitingOnYou
-            ? "waiting"
-            : "working"
-          : finished
+    <section className="hv-rail" aria-label="Progress of the first deployment">
+      <ol className="hv-rail-stops">
+        {STOPS.map((stop, index) => {
+          const state = done[index]
             ? "done"
-            : needsYou
-              ? "waiting"
-              : "working"
-      }
-      aria-label="Progress of the first deployment"
-    >
-      <button
-        type="button"
-        className="hv-rail-mascot"
-        aria-label="Make Hallvi dance"
-        onClick={() => setDances((count) => count + 1)}
-      >
-        <Mascot
-          color="#7a8bd6"
-          mood={mood}
-          dance={finished ? "cartwheel" : "shuffle"}
-          // Arriving earns one dance of its own.
-          danceRequest={dances + (finished ? 1 : 0)}
-        />
-      </button>
-      <p className="hv-rail-says" key={line} role="status">
-        {working && !needsYou && (
-          <SpinnerGap className="hv-rail-spin" aria-hidden="true" />
-        )}
-        <span>{line}</span>
-        {!started && !working && canStart && !finished && (
-          <button type="button" className="hv-rail-start" onClick={onStart}>
-            Read repository <ArrowRight weight="bold" aria-hidden="true" />
-          </button>
-        )}
-      </p>
-      {!later && (
-        <ol className="hv-rail-stops">
-          {STOPS.map((stop, index) => {
-            const state = done[index]
-              ? "done"
-              : index === at
-                ? needsYou
-                  ? "waiting"
-                  : "current"
-                : "pending";
-            return (
-              <li key={stop.id} data-state={state}>
-                <span className="hv-rail-mark" aria-hidden="true">
-                  {done[index] ? <Check weight="bold" /> : index + 1}
-                </span>
-                {stop.label}
-                <span className="hv-visually-hidden">
-                  {state === "done"
-                    ? ", done"
-                    : state === "waiting"
-                      ? ", waiting for you"
-                      : state === "current"
-                        ? ", current"
-                        : ""}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+            : index === at
+              ? needsYou
+                ? "waiting"
+                : "current"
+              : "pending";
+          return (
+            <li
+              key={stop.id}
+              data-state={state}
+              aria-current={index === at ? "step" : undefined}
+            >
+              <span className="hv-rail-mark" aria-hidden="true">
+                {done[index] ? <Check weight="bold" /> : index + 1}
+              </span>
+              {stop.label}
+              <span className="hv-visually-hidden">
+                {state === "done"
+                  ? ", done"
+                  : state === "waiting"
+                    ? ", waiting for you"
+                    : state === "current"
+                      ? ", current"
+                      : ""}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }

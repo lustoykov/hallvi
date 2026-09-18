@@ -318,9 +318,8 @@
 
 .hv-chat-pane {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   background: #fff;
 }
 .hv-pane-title {
@@ -378,6 +377,7 @@
 }
 .hv-conversation {
   position: relative;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
@@ -608,7 +608,9 @@
 /* What is still running, on the same measure as the composer under it.
    Quiet on purpose: this is Hallvi working, not a problem. */
 .hv-still-working {
+  flex: none;
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
   align-items: center;
   width: min(100%, var(--hv-measure, 760px));
@@ -810,6 +812,7 @@
 /* ---------- Composer ---------- */
 
 .hv-composer {
+  flex: none;
   min-width: 0;
   padding: 12px 24px 16px;
   border-top: 1px solid var(--line);

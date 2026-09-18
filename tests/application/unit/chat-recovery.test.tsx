@@ -38,6 +38,8 @@ function render({
   piActivity,
   status = "failed",
   body = "",
+  messages,
+  suppliedRuns,
 }: {
   error?: string;
   archived?: boolean;
@@ -45,6 +47,8 @@ function render({
   piActivity?: OperatorView["piActivity"];
   status?: "queued" | "running" | "failed" | "cancelled" | "completed";
   body?: string;
+  messages?: OperatorView["messages"];
+  suppliedRuns?: PiRun[];
 } = {}) {
   const view: OperatorView = {
     application: {
@@ -58,7 +62,7 @@ function render({
     },
     chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
-    messages: [
+    messages: messages ?? [
       {
         id: run.assistantMessageId,
         chatId: chat.id,
@@ -86,13 +90,15 @@ function render({
       onComposerChange={vi.fn()}
       onSend={vi.fn()}
       onArchive={vi.fn()}
-      runs={[
-        {
-          ...run,
-          error,
-          status: status === "completed" ? "succeeded" : status,
-        },
-      ]}
+      runs={
+        suppliedRuns ?? [
+          {
+            ...run,
+            error,
+            status: status === "completed" ? "succeeded" : status,
+          },
+        ]
+      }
       reconnecting={false}
       onRunAction={vi.fn()}
       onNewChat={vi.fn()}
@@ -166,6 +172,47 @@ describe("conversation recovery and assistant branding", () => {
     expect(html).not.toContain("Start a new chat</button>");
     expect(html).not.toContain("Try again</button>");
     expect(html).not.toContain("Ask what went wrong</button>");
+  });
+
+  it("lets a queued follow-up be withdrawn without stopping the active turn", () => {
+    const active = { ...run, id: "active", status: "running" as const };
+    const queued = {
+      ...run,
+      id: "follow-up",
+      assistantMessageId: "queued-message",
+      requestKey: "queued-key",
+      status: "queued" as const,
+      startedAt: null,
+    };
+    const html = render({
+      messages: [
+        {
+          id: active.assistantMessageId,
+          chatId: chat.id,
+          role: "assistant",
+          source: "pi",
+          body: "",
+          createdAt: failedAt,
+          status: "running",
+          revision: 2,
+        },
+        {
+          id: queued.assistantMessageId,
+          chatId: chat.id,
+          role: "assistant",
+          source: "pi",
+          body: "",
+          createdAt: failedAt,
+          status: "queued",
+          revision: 2,
+        },
+      ],
+      suppliedRuns: [active, queued],
+    });
+
+    expect(html).toContain("Stop + cancel 1 queued");
+    expect(html).toContain("Cancel queued message");
+    expect(html.match(/Waiting for the model/g)).toHaveLength(1);
   });
 
   it("uses one assistant name and a matching composer accessible label", () => {
