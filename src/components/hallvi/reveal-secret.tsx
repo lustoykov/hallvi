@@ -184,9 +184,9 @@ export function RevealSecret({
       )}
       {value && (
         <p className="hv-reveal-note">
-          On screen for {VISIBLE_MS / 1000} seconds, then hidden again. Server
-          Guy generated this and keeps it sealed; it is not in the conversation,
-          the records or any log.
+          On screen for {VISIBLE_MS / 1000} seconds, then hidden again. Hallvi
+          generated this and keeps it sealed; it is not in the conversation, the
+          records or any log.
         </p>
       )}
       {error && (

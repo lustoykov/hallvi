@@ -276,10 +276,9 @@ export function NewApplicationScreen({
               )}
               <p className={s.scope}>
                 Nothing is rented or changed at this step. A new application
-                starts on <strong>Pi decides</strong>: Hallvi asks before
-                consequential steps such as renting a server, at its own
-                judgment. You can change that in the conversation before
-                anything happens.
+                starts on <strong>Pi decides</strong>: Hallvi decides when to
+                ask for your approval. Switch to <strong>Always ask</strong>{" "}
+                there if every command should wait for your approval.
               </p>
               {error && (
                 <p role="alert" className={s.error}>

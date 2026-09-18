@@ -111,7 +111,8 @@ describe("application navigation", () => {
     expect(html).toContain('value=""');
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Add application/);
     expect(html).not.toContain("todo-fastapi");
-    for (const retired of ["Always ask", "Let Hallvi decide", "Full autonomy"])
+    expect(html).not.toContain('name="permissionMode"');
+    for (const retired of ["Let Hallvi decide", "Full autonomy"])
       expect(html).not.toContain(retired);
     expect(html).toContain('href="/applications"');
   });

@@ -29,11 +29,22 @@ import {
   type PermissionMode,
 } from "./types";
 
+/** Stable marker used both by the install command and the revocation copy. */
+export function machineKeyLabel(publicKey: string) {
+  const encoded = publicKey.trim().split(/\s+/)[1] ?? "";
+  const marker = encoded.replace(/[^A-Za-z0-9]/g, "").slice(-20);
+  return `hallvi-${marker || "access"}`;
+}
+
 /** The one command. Everything it does is listed under "What this does". */
 export function machineCommand(publicKey: string) {
+  const [kind = "ssh-ed25519", encoded = ""] = publicKey.trim().split(/\s+/);
+  const taggedKey = `${kind} ${encoded} ${machineKeyLabel(publicKey)}`;
   return [
     `mkdir -p ~/.ssh && chmod 700 ~/.ssh`,
-    `echo '${publicKey}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`,
+    `touch ~/.ssh/authorized_keys`,
+    `(tmp=$(mktemp ~/.ssh/authorized_keys.hallvi.XXXXXX) && trap 'rm -f "$tmp"' EXIT && awk -v kind='${kind}' -v encoded='${encoded}' -v replacement='${taggedKey}' '$1 == kind && $2 == encoded { if (!seen++) print replacement; next } { print } END { if (!seen) print replacement }' ~/.ssh/authorized_keys > "$tmp" && chmod 600 "$tmp" && mv "$tmp" ~/.ssh/authorized_keys)`,
+    `chmod 600 ~/.ssh/authorized_keys`,
     `set -- $SSH_CONNECTION; echo "hallvi-machine user=$(whoami) port=\${4:-22} key=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}') os=$(. /etc/os-release; echo $ID-$VERSION_ID) arch=$(uname -m) addrs=$3,$(hostname -I | tr -s ' ' ',')"`,
   ].join(" && ");
 }
@@ -121,8 +132,8 @@ function settle(outcome: MachineOutcome, line: MachineLine): Check[] {
     ...settled,
     {
       id: "room",
-      label: "Room for the application",
-      state: "passed",
+      label: "Memory and free disk measured",
+      state: "noted",
       detail: `${(outcome.memoryMb / 1024).toFixed(1)} GB memory and ${outcome.diskGb} GB disk free.`,
     },
   ];
@@ -174,7 +185,11 @@ export function MachineConnect({
     await staged.play(
       [
         ...PLAN,
-        { id: "room", label: "Room for the application", state: "pending" },
+        {
+          id: "room",
+          label: "Memory and free disk measured",
+          state: "pending",
+        },
       ],
       settle(outcome, line),
     );
@@ -191,8 +206,9 @@ export function MachineConnect({
           The ability to sign in to that machine as <b>one user</b> and run
           commands there, including as administrator. It uses a key made for
           this application only. Your password and your own keys are never asked
-          for, and removing one line from <code>~/.ssh/authorized_keys</code>{" "}
-          takes the access away.
+          for. To take the access away, remove the line ending in{" "}
+          <code>{machineKeyLabel(publicKey)}</code> from{" "}
+          <code>~/.ssh/authorized_keys</code>.
         </p>
         <p className="hv-ob-fine">
           It needs 64-bit Linux that you can already sign in to, where you are
