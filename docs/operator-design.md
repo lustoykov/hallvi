@@ -87,7 +87,7 @@ The architectural direction is sufficiently clear to begin bounded implementatio
 4. **Complete the lightweight deployment UI/UX checkpoint — current focus.** Deployment has been demonstrated. Implement the data-to-view mapping and polish the complete journey against the reference designs. Prove it with fresh Pi output and obtain owner acceptance before expanding complexity.
 5. **Prove generalization progressively.** Review the lightweight journey before moving to the medium example, then the more complicated example. Add capabilities those deployments actually need. These remain separate reviewable increments.
 
-**Queue, steer and side-chat work is deferred to a later milestone.** Get the core deployment experience right first. Existing read-only tool restrictions remain in effect; native queue/steer, contextual side-chat opening and concurrent side explanations are not part of the provisioning milestone.
+**Send next is the first conversation-control slice.** Explicit follow-ups use the existing durable message rows and run one at a time after the active turn. Native steering, contextual side-chat opening and concurrent side explanations remain deferred. Existing read-only tool restrictions remain in effect.
 
 After those checkpoints establish the deployment journey, begin the view-by-view design work described above. Detailed care features and broad hardening remain deferred. Exact application repositories, final record fields and visual details can be settled at the relevant checkpoint; they do not require another comprehensive architecture exercise.
 
@@ -98,7 +98,7 @@ This walkthrough is a proposal to refine with the user, not a fixed workflow or 
 | “Deploy this repository” | Inspect available source, existing connections and saved preferences. | Enter or select the repository and a request; enter the main conversation without an infrastructure questionnaire. |
 | Understand what is needed | Determine how the application runs, its dependencies, configuration and persistent data. | A concise explanation of the intended setup; ask only for access, private inputs or consequential choices that are actually missing. |
 | Establish the target | Recommend an appropriate server using available context, explain any new cost, and obtain authority when needed under the permission mode. | A concrete recommendation or decision in the conversation, not a mandatory release-proposal workflow. |
-| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress and expandable execution logs. Queue/steer/side-chat controls follow in a later milestone. |
+| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress and expandable execution logs. Send next retains an explicit follow-up; Stop also cancels waiting follow-ups in that conversation. Steering and contextual side chats remain deferred. |
 | Verify useful behavior | Choose and execute checks appropriate to the actual application, including reachability and meaningful behavior. | Explain what was actually verified and any remaining limitation. |
 | Hand over a working application | Preserve useful configuration and consequential knowledge and publish the relevant outcome. | An application link where applicable, an understandable deployment result and evidence available in the relevant existing views. |
 
@@ -116,19 +116,24 @@ Background work and, eventually, requests from other agents must coordinate with
 
 ### Interaction while Pi is busy
 
-For the deferred conversation-controls milestone, use the familiar queue/steer/side-chat interaction described by the user, reusing Pi's native session capabilities rather than building another conversation scheduler:
+The composer remains editable during work. **Send next** explicitly saves a follow-up in Hallvi's existing message queue; it does not interrupt the current command or deliver text to the active model turn. The worker claims requests in order, one at a time, and each gets its own reply in the same native conversation. A waiting follow-up never replaces the active reply's approval or activity pointer.
 
-| Interaction | Intended behavior |
-| --- | --- |
-| Queue | Retain a follow-up for Pi to process after its current work finishes. |
-| Steer | Deliver direction into the active conversation at the runtime's next steering boundary. |
-| Open in side chat | Discuss a message and relevant context in a separate read-only conversation without redirecting the main operator. |
+**Stop** cancels the active reply and the waiting follow-ups in that conversation. Their text remains in the transcript, with an explicit never-started explanation. Stopping a reply does not prove that a command already issued to the server stopped. Restart marks an unfinished active reply interrupted rather than replaying it; explicitly queued, not-yet-started requests remain available to the worker.
 
-Verified against the locally installed `@earendil-works/pi-coding-agent` version `0.84.4`: `AgentSession.followUp()` waits until there are no more tool calls or steering messages; `AgentSession.steer()` delivers after the current assistant turn's tool calls finish, before the next model call. `prompt()` also accepts either behavior while streaming. The runtime exposes queue state and queue-update events for UI integration. Steering does not itself cancel an already-running server command.
+```mermaid
+flowchart TD
+  View[Application destination] -->|Ask| Draft[Editable draft with removable origin chip]
+  Draft -->|Explicit Send or Send next| Saved[Durable user message and queued reply]
+  Saved -->|Current turn finishes| Run[Single worker claims next reply]
+  Run --> Result[Recorded reply and outcomes]
+  Result -->|Return to destination| View
+  Stop[Stop active reply] --> Cancel[Cancel active and waiting replies in this conversation]
+  Cancel --> History[Keep transcript and command history]
+```
 
-Pi's `SessionManager` also provides session branching/forking primitives. These are possible building blocks for side-chat context, not a built-in guarantee of read-only behavior or a finished side-chat UI. Hallvi supplies the read-only tool set and chooses what context to include.
+A destination's question keeps its origin in a removable chip and offers a return action after submission. It never replaces an existing draft. Drafts are kept in browser storage scoped to the controller origin, application and conversation, survive tab closure, and are cleared after acceptance. Storage being unavailable must not block ordinary messaging. Credential-entry fields do not use draft persistence.
 
-Source for this check: installed `dist/core/agent-session.d.ts`, `dist/core/agent-session.js` and `dist/core/session-manager.d.ts`. This establishes available runtime primitives, not that Hallvi has wired them into its current per-request run lifecycle. Keep application integration small: route messages to the live session, expose pending/delivered state, using its existing queue state. Cross-process restoration of pending messages is not a prerequisite for the first slice; normal session history still provides conversational continuity.
+Mid-command steering and contextual read-only side chats remain future work. Pi's native `AgentSession.followUp()`, `AgentSession.steer()` and session branching primitives are available building blocks; they are not used to create a second queue in this slice. Steering would require a separately reviewed delivery boundary and must not imply cancellation of an already-running server command.
 
 ### General tools and independent permissions
 

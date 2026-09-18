@@ -7,6 +7,7 @@ import {
   PaperPlaneRight,
   SpinnerGap,
   WarningCircle,
+  X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import {
@@ -33,6 +34,7 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
+import type { ConversationContext } from "./conversation-continuity";
 import type { Reachability } from "./deployment-prototype/page-head";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
@@ -174,7 +176,10 @@ export function ChatPane({
   pendingMessage,
   piReady,
   composer,
+  context = null,
   onComposerChange,
+  onDismissContext,
+  onReturnToContext,
   onSend,
   onArchive,
   runs,
@@ -200,7 +205,10 @@ export function ChatPane({
   pendingMessage: string | null;
   piReady: boolean;
   composer: string;
+  context?: ConversationContext | null;
   onComposerChange: (value: string) => void;
+  onDismissContext?: () => void;
+  onReturnToContext?: (section: ApplicationSection) => void;
   onSend: () => void;
   onArchive: () => void;
   runs: PiRun[];
@@ -405,6 +413,9 @@ export function ChatPane({
   const requestPending = view.messages.some(
     (message) => message.status === "queued" || message.status === "running",
   );
+  const contextualUserMessageId = context?.requestKey
+    ? runs.find((run) => run.requestKey === context.requestKey)?.userMessageId
+    : null;
 
   // What Pi has asked the owner for. Read while a turn is running, because
   // that is when a request appears, and once afterwards so the field goes
@@ -526,8 +537,11 @@ export function ChatPane({
             <JourneyRail
               application={view.application.name}
               facts={connections.journey}
-              working={requestPending}
-              says={railActivity?.says ?? null}
+              working={requestPending || Boolean(pendingMessage)}
+              says={
+                railActivity?.says ??
+                (pendingMessage ? "Saving your message" : null)
+              }
               waitingOnYou={
                 Boolean(railActivity?.waitingOnYou) ||
                 secrets.some((secret) => !secret.establishedAt)
@@ -557,6 +571,14 @@ export function ChatPane({
             const provisional = message.status !== "completed";
             const inProgress =
               message.status === "queued" || message.status === "running";
+            const queuedFollowUps =
+              message.status === "running"
+                ? view.messages.filter(
+                    (candidate) =>
+                      candidate.role === "assistant" &&
+                      candidate.status === "queued",
+                  ).length
+                : 0;
             const retried =
               run !== undefined &&
               runs.some((attempt) => attempt.retryOfId === run.id);
@@ -613,6 +635,11 @@ export function ChatPane({
                     <LocalTime value={message.createdAt} variant="compact" />
                   </div>
                   <MessageContent>
+                    {engineer && message.id === contextualUserMessageId && (
+                      <span className="hv-message-context">
+                        About {context?.label}
+                      </span>
+                    )}
                     {provisional ? (
                       <div className="hv-run-progress">
                         {message.body && inProgress && !view.piActivity && (
@@ -646,7 +673,13 @@ export function ChatPane({
                             run.error
                           ) : message.status === "cancelled" ||
                             message.status === "interrupted" ? (
-                            stopOutcome(view.executions, message.id)
+                            message.status === "cancelled" &&
+                            !run?.startedAt &&
+                            run?.error ? (
+                              run.error
+                            ) : (
+                              stopOutcome(view.executions, message.id)
+                            )
                           ) : (
                             failure.says
                           )}
@@ -684,7 +717,11 @@ export function ChatPane({
                               />
                             )}
                             {inProgress
-                              ? "Stop"
+                              ? message.status === "queued"
+                                ? "Cancel queued message"
+                                : queuedFollowUps
+                                  ? `Stop + cancel ${queuedFollowUps} queued`
+                                  : "Stop"
                               : historyUnavailable
                                 ? "Start a new chat"
                                 : // A command that exited non-zero will exit
@@ -945,9 +982,15 @@ export function ChatPane({
             <div>
               <strong>No worker is running</strong>
               <p>
-                Messages are saved and stay queued until one starts. Run{" "}
-                <code>npm run dev</code>, which starts it, or{" "}
-                <code>npm run worker</code> in this checkout.
+                Messages are saved and stay queued. Restart Hallvi with{" "}
+                <code>hallvi restart</code>, then check it with{" "}
+                <code>hallvi status</code>.
+                {process.env.NODE_ENV === "development" && (
+                  <>
+                    {" "}
+                    In development, restart <code>npm run dev</code>.
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -979,6 +1022,29 @@ export function ChatPane({
         <div
           className={`hv-composer-box${composerDisabled ? " disabled" : ""}`}
         >
+          {context && !context.requestKey && (
+            <div className="hv-composer-context">
+              <span>About {context.label}</span>
+              <button
+                type="button"
+                onClick={onDismissContext}
+                aria-label={`Remove ${context.label} context`}
+              >
+                <X weight="bold" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          {context?.requestKey && (
+            <div className="hv-context-return">
+              <span>This question came from {context.label}.</span>
+              <button
+                type="button"
+                onClick={() => onReturnToContext?.(context.section)}
+              >
+                Return to {context.label}
+              </button>
+            </div>
+          )}
           <textarea
             disabled={composerDisabled}
             id="pi-composer"
@@ -1032,7 +1098,7 @@ export function ChatPane({
               ) : (
                 <PaperPlaneRight weight="fill" aria-hidden="true" />
               )}
-              Send
+              {requestPending ? "Send next" : "Send"}
             </button>
           </div>
         </div>

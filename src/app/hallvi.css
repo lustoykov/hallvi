@@ -319,6 +319,7 @@
 .hv-chat-pane {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: #fff;
 }
@@ -448,6 +449,17 @@
   padding: 10px 14px;
   border-radius: 12px 12px 4px 12px;
   background: var(--blue-soft);
+}
+.hv-message-context {
+  display: inline-flex;
+  margin: 0 0 7px;
+  padding: 2px 8px;
+  border: 1px solid #c7d6f5;
+  border-radius: 999px;
+  background: #fff;
+  color: #2852a6;
+  font-size: 11px;
+  font-weight: 600;
 }
 .hv-message-response {
   overflow-wrap: anywhere;
@@ -761,6 +773,7 @@
 /* ---------- Composer ---------- */
 
 .hv-composer {
+  min-width: 0;
   padding: 12px 24px 16px;
   border-top: 1px solid var(--line);
   background: #fff;
@@ -779,6 +792,62 @@
 }
 .hv-composer-box.disabled {
   background: var(--panel);
+}
+.hv-composer-context,
+.hv-context-return {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 0;
+  color: #2852a6;
+  font-size: 12px;
+}
+.hv-composer-context span {
+  padding: 3px 4px 3px 8px;
+  border: 1px solid #c7d6f5;
+  border-radius: 999px;
+  background: #edf3ff;
+  font-weight: 600;
+}
+.hv-composer-context button {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  margin-left: -10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #2852a6;
+  cursor: pointer;
+}
+.hv-composer-context button:hover {
+  background: #dbe7ff;
+}
+.hv-composer-context button:focus-visible,
+.hv-context-return button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.hv-composer-context svg {
+  width: 12px;
+  height: 12px;
+}
+.hv-context-return {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #f7f9fd;
+  color: var(--muted);
+}
+.hv-context-return button {
+  border: 0;
+  background: transparent;
+  color: #315bc6;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 .hv-composer textarea {
   display: block;
@@ -825,6 +894,7 @@
   color: var(--ink-2);
 }
 .hv-send {
+  flex-shrink: 0;
   min-width: 72px;
   height: 32px;
   padding: 0 12px;
@@ -1206,6 +1276,12 @@
 }
 
 @media (max-width: 540px) {
+  .hv-composer {
+    padding-inline: 12px;
+  }
+  .hv-composer-hint {
+    display: none;
+  }
   .hv-setup-topbar {
     padding: 0 15px;
   }

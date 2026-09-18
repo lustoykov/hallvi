@@ -106,25 +106,25 @@ function insertResponse(
       ),
     )
     .get();
-  if (active)
-    throw new ExistingApplicationConflictError(
-      "Pi is still working in this conversation. Wait or cancel before sending another message.",
-    );
   const response = insertMessage(chatId, "assistant", "", "pi", "queued");
   db()
     .update(messages)
     .set({ responseTo: userMessageId, requestKey, retryOfId })
     .where(eq(messages.id, response.id))
     .run();
-  db()
-    .update(chats)
-    .set({
-      currentResponseId: response.id,
-      status: "working",
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(chats.id, chatId))
-    .run();
+  // A follow-up may wait behind active work, but it must not replace the
+  // pointer used by activity and approval UI before it actually starts. The
+  // queued message row is the durable FIFO.
+  if (!active)
+    db()
+      .update(chats)
+      .set({
+        currentResponseId: response.id,
+        status: "working",
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(chats.id, chatId))
+      .run();
   return accepted(getPiRun(response.id)!);
 }
 export function sendChatMessage(
@@ -182,13 +182,29 @@ export function retryPiRun(applicationId: string, chatId: string, id: string) {
   });
 }
 export function cancelPiRun(applicationId: string, chatId: string, id: string) {
-  scopedRun(applicationId, chatId, id);
-  finishPiRun(
-    id,
-    "cancelled",
-    "Turn cancelled. Commands already started may have changed the server; check execution history.",
-  );
-  return getPiRun(id)!;
+  return withTransaction(() => {
+    const target = scopedRun(applicationId, chatId, id);
+    settle(
+      id,
+      "cancelled",
+      "Turn cancelled. Commands already started may have changed the server; check execution history.",
+    );
+    // Stop is a boundary for this conversation. Follow-ups written for the
+    // outcome of the stopped turn must not start later as though that outcome
+    // existed. Keep them in the transcript with a clear never-started result.
+    if (target.status === "running")
+      for (const queued of db()
+        .select()
+        .from(messages)
+        .where(and(eq(messages.chatId, chatId), eq(messages.status, "queued")))
+        .all())
+        settle(
+          queued.id,
+          "cancelled",
+          "Not started because the active reply was stopped.",
+        );
+    return getPiRun(id)!;
+  });
 }
 export function claimNextPiRun() {
   return withTransaction(() => {
@@ -212,6 +228,15 @@ export function claimNextPiRun() {
         revision: sql`${messages.revision} + 1`,
       })
       .where(eq(messages.id, next.id))
+      .run();
+    db()
+      .update(chats)
+      .set({
+        currentResponseId: next.id,
+        status: "working",
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(chats.id, next.chatId))
       .run();
     return getPiRun(next.id);
   });
@@ -250,11 +275,21 @@ function settle(
     })
     .where(eq(messages.id, id))
     .run();
+  const next = db()
+    .select()
+    .from(messages)
+    .where(and(eq(messages.chatId, run.chatId), eq(messages.status, "queued")))
+    .orderBy(asc(messages.createdAt), asc(sql`rowid`))
+    .get();
   db()
     .update(chats)
     .set({
-      status: status === "interrupted" ? "interrupted" : "idle",
-      currentResponseId: null,
+      status: next
+        ? "working"
+        : status === "interrupted"
+          ? "interrupted"
+          : "idle",
+      currentResponseId: next?.id ?? null,
       updatedAt: now,
     })
     .where(and(eq(chats.id, run.chatId), eq(chats.currentResponseId, id)))

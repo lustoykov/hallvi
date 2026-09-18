@@ -29,7 +29,7 @@ export function InformationCard(props: {
   /** See InformationContent: an access URL outlives the tunnel behind it. */
   reachable?: Reachability;
 }) {
-  return props.record.presentation?.content ? (
+  return props.record.presentation?.content && !props.record.retiredAt ? (
     <InformationContent {...props} />
   ) : (
     <GenericInformationCard {...props} />
@@ -70,6 +70,15 @@ function GenericInformationCard({
   const elsewhere = recordDestination(presentation.views, currentView);
   const established = record.establishedAt ?? record.updatedAt;
   const recommendation = presentation.role === "recommendation";
+  const attention =
+    presentation.status === "failed" || presentation.status === "warning";
+  const kind = recommendation
+    ? "Recommendation"
+    : attention
+      ? "Needs attention"
+      : presentation.role === "outcome"
+        ? "Result"
+        : "Update";
   /**
    * Retired: a later record replaced this one, so it is history.
    *
@@ -150,12 +159,18 @@ function GenericInformationCard({
 
       {presentation.nextStep && !retired && (
         <p className="hv-info-next">
-          <span>{recommendation ? "What Pi suggests" : "Next"}</span>
+          <span>
+            {recommendation
+              ? "What Pi suggests"
+              : attention
+                ? "A useful next step"
+                : "Next"}
+          </span>
           {presentation.nextStep}
         </p>
       )}
 
-      {(presentation.url || destinations.length > 0) && (
+      {(presentation.url || (onOpen && destinations.length > 0)) && (
         <footer className="hv-info-foot">
           {presentation.url && (
             <a
@@ -333,7 +348,12 @@ function GenericInformationCard({
       data-information-id={record.id}
     >
       <header className="hv-info-head">
-        <Tag tone={tone}>{word}</Tag>
+        <div className="hv-info-classification">
+          {kind.toLowerCase() !== word.toLowerCase() && (
+            <span className="hv-info-kind">{kind}</span>
+          )}
+          <Tag tone={tone}>{word}</Tag>
+        </div>
         <h3>{record.title}</h3>
         <span className="hv-info-when">
           {record.establishedAt ? "Established" : "Saved"}{" "}

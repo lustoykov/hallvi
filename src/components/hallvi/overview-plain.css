@@ -38,6 +38,77 @@
   padding: 0;
   list-style: none;
 }
+.hv-overview-stage {
+  padding: 20px 22px;
+  border: 1px solid var(--working-line, #c7d6f5);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fff 0%, var(--working-bg, #edf3ff) 145%);
+}
+.hv-overview-stage > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--working-text, #2852a6);
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.hv-overview-stage h2 {
+  margin: 0 0 6px;
+  color: var(--ink, #202838);
+  font-size: 19px;
+  font-weight: 620;
+  letter-spacing: -0.018em;
+  text-transform: none;
+}
+.hv-overview-stage p {
+  max-width: 62ch;
+  margin-bottom: 13px;
+}
+.hv-overview-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 920px;
+  margin: 0 auto 34px;
+  padding: 16px 20px;
+  border: 1px solid var(--working-line, #c7d6f5);
+  border-radius: 12px;
+  background: var(--working-bg, #edf3ff);
+}
+.hv-overview-resume span,
+.hv-overview-resume b {
+  display: block;
+}
+.hv-overview-resume span {
+  margin-bottom: 2px;
+  color: var(--working-text, #2852a6);
+  font-size: 10.5px;
+  font-weight: 680;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.hv-overview-resume b {
+  color: var(--ink, #202838);
+  font-size: 14px;
+}
+.hv-overview-resume p {
+  margin: 3px 0 0;
+  color: var(--ink-2, #3e4a60);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.hv-overview-resume .hv-primary-button {
+  flex: none;
+}
+@media (max-width: 680px) {
+  .hv-overview-resume {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-inline: 16px;
+  }
+}
 
 /* The four lanes, as rows you can open. */
 .hv-overview-vitals {

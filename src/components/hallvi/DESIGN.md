@@ -348,7 +348,7 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 The workspace shell is unchanged: a 240px navigation column, a 56px top bar, and a workspace that fills the rest. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
 
-A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”, and, when work elsewhere is live, a suggestion chip. While a destination is open and an action is working or waiting, the top bar shows a **work strip** on the right: state chip, action title, nothing else. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip.
+A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”, and, when work elsewhere is live, a suggestion chip. While a destination is open and an action is working or waiting, the top bar shows a **work strip** on the right: state chip, action title, nothing else. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit label becomes “Send next”; queued text has an explicit waiting state. Stop also cancels queued follow-ups in that conversation.
 
 Receipts sit under the message that started the work, inside the message column, and stretch to the message width. Activity cards and origin lines sit at the top of a destination’s content, above the first heading, so the first thing a view says is what is happening to it right now.
 
@@ -400,6 +400,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 
 ### Destination links and reference chips
 
+- **Record hierarchy:** name the interaction (Recommendation, Needs attention, Result or Update) separately from the evidence grade. Give the outcome title prominence, keep evidence disclosed, and label a recorded next step without inventing an executable action. Retired records remain quiet history with obsolete calls to action removed.
 - **Destination link:** pill, `line` border on white, working-blue text, 11.5px, an arrow icon after the verb and destination (“Open Backups →”). Hover tints the background `working-bg`. The verb is the option’s verb; conversation-first says “Open”.
 - **Reference chip:** the same pill with a state chip inside, the referenced action’s title in ink and “from [conversation]” in muted. It opens that conversation at that message. Used when a reply builds on work from another conversation.
 - **Text link:** the bare blue text button used for “from Database and backups” and the Backups link inside a fact.
@@ -417,6 +418,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 
 ### Overview blocks
 
+- **Before a recorded deployment:** lead with one stage-specific continuation based on the latest application record and stored connection settings. Missing records mean “No deployment is recorded yet”, not “Not deployed”. Hide repeated unknown vital rows. Failed or limited latest deployments take precedence over older verified records.
 - **Condition row:** status dot (green only when the last verification is under 24 hours old), application name, one line of condition with the relative verification time and “no continuous monitoring yet”. When stale, a secondary button drafts a re-verification request.
 - **Needs you:** items with a state chip, title, one sentence, and two links: review or open the conversation, and open the destination. Amber surface; red border when failed. Empty state: “Nothing needs you right now.”
 - **Running:** a four-row fact list (application, host, database, protection) with a 110px label column; protection is coloured by state.
