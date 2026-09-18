@@ -521,6 +521,43 @@
   color: var(--blue-text);
   text-underline-offset: 3px;
 }
+.hv-reply-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.hv-reply-copy button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hv-reply-copy button:hover {
+  background: var(--panel);
+  color: var(--ink-2);
+}
+.hv-reply-copy button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.hv-reply-copy svg {
+  width: 13px;
+  height: 13px;
+}
+.hv-reply-copy span:not(:empty) {
+  color: var(--red);
+}
 /* Return to the live edge.
    This was a 32px circle at left:50%, which put it exactly on the middle of
    the reading column: the one control whose whole job is to help you read was

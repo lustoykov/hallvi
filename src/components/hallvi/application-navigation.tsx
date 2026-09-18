@@ -189,6 +189,7 @@ function Activity({
 export function ApplicationNavigation({
   chats,
   selectedChatId,
+  settingsHref = "/setup/pi",
   section,
   busy,
   onSection,
@@ -215,6 +216,7 @@ export function ApplicationNavigation({
   onReveal?: (revealed: boolean) => void;
   chats: ChatSummary[];
   selectedChatId: string | null;
+  settingsHref?: string;
   section: ApplicationSection | null;
   busy: boolean;
   onSection: (section: ApplicationSection) => void;
@@ -317,7 +319,7 @@ export function ApplicationNavigation({
           </button>
         ))}
       </nav>
-      <Link className="hv-navigation-settings" href="/setup/pi">
+      <Link className="hv-navigation-settings" href={settingsHref}>
         <GearSix /> Settings
       </Link>
     </aside>

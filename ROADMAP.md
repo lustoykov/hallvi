@@ -4,7 +4,7 @@ The active delivery sequence for the application operator redesign. [Product](PR
 
 ## Current priority and sequencing boundary
 
-**Current priority: make the simple deployment experience beautiful, understandable and delightful before expanding application complexity.** On 12 September 2026, the owner confirmed that application deployment has been demonstrated and asked to focus next on the database-to-UI mapping and the happy path. Opus is working on this stage, as reported by the owner; this is work in progress, not a completion claim.
+**Current priority: finish concrete everyday UX fixes, then prepare the public self-service beta.** On 18 September 2026, the owner asked for a pleasant experience without additional machinery and to move into launch preparation once further polish has diminishing returns. The fresh deployment walkthrough remains the acceptance gate; extra features, animation and broader application complexity are not the next step.
 
 Connect real saved records and execution evidence to the accepted reference designs through the [presentation contract](docs/presentation-contract.md). Pi supplies structured observations; deterministic view projections and components own the layout and visual hierarchy. Polish the journey from adding a repository through permissions, visible progress and a verified result to opening the application from the user's PC. The next gate is the owner accepting this complete experience on a fresh run, including refresh and return visits.
 
@@ -39,7 +39,15 @@ Stop after each reviewable increment and use the user's feedback to shape the ne
 
 After the simple deployment UI/UX is accepted, expand application complexity in the order above and review further sidebar capabilities individually and decide what it can usefully show and do. Revisit broad security hardening after beta. Always-on care remains a direction; log-error detection, Pi-authored monitors, detailed care cadences and per-vertical policies are deferred.
 
+## Public self-service beta preparation
+
+- [ ] **A release people can install.** Produce the downloadable candidate, its checksum and accurate prerequisites. Rehearse clean installation and restart on the platforms advertised for beta. Verify same-schema upgrade with retained state; explain the current refusal of schema-changing upgrades rather than imply automatic migration. [Installation and limits](docs/installation.md).
+- [ ] **One fresh-user journey on that exact candidate.** Have someone outside the development setup install it, connect their model and required accounts, add a repository, deploy to a real host, use the result and return after restart. Record the candidate and concrete friction; dated proofs and synthetic UI checks do not establish this gate. Keep the useful application behavior, not only a green HTTP check, in the walkthrough.
+- [ ] **Clear authority before connecting.** Finish the beta safety communication item above and verify it in that walkthrough: what host/provider access permits, what Pi decides versus Always ask means, practical scoped-account/test-server precautions and an independent recovery copy. Keep this contextual and short rather than introduce another workflow.
+
 ## Conversation controls
+
+- [x] **Everyday interaction polish — [PR #138](https://github.com/lustoykov/hallvi/pull/138).** Copy completed replies, keep keyboard focus useful after sending and returning, carry conversation context through Settings and GitHub connection, simplify repeat application setup, and keep Home consistent with current recorded problems and recovery.
 
 - [x] **Send next and conversation continuity.** Explicit follow-ups wait in the existing durable message queue; Stop cancels active and waiting replies in that conversation. Contextual questions preserve the owner's draft and destination, and drafts survive tab closure. [Interaction contract](docs/operator-design.md#interaction-while-pi-is-busy).
 - [ ] **Steer and contextual side chats — deferred.** Review native steering boundaries, opening contextual side chats and concurrent read-only explanations separately. Existing read-only tool restrictions remain; these controls are not prerequisites for first deployment.

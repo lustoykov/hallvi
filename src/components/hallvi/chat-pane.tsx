@@ -4,6 +4,8 @@ import { HallviMark } from "./hallvi-mark";
 import {
   Archive,
   ArrowClockwise,
+  Check,
+  Copy,
   PaperPlaneRight,
   SpinnerGap,
   WarningCircle,
@@ -78,6 +80,37 @@ const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   "timed-out": "Timed out",
   interrupted: "Stopped",
 };
+
+function CopyReply({ body }: { body: string }) {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(body);
+      setStatus("copied");
+    } catch {
+      setStatus("failed");
+    }
+  }
+
+  return (
+    <div className="hv-reply-copy">
+      <button type="button" onClick={() => void copy()}>
+        {status === "copied" ? (
+          <Check weight="bold" aria-hidden="true" />
+        ) : (
+          <Copy weight="bold" aria-hidden="true" />
+        )}
+        {status === "copied" ? "Copied" : "Copy reply"}
+      </button>
+      <span role="status">
+        {status === "failed"
+          ? "Copy failed — select the reply to copy it."
+          : ""}
+      </span>
+    </div>
+  );
+}
 
 /**
  * Where each saved record is shown in full, keyed by the record's own id.
@@ -245,6 +278,7 @@ export function ChatPane({
   workerAlive?: boolean;
 }) {
   const chatId = activeChat?.id ?? null;
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   // Receipts sit under the reply that started the work. One whose reply is
   // not in this transcript (an older record, or a reply not saved yet) is
   // still shown, at the end, so no operation is ever lost.
@@ -766,6 +800,12 @@ export function ChatPane({
                       }
                     />
                   )}
+                  {message.role === "assistant" &&
+                    message.source === "pi" &&
+                    message.status === "completed" &&
+                    Boolean(message.body.trim()) && (
+                      <CopyReply body={message.body} />
+                    )}
                   {message.blocks?.map((block, index) => {
                     // A call already drawn in the activity order is not drawn
                     // again here; the link is by execution id, not by name.
@@ -951,7 +991,14 @@ export function ChatPane({
             onClick={() =>
               document
                 .getElementById(`hv-message-${inFlight.id}`)
-                ?.scrollIntoView({ block: "center", behavior: "smooth" })
+                ?.scrollIntoView({
+                  block: "center",
+                  behavior: window.matchMedia(
+                    "(prefers-reduced-motion: reduce)",
+                  ).matches
+                    ? "auto"
+                    : "smooth",
+                })
             }
           >
             Show
@@ -964,6 +1011,9 @@ export function ChatPane({
         onSubmit={(event) => {
           event.preventDefault();
           onSend();
+          requestAnimationFrame(() =>
+            composerRef.current?.focus({ preventScroll: true }),
+          );
         }}
       >
         {archived && (
@@ -1046,6 +1096,7 @@ export function ChatPane({
             </div>
           )}
           <textarea
+            ref={composerRef}
             disabled={composerDisabled}
             id="pi-composer"
             aria-label="Message Hallvi"

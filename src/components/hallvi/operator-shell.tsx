@@ -191,6 +191,7 @@ export function OperatorShell({
   // Closing a destination returns to the conversation.
   function closeSection() {
     selectSection(null);
+    focusComposer();
   }
   useEffect(() => {
     const restore = () =>
@@ -954,6 +955,11 @@ export function OperatorShell({
           head={identityVariant === "navigation" ? identity : undefined}
           chats={view.chats}
           selectedChatId={view.selectedChatId}
+          settingsHref={
+            applicationId && view.selectedChatId
+              ? `/setup/pi?application=${applicationId}&chat=${view.selectedChatId}`
+              : "/setup/pi"
+          }
           section={activeSection}
           busy={busy !== null}
           onSection={selectSection}
@@ -1025,16 +1031,23 @@ export function OperatorShell({
                   <p>
                     <strong>Repository access:</strong> {view.repository.result}
                   </p>
-                  {view.repository.connected ? (
-                    <button
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={checkRepository}
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={checkRepository}
+                  >
+                    {busy === "repository" ? "Checking…" : "Check again"}
+                  </button>
+                  {!view.repository.connected && (
+                    <Link
+                      href={
+                        view.selectedChatId
+                          ? `/setup/github?application=${application.id}&chat=${view.selectedChatId}`
+                          : "/setup/github"
+                      }
                     >
-                      {busy === "repository" ? "Checking…" : "Check again"}
-                    </button>
-                  ) : (
-                    <Link href="/setup/github">Connect GitHub</Link>
+                      Connect GitHub
+                    </Link>
                   )}
                 </div>
               )}
@@ -1060,6 +1073,13 @@ export function OperatorShell({
               }}
               onReturnToContext={(section) => {
                 selectSection(section);
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector<HTMLButtonElement>(
+                      '.hv-application-navigation button[aria-current="page"]',
+                    )
+                    ?.focus({ preventScroll: true }),
+                );
               }}
               onSend={() => sendMessage()}
               onTell={sendMessage}

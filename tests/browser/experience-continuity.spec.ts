@@ -73,17 +73,51 @@ test("contextual questions preserve a draft across tab closure and return to the
       ),
     ).toBe(false);
     await returned.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(composer).toBeFocused();
     await expect(
       returned.getByText(`[QA fixture reply] ${question}`, { exact: true }),
     ).toBeVisible();
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: fixture.url,
+    });
+    const copy = returned.getByRole("button", {
+      name: "Copy reply",
+      exact: true,
+    });
+    await expect(copy).toHaveCount(1);
+    await copy.click();
+    await expect(
+      returned.getByRole("button", { name: "Copied", exact: true }),
+    ).toBeVisible();
+    expect(await returned.evaluate(() => navigator.clipboard.readText())).toBe(
+      `[QA fixture reply] ${question}`,
+    );
     await returned.reload();
     await expect(composer).toHaveValue("");
+    // Clipboard denial is recoverable, not an unhandled browser exception.
+    await returned.evaluate(() => {
+      Object.defineProperty(navigator.clipboard, "writeText", {
+        configurable: true,
+        value: async () => {
+          throw new Error("Clipboard unavailable");
+        },
+      });
+    });
+    await copy.click();
+    await expect(
+      returned.getByRole("status").filter({ hasText: "Copy failed" }),
+    ).toBeVisible();
     await returned
       .getByRole("button", { name: "Return to Backups", exact: true })
       .click();
     await expect(
       returned.getByRole("heading", { name: "Backups", exact: true }),
     ).toBeVisible();
+    await expect(
+      returned
+        .getByRole("navigation", { name: "Application workspace" })
+        .getByRole("button", { name: "Backups", exact: true }),
+    ).toBeFocused();
   } finally {
     await returned.close();
   }
