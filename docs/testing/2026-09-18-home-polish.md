@@ -1,7 +1,7 @@
 # Applications home polish — 18 September 2026
 
-Branch `codex/home-welcome-polish`, based on `a83db53e`. Captures show the
-implementation in this change. The isolated local app uses synthetic application
+Candidate `5004f7d4`, based on `a83db53e`, in [PR #139](https://github.com/lustoykov/hallvi/pull/139). Captures show the
+implementation in this change; later tracking edits do not change the tested UI. The isolated local app uses synthetic application
 records and provider responses; the illustrated previews are not screenshots of
 running deployments.
 

@@ -47,7 +47,7 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 ## Applications home
 
-- [ ] **Welcome and collection polish — in review.** Group the welcome copy, place a compact status summary with the apps, strengthen Add application and card color, and replace vague More links. Preserve the caretaker identity and recorded status meanings.
+- [x] **Welcome and collection polish — [PR #139](https://github.com/lustoykov/hallvi/pull/139).** Group the welcome copy, place a compact status summary with the apps, strengthen Add application and card color, and replace vague More links. Preserve the caretaker identity and recorded status meanings.
 
 ## Conversation controls
 
