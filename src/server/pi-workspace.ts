@@ -85,21 +85,40 @@ function runtimeFiles() {
   ];
 }
 
-let building: Promise<string> | undefined;
+type WorkspaceArchitecture = "amd64" | "arm64";
+
+async function workspaceArchitecture(
+  docker: DockerClient,
+): Promise<WorkspaceArchitecture> {
+  const { Architecture } = await docker.json<{ Architecture?: unknown }>(
+    "/info",
+  );
+  if (Architecture === "amd64" || Architecture === "x86_64") return "amd64";
+  if (Architecture === "arm64" || Architecture === "aarch64") return "arm64";
+  throw new Error(
+    `Pi's workspace does not support this Docker Engine architecture (${String(Architecture ?? "unknown")}).`,
+  );
+}
+
+const building = new Map<WorkspaceArchitecture, Promise<string>>();
 async function ensureImage(docker: DockerClient) {
+  const architecture = await workspaceArchitecture(docker);
   const files = runtimeFiles();
   const archive = treeArchive(files);
-  const image = `hallvi-pi-workspace:${createHash("sha256").update(archive).digest("hex").slice(0, 16)}`;
+  const image = `hallvi-pi-workspace:${createHash("sha256").update(architecture).update(archive).digest("hex").slice(0, 16)}`;
   try {
     return (await docker.inspectImage(image)).Id;
   } catch (error) {
     if (!(error instanceof DockerError) || error.status !== 404) throw error;
   }
-  building ??= (async () => {
-    // A child manifest avoids reusing a cached ARM tag in the classic builder.
+  const existing = building.get(architecture);
+  if (existing) return existing;
+  const preparation = (async () => {
+    // A child manifest avoids reusing a cached tag for the other architecture.
     const nodeImage = await pinContainerImage(
       "node:24-bookworm-slim",
       AbortSignal.timeout(90_000),
+      architecture,
     );
     const buildArchive = treeArchive(
       files.map((file) =>
@@ -115,16 +134,19 @@ async function ensureImage(docker: DockerClient) {
           : file,
       ),
     );
-    const response = await docker.request(
-      `/build?t=${encodeURIComponent(image)}&rm=1&platform=linux%2Famd64`,
-      {
-        method: "POST",
-        body: buildArchive,
-        headers: { "Content-Type": "application/x-tar" },
-        timeoutMs: 20 * 60_000,
-        maxBytes: 512 * 1024,
-      },
-    );
+    const query = new URLSearchParams({
+      t: image,
+      rm: "1",
+      platform: `linux/${architecture}`,
+      buildargs: JSON.stringify({ WORKSPACE_ARCH: architecture }),
+    });
+    const response = await docker.request(`/build?${query}`, {
+      method: "POST",
+      body: buildArchive,
+      headers: { "Content-Type": "application/x-tar" },
+      timeoutMs: 20 * 60_000,
+      maxBytes: 512 * 1024,
+    });
     let buildOutput = "";
     for (const line of response.body.toString().split("\n").filter(Boolean)) {
       const entry = JSON.parse(line) as { error?: string; stream?: string };
@@ -138,9 +160,10 @@ async function ensureImage(docker: DockerClient) {
       throw new Error("Pi workspace image preparation failed.");
     return (await docker.inspectImage(image)).Id;
   })().finally(() => {
-    building = undefined;
+    building.delete(architecture);
   });
-  return building;
+  building.set(architecture, preparation);
+  return preparation;
 }
 
 export interface WorkspaceSource {

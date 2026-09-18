@@ -93,6 +93,17 @@ it("pins a tag to its Linux amd64 manifest with the pull token its registry's ch
   ]);
 });
 
+it("pins the requested Linux arm64 manifest while deployment callers still default to amd64", async () => {
+  registry({
+    "24-bookworm-slim": index,
+    [digest(amd64)]: amd64,
+    [digest(arm64)]: arm64,
+  });
+  await expect(
+    pinContainerImage("node:24-bookworm-slim", signal, "arm64"),
+  ).resolves.toBe(`node@${digest(arm64)}`);
+});
+
 it("resolves Docker Hub official images and other public registries through the same distribution flow", async () => {
   const hub = registry({ "16": amd64 });
   await expect(
