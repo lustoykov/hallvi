@@ -42,40 +42,49 @@ export function applicationKind(source: string, name: string) {
     : { kind: "generic" as ApplicationKind, purpose: source };
 }
 
-/** The application's own colour, for the ground under its screen. */
-export const KIND_ACCENT: Record<ApplicationKind, string> = {
-  documents: "#5b7fd6",
-  publishing: "#c26a8a",
-  photos: "#e0a24a",
-  metrics: "#73bf69",
-  files: "#0082c9",
-  home: "#f9b233",
-  feeds: "#e08a3c",
-  passwords: "#175ddc",
-  media: "#aa5cc3",
-  code: "#609926",
-  uptime: "#5cdd8b",
-  music: "#4361ee",
-  generic: "#7198db",
-};
+/**
+ * The colours an owner's applications wear: the ground under the screen, the
+ * card's selected border and the caretaker's paint.
+ *
+ * A fixed set chosen to sit together and beside the shell's slate blue,
+ * rather than each upstream project's brand colour softened toward grey,
+ * which gave a washed mint for anything green. Hallvi's own periwinkle is not
+ * among them: that one is Little Server's when it speaks for Hallvi.
+ */
+export const APPLICATION_COLORS = [
+  "#6f9fd8", // sky
+  "#d9a35f", // honey
+  "#a58bd3", // violet
+  "#5fa6a0", // teal
+  "#d98878", // coral
+  "#7f9f7c", // moss
+  "#cc86a8", // rose
+  "#8c9fb9", // slate
+] as const;
 
-function mix(a: string, b: string, t: number) {
-  const n = (h: string) =>
-    [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  const [x, y] = [n(a), n(b)];
-  return `#${x
-    .map((v, i) =>
-      Math.round(v + (y[i] - v) * t)
-        .toString(16)
-        .padStart(2, "0"),
-    )
-    .join("")}`;
+function hash(text: string) {
+  let value = 0;
+  for (const character of text)
+    value = (value * 31 + character.charCodeAt(0)) >>> 0;
+  return value;
 }
 
 /**
- * The caretaker's paint: the application's colour softened halfway toward
- * the shell's slate blue, so a dozen of them still look like one family.
- * Identity, never state; the face carries the state.
+ * One colour per application, keyed by id. Each starts from a colour its id
+ * chooses, so it keeps it as others come and go; when an older application
+ * already wears that one, it takes the next that is free, so two cards side
+ * by side are told apart until there are more applications than colours.
+ * `ids` is oldest first.
  */
-export const caretakerPaint = (kind: ApplicationKind) =>
-  mix(KIND_ACCENT[kind], "#9aa9c3", 0.5);
+export function applicationColors(ids: string[]) {
+  const taken = new Set<number>();
+  const colors = new Map<string, string>();
+  for (const id of ids) {
+    let index = hash(id) % APPLICATION_COLORS.length;
+    if (taken.size < APPLICATION_COLORS.length)
+      while (taken.has(index)) index = (index + 1) % APPLICATION_COLORS.length;
+    taken.add(index);
+    colors.set(id, APPLICATION_COLORS[index]!);
+  }
+  return colors;
+}

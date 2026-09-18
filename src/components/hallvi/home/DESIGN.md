@@ -13,9 +13,12 @@ was not.
 Kept:
 
 - **One 3D caretaker per application**, above its card, at the same size as
-  before. They wave and dance in turn and greet when clicked. Paint is the
-  application's own colour softened halfway toward the shell's slate blue
-  (`caretakerPaint`), so a dozen still read as one family. Paint is identity;
+  before. They wave and dance in turn and greet when clicked. Paint is one of
+  eight fixed application colours (`APPLICATION_COLORS`), handed out per
+  application oldest first, so a dozen still read as one family and two cards
+  side by side are told apart. Until 18 September it was each upstream
+  project's brand colour softened toward slate, which gave a washed mint for
+  anything green. Hallvi's own periwinkle is not among them. Paint is identity;
   the face and the prop are the state.
 - **A drawn screen of the application** in a tilted window that settles on
   hover, and the parts of the screen wake up once.

@@ -16,8 +16,7 @@ import type { ApplicationListItem } from "../applications-screen";
 import type { MascotMood } from "./mascot-scene";
 import {
   applicationKind,
-  caretakerPaint,
-  KIND_ACCENT,
+  applicationColors,
   type ApplicationKind,
 } from "./application-kind";
 import { PREVIEWS } from "./interface-previews";
@@ -144,6 +143,11 @@ export function ApplicationsHome({
   const [greeting, setGreeting] = useState(0);
   const [paused, setPaused] = useState(false);
   const [query, setQuery] = useState("");
+  // The list arrives newest first; colours are handed out oldest first so an
+  // application keeps its colour when a newer one is added.
+  const colors = applicationColors(
+    [...applications].reverse().map((item) => item.id),
+  );
   const visible = applications.filter((item) =>
     `${item.name} ${item.source}`
       .toLowerCase()
@@ -252,7 +256,7 @@ export function ApplicationsHome({
                   <li
                     key={item.id}
                     className={`${s.card} ${active ? s.selected : ""}`}
-                    style={{ "--tint": KIND_ACCENT[kind] } as CSSProperties}
+                    style={{ "--tint": colors.get(item.id) } as CSSProperties}
                   >
                     <button
                       type="button"
@@ -262,7 +266,7 @@ export function ApplicationsHome({
                       onClick={() => greet(item.id)}
                     >
                       <Mascot
-                        color={caretakerPaint(kind)}
+                        color={colors.get(item.id)}
                         mood={moodOf(situation, active)}
                         paused={paused}
                         gesture={active ? greeting : 0}
