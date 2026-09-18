@@ -1,7 +1,9 @@
 # Onboarding: from a repository to a working address
 
-**Status, 18 September 2026: wired into the conversation, not yet proven on
-a real provider or machine.** The owner chose the recommended answers to
+**Status, 18 September 2026: wired into the conversation and proven once on a
+real Hetzner server, a real machine check, a direct address and a domain (see
+[Live run](#live-run-18-september-2026)). Pasting a token into a card is the
+one interaction still untested live.** The owner chose the recommended answers to
 decisions 1 and 2 below; 3 and 4 are implemented as recommended and await
 review in [PR #135](https://github.com/lustoykov/hallvi/pull/135).
 
@@ -268,11 +270,24 @@ server is a labelled, registered development fixture.
   into a receipt, and resumed Pi unprompted.
 - **Publishing guard.** Asked for the direct address, Pi found Uptime Kuma's
   unclaimed setup page and asked for an administrator password through the
-  secure field instead of publishing. That value is the owner's to type, so
-  the sslip.io address and the domain stop here until they do.
-- **Domain lookup.** Public DNS named Cloudflare for the owner's zone, and the
-  existing connection is reported by Cloudflare as able to edit its DNS, so
-  the card offers "Let Hallvi add the record" and asks for no token.
+  secure field instead of publishing. The application then refused the typed
+  password as too weak; Pi stopped again with nothing exposed. It continued
+  once asked to generate the password itself (`generate_secret`), claimed the
+  setup privately and proved a real login before opening anything.
+- **Direct address.** `https://46-62-253-6.sslip.io` served a trusted Let's
+  Encrypt certificate for that name, redirected HTTP to HTTPS and reached the
+  dashboard, checked from this computer independently of Pi's own
+  `check_public_access`; port 3001 still did not answer from outside. The
+  ladder moved to "Anyone with the address" from Pi's updated record alone.
+  Publishing closed the private tunnel, so the ladder's copy now says Hallvi
+  can reopen it rather than that it still works.
+- **Domain.** "Use my domain" looked the name up on public DNS, named
+  Cloudflare, found the controller's existing connection listed with DNS edit
+  for the zone, and asked for no token. "Let Hallvi add the record" resumed
+  Pi, which wrote a DNS-only A record (commented `managed-by=hallvi`),
+  obtained a certificate and verified sign-in through
+  `https://hallvi-test.accountant-agent.com`; verified again from this
+  computer. The sslip.io address kept working.
 
 What the run changed: a request whose estimate overran its own schema was
 written and then dropped on read, so the card never appeared (now clamped on
@@ -285,23 +300,21 @@ connection made earlier is used instead of asking again. The repository
 workspace image is amd64 and failed on this arm64 Mac; Pi worked from the
 server instead. That is outside this change and worth its own fix.
 
-**Not exercised live:** pasting a Hetzner or Cloudflare token (needs the
-owner's hands; a read-only and a read-write Hetzner token are the useful
-pair), a home-network machine, the sslip.io certificate, and a domain record.
+**Not exercised live:** pasting a Hetzner or Cloudflare token into a card
+(needs the owner's hands; a read-only and a read-write Hetzner token are the
+useful pair), a home-network machine, and the hand-added DNS record path.
+Known gap seen in the run: with a domain on, the ladder marks only that rung,
+though the direct address still answers.
 
 ## Still to prove or build
 
-- A fresh journey on a **real Hetzner project** and on a **real machine**
-  (VPS and home), including Pi actually calling `request_connection`, the
-  write probe with a real Read & Write token and a real Read token, and the
-  continuation message resuming the turn.
-- The **direct address** on a real server: sslip.io resolution, Caddy's
-  certificate, sign-in through it. Pi's prompt carries the procedure; nothing
-  has exercised it. Whether Let's Encrypt rate limits bite on a shared
-  sslip.io suffix is unknown.
-- One domain by each path, Cloudflare token and hand-added record.
+- The **write probe with real tokens**, Read & Write and Read, pasted by the
+  owner; a **home-network machine**; a domain by the **hand-added record**.
+- Whether Let's Encrypt rate limits bite on the shared sslip.io suffix at
+  scale is unknown; one certificate issued without trouble.
 - The ladder's "first account unclaimed" state is "unknown" in the product:
-  Pi does not record it yet, so the ladder cautions rather than withholds.
+  Pi does not record it yet, so the ladder cautions rather than withholds. In
+  the live run Pi's own check did the withholding.
 - Settings › Connections still uses the bare token forms (with corrected
   wording): the write probe needs an application's key, which that page does
   not have. `provider-token-form.tsx` therefore stays.
