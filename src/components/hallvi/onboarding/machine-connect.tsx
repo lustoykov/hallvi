@@ -148,6 +148,7 @@ export function MachineConnect({
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MachineFailure | null>(null);
+  const [unexpected, setUnexpected] = useState<string | null>(null);
   const staged = useStagedChecks();
   const line = useMemo(() => parseMachineLine(pasted), [pasted]);
   const target = address || line?.addresses[0] || "";
@@ -157,7 +158,19 @@ export function MachineConnect({
     if (!line || !target) return;
     setBusy(true);
     setFailure(null);
-    const outcome = await transport.checkMachine(line, target);
+    setUnexpected(null);
+    let outcome: MachineOutcome;
+    try {
+      outcome = await transport.checkMachine(line, target);
+    } catch (problem) {
+      setBusy(false);
+      setUnexpected(
+        problem instanceof Error
+          ? problem.message
+          : "The check did not finish.",
+      );
+      return;
+    }
     await staged.play(
       [
         ...PLAN,
@@ -361,6 +374,11 @@ export function MachineConnect({
       />
 
       {staged.checks.length > 0 && <CheckList checks={staged.checks} />}
+      {unexpected && (
+        <Problem title="The check could not be completed">
+          <p>{unexpected} Nothing was saved. Check again in a moment.</p>
+        </Problem>
+      )}
       {failure && line && (
         <MachineProblem failure={failure} line={line} address={target} />
       )}

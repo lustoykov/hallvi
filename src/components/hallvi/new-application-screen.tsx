@@ -25,6 +25,8 @@ export function NewApplicationScreen({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = useRef(false);
+  const derivedName =
+    /[/:]([^/\s:]+?)(?:\.git)?\/?$/.exec(repositoryUrl.trim())?.[1] ?? "";
 
   useEffect(() => {
     active.current = true;
@@ -126,10 +128,10 @@ export function NewApplicationScreen({
       >
         <div className={s.heading}>
           <div>
-            <h1 id="new-application-heading">Add application</h1>
+            <h1 id="new-application-heading">What do you want to run?</h1>
             <p>
-              Each application has its own conversations, configuration and
-              history.
+              Paste the repository of the application. Hallvi reads it, tells
+              you what it needs, and gets it working on a server you control.
             </p>
           </div>
         </div>
@@ -140,21 +142,6 @@ export function NewApplicationScreen({
             void createApplication();
           }}
         >
-          <div className={s.githubConnection}>
-            <div>
-              <strong>
-                {githubLogin ? `GitHub · ${githubLogin}` : "No GitHub login"}
-              </strong>
-              <p className={s.helper}>
-                {githubLogin
-                  ? "Repository access is verified when you add the application."
-                  : "Public repositories are read without one. Connect a login for private repositories."}
-              </p>
-            </div>
-            <Link href="/setup/github?from=add" onClick={keepDraft}>
-              {githubLogin ? "Change" : "Connect GitHub"}
-            </Link>
-          </div>
           <label className={s.field} htmlFor="repository-url">
             GitHub repository
           </label>
@@ -172,10 +159,29 @@ export function NewApplicationScreen({
             aria-describedby="repository-help"
           />
           <p className={s.helper} id="repository-help">
-            HTTPS and SSH repository URLs are supported.
+            A public repository needs no GitHub sign-in.{" "}
+            {githubLogin ? (
+              <>
+                Private ones are read as <strong>{githubLogin}</strong>.{" "}
+                <Link href="/setup/github?from=add" onClick={keepDraft}>
+                  Change
+                </Link>
+              </>
+            ) : (
+              <>
+                For a private one,{" "}
+                <Link href="/setup/github?from=add" onClick={keepDraft}>
+                  Connect GitHub
+                </Link>{" "}
+                first; what you typed here is kept.
+              </>
+            )}
           </p>
-          <label className={s.field} htmlFor="application-name">
-            Application name
+          <label
+            className={`${s.field} ${s.secondary}`}
+            htmlFor="application-name"
+          >
+            Application name <span>optional</span>
           </label>
           <input
             id="application-name"
@@ -184,15 +190,17 @@ export function NewApplicationScreen({
             maxLength={120}
             disabled={!ready || busy}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Defaults to the repository name"
+            placeholder={
+              derivedName
+                ? `${derivedName}, from the repository`
+                : "Defaults to the repository name"
+            }
           />
-          <p className={s.helper}>
-            The same repository can have several independently named
-            applications.
-          </p>
           <p className={s.scope}>
-            Hallvi checks repository access first, then helps you deploy the
-            application. Every change asks for your approval.
+            Nothing is rented or changed at this step. A new application starts
+            on <strong>Pi decides</strong>: Hallvi asks before consequential
+            steps such as renting a server, at its own judgment. You can change
+            that in the conversation before anything happens.
           </p>
           {error && (
             <p role="alert" className={s.error}>

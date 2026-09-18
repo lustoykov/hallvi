@@ -45,6 +45,7 @@ import {
   type RunActivity,
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
+import { useConnectionRequests } from "./onboarding/connection-requests";
 import {
   SecretRequests,
   SecretRequestsChip,
@@ -177,6 +178,7 @@ export function ChatPane({
   runs,
   reconnecting,
   onRunAction,
+  onTell,
   onNewChat,
   references,
   onReveal,
@@ -202,6 +204,12 @@ export function ChatPane({
   runs: PiRun[];
   reconnecting: boolean;
   onRunAction: (id: string, action: "cancel" | "retry") => void;
+  /**
+   * Sends Hallvi a message the owner did not have to type: a connection card
+   * settled, or a rung of the access ladder was chosen. Absent, it is drafted
+   * into the composer instead.
+   */
+  onTell?: (message: string) => void;
   onNewChat: () => void;
   /** Records each reply produced, shown as a line under it. */
   references?: Map<string, RecordReference[]>;
@@ -437,6 +445,15 @@ export function ChatPane({
     [view.messages],
   );
   const applicationId = view.application?.id;
+  const connections = useConnectionRequests({
+    applicationId,
+    application: view.application?.name ?? "the application",
+    messages: view.messages,
+    information: view.information ?? [],
+    poll: requestPending,
+    enabled: secretsHere,
+    onTell: onTell ?? continueAfterSecrets,
+  });
   useEffect(() => {
     if (!applicationId) return;
     let cancelled = false;
@@ -754,6 +771,7 @@ export function ChatPane({
                 </Message>
                 {/* The request Pi raised on this message, drawn at the point
                     it was asked rather than wherever the reader is now. */}
+                {connections.at(message.id)}
                 {secretsHere && secretsOwnMessage === message.id && (
                   <SecretRequests
                     applicationId={view.application!.id}
@@ -810,6 +828,7 @@ export function ChatPane({
             </>
           )}
 
+          {connections.rest}
           {error && application && (
             <div className="hv-error" role="alert">
               {error}

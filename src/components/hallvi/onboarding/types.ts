@@ -58,8 +58,8 @@ export type MachineOutcome =
   | { kind: "failed"; at: MachineFailure };
 
 export type DnsHost =
-  | { kind: "cloudflare" }
-  | { kind: "other"; nameservers: string[]; who: string | null }
+  | { kind: "cloudflare"; zone: string }
+  | { kind: "other"; zone: string; nameservers: string[]; who: string | null }
   | { kind: "unregistered" }
   | { kind: "unreachable" };
 

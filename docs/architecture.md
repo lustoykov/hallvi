@@ -66,7 +66,7 @@ output is large and append-only. And local diagnostics, under `diagnostics/`.
 
 ## What Pi can do
 
-Twenty tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
+Twenty-two tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
 engine behind them: Pi reads the repository, decides what to do and does it,
 and the tools are the only things that can reach outside.
 
@@ -76,6 +76,11 @@ and the tools are the only things that can reach outside.
 - **Provisioning.** `hetzner_request` is the provider's own REST API;
   `server_public_key` supplies this application's key; `connect_server`
   verifies SSH and saves the connection.
+- **Asking for a connection.** `request_connection` asks where the application
+  should run and `request_domain_access` asks how to reach a domain's DNS. Each
+  puts a guided card in the conversation and ends the turn; the controller
+  does the checking, and a message tells Pi what was connected.
+  [Onboarding](design/onboarding.md) owns the design.
 - **Publishing.** `set_domain_record` writes one DNS record; `check_domain`
   and `check_public_access` ask the internet what it can see.
 - **Records.** `save_information` writes what Pi established;
@@ -178,7 +183,7 @@ claims to have observed a renewal.
 
 ## Provisioning
 
-Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
+Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation; since 18 September the [host request card](design/onboarding.md) gathers both with one command the owner pastes on the machine, and `connection-checks.ts` also requires passwordless administrator rights and a 64-bit Linux before the host is saved. The same card proves a Hetzner token can write by registering the application's public SSH key. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
 
 ## Protecting the controller
 

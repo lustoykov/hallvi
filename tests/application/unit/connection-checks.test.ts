@@ -1,0 +1,146 @@
+// The claims a connection card makes to someone who cannot check them: a
+// provider that did not answer has not judged the credential, a credential of
+// the wrong kind is not saved, and a zone a token cannot see is not reported
+// as a zone that does not exist.
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+
+import { recogniseCloudflare } from "../../../src/components/hallvi/onboarding/domain-connect";
+import { recogniseHetzner } from "../../../src/components/hallvi/onboarding/hetzner-connect";
+import { parseMachineLine } from "../../../src/components/hallvi/onboarding/machine-connect";
+
+const application = "6f1c2a3e-7b5d-4c8e-9a10-2b3c4d5e6f70";
+const token = "a".repeat(64);
+let config: string;
+
+beforeEach(() => {
+  config = mkdtempSync(join(tmpdir(), "hallvi-connections-"));
+  vi.stubEnv("HALLVI_CONFIG_DIR", config);
+  vi.resetModules();
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  rmSync(config, { recursive: true, force: true });
+});
+
+const saved = () => existsSync(join(config, "hetzner-connection.json"));
+
+it("does not call a Hetzner token bad when Hetzner was never reached", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw new Error("getaddrinfo ENOTFOUND api.hetzner.cloud");
+    }),
+  );
+  const { checkHetznerToken } =
+    await import("../../../src/server/connection-checks");
+  expect(await checkHetznerToken(application, token)).toEqual({
+    kind: "unreachable",
+  });
+  expect(saved()).toBe(false);
+});
+
+it("tells a read-only Hetzner token from a rejected one, and saves neither", async () => {
+  const { checkHetznerToken } =
+    await import("../../../src/server/connection-checks");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ error: { code: "unauthorized" } }, { status: 401 }),
+    ),
+  );
+  expect(await checkHetznerToken(application, token)).toEqual({
+    kind: "rejected",
+  });
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: RequestInit) =>
+      init.method === "GET"
+        ? Response.json({
+            servers: [],
+            meta: { pagination: { total_entries: 3 } },
+          })
+        : Response.json({ error: { code: "forbidden" } }, { status: 403 }),
+    ),
+  );
+  expect(await checkHetznerToken(application, token)).toEqual({
+    kind: "read-only",
+    servers: 3,
+  });
+  expect(saved()).toBe(false);
+});
+
+it("saves a Hetzner token only after the write probe, and never returns it", async () => {
+  const fetch = vi.fn(async (_url: string, init: RequestInit) =>
+    init.method === "GET"
+      ? Response.json({
+          servers: [],
+          meta: { pagination: { total_entries: 0 } },
+        })
+      : Response.json({ ssh_key: { id: 1 } }, { status: 201 }),
+  );
+  vi.stubGlobal("fetch", fetch);
+  const { checkHetznerToken } =
+    await import("../../../src/server/connection-checks");
+  const outcome = await checkHetznerToken(application, token);
+  expect(outcome).toEqual({ kind: "connected", servers: 0, wrote: true });
+  expect(JSON.stringify(outcome)).not.toContain(token);
+  expect(fetch.mock.calls[1]![0]).toBe("https://api.hetzner.cloud/v1/ssh_keys");
+  expect(String(fetch.mock.calls[1]![1].body)).toContain("ssh-ed25519 ");
+  expect(saved()).toBe(true);
+});
+
+it("reports a Cloudflare zone outside the token's scope as hidden, with what it can see, and saves nothing", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) =>
+      Response.json({
+        success: true,
+        result: url.endsWith("/verify")
+          ? { status: "active" }
+          : [{ name: "other.dev" }],
+      }),
+    ),
+  );
+  const { connectCloudflareForZone } =
+    await import("../../../src/server/cloudflare");
+  expect(
+    await connectCloudflareForZone({
+      token: "t".repeat(40),
+      zone: "example.com",
+    }),
+  ).toEqual({ kind: "zone-hidden", visible: ["other.dev"] });
+  expect(existsSync(join(config, "cloudflare-connection.json"))).toBe(false);
+});
+
+it("recognises the wrong kind of key by shape, without echoing it", () => {
+  const global = "0123456789abcdef0123456789abcdef01234";
+  expect(recogniseCloudflare(global).ok).toBe(false);
+  expect(recogniseCloudflare(global).hint).not.toContain(global);
+  expect(recogniseCloudflare(`cfut_${"x".repeat(40)}`).ok).toBe(true);
+  expect(recogniseHetzner("ssh-ed25519 AAAA").ok).toBe(false);
+  expect(recogniseHetzner(token).ok).toBe(true);
+});
+
+it("reads a pasted machine line and refuses one without a full fingerprint", () => {
+  const fingerprint = `SHA256:${"k".repeat(43)}`;
+  expect(
+    parseMachineLine(
+      `$ noise\nhallvi-machine user=deploy port=2222 key=${fingerprint} os=ubuntu-24.04 arch=x86_64 addrs=203.0.113.9,10.0.0.5,203.0.113.9`,
+    ),
+  ).toEqual({
+    user: "deploy",
+    port: 2222,
+    fingerprint,
+    os: "ubuntu-24.04",
+    arch: "x86_64",
+    addresses: ["203.0.113.9", "10.0.0.5"],
+  });
+  expect(
+    parseMachineLine("hallvi-machine user=deploy port=22 key=SHA256:short"),
+  ).toBeNull();
+});

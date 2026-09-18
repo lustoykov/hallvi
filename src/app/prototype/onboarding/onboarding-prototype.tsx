@@ -167,16 +167,20 @@ export function OnboardingPrototype() {
             }
           : { kind: "failed", at };
       },
-      async whoHostsDns() {
+      async whoHostsDns(name) {
         await wait(700);
         const kind = simRef.current.dns;
+        const zone = name.split(".").slice(-2).join(".");
         return kind === "other"
           ? {
               kind,
+              zone,
               nameservers: ["dns1.registrar-servers.com"],
               who: "Namecheap",
             }
-          : { kind };
+          : kind === "cloudflare"
+            ? { kind, zone }
+            : { kind };
       },
       async checkCloudflare(_token, zone) {
         await wait(500);

@@ -1,13 +1,19 @@
 # Onboarding: from a repository to a working address
 
-**Status: proposal, 18 September 2026. Not shipped.** The cards in
-`src/components/hallvi/onboarding/` are written to ship; today they run only in
-`/prototype/onboarding`, against a scripted conversation and simulated
-providers. Nothing here has been proven against Hetzner, Cloudflare or a real
-machine. The [decisions](#decisions-for-the-owner) below need the owner's
-direction before anything is wired into the product.
+**Status, 18 September 2026: wired into the conversation, not yet proven on
+a real provider or machine.** The owner chose the recommended answers to
+decisions 1 and 2 below; 3 and 4 are implemented as recommended and await
+review in [PR #135](https://github.com/lustoykov/hallvi/pull/135).
 
-To look at it: `npm run dev -- --port 3300`, then
+What runs in the product: the cards in `src/components/hallvi/onboarding/`,
+drawn in the main conversation by `connection-requests.tsx`; Pi's
+`request_connection` and `request_domain_access` tools; the controller checks
+in `src/server/connection-checks.ts` and `connectCloudflareForZone`; the
+request store in `connection-requests.ts`; the reworked Add application screen.
+`/prototype/onboarding` keeps the scripted conversation with simulated
+providers, because no record produces its failure states on demand.
+
+To look at the scripted journey: `npm run dev -- --port 3300`, then
 <http://127.0.0.1:3300/prototype/onboarding>. The dark panel chooses the
 permission mode, what each provider answers next, and jumps between chapters;
 "Reload the page" shows what survives leaving and coming back.
@@ -185,28 +191,59 @@ any DNS provider work through one hand-added record that Hallvi watches for.
 A Cloudflare token is asked for only when the zone is at Cloudflare and the
 owner wants Hallvi to write the record.
 
-## Promotion plan, after direction
+## What is wired, and what proves it
 
-Small, reviewable steps; no workflow framework.
+```mermaid
+sequenceDiagram
+  participant Pi
+  participant C as Controller
+  participant O as Owner, in the conversation
+  participant P as Provider or machine
+  Pi->>C: request_connection(needs, estimate, recommended)
+  C-->>Pi: waiting, so the turn ends
+  C->>O: card at the asking message (kept across reloads)
+  O->>C: token or machine line, in one same-origin body
+  C->>P: read, then the write probe / pin the host key, sign in, check the system
+  P-->>C: what was established
+  C-->>O: check list, or one named problem; saved only when all of it held
+  O->>Pi: "Hetzner is connected… please carry on" (an ordinary message)
+  Pi->>P: continues under the permission mode
+```
 
-1. A `request_connection` tool beside `request_secret`, persisted the same way
-   and drawn at the asking message; completion posts the continuation message.
-2. Controller routes behind `OnboardingTransport`: Hetzner check with the write
-   probe and distinct outcomes; machine check wrapping `connectServer` plus the
-   new checks; NS lookup; Cloudflare check with the zone listing.
-3. Replace the intake screen; host the cards in Settings › Connections; correct
-   the storage wording; delete `provider-token-form.tsx`.
-4. Pi's prompt and operator-design: raise the host request instead of naming
-   Settings; the direct-address rung if decision 1 is accepted.
-5. Proof: one fresh Hetzner journey and one machine journey on real hosts, the
-   direct address verified from outside, one domain by each path. Tests: the
-   token never reaches a URL, storage, a message or a log; a network failure is
-   never reported as a bad credential; a worker restart replays nothing.
+- **Verified against live services, without credentials:** a made-up Hetzner
+  token comes back `rejected` from the real API and nothing is saved; a made-up
+  Cloudflare token likewise; the DNS lookup names Cloudflare-hosted, other and
+  unregistered domains from public DNS; a cross-origin post is refused.
+- **Verified in the browser:** the Add application screen creates an
+  application from a public repository with no GitHub sign-in; a host request
+  written in the tool's format renders in the real main conversation at the
+  asking message and survives reload; every simulated state in the prototype.
+- **Unit tests** (`connection-checks.test.ts`): a network failure is never a
+  bad token; a Read token and a rejected one are told apart and neither is
+  saved; a token is saved only after the write probe and never returned; a
+  zone outside a token's scope is reported as hidden, with what is visible,
+  and nothing is saved; key shapes and the machine line.
 
-## Limits of what exists today
+## Still to prove or build
 
-Simulated UI proof only. No live provider, machine, DNS or deployment was
-exercised. The sslip.io rung, the sudo/Docker checks, the NS lookup and the
-continuation message are designed, not built. Keyboard order, screen-reader
-output, contrast at zoom and widths under 640px were not audited. Backups are
-out of scope; they can reuse the same card when asked for.
+- A fresh journey on a **real Hetzner project** and on a **real machine**
+  (VPS and home), including Pi actually calling `request_connection`, the
+  write probe with a real Read & Write token and a real Read token, and the
+  continuation message resuming the turn.
+- The **direct address** on a real server: sslip.io resolution, Caddy's
+  certificate, sign-in through it. Pi's prompt carries the procedure; nothing
+  has exercised it. Whether Let's Encrypt rate limits bite on a shared
+  sslip.io suffix is unknown.
+- One domain by each path, Cloudflare token and hand-added record.
+- The ladder's "first account unclaimed" state is "unknown" in the product:
+  Pi does not record it yet, so the ladder cautions rather than withholds.
+- Settings › Connections still uses the bare token forms (with corrected
+  wording): the write probe needs an application's key, which that page does
+  not have. `provider-token-form.tsx` therefore stays.
+- ChatGPT sign-in inside the conversation is drawn only in the prototype; the
+  product still uses the existing setup-return trip.
+- Keyboard order, screen-reader output, contrast at zoom and widths under
+  640px were not audited. Backups are out of scope and can reuse the card.
+- Developed on Node 26 because Node 22 is not installed on this machine; the
+  `terminal-transport` suite fails there on `node-pty`'s binary and is
+  unrelated to this change.

@@ -64,11 +64,6 @@ export function recogniseCloudflare(value: string) {
   };
 }
 
-/** example.co.uk is beyond this; the controller's answer names the zone. */
-function zoneOf(name: string) {
-  return name.split(".").slice(-2).join(".");
-}
-
 const PLAN: Check[] = [
   { id: "reach", label: "Reach Cloudflare", state: "pending" },
   {
@@ -138,7 +133,8 @@ export function DomainConnect({
   const [outcome, setOutcome] = useState<CloudflareOutcome | null>(null);
   const staged = useStagedChecks();
   const { name, host, way } = progress;
-  const zone = zoneOf(name);
+  const zone =
+    host && "zone" in host ? host.zone : name.split(".").slice(-2).join(".");
   const label = name === zone ? "@" : name.slice(0, -zone.length - 1);
 
   if (done)

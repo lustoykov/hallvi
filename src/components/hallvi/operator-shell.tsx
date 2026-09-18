@@ -680,12 +680,18 @@ export function OperatorShell({
     void run("archive", () => api.archiveChat(application.id, activeChat.id));
   }
 
-  function sendMessage() {
-    const message = composer.trim();
-    if (busy || !piReady || !application || !activeChat || !message) return;
+  /** `told` is a message a card sends for the owner; the draft is kept. */
+  function sendMessage(told?: string) {
+    const message = (told ?? composer).trim();
+    if (!message) return;
+    if (busy || !piReady || !application || !activeChat) {
+      // Not sendable right now: leave it where the owner can send it.
+      if (told) setComposer(told);
+      return;
+    }
     setPendingMessage(message);
     submittingChat.current = activeChat.id;
-    setComposer("");
+    if (!told) setComposer("");
     const previous = readSubmission(activeChat.id);
     const key =
       previous?.message === message ? previous.key : crypto.randomUUID();
@@ -937,7 +943,8 @@ export function OperatorShell({
               piReady={piReady}
               onArchive={archiveActiveChat}
               onComposerChange={setComposer}
-              onSend={sendMessage}
+              onSend={() => sendMessage()}
+              onTell={sendMessage}
               runs={runs.filter((run) => run.chatId === activeChat?.id)}
               reconnecting={reconnecting}
               workerAlive={view.worker?.alive}

@@ -116,6 +116,51 @@ export async function connectCloudflare(input: {
   return { account: chosen };
 }
 
+/**
+ * Checks a token for one zone before saving it: whether Cloudflare could be
+ * reached, whether the token is active, and whether it can see the zone. A
+ * zone the token cannot see is reported with the zones it can, because that
+ * is a scope chosen on Cloudflare's page and not a missing domain. Whether it
+ * may edit DNS cannot be asked without writing, so it is not claimed here.
+ */
+export async function connectCloudflareForZone(input: {
+  token: string;
+  zone: string;
+}): Promise<
+  | { kind: "connected"; zone: string }
+  | { kind: "unreachable" }
+  | { kind: "rejected" }
+  | { kind: "zone-hidden"; visible: string[] }
+> {
+  const value = input.token.trim();
+  if (!/^[A-Za-z0-9_-]{30,200}$/.test(value)) return { kind: "rejected" };
+  // `callWith` throws its own sentence once Cloudflare has answered; any
+  // other failure is the request never completing.
+  const answered = (error: unknown) =>
+    error instanceof Error && error.message.startsWith("Cloudflare refused");
+  try {
+    const verified = await callWith<{ status: string }>(
+      value,
+      "/user/tokens/verify",
+    );
+    if (verified.status !== "active") return { kind: "rejected" };
+  } catch (error) {
+    return answered(error) ? { kind: "rejected" } : { kind: "unreachable" };
+  }
+  let zones: { name: string }[];
+  try {
+    zones = await callWith<{ name: string }[]>(value, "/zones?per_page=50");
+  } catch (error) {
+    // Active, and not allowed to list zones: it can see none of them.
+    if (!answered(error)) return { kind: "unreachable" };
+    zones = [];
+  }
+  if (!zones.some((zone) => zone.name === input.zone))
+    return { kind: "zone-hidden", visible: zones.map((zone) => zone.name) };
+  await connectCloudflare({ token: value });
+  return { kind: "connected", zone: input.zone };
+}
+
 interface CloudflareBody<T> {
   success: boolean;
   result: T;
@@ -129,7 +174,7 @@ async function call<T>(
   const held = token();
   if (!held)
     throw new Error(
-      "Connect Cloudflare in Settings › Connections, or set CLOUDFLARE_API_TOKEN in the controller's environment.",
+      "Cloudflare is not connected yet. It is connected in the conversation when a domain needs it (request_domain_access), in Settings › Connections, or by CLOUDFLARE_API_TOKEN in the controller's environment.",
     );
   return callWith<T>(held, path, options);
 }

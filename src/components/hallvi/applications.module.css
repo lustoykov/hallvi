@@ -220,6 +220,15 @@
   font-weight: 650;
   margin-bottom: 10px;
 }
+.secondary {
+  margin-top: 22px;
+}
+.secondary span {
+  margin-left: 6px;
+  color: #53617a;
+  font-size: 12px;
+  font-weight: 400;
+}
 .form > input {
   width: 100%;
   height: 46px;
