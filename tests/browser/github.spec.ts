@@ -29,9 +29,10 @@ test(
     await page
       .getByLabel("GitHub repository", { exact: true })
       .fill("https://github.com/qa/github-consent");
+    // Public repositories can be added without connecting an account.
     await expect(
       page.getByRole("button", { name: "Add application", exact: true }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     await page
       .getByRole("link", { name: "Connect GitHub", exact: true })
       .click();
@@ -88,19 +89,28 @@ test(
     await openConversation(page);
     const notice = page.locator(".hv-repository-notice");
     await expect(notice).toContainText(
-      "Connect GitHub, then run the repository check.",
+      "Run the repository check, or connect GitHub if this repository is private.",
     );
+    await expect(
+      notice.getByRole("button", { name: "Check again" }),
+    ).toBeEnabled();
     const settings = notice.getByRole("link", {
       name: "Connect GitHub",
       exact: true,
     });
-    await expect(settings).toHaveAttribute("href", "/setup/github");
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    const draft = "Continue after connecting my repository.";
+    await composer.fill(draft);
+    await expect(settings).toHaveAttribute(
+      "href",
+      `/setup/github?application=${before.application.id}&chat=${before.selectedChatId}`,
+    );
     await page.screenshot({
       path: testInfo.outputPath("github-recovery-action.png"),
       fullPage: true,
     });
     await settings.click();
-    await expect(page).toHaveURL(/\/setup\/github$/);
+    await expect(page).toHaveURL(/\/setup\/github\?application=.*&chat=/);
     let releaseCheck!: () => void;
     const heldCheck = new Promise<void>((resolve) => {
       releaseCheck = resolve;
@@ -135,9 +145,23 @@ test(
     expect(
       (await (await page.request.get(`/api${path}`)).json()).repository,
     ).toEqual(refreshed.repository);
-    await page.goto(path);
+    await page
+      .getByRole("link", { name: "Back to the conversation" })
+      .first()
+      .click();
+    await expect(page).toHaveURL(
+      `${new URL(page.url()).origin}${path}?chat=${before.selectedChatId}`,
+    );
     await openConversation(page);
+    await expect(composer).toHaveValue(draft);
     await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
+    // Ordinary Settings uses the same return contract as connection recovery.
+    await page.getByRole("link", { name: "Settings", exact: true }).click();
+    await page
+      .getByRole("link", { name: "Back to the conversation" })
+      .first()
+      .click();
+    await expect(composer).toHaveValue(draft);
   },
 );
 

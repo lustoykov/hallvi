@@ -213,12 +213,14 @@ export function NewApplicationScreen({
                 ? "I get self-hosted software running on a server you control, check that it really works, and keep an eye on it afterwards. You bring an application; I do the infrastructure, and explain what I am doing as I go."
                 : "Same as before: I read it, you choose where it runs, and I hand it over working."}
             </p>
-            <ul className={w.yours} aria-label="What stays yours">
-              <li>Your server</li>
-              <li>Your accounts</li>
-              <li>Your data</li>
-              <li>Hallvi runs on this computer</li>
-            </ul>
+            {first && (
+              <ul className={w.yours} aria-label="What stays yours">
+                <li>Your server</li>
+                <li>Your accounts</li>
+                <li>Your data</li>
+                <li>Hallvi runs on this computer</li>
+              </ul>
+            )}
           </div>
           <div className={w.ask}>
             <h2>What do you want to run?</h2>
@@ -311,8 +313,12 @@ export function NewApplicationScreen({
             </form>
           </div>
         </div>
-        <h2 className={w.how}>How it goes from here</h2>
-        <WelcomeSteps />
+        {first && (
+          <>
+            <h2 className={w.how}>How it goes from here</h2>
+            <WelcomeSteps />
+          </>
+        )}
       </section>
     </main>
   );

@@ -23,6 +23,9 @@ test(
       page.getByRole("heading", { name: "Hi, I’m Hallvi." }),
     ).toBeVisible();
     await expect(
+      page.getByRole("list", { name: "How Hallvi works" }),
+    ).toBeVisible();
+    await expect(
       page.getByRole("heading", { name: "What do you want to run?" }),
     ).toBeVisible();
     await expect(
@@ -84,5 +87,12 @@ test(
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeVisible();
+    await page.goto("/applications/new");
+    await expect(
+      page.getByLabel("GitHub repository", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "How Hallvi works" }),
+    ).toHaveCount(0);
   },
 );
