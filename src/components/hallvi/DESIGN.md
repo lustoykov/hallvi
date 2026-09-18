@@ -242,15 +242,12 @@ Source authority: `application-shell.css`, `application-navigation.tsx`, `operat
 
 ## Applications home
 
-The “in good company” identity pairs each application with its caretaker and
-an explicitly illustrated preview. The welcome heading and continuation copy
-stay together; a solid blue Add application action sits beside them on desktop
-and below on mobile. A compact summary belongs with the application collection,
-not in a distant hero paragraph. Detailed conditions stay on their cards;
-recorded checks are not a promise of continuous monitoring. Card preview tints
-carry the caretaker’s color, while blue remains the action color. Use explicit
-Open app links rather than More. One application keeps its larger side-by-side
-composition; multiple applications use a compact collection.
+The [applications-home design](home/DESIGN.md) owns the “in good company”
+composition: each application and its caretaker share a colored header,
+followed by its explicitly illustrated preview and recorded condition.
+Blue remains the action color; caretaker colors identify applications rather
+than health. Greeting the caretaker is a small optional interaction, separate
+from opening the application. It makes no new claims about runtime state.
 
 ## Adopted interaction direction (9 September)
 

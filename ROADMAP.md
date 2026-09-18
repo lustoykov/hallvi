@@ -47,6 +47,8 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 ## Applications home
 
+- [x] **A warmer arrival — [PR #140](https://github.com/lustoykov/hallvi/pull/140).** Unite each application and its caretaker in a colored card, add an optional greeting, and shorten the first-time introduction. Verified desktop, mobile and the common single-app view.
+
 - [x] **Welcome and collection polish — [PR #139](https://github.com/lustoykov/hallvi/pull/139).** Group the welcome copy, place a compact status summary with the apps, strengthen Add application and card color, and replace vague More links. Preserve the caretaker identity and recorded status meanings.
 
 ## Conversation controls

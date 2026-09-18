@@ -61,6 +61,15 @@ const WORD: Record<Situation, string> = {
   new: "New",
 };
 
+// A greeting is conversational, never another claim about the host.
+const HELLO: Record<Situation, string> = {
+  fine: "Good to see you. What’s next?",
+  working: "Let’s pick up the conversation.",
+  needs: "Let’s take a look together.",
+  stale: "Shall we check in?",
+  new: "Ready to make this one yours?",
+};
+
 function moodOf(situation: Situation, active: boolean): MascotMood {
   if (situation === "needs") return "attention";
   if (situation === "working") return "working";
@@ -130,13 +139,12 @@ export function ApplicationsHome({
         <section className={s.greeting} aria-labelledby="home-heading">
           <div className={s.welcome}>
             <h1 id="home-heading">
-              Your {applications.length === 1 ? "app," : "apps,"}
-              <br />
+              Your {applications.length === 1 ? "app," : "apps,"}{" "}
               <em>in good company.</em>
             </h1>
             <p>
               {applications.length
-                ? "Pick an app. Pick up where you left off."
+                ? "Pick up a conversation, or make room for something new."
                 : "A little help for the software you make your own."}
             </p>
           </div>
@@ -193,7 +201,7 @@ export function ApplicationsHome({
               className={s.collection}
               aria-label="Applications"
               // One application is the common case, and it gets the room: its
-              // caretaker stands beside a card wide enough to read.
+              // caretaker and app share one wide card.
               data-solo={applications.length === 1 ? "" : undefined}
             >
               {visible.map((item, index) => {
@@ -222,33 +230,12 @@ export function ApplicationsHome({
                     className={`${s.card} ${active ? s.selected : ""}`}
                     style={{ "--tint": colors.get(item.id) } as CSSProperties}
                   >
-                    <button
-                      type="button"
-                      className={s.caretaker}
-                      aria-label={`Say hello to ${item.name}'s caretaker`}
-                      aria-pressed={active}
-                      onClick={() => greet(item.id)}
-                    >
-                      <Mascot
-                        color={colors.get(item.id)}
-                        mood={moodOf(situation, active)}
-                        paused={paused}
-                        gesture={active ? greeting : 0}
-                        ambient={situation === "fine"}
-                        slot={index % 3}
-                        dance={
-                          (["shuffle", "robot", "floss"] as const)[index % 3]
-                        }
-                      />
-                    </button>
-                    <div className={s.body}>
+                    <div className={s.cardWelcome}>
                       <div className={s.identity}>
-                        <div>
-                          <h3>
-                            <Link href={item.href}>{item.name}</Link>
-                          </h3>
-                          <span>{purpose}</span>
-                        </div>
+                        <h3>
+                          <Link href={item.href}>{item.name}</Link>
+                        </h3>
+                        <span className={s.purpose}>{purpose}</span>
                         <span
                           className={`${s.word} ${s[`tone_${item.condition.tone}`]}`}
                         >
@@ -256,6 +243,31 @@ export function ApplicationsHome({
                           {WORD[situation]}
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        className={s.caretaker}
+                        aria-label={`Say hello to ${item.name}'s caretaker`}
+                        onClick={() => greet(item.id)}
+                      >
+                        <Mascot
+                          color={colors.get(item.id)}
+                          mood={moodOf(situation, active)}
+                          paused={paused}
+                          gesture={active ? greeting : 0}
+                          ambient={situation === "fine"}
+                          slot={index % 3}
+                          dance={
+                            (["shuffle", "robot", "floss"] as const)[index % 3]
+                          }
+                        />
+                      </button>
+                      <p className={s.hello} role="status" aria-atomic="true">
+                        {active && greeting > 0 && (
+                          <span>{HELLO[situation]}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className={s.body}>
                       <Link
                         className={s.preview}
                         href={item.href}

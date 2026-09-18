@@ -1,5 +1,4 @@
-/* In good company: the caretakers as they were, one per application, over a
-   card with a drawn screen and a hierarchy. Decided 16 September 2026. */
+/* In good company: each application and its caretaker share one home. */
 .page {
   min-height: 100vh;
   background: var(--panel);
@@ -129,6 +128,7 @@
   text-wrap: balance;
 }
 .greeting h1 em {
+  display: inline-block;
   color: var(--blue);
   font-weight: inherit;
   font-style: normal;
@@ -137,7 +137,7 @@
   margin-top: 12px;
   color: var(--ink-2);
   font-size: 16px;
-  max-width: 44ch;
+  max-width: 56ch;
   text-wrap: pretty;
 }
 .addApplication {
@@ -174,7 +174,7 @@
   display: flex;
   align-items: center;
   gap: 18px;
-  margin-bottom: 4px;
+  margin-bottom: 20px;
 }
 .collectionIntro {
   margin-right: auto;
@@ -233,25 +233,69 @@
 }
 .card {
   min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(23 34 56 / 3%);
 }
-/* One application: the caretaker beside its card, both at a size that fills
-   the page instead of a third of it. */
+.selected {
+  border-color: color-mix(in srgb, var(--tint) 75%, var(--line));
+}
+.cardWelcome {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  grid-template-rows: minmax(144px, auto) auto;
+  align-items: center;
+  padding: 0 12px 12px 20px;
+  border-radius: 15px 15px 0 0;
+  background: color-mix(in srgb, var(--tint) 23%, white);
+}
+.caretaker {
+  display: block;
+  width: 128px;
+  height: 144px;
+  border: 0;
+  padding: 0;
+  background: none;
+  border-radius: 14px;
+}
+.hello {
+  grid-column: 1 / -1;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.hello span {
+  padding: 7px 10px;
+  border-radius: 10px 10px 10px 2px;
+  background: rgb(255 255 255 / 82%);
+}
+/* The common one-app case has the same identity and contents, side by side. */
 .collection[data-solo] {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 980px;
+  max-width: 900px;
 }
 .collection[data-solo] .card {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+.collection[data-solo] .cardWelcome {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 200px auto;
+  padding: 24px 24px 16px;
+  border-radius: 15px 0 0 15px;
 }
 .collection[data-solo] .caretaker {
-  height: 280px;
+  width: 100%;
+  height: 200px;
 }
 .collection[data-solo] .body {
-  padding: 22px 24px;
+  padding: 24px;
   gap: 16px;
+  align-content: center;
 }
 .collection[data-solo] .identity h3 {
   font-size: 24px;
@@ -260,18 +304,16 @@
   .collection[data-solo] .card {
     grid-template-columns: minmax(0, 1fr);
   }
-  .collection[data-solo] .caretaker {
-    height: 168px;
+  .collection[data-solo] .cardWelcome {
+    grid-template-columns: minmax(0, 1fr) 128px;
+    grid-template-rows: minmax(144px, auto) auto;
+    padding: 0 12px 12px 20px;
+    border-radius: 15px 15px 0 0;
   }
-}
-.caretaker {
-  display: block;
-  width: 100%;
-  height: 168px;
-  border: 0;
-  padding: 0;
-  background: none;
-  border-radius: 14px;
+  .collection[data-solo] .caretaker {
+    width: 128px;
+    height: 144px;
+  }
 }
 .caretaker :global(.mascot-scene),
 .emptyMascot :global(.mascot-scene) {
@@ -296,21 +338,13 @@
   height: 100%;
 }
 .body {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 16px 18px;
+  padding: 18px;
   display: grid;
   gap: 12px;
 }
-.selected .body {
-  border-color: color-mix(in srgb, var(--tint) 75%, var(--line));
-}
 .identity {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  min-width: 0;
+  padding: 12px 0;
 }
 .identity h3 {
   font-size: 19px;
@@ -322,7 +356,7 @@
 .identity h3 a:hover {
   color: var(--blue-text);
 }
-.identity > div > span {
+.purpose {
   display: block;
   margin-top: 3px;
   font-size: 13px;
@@ -330,7 +364,8 @@
   overflow-wrap: anywhere;
 }
 .word {
-  flex: 0 0 auto;
+  display: inline-block;
+  margin-top: 10px;
   font-size: 12.5px;
   font-weight: 600;
   padding-top: 3px;

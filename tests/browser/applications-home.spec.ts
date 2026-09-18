@@ -5,7 +5,7 @@ import { journey } from "./journeys";
 // disposable app rather than one that earlier journeys have populated.
 test.use({ isolatedApp: true });
 
-// The page is the caretakers over their applications: one card each, with
+// The page pairs caretakers with their applications: one card each, with
 // the drawn screen, one word of state and what runs. What has to keep
 // working: the reader recognises an application and opens it from its name,
 // its screen or Open app; search, once there is enough to search, never leaves
@@ -67,9 +67,20 @@ test(
       `/applications/${ids[0]}`,
     );
     // A freshly added application says so in one word, and its caretaker
-    // carries the box; nothing on the card warns about protection.
+    // stands ready; nothing on the card warns about protection.
     await expect(alpha.getByText("New", { exact: true })).toBeVisible();
     await expect(alpha.getByText(/backed up|backup/i)).toHaveCount(0);
+
+    // Saying hello is keyboard-accessible and never replaces the real status
+    // or takes the reader away from the application they meant to open.
+    await alpha
+      .getByRole("button", { name: "Say hello to Home alpha's caretaker" })
+      .press("Enter");
+    await expect(alpha.getByRole("status")).toContainText(
+      "Ready to make this one yours?",
+    );
+    await expect(alpha.getByText("No deployment recorded yet.")).toBeVisible();
+    await expect(page).toHaveURL(/\/applications$/);
 
     // The collection and search remain usable on a narrow screen.
     await page.setViewportSize({ width: 390, height: 844 });
