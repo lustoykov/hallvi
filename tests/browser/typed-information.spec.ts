@@ -169,7 +169,12 @@ test("records render in chat and their views, survive refresh, and update by rec
     ).toHaveCount(0);
     // And a map nothing describes is missing, which is not the same as an
     // application with no parts.
-    await expect(overview.getByText(/missing rather than empty/)).toBeVisible();
+    await expect(
+      overview.getByText(
+        "The deployment is recorded, but its architecture has not been mapped yet.",
+        { exact: true },
+      ),
+    ).toBeVisible();
     for (const title of [
       "Application deployed",
       "Private access ready",

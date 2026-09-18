@@ -39,9 +39,10 @@ Stop after each reviewable increment and use the user's feedback to shape the ne
 
 After the simple deployment UI/UX is accepted, expand application complexity in the order above and review further sidebar capabilities individually and decide what it can usefully show and do. Revisit broad security hardening after beta. Always-on care remains a direction; log-error detection, Pi-authored monitors, detailed care cadences and per-vertical policies are deferred.
 
-## Later milestone: conversation controls
+## Conversation controls
 
-- [ ] **Queue, steer and side chats — deferred.** Revisit native queue/steer, opening contextual side chats and concurrent read-only explanations after the core deployment experience works well. Existing read-only tool restrictions remain, but expanding side-chat behavior is outside the current sprint. Do not make these controls prerequisites for provisioning or first deployment.
+- [x] **Send next and conversation continuity.** Explicit follow-ups wait in the existing durable message queue; Stop cancels active and waiting replies in that conversation. Contextual questions preserve the owner's draft and destination, and drafts survive tab closure. [Interaction contract](docs/operator-design.md#interaction-while-pi-is-busy).
+- [ ] **Steer and contextual side chats — deferred.** Review native steering boundaries, opening contextual side chats and concurrent read-only explanations separately. Existing read-only tool restrictions remain; these controls are not prerequisites for first deployment.
 
 ## Later milestone: Pi heartbeat and state synchronization
 

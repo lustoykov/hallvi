@@ -43,6 +43,16 @@ export function InformationContent({
   const compact = !currentView;
   const access = content.kind === "application-access";
   const primary = access && currentView === "overview";
+  const recommendation = presentation.role === "recommendation";
+  const attention =
+    presentation.status === "failed" || presentation.status === "warning";
+  const kind = recommendation
+    ? "Recommendation"
+    : attention
+      ? "Needs attention"
+      : presentation.role === "outcome"
+        ? "Result"
+        : "Update";
   const details =
     content.kind === "deployment" ? (
       <>
@@ -242,10 +252,16 @@ export function InformationContent({
       data-kind={content.kind}
       data-context={currentView ?? "chat"}
       data-tone={tone}
+      data-role={presentation.role}
       data-information-id={record.id}
     >
       <header className="hv-record-head">
-        <Tag tone={tone}>{word}</Tag>
+        <div className="hv-record-classification">
+          {kind.toLowerCase() !== word.toLowerCase() && (
+            <span className="hv-record-kind">{kind}</span>
+          )}
+          <Tag tone={tone}>{word}</Tag>
+        </div>
         <span>
           {record.establishedAt ? "Established" : "Saved"}{" "}
           <LocalTime
@@ -328,7 +344,16 @@ export function InformationContent({
         </>
       )}
       {presentation.nextStep && (
-        <p className="hv-record-next">{presentation.nextStep}</p>
+        <p className="hv-record-next">
+          <span>
+            {recommendation
+              ? "What Pi suggests"
+              : attention
+                ? "A useful next step"
+                : "Next"}
+          </span>
+          {presentation.nextStep}
+        </p>
       )}
       {onOpen && compact && presentation.views.includes("deployment") && (
         <button

@@ -16,6 +16,27 @@
   gap: 8px;
   margin-bottom: 12px;
 }
+.hv-record-classification {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hv-record-classification > .hv-record-kind {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.hv-record[data-role="recommendation"]
+  .hv-record-classification
+  > .hv-record-kind {
+  color: var(--working-text);
+}
+.hv-record[data-tone="failed"] .hv-record-classification > .hv-record-kind,
+.hv-record[data-tone="stale"] .hv-record-classification > .hv-record-kind {
+  color: var(--failed);
+}
 .hv-record-head > span:last-child {
   color: var(--muted);
   font-size: 12px;
@@ -171,9 +192,25 @@
   color: var(--failed);
 }
 .hv-record-next {
+  display: grid;
+  gap: 3px;
   margin: 20px 0 12px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: var(--context);
   max-width: 68ch;
   color: var(--ink-2);
+}
+.hv-record-next > span {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 680;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.hv-record[data-role="recommendation"] .hv-record-next {
+  background: var(--working-bg);
+  color: var(--working-text);
 }
 .hv-record-evidence,
 .hv-record-details {

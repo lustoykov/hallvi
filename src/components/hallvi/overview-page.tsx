@@ -48,6 +48,90 @@ const tone = {
   planned: "unknown",
 } as const;
 
+export function overviewReturnVisit(
+  records: SavedInformation[],
+  application: ApplicationRecord,
+) {
+  const current = records.filter(
+    (record) => !record.retiredAt && record.applicationId === application.id,
+  );
+  const deployments = current.filter(
+    (record) => record.presentation?.content?.kind === "deployment",
+  );
+  const latestDeployment = deployments.toSorted(
+    (a, b) =>
+      Date.parse(b.establishedAt ?? b.createdAt) -
+      Date.parse(a.establishedAt ?? a.createdAt),
+  )[0];
+  const hasData = current.some((record) => {
+    const ref = record.presentation?.states?.ref;
+    return ref?.kind === "database" || ref?.kind === "volume";
+  });
+
+  if (latestDeployment?.presentation?.status === "verified")
+    return {
+      deployed: true,
+      stage: "Deployed",
+      title: "A verified deployment is on record",
+      detail:
+        "Any condition below is the last recorded check, not continuous monitoring. Unfinished work stays visible here.",
+      draft: "Check the application now and record what you find.",
+      action: "Check it again",
+    };
+
+  if (latestDeployment) {
+    const status = latestDeployment.presentation?.status;
+    if (status === "failed")
+      return {
+        deployed: false,
+        stage: "Deployment needs attention",
+        title: "The latest deployment record reports a failure",
+        detail:
+          "The earlier result may no longer describe the application. Continue from the latest recorded problem.",
+        draft:
+          latestDeployment.presentation?.nextStep ??
+          "Investigate the latest failed deployment, explain what stopped it, and continue safely if it is recoverable.",
+        action: "Resolve the deployment problem",
+      };
+    if (status === "warning")
+      return {
+        deployed: false,
+        stage: "Deployment has a limit",
+        title: "The latest deployment record needs review",
+        detail:
+          "A deployment is recorded, with a limitation that should be understood before treating it as finished.",
+        draft:
+          latestDeployment.presentation?.nextStep ??
+          "Review the limitation on the latest deployment, explain its impact, and recommend the safest continuation.",
+        action: "Review the deployment",
+      };
+    return {
+      deployed: false,
+      stage: "Deployment recorded",
+      title: "The working result has not been verified",
+      detail:
+        "Hallvi has a deployment record, but no verified application result. Continue from that recorded work.",
+      draft:
+        "Continue from the recorded deployment, verify that the application works from its intended access path, and record the result.",
+      action: "Verify the deployment",
+    };
+  }
+
+  const source = application.repositoryUrl;
+  return {
+    deployed: false,
+    stage: application.host ? "Server recorded" : "Setup started",
+    title: "No deployment is recorded yet",
+    detail: application.host
+      ? `The repository and server settings are stored${hasData ? ", and application data has been identified" : ""}. Hallvi has not recorded a deployment result.`
+      : "The repository is stored. Continue by choosing or connecting an application server.",
+    draft: application.host
+      ? `Continue setting up ${source} using the stored server settings. Verify access, inspect what it needs${hasData ? ", preserve the application data already identified," : ""} and deploy it. Ask before any decision that needs me.`
+      : `Continue setting up ${source}. Work out what it needs, then help me connect an appropriate application server.`,
+    action: application.host ? "Continue setup" : "Choose a server",
+  };
+}
+
 export function OverviewPage({
   records,
   executions,
@@ -119,6 +203,10 @@ export function OverviewPage({
     () => applicationCondition(records, application.id, now),
     [records, application.id, now],
   );
+  const returnVisit = useMemo(
+    () => overviewReturnVisit(records, application),
+    [records, application],
+  );
 
   // Where the application answers, from the record that says so.
   const openUrl =
@@ -156,6 +244,22 @@ export function OverviewPage({
             earlier: 0,
           }}
         />
+        {!returnVisit.deployed && (
+          <section className="hv-overview-resume" aria-label="Continue setup">
+            <div>
+              <span>{returnVisit.stage}</span>
+              <b>{returnVisit.title}</b>
+              <p>{returnVisit.detail}</p>
+            </div>
+            <button
+              type="button"
+              className="hv-primary-button"
+              onClick={() => onAsk(returnVisit.draft)}
+            >
+              {returnVisit.action}
+            </button>
+          </section>
+        )}
       </div>
     );
   }
@@ -167,18 +271,36 @@ export function OverviewPage({
       {chrome.header}
       <div className="hv-section-content">
         <div className="hv-overview-plain">
-          <p className="hv-overview-condition">
-            <Tag tone={tone[condition.certainty]}>
-              {condition.certainty === "verified"
-                ? "Verified"
-                : condition.certainty === "stale"
-                  ? "Out of date"
-                  : condition.certainty === "failed"
-                    ? "Failed"
-                    : "Not assessed"}
-            </Tag>
-            {condition.text}
-          </p>
+          <section
+            className="hv-overview-stage"
+            aria-labelledby="overview-stage-title"
+          >
+            <span>{returnVisit.stage}</span>
+            <h2 id="overview-stage-title">{returnVisit.title}</h2>
+            <p>{returnVisit.detail}</p>
+            <button
+              type="button"
+              className="hv-primary-button"
+              onClick={() => onAsk(returnVisit.draft)}
+            >
+              {returnVisit.action}
+            </button>
+          </section>
+
+          {condition.certainty !== "unknown" && (
+            <p className="hv-overview-condition">
+              <Tag tone={tone[condition.certainty]}>
+                {condition.certainty === "verified"
+                  ? "Verified"
+                  : condition.certainty === "stale"
+                    ? "Out of date"
+                    : condition.certainty === "failed"
+                      ? "Failed"
+                      : "Not assessed"}
+              </Tag>
+              {condition.text}
+            </p>
+          )}
 
           {built.needs.length > 0 && (
             <section>
@@ -202,42 +324,56 @@ export function OverviewPage({
             </section>
           )}
 
-          <section>
-            <h2>What is true now</h2>
-            <ul className="hv-overview-vitals">
-              {built.vitals.map((vital) => (
-                <li key={vital.id}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenDestination(vital.destination)}
-                  >
-                    <Tag tone={tone[vital.status.certainty]}>{vital.value}</Tag>
-                    <b>{vital.label}</b>
-                    <span>{vital.status.text}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {(returnVisit.deployed ||
+            built.vitals.some(
+              (vital) => vital.status.certainty !== "unknown",
+            )) && (
+            <section>
+              <h2>What has been assessed</h2>
+              <ul className="hv-overview-vitals">
+                {built.vitals
+                  .filter(
+                    (vital) =>
+                      returnVisit.deployed ||
+                      vital.status.certainty !== "unknown",
+                  )
+                  .map((vital) => (
+                    <li key={vital.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenDestination(vital.destination)}
+                      >
+                        <Tag tone={tone[vital.status.certainty]}>
+                          {vital.value}
+                        </Tag>
+                        <b>{vital.label}</b>
+                        <span>{vital.status.text}</span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          )}
 
-          <section>
-            <h2>How this fits together</h2>
-            <p>
-              Nothing on record says what this application is made of, so the
-              map above it is missing rather than empty.
-            </p>
-            <button
-              type="button"
-              className="hv-primary-button"
-              onClick={() =>
-                onAsk(
-                  "Work out how this application is put together — its pieces, how they connect, and what you can verify about each — and record it.",
-                )
-              }
-            >
-              Ask Hallvi to map this application
-            </button>
-          </section>
+          {returnVisit.deployed && (
+            <section>
+              <h2>How this fits together</h2>
+              <p>
+                The deployment is recorded, but its architecture has not been
+                mapped yet.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  onAsk(
+                    "Work out how this application is put together — its pieces, how they connect, and what you can verify about each — and record it.",
+                  )
+                }
+              >
+                Ask Hallvi to map this application
+              </button>
+            </section>
+          )}
 
           {built.recent.length > 0 && (
             <section>

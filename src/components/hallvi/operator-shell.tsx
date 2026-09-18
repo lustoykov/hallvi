@@ -50,6 +50,18 @@ import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { RenameApplicationDialog } from "./rename-application-dialog";
 import { DemoContext } from "./external-link";
 import { recordReferences } from "./record-references";
+import {
+  acceptedDraftCanClear,
+  clearPendingSubmission,
+  readConversationContext,
+  readConversationDraft,
+  readPendingSubmission,
+  sectionContext,
+  writeConversationContext,
+  writeConversationDraft,
+  writePendingSubmission,
+  type ConversationContext,
+} from "./conversation-continuity";
 
 function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
   const byId = new Map(current.map((message) => [message.id, message]));
@@ -98,40 +110,6 @@ function readSeen(applicationId: string | undefined) {
  * under the conversation it belongs to; it is never put in a URL and never
  * sent anywhere, and it is dropped the moment the message goes.
  */
-function draftKey(chatId: string) {
-  return `hv-draft:${chatId}`;
-}
-function readDraft(chatId: string) {
-  try {
-    return sessionStorage.getItem(draftKey(chatId)) ?? "";
-  } catch {
-    return "";
-  }
-}
-function writeDraft(chatId: string, value: string) {
-  try {
-    if (value) sessionStorage.setItem(draftKey(chatId), value);
-    else sessionStorage.removeItem(draftKey(chatId));
-  } catch {
-    /* a browser without storage simply forgets an unsent draft */
-  }
-}
-
-function readSubmission(chatId: string) {
-  try {
-    const value = JSON.parse(
-      sessionStorage.getItem(`pi-submission:${chatId}`) ?? "null",
-    );
-    return value &&
-      typeof value.message === "string" &&
-      typeof value.key === "string"
-      ? (value as { message: string; key: string })
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function focusComposer() {
   requestAnimationFrame(() =>
     document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus(),
@@ -259,20 +237,28 @@ export function OperatorShell({
     };
   }, [piReady, router]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [contexts, setContexts] = useState<
+    Record<string, ConversationContext | null>
+  >({});
   // What this browser kept while the reader was away — connecting ChatGPT,
   // for instance. Anything typed since wins over it.
   const chatIds = view.chats.map((chat) => chat.id).join(" ");
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const kept: Record<string, string> = {};
+      const restoredContexts: Record<string, ConversationContext | null> = {};
+      const appId = initialView.application?.id;
       for (const id of chatIds.split(" ").filter(Boolean)) {
-        const draft = readDraft(id);
+        if (!appId) continue;
+        const draft = readConversationDraft(appId, id);
         if (draft) kept[id] = draft;
+        restoredContexts[id] = readConversationContext(appId, id);
       }
       setDrafts((current) => ({ ...kept, ...current }));
+      setContexts((current) => ({ ...restoredContexts, ...current }));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [chatIds]);
+  }, [chatIds, initialView.application?.id]);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [runs, setRuns] = useState<PiRun[]>([]);
   const [terminal, setTerminal] = useState({
@@ -288,6 +274,8 @@ export function OperatorShell({
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const submittingChat = useRef<string | null>(null);
+  const submittingKey = useRef<string | null>(null);
+  const editedAfterSubmission = useRef(new Set<string>());
 
   const application = view.application;
   const activeChat =
@@ -472,22 +460,34 @@ export function OperatorShell({
             }
           : current,
       );
-      const pending = readSubmission(selectedChatId);
+      const pending = readPendingSubmission(applicationId, selectedChatId);
       if (pending) {
         if (snapshot.runs.some((run) => run.requestKey === pending.key)) {
           // SSE can confirm acceptance before the POST response arrives.
           // Retire the optimistic copy as soon as durable intent is visible.
           setPendingMessage(null);
-          sessionStorage.removeItem(`pi-submission:${selectedChatId}`);
+          clearPendingSubmission(applicationId, selectedChatId);
           setDrafts((current) => {
-            if (current[selectedChatId] !== pending.message) return current;
-            writeDraft(selectedChatId, "");
+            const latest = current[selectedChatId] ?? "";
+            if (
+              !acceptedDraftCanClear(
+                latest,
+                pending.message,
+                editedAfterSubmission.current.has(pending.key),
+              )
+            )
+              return current;
+            writeConversationDraft(applicationId, selectedChatId, "");
             return { ...current, [selectedChatId]: "" };
           });
         } else if (submittingChat.current !== selectedChatId) {
           setDrafts((current) => {
             if (current[selectedChatId]) return current;
-            writeDraft(selectedChatId, pending.message);
+            writeConversationDraft(
+              applicationId,
+              selectedChatId,
+              pending.message,
+            );
             return { ...current, [selectedChatId]: pending.message };
           });
         }
@@ -523,9 +523,14 @@ export function OperatorShell({
   }, [applicationId, selectedChatId]);
 
   function setComposer(value: string) {
-    if (!activeChat) return;
+    if (!activeChat || !applicationId) return;
+    const pending = readPendingSubmission(applicationId, activeChat.id);
+    const pendingKey =
+      pending?.key ??
+      (submittingChat.current === activeChat.id ? submittingKey.current : null);
+    if (pendingKey) editedAfterSubmission.current.add(pendingKey);
     setDrafts((current) => ({ ...current, [activeChat.id]: value }));
-    writeDraft(activeChat.id, value);
+    writeConversationDraft(applicationId, activeChat.id, value);
   }
 
   function applyView(next: OperatorView) {
@@ -603,6 +608,7 @@ export function OperatorShell({
       if (label === "message") {
         setPendingMessage(null);
         submittingChat.current = null;
+        submittingKey.current = null;
       }
       setBusy(null);
     }
@@ -650,20 +656,29 @@ export function OperatorShell({
   }
 
   // Drafts a message in a conversation without sending it.
-  function askInConversation(chatId: string | null, draft: string) {
+  function askInConversation(
+    chatId: string | null,
+    draft: string,
+    section: ApplicationSection | null = activeSection,
+  ) {
+    if (!application) return;
     const target = chatId ?? view.selectedChatId;
     if (!target) {
       // Every destination's primary action goes through here. Returning
       // quietly made all of them dead buttons for an application whose only
       // conversation had been archived — the page invites the question and
       // then swallows it. Start one instead.
-      if (!application) return;
       void run("chat", async () => {
         const next = await api.createChat(application.id);
         const started = next.selectedChatId;
         if (started) {
           setDrafts((current) => ({ ...current, [started]: draft }));
-          writeDraft(started, draft);
+          writeConversationDraft(application.id, started, draft);
+          if (section) {
+            const context = sectionContext(section);
+            setContexts((current) => ({ ...current, [started]: context }));
+            writeConversationContext(application.id, started, context);
+          }
         }
         return next;
       });
@@ -671,8 +686,21 @@ export function OperatorShell({
       focusComposer();
       return;
     }
-    setDrafts((current) => ({ ...current, [target]: draft }));
-    writeDraft(target, draft);
+    setDrafts((current) => {
+      // A destination may suggest a useful question, but text the owner has
+      // already written wins. The context chip still arrives and explains
+      // where they came from without rewriting their words.
+      const existing =
+        current[target] ?? readConversationDraft(application.id, target);
+      if (existing.trim()) return { ...current, [target]: existing };
+      writeConversationDraft(application.id, target, draft);
+      return { ...current, [target]: draft };
+    });
+    if (section) {
+      const context = sectionContext(section);
+      setContexts((current) => ({ ...current, [target]: context }));
+      writeConversationContext(application.id, target, context);
+    }
     if (application && target !== view.selectedChatId)
       void run("chat", () => api.view(application.id, target));
     closeSection();
@@ -688,7 +716,7 @@ export function OperatorShell({
       const next = existing.trim()
         ? `${existing.trimEnd()}\n\n${block}`
         : block;
-      writeDraft(target, next);
+      if (application) writeConversationDraft(application.id, target, next);
       return { ...current, [target]: next };
     });
     if (application && target !== view.selectedChatId)
@@ -712,24 +740,52 @@ export function OperatorShell({
     }
     setPendingMessage(message);
     submittingChat.current = activeChat.id;
-    if (!told) setComposer("");
-    const previous = readSubmission(activeChat.id);
+    // Clear the field optimistically, but keep its durable copy until the
+    // server accepts it. Text typed after this point is a newer draft and
+    // wins in both React state and storage.
+    if (!told) setDrafts((current) => ({ ...current, [activeChat.id]: "" }));
+    const previous = readPendingSubmission(application.id, activeChat.id);
     const key =
       previous?.message === message ? previous.key : crypto.randomUUID();
+    submittingKey.current = key;
+    editedAfterSubmission.current.delete(key);
+    if (told) editedAfterSubmission.current.add(key);
+    const context = contexts[activeChat.id];
+    const draftContext = told || context?.requestKey ? null : context;
+    if (draftContext) {
+      const sentContext = { ...draftContext, requestKey: key };
+      setContexts((current) => ({
+        ...current,
+        [activeChat.id]: sentContext,
+      }));
+      writeConversationContext(application.id, activeChat.id, sentContext);
+    }
     let accepted = false;
     void run(
       "message",
       async () => {
         // Keep the key across a lost HTTP response and reload. Resubmitting the
         // same draft cannot create two accepted requests.
-        sessionStorage.setItem(
-          `pi-submission:${activeChat.id}`,
-          JSON.stringify({ key, message }),
-        );
+        writePendingSubmission(application.id, activeChat.id, {
+          message,
+          key,
+        });
         await api.sendMessage(application.id, activeChat.id, message, key);
         accepted = true;
         setPendingMessage(null);
-        sessionStorage.removeItem(`pi-submission:${activeChat.id}`);
+        clearPendingSubmission(application.id, activeChat.id);
+        setDrafts((current) => {
+          if (
+            !acceptedDraftCanClear(
+              current[activeChat.id] ?? "",
+              message,
+              editedAfterSubmission.current.has(key),
+            )
+          )
+            return current;
+          writeConversationDraft(application.id, activeChat.id, "");
+          return current;
+        });
         return api.view(application.id, activeChat.id);
       },
       async () => {
@@ -740,14 +796,38 @@ export function OperatorShell({
           snapshot?.runs.some((run) => run.requestKey === key),
         );
         if (accepted) {
-          sessionStorage.removeItem(`pi-submission:${activeChat.id}`);
+          clearPendingSubmission(application.id, activeChat.id);
+          setDrafts((current) => {
+            if (
+              !acceptedDraftCanClear(
+                current[activeChat.id] ?? "",
+                message,
+                editedAfterSubmission.current.has(key),
+              )
+            )
+              return current;
+            writeConversationDraft(application.id, activeChat.id, "");
+            return current;
+          });
           setError("Your message was saved. Reconnecting to its progress…");
-        } else
+        } else {
+          if (draftContext) {
+            setContexts((current) => ({
+              ...current,
+              [activeChat.id]: draftContext,
+            }));
+            writeConversationContext(
+              application.id,
+              activeChat.id,
+              draftContext,
+            );
+          }
           setDrafts((current) => {
             const next = current[activeChat.id] || message;
-            writeDraft(activeChat.id, next);
+            writeConversationDraft(application.id, activeChat.id, next);
             return { ...current, [activeChat.id]: next };
           });
+        }
         const refreshed = await api
           .view(application.id, activeChat.id)
           .catch(() => null);
@@ -963,11 +1043,24 @@ export function OperatorShell({
               reachable={reachable}
               busy={busy}
               composer={composer}
+              context={activeChat ? (contexts[activeChat.id] ?? null) : null}
               error={error}
               pendingMessage={pendingMessage}
               piReady={piReady}
               onArchive={archiveActiveChat}
               onComposerChange={setComposer}
+              onDismissContext={() => {
+                if (!activeChat || !application) return;
+                setContexts((current) => ({
+                  ...current,
+                  [activeChat.id]: null,
+                }));
+                writeConversationContext(application.id, activeChat.id, null);
+                focusComposer();
+              }}
+              onReturnToContext={(section) => {
+                selectSection(section);
+              }}
               onSend={() => sendMessage()}
               onTell={sendMessage}
               runs={runs.filter((run) => run.chatId === activeChat?.id)}
