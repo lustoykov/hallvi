@@ -71,10 +71,9 @@ export function ModeLine({
           </>
         ) : mode === "pi-decides" ? (
           <>
-            You are on <b>Pi decides</b>: whether to ask first is Hallvi&rsquo;s
-            judgment, and it may take connecting as your go-ahead to {action} as
-            it proposed. Choose Always ask if you want a prompt before that
-            happens.
+            You are on <b>Pi decides</b>: Hallvi chooses whether a command needs
+            approval. Connecting can be enough authority for it to {action} as
+            proposed. Choose Always ask if you want every command to wait.
           </>
         ) : (
           <>

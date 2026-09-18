@@ -115,6 +115,17 @@ export function HostRequest({
       <p className="hv-ob-said">
         {needs} Where should {application} run?
       </p>
+      <details className="hv-ob-more">
+        <summary>Safer first run</summary>
+        <p>
+          Hallvi is in beta. Use the most capable supported model, a dedicated
+          test server and non-sensitive data. Repository files and server output
+          can mislead an AI; Always ask lets you inspect every command, but it
+          is not a security boundary. Before using real data, keep a tested
+          recovery copy in an account this server and its credentials cannot
+          delete.
+        </p>
+      </details>
       {/* Real radio inputs, so arrow keys, focus and the screen reader's
           "1 of 2" all come from the browser. */}
       <fieldset className="hv-ob-choices">

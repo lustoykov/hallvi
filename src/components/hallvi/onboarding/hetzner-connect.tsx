@@ -160,8 +160,9 @@ export function HetznerConnect({
         <p>
           A key to <b>one Hetzner project</b>. With it Hallvi can create, change
           and delete servers and everything else in that project. Hetzner does
-          not offer narrower keys, so the way to keep it contained is a project
-          used only for Hallvi: nothing outside it can be touched.
+          not offer narrower keys. Use a separate project containing only
+          Hallvi&rsquo;s test servers: nothing outside that project can be
+          touched, but everything inside it is within reach.
         </p>
         <ModeLine mode={mode} action="rent the server" />
       </div>

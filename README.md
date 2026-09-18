@@ -8,7 +8,13 @@ The target is Docker Compose on one instance, with PostgreSQL or SQLite, require
 
 ## Current direction
 
-The first [operator redesign](docs/operator-design.md) checkpoint is implemented: the main conversation has general server Bash, three permission modes, inline approval and recorded command output. Other conversations have read-only tools. The execution backend has been verified with a temporary SSH target; server selection will arrive with deployment setup. The four-table controller model and shared-information cards are implemented locally; see [storage verification](docs/testing/2026-09-12-operator-storage.md). Review this checkpoint before Hetzner provisioning, then a verified lightweight deployment. Queue/steer and further side-chat work are deferred until that experience is established.
+Current `main` implements conversation-first repository intake, model and
+GitHub setup, Hetzner or existing-machine connection, general server execution
+with three permission modes, inline approval, recorded output and
+evidence-backed application views. Other conversations have read-only tools.
+The public beta candidate still needs exact installation and fresh-user real
+deployment evidence; [Roadmap](ROADMAP.md#public-self-service-beta-preparation)
+owns those gates.
 
 [Design and prove the main deployment journey first](PRODUCT.md#development-priority), in reviewable stages from lightweight to more complicated applications; [Roadmap](ROADMAP.md) owns the checkpoints.
 
@@ -31,7 +37,10 @@ Hallvi can execute commands on your application server with the connected accoun
 
 A real repository-to-Hetzner deployment with private persistent PostgreSQL and external behavior checks was [verified on 8 September](docs/testing/README.md#dated-evidence), followed by [hardening](docs/testing/README.md#dated-evidence). The [UI reference](docs/design/screens.md) distinguishes real records from simulated scenarios.
 
-The old deployment/operation workers, mutation endpoints and approval cards have been removed from the active path. Their underlying modules and data model are being replaced incrementally. This checkpoint can execute on an existing SSH server; the replacement repository-to-provider deployment journey is not complete. Historical deployment proofs describe the previous architecture.
+The active path can inspect a repository, connect Hetzner or an existing
+machine and carry deployment work through the main operator. Dated proofs
+establish capability on earlier revisions; they do not replace the exact
+candidate walkthrough still open in the roadmap.
 
 ## Run
 
