@@ -210,7 +210,7 @@ export function NewApplicationScreen({
             </h1>
             <p>
               {first
-                ? "I get self-hosted software running on a server you control, check that it really works, and keep an eye on it afterwards. You bring an application; I do the infrastructure, and explain what I am doing as I go."
+                ? "Bring an app you’d like to run. I’ll help you find it a home on your own server, and explain each step as we go."
                 : "Same as before: I read it, you choose where it runs, and I hand it over working."}
             </p>
             {first && (
