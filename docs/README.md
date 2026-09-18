@@ -12,6 +12,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
 | [Installing Hallvi](installation.md) | The installed background service on macOS and Linux: building the package, install paths, `hallvi start/stop/status`, startup behavior, using an installation on a virtual machine from a laptop, upgrade, uninstall and current limits. |
+| [Beta walkthrough](beta-walkthrough.md) | Fresh-user acceptance: install the exact candidate, inspect a repository, connect a test server, use the app and return after restart. |
 | [Always-on concept](design/always-on-concept.md) | Where Hallvi itself runs, as a ladder the user climbs: their own Mac or Linux PC first, then a virtual machine they provide and reach through their own SSH connection, later a hosted service; the failure table behind each rung and the packaging decisions. The first two rungs are implemented. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
 | [Development resources](development-resources.md) | Local development, resource ownership, task completion and scheduled cleanup safeguards. |
