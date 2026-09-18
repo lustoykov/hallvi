@@ -39,7 +39,11 @@ No wizard, no modal, no trip to Settings. The task stays visible above it.
 
 ```mermaid
 flowchart TD
-  A[Paste a repository] --> B[Hallvi reads it: no GitHub sign-in for public code]
+  A[Add a repository] --> A1{ChatGPT connected?}
+  A1 -- No --> A2[Connect ChatGPT with the app and caretaker in view]
+  A2 --> A3[Read repository: explicit action]
+  A1 -- Yes --> A3
+  A3 --> B[Hallvi explains what it needs: no renting or deployment yet]
   B --> C{Where should it run?}
   C -- Rent a server --> D[Hetzner: guided token, or paste one]
   C -- A machine I have --> E[One command on the machine, paste one line back]
@@ -56,23 +60,29 @@ flowchart TD
   L -- Anyone else --> N[One record to add; Hallvi watches public DNS]
 ```
 
-1. **Intake is a welcome, then one field.** Little Server greets, says in
-   three sentences what Hallvi is, and follows the form: a wave, a box once a
-   repository is typed, the wrench while it is read, a worried look when it
-   could not be. Three drawings say how it goes from here (read, choose where,
-   open). The field stays above the fold; the name is derived and can change
-   later. GitHub is a quiet link for private repositories, and the typed
-   address is kept across that trip. ChatGPT, if missing, is asked for in the
-   conversation after the request is saved; preferences wait.
-   After it, the conversation is not an empty page: **Little Server stays
-   above the transcript with a four-stop rail** (read it, a place to run,
-   deploy, open it). Each stop is read from a record (a request, an attached
-   host, a deployment record, an access record), never from a timer. While Pi
-   works the current stop carries a travelling band and the bubble repeats
-   the turn's own status line; when something waits for the owner the stop
-   turns amber and Little Server points at it; on arrival it celebrates, and
-   on later visits the rail is gone. Before the first message it offers "Get
-   it running", so nobody has to guess what to type.
+1. **Intake is a welcome, then one field.** Little Server greets and follows
+   the form. Adding checks repository access; it does not imply that Pi has
+   read its contents. The layout fits narrow windows, including the form and
+   action. GitHub remains a quiet link for private repositories, and the typed
+   address is kept across that trip. Approval behavior is explained briefly
+   in plain language; its detailed control stays in the conversation.
+
+   Before the first message, an app-specific introduction says what Hallvi
+   will inspect and offers **Read repository**, or **Connect ChatGPT** if
+   needed. Connection uses the existing account flow in an app-specific view
+   with the same caretaker and name. Model preferences are optional and
+   collapsed. The explicit **Read repository** action after connection sends
+   the inspection request and returns to that conversation, already queued.
+   It asks Pi to explain the app, its requirements and a sensible hosting
+   option, without renting, deploying or changing anything. Authentication
+   alone never starts a turn. The existing message request key makes retries
+   of this first inspection idempotent. Ordinary Settings visits and drafted
+   questions keep their existing return behavior.
+
+   After the first request, Little Server stays above the transcript with a
+   compact four-stop rail: read it, a place to run, deploy, open it. Each stop
+   derives from a record, never a timer. Running, waiting and completed text
+   describe recorded state; the arrival does not imply continuous monitoring.
 2. **"Where should it run?" is one card with two whole journeys.** Pi's
    recommendation is marked, not imposed. A connected Hetzner account collapses
    that side to one button.

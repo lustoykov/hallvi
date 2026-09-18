@@ -51,7 +51,10 @@ import {
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import { useConnectionRequests } from "./onboarding/connection-requests";
-import { JourneyRail } from "./onboarding/journey-rail";
+import {
+  JourneyRail,
+  READ_REPOSITORY_MESSAGE,
+} from "./onboarding/journey-rail";
 import {
   SecretRequests,
   SecretRequestsChip,
@@ -543,6 +546,14 @@ export function ChatPane({
       })
     : null;
 
+  const firstConversation =
+    secretsHere &&
+    Boolean(connections.journey) &&
+    activeChat?.kind === "main" &&
+    !archived &&
+    !view.messages.some((message) => message.role === "user") &&
+    !connections.journey?.read;
+
   return (
     <section className="hv-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -582,9 +593,12 @@ export function ChatPane({
               }
               started={view.messages.some((message) => message.role === "user")}
               canStart={piReady && !busy && !requestPending && Boolean(onTell)}
-              onStart={() =>
-                onTell?.("Please read this repository and get it running.")
+              connectHref={
+                !piReady && chatId
+                  ? `/setup/pi?application=${view.application.id}&chat=${chatId}&onboarding=1`
+                  : undefined
               }
+              onStart={() => onTell?.(READ_REPOSITORY_MESSAGE)}
             />
           )}
         </div>
@@ -1045,30 +1059,32 @@ export function ChatPane({
             </div>
           </div>
         )}
-        {application && !piReady && (
-          <div className="hv-pi-required">
-            <WarningCircle weight="bold" />
-            <div>
-              <strong>Connect ChatGPT to chat</strong>
-              <p>
-                Your applications and chat history are still available, and
-                anything you have typed here is kept.
-              </p>
-            </div>
-            {/* The two ids are what brings the reader back to this exact
+        {application &&
+          !piReady &&
+          (!firstConversation || Boolean(composer.trim())) && (
+            <div className="hv-pi-required">
+              <WarningCircle weight="bold" />
+              <div>
+                <strong>Connect ChatGPT to chat</strong>
+                <p>
+                  Your applications and chat history are still available, and
+                  anything you have typed here is kept.
+                </p>
+              </div>
+              {/* The two ids are what brings the reader back to this exact
                 conversation afterwards. They name records, not a URL, and
                 the draft stays in this browser rather than travelling. */}
-            <Link
-              href={
-                chatId
-                  ? `/setup/pi?application=${application.id}&chat=${chatId}`
-                  : "/setup/pi"
-              }
-            >
-              Open Settings
-            </Link>
-          </div>
-        )}
+              <Link
+                href={
+                  chatId
+                    ? `/setup/pi?application=${application.id}&chat=${chatId}`
+                    : "/setup/pi"
+                }
+              >
+                Open Settings
+              </Link>
+            </div>
+          )}
         <div
           className={`hv-composer-box${composerDisabled ? " disabled" : ""}`}
         >

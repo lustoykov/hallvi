@@ -16,6 +16,7 @@
 
 import { ArrowRight, Check, SpinnerGap } from "@phosphor-icons/react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useState } from "react";
 
 import "./journey-rail.css";
@@ -24,6 +25,9 @@ const Mascot = dynamic(
   () => import("../home/mascot-scene").then((m) => m.MascotScene),
   { ssr: false, loading: () => null },
 );
+
+export const READ_REPOSITORY_MESSAGE =
+  "Read this repository and explain what the application does, what it needs to run, and a sensible hosting option. Do not rent a server, deploy, or change anything yet. Ask me where I want it to run after explaining what you found.";
 
 export interface JourneyFacts {
   /** Pi has said what the application needs, or gone further. */
@@ -57,6 +61,7 @@ export function JourneyRail({
   started,
   canStart,
   onStart,
+  connectHref,
 }: {
   application: string;
   facts: JourneyFacts;
@@ -71,6 +76,7 @@ export function JourneyRail({
   /** A message can be sent: the model is connected and nothing is running. */
   canStart: boolean;
   onStart: () => void;
+  connectHref?: string;
 }) {
   const done = [facts.read, facts.placed, facts.deployed, facts.opens];
   // A later stop proves the earlier ones, however the records arrived.
@@ -115,8 +121,60 @@ export function JourneyRail({
           : started
             ? "I’m here. Tell me what you’d like next."
             : canStart
-              ? `I’ve added ${application}. Shall I read it and get it running?`
-              : `I’ve added ${application}. Connect ChatGPT below and I’ll get started.`;
+              ? `I’ve added ${application}. Ready to read its repository.`
+              : `I’ve added ${application}. Connect ChatGPT to continue.`;
+
+  const intro = !started && !working && !needsYou && !facts.read && !finished;
+  if (intro)
+    return (
+      <section
+        className="hv-first-app"
+        aria-label="Get to know your application"
+      >
+        <button
+          type="button"
+          className="hv-first-app-mascot hv-rail-mascot"
+          aria-label="Make Hallvi dance"
+          onClick={() => setDances((count) => count + 1)}
+        >
+          <Mascot
+            color="#7a8bd6"
+            mood="waving"
+            dance="shuffle"
+            danceRequest={dances}
+          />
+        </button>
+        <div>
+          <h2>Let’s get to know {application}.</h2>
+          <p>
+            I’ll read the repository and explain what it needs. Then we’ll
+            choose where it runs.
+          </p>
+          {connectHref ? (
+            <>
+              <p className="hv-first-app-next">
+                Connect ChatGPT so I can read {application}.
+              </p>
+              <Link className="hv-rail-start" href={connectHref}>
+                Connect ChatGPT <ArrowRight aria-hidden="true" />
+              </Link>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="hv-rail-start"
+              disabled={!canStart}
+              onClick={onStart}
+            >
+              Read repository <ArrowRight aria-hidden="true" />
+            </button>
+          )}
+          <p className="hv-first-app-note">
+            This first look won’t rent a server or deploy anything.
+          </p>
+        </div>
+      </section>
+    );
 
   return (
     <section
@@ -155,7 +213,7 @@ export function JourneyRail({
         <span>{line}</span>
         {!started && !working && canStart && !finished && (
           <button type="button" className="hv-rail-start" onClick={onStart}>
-            Get it running <ArrowRight weight="bold" aria-hidden="true" />
+            Read repository <ArrowRight weight="bold" aria-hidden="true" />
           </button>
         )}
       </p>
