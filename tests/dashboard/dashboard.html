@@ -1,17 +1,17 @@
 <!doctype html>
-<!-- Desktop developer tool for one engineer. Inherits Haldur's navy/blue palette and restrained list UI.
+<!-- Desktop developer tool for one engineer. Inherits Hallvi's navy/blue palette and restrained list UI.
      Two pages share one shell: / runs fixed checks, /evals reads the archive of saved eval answers.
      Reading spends nothing; a live run and its automatic judging share one confirmation. -->
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="testing-token" content="CSRF_TOKEN">
-  <title>Haldur Testing</title><link rel="stylesheet" href="/dashboard.css">
+  <title>Hallvi Testing</title><link rel="stylesheet" href="/dashboard.css">
   <script src="/dashboard.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" data-route><strong>Haldur</strong><span class="brand-tag">Testing</span></a>
+    <a class="brand" href="/" data-route><strong>Hallvi</strong><span class="brand-tag">Testing</span></a>
     <nav class="pages" aria-label="Pages"><a id="checks-link" href="/" data-route>Run checks</a><a id="reviews-link" href="/evals" data-route>Eval archive <span id="pending" class="chip discuss" hidden></span></a><a id="about-link" href="/about" data-route>How it works</a></nav>
     <nav class="resources" aria-label="Resources"><span id="origin" class="local"></span><a href="/guide">Acceptance guide</a><a href="http://127.0.0.1:3000/applications" target="_blank" rel="noreferrer">Open app<svg class="ext" aria-hidden="true" viewBox="0 0 12 12"><path d="M4 1.5h6.5V8M10.5 1.5 1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="visually-hidden"> (opens in a new tab)</span></a></nav>
   </header>
@@ -43,7 +43,7 @@
     </section>
 
     <section id="reviews-panel" aria-labelledby="reviews-title" hidden>
-      <div class="page-heading"><div><h1 id="reviews-title" tabindex="-1">Eval archive</h1><p>Saved Haldur answers from the retired live evals, kept so they can still be read and reviewed. Nothing here starts a run or calls a model.</p></div></div>
+      <div class="page-heading"><div><h1 id="reviews-title" tabindex="-1">Eval archive</h1><p>Saved Hallvi answers from the retired live evals, kept so they can still be read and reviewed. Nothing here starts a run or calls a model.</p></div></div>
       <p id="bulk-result" class="notice" role="status"></p>
       <div id="empty-reviews" class="empty" hidden><p>No saved eval answers on this machine.</p><p class="footnote">The live eval runner and its model judge have been retired; this page reads archives left from earlier runs.</p></div>
       <div id="review-content" class="review-layout" hidden>
@@ -82,7 +82,7 @@
             <section class="conversation" aria-label="Saved conversation">
               <div id="context" class="context" hidden><h4>Decisions already recorded before this message</h4><ul id="context-list"></ul></div>
               <div class="turn engineer"><h4>Engineer</h4><div id="input" class="turn-body"></div></div>
-              <div class="turn agent"><h4>Haldur</h4><div id="answer" class="turn-body"></div><p id="answer-error" class="error" hidden></p></div>
+              <div class="turn agent"><h4>Hallvi</h4><div id="answer" class="turn-body"></div><p id="answer-error" class="error" hidden></p></div>
             </section>
             <section class="evidence" aria-label="Recorded evidence">
               <div id="proposal-block" class="proposals"><h4 id="proposals-title">Proposed decisions</h4><ul id="proposals"></ul><p id="no-proposals" class="muted">No decisions proposed.</p></div>
@@ -101,7 +101,7 @@
               </div>
               <label id="note-field" class="field" hidden>Note<textarea id="reason" maxlength="5000" rows="2" placeholder="Optional. Saved with your next verdict click."></textarea></label>
             </section>
-            <p id="unreviewable" class="unreviewable" hidden>This answer failed before Haldur replied, so there is nothing to grade or judge.</p>
+            <p id="unreviewable" class="unreviewable" hidden>This answer failed before Hallvi replied, so there is nothing to grade or judge.</p>
           </section>
         </article>
       </div>

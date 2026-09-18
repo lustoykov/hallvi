@@ -158,7 +158,7 @@ export async function getPiSetupStatus(
     try {
       if (configuration.credentialType !== "oauth")
         throw new Error(
-          "Haldur supports ChatGPT subscription access only. Use a new ChatGPT connection.",
+          "Hallvi supports ChatGPT subscription access only. Use a new ChatGPT connection.",
         );
       model = validatePiSelection(catalog, configuration);
     } catch (error) {
@@ -430,12 +430,12 @@ export class PiLoginCoordinator {
 }
 
 const globalForPiLogin = globalThis as typeof globalThis & {
-  haldurPiLoginCoordinator?: PiLoginCoordinator;
+  hallviPiLoginCoordinator?: PiLoginCoordinator;
 };
 
 export const piLoginCoordinator =
-  globalForPiLogin.haldurPiLoginCoordinator ?? new PiLoginCoordinator();
+  globalForPiLogin.hallviPiLoginCoordinator ?? new PiLoginCoordinator();
 
 if (process.env.NODE_ENV !== "production") {
-  globalForPiLogin.haldurPiLoginCoordinator = piLoginCoordinator;
+  globalForPiLogin.hallviPiLoginCoordinator = piLoginCoordinator;
 }

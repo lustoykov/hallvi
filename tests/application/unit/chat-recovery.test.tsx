@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ChatPane } from "../../../src/components/haldur/chat-pane";
+import { ChatPane } from "../../../src/components/hallvi/chat-pane";
 import type { Chat, OperatorView, PiRun } from "../../../src/server/types";
 
 const failedAt = "2026-09-05T10:00:00.000Z";
@@ -139,7 +139,7 @@ describe("conversation recovery and assistant branding", () => {
       "The turn ended before it finished, and no command recorded why.",
     );
     expect(html).toMatch(
-      /<details class="hd-run-draft"><summary>Show unfinished draft<\/summary>/,
+      /<details class="hv-run-draft"><summary>Show unfinished draft<\/summary>/,
     );
     expect(html).toContain("Saved: hosting budget €30/month.");
     expect(html).not.toContain("Commit failed");
@@ -153,7 +153,7 @@ describe("conversation recovery and assistant branding", () => {
     expect(unavailable).toContain("Start a new chat</button>");
     expect(unavailable).not.toContain("Retry reply</button>");
     const ordinary = render({
-      error: "Haldur could not finish this attempt.",
+      error: "Hallvi could not finish this attempt.",
     });
     // "Try again" now, because the control follows what failed: with no
     // command output to read, trying again is the honest offer.
@@ -170,8 +170,8 @@ describe("conversation recovery and assistant branding", () => {
 
   it("uses one assistant name and a matching composer accessible label", () => {
     const html = render();
-    expect(html).toContain("<strong>Haldur</strong>");
-    expect(html).toContain('aria-label="Message Haldur"');
+    expect(html).toContain("<strong>Hallvi</strong>");
+    expect(html).toContain('aria-label="Message Hallvi"');
     expect(html).not.toContain("<strong>Pi</strong>");
   });
 });

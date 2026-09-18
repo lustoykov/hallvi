@@ -1,6 +1,6 @@
-# Installing Haldur
+# Installing Hallvi
 
-Haldur installs as a background service for one user on macOS or Linux.
+Hallvi installs as a background service for one user on macOS or Linux.
 It keeps running without a terminal, restarts after a crash, and starts again
 with the machine. The same package runs on your own computer and on a virtual
 machine you provide; the [always-on concept](design/always-on-concept.md)
@@ -17,7 +17,7 @@ checkout do not share a database.
 - A C/C++ compiler, `make` and `python3`, because two dependencies compile on
   installation. On macOS: `xcode-select --install`. On Debian or Ubuntu:
   `sudo apt-get install -y build-essential python3 curl openssh-client`.
-- `ssh`, which Haldur uses to reach application servers.
+- `ssh`, which Hallvi uses to reach application servers.
 - Docker, only for Pi's repository workspace: reading and building a
   repository. Conversations, server work and every page work without it, and
   Pi says so when the workspace is unavailable.
@@ -35,7 +35,7 @@ npm ci
 npm run package
 ```
 
-This writes `dist/haldur-<version>.tgz`: the built interface, the Pi worker
+This writes `dist/hallvi-<version>.tgz`: the built interface, the Pi worker
 as plain JavaScript, the database schema, the lockfile and `install.sh`. The
 archive is the same for every platform; dependencies are installed on the
 machine that runs them.
@@ -43,8 +43,8 @@ machine that runs them.
 ## Install
 
 ```bash
-tar -xzf haldur-0.1.0.tgz
-./haldur-0.1.0/install.sh
+tar -xzf hallvi-0.1.0.tgz
+./hallvi-0.1.0/install.sh
 ```
 
 Nothing needs root. A new installation starts the service and prints its
@@ -52,25 +52,25 @@ status. Open <http://127.0.0.1:4747>.
 
 | What | Where | On upgrade or uninstall |
 | --- | --- | --- |
-| Program, its Node.js and dependencies | `~/.local/lib/haldur` | Replaced / removed |
-| The `haldur` command | `~/.local/bin/haldur` | Replaced / removed |
-| Database, credentials, SSH keys, conversations, logs | `~/.local/share/haldur` | Kept |
-| Model account (ChatGPT connection) | `~/.config/haldur/pi` | Kept |
-| Service definition | `~/Library/LaunchAgents/com.haldur.plist` or `~/.config/systemd/user/haldur.service` | Rewritten by `start` |
+| Program, its Node.js and dependencies | `~/.local/lib/hallvi` | Replaced / removed |
+| The `hallvi` command | `~/.local/bin/hallvi` | Replaced / removed |
+| Database, credentials, SSH keys, conversations, logs | `~/.local/share/hallvi` | Kept |
+| Model account (ChatGPT connection) | `~/.config/hallvi/pi` | Kept |
+| Service definition | `~/Library/LaunchAgents/com.hallvi.plist` or `~/.config/systemd/user/hallvi.service` | Rewritten by `start` |
 
-Optional settings go in `~/.local/share/haldur/haldur.env`, one
-`NAME=value` per line, read at every start: `HALDUR_PORT` to move the
+Optional settings go in `~/.local/share/hallvi/hallvi.env`, one
+`NAME=value` per line, read at every start: `HALLVI_PORT` to move the
 interface, and the GitHub App values from [GitHub setup](integrations/github.md)
 for private repositories. Public repositories need no login.
 
 ## The service
 
 ```bash
-haldur start      # run now, and whenever this machine starts
-haldur stop       # stop, and stay stopped until the next start
-haldur restart
-haldur status     # service, interface and Pi worker
-haldur logs -f
+hallvi start      # run now, and whenever this machine starts
+hallvi stop       # stop, and stay stopped until the next start
+hallvi restart
+hallvi status     # service, interface and Pi worker
+hallvi logs -f
 ```
 
 `start` and `stop` are the only two states. There is no state in which Server
@@ -91,7 +91,7 @@ being answered at that moment shows as interrupted and can be retried.
 
 ## On a virtual machine
 
-Install exactly as above, as an ordinary user on the machine. Haldur still
+Install exactly as above, as an ordinary user on the machine. Hallvi still
 listens on the machine's loopback only. It has no login, so it must never be
 bound to a public address; an SSH connection you open is the only way in.
 
@@ -110,25 +110,25 @@ to the same number:
 On the virtual machine, print the configuration for your laptop:
 
 ```bash
-haldur remote you@vm.example.com
+hallvi remote you@vm.example.com
 ```
 
-Paste the `Host haldur` block it prints into `~/.ssh/config` on the laptop,
+Paste the `Host hallvi` block it prints into `~/.ssh/config` on the laptop,
 then. Every local forward explicitly binds the laptop's `127.0.0.1`, even when
 the laptop's SSH defaults allow forwarded ports on other interfaces:
 
 ```bash
-ssh -N haldur
+ssh -N hallvi
 ```
 
-Keep that running while you use Haldur, and open
+Keep that running while you use Hallvi, and open
 <http://127.0.0.1:4747> on the laptop. A private application link Pi opens, for
 example `http://127.0.0.1:4757`, now works in the laptop's browser as it is
 written. Connecting ChatGPT and GitHub uses device codes, so both work through
 the same connection with nothing further to forward.
 
 If one of those ports is already used on the laptop, `ssh` refuses to start and
-names it. Free the port, or move the whole installation with `HALDUR_PORT`
+names it. Free the port, or move the whole installation with `HALLVI_PORT`
 on the virtual machine: every other port is derived from it.
 
 Keeping the virtual machine updated, and its SSH access protected, is yours to
@@ -151,49 +151,14 @@ reporting the mismatch instead of restarting indefinitely. Until schema
 migrations exist, the choices are to keep or reinstall the version that wrote
 the database, or to move the database aside and start fresh.
 
-## Moving from Server Guy
-
-Haldur was called Server Guy until 17 September 2026. Haldur does not read
-state left under that name, and it does not start over it either: the
-installer, the service and development commands stop and name what to move.
-Move it once, with nothing running:
-
-```sh
-# 1. Stop the service. A Server Guy installation: server-guy stop, then remove
-#    ~/.local/bin/server-guy and ~/.local/lib/server-guy (program only).
-haldur stop
-# 2. Move state and the model account, from an unpacked Haldur archive or a checkout.
-node scripts/move-from-server-guy.mjs installation
-node scripts/move-from-server-guy.mjs account
-# 3. Install or start Haldur.
-haldur start
-```
-
-A development checkout moves its own state with
-`node scripts/move-from-server-guy.mjs checkout <checkout>` while its
-development servers and worker are stopped.
-
-The script renames `~/.local/share/server-guy` to `~/.local/share/haldur`,
-`~/.config/server-guy` to `~/.config/haldur` and a checkout's `.server-guy` to
-`.haldur`, renames `server-guy.db`, `server-guy.env` and their companions to
-`haldur.*`, and rewrites the paths Haldur stored inside them: SSH key paths in
-the database and the model credential path in `pi-settings.json`. It refuses
-to move over an existing Haldur directory or a database another process has
-open, and `--dry-run` lists what it would change. Records of work that already
-ran keep the paths they ran with, and `SERVER_GUY_*` settings are not read:
-rename them to `HALDUR_*`.
-
-Controller copies made before the rename hold `payload/database/server-guy.db`
-and `server-guy.env.disabled`; when restoring one, rename those files as above.
-
 ## Uninstall
 
 ```bash
-haldur uninstall
+hallvi uninstall
 ```
 
 This stops the service and removes the program, the command and the service
-definition. It keeps `~/.local/share/haldur` and `~/.config/haldur`
+definition. It keeps `~/.local/share/hallvi` and `~/.config/hallvi`
 and prints both paths. Installing again picks everything up where it was. To
 discard the state as well, delete those two directories yourself.
 
@@ -208,6 +173,6 @@ discard the state as well, delete those two directories yourself.
   reboots. The Overview shows the link as closed; ask Pi to open it again.
 - One installation per user account.
 - A laptop that runs its own installation and also forwards one from a virtual
-  machine needs them on different ports: set `HALDUR_PORT` on one of them.
-- macOS keeps one service log, `~/.local/share/haldur/logs/service.log`,
-  rotated only when it passes 10 MB at a `haldur start`.
+  machine needs them on different ports: set `HALLVI_PORT` on one of them.
+- macOS keeps one service log, `~/.local/share/hallvi/logs/service.log`,
+  rotated only when it passes 10 MB at a `hallvi start`.

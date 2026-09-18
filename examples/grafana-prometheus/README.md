@@ -2,7 +2,7 @@
 
 This fixture documents the existing managed deployment path. It is reusable evidence, not a mandatory application in the [redesign complexity tiers](../../docs/operator-design.md#three-application-complexity-tiers); exact examples remain to be selected.
 
-This directory is an independently deployable application. It uses official published images, not Haldur's application source. The controller resolves image tags to immutable Linux amd64 digests before asking for deployment approval.
+This directory is an independently deployable application. It uses official published images, not Hallvi's application source. The controller resolves image tags to immutable Linux amd64 digests before asking for deployment approval.
 
 Grafana listens on 3000 and keeps its SQLite database at `/var/lib/grafana/grafana.db` in `grafana-data`. Supply a private `GF_SECURITY_ADMIN_PASSWORD`; do not use a published default. Keep HTTP restricted during initial setup and use an SSH tunnel for admin credentials until HTTPS is available.
 
@@ -12,5 +12,5 @@ Acceptance checks:
 
 - Grafana `/api/health` reports a working database, and `/login` serves Grafana.
 - Prometheus `/-/ready` succeeds. `/api/v1/query?query=up` has `status=success` and `data.result.0.value.1="1"` after the first scrape.
-- Grafana can query that datasource. Save a small dashboard, recreate both containers through Haldur, and verify the saved dashboard and previously collected time series survive.
-- Inspect logs in Haldur. This fixture makes no backup, high availability or HTTPS claim.
+- Grafana can query that datasource. Save a small dashboard, recreate both containers through Hallvi, and verify the saved dashboard and previously collected time series survive.
+- Inspect logs in Hallvi. This fixture makes no backup, high availability or HTTPS claim.

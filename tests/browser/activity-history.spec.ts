@@ -23,7 +23,7 @@ async function send(
   answer = `[QA fixture reply] ${message}`,
 ) {
   await openConversation(page);
-  await page.getByRole("textbox", { name: "Message Haldur" }).fill(message);
+  await page.getByRole("textbox", { name: "Message Hallvi" }).fill(message);
   await openConversation(page);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText(answer, { exact: true })).toBeVisible();
@@ -46,7 +46,7 @@ test(
     try {
       await openConversation(page);
       await page
-        .getByRole("textbox", { name: "Message Haldur" })
+        .getByRole("textbox", { name: "Message Hallvi" })
         .fill("Acceptance race");
       await openConversation(page);
       await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -74,7 +74,7 @@ test(
     await addApplication(page, "activity-history");
     const activityTab = page.getByRole("button", { name: /^History/ });
     await openHistory(page);
-    const events = page.locator("#history-activity .hd-history-records > li");
+    const events = page.locator("#history-activity .hv-history-records > li");
     await openHistory(page);
     await expect(events).toHaveCount(2);
     await openHistory(page);
@@ -139,7 +139,7 @@ test(
     // Cancellation is recorded with that attempt, never in Activity.
     await openConversation(page);
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("[slow-cancel] hello");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -181,7 +181,7 @@ test(
   async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     const path = await addApplication(page, "activity-invalidation");
-    const events = page.locator("#history-activity .hd-history-records > li");
+    const events = page.locator("#history-activity .hv-history-records > li");
     await openHistory(page);
     await expect(events).toHaveCount(2);
 
@@ -224,7 +224,7 @@ test(
     });
     // The check itself is no longer current, without claiming lost access.
     await openConversation(page);
-    await expect(page.locator(".hd-repository-notice")).toContainText(
+    await expect(page.locator(".hv-repository-notice")).toContainText(
       "Connect GitHub, then run the repository check.",
     );
 
@@ -251,6 +251,6 @@ test(
       events.filter({ hasText: "Repository verification invalidated" }),
     ).toHaveCount(1);
     await openConversation(page);
-    await expect(page.locator(".hd-repository-notice")).toHaveCount(0);
+    await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
   },
 );

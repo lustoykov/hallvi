@@ -12,25 +12,25 @@ import schemaVersion from "./schema-version.json";
 import type { ApplicationRecord, ChatMessage, Observation } from "./types";
 
 const schema = { applications, chats, messages, savedInformation };
-type HaldurDatabase = ReturnType<typeof drizzle<typeof schema>>;
+type HallviDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
-  var __haldurDb: HaldurDatabase | undefined;
+  var __hallviDb: HallviDatabase | undefined;
 }
 
 export function databasePath() {
   const path =
-    process.env.HALDUR_DB_PATH ??
+    process.env.HALLVI_DB_PATH ??
     stateLocation(/* turbopackIgnore: true */ process.cwd(), { hidden: true })
       .database;
   return path;
 }
 
-export function db(): HaldurDatabase {
-  return (globalThis.__haldurDb ??= createDatabase());
+export function db(): HallviDatabase {
+  return (globalThis.__hallviDb ??= createDatabase());
 }
 
-function createDatabase(): HaldurDatabase {
+function createDatabase(): HallviDatabase {
   const path = databasePath();
   mkdirSync(dirname(path), { recursive: true });
   const client = new Database(path);

@@ -32,7 +32,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Stack**: The services, worker processes, schedules, private connections and persistent state required by one Application on one instance.
 
-**Application requirement**: A declared need for running or checking an Application, grounded in its software configuration, documentation or the owner's request. Declaring a requirement does not establish that Haldur can fulfill it.
+**Application requirement**: A declared need for running or checking an Application, grounded in its software configuration, documentation or the owner's request. Declaring a requirement does not establish that Hallvi can fulfill it.
 
 **Conversation (Chat in existing code)**: An application-owned transcript and native model session. Conversations have separate drafts/history and share the application's operational state. In the redesign, only the main conversation owns changes; side conversations are read-only.
 
@@ -70,7 +70,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Deployment host**: The user-controlled Linux instance running an application's stack, provisioned through Hetzner or adopted through BYOM.
 
-**Controller**: The Haldur web/worker installation coordinating work and retaining product records. It can be on the application host or a separate machine.
+**Controller**: The Hallvi web/worker installation coordinating work and retaining product records. It can be on the application host or a separate machine.
 
 **Release**: A selected immutable source/image identity and deployment configuration intended to run for an Application.
 
@@ -82,7 +82,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Observed runtime**: The application configuration and running images established on a host at a recorded time, whether or not its intended behavior has been verified. A known running configuration and a working application are separate claims.
 
-**Operability change**: A change needed to run or check the application, such as a health endpoint, its start entrypoint or an environment-driven port. Haldur hands application-code changes to the owner, who merges them before a release deploys them.
+**Operability change**: A change needed to run or check the application, such as a health endpoint, its start entrypoint or an environment-driven port. Hallvi hands application-code changes to the owner, who merges them before a release deploys them.
 
 **Service role**: The responsibility of a running component within a stack: serving HTTP, consuming background work, brokering work, or providing another private service. A role does not prove health or behavior.
 
@@ -106,7 +106,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 ## Retired and optional terms
 
-**Retired record**: A record of Haldur's retired preparation workflow, kept read-only as an Observation under its original identity. It grants no authority and never runs again.
+**Retired record**: A record of Hallvi's retired preparation workflow, kept read-only as an Observation under its original identity. It grants no authority and never runs again.
 _Avoid_: Phase Workspace, Gate Check, Application Contract, Conformance Result, Launch Brief
 
 **Plugin**: The reserved term for an optional future extension with UI and authorized behavior. Plugin implementation is deferred; built-in views do not depend on it.

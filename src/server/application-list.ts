@@ -1,4 +1,4 @@
-import type { ApplicationListItem } from "@/components/haldur/applications-screen";
+import type { ApplicationListItem } from "@/components/hallvi/applications-screen";
 import { listApplications } from "./db";
 import {
   checkAsNow,

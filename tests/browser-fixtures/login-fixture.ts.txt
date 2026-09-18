@@ -7,7 +7,7 @@ import type { PiLoginAttempt } from "./pi-setup";
 type Record = { attempt: PiLoginAttempt; started: number; polls: number };
 const host = globalThis as typeof globalThis & { qaLogin?: Record };
 function record() {
-  if (!process.env.HALDUR_QA_ROOT?.startsWith("/tmp/haldur-e2e-")) throw new Error("QA app only");
+  if (!process.env.HALLVI_QA_ROOT?.startsWith("/tmp/hallvi-e2e-")) throw new Error("QA app only");
   return host.qaLogin;
 }
 export async function begin(request: Request) {
@@ -15,7 +15,7 @@ export async function begin(request: Request) {
   const selection = { ...await request.json(), providerId: "openai-codex" };
   const id = randomUUID();
   host.qaLogin = { started: Date.now(), polls: 0, attempt: {
-    id, selection, authPath: join(process.env.HALDUR_CONFIG_DIR!, "pi-auth-" + id + ".json"),
+    id, selection, authPath: join(process.env.HALLVI_CONFIG_DIR!, "pi-auth-" + id + ".json"),
     state: "starting", verificationUri: "https://example.invalid/qa-only", userCode: "QA-1234",
     expiresAt: new Date(Date.now() + 900_000).toISOString(), message: "QA sign-in starting",
   } };
@@ -28,7 +28,7 @@ export function poll() {
   if (["starting", "awaiting-user"].includes(entry.attempt.state)) {
     entry.attempt.state = "awaiting-user";
     if (Date.now() - entry.started > 12_000) {
-      if (process.env.HALDUR_QA_LOGIN_MODE === "failure") {
+      if (process.env.HALLVI_QA_LOGIN_MODE === "failure") {
         entry.attempt.state = "failed";
         entry.attempt.message = "QA simulated sign-in failure. Your previous login is unchanged.";
       } else {

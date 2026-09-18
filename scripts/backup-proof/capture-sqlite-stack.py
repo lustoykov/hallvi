@@ -100,8 +100,8 @@ def inventory(root):
 def capture(deployment_id, proof_id):
     uuid.UUID(deployment_id)
     uuid.UUID(proof_id)
-    root = Path("/opt/haldur") / deployment_id
-    output = Path("/var/tmp") / ("haldur-proof-" + proof_id)
+    root = Path("/opt/hallvi") / deployment_id
+    output = Path("/var/tmp") / ("hallvi-proof-" + proof_id)
     output.mkdir(mode=0o700)
     stage = output / "snapshot"
     stage.mkdir(mode=0o700)

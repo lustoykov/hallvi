@@ -50,9 +50,9 @@ def settings(**overrides):
         "kind": "sqlite-stack",
         "endpoint": "https://account.r2.cloudflarestorage.com",
         "region": "auto",
-        "bucket": "haldur-backups",
+        "bucket": "hallvi-backups",
         "prefix": PREFIX,
-        "credentialsFile": "/etc/haldur/credentials.json",
+        "credentialsFile": "/etc/hallvi/credentials.json",
         "keep": 3,
         "schedule": "*-*-* 03:00:00 Europe/Sofia",
         "timezone": "Europe/Sofia",
@@ -166,8 +166,8 @@ class FakeDocker:
             labels
             if labels is not None
             else {
-                "haldur.deployment": DEPLOYMENT,
-                "haldur.revision": "rev-9",
+                "hallvi.deployment": DEPLOYMENT,
+                "hallvi.revision": "rev-9",
             }
         )
         self.named = dict(named or {})
@@ -361,7 +361,7 @@ class FakeDocker:
                     container, "louislam/uptime-kuma@sha256:" + "a" * 64
                 ),
                 "Env": [
-                    "POSTGRES_USER=haldur",
+                    "POSTGRES_USER=hallvi",
                     "POSTGRES_DB=application",
                     "POSTGRES_PASSWORD=" + SECRET,
                 ],
@@ -654,7 +654,7 @@ class ScheduledBackupTest(unittest.TestCase):
                 "deploymentId": DEPLOYMENT,
                 "stopped": mine,
                 "stoppedAt": "2026-09-01T03:00:00Z",
-                "stagePath": "/var/tmp/haldur-proof-" + run_id,
+                "stagePath": "/var/tmp/hallvi-proof-" + run_id,
                 "complete": False,
             }
         )
@@ -960,7 +960,7 @@ class ScheduledBackupTest(unittest.TestCase):
             state,
             command=docker,
             storage_factory=lambda _: runner.Storage(
-                FakeClient(), "haldur-backups", PREFIX
+                FakeClient(), "hallvi-backups", PREFIX
             ),
         )
         self.assertTrue(first["cleanupPending"])
@@ -971,7 +971,7 @@ class ScheduledBackupTest(unittest.TestCase):
             state,
             command=docker,
             storage_factory=lambda _: runner.Storage(
-                FakeClient(), "haldur-backups", PREFIX
+                FakeClient(), "hallvi-backups", PREFIX
             ),
         )
         self.assertFalse(second["cleanupPending"])
@@ -1002,7 +1002,7 @@ class ScheduledBackupTest(unittest.TestCase):
             state,
             command=FakeDocker(),
             storage_factory=lambda _: runner.Storage(
-                FakeClient(), "haldur-backups", PREFIX
+                FakeClient(), "hallvi-backups", PREFIX
             ),
         )
         self.assertFalse(result["cleanupPending"])
@@ -1124,7 +1124,7 @@ class ScheduledBackupTest(unittest.TestCase):
         value.update(
             {
                 "pendingCleanup": True,
-                "archivePath": "/var/lib/haldur/backups/stack.tar.gz",
+                "archivePath": "/var/lib/hallvi/backups/stack.tar.gz",
                 "sourceAddress": "10.0.0.4",
                 "credentials": {"accessKeyId": SECRET},
                 "errorCode": "raw boto3 failure text",
@@ -1491,10 +1491,10 @@ class ScheduledBackupTest(unittest.TestCase):
         self.source_stack()
         run_id = str(uuid.uuid4())
         for labels in (
-            {"haldur.deployment": DEPLOYMENT, "haldur.revision": "rev-10"},
+            {"hallvi.deployment": DEPLOYMENT, "hallvi.revision": "rev-10"},
             {
-                "haldur.deployment": str(uuid.uuid4()),
-                "haldur.revision": "rev-9",
+                "hallvi.deployment": str(uuid.uuid4()),
+                "hallvi.revision": "rev-9",
             },
             {},
         ):
@@ -2468,11 +2468,11 @@ class ScheduledBackupTest(unittest.TestCase):
     def test_stack_identity_follows_the_labels_its_definition_declares(self):
         # A service the definition labels must run this revision.
         config, docker = self.dump_stack(
-            web_labels={"haldur.revision": "rev-9"}
+            web_labels={"hallvi.revision": "rev-9"}
         )
         docker.labels = {
-            "haldur.deployment": DEPLOYMENT,
-            "haldur.revision": "rev-10",
+            "hallvi.deployment": DEPLOYMENT,
+            "hallvi.revision": "rev-10",
         }
         state = self.state(config)
         run_id = str(uuid.uuid4())

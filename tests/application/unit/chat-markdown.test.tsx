@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Markdown } from "../../../src/components/haldur/markdown";
+import { Markdown } from "../../../src/components/hallvi/markdown";
 
 const render = (source: string) =>
   renderToStaticMarkup(<Markdown source={source} />);
@@ -16,7 +16,7 @@ describe("chat markdown", () => {
         "",
         "1. In GitHub, check the integration has access—select it if access is",
         "   limited to specific repositories.",
-        "2. Return to Haldur and retry.",
+        "2. Return to Hallvi and retry.",
         "",
         "- one",
         "- two",
@@ -36,13 +36,13 @@ describe("chat markdown", () => {
     );
     expect(html).toContain("<code>https://github.com/qa/todo</code>:</p>");
     expect(html).toContain(
-      "<ol><li>In GitHub, check the integration has access—select it if access is limited to specific repositories.</li><li>Return to Haldur and retry.</li></ol>",
+      "<ol><li>In GitHub, check the integration has access—select it if access is limited to specific repositories.</li><li>Return to Hallvi and retry.</li></ol>",
     );
     expect(html).toContain("<ul><li>one</li><li>two</li></ul>");
     expect(html).toContain("<pre><code>npm test &lt;x&gt;</code></pre>");
     expect(html).toContain("<blockquote>quoted</blockquote>");
     expect(html).toContain(
-      '<p class="hd-md-heading"><strong>Next</strong></p>',
+      '<p class="hv-md-heading"><strong>Next</strong></p>',
     );
     expect(html).toContain(
       '<a href="https://example.com/docs" rel="noreferrer" target="_blank">the docs</a>',

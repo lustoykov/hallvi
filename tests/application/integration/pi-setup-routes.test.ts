@@ -18,8 +18,8 @@ import { readPiConfiguration } from "../../../src/server/pi-configuration";
 beforeEach(() => {
   startLogin.mockClear();
   vi.stubEnv(
-    "HALDUR_CONFIG_DIR",
-    mkdtempSync(join(tmpdir(), "haldur-pi-route-")),
+    "HALLVI_CONFIG_DIR",
+    mkdtempSync(join(tmpdir(), "hallvi-pi-route-")),
   );
 });
 afterEach(() => vi.unstubAllEnvs());

@@ -40,7 +40,7 @@ export async function serverPublicKey(
         "-N",
         "",
         "-C",
-        `haldur-${applicationId}`,
+        `hallvi-${applicationId}`,
         "-f",
         key,
       ],
@@ -214,12 +214,12 @@ export async function connectServer(
   };
   const result = await runHostCommand(
     host,
-    "printf 'haldur-ssh-ready\\n'; uname -s",
+    "printf 'hallvi-ssh-ready\\n'; uname -s",
     signal,
     undefined,
     20,
   );
-  if (result.exitCode !== 0 || !result.output.includes("haldur-ssh-ready"))
+  if (result.exitCode !== 0 || !result.output.includes("hallvi-ssh-ready"))
     throw new Error(
       `SSH access was not verified; the application connection was not changed. ${result.output}`,
     );

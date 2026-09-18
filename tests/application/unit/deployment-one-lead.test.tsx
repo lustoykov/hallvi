@@ -9,10 +9,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { workFor } from "@/components/haldur/release-records";
-import { DeploymentPage } from "@/components/haldur/deployment-page";
-import { ReleasesPanel } from "@/components/haldur/releases-panel";
-import type { Release, ReleaseView } from "@/components/haldur/release-records";
+import { workFor } from "@/components/hallvi/release-records";
+import { DeploymentPage } from "@/components/hallvi/deployment-page";
+import { ReleasesPanel } from "@/components/hallvi/releases-panel";
+import type { Release, ReleaseView } from "@/components/hallvi/release-records";
 import type { ExecutionRecord } from "@/server/operator-execution";
 
 const AT = "2026-09-15T10:00:00.000Z";
@@ -186,6 +186,6 @@ describe("deployment evidence and active work", () => {
     );
     expect(html).toContain("Work is in progress");
     expect(html).toContain("Creating the server");
-    expect(html).not.toContain("Ask Haldur to deploy");
+    expect(html).not.toContain("Ask Hallvi to deploy");
   });
 });

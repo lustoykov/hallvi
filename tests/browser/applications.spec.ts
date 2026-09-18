@@ -22,7 +22,7 @@ async function view(page: Page) {
   return (await page.request.get(`/api${new URL(page.url()).pathname}`)).json();
 }
 async function send(page: Page, message: string) {
-  await page.getByRole("textbox", { name: "Message Haldur" }).fill(message);
+  await page.getByRole("textbox", { name: "Message Hallvi" }).fill(message);
   const applicationUrl = new URL(page.url());
   // First-use dev compilation belongs to HTTP acceptance, not the reply budget.
   const [accepted] = await Promise.all([
@@ -83,24 +83,24 @@ test(
     ).toBeVisible();
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
+      page.locator(".hv-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
 
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("Cancel **me** [slow-cancel]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
     await openConversation(page);
-    await expect(page.locator(".hd-did").last()).toContainText(
+    await expect(page.locator(".hv-did").last()).toContainText(
       "[QA fixture reply]",
     );
     // The HTTP acceptance has finished, but the saved run is still active.
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeEnabled();
-    await expect(page.locator(".hd-busy-bar")).toBeVisible();
+    await expect(page.locator(".hv-busy-bar")).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("durable-reply-in-progress.png"),
       fullPage: true,
@@ -116,10 +116,10 @@ test(
     await expect(
       page.getByRole("button", { name: "Retry reply" }),
     ).toBeVisible();
-    await expect(page.locator(".hd-busy-bar")).toHaveCount(0);
+    await expect(page.locator(".hv-busy-bar")).toHaveCount(0);
     await page.getByText("Show unfinished draft", { exact: true }).click();
     await openConversation(page);
-    await expect(page.locator(".hd-run-progress details")).toContainText(
+    await expect(page.locator(".hv-run-progress details")).toContainText(
       "[QA fixture reply]",
     );
     await page.getByText("Show unfinished draft", { exact: true }).click();
@@ -137,12 +137,12 @@ test(
     await openConversation(page);
     await expect(
       page
-        .locator(".hd-messages")
+        .locator(".hv-messages")
         .getByText("Cancel me [slow-cancel]", { exact: true }),
     ).toHaveCount(1);
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages strong:visible").filter({ hasText: /^me$/ }),
+      page.locator(".hv-messages strong:visible").filter({ hasText: /^me$/ }),
     ).toHaveCount(2); // Original user message and successful assistant answer.
     const saved = await (await page.request.get(endpoint)).json();
     expect(saved.runs.map((run: { status: string }) => run.status)).toEqual([
@@ -241,7 +241,7 @@ test(
     await addApplication(page, "failure-app");
     const before = await view(page);
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("Hello [fail-once]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -251,12 +251,12 @@ test(
       page.getByText("Something went wrong. Please retry.", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toHaveValue("");
     await openConversation(page);
     await expect(
       page
-        .locator(".hd-messages")
+        .locator(".hv-messages")
         .getByText("Hello [fail-once]", { exact: true }),
     ).toHaveCount(1);
     expect((await view(page)).messages).toHaveLength(
@@ -271,7 +271,7 @@ test(
     await openConversation(page);
     await expect(
       page
-        .locator(".hd-messages")
+        .locator(".hv-messages")
         .getByText("Hello [fail-once]", { exact: true }),
     ).toHaveCount(1);
     expect((await view(page)).messages).toHaveLength(
@@ -288,11 +288,11 @@ test(
     await openConversation(page);
     await send(page, "priority: First app only");
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("Unsent draft");
     await addApplication(page, "isolation-second");
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toHaveValue("");
     expect((await view(page)).decisions).toEqual([]);
     await page.goto(first);
@@ -315,7 +315,7 @@ test(
     expect(revised.decisions[0].id).not.toBe(oldId);
     expect(revised.decisions[0].value).toBe("Fast recovery");
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("invalid-replacement: reject this");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -383,7 +383,7 @@ test(
     ).toBeDisabled();
     await page.goto(path);
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeDisabled();
     expect((await view(page)).messages).toEqual(before.messages);
   },
@@ -395,7 +395,7 @@ test(
   async ({ page }, testInfo) => {
     await addApplication(page, "slow-send-app");
     const before = await view(page);
-    const composer = page.getByRole("textbox", { name: "Message Haldur" });
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     let release!: () => void;
     let requests = 0;
     const held = new Promise<void>((resolve) => {
@@ -418,11 +418,11 @@ test(
       await composer.press("Enter");
       await openConversation(page);
       await expect(
-        page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
+        page.locator(".hv-messages").getByText("Hello [slow]", { exact: true }),
       ).toBeVisible();
       await openConversation(page);
       await expect(
-        page.locator(".hd-messages").getByText("Pending", { exact: true }),
+        page.locator(".hv-messages").getByText("Pending", { exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole("status").filter({ hasText: "Saving message" }),
@@ -450,11 +450,11 @@ test(
     ).toBeVisible();
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
+      page.locator(".hv-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages").getByText("Pending", { exact: true }),
+      page.locator(".hv-messages").getByText("Pending", { exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("status").filter({ hasText: "Saving message" }),

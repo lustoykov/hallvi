@@ -34,13 +34,13 @@ import {
   serverPublicKey,
   connectServer,
 } from "../../../src/server/server-access";
-const root = mkdtempSync(join(tmpdir(), "hd-access-"));
+const root = mkdtempSync(join(tmpdir(), "hv-access-"));
 let id: string;
 let publicKey: string;
 let fingerprint: string;
 beforeEach(async () => {
   vi.clearAllMocks();
-  vi.stubEnv("HALDUR_CONFIG_DIR", root);
+  vi.stubEnv("HALLVI_CONFIG_DIR", root);
   id = randomUUID();
   ({ publicKey } = await serverPublicKey(id));
   fingerprint =
@@ -55,7 +55,7 @@ beforeEach(async () => {
   });
   mocks.host.mockResolvedValue({
     exitCode: 0,
-    output: "haldur-ssh-ready\nLinux\n",
+    output: "hallvi-ssh-ready\nLinux\n",
   });
   mocks.provider.mockResolvedValue({
     server: { status: "running", public_net: { ipv4: { ip: "192.0.2.1" } } },
@@ -123,7 +123,7 @@ it("requires a trusted existing-machine fingerprint and never saves a failed con
   expect(mocks.save).not.toHaveBeenCalled();
   mocks.host.mockResolvedValue({
     exitCode: 0,
-    output: "haldur-ssh-ready\nLinux",
+    output: "hallvi-ssh-ready\nLinux",
   });
   expect(
     await connectServer(id, {

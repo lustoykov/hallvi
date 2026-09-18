@@ -6,7 +6,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { databaseFromRecords } from "@/components/haldur/database-records";
+import { databaseFromRecords } from "@/components/hallvi/database-records";
 import {
   APP,
   NOW,

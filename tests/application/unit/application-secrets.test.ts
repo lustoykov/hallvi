@@ -18,8 +18,8 @@ let directory: string;
 let secrets: typeof import("@/server/application-secrets");
 
 beforeEach(async () => {
-  directory = mkdtempSync(join(tmpdir(), "hd-secrets-"));
-  process.env.HALDUR_CONFIG_DIR = directory;
+  directory = mkdtempSync(join(tmpdir(), "hv-secrets-"));
+  process.env.HALLVI_CONFIG_DIR = directory;
   // The module reads the directory lazily, but a fresh import per test keeps
   // any future caching from leaking a value between them.
   secrets = await import("@/server/application-secrets");
@@ -31,7 +31,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  delete process.env.HALDUR_CONFIG_DIR;
+  delete process.env.HALLVI_CONFIG_DIR;
 });
 
 describe("asking", () => {
@@ -162,10 +162,10 @@ describe("a hostile value is data, not syntax", () => {
   // the text Pi wrote. Through the environment, none of them is.
   const hostile = [
     ["a quote", `pa'ss word`],
-    ["a command substitution", "x$(touch /tmp/hd-pwned)y"],
-    ["backticks", "x`touch /tmp/hd-pwned2`y"],
-    ["a semicolon", "abc; touch /tmp/hd-pwned3"],
-    ["a newline", "line one\ntouch /tmp/hd-pwned4"],
+    ["a command substitution", "x$(touch /tmp/hv-pwned)y"],
+    ["backticks", "x`touch /tmp/hv-pwned2`y"],
+    ["a semicolon", "abc; touch /tmp/hv-pwned3"],
+    ["a newline", "line one\ntouch /tmp/hv-pwned4"],
     ["a dollar variable", "$HOME and ${PATH}"],
     ["unicode and spaces", "  pä ss — wörd  "],
     ["a backslash", "back\\slash\\"],

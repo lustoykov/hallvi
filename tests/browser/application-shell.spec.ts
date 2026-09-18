@@ -22,7 +22,7 @@ test(
       timeout: 30000,
     });
     const nav = page.getByRole("navigation", { name: "Application workspace" });
-    const composer = page.getByRole("textbox", { name: "Message Haldur" });
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     await expect(
       page.getByRole("button", { name: "Overview", exact: true }),
     ).toHaveCount(1);
@@ -103,7 +103,7 @@ test(
     // Before a deployment records the stack, only the application and care
     // destinations exist; Processes, Database and the rest appear as recorded.
     // A quiet row reveals what the application could run, with the reason
-    // each is hidden, and the empty view says what Haldur would do there.
+    // each is hidden, and the empty view says what Hallvi would do there.
     await expect(
       nav.getByRole("button", { name: "Database", exact: true }),
     ).toHaveCount(0);

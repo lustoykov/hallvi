@@ -1,4 +1,4 @@
-// Assembles the archive a person installs: `dist/haldur-<version>.tgz`.
+// Assembles the archive a person installs: `dist/hallvi-<version>.tgz`.
 //
 // The archive holds what runs and nothing that builds it. Dependencies are not
 // inside: two of them are native, so `install.sh` installs them on the machine
@@ -15,7 +15,7 @@ import {
 import { join } from "node:path";
 
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
-const name = `haldur-${version}`;
+const name = `hallvi-${version}`;
 
 execFileSync(process.execPath, ["scripts/build.mjs"], { stdio: "inherit" });
 
@@ -33,7 +33,6 @@ for (const path of [
   "scripts/cli.mjs",
   "scripts/dev-environment.mjs",
   "scripts/state-location.mjs",
-  "scripts/move-from-server-guy.mjs",
   "scripts/installed-ports.mjs",
   // Pi's workspace image is built from these files at run time.
   "scripts/pi-workspace",

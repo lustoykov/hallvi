@@ -29,12 +29,12 @@ const port = Number(values.port);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error("Invalid port.");
 const state = () => stateLocation(process.cwd(), { hidden: true });
-const databasePath = resolve(process.env.HALDUR_DB_PATH ?? state().database);
+const databasePath = resolve(process.env.HALLVI_DB_PATH ?? state().database);
 const database = new Database(databasePath, {
   readonly: true,
   fileMustExist: true,
 });
-const configRoot = resolve(process.env.HALDUR_CONFIG_DIR ?? state().directory);
+const configRoot = resolve(process.env.HALLVI_CONFIG_DIR ?? state().directory);
 const assets = join(dirname(fileURLToPath(import.meta.url)), "inspection");
 const output = join(
   mkdtempSync(join(tmpdir(), "sg-live-inspection-")),

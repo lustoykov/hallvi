@@ -32,10 +32,10 @@ import { applicationWorkspaceSource } from "../../../src/server/pi-workspace-sou
 
 let root: string, app: string;
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "hd-workspace-source-"));
-  vi.stubEnv("HALDUR_DB_PATH", join(root, "db.sqlite"));
-  vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "config"));
-  pushTestDatabase(process.env.HALDUR_DB_PATH!);
+  root = mkdtempSync(join(tmpdir(), "hv-workspace-source-"));
+  vi.stubEnv("HALLVI_DB_PATH", join(root, "db.sqlite"));
+  vi.stubEnv("HALLVI_CONFIG_DIR", join(root, "config"));
+  pushTestDatabase(process.env.HALLVI_DB_PATH!);
 });
 beforeEach(() => {
   store.db().$client.exec("DELETE FROM applications");
@@ -48,8 +48,8 @@ beforeEach(() => {
   github.repositoryId = 10;
 });
 afterAll(() => {
-  globalThis.__haldurDb?.$client.close();
-  delete globalThis.__haldurDb;
+  globalThis.__hallviDb?.$client.close();
+  delete globalThis.__hallviDb;
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });

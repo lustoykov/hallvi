@@ -1,4 +1,4 @@
-import { ConnectionsScreen } from "@/components/haldur/connections-screen";
+import { ConnectionsScreen } from "@/components/hallvi/connections-screen";
 import {
   cloudflareBuckets,
   r2UploadGaps,
@@ -14,7 +14,7 @@ import { setupReturnDestination } from "@/server/setup-return";
 export const dynamic = "force-dynamic";
 
 /**
- * The accounts Haldur acts through, as the providers themselves report
+ * The accounts Hallvi acts through, as the providers themselves report
  * them rather than as the presence of a variable implies. Verifying costs one
  * request each and is the difference between "configured" and "works".
  */
@@ -52,7 +52,7 @@ export default async function ConnectionsPage({
         hetznerConnected: Boolean(hetznerConnectionId()),
         cloudflare,
         buckets: buckets?.length ?? null,
-        // What the owner saved for backups, Haldur's own copies included.
+        // What the owner saved for backups, Hallvi's own copies included.
         storage: backupDestination(),
         uploadGaps: r2UploadGaps(),
         applications: listApplications().map(({ id, name }) => ({ id, name })),

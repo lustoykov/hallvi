@@ -81,9 +81,9 @@ def main():
         r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", bucket
     ):
         raise RuntimeError("Invalid destination")
-    runtime = Path(os.environ.get("HALDUR_CONFIG_DIR", ".haldur")).resolve()
+    runtime = Path(os.environ.get("HALLVI_CONFIG_DIR", ".hallvi")).resolve()
     db_path = Path(
-        os.environ.get("HALDUR_DB_PATH", ".haldur/haldur.db")
+        os.environ.get("HALLVI_DB_PATH", ".hallvi/hallvi.db")
     ).resolve()
     db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
@@ -154,7 +154,7 @@ def main():
         "root@" + deployment["address"],
     ]
     project = "sg-proof-" + proof
-    remote_dir = "/var/tmp/haldur-proof-" + proof
+    remote_dir = "/var/tmp/hallvi-proof-" + proof
     remote_script = "/var/tmp/sg-capture-" + proof + ".py"
     restore_compose = directory / "restore-compose.json"
     compose = ["docker", "compose", "-p", project, "-f", str(restore_compose)]
@@ -210,7 +210,7 @@ def main():
             functional_module.setup(
                 run, ssh, deployment_id, proof, directory, functional_fixture
             )
-        source_compose = f"docker compose -p sg-{deployment_id[:8]} -f /opt/haldur/{deployment_id}/compose.json"
+        source_compose = f"docker compose -p sg-{deployment_id[:8]} -f /opt/hallvi/{deployment_id}/compose.json"
         ids = run(*ssh, source_compose + " ps -q").decode().split()
         if not ids or not all(re.fullmatch(r"[a-f0-9]{64}", value) for value in ids):
             raise RuntimeError("Source containers unavailable")

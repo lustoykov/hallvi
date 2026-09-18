@@ -1,0 +1,220 @@
+/* The terminal panel: the shell's dark execution surface, at the bottom of the
+   application workspace. It sits in its own grid row so the conversation and
+   the destinations keep their own scrolling. */
+
+@import "@xterm/xterm/css/xterm.css";
+
+@media (min-width: 641px) {
+  .hv-shell[data-terminal="open"] {
+    grid-template-rows: 56px minmax(0, 1fr) auto;
+  }
+  .hv-shell[data-terminal="open"] .hv-section-page,
+  .hv-shell[data-terminal="open"] .hv-chat-column {
+    grid-row: 2;
+  }
+  .hv-terminal {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+@media (max-width: 640px) {
+  .hv-shell[data-terminal="open"] {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+  .hv-terminal {
+    grid-column: 1;
+    grid-row: 4;
+  }
+}
+
+.hv-terminal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 34vh;
+  border-top: 1px solid #39465d;
+  background: #202838;
+  color: #f7f8fa;
+  font-size: 12px;
+  resize: vertical;
+  overflow: hidden;
+}
+.hv-terminal[data-expanded] {
+  position: fixed;
+  inset: 56px 0 0 224px;
+  height: auto;
+  z-index: 40;
+  resize: none;
+}
+@media (max-width: 1100px) {
+  .hv-terminal[data-expanded] {
+    left: 196px;
+  }
+}
+@media (max-width: 640px) {
+  .hv-terminal[data-expanded] {
+    inset: 0;
+  }
+}
+.hv-terminal[data-minimized] {
+  height: auto;
+  resize: none;
+}
+
+/* ---------- Bar ---------- */
+
+.hv-terminal-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #39465d;
+}
+.hv-terminal-bar strong {
+  font-size: 12.5px;
+  font-weight: 620;
+}
+.hv-terminal-target {
+  color: #bec6d4;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hv-terminal-target code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: #b8ceff;
+}
+.hv-terminal-status {
+  color: #bec6d4;
+  font-variant-numeric: tabular-nums;
+}
+.hv-terminal-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.hv-terminal-controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid #687183;
+  border-radius: 5px;
+  background: transparent;
+  color: #f7f8fa;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hv-terminal-controls button:hover {
+  background: #39465d;
+}
+
+/* ---------- Body ---------- */
+
+.hv-terminal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  padding: 8px 10px 10px;
+}
+.hv-terminal-screen {
+  flex: 1;
+  min-height: 0;
+}
+.hv-terminal-pi,
+.hv-terminal-notice,
+.hv-terminal-ended {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #2b3548;
+  color: #bec6d4;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.hv-terminal-notice {
+  background: #3b2e2c;
+  color: #f0c9c4;
+}
+.hv-terminal-ended button {
+  margin-left: 6px;
+  border: 1px solid #687183;
+  border-radius: 5px;
+  background: transparent;
+  color: #b8ceff;
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.hv-terminal-empty {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 18px 4px;
+  color: #bec6d4;
+}
+.hv-terminal-empty p {
+  margin: 0;
+}
+.hv-terminal-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid #687183;
+  border-radius: 999px;
+  background: transparent;
+  color: #f7f8fa;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.hv-terminal :focus-visible {
+  outline: 2px solid #8aaaf0;
+  outline-offset: -2px;
+}
+
+/* On a narrow screen the panel is the workspace, with the bar to leave it. */
+/* On a narrow screen the panel is the workspace, with its bar to leave it. */
+@media (max-width: 760px) {
+  .hv-terminal {
+    height: 60dvh;
+    resize: none;
+  }
+  .hv-terminal[data-minimized] {
+    height: auto;
+  }
+}
+
+/* The action that opens it, in the application's top bar. */
+.hv-topbar-terminal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--line, #e7e9ee);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink, #202838);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.hv-topbar-terminal:hover {
+  background: #fafbfc;
+  border-color: #c3ccdb;
+}
+.hv-topbar-terminal[aria-pressed="true"] {
+  background: #202838;
+  border-color: #202838;
+  color: #fff;
+}

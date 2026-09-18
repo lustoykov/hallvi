@@ -10,14 +10,14 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { architectureFromRecords } from "@/components/haldur/architecture-records";
-import { databaseFromRecords } from "@/components/haldur/database-records";
-import { monitoringFromRecords } from "@/components/haldur/monitoring-records";
-import { overviewFromRecords } from "@/components/haldur/overview-records";
-import { processesFromRecords } from "@/components/haldur/processes-records";
-import { reachFromRecords } from "@/components/haldur/reach-records";
-import { storageFromRecords } from "@/components/haldur/storage-records";
-import { supplyFromRecords } from "@/components/haldur/supply-records";
+import { architectureFromRecords } from "@/components/hallvi/architecture-records";
+import { databaseFromRecords } from "@/components/hallvi/database-records";
+import { monitoringFromRecords } from "@/components/hallvi/monitoring-records";
+import { overviewFromRecords } from "@/components/hallvi/overview-records";
+import { processesFromRecords } from "@/components/hallvi/processes-records";
+import { reachFromRecords } from "@/components/hallvi/reach-records";
+import { storageFromRecords } from "@/components/hallvi/storage-records";
+import { supplyFromRecords } from "@/components/hallvi/supply-records";
 import type { SavedInformation } from "@/server/operator-data";
 import {
   APP,

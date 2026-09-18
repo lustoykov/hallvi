@@ -1,0 +1,2154 @@
+.hv-adaptive-shell {
+  --ink: #202838;
+  --muted: #687183;
+  --line: #e7e9ee;
+  min-width: 0;
+  height: 100dvh;
+  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr);
+  background: #fff;
+}
+.hv-adaptive-shell [hidden] {
+  display: none !important;
+}
+/* An optional repository notice above the transcript, then the pane. */
+.hv-adaptive-shell .hv-chat-column {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.hv-adaptive-shell button,
+.hv-adaptive-shell input {
+  font: inherit;
+}
+.hv-adaptive-shell button:focus-visible,
+.hv-adaptive-shell a:focus-visible {
+  outline: 2px solid #315bc6;
+  outline-offset: 3px;
+}
+.hv-adaptive-shell .hv-topbar {
+  grid-column: 2;
+  grid-row: 1;
+  height: auto;
+  background: #fff;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  padding: 0 24px;
+}
+.hv-adaptive-shell .hv-application-picker {
+  color: var(--ink);
+}
+.hv-adaptive-shell .hv-application-picker small {
+  color: var(--muted);
+}
+.hv-application-navigation {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  background: #f7f8fa;
+  border-right: 1px solid var(--line);
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.hv-navigation-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 650;
+  text-decoration: none;
+  padding: 0 8px 36px;
+}
+.hv-navigation-brand > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: #243149;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.hv-application-navigation nav {
+  overflow: auto;
+}
+.hv-application-navigation button {
+  /* Positioned so a row's hidden mark text stays inside the row. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink);
+}
+.hv-application-navigation button:hover {
+  background: #eef0f4;
+}
+.hv-application-navigation button.selected {
+  background: #e8edf7;
+  color: #244d98;
+}
+.hv-application-navigation button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-application-navigation svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+.hv-application-navigation small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.hv-conversations-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 10px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.hv-conversations-heading button {
+  width: auto;
+  padding: 5px;
+}
+/* The destinations and conversations scroll; identity and Settings stay put.
+   Without this the column simply grew past the window: on an application with
+   the full set of destinations, the conversations list came to rest 27px on
+   top of the Settings link, so two controls occupied the same pixels on every
+   page of that application. The information architecture is untouched — the
+   groups, their order and "Show more" are exactly as they were; the column
+   they live in can now be scrolled when it is taller than the screen. */
+.hv-application-navigation > nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d3d9e4 transparent;
+}
+.hv-application-navigation > nav::-webkit-scrollbar {
+  width: 8px;
+}
+.hv-application-navigation > nav::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: #d3d9e4;
+}
+.hv-application-navigation > nav::-webkit-scrollbar-thumb:hover {
+  background-color: #bcc5d4;
+}
+.hv-navigation-settings {
+  display: flex;
+  flex: none;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 10px 0;
+  margin-top: auto;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  text-decoration: none;
+}
+.hv-adaptive-shell .hv-workspace {
+  grid-column: 2;
+  grid-row: 2;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  position: relative;
+}
+.hv-adaptive-shell .hv-chat-column {
+  min-width: 0;
+}
+/* An open destination parks the conversation instead of unmounting it, so
+   scroll position, draft and focus history survive the trip. */
+.hv-chat-parked {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.hv-adaptive-shell .hv-chat-pane {
+  background: #fff;
+}
+.hv-adaptive-shell .hv-chat-title {
+  padding: 24px 30px;
+  min-height: 86px;
+  border-bottom: 1px solid var(--line);
+}
+.hv-adaptive-shell .hv-chat-title strong {
+  font-size: 18px;
+}
+.hv-adaptive-shell .hv-messages {
+  padding: 28px 36px;
+}
+.hv-adaptive-shell .hv-workspace.hv-dashboard-open {
+  grid-template-columns: minmax(0, 1fr);
+  overflow: auto;
+  display: block;
+}
+
+@media (max-width: 1100px) {
+  .hv-adaptive-shell {
+    grid-template-columns: 196px minmax(0, 1fr);
+  }
+  .hv-adaptive-shell .hv-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+}
+@media (max-width: 640px) {
+  .hv-adaptive-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  .hv-application-navigation {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .hv-navigation-brand {
+    padding: 0 0 12px;
+  }
+  .hv-application-navigation nav {
+    display: flex;
+    gap: 8px;
+  }
+  .hv-application-navigation nav > button {
+    width: auto;
+    white-space: nowrap;
+  }
+  .hv-conversations-heading {
+    padding: 0;
+  }
+  .hv-conversations-heading > span,
+  .hv-navigation-settings {
+    display: none;
+  }
+  .hv-adaptive-shell .hv-topbar {
+    grid-column: 1;
+    grid-row: 2;
+    padding: 0 12px;
+  }
+  .hv-adaptive-shell .hv-workspace {
+    grid-column: 1;
+    grid-row: 3;
+  }
+}
+
+.hv-deployment-panel {
+  border-top: 1px solid #e2e7ef;
+  padding-top: 20px;
+  margin-top: 20px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.hv-deployment-panel h2 {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+.hv-deployment-panel p {
+  color: #53627b;
+}
+.hv-deployment-panel form,
+.hv-deployment-panel label {
+  display: grid;
+  gap: 12px;
+}
+.hv-deployment-panel input {
+  width: 100%;
+  border: 1px solid #ccd5e3;
+  border-radius: 7px;
+  padding: 10px;
+  background: white;
+  color: #17233b;
+}
+.hv-deployment-panel button {
+  cursor: pointer;
+  border: 1px solid #ccd5e3;
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+.hv-deployment-panel details {
+  margin: 16px 0;
+}
+.hv-deployment-panel summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #53627b;
+}
+.hv-deployment-panel pre {
+  overflow: auto;
+  max-height: 320px;
+  font-size: 11px;
+  padding: 12px;
+  background: #edf1f7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hv-host-recommendation {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  background: white;
+  border: 1px solid #dce3ee;
+  border-radius: 8px;
+}
+.hv-host-recommendation small,
+.hv-verification-time {
+  display: block;
+  color: #64738b;
+  font-size: 11px;
+}
+.hv-deployment-timeline {
+  list-style: none;
+  margin: 18px 0 0 5px;
+  padding-left: 17px;
+  border-left: 1px solid #ccd5e3;
+}
+.hv-deployment-timeline li {
+  position: relative;
+  padding: 0 0 18px 4px;
+  font-size: 12px;
+}
+.hv-deployment-timeline li::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8494ad;
+  border: 2px solid #f7f9fc;
+}
+.hv-deployment-timeline li.active::before {
+  background: #3761d6;
+  box-shadow: 0 0 0 3px #dce7ff;
+}
+.hv-deployment-timeline time {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+.hv-deployment-error {
+  color: #a03030 !important;
+}
+.hv-is-live {
+  color: #19744b !important;
+}
+
+/* Application destinations follow the same quiet, compact navigation as conversations. */
+.hv-adaptive-shell {
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+.hv-navigation-brand {
+  padding-bottom: 28px;
+}
+.hv-application-navigation nav {
+  min-height: 0;
+  padding-bottom: 16px;
+}
+.hv-application-navigation button {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.hv-application-navigation .hv-nav-group-start {
+  margin-top: 12px;
+  position: relative;
+}
+.hv-nav-group-start::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--line);
+}
+.hv-conversations-heading {
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.hv-section-page {
+  min-width: 0;
+  background: #fff;
+}
+.hv-section-header {
+  padding: 32px 36px 28px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.hv-section-header h1 {
+  margin: 0 0 10px;
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.hv-section-header p {
+  margin: 0;
+  color: #606d80;
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 65ch;
+}
+.hv-section-open-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #315bc6;
+  text-decoration: none;
+  padding-top: 5px;
+}
+.hv-section-open-app svg {
+  width: 15px;
+  height: 15px;
+}
+.hv-section-content {
+  padding: 30px 36px;
+  max-width: 1080px;
+}
+.hv-section-content h2 {
+  font-size: 18px;
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.hv-section-content p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #606d80;
+  max-width: 70ch;
+}
+.hv-section-facts {
+  margin: 12px 0 28px;
+  font-size: 13px;
+}
+.hv-section-facts > div {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hv-section-facts dt {
+  color: #606d80;
+}
+.hv-section-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.hv-overview-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 24px;
+}
+.hv-overview-status h2 {
+  margin-bottom: 4px;
+}
+.hv-overview-status p {
+  margin: 0;
+}
+.hv-status-dot {
+  width: 9px;
+  height: 9px;
+  background: #8b95a5;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hv-status-dot.live {
+  background: #267c58;
+}
+.hv-planned-section {
+  padding: 28px 0 10px;
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.hv-planned-section h2 {
+  margin-top: 18px;
+}
+.hv-availability {
+  display: inline-block;
+  font-size: 11px;
+  color: #606d80;
+  border: 1px solid #dce1e9;
+  border-radius: 5px;
+  padding: 3px 7px;
+}
+.hv-section-empty {
+  padding: 8px 0 18px;
+}
+.hv-section-content .hv-deployment-panel {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  max-width: 720px;
+}
+.hv-section-content .hv-deployment-panel form {
+  max-width: 620px;
+}
+.hv-variable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.hv-variable-row span {
+  color: #606d80;
+}
+.hv-table-head {
+  font-size: 12px;
+}
+.hv-log-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.hv-log-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dce1e9;
+  padding: 8px 12px;
+  border-radius: 7px;
+  flex: 1;
+  max-width: 430px;
+}
+.hv-log-toolbar input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: none;
+  color: var(--ink);
+  background: transparent;
+}
+.hv-log-toolbar label:focus-within {
+  outline: 2px solid #315bc6;
+  outline-offset: 2px;
+}
+.hv-log-toolbar button,
+.hv-canvas-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #dce1e9;
+  border-radius: 7px;
+  background: #fff;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+}
+.hv-log-toolbar svg,
+.hv-canvas-toolbar svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.hv-log-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hv-log-context {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  font-size: 11px;
+  color: #606d80;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #fafbfc;
+}
+.hv-logs-output {
+  margin: 0;
+  padding: 20px;
+  /* A four-line command left two hundred pixels of white below it, and a
+     page of them read as if something had failed to load. The ceiling still
+     stops one long capture from filling the screen. */
+  max-height: 600px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #303b4e;
+  border: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+}
+.hv-architecture-view {
+  min-width: 0;
+}
+.hv-canvas-toolbar {
+  padding: 20px 30px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #606d80;
+}
+.hv-canvas-toolbar > div {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.hv-canvas-scroll {
+  background: #fafbfc;
+  overflow: auto;
+  border-block: 1px solid var(--line);
+}
+.hv-topology {
+  display: block;
+  width: 100%;
+  min-width: 760px;
+  max-height: 720px;
+}
+.hv-topology-node {
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+}
+.hv-topology-node:active {
+  cursor: grabbing;
+}
+.hv-node-surface {
+  fill: #fff;
+  stroke: #d6deea;
+  stroke-width: 1;
+}
+.hv-topology-node.selected .hv-node-surface {
+  stroke: #6484bf;
+  stroke-width: 1.5;
+}
+.hv-topology-node:focus-visible .hv-node-surface {
+  stroke: #315bc6;
+  stroke-width: 3;
+}
+.hv-node-label {
+  font-size: 11px;
+  fill: #606d80;
+}
+.hv-node-name {
+  font-size: 15px;
+  font-weight: 600;
+  fill: #243149;
+}
+.hv-node-detail {
+  font-size: 10px;
+  fill: #606d80;
+}
+.hv-topology-edge {
+  fill: none;
+  stroke: #cbd6e7;
+  stroke-width: 2;
+}
+.hv-topology-flow {
+  fill: none;
+  stroke: #7294c9;
+  stroke-width: 2;
+  stroke-dasharray: 6 15;
+}
+.hv-topology-motion .hv-topology-flow {
+  animation: hv-topology-travel 3s linear infinite;
+}
+.hv-edge-label {
+  font-size: 10px;
+  fill: #586b86;
+}
+.hv-canvas-detail {
+  padding: 24px 36px 8px;
+  font-size: 13px;
+}
+.hv-canvas-detail strong {
+  font-weight: 600;
+}
+.hv-canvas-detail p {
+  color: #606d80;
+  line-height: 1.8;
+  max-width: 75ch;
+  overflow-wrap: anywhere;
+  margin-bottom: 0;
+}
+.hv-canvas-caption {
+  padding: 0 36px 22px;
+  color: #606d80;
+  font-size: 11px;
+  line-height: 1.7;
+}
+@keyframes hv-topology-travel {
+  to {
+    stroke-dashoffset: -63;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hv-topology-motion .hv-topology-flow {
+    animation: none;
+  }
+}
+@media (max-width: 1100px) {
+  .hv-adaptive-shell {
+    grid-template-columns: 224px minmax(0, 1fr);
+  }
+  .hv-canvas-toolbar {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 640px) {
+  .hv-adaptive-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hv-navigation-brand {
+    padding-bottom: 12px;
+  }
+  .hv-application-navigation nav {
+    display: block;
+    padding-bottom: 0;
+  }
+  .hv-destinations {
+    display: flex;
+    overflow-x: auto;
+    padding: 0 0 8px;
+    gap: 4px;
+  }
+  .hv-destinations button {
+    width: auto;
+    flex-shrink: 0;
+  }
+  .hv-application-navigation .hv-nav-group-start {
+    margin-top: 0;
+  }
+  .hv-nav-group-start::before {
+    display: none;
+  }
+  .hv-conversations-heading {
+    display: inline-flex;
+    margin: 4px 6px 0 0;
+    padding: 0;
+    border: 0;
+    vertical-align: middle;
+  }
+  .hv-application-navigation nav > button {
+    display: inline-flex;
+    vertical-align: middle;
+    max-width: 230px;
+  }
+  .hv-section-header {
+    padding: 24px;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hv-section-content {
+    padding: 24px;
+  }
+  .hv-section-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 15px 0;
+  }
+  .hv-canvas-toolbar {
+    padding: 20px 24px;
+  }
+  .hv-canvas-detail {
+    padding-inline: 24px;
+  }
+  .hv-canvas-caption {
+    padding-inline: 24px;
+  }
+  .hv-log-toolbar {
+    flex-wrap: wrap;
+  }
+  .hv-log-context {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+/* Navigation marks: a 7px dot with its reason in a title and hidden text. */
+.hv-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.hv-nav-indicator {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+}
+.hv-nav-indicator.working {
+  background: var(--blue);
+  animation: hv-mark-pulse 1.6s ease-in-out infinite;
+}
+.hv-nav-indicator.needs-you {
+  background: var(--amber);
+}
+.hv-nav-indicator.failed {
+  background: var(--red);
+}
+.hv-nav-indicator.updated {
+  background: var(--green);
+}
+@keyframes hv-mark-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* The way back from a full-width destination. */
+.hv-view-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfc;
+  font-size: 12px;
+}
+.hv-view-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: #315bc6;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.hv-view-back svg {
+  width: 14px;
+  height: 14px;
+}
+.hv-suggest {
+  border: 1px solid #c7d6f5;
+  background: var(--blue-soft);
+  color: var(--blue-text);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* The active-work strip in the top bar while a destination is open. */
+.hv-adaptive-shell .hv-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+/* Development only, and quieter than the actions beside them: the recorded
+   conversation and the database are a developer's errands, not an
+   operator's. */
+.hv-topbar-debug {
+  display: flex;
+  flex: none;
+  gap: 14px;
+  font-size: 12.5px;
+}
+.hv-topbar-debug a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.hv-topbar-debug a:hover {
+  color: var(--ink);
+}
+.hv-workstrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.hv-workstrip > span:not(.hv-op-state) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* State chip: one icon, one word, optionally one detail. */
+.hv-op-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+.hv-op-state svg {
+  width: 12px;
+  height: 12px;
+}
+.hv-op-state em {
+  font-style: normal;
+  font-weight: 500;
+}
+.hv-op-state-working {
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+.hv-op-state-proposed {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+.hv-op-state-inspected {
+  background: #eef1f6;
+  color: var(--muted);
+}
+.hv-op-state-verified {
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+.hv-op-state-failed {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+/* Receipt: under the reply that started the work. */
+.hv-op-receipt {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  font-size: 14px;
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  max-width: 100%;
+}
+.hv-message-receipts {
+  max-width: 92%;
+}
+.hv-message-receipts .hv-op-receipt {
+  margin-top: 0;
+}
+.hv-op-receipt-proposed {
+  border-color: #ecd6b8;
+  background: #fffdfa;
+}
+.hv-op-receipt-working {
+  border-color: #c7d6f5;
+}
+.hv-op-receipt-failed {
+  border-color: #f2d3d0;
+  background: #fffbfb;
+}
+.hv-op-receipt-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hv-op-receipt-head strong {
+  font-weight: 600;
+}
+.hv-op-rel {
+  color: var(--muted);
+  margin-left: auto;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.hv-op-summary,
+.hv-op-evidence,
+.hv-op-next {
+  margin: 0;
+  color: #4b5568;
+  line-height: 1.6;
+}
+.hv-op-evidence {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--green-text);
+}
+.hv-op-evidence svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.hv-op-next {
+  color: var(--amber-text);
+}
+.hv-op-muted {
+  color: var(--muted);
+}
+
+/* Step list. */
+.hv-op-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.hv-op-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.hv-op-steps li.done {
+  color: var(--ink);
+}
+.hv-op-steps li.active {
+  color: var(--blue-text);
+  font-weight: 600;
+}
+.hv-op-steps li.failed {
+  color: var(--red);
+  font-weight: 600;
+}
+.hv-op-step-mark {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.hv-op-step-mark svg {
+  width: 13px;
+  height: 13px;
+}
+.hv-op-step-mark i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid #b7c1d1;
+}
+
+/* Destination links, reference chips and text links. */
+.hv-op-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.hv-op-links:empty {
+  display: none;
+}
+.hv-op-links-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hv-op-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--blue-text);
+  cursor: pointer;
+}
+.hv-op-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.hv-op-link:hover:not(:disabled) {
+  border-color: #c7d6f5;
+  background: var(--blue-soft);
+}
+.hv-op-link svg {
+  width: 12px;
+  height: 12px;
+}
+.hv-op-refs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hv-op-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 10px 2px 4px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.hv-op-ref:hover {
+  border-color: #c7d6f5;
+}
+.hv-op-ref em {
+  font-style: normal;
+  color: var(--muted);
+}
+.hv-op-text-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #315bc6;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+.hv-op-text-link:hover {
+  text-decoration: underline;
+}
+
+/* Approval and recovery: the one dashed border in the system. */
+.hv-op-approval {
+  border: 1px dashed #c9d4e4;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 10px;
+}
+.hv-op-approval > strong {
+  font-weight: 600;
+}
+.hv-op-approval p {
+  margin: 0;
+  color: #4b5568;
+  line-height: 1.6;
+}
+.hv-op-approval label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+.hv-op-approval label small {
+  color: var(--muted);
+}
+.hv-op-approval input {
+  border: 1px solid #ccd5e3;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  background: #fff;
+}
+.hv-op-approval details {
+  font-size: 12px;
+}
+.hv-op-approval summary {
+  cursor: pointer;
+  color: #53627b;
+}
+.hv-op-approval details p {
+  margin-top: 8px;
+}
+.hv-op-approval pre {
+  overflow: auto;
+  max-height: 320px;
+  font-size: 11px;
+  padding: 12px;
+  margin: 8px 0;
+  background: #edf1f7;
+  border-radius: 7px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hv-op-approval .hv-host-recommendation {
+  font-size: 12px;
+}
+.hv-op-approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.hv-op-approval .hv-primary-button,
+.hv-op-approval .hv-secondary-button {
+  padding: 8px 12px;
+  border-radius: 7px;
+  min-height: 0;
+}
+
+/* Activity above a view's confirmed facts, and the settled origin line. */
+.hv-activity-list {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 22px;
+}
+.hv-section-activity {
+  padding: 24px 36px 0;
+}
+.hv-section-activity .hv-activity-list {
+  margin-bottom: 0;
+}
+.hv-activity {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  background: #fbfcfe;
+  font-size: 13px;
+}
+.hv-activity-proposed {
+  border-color: #ecd6b8;
+  background: #fffdfa;
+}
+.hv-activity-working {
+  border-color: #c7d6f5;
+}
+.hv-activity-failed {
+  border-color: #f2d3d0;
+  background: #fffbfb;
+}
+.hv-activity-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hv-activity p {
+  margin: 0;
+  max-width: none;
+}
+.hv-origin {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+  line-height: 2;
+  color: var(--muted);
+}
+.hv-origin .hv-op-state {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.hv-operation-history {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hv-operation-history summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.hv-history-entry {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+}
+.hv-history-entry > strong {
+  color: var(--ink);
+}
+.hv-history-entry p {
+  margin: 0;
+}
+
+/* Overview: condition, needs you, running, recent changes, freshness. */
+.hv-overview-condition {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 26px;
+  flex-wrap: wrap;
+}
+.hv-overview-condition h2 {
+  margin: 0 0 4px;
+}
+.hv-overview-condition p {
+  margin: 0;
+}
+.hv-overview-ask {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 0 12px;
+}
+.hv-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 36px;
+  margin-bottom: 8px;
+}
+.hv-overview-block {
+  padding: 14px 0 6px;
+}
+.hv-overview-block h3 {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.hv-overview-empty {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+.hv-attention {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.hv-attention li {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #ecd6b8;
+  border-radius: 10px;
+  background: #fffdfa;
+  font-size: 13px;
+}
+.hv-attention li.failed {
+  border-color: #f2d3d0;
+  background: #fffbfb;
+}
+.hv-attention-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hv-attention p {
+  margin: 0;
+  max-width: none;
+}
+.hv-overview-facts {
+  margin: 0;
+  font-size: 13px;
+}
+.hv-overview-facts > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hv-overview-facts dt {
+  color: var(--muted);
+}
+.hv-overview-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+dd.hv-protection-warn {
+  color: var(--amber-text);
+}
+.hv-changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hv-changes li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 14px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.hv-changes .hv-op-links {
+  grid-column: 2;
+}
+.hv-changes strong {
+  display: block;
+  font-weight: 600;
+}
+.hv-change-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.hv-fresh table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.hv-fresh th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hv-fresh td {
+  padding: 11px 12px 11px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+.hv-fresh td small {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.hv-fresh td.stale {
+  color: var(--amber-text);
+  font-weight: 600;
+}
+.hv-fresh td.never {
+  color: var(--muted);
+}
+.hv-fresh td.fresh {
+  color: var(--green-text);
+}
+
+/* A message opened from a view or Overview. */
+.hv-message-highlight {
+  animation: hv-message-flash 2.4s ease-out;
+  border-radius: 10px;
+}
+@keyframes hv-message-flash {
+  0%,
+  35% {
+    background: var(--blue-soft);
+    box-shadow: 0 0 0 8px var(--blue-soft);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hv-nav-indicator.working,
+  .hv-message-highlight {
+    animation: none;
+  }
+}
+@media (max-width: 640px) {
+  .hv-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hv-changes li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hv-changes .hv-op-links {
+    grid-column: 1;
+  }
+  .hv-workstrip {
+    display: none;
+  }
+  .hv-section-activity {
+    padding: 20px 24px 0;
+  }
+  .hv-message-receipts {
+    max-width: 100%;
+  }
+}
+
+/* ---------- Stack destinations: processes, services, jobs, volumes ---------- */
+.hv-stack-item + .hv-stack-item {
+  margin-top: 8px;
+}
+.hv-stack-item h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hv-stack-item h2 code {
+  font-size: 15px;
+}
+.hv-role {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.hv-section-facts code,
+.hv-job-row code,
+.hv-volume-row code {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.hv-section-facts code + code {
+  margin-left: 6px;
+}
+.hv-section-facts em {
+  font-style: normal;
+  color: var(--muted);
+}
+.hv-job-list,
+.hv-volume-list {
+  margin: 12px 0 28px;
+}
+.hv-job-row,
+.hv-volume-row {
+  display: grid;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  align-items: start;
+}
+.hv-job-row {
+  grid-template-columns:
+    minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.9fr)
+    minmax(0, 1fr);
+}
+.hv-volume-row {
+  grid-template-columns:
+    minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.7fr)
+    minmax(0, 1.2fr);
+}
+.hv-job-row > span,
+.hv-volume-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hv-job-row small,
+.hv-volume-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 12px;
+}
+.hv-job-row.hv-table-head,
+.hv-volume-row.hv-table-head {
+  color: var(--muted);
+  padding: 6px 0;
+}
+.hv-outcome-ok {
+  color: var(--green-text);
+}
+.hv-outcome-bad {
+  color: var(--red);
+  font-weight: 600;
+}
+.hv-outcome-warn {
+  color: var(--amber-text);
+}
+@media (max-width: 640px) {
+  .hv-job-row,
+  .hv-volume-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .hv-job-row.hv-table-head,
+  .hv-volume-row.hv-table-head {
+    display: none;
+  }
+  .hv-job-row > span[data-label]::before,
+  .hv-volume-row > span[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+}
+
+/* Revealing the rest of the stack: one quiet row, then muted rows with why. */
+.hv-application-navigation .hv-nav-reveal {
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 32px;
+  padding: 6px 10px;
+}
+.hv-application-navigation .hv-nav-reveal svg {
+  width: 13px;
+  height: 13px;
+}
+/* The activity heading is a destination row, not a footnote: same size and
+   same target as the rows above it, with the caret in the icon's place. */
+.hv-application-navigation .hv-nav-activity svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+.hv-application-navigation .hv-nav-inside {
+  padding-left: 30px;
+}
+.hv-application-navigation .hv-nav-unused {
+  color: var(--muted);
+}
+.hv-application-navigation .hv-nav-unused svg {
+  opacity: 0.7;
+}
+.hv-application-navigation .hv-nav-unused small {
+  font-size: 10.5px;
+  margin-top: 2px;
+}
+.hv-possible p {
+  max-width: 70ch;
+}
+.hv-possible .hv-op-links {
+  margin-top: 4px;
+}
+@media (max-width: 640px) {
+  .hv-application-navigation .hv-nav-unused small {
+    display: none;
+  }
+}
+
+/* ---------- Finished views: conditions, pills, tables, issues, meters ---------- */
+.hv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.6;
+  vertical-align: middle;
+}
+.hv-pill-ok {
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+.hv-pill-warn {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+.hv-pill-bad {
+  background: var(--red-soft);
+  color: var(--red);
+}
+.hv-pill-muted {
+  background: #eef1f6;
+  color: var(--muted);
+}
+.hv-pill-working {
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+.hv-condition {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 26px;
+}
+.hv-condition-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #8b95a5;
+  flex-shrink: 0;
+  margin-top: 9px;
+}
+.hv-condition-ok .hv-condition-dot {
+  background: #267c58;
+}
+.hv-condition-warn .hv-condition-dot {
+  background: var(--amber);
+}
+.hv-condition-bad .hv-condition-dot {
+  background: var(--red);
+}
+.hv-condition-working .hv-condition-dot {
+  background: var(--blue);
+}
+.hv-condition > div {
+  min-width: 0;
+  flex: 1;
+}
+.hv-condition h2 {
+  margin: 0 0 4px;
+}
+.hv-condition p {
+  margin: 0;
+}
+.hv-condition-aside {
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+.hv-subheading {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 26px 0 10px;
+  font-weight: 600;
+}
+.hv-fact-note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.hv-fact-note .hv-op-muted {
+  color: var(--muted);
+}
+.hv-protection-ok {
+  color: var(--green-text);
+}
+.hv-protection-bad {
+  color: var(--red);
+}
+
+/* Coverage, checks, routes and runs share one quiet row grammar. */
+.hv-coverage,
+.hv-checks,
+.hv-routes {
+  margin: 4px 0 24px;
+}
+.hv-coverage-row,
+.hv-check-row,
+.hv-route-row {
+  display: grid;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  align-items: start;
+}
+.hv-coverage-row {
+  grid-template-columns: minmax(0, 1.4fr) 150px minmax(0, 1.4fr);
+}
+.hv-check-row {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 120px minmax(
+      0,
+      1.4fr
+    );
+}
+.hv-route-row {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) 120px;
+}
+.hv-coverage-row > *,
+.hv-check-row > *,
+.hv-route-row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hv-coverage-row small,
+.hv-check-row small,
+.hv-route-row small,
+.hv-history small,
+.hv-runs small,
+.hv-candidate small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 12px;
+}
+.hv-check-row.hv-table-head,
+.hv-route-row.hv-table-head {
+  color: var(--muted);
+  padding: 6px 0;
+  font-size: 12px;
+}
+.hv-history,
+.hv-runs {
+  list-style: none;
+  margin: 4px 0 24px;
+  padding: 0;
+}
+.hv-history li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.hv-runs li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.hv-run-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hv-run-output {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: #fafbfc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hv-job-actions {
+  margin-top: 8px;
+}
+
+/* Issues: durable, in app, with evidence and the way on. */
+.hv-issues {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 24px;
+}
+.hv-issues-overview {
+  margin-bottom: 10px;
+}
+.hv-issue {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.hv-issue-open {
+  border-color: #f2d3d0;
+  background: #fffbfb;
+}
+.hv-issue-acknowledged {
+  border-color: #ecd6b8;
+  background: #fffdfa;
+}
+.hv-issue-unread .hv-issue-head strong::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.hv-issue-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hv-issue p {
+  margin: 0;
+  max-width: none;
+}
+.hv-issue-evidence span {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 8px;
+}
+
+/* Resources: three quiet meters. */
+.hv-resources {
+  display: grid;
+  gap: 14px;
+  margin: 4px 0 8px;
+}
+.hv-resource-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.hv-resource-head span {
+  color: var(--muted);
+}
+.hv-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: #eef1f6;
+  overflow: hidden;
+}
+.hv-meter span {
+  display: block;
+  height: 100%;
+  background: #7294c9;
+  border-radius: 999px;
+}
+.hv-meter span.warn {
+  background: var(--amber);
+}
+.hv-meter span.bad {
+  background: var(--red);
+}
+.hv-resource-single {
+  margin: 16px 0 8px;
+}
+
+/* Delivery: the one step only the user can do. */
+.hv-user-step {
+  border: 1px dashed #c9d4e4;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fbfcfe;
+  margin: 0 0 22px;
+  font-size: 13px;
+}
+.hv-user-step strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.hv-user-step p {
+  margin: 0;
+  max-width: none;
+}
+
+/* Variables: pending values and the wide table. */
+.hv-pending-inputs {
+  border: 1px solid #ecd6b8;
+  border-radius: 10px;
+  background: #fffdfa;
+  padding: 12px 14px;
+  margin: 0 0 20px;
+  font-size: 13px;
+}
+.hv-pending-inputs ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.hv-pending-inputs .hv-op-link {
+  margin-left: 8px;
+}
+.hv-variable-list-wide .hv-variable-row {
+  grid-template-columns: minmax(0, 1.3fr) 130px 170px minmax(0, 1.2fr);
+}
+.hv-variable-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 12px;
+}
+.hv-variable-row .hv-pill {
+  margin-top: 6px;
+}
+
+/* Logs: one stream per service. */
+.hv-streams {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.hv-stream {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  min-width: 150px;
+}
+.hv-stream strong {
+  display: block;
+  font-size: 13px;
+}
+.hv-stream small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.hv-stream.selected {
+  border-color: #c7d6f5;
+  background: var(--blue-soft);
+}
+.hv-stream.errors strong::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Releases: the one candidate. */
+.hv-candidate {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fbfcfe;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+.hv-candidate > div:first-child {
+  min-width: 0;
+}
+.hv-candidate > .hv-op-muted,
+.hv-candidate > .hv-op-links {
+  grid-column: 1 / -1;
+}
+.hv-op-cost {
+  display: grid;
+  gap: 2px;
+}
+.hv-op-cost span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+@media (max-width: 640px) {
+  .hv-coverage-row,
+  .hv-check-row,
+  .hv-route-row,
+  .hv-variable-list-wide .hv-variable-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .hv-check-row.hv-table-head,
+  .hv-route-row.hv-table-head {
+    display: none;
+  }
+  .hv-condition {
+    flex-wrap: wrap;
+  }
+  .hv-candidate {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.hv-history-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.hv-history-filters [aria-pressed="true"] {
+  color: var(--hv-accent, #2456db);
+  background: #eff3fc;
+  border-color: #cbd7f5;
+}
+.hv-operation-history {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.hv-operation-history > li {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--hv-border, #e2e7ee);
+  scroll-margin-top: 80px;
+}
+.hv-history-open {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.hv-history-open > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.hv-history-open small {
+  display: block;
+  color: var(--hv-muted, #63728c);
+  margin-top: 7px;
+}
+.hv-op-state-queued {
+  color: #476fbe;
+  background: #f0f4fc;
+}
+.hv-op-state-cancelled {
+  color: #6f7b8e;
+  background: #f2f4f7;
+}
+.hv-op-receipt-queued,
+.hv-activity-queued {
+  border-color: #cfdbef;
+}
+@media (max-width: 700px) {
+  .hv-history-open {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .hv-history-open > .hv-op-rel {
+    flex-basis: 100%;
+  }
+}
+
+.hv-op-receipt > .hv-op-ref {
+  justify-self: start;
+}
+
+/* Architecture, before anybody has mapped the application. The designed
+   page's own empty state: it says nobody looked, which is not the same as
+   saying there is nothing to find. */
+.hv-arch-unmapped {
+  max-width: 62ch;
+  padding: 8px 0 0;
+}
+.hv-arch-unmapped h2 {
+  margin: 0 0 10px;
+  color: var(--ink, #202838);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.hv-arch-unmapped p {
+  margin: 0 0 12px;
+  color: var(--ink-2, #3e4a60);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.hv-arch-unmapped button {
+  margin-top: 4px;
+}

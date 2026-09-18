@@ -16,7 +16,7 @@ const optionsSchema = z.object({
 /**
  * The ports an installation opens private links on, when it fixes them.
  *
- * An installed Haldur may be on a virtual machine, with its owner's
+ * An installed Hallvi may be on a virtual machine, with its owner's
  * browser on another machine reaching it over SSH. A link on a port nobody
  * forwarded opens nothing there, so the installation names a small range in
  * advance, the owner forwards exactly that range, and links stay inside it.
@@ -24,7 +24,7 @@ const optionsSchema = z.object({
  */
 function privateRange() {
   const match = /^(\d+)-(\d+)$/.exec(
-    process.env.HALDUR_PRIVATE_PORTS?.trim() ?? "",
+    process.env.HALLVI_PRIVATE_PORTS?.trim() ?? "",
   );
   return match ? { first: Number(match[1]), last: Number(match[2]) } : null;
 }
@@ -49,7 +49,7 @@ function controlSocket(
     .digest("hex")
     .slice(0, 24);
   // Keep control socket paths short enough for macOS Unix sockets.
-  return join(`/tmp/haldur-ssh-${process.getuid!()}`, identity);
+  return join(`/tmp/hallvi-ssh-${process.getuid!()}`, identity);
 }
 
 async function masterAlive(
@@ -90,7 +90,7 @@ export async function openServerPort(
   const host = operatorSettings(applicationId).host;
   if (!host) throw new Error("Connect a server before opening private access.");
   signal?.throwIfAborted();
-  mkdirSync(`/tmp/haldur-ssh-${process.getuid!()}`, {
+  mkdirSync(`/tmp/hallvi-ssh-${process.getuid!()}`, {
     recursive: true,
     mode: 0o700,
   });
@@ -126,7 +126,7 @@ export async function openServerPort(
       chosen ??= open;
       if (chosen === undefined)
         throw new Error(
-          `Every private link port (${first}-${last}) is in use on the machine running Haldur.`,
+          `Every private link port (${first}-${last}) is in use on the machine running Hallvi.`,
         );
       localPort = chosen;
     }
@@ -203,8 +203,8 @@ export async function openServerPort(
     localPort,
     reused,
     access: range
-      ? "On the machine running Haldur, while its SSH tunnel is alive, and in the owner's browser on another machine when they forward this installation's ports to it. This does not change server listeners or firewalls; verify those separately."
-      : "Only on the PC running Haldur, while its SSH tunnel is alive. This does not change server listeners or firewalls; verify those separately.",
+      ? "On the machine running Hallvi, while its SSH tunnel is alive, and in the owner's browser on another machine when they forward this installation's ports to it. This does not change server listeners or firewalls; verify those separately."
+      : "Only on the PC running Hallvi, while its SSH tunnel is alive. This does not change server listeners or firewalls; verify those separately.",
     // 127.0.0.1 means a different machine in each of the three places this
     // operator works, and the workspace is the one that looks most like the
     // controller and is least like it. Saying so here costs nothing; finding

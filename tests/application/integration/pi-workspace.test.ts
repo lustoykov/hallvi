@@ -42,8 +42,8 @@ type Mount = { Type: string };
 
 const variables = [
   "DOCKER_HOST",
-  "HALDUR_DB_PATH",
-  "HALDUR_PROBE_TOKEN",
+  "HALLVI_DB_PATH",
+  "HALLVI_PROBE_TOKEN",
 ] as const;
 const saved = Object.fromEntries(
   variables.map((name) => [name, process.env[name]]),
@@ -200,9 +200,9 @@ function syntheticEngine() {
 }
 
 beforeEach(async () => {
-  root = createTemporaryRoot("/tmp/haldur-pi-workspace-");
+  root = createTemporaryRoot("/tmp/hallvi-pi-workspace-");
   // Workspace ownership labels and event logs belong to this scratch root.
-  process.env.HALDUR_DB_PATH = join(root, "haldur.db");
+  process.env.HALLVI_DB_PATH = join(root, "hallvi.db");
   process.env.DOCKER_HOST = `unix://${join(root, "docker.sock")}`;
   discovery.missing = false;
   engine = syntheticEngine();
@@ -224,7 +224,7 @@ afterEach(async () => {
 
 it("starts one isolated container on first use and keeps a Run's sequential calls in it", async () => {
   const secret = `ghp_${"S".repeat(36)}`;
-  process.env.HALDUR_PROBE_TOKEN = secret;
+  process.env.HALLVI_PROBE_TOKEN = secret;
   const file = (path: string, content: string) => ({
     path,
     mode: 0o644,
@@ -333,13 +333,13 @@ it("starts one isolated container on first use and keeps a Run's sequential call
       .sort(),
   ).toEqual([
     ".env.example",
-    ".haldur-source.txt",
+    ".hallvi-source.txt",
     "src/config.js",
     "src/server.js",
   ]);
   expect(
     seeded
-      .find((entry) => entry.path === ".haldur-source.txt")!
+      .find((entry) => entry.path === ".hallvi-source.txt")!
       .content.toString(),
   ).toContain("qa/example@abc123");
 });

@@ -9,7 +9,7 @@ const browserGuide = {
   mocked:
     "Pi replies and ChatGPT login responses are synthetic. GitHub API responses and credential discovery are synthetic, but its setup routes and login coordinator are real. Dashboard tests simulate runner launches and saved answers; no model or provider calls.",
   isolation:
-    "Product journeys start one disposable Haldur app on port 3180 with its own temporary SQLite file. All selected journeys share that file, but each creates a different application. Example: a priority saved by the isolation journey cannot appear in the revision journey. After the suite, Next.js and the Pi worker stop and the whole /tmp/haldur-e2e-* directory, database included, is deleted; the dashboard's Stop button and shutdown take the same path. Only a hard kill (SIGKILL) can leave one behind. Port 3000 and your normal database are never opened. Dashboard-only journeys use synthetic dashboard state.",
+    "Product journeys start one disposable Hallvi app on port 3180 with its own temporary SQLite file. All selected journeys share that file, but each creates a different application. Example: a priority saved by the isolation journey cannot appear in the revision journey. After the suite, Next.js and the Pi worker stop and the whole /tmp/hallvi-e2e-* directory, database included, is deleted; the dashboard's Stop button and shutdown take the same path. Only a hard kill (SIGKILL) can leave one behind. Port 3000 and your normal database are never opened. Dashboard-only journeys use synthetic dashboard state.",
   checks:
     "Code assertions check visible UI and saved state: for example, send a message, reload, and verify its saved response and shared cards. No human or LLM grading.",
   limits:
@@ -34,7 +34,7 @@ export const suiteGuides = {
     mocked:
       "Pi, GitHub and OAuth/provider boundaries are replaced with test responses. Route tests stub domain calls when testing the HTTP boundary alone.",
     isolation:
-      "Unit tests do not open SQLite. The database-backed integration tests create temporary databases: application tests reuse one file but clear its application rows before every test, while schema tests create a fresh file for every test. Example: a chat saved by one application test cannot appear in the next. After the tests, database connections close and these temporary folders are deleted. Your normal Haldur database is never opened.",
+      "Unit tests do not open SQLite. The database-backed integration tests create temporary databases: application tests reuse one file but clear its application rows before every test, while schema tests create a fresh file for every test. Example: a chat saved by one application test cannot appear in the next. After the tests, database connections close and these temporary folders are deleted. Your normal Hallvi database is never opened.",
     checks:
       "Code assertions compare expected values, errors, saved messages, shared information, permissions and refresh behavior. No human or LLM grading.",
     limits:

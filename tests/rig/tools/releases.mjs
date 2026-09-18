@@ -13,7 +13,7 @@ const rows = JSON.parse(
     [
       "-readonly",
       "-json",
-      join(rig, "state/haldur.db"),
+      join(rig, "state/hallvi.db"),
       "select body from deployments",
     ],
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },

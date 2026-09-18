@@ -17,7 +17,7 @@ test(
       timeout: 30_000,
     });
     const composer = page.getByRole("textbox", {
-      name: "Message Haldur",
+      name: "Message Hallvi",
       exact: true,
     });
     await openConversation(page);
@@ -109,7 +109,7 @@ test(
     });
     const message = `priority: ${"reliability-".repeat(24)}`;
     const composer = page.getByRole("textbox", {
-      name: "Message Haldur",
+      name: "Message Hallvi",
       exact: true,
     });
     await openConversation(page);
@@ -130,7 +130,7 @@ test(
     const saved = page.locator("#history-requirements");
     for (const width of [1440, 1280]) {
       await page.setViewportSize({ width, height: 900 });
-      await expect(saved.locator(".hd-history-records strong")).toBeVisible();
+      await expect(saved.locator(".hv-history-records strong")).toBeVisible();
       const fits = await saved.evaluate(
         (element) => element.scrollWidth <= element.clientWidth,
       );

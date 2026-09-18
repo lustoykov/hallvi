@@ -38,12 +38,12 @@ export interface ChatMessage {
   body: string;
   blocks?: import("./operator-data").MessageBlock[];
   /**
-   * `user` is the engineer's own message. `haldur` marks a recorded
-   * event or a request Haldur started itself; it is never presented as
+   * `user` is the engineer's own message. `hallvi` marks a recorded
+   * event or a request Hallvi started itself; it is never presented as
    * the engineer's words. The stored value keeps the product's former name
    * so messages already saved under it read the same way.
    */
-  source: "user" | "pi" | "haldur";
+  source: "user" | "pi" | "hallvi";
   createdAt: string;
   status: "completed" | PiRunStatus;
   revision: number;

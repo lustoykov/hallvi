@@ -12,7 +12,7 @@ afterEach(() => {
     rmSync(root, { recursive: true, force: true });
 });
 function temporary(name: string) {
-  const root = mkdtempSync(join(tmpdir(), "haldur-schema-"));
+  const root = mkdtempSync(join(tmpdir(), "hallvi-schema-"));
   roots.push(root);
   return { root, path: join(root, name) };
 }

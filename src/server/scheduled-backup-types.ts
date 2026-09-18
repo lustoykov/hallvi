@@ -108,7 +108,7 @@ export const scheduledRunSchema = z.object({
       /** The restored application, booted in isolation on this host. */
       boot: z
         .object({
-          project: z.string().regex(/^hd-restore-[0-9a-f]{8}$/),
+          project: z.string().regex(/^hv-restore-[0-9a-f]{8}$/),
           seconds: z.number().nonnegative(),
           services: z.record(
             z.string().regex(/^[a-z0-9][a-z0-9_.-]{0,62}$/),

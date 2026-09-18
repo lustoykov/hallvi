@@ -16,7 +16,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { InformationCard } from "../../../src/components/haldur/information-card";
+import { InformationCard } from "../../../src/components/hallvi/information-card";
 import type { SavedInformation } from "../../../src/server/operator-data";
 
 const ID = "bcb57ff6-2d1e-4a1b-9c74-0f2f7a4ad2e1";
@@ -57,7 +57,7 @@ describe("a record mentioned a second time", () => {
     );
     // A control, because switching destination is the shell's job rather
     // than a URL the transcript can link to.
-    expect(markup).toContain("hd-result-elsewhere");
+    expect(markup).toContain("hv-result-elsewhere");
     expect(markup).toContain("open Backups");
     expect(markup).not.toContain("see it in full above");
     // Nothing to scroll to, and nothing claiming to be the target.
@@ -90,7 +90,7 @@ describe("a record mentioned a second time", () => {
     );
     // On Backups itself there is nowhere better to go, so the old anchor is
     // still the best available.
-    expect(markup).not.toContain("hd-result-elsewhere");
+    expect(markup).not.toContain("hv-result-elsewhere");
     expect(anchorTo(markup)).toBe(`record-${ID}`);
   });
 
@@ -100,7 +100,7 @@ describe("a record mentioned a second time", () => {
     const markup = renderToStaticMarkup(
       <InformationCard record={bare} superseded onOpen={() => {}} />,
     );
-    expect(markup).not.toContain("hd-result-elsewhere");
+    expect(markup).not.toContain("hv-result-elsewhere");
     expect(anchorTo(markup)).toBe(`record-${ID}`);
   });
 
@@ -133,7 +133,7 @@ describe("a repeated record that carries its own content", () => {
     const markup = renderToStaticMarkup(
       <InformationCard record={contentRecord()} superseded onOpen={() => {}} />,
     );
-    expect(markup).toContain("hd-result-elsewhere");
+    expect(markup).toContain("hv-result-elsewhere");
     expect(markup).toContain("open Overview");
     expect(markup).not.toContain("see it in full above");
   });
@@ -174,12 +174,12 @@ describe("a record a later one replaced", () => {
     expect(markup).toContain("No longer current");
     // The instruction goes entirely: a resolved failure that still says
     // "Next: retry" reads as an open task wherever it is printed.
-    expect(markup).not.toContain("hd-info-next");
+    expect(markup).not.toContain("hv-info-next");
     expect(markup).not.toContain("Retry fetch_backup_copy");
     // The failed check is kept but not on the surface. Everything the card
     // shows before its disclosure is title, tag and time.
     const surface = markup.slice(0, markup.indexOf("<details"));
-    expect(surface).not.toContain("hd-info-checks");
+    expect(surface).not.toContain("hv-info-checks");
     expect(surface).not.toContain("Protected transfer");
   });
 
@@ -188,9 +188,9 @@ describe("a record a later one replaced", () => {
       <InformationCard record={retired()} onOpen={() => {}} />,
     );
     // Compact, like the other two reasons a card yields space.
-    expect(markup).toContain("hd-result");
+    expect(markup).toContain("hv-result");
     expect(markup).toContain("data-quiet");
-    expect(markup).not.toContain('class="hd-info"');
+    expect(markup).not.toContain('class="hv-info"');
     // Behind the disclosure, not deleted.
     expect(markup).toContain("<details");
     expect(markup).toContain("Protected transfer to the controller completed");
@@ -204,8 +204,8 @@ describe("a record a later one replaced", () => {
     const markup = renderToStaticMarkup(
       <InformationCard record={live} onOpen={() => {}} />,
     );
-    expect(markup).toContain('class="hd-info"');
-    expect(markup).toContain("hd-info-next");
+    expect(markup).toContain('class="hv-info"');
+    expect(markup).toContain("hv-info-next");
     expect(markup).toContain("Retry fetch_backup_copy");
   });
 });

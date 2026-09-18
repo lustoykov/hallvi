@@ -1,0 +1,637 @@
+/* Application-first backup view. Prefix: bs-. */
+
+.hv-backups {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  padding: 0 0 36px;
+}
+
+.bs {
+  display: grid;
+  gap: 0;
+}
+
+.bs button,
+.bs select,
+.bs summary {
+  font: inherit;
+}
+
+.bs button:focus-visible,
+.bs select:focus-visible,
+.bs summary:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 3px;
+}
+
+.bs-application {
+  display: grid;
+  gap: 14px;
+}
+
+.bs-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bs-source-icon,
+.bs-summary-icon,
+.bs-data-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--ax-blue);
+}
+
+.bs-source-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--ax-working-bg);
+}
+
+.bs-source-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.bs-source b,
+.bs-source small {
+  display: block;
+}
+
+.bs-source b {
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.bs-source small {
+  margin-top: 1px;
+  color: var(--ax-muted);
+  font-size: 12px;
+}
+
+.bs-inventory {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bs-inventory button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 78px;
+  padding: 12px 13px;
+  border: 1px solid var(--ax-line);
+  border-radius: 12px;
+  background: var(--ax-surface);
+  color: var(--ax-ink);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--ax-fast),
+    background var(--ax-fast),
+    box-shadow var(--ax-fast);
+}
+
+.bs-inventory button:hover {
+  border-color: color-mix(in srgb, var(--ax-blue) 45%, var(--ax-line));
+  background: color-mix(in srgb, var(--ax-working-bg) 36%, white);
+}
+
+.bs-inventory button[data-selected] {
+  border-color: color-mix(in srgb, var(--ax-blue) 68%, var(--ax-line));
+  box-shadow: 0 3px 12px rgb(23 34 56 / 8%);
+}
+
+.bs-inventory button[data-tone="gap"],
+.bs-inventory button[data-tone="unknown"] {
+  background: color-mix(in srgb, var(--ax-nav) 55%, white);
+}
+
+.bs-data-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--ax-working-bg);
+}
+
+.bs-data-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.bs-data-name {
+  min-width: 0;
+}
+
+.bs-data-name b,
+.bs-data-name small {
+  display: block;
+}
+
+.bs-data-name b {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.bs-data-name small {
+  margin-top: 2px;
+  color: var(--ax-muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bs-data-state {
+  display: flex;
+  grid-column: 2 / -1;
+  align-items: center;
+  gap: 5px;
+  color: var(--ax-muted);
+  font-size: 11.5px;
+}
+
+.bs-data-state svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bs-inventory button[data-tone="included"] .bs-data-state {
+  color: var(--ax-verified-text);
+}
+
+.bs-inventory button[data-tone="gap"] .bs-data-state {
+  color: var(--ax-waiting-text);
+}
+
+.bs-data-caret {
+  grid-column: 3;
+  grid-row: 1;
+  width: 13px;
+  height: 13px;
+  color: var(--ax-muted);
+  transition: transform var(--ax-fast);
+}
+
+.bs-inventory button[aria-expanded="true"] .bs-data-caret {
+  transform: rotate(90deg);
+}
+
+.bs-empty-data {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--ax-line);
+  border-radius: 12px;
+  color: var(--ax-muted);
+  font-size: 13px;
+}
+
+.bs-item-detail {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr) auto;
+  gap: 18px;
+  align-items: start;
+  margin-top: 10px;
+  padding: 14px 15px;
+  border: 1px solid var(--ax-line);
+  border-radius: 12px;
+  background: var(--ax-nav);
+}
+
+.bs-item-detail b {
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.bs-item-detail p {
+  margin: 3px 0 0;
+  color: var(--ax-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bs-item-detail dl,
+.bs-facts,
+.bs-restore-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0;
+}
+
+.bs-item-detail dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bs-item-detail dt,
+.bs-facts dt,
+.bs-restore-facts dt {
+  color: var(--ax-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bs-item-detail dd,
+.bs-facts dd,
+.bs-restore-facts dd {
+  display: grid;
+  gap: 3px;
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--ax-ink-2);
+  font-size: 12.5px;
+}
+
+.bs-item-detail dd small,
+.bs-facts dd small,
+.bs-restore-facts dd small {
+  color: var(--ax-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.bs-detail-close {
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ax-blue);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.bs-copy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bs-copy code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--ax-ink-2);
+  font-family: var(--ax-mono);
+  font-size: 11.5px;
+}
+
+.bs-copy button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ax-blue);
+  cursor: pointer;
+  font-size: 11.5px;
+}
+
+.bs-route {
+  display: grid;
+  justify-items: center;
+  height: 48px;
+  color: color-mix(in srgb, var(--ax-blue) 65%, var(--ax-muted));
+}
+
+.bs-route span {
+  height: 29px;
+  border-left: 1px dashed color-mix(in srgb, var(--ax-blue) 42%, var(--ax-line));
+}
+
+.bs-route svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bs-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px 14px;
+  align-items: center;
+  padding: 15px 16px;
+  border: 1px solid var(--ax-line);
+  border-radius: 12px;
+  background: var(--ax-surface);
+}
+
+.bs-summary[data-tone="warning"] {
+  border-color: var(--ax-waiting-line);
+  background: var(--ax-waiting-bg);
+}
+
+.bs-summary[data-tone="failed"] {
+  border-color: var(--ax-failed-line);
+  background: var(--ax-failed-bg);
+}
+
+.bs-summary[data-tone="verified"] {
+  border-color: color-mix(in srgb, var(--ax-verified) 28%, var(--ax-line));
+  background: var(--ax-verified-bg);
+}
+
+.bs-summary-icon {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--ax-working-bg) 70%, white);
+}
+
+.bs-summary-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.bs-summary[data-tone="warning"] .bs-summary-icon {
+  background: var(--ax-waiting-bg);
+  color: var(--ax-waiting-text);
+}
+
+.bs-summary[data-tone="failed"] .bs-summary-icon {
+  background: color-mix(in srgb, var(--ax-failed) 12%, white);
+  color: var(--ax-failed);
+}
+
+.bs-summary[data-tone="verified"] .bs-summary-icon {
+  background: color-mix(in srgb, var(--ax-verified) 13%, white);
+  color: var(--ax-verified-text);
+}
+
+.bs-summary-copy {
+  min-width: 0;
+}
+
+.bs-summary-copy > b,
+.bs-summary-copy > small {
+  display: block;
+}
+
+.bs-summary-copy > b {
+  max-width: 72ch;
+  font-size: 14px;
+  font-weight: 620;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.bs-summary-copy > small {
+  margin-top: 3px;
+  color: var(--ax-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bs-summary-copy > p {
+  margin: 7px 0 0;
+  color: var(--ax-failed);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bs-primary,
+.bs-action {
+  display: inline-flex;
+  flex: none;
+  gap: 7px;
+  align-items: baseline;
+  justify-self: start;
+  padding: 7px 11px;
+  border: 1px solid var(--ax-line);
+  border-radius: 8px;
+  background: var(--ax-surface);
+  color: var(--ax-ink);
+  cursor: pointer;
+  font-weight: 560;
+}
+
+.bs-primary {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+  color: white;
+  white-space: nowrap;
+}
+
+.bs-primary:hover {
+  background: color-mix(in srgb, var(--ax-blue) 87%, black);
+}
+
+.bs-action:hover {
+  border-color: color-mix(in srgb, var(--ax-blue) 45%, var(--ax-line));
+  background: var(--ax-working-bg);
+}
+
+.bs-primary em,
+.bs-action em {
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 450;
+}
+
+.bs-primary em {
+  color: rgb(255 255 255 / 74%);
+}
+
+.bs-action em {
+  color: var(--ax-muted);
+}
+
+.bs-details {
+  display: grid;
+  margin-top: 18px;
+  border-top: 1px solid var(--ax-line);
+}
+
+.bs-disclosure {
+  border-bottom: 1px solid var(--ax-line);
+}
+
+.bs-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 3px;
+  list-style: none;
+  color: var(--ax-ink);
+  cursor: pointer;
+}
+
+.bs-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bs-disclosure > summary:hover b {
+  color: var(--ax-blue);
+}
+
+.bs-disclosure > summary b,
+.bs-disclosure > summary small {
+  display: block;
+}
+
+.bs-disclosure > summary b {
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.bs-disclosure > summary small {
+  margin-top: 2px;
+  color: var(--ax-muted);
+  font-size: 11.5px;
+}
+
+.bs-chevron {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--ax-muted);
+  transition: transform var(--ax-fast);
+}
+
+.bs-disclosure[open] > summary .bs-chevron {
+  transform: rotate(90deg);
+}
+
+.bs-disclosure-body {
+  display: grid;
+  gap: 14px;
+  padding: 2px 3px 18px;
+}
+
+.bs-disclosure-body > h4 {
+  margin: 2px 0 -4px;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.bs-unknown {
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 12.5px;
+}
+
+.bs-failure {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ax-failed-line);
+  border-radius: 10px;
+  background: var(--ax-failed-bg);
+  color: var(--ax-failed);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bs-kept {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bs-kept > li {
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--ax-nav);
+}
+
+.bs-kept > li[data-newest] {
+  background: var(--ax-working-bg);
+}
+
+.bs-kept b {
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.bs-kept small {
+  color: var(--ax-muted);
+  font-size: 11.5px;
+}
+
+.bs-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ax-muted);
+  font-size: 12px;
+}
+
+.bs-pick select {
+  padding: 6px 28px 6px 9px;
+  border: 1px solid var(--ax-line);
+  border-radius: 8px;
+  background: var(--ax-surface);
+  color: var(--ax-ink);
+}
+
+.bs-modes {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--ax-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bs-modes button {
+  padding: 6px 9px;
+  border: 0;
+  background: var(--ax-surface);
+  color: var(--ax-muted);
+  cursor: pointer;
+  font-size: 11.5px;
+}
+
+.bs-modes button + button {
+  border-left: 1px solid var(--ax-line);
+}
+
+.bs-modes button[data-picked] {
+  background: var(--ax-working-bg);
+  color: var(--ax-blue);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .bs-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .bs-summary .bs-primary {
+    grid-column: 2;
+  }
+
+  .bs-item-detail {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bs-item-detail dl {
+    grid-column: 1 / -1;
+  }
+
+  .bs-facts,
+  .bs-restore-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-inventory button,
+  .bs-data-caret,
+  .bs-chevron {
+    transition: none;
+  }
+}

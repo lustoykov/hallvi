@@ -1,4 +1,4 @@
-"""Host-side scheduled backup engine for one Haldur deployment.
+"""Host-side scheduled backup engine for one Hallvi deployment.
 
 Installed by the controller next to capture_sqlite_stack.py and driven by a
 systemd timer. One process per run, guarded by the deployment lock the
@@ -43,13 +43,13 @@ DETAIL_CHARACTERS = 1500
 RECOVERY_LOCK_WAIT = 15
 
 STATE_ROOT = Path(
-    os.environ.get("HALDUR_BACKUP_ROOT", "/var/lib/haldur/backups")
+    os.environ.get("HALLVI_BACKUP_ROOT", "/var/lib/hallvi/backups")
 )
-LOCK_ROOT = Path(os.environ.get("HALDUR_LOCK_DIR", "/run/lock"))
-SOURCE_ROOT = Path(os.environ.get("HALDUR_SOURCE_ROOT", "/opt/haldur"))
+LOCK_ROOT = Path(os.environ.get("HALLVI_LOCK_DIR", "/run/lock"))
+SOURCE_ROOT = Path(os.environ.get("HALLVI_SOURCE_ROOT", "/opt/hallvi"))
 # Where the capture helper stages its snapshot. The helper hardcodes /var/tmp,
 # so this only ever moves for the tests.
-HELPER_STAGE_ROOT = Path(os.environ.get("HALDUR_HELPER_STAGE_ROOT", "/var/tmp"))
+HELPER_STAGE_ROOT = Path(os.environ.get("HALLVI_HELPER_STAGE_ROOT", "/var/tmp"))
 
 RESTORE_LABEL = "sg-scheduled-restore"
 
@@ -414,7 +414,7 @@ def helper_stage(run_id):
     Recovery deletes this path, so it is always generated from the run id
     rather than taken from a record that could name anything at all.
     """
-    return HELPER_STAGE_ROOT / ("haldur-proof-" + run_id)
+    return HELPER_STAGE_ROOT / ("hallvi-proof-" + run_id)
 
 
 def restore_names(run_id):
@@ -555,7 +555,7 @@ def acquire_lock(deployment_id, wait=0):
     """The deployment lock the controller shares for deploy and recreate."""
     LOCK_ROOT.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(
-        LOCK_ROOT / ("haldur-" + deployment_id + ".lock"),
+        LOCK_ROOT / ("hallvi-" + deployment_id + ".lock"),
         os.O_CREAT | os.O_RDWR,
         0o600,
     )
@@ -813,22 +813,22 @@ def verify_source_identity(config, states, definition=None):
         expected = {
             name
             for name, service in definition["services"].items()
-            if "haldur.revision" in (service.get("labels") or {})
+            if "hallvi.revision" in (service.get("labels") or {})
         }
         labeled = [value for value in states.values() if value["service"] in expected]
     else:
         labeled = [
             value
             for value in states.values()
-            if {"haldur.deployment", "haldur.revision"} & set(value["labels"])
+            if {"hallvi.deployment", "hallvi.revision"} & set(value["labels"])
         ]
         # Running containers the controller never labeled are not this one.
         if not labeled:
             raise BackupError("capture", "source-identity-mismatch")
     for value in labeled:
         if (
-            value["labels"].get("haldur.deployment") != config["deploymentId"]
-            or value["labels"].get("haldur.revision") != config["revision"]
+            value["labels"].get("hallvi.deployment") != config["deploymentId"]
+            or value["labels"].get("hallvi.revision") != config["revision"]
         ):
             raise BackupError("capture", "source-identity-mismatch")
 
@@ -1542,7 +1542,7 @@ def restore_definition(extracted, manifest, run_id, workspace):
         service["labels"] = {
             key: value
             for key, value in (service.get("labels") or {}).items()
-            if not str(key).startswith("haldur.")
+            if not str(key).startswith("hallvi.")
         }
         service["labels"][RESTORE_LABEL] = run_id
         for mount in service.get("volumes") or []:

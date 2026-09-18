@@ -26,7 +26,7 @@ const api = async (path) => {
     {
       headers: {
         Accept: "application/vnd.github+json",
-        "User-Agent": "haldur-rig",
+        "User-Agent": "hallvi-rig",
       },
     },
   );

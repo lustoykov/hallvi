@@ -1,9 +1,7 @@
 .DS_Store
 .claude/
 .env
-.haldur/
-# Server Guy state not yet moved (docs/installation.md): never commit its credentials.
-.server-guy/
+.hallvi/
 data/
 node_modules
 .next/

@@ -27,17 +27,17 @@ import { WORKER_BUSY_EXIT as workerBusyExit } from "../../../src/server/pi-worke
 import { workerPresence } from "../../../src/server/worker-presence";
 
 const keys = [
-  "HALDUR_DB_PATH",
-  "HALDUR_CONFIG_DIR",
-  "HALDUR_PI_CONFIG_DIR",
-  "HALDUR_LOG_DIR",
+  "HALLVI_DB_PATH",
+  "HALLVI_CONFIG_DIR",
+  "HALLVI_PI_CONFIG_DIR",
+  "HALLVI_LOG_DIR",
 ] as const;
 let saved: Record<string, string | undefined>;
 let root: string;
 
 beforeEach(() => {
   saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
-  root = mkdtempSync(join(tmpdir(), "haldur-dev-start-"));
+  root = mkdtempSync(join(tmpdir(), "hallvi-dev-start-"));
 });
 afterEach(() => {
   for (const key of keys)
@@ -65,7 +65,7 @@ function asChild(environment: Record<string, string> = {}) {
 // isolate the owner's ChatGPT connection and ask them to sign in again.
 it("hands every child the directories the application would have chosen", () => {
   const plain = asChild();
-  // `.haldur` and ~/.config/haldur/pi.
+  // `.hallvi` and ~/.config/hallvi/pi.
   expect(plain.database).toBe(
     stateLocation(process.cwd(), { hidden: true }).database,
   );
@@ -73,8 +73,8 @@ it("hands every child the directories the application would have chosen", () => 
   expect(plain.piAccount).toBe(piAccountLocation(homedir()));
 
   const moved = asChild({
-    HALDUR_DB_PATH: join(root, "moved.db"),
-    HALDUR_CONFIG_DIR: join(root, "state"),
+    HALLVI_DB_PATH: join(root, "moved.db"),
+    HALLVI_CONFIG_DIR: join(root, "state"),
   });
   expect(moved.database).toBe(join(root, "moved.db"));
   expect(moved.config).toBe(join(root, "state"));
@@ -83,9 +83,9 @@ it("hands every child the directories the application would have chosen", () => 
   expect(moved.piAccount).toBe(join(root, "state"));
 
   const split = asChild({
-    HALDUR_CONFIG_DIR: join(root, "state"),
-    HALDUR_PI_CONFIG_DIR: join(root, "account"),
-    HALDUR_LOG_DIR: join(root, "logs"),
+    HALLVI_CONFIG_DIR: join(root, "state"),
+    HALLVI_PI_CONFIG_DIR: join(root, "account"),
+    HALLVI_LOG_DIR: join(root, "logs"),
   });
   expect(split.piAccount).toBe(join(root, "account"));
   expect(split.logs).toBe(join(root, "logs"));
@@ -100,7 +100,7 @@ it("says which exit code means another worker already holds the database", () =>
 // reply being written.
 it("believes a live worker only on evidence a worker is alive", () => {
   const database = join(root, "presence.db");
-  process.env.HALDUR_DB_PATH = database;
+  process.env.HALLVI_DB_PATH = database;
   const beat = (value: Record<string, unknown>) =>
     writeFileSync(`${database}.worker-status`, JSON.stringify(value));
 

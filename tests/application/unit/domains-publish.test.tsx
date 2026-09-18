@@ -9,13 +9,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { CallersDirection } from "@/components/haldur/reach-prototype/callers";
-import { PageHead } from "@/components/haldur/deployment-prototype/page-head";
+import { CallersDirection } from "@/components/hallvi/reach-prototype/callers";
+import { PageHead } from "@/components/hallvi/deployment-prototype/page-head";
 import {
   publishOffer,
   type DomainState,
   type ReachView,
-} from "@/components/haldur/reach-prototype/reach-story";
+} from "@/components/hallvi/reach-prototype/reach-story";
 
 const base: ReachView = {
   name: "Paper",

@@ -1,10 +1,10 @@
-// Haldur's own protection is a distinct, compact disclosure below the
+// Hallvi's own protection is a distinct, compact disclosure below the
 // application's backup surface. Its actions never imply application coverage.
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it } from "vitest";
 
-import { BackupsPage } from "@/components/haldur/backups-page";
+import { BackupsPage } from "@/components/hallvi/backups-page";
 import type { ControllerProtectionFacts } from "@/server/application-facts";
 
 import { APP, NOW, fact, resetRecordIds, states } from "../fixtures/records";
@@ -24,7 +24,7 @@ function controller(
   return {
     connected: true,
     state: "recoverable",
-    bucket: "haldur-copies",
+    bucket: "hallvi-copies",
     host: "account.r2.cloudflarestorage.com",
     keep: 14,
     lastCopyAt: AT,
@@ -63,7 +63,7 @@ const draw = (
 
 it("keeps recoverable controller protection in one compact disclosure", () => {
   const markup = draw([PLAN()], controller());
-  expect(markup.split("Haldur on this Mac")).toHaveLength(3);
+  expect(markup.split("Hallvi on this Mac")).toHaveLength(3);
   expect(markup).toContain("recovery kit saved");
   expect(markup).toContain("It keeps the last 14 copies");
   expect(markup).not.toContain("Save your recovery kit");
@@ -96,7 +96,7 @@ it("uses the same truthful surface when application evidence is sparse", () => {
     }),
   );
   expect(markup).toContain("Nobody has looked at whether this application");
-  expect(markup).toContain("Haldur on this Mac");
+  expect(markup).toContain("Hallvi on this Mac");
   expect(markup).toContain("Not copied");
   expect(markup).toContain("Connect backup storage");
   expect(markup).toContain("Application data still needs its own backup plan");
@@ -104,7 +104,7 @@ it("uses the same truthful surface when application evidence is sparse", () => {
 
 it("keeps the controller disclosure present on a sparse recoverable page", () => {
   const markup = draw([], controller());
-  expect(markup).toContain("Haldur on this Mac");
+  expect(markup).toContain("Hallvi on this Mac");
   expect(markup).toContain("recovery kit saved");
   expect(markup).not.toContain("Save your recovery kit");
 });
@@ -132,5 +132,5 @@ it("shows an actual failed controller copy and its reason", () => {
 });
 
 it("says nothing about a controller it has no facts for", () => {
-  expect(draw([PLAN()])).not.toContain("Haldur on this Mac");
+  expect(draw([PLAN()])).not.toContain("Hallvi on this Mac");
 });

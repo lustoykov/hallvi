@@ -92,7 +92,7 @@ it("rejects invalid ports, missing connections and cancellation before starting 
 // An installation's owner may be on another machine, forwarding a fixed set of
 // ports to their browser. A link outside that set opens nothing for them.
 describe("on an installation with fixed private ports", () => {
-  beforeEach(() => vi.stubEnv("HALDUR_PRIVATE_PORTS", "47570-47572"));
+  beforeEach(() => vi.stubEnv("HALLVI_PRIVATE_PORTS", "47570-47572"));
   afterEach(() => vi.unstubAllEnvs());
 
   it("chooses a free port inside the range when Pi names none", async () => {

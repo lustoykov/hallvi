@@ -21,17 +21,17 @@ import { piAccountLocation, stateLocation } from "./state-location.mjs";
 
 export function resolveEnvironment(env = process.env, cwd = process.cwd()) {
   const state = () => stateLocation(cwd, { hidden: true });
-  const database = resolve(cwd, env.HALDUR_DB_PATH ?? state().database);
-  const config = resolve(cwd, env.HALDUR_CONFIG_DIR ?? state().directory);
+  const database = resolve(cwd, env.HALLVI_DB_PATH ?? state().database);
+  const config = resolve(cwd, env.HALLVI_CONFIG_DIR ?? state().directory);
   const piAccount = resolve(
     cwd,
-    env.HALDUR_PI_CONFIG_DIR?.trim() ||
-      env.HALDUR_CONFIG_DIR ||
+    env.HALLVI_PI_CONFIG_DIR?.trim() ||
+      env.HALLVI_CONFIG_DIR ||
       piAccountLocation(homedir()),
   );
   const logs = resolve(
     cwd,
-    env.HALDUR_LOG_DIR?.trim() || join(dirname(database), "diagnostics"),
+    env.HALLVI_LOG_DIR?.trim() || join(dirname(database), "diagnostics"),
   );
   return { database, config, piAccount, logs };
 }
@@ -39,10 +39,10 @@ export function resolveEnvironment(env = process.env, cwd = process.cwd()) {
 /** The same values as the environment every child is given. */
 export function environmentVariables(resolved) {
   return {
-    HALDUR_DB_PATH: resolved.database,
-    HALDUR_CONFIG_DIR: resolved.config,
-    HALDUR_PI_CONFIG_DIR: resolved.piAccount,
-    HALDUR_LOG_DIR: resolved.logs,
+    HALLVI_DB_PATH: resolved.database,
+    HALLVI_CONFIG_DIR: resolved.config,
+    HALLVI_PI_CONFIG_DIR: resolved.piAccount,
+    HALLVI_LOG_DIR: resolved.logs,
   };
 }
 
