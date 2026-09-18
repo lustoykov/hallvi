@@ -102,11 +102,18 @@ and the tools are the only things that can reach outside.
 [operator-execution.ts](../src/server/operator-execution.ts) owns it. Every
 call that reaches a server or a provider passes through it and is recorded
 with its mode, its input and its outcome, whatever the answer.
+Executor-backed calls require the runtime tool-call ID, linking the activity
+and execution records without an optional identity argument.
 
 The three modes are defined in
 [Product](../PRODUCT.md#permission-modes). A call awaiting
 approval is a durable record: the page reads pending calls, the owner decides,
 and the tool continues or declines. A worker restart does not replay a call.
+
+Command execution, the owner's terminal, private tunnels and backup transfers
+share [managedSshOptions](../src/server/managed-ssh.ts) for the saved SSH key,
+port and pinned-host verification policy. Each caller retains its own timeout,
+keepalive, terminal, forwarding and output handling.
 
 ## From a record to a page
 
