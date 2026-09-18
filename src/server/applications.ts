@@ -11,6 +11,7 @@ import {
   listApplicationChats,
   listApplications,
   withTransaction,
+  renameApplicationRow,
 } from "./db";
 import {
   ANONYMOUS_CREDENTIAL,
@@ -250,6 +251,16 @@ export async function withGithubConnectionTransition<T>(
   operation: () => Promise<T> | T,
 ): Promise<T> {
   return operation();
+}
+
+/** The name is the owner's label and nothing else: no record is keyed on it. */
+export function renameApplication(applicationId: string, name: string) {
+  loadApplication(applicationId);
+  const next = name.trim();
+  if (!next || next.length > 120)
+    throw new Error("Give the application a name of up to 120 characters.");
+  renameApplicationRow(applicationId, next);
+  return loadApplication(applicationId);
 }
 
 export function removeApplication(applicationId: string, repository: string) {

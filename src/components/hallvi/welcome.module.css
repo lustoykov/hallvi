@@ -24,6 +24,11 @@
 }
 .mascot {
   flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  cursor: pointer;
   width: 230px;
   height: 215px;
   margin-left: -34px;
@@ -52,7 +57,13 @@
   font-size: 14px;
   line-height: 1.5;
   color: #3e4a60;
-  transition: opacity 260ms ease;
+  animation: say 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes say {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
 }
 .hello h1 {
   margin: 0 0 12px;
@@ -194,6 +205,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .says,
   .codeLine,
   .lens,
   .blink,

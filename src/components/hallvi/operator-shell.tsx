@@ -47,6 +47,7 @@ import {
 } from "./operation-model";
 import { StateChip } from "./operation-receipt";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
+import { RenameApplicationDialog } from "./rename-application-dialog";
 import { DemoContext } from "./external-link";
 import { recordReferences } from "./record-references";
 
@@ -284,6 +285,8 @@ export function OperatorShell({
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const submittingChat = useRef<string | null>(null);
 
   const application = view.application;
@@ -538,6 +541,24 @@ export function OperatorShell({
     window.history.replaceState(null, "", url);
   }
 
+  async function renameApplication(name: string) {
+    if (!application || busy) return;
+    setBusy("rename");
+    setRenameError(null);
+    try {
+      await api.renameApplication(application.id, name);
+      setRenaming(false);
+      setBusy(null);
+      router.refresh();
+      if (activeChat) applyView(await api.view(application.id, activeChat.id));
+    } catch (caught) {
+      setRenameError(
+        caught instanceof Error ? caught.message : "Could not rename it.",
+      );
+      setBusy(null);
+    }
+  }
+
   async function removeApplication() {
     if (!application || busy) return;
     setBusy("remove");
@@ -752,6 +773,10 @@ export function OperatorShell({
       hrefFor={(item) => `/applications/${item.id}`}
       addHref="/applications/new"
       disabled={busy !== null}
+      onRename={() => {
+        setRenameError(null);
+        setRenaming(true);
+      }}
       onRemove={() => {
         setRemoveError(null);
         setConfirmRemove(true);
@@ -962,6 +987,15 @@ export function OperatorShell({
           </div>
         </section>
 
+        {renaming && application && (
+          <RenameApplicationDialog
+            current={application.name}
+            busy={busy === "rename"}
+            error={renameError}
+            onCancel={() => setRenaming(false)}
+            onRename={(name) => void renameApplication(name)}
+          />
+        )}
         {confirmRemove && application && (
           <ConfirmActionDialog
             title={`Remove ${application.name}?`}

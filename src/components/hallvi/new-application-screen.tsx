@@ -12,6 +12,17 @@ import s from "./applications.module.css";
 import w from "./welcome.module.css";
 import { WelcomeSteps } from "./welcome-steps";
 
+/** What Little Server says while nobody is typing, one line at a time. */
+const CHATTER = [
+  "Hello! Got something you want running?",
+  "Paste a repository and I’ll read it. No forms about it, promise.",
+  "No server yet? I can rent a small one, or use a machine you have.",
+  "Nothing gets rented until you have seen the plan and the price.",
+  "I check that it really works before I call it done.",
+  "Click me. I dance.",
+];
+const DANCES = ["shuffle", "robot", "floss", "cartwheel", "backflip"] as const;
+
 const Mascot = dynamic(
   () => import("./home/mascot-scene").then((m) => m.MascotScene),
   {
@@ -32,7 +43,6 @@ export function NewApplicationScreen({
   const draftKey = "hallvi:add-application:v1";
   const applicationsHref = "/applications";
   const [repositoryUrl, setRepositoryUrl] = useState("");
-  const [name, setName] = useState("");
   const creationRequest = useRef<{ key: string; settings: string } | null>(
     null,
   );
@@ -40,6 +50,8 @@ export function NewApplicationScreen({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = useRef(false);
+  const [chatter, setChatter] = useState(0);
+  const [dances, setDances] = useState(0);
   const derivedName =
     /[/:]([^/\s:]+?)(?:\.git)?\/?$/.exec(repositoryUrl.trim())?.[1] ?? "";
 
@@ -52,7 +64,6 @@ export function NewApplicationScreen({
       if (draft && typeof draft.repositoryUrl === "string") {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate an external, tab-local form draft once after mount.
         setRepositoryUrl(draft.repositoryUrl);
-        setName(typeof draft.name === "string" ? draft.name : "");
         if (
           typeof draft.requestKey === "string" &&
           typeof draft.settings === "string"
@@ -79,7 +90,6 @@ export function NewApplicationScreen({
         draftKey,
         JSON.stringify({
           repositoryUrl,
-          name,
           requestKey: creationRequest.current?.key,
           settings: creationRequest.current?.settings,
         }),
@@ -96,7 +106,6 @@ export function NewApplicationScreen({
     try {
       const settings = JSON.stringify({
         repositoryUrl: repositoryUrl.trim(),
-        name: name.trim(),
       });
       if (creationRequest.current?.settings !== settings)
         creationRequest.current = { key: crypto.randomUUID(), settings };
@@ -104,7 +113,6 @@ export function NewApplicationScreen({
       const view = await api.createApplication({
         requestKey: creationRequest.current.key,
         repositoryUrl,
-        ...(name.trim() ? { name: name.trim() } : {}),
       });
       // Leaving the form does not undo creation, but must stop its late
       // navigation.
@@ -129,25 +137,35 @@ export function NewApplicationScreen({
     }
   }
 
-  // Little Server follows the form: a hello, a box once there is something
-  // to carry, the wrench while the repository is read, a worried look when
-  // it could not be.
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setChatter((line) => line + 1),
+      6500,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // Little Server follows the form and keeps the owner company: a wave, a
+  // listening antenna once there is a repository, the wrench while it is
+  // read, a worried look when it could not be. Left alone it waves and dances
+  // now and then, says a little more about itself, and dances when clicked.
   const mood = error
     ? "attention"
     : busy
       ? "working"
       : derivedName
-        ? "carrying"
+        ? "checking"
         : "waving";
+  const idle = !error && !busy && !derivedName;
   const said = error
-    ? "That did not work. The reason is under the field."
+    ? "Hmm, that did not work. The reason is under the field."
     : busy
       ? `Reading ${derivedName || "the repository"}…`
       : derivedName
-        ? `${derivedName}. I’ll read it first and tell you what it needs.`
-        : first
-          ? "Hello! Got something you want running?"
-          : "Hello again. What’s next?";
+        ? `Ooh, ${derivedName}. I’ll read it first and tell you what it needs.`
+        : chatter === 0 && !first
+          ? "Hello again. What’s next?"
+          : CHATTER[chatter % CHATTER.length];
 
   return (
     <main className={s.page}>
@@ -161,10 +179,27 @@ export function NewApplicationScreen({
         <div className={w.hero}>
           <div className={w.hello}>
             <div className={w.greeting}>
-              <div className={w.mascot} aria-hidden="true">
-                <Mascot color="#7a8bd6" mood={mood} />
-              </div>
-              <p className={w.says} role="status">
+              <button
+                type="button"
+                className={w.mascot}
+                aria-label="Make Hallvi dance"
+                onClick={() => setDances((count) => count + 1)}
+              >
+                <Mascot
+                  color="#7a8bd6"
+                  mood={mood}
+                  ambient={idle}
+                  dance={DANCES[dances % DANCES.length]}
+                  danceRequest={dances}
+                />
+              </button>
+              {/* Chatter is company, not news: only what the form did is
+                  announced. */}
+              <p
+                className={w.says}
+                key={said}
+                role={idle ? undefined : "status"}
+              >
                 {said}
               </p>
             </div>
@@ -231,25 +266,12 @@ export function NewApplicationScreen({
                   </>
                 )}
               </p>
-              <label
-                className={`${s.field} ${s.secondary}`}
-                htmlFor="application-name"
-              >
-                Application name <span>optional</span>
-              </label>
-              <input
-                id="application-name"
-                name="name"
-                value={name}
-                maxLength={120}
-                disabled={!ready || busy}
-                onChange={(event) => setName(event.target.value)}
-                placeholder={
-                  derivedName
-                    ? `${derivedName}, from the repository`
-                    : "Defaults to the repository name"
-                }
-              />
+              {derivedName && (
+                <p className={s.helper}>
+                  It will be called <strong>{derivedName}</strong>. You can
+                  rename it afterwards from the application&rsquo;s menu.
+                </p>
+              )}
               <p className={s.scope}>
                 Nothing is rented or changed at this step. A new application
                 starts on <strong>Pi decides</strong>: Hallvi asks before

@@ -283,9 +283,6 @@ await page
   .getByLabel("GitHub repository", { exact: true })
   .fill(`https://github.com/qa/${rich ? "document-archive" : "static-site"}`);
 await page
-  .getByLabel("Application name", { exact: true })
-  .fill(rich ? "Document archive" : "Static site");
-await page
   .getByRole("button", { name: "Add application", exact: true })
   .click();
 await page.waitForURL(/\/applications\/[\da-f-]{36}$/, { timeout: 30000 });

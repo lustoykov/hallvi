@@ -96,6 +96,14 @@ export function deleteApplication(id: string) {
   db().delete(applications).where(eq(applications.id, id)).run();
 }
 
+export function renameApplicationRow(id: string, name: string) {
+  db()
+    .update(applications)
+    .set({ name, updatedAt: new Date().toISOString() })
+    .where(eq(applications.id, id))
+    .run();
+}
+
 export function insertApplication(
   input: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">,
   id: string = randomUUID(),

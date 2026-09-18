@@ -13,9 +13,6 @@ test(
       .getByLabel("GitHub repository", { exact: true })
       .fill("https://github.com/qa/application-shell");
     await page
-      .getByLabel("Application name", { exact: true })
-      .fill("Application shell acceptance");
-    await page
       .getByRole("button", { name: "Add application", exact: true })
       .click();
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {
@@ -235,7 +232,6 @@ test(
       await page
         .getByLabel("GitHub repository", { exact: true })
         .fill("https://github.com/qa/same-source");
-      await page.getByLabel("Application name", { exact: true }).fill(name);
       await page
         .getByRole("button", { name: "Add application", exact: true })
         .click();
@@ -243,6 +239,16 @@ test(
         timeout: 30000,
       });
       ids.push(new URL(page.url()).pathname);
+      // The name comes from the repository; the owner's own name for it is
+      // given afterwards, from the application's menu.
+      await page
+        .getByRole("button", { name: "Switch application: same-source" })
+        .click();
+      await page
+        .getByRole("button", { name: "Rename application…", exact: true })
+        .click();
+      await page.getByLabel("Application name", { exact: true }).fill(name);
+      await page.getByRole("button", { name: "Rename", exact: true }).click();
       // The application's name lives in the top-bar picker; the conversation
       // has no permanent panel repeating it.
       await expect(
