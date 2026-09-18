@@ -47,7 +47,7 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 ## First-use experience
 
-- [ ] **A continuous first application.** Fit narrow windows, carry the app and caretaker through ChatGPT connection, disclose optional model preferences, and start repository inspection from one explicit action. The first request explains requirements before server selection; connection alone does not start work.
+- [x] **A continuous first application — [PR #141](https://github.com/lustoykov/hallvi/pull/141).** Fit narrow windows, carry the app and caretaker through ChatGPT connection, disclose optional model preferences, and start repository inspection from one explicit action. The first request explains requirements before server selection; connection alone does not start work.
 
 ## Applications home
 
