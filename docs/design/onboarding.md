@@ -54,10 +54,14 @@ flowchart TD
   L -- Anyone else --> N[One record to add; Hallvi watches public DNS]
 ```
 
-1. **Intake is one field.** The name is derived and can change later. GitHub is
-   mentioned only if the repository cannot be read anonymously, and then the
-   typed address is kept. ChatGPT, if missing, is asked for in the conversation
-   after the request is saved, with the recommended model; preferences wait.
+1. **Intake is a welcome, then one field.** Little Server greets, says in
+   three sentences what Hallvi is, and follows the form: a wave, a box once a
+   repository is typed, the wrench while it is read, a worried look when it
+   could not be. Three drawings say how it goes from here (read, choose where,
+   open). The field stays above the fold; the name is derived and can change
+   later. GitHub is a quiet link for private repositories, and the typed
+   address is kept across that trip. ChatGPT, if missing, is asked for in the
+   conversation after the request is saved; preferences wait.
 2. **"Where should it run?" is one card with two whole journeys.** Pi's
    recommendation is marked, not imposed. A connected Hetzner account collapses
    that side to one button.
@@ -190,6 +194,16 @@ sudo, OS and architecture, Docker, memory and disk.
 any DNS provider work through one hand-added record that Hallvi watches for.
 A Cloudflare token is asked for only when the zone is at Cloudflare and the
 owner wants Hallvi to write the record.
+
+**5. No "run it on this computer" path (owner's question, 18 September).**
+Recommended: not now. Deployed on the owner's laptop an application has no
+address anyone else can reach, stops when the lid closes, and shows none of
+what Hallvi is for; it is `docker compose up` with more steps, and it would
+need a second executor beside SSH. The worry behind the question is paying
+before seeing anything work, and the honest answer to that is already true:
+Hetzner bills by the hour, so a day of trying costs cents and deleting the
+server stops the bill. The host card now says so. A Linux computer at home is
+already covered by "a machine I already have".
 
 ## What is wired, and what proves it
 

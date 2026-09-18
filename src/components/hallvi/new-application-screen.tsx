@@ -5,13 +5,28 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import dynamic from "next/dynamic";
+
 import { api } from "./api";
 import s from "./applications.module.css";
+import w from "./welcome.module.css";
+import { WelcomeSteps } from "./welcome-steps";
+
+const Mascot = dynamic(
+  () => import("./home/mascot-scene").then((m) => m.MascotScene),
+  {
+    ssr: false,
+    loading: () => <div className={w.mascotPlaceholder} aria-hidden="true" />,
+  },
+);
 
 export function NewApplicationScreen({
   githubLogin = null,
+  first = false,
 }: {
   githubLogin?: string | null;
+  /** Nothing has been added yet: say what Hallvi is before asking. */
+  first?: boolean;
 }) {
   const router = useRouter();
   const draftKey = "hallvi:add-application:v1";
@@ -114,6 +129,26 @@ export function NewApplicationScreen({
     }
   }
 
+  // Little Server follows the form: a hello, a box once there is something
+  // to carry, the wrench while the repository is read, a worried look when
+  // it could not be.
+  const mood = error
+    ? "attention"
+    : busy
+      ? "working"
+      : derivedName
+        ? "carrying"
+        : "waving";
+  const said = error
+    ? "That did not work. The reason is under the field."
+    : busy
+      ? `Reading ${derivedName || "the repository"}…`
+      : derivedName
+        ? `${derivedName}. I’ll read it first and tell you what it needs.`
+        : first
+          ? "Hello! Got something you want running?"
+          : "Hello again. What’s next?";
+
   return (
     <main className={s.page}>
       <header className={s.topbar}>
@@ -122,110 +157,134 @@ export function NewApplicationScreen({
         </Link>
         <Link href={applicationsHref}>All applications</Link>
       </header>
-      <section
-        className={`${s.content} ${s.newContent}`}
-        aria-labelledby="new-application-heading"
-      >
-        <div className={s.heading}>
-          <div>
-            <h1 id="new-application-heading">What do you want to run?</h1>
+      <section className={w.welcome} aria-labelledby="new-application-heading">
+        <div className={w.hero}>
+          <div className={w.hello}>
+            <div className={w.greeting}>
+              <div className={w.mascot} aria-hidden="true">
+                <Mascot color="#7a8bd6" mood={mood} />
+              </div>
+              <p className={w.says} role="status">
+                {said}
+              </p>
+            </div>
+            <h1 id="new-application-heading">
+              {first ? "Hi, I’m Hallvi." : "What shall we run next?"}
+            </h1>
             <p>
-              Paste the repository of the application. Hallvi reads it, tells
-              you what it needs, and gets it working on a server you control.
+              {first
+                ? "I get self-hosted software running on a server you control, check that it really works, and keep an eye on it afterwards. You bring an application; I do the infrastructure, and explain what I am doing as I go."
+                : "Same as before: I read it, you choose where it runs, and I hand it over working."}
             </p>
+            <ul className={w.yours} aria-label="What stays yours">
+              <li>Your server</li>
+              <li>Your accounts</li>
+              <li>Your data</li>
+              <li>Hallvi runs on this computer</li>
+            </ul>
+          </div>
+          <div className={w.ask}>
+            <h2>What do you want to run?</h2>
+            <p>
+              Paste the GitHub repository of the application. It can be yours or
+              someone else&rsquo;s open-source project.
+            </p>
+            <form
+              className={s.form}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void createApplication();
+              }}
+            >
+              <label className={s.field} htmlFor="repository-url">
+                GitHub repository
+              </label>
+              <input
+                id="repository-url"
+                name="repositoryUrl"
+                autoComplete="url"
+                spellCheck={false}
+                disabled={!ready || busy}
+                value={repositoryUrl}
+                onChange={(event) => setRepositoryUrl(event.target.value)}
+                placeholder="https://github.com/owner/repository"
+                required
+                type="text"
+                aria-describedby="repository-help"
+              />
+              <p className={s.helper} id="repository-help">
+                A public repository needs no GitHub sign-in.{" "}
+                {githubLogin ? (
+                  <>
+                    Private ones are read as <strong>{githubLogin}</strong>.{" "}
+                    <Link href="/setup/github?from=add" onClick={keepDraft}>
+                      Change
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    For a private one,{" "}
+                    <Link href="/setup/github?from=add" onClick={keepDraft}>
+                      Connect GitHub
+                    </Link>{" "}
+                    first; what you typed here is kept.
+                  </>
+                )}
+              </p>
+              <label
+                className={`${s.field} ${s.secondary}`}
+                htmlFor="application-name"
+              >
+                Application name <span>optional</span>
+              </label>
+              <input
+                id="application-name"
+                name="name"
+                value={name}
+                maxLength={120}
+                disabled={!ready || busy}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={
+                  derivedName
+                    ? `${derivedName}, from the repository`
+                    : "Defaults to the repository name"
+                }
+              />
+              <p className={s.scope}>
+                Nothing is rented or changed at this step. A new application
+                starts on <strong>Pi decides</strong>: Hallvi asks before
+                consequential steps such as renting a server, at its own
+                judgment. You can change that in the conversation before
+                anything happens.
+              </p>
+              {error && (
+                <p role="alert" className={s.error}>
+                  {error}
+                </p>
+              )}
+              {busy && (
+                <p className={s.helper} role="status">
+                  Creation continues if you leave this page.
+                </p>
+              )}
+              <div className={s.actions}>
+                <Link href={applicationsHref}>
+                  {busy ? "Back to applications" : "Cancel"}
+                </Link>
+                <button
+                  className={s.primary}
+                  disabled={!ready || busy || !repositoryUrl.trim()}
+                  type="submit"
+                >
+                  {busy && <SpinnerGap className="spin" />}
+                  {busy ? "Checking repository…" : "Add application"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-        <form
-          className={s.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void createApplication();
-          }}
-        >
-          <label className={s.field} htmlFor="repository-url">
-            GitHub repository
-          </label>
-          <input
-            id="repository-url"
-            name="repositoryUrl"
-            autoComplete="url"
-            spellCheck={false}
-            disabled={!ready || busy}
-            value={repositoryUrl}
-            onChange={(event) => setRepositoryUrl(event.target.value)}
-            placeholder="https://github.com/owner/repository"
-            required
-            type="text"
-            aria-describedby="repository-help"
-          />
-          <p className={s.helper} id="repository-help">
-            A public repository needs no GitHub sign-in.{" "}
-            {githubLogin ? (
-              <>
-                Private ones are read as <strong>{githubLogin}</strong>.{" "}
-                <Link href="/setup/github?from=add" onClick={keepDraft}>
-                  Change
-                </Link>
-              </>
-            ) : (
-              <>
-                For a private one,{" "}
-                <Link href="/setup/github?from=add" onClick={keepDraft}>
-                  Connect GitHub
-                </Link>{" "}
-                first; what you typed here is kept.
-              </>
-            )}
-          </p>
-          <label
-            className={`${s.field} ${s.secondary}`}
-            htmlFor="application-name"
-          >
-            Application name <span>optional</span>
-          </label>
-          <input
-            id="application-name"
-            name="name"
-            value={name}
-            maxLength={120}
-            disabled={!ready || busy}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={
-              derivedName
-                ? `${derivedName}, from the repository`
-                : "Defaults to the repository name"
-            }
-          />
-          <p className={s.scope}>
-            Nothing is rented or changed at this step. A new application starts
-            on <strong>Pi decides</strong>: Hallvi asks before consequential
-            steps such as renting a server, at its own judgment. You can change
-            that in the conversation before anything happens.
-          </p>
-          {error && (
-            <p role="alert" className={s.error}>
-              {error}
-            </p>
-          )}
-          {busy && (
-            <p className={s.helper} role="status">
-              Creation continues if you leave this page.
-            </p>
-          )}
-          <div className={s.actions}>
-            <Link href={applicationsHref}>
-              {busy ? "Back to applications" : "Cancel"}
-            </Link>
-            <button
-              className={s.primary}
-              disabled={!ready || busy || !repositoryUrl.trim()}
-              type="submit"
-            >
-              {busy && <SpinnerGap className="spin" />}
-              {busy ? "Checking repository…" : "Add application"}
-            </button>
-          </div>
-        </form>
+        <h2 className={w.how}>How it goes from here</h2>
+        <WelcomeSteps />
       </section>
     </main>
   );

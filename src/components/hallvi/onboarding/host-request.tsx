@@ -128,7 +128,8 @@ export function HostRequest({
           </strong>
           <span>
             Hetzner Cloud, {estimate}, billed by Hetzner to you, ready in about
-            two minutes.{" "}
+            two minutes. It is billed by the hour: a day of trying it costs
+            cents, and deleting the server stops the bill.{" "}
             {hetznerConnected
               ? "Your Hetzner account is already connected."
               : "Needs a Hetzner account; Hallvi walks you through it."}
