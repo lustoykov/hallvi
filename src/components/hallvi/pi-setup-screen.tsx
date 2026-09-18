@@ -1,5 +1,6 @@
 "use client";
 
+import { HallviMark } from "./hallvi-mark";
 import {
   ArrowLeft,
   ArrowRight,
@@ -321,7 +322,7 @@ export function PiSetupScreen({
     <main className={"hv-setup-shell " + s.root}>
       <header className="hv-setup-topbar">
         <Link className="hv-setup-brand" href="/">
-          <span className="hv-app-mark">H</span>
+          <HallviMark size={28} onDark />
           <span>Hallvi</span>
         </Link>
         <Link

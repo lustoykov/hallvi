@@ -69,8 +69,8 @@ export function ProviderTokenForm({
     >
       <p className={s.hint}>
         {hetzner
-          ? "A Hetzner Cloud API token with read and write in the project the servers belong to. It is checked against Hetzner before it is saved, and stored on this controller only."
-          : "A Cloudflare API token that may read zones and DNS, and manage R2. It is checked against Cloudflare before it is saved. This is the management token; writing backups into a bucket is a separate credential below."}
+          ? "A Hetzner Cloud API token with Read & Write, made in the project the servers belong to (Hetzner Console: Security, then API tokens). It reaches everything in that project and nothing outside it. It is checked against Hetzner before it is saved in a file on this computer that only your user account can read; it is not encrypted there, the AI model never sees it, and Hallvi's own encrypted backup includes it once backup storage is connected. When a conversation needs a server, it guides this step and also proves the token can write."
+          : "A Cloudflare API token that may read zones and edit DNS, and manage R2 if Hallvi should list or create buckets. Cloudflare is asked whether it is active before it is saved, in a file on this computer that only your user account can read, unencrypted; the AI model never sees it. Pointing a domain needs only DNS edit and zone read for that zone, and the conversation guides that token when a domain needs it. Writing backups into a bucket is a separate credential below."}
       </p>
       <label>
         {hetzner ? "Hetzner Cloud API token" : "Cloudflare API token"}

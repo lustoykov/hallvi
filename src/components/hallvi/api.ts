@@ -45,6 +45,12 @@ export const api = {
       `/api/applications/${applicationId}/chats/${chatId}/messages`,
     );
   },
+  renameApplication(applicationId: string, name: string) {
+    return jsonRequest<{ application: { id: string; name: string } }>(
+      `/api/applications/${applicationId}`,
+      { method: "PATCH", body: JSON.stringify({ name }) },
+    );
+  },
   removeApplication(applicationId: string, repository: string) {
     return jsonRequest<{ removedApplicationId: string }>(
       `/api/applications/${applicationId}`,

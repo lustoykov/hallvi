@@ -116,6 +116,12 @@
   gap: 40px;
   margin-bottom: 36px;
 }
+.greeting .hello {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+}
 .greeting h1 {
   font-size: 40px;
   line-height: 1.1;
@@ -227,6 +233,36 @@
 }
 .card {
   min-width: 0;
+}
+/* One application: the caretaker beside its card, both at a size that fills
+   the page instead of a third of it. */
+.collection[data-solo] {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 980px;
+}
+.collection[data-solo] .card {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.collection[data-solo] .caretaker {
+  height: 320px;
+}
+.collection[data-solo] .body {
+  padding: 22px 24px;
+  gap: 16px;
+}
+.collection[data-solo] .identity h3 {
+  font-size: 24px;
+}
+@media (max-width: 860px) {
+  .collection[data-solo] .card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .collection[data-solo] .caretaker {
+    height: 210px;
+  }
 }
 .caretaker {
   display: block;
@@ -608,11 +644,6 @@
 .controls svg {
   width: 15px;
   height: 15px;
-}
-.footer {
-  margin-top: 40px;
-  color: var(--muted);
-  font-size: 13.5px;
 }
 
 @media (max-width: 760px) {

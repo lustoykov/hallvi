@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CaretUpDown,
   Check,
+  PencilSimple,
   Plus,
   Trash,
 } from "@phosphor-icons/react";
@@ -48,6 +49,7 @@ export function ApplicationIdentity({
   hrefFor,
   onSelect,
   addHref,
+  onRename,
   onRemove,
   disabled,
   listHref = "/applications",
@@ -60,6 +62,7 @@ export function ApplicationIdentity({
   /** Intercepts a choice; the prototype swaps scenario instead of routing. */
   onSelect?: (item: IdentityApplication, event: MouseEvent) => void;
   addHref: string;
+  onRename?: () => void;
   onRemove?: () => void;
   disabled?: boolean;
   listHref?: string;
@@ -156,9 +159,27 @@ export function ApplicationIdentity({
         <Link className="hv-application-menu-action" href={listHref}>
           <ArrowLeft /> All applications
         </Link>
-        {onRemove && (
+        {onRename && (
           <>
             <hr />
+            <button
+              type="button"
+              className="hv-application-menu-action"
+              disabled={disabled}
+              onClick={(event) => {
+                event.currentTarget
+                  .closest<HTMLElement>("[popover]")
+                  ?.hidePopover();
+                onRename();
+              }}
+            >
+              <PencilSimple /> Rename application…
+            </button>
+          </>
+        )}
+        {onRemove && (
+          <>
+            {!onRename && <hr />}
             <button
               type="button"
               className="hv-remove-application"

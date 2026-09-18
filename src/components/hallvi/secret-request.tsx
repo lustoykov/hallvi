@@ -21,6 +21,7 @@
 // Nothing is pinned there now except, once the request has scrolled out of
 // sight, a single chip that carries you back to it.
 
+import { HallviMark } from "./hallvi-mark";
 import {
   CaretRight,
   ChatCircleText,
@@ -276,9 +277,7 @@ export function SecretRequests({
 function Who() {
   return (
     <div className="hv-secrets-who">
-      <span className="hv-secrets-avatar" aria-hidden="true">
-        SG
-      </span>
+      <HallviMark />
       <strong>Hallvi</strong>
       <span className="hv-secrets-asks">asked for</span>
     </div>

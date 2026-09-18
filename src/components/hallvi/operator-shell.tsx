@@ -47,6 +47,7 @@ import {
 } from "./operation-model";
 import { StateChip } from "./operation-receipt";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
+import { RenameApplicationDialog } from "./rename-application-dialog";
 import { DemoContext } from "./external-link";
 import { recordReferences } from "./record-references";
 
@@ -284,6 +285,8 @@ export function OperatorShell({
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const submittingChat = useRef<string | null>(null);
 
   const application = view.application;
@@ -538,6 +541,24 @@ export function OperatorShell({
     window.history.replaceState(null, "", url);
   }
 
+  async function renameApplication(name: string) {
+    if (!application || busy) return;
+    setBusy("rename");
+    setRenameError(null);
+    try {
+      await api.renameApplication(application.id, name);
+      setRenaming(false);
+      setBusy(null);
+      router.refresh();
+      if (activeChat) applyView(await api.view(application.id, activeChat.id));
+    } catch (caught) {
+      setRenameError(
+        caught instanceof Error ? caught.message : "Could not rename it.",
+      );
+      setBusy(null);
+    }
+  }
+
   async function removeApplication() {
     if (!application || busy) return;
     setBusy("remove");
@@ -680,12 +701,18 @@ export function OperatorShell({
     void run("archive", () => api.archiveChat(application.id, activeChat.id));
   }
 
-  function sendMessage() {
-    const message = composer.trim();
-    if (busy || !piReady || !application || !activeChat || !message) return;
+  /** `told` is a message a card sends for the owner; the draft is kept. */
+  function sendMessage(told?: string) {
+    const message = (told ?? composer).trim();
+    if (!message) return;
+    if (busy || !piReady || !application || !activeChat) {
+      // Not sendable right now: leave it where the owner can send it.
+      if (told) setComposer(told);
+      return;
+    }
     setPendingMessage(message);
     submittingChat.current = activeChat.id;
-    setComposer("");
+    if (!told) setComposer("");
     const previous = readSubmission(activeChat.id);
     const key =
       previous?.message === message ? previous.key : crypto.randomUUID();
@@ -746,6 +773,10 @@ export function OperatorShell({
       hrefFor={(item) => `/applications/${item.id}`}
       addHref="/applications/new"
       disabled={busy !== null}
+      onRename={() => {
+        setRenameError(null);
+        setRenaming(true);
+      }}
       onRemove={() => {
         setRemoveError(null);
         setConfirmRemove(true);
@@ -937,7 +968,8 @@ export function OperatorShell({
               piReady={piReady}
               onArchive={archiveActiveChat}
               onComposerChange={setComposer}
-              onSend={sendMessage}
+              onSend={() => sendMessage()}
+              onTell={sendMessage}
               runs={runs.filter((run) => run.chatId === activeChat?.id)}
               reconnecting={reconnecting}
               workerAlive={view.worker?.alive}
@@ -955,6 +987,15 @@ export function OperatorShell({
           </div>
         </section>
 
+        {renaming && application && (
+          <RenameApplicationDialog
+            current={application.name}
+            busy={busy === "rename"}
+            error={renameError}
+            onCancel={() => setRenaming(false)}
+            onRename={(name) => void renameApplication(name)}
+          />
+        )}
         {confirmRemove && application && (
           <ConfirmActionDialog
             title={`Remove ${application.name}?`}

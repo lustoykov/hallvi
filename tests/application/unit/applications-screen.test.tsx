@@ -100,9 +100,9 @@ describe("application navigation", () => {
     expect(html.match(/<input[^>]*id="repository-url"[^>]*>/)?.[0]).toContain(
       "disabled",
     );
-    expect(html.match(/<input[^>]*id="application-name"[^>]*>/)?.[0]).toContain(
-      "disabled",
-    );
+    // The name comes from the repository and is changed afterwards, so the
+    // page asks for one thing.
+    expect(html).not.toContain('id="application-name"');
   });
 
   it("starts creation with an empty URL and no retired permission choice", () => {

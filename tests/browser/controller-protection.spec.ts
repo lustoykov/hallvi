@@ -20,9 +20,6 @@ test(
       .getByLabel("GitHub repository", { exact: true })
       .fill("https://github.com/qa/controller-protection");
     await page
-      .getByLabel("Application name", { exact: true })
-      .fill("Controller protection");
-    await page
       .getByRole("button", { name: "Add application", exact: true })
       .click();
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {

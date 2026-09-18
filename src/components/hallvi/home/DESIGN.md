@@ -13,9 +13,12 @@ was not.
 Kept:
 
 - **One 3D caretaker per application**, above its card, at the same size as
-  before. They wave and dance in turn and greet when clicked. Paint is the
-  application's own colour softened halfway toward the shell's slate blue
-  (`caretakerPaint`), so a dozen still read as one family. Paint is identity;
+  before. They wave and dance in turn and greet when clicked. Paint is one of
+  eight fixed application colours (`APPLICATION_COLORS`), handed out per
+  application oldest first, so a dozen still read as one family and two cards
+  side by side are told apart. Until 18 September it was each upstream
+  project's brand colour softened toward slate, which gave a washed mint for
+  anything green. Hallvi's own periwinkle is not among them. Paint is identity;
   the face and the prop are the state.
 - **A drawn screen of the application** in a tilted window that settles on
   hover, and the parts of the screen wake up once.
@@ -30,8 +33,10 @@ Changed:
 - **The caretaker's face and hands say the state.** Fine: a mug of coffee,
   smiling, and it dances. Working: the wrench. Not looked at lately: the
   clipboard. Something waiting: a magnifier held up and a worried face,
-  never an angry one. Not deployed yet: a cardboard box in both arms. A
-  caretaker whose application needs something does not dance.
+  never an angry one. Not deployed yet: it stands ready and waves, and the
+  card says "New"; the cardboard box it first held was dropped on 18 September
+  because it read as awkward. A caretaker whose application needs something
+  does not dance.
 - **The card has a hierarchy**: name and purpose with one word of state at the
   right ("Fine", "Working", "Needs me", "Not checked", "New"); the screen; the
   condition in one line; what runs, as chips; the address as the link; More.
@@ -50,3 +55,11 @@ saved records (`listApplicationItems`). Kind and purpose are read from the
 repository name (`application-kind.ts`); unknown software gets the generic
 screen and its repository as the purpose. The screens are drawings; their
 lines and numbers are decorative and never read from the host.
+
+## Fewer words (18 September 2026)
+
+The owner found the page's loose sentences random. It now opens "Hello, I'm
+Hallvi." over the heading; the collection summary appears only with more than
+one application, because a single card already says how its application is;
+the "Click a caretaker" hint and the footer tagline are gone. One application
+gets the wide layout (`data-solo`), and none goes straight to the welcome.

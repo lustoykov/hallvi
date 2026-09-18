@@ -1,5 +1,6 @@
 "use client";
 
+import { HallviMark } from "./hallvi-mark";
 import { ArrowLeft, Check, Warning } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -152,7 +153,7 @@ export function ConnectionsScreen({
     <main className={`hv-setup-shell ${s.root}`}>
       <header className="hv-setup-topbar">
         <Link className="hv-setup-brand" href="/applications">
-          <span className="hv-app-mark">H</span>
+          <HallviMark size={28} onDark />
           <span>Hallvi</span>
         </Link>
         <Link
@@ -279,9 +280,10 @@ export function ConnectionsScreen({
         </section>
         {recoveryKit && <RecoveryKit kit={recoveryKit} />}
         <p className={s.hint}>
-          Connecting an account never authorises spending or changes on its own.
-          Each purchase, deployment or change is approved in the conversation
-          that proposes it, with its cost and scope.
+          Connecting an account changes nothing by itself. What happens next
+          follows each application&rsquo;s permission mode: Always ask waits for
+          you on every command, Pi decides asks at Hallvi&rsquo;s own judgment,
+          and Bypass runs without asking.
         </p>
       </div>
     </main>

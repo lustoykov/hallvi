@@ -1,5 +1,6 @@
 "use client";
 
+import { HallviMark } from "./hallvi-mark";
 import {
   Archive,
   ArrowClockwise,
@@ -45,6 +46,8 @@ import {
   type RunActivity,
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
+import { useConnectionRequests } from "./onboarding/connection-requests";
+import { JourneyRail } from "./onboarding/journey-rail";
 import {
   SecretRequests,
   SecretRequestsChip,
@@ -177,6 +180,7 @@ export function ChatPane({
   runs,
   reconnecting,
   onRunAction,
+  onTell,
   onNewChat,
   references,
   onReveal,
@@ -202,6 +206,12 @@ export function ChatPane({
   runs: PiRun[];
   reconnecting: boolean;
   onRunAction: (id: string, action: "cancel" | "retry") => void;
+  /**
+   * Sends Hallvi a message the owner did not have to type: a connection card
+   * settled, or a rung of the access ladder was chosen. Absent, it is drafted
+   * into the composer instead.
+   */
+  onTell?: (message: string) => void;
   onNewChat: () => void;
   /** Records each reply produced, shown as a line under it. */
   references?: Map<string, RecordReference[]>;
@@ -437,6 +447,15 @@ export function ChatPane({
     [view.messages],
   );
   const applicationId = view.application?.id;
+  const connections = useConnectionRequests({
+    applicationId,
+    application: view.application?.name ?? "the application",
+    messages: view.messages,
+    information: view.information ?? [],
+    poll: requestPending,
+    enabled: secretsHere,
+    onTell: onTell ?? continueAfterSecrets,
+  });
   useEffect(() => {
     if (!applicationId) return;
     let cancelled = false;
@@ -461,6 +480,24 @@ export function ChatPane({
     };
   }, [applicationId, requestPending]);
 
+  // The running turn, said the same way its own status line says it.
+  const running = view.messages.find(
+    (message) => message.status === "queued" || message.status === "running",
+  );
+  const railActivity = running
+    ? runActivity({
+        runId: running.id,
+        status: running.status as "queued" | "running",
+        startedAt: runs.find((run) => run.assistantMessageId === running.id)
+          ?.startedAt,
+        hasDraft: Boolean(running.body?.trim()),
+        workerAlive,
+        executions: view.executions ?? [],
+        activity: view.piActivity ?? [],
+        now,
+      })
+    : null;
+
   return (
     <section className="hv-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -480,20 +517,29 @@ export function ChatPane({
           )}
         </header>
       )}
-      {/* The bar means work is moving. With no worker reading the queue it
-          would be an animation over a message nobody has picked up. */}
-      {(busy !== null || (requestPending && workerAlive !== false)) && (
-        <div className="hv-busy-bar" aria-hidden="true" />
-      )}
-
-      {view.application && chatId && view.chats[0]?.id === chatId && (
-        <OperatorConsole
-          key={`settings:${view.application.id}:${chatId}`}
-          applicationId={view.application.id}
-          chatId={chatId}
-          main={view.chats[0]?.id === chatId}
-          settingsOnly
-        />
+      {/* The pane's first row. It is always here in the main conversation,
+          because the grid below it counts rows; it is empty once the first
+          deployment has arrived. */}
+      {secretsHere && (
+        <div className="hv-chat-top">
+          {connections.journey && view.application && (
+            <JourneyRail
+              application={view.application.name}
+              facts={connections.journey}
+              working={requestPending}
+              says={railActivity?.says ?? null}
+              waitingOnYou={
+                Boolean(railActivity?.waitingOnYou) ||
+                secrets.some((secret) => !secret.establishedAt)
+              }
+              started={view.messages.some((message) => message.role === "user")}
+              canStart={piReady && !busy && !requestPending && Boolean(onTell)}
+              onStart={() =>
+                onTell?.("Please read this repository and get it running.")
+              }
+            />
+          )}
+        </div>
       )}
       <Conversation className="hv-conversation">
         <ConversationContent className="hv-messages">
@@ -542,12 +588,13 @@ export function ChatPane({
                   id={`hv-message-${message.id}`}
                 >
                   <div className="hv-message-heading">
-                    <span
-                      className={`hv-avatar ${engineer ? "user" : ""}`}
-                      aria-hidden="true"
-                    >
-                      {engineer ? "You" : "H"}
-                    </span>
+                    {engineer ? (
+                      <span className="hv-avatar user" aria-hidden="true">
+                        You
+                      </span>
+                    ) : (
+                      <HallviMark />
+                    )}
                     <strong>{engineer ? "You" : "Hallvi"}</strong>
                     {message.source === "hallvi" && (
                       <span className="hv-source-tag">
@@ -754,6 +801,7 @@ export function ChatPane({
                 </Message>
                 {/* The request Pi raised on this message, drawn at the point
                     it was asked rather than wherever the reader is now. */}
+                {connections.at(message.id)}
                 {secretsHere && secretsOwnMessage === message.id && (
                   <SecretRequests
                     applicationId={view.application!.id}
@@ -810,6 +858,7 @@ export function ChatPane({
             </>
           )}
 
+          {connections.rest}
           {error && application && (
             <div className="hv-error" role="alert">
               {error}
@@ -959,8 +1008,19 @@ export function ChatPane({
             value={composer}
           />
           <div className="hv-composer-bar">
-            <span className="hv-composer-hint">
-              <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
+            <span className="hv-composer-left">
+              {view.application && chatId && view.chats[0]?.id === chatId && (
+                <OperatorConsole
+                  key={`settings:${view.application.id}:${chatId}`}
+                  applicationId={view.application.id}
+                  chatId={chatId}
+                  main
+                  settingsOnly
+                />
+              )}
+              <span className="hv-composer-hint">
+                <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
+              </span>
             </span>
             <button
               className="hv-send"

@@ -16,8 +16,7 @@ import type { ApplicationListItem } from "../applications-screen";
 import type { MascotMood } from "./mascot-scene";
 import {
   applicationKind,
-  caretakerPaint,
-  KIND_ACCENT,
+  applicationColors,
   type ApplicationKind,
 } from "./application-kind";
 import { PREVIEWS } from "./interface-previews";
@@ -36,8 +35,9 @@ type HomeApplication = ApplicationListItem & { href: string };
  * The application's situation, read from the list item. Five words the card
  * can say at its top right, and the caretaker's face and prop follow them:
  * a mug when all is fine, a wrench while working, a clipboard when nobody
- * has looked lately, a magnifier and a worried face when something waits,
- * a box for an application that is not deployed yet.
+ * has looked lately, a magnifier and a worried face when something waits.
+ * A new application's caretaker simply stands ready and waves: the card's
+ * "New" says the rest, and the box it used to hold read as awkward.
  */
 type Situation = "fine" | "working" | "needs" | "stale" | "new";
 
@@ -64,7 +64,6 @@ function moodOf(situation: Situation, active: boolean): MascotMood {
   if (situation === "needs") return "attention";
   if (situation === "working") return "working";
   if (situation === "stale") return "checking";
-  if (situation === "new") return "carrying";
   return active ? "waving" : "ready";
 }
 
@@ -144,6 +143,11 @@ export function ApplicationsHome({
   const [greeting, setGreeting] = useState(0);
   const [paused, setPaused] = useState(false);
   const [query, setQuery] = useState("");
+  // The list arrives newest first; colours are handed out oldest first so an
+  // application keeps its colour when a newer one is added.
+  const colors = applicationColors(
+    [...applications].reverse().map((item) => item.id),
+  );
   const visible = applications.filter((item) =>
     `${item.name} ${item.source}`
       .toLowerCase()
@@ -176,16 +180,17 @@ export function ApplicationsHome({
             protection to the application's own pages until the data has
             earned a nudge. */}
         <section className={s.greeting} aria-labelledby="home-heading">
-          <h1 id="home-heading">
-            Your apps are
-            <br />
-            <em>in good company.</em>
-          </h1>
-          <p>
-            {applications.length
-              ? summary(applications)
-              : "Nothing here yet. Add an application and a caretaker arrives with it."}
-          </p>
+          <div>
+            <p className={s.hello}>Hello, I&rsquo;m Hallvi.</p>
+            <h1 id="home-heading">
+              {applications.length === 1 ? "Your app is" : "Your apps are"}
+              <br />
+              <em>in good company.</em>
+            </h1>
+          </div>
+          {/* With one application its card already says how it is. The
+              sentence earns its place once there are several to sum up. */}
+          {applications.length > 1 && <p>{summary(applications)}</p>}
         </section>
         {applications.length > 0 && (
           <div className={s.collectionHeading}>
@@ -227,7 +232,13 @@ export function ApplicationsHome({
           </div>
         ) : (
           <>
-            <ul className={s.collection} aria-label="Applications">
+            <ul
+              className={s.collection}
+              aria-label="Applications"
+              // One application is the common case, and it gets the room: its
+              // caretaker stands beside a card wide enough to read.
+              data-solo={applications.length === 1 ? "" : undefined}
+            >
               {visible.map((item, index) => {
                 const { kind, purpose } = applicationKind(
                   item.source,
@@ -252,7 +263,7 @@ export function ApplicationsHome({
                   <li
                     key={item.id}
                     className={`${s.card} ${active ? s.selected : ""}`}
-                    style={{ "--tint": KIND_ACCENT[kind] } as CSSProperties}
+                    style={{ "--tint": colors.get(item.id) } as CSSProperties}
                   >
                     <button
                       type="button"
@@ -262,7 +273,7 @@ export function ApplicationsHome({
                       onClick={() => greet(item.id)}
                     >
                       <Mascot
-                        color={caretakerPaint(kind)}
+                        color={colors.get(item.id)}
                         mood={moodOf(situation, active)}
                         paused={paused}
                         gesture={active ? greeting : 0}
@@ -353,7 +364,7 @@ export function ApplicationsHome({
               </div>
             )}
             <div className={s.controls}>
-              <span>Click a caretaker to say hello.</span>
+              <span />
               <button onClick={() => setPaused((value) => !value)}>
                 {paused ? (
                   <Play aria-hidden="true" />
@@ -365,9 +376,6 @@ export function ApplicationsHome({
             </div>
           </>
         )}
-        <footer className={s.footer}>
-          Software you own. Help when you need it.
-        </footer>
       </div>
     </main>
   );

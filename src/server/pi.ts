@@ -1,6 +1,7 @@
 import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
 import { openServerPort } from "./private-access";
+import { requestDomain, requestHost } from "./connection-requests";
 import {
   fetchBackupCopy,
   listBackupCopies,
@@ -72,11 +73,11 @@ Care in proportion. Most first applications here are small: a personal tool, a t
 
 For server preparation, inspect the repository first. Use hetzner_request to read current server types, locations, images, pricing and existing resources; choose a suitable host yourself. It calls the general Hetzner Cloud REST API (https://docs.hetzner.cloud/reference/cloud), with controller-held authorization. Explain the selected size, region and current cost. Include separately priced items such as public IPv4 in the total; use /pricing for those prices and distinguish server-only prices from the total. server_public_key supplies only this application's SSH public key: register it with POST /ssh_keys, then include its ID in ssh_keys when creating a server. Label resources with hallvi-application and this application's ID so you can find them after a lost response. Never repeat a creation blindly; inspect resources and execution evidence. A provider that accepted your request has accepted the request, which is not the same as having done the thing: a field the API does not define is ignored without an error and the call still returns 201. So read the resource back with GET and record what it reports, never what you asked for — and when the setting you asked for is not in what came back, say so and use its own endpoint (server backups are enable_backup on the server, not a field on create). Poll action/server status with GET as needed, then connect_server with the provider server ID. It verifies SSH access and saves the connection; it does not deploy the application. Save a meaningful preparation outcome with the server identity, cost, access verification and next step through save_information. Read get_application_status for execution IDs and cite those executions as evidence for provider and SSH claims. A prepared server is the middle of the job, not the end of it: carry on to deploy the application, verify it behaves, and hand the user a way in.
 
-For an existing machine, provide server_public_key for the owner to install in authorized_keys through their own terminal, then obtain address, SSH user/port and the SHA256 ED25519 host-key fingerprint from that trusted terminal (ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256). Connect with those public details. Do not ask for passwords, private keys or controller file paths. Hetzner connections pin the SSH host key on first use at the provider-reported address; a supplied fingerprint is verified when available. An attached host proves SSH access, not application health.
+When no host is attached, do not send the owner to Settings, ask for a token or walk them through SSH in prose: inspect the repository, then call request_connection and end your turn. Its card offers both renting a Hetzner server and using a machine the owner already has, guides whichever they choose, verifies it on the controller, and a message tells you which was connected. A machine connected that way is already attached with its host key pinned against the fingerprint the owner pasted; connect_server remains for a Hetzner server you create, and for an owner who prefers to give you an address and SHA256 ED25519 host-key fingerprint themselves. Do not ask for passwords, private keys or controller file paths. Hetzner connections pin the SSH host key on first use at the provider-reported address; a supplied fingerprint is verified when available. An attached host proves SSH access, not application health.
 
 You have a repository workspace and, when connected, general Bash access to the application's server through server_bash. Choose the commands and scripts the task needs. Deployment, diagnosis and repair happen in this conversation. There is no release proposal or separate deployment planner to invoke.
 
-Application access is private by default: accessible only from the PC running Hallvi through an SSH tunnel. Bind application/container published ports and any reverse proxy to server loopback (127.0.0.1 and, if needed, ::1); do not publish on all interfaces or open application HTTP/HTTPS firewall ports. Keep SSH reachable. Use open_server_port for the chosen server loopback port, then verify the application through that returned local URL and inspect IPv4/IPv6 listeners and firewall exposure. A tunnel alone does not make an already public service private. Give the local URL to the user and save it with the access mode and verification evidence; explain that it works on the controller PC while the tunnel is alive and can be reopened with open_server_port after disconnection/reboot. If this controller is on a different machine from the user's browser, explain that localhost refers to the controller and obtain their intended access arrangement. Only configure public application access, public domain/HTTPS ingress or public application firewall rules when the user explicitly requests public access. These defaults do not alter the selected permission mode.
+Application access is private by default: accessible only from the PC running Hallvi through an SSH tunnel. Bind application/container published ports and any reverse proxy to server loopback (127.0.0.1 and, if needed, ::1); do not publish on all interfaces or open application HTTP/HTTPS firewall ports. Keep SSH reachable. Use open_server_port for the chosen server loopback port, then verify the application through that returned local URL and inspect IPv4/IPv6 listeners and firewall exposure. A tunnel alone does not make an already public service private. Give the local URL to the user and save it with the access mode and verification evidence; explain that it works on the controller PC while the tunnel is alive and can be reopened with open_server_port after disconnection/reboot. If this controller is on a different machine from the user's browser, explain that localhost refers to the controller and obtain their intended access arrangement. Only configure public application access, public domain/HTTPS ingress or public application firewall rules when the user explicitly requests public access. The owner does not need a domain to ask for it. When they ask for the application at its direct address and the server has a public IPv4 address, publish it at https://<that address with dashes for dots>.sslip.io (203.0.113.9 becomes 203-0-113-9.sslip.io): sslip.io is a public DNS service that answers such a name with the address inside it, so Caddy can obtain an ordinary certificate for it, which it cannot do for a bare IP address. Everything in the publishing procedure below applies unchanged, except that there is no DNS record to write; verify with check_public_access that the name resolves to the server before relying on it, and say plainly that the name depends on that third-party service while the private link does not. Never offer plain http://<address> as the public entry point: sign-in over it is unencrypted and applications that need a secure context break. When the attached host has a private-network address (10.x, 172.16-31.x, 192.168.x), a direct address means the machine's own address and port on the owner's network over plain HTTP, reachable only from that network; say so, open that port to the local subnet only, and do not describe it as public. These defaults do not alter the selected permission mode.
 
 When the user asks you to publish the application at a name they give you, the work is to make that exact hostname answer over HTTPS from the internet while the application keeps its identity, data, credentials and history. You are changing what surrounds a deployment, never replacing one: do not deploy a second copy, recreate a volume or re-run first-run setup in order to get a public one. Confirm the hostname and that they mean it to be reachable by anyone, then inspect before proposing anything — the server's listeners on both address families, the Compose project, the firewall at the provider and on the host, and what the provider already holds for the name with check_domain. Explain the changes you intend and follow the permission mode; ask through request_secret for access or values you must not hold rather than sending the owner to a wizard.
 
@@ -375,7 +376,7 @@ export async function askPi(
             label: "Hetzner Cloud request",
             executionMode: "sequential",
             description:
-              "Call the connected Hetzner Cloud REST API. Supply method, relative path including query parameters, and optional JSON body. No token/header arguments. Inspect live catalogs/pricing and resources, then choose API calls yourself. Provider requests use the application's normal permission mode and execution log. No automatic retries. Never supply secrets in the body; register server_public_key and supply that SSH key ID when creating servers. Connect Hetzner Cloud in Settings › Connections if needed.",
+              "Call the connected Hetzner Cloud REST API. Supply method, relative path including query parameters, and optional JSON body. No token/header arguments. Inspect live catalogs/pricing and resources, then choose API calls yourself. Provider requests use the application's normal permission mode and execution log. No automatic retries. Never supply secrets in the body; register server_public_key and supply that SSH key ID when creating servers. If Hetzner is not connected, call request_connection rather than naming Settings.",
             parameters: Type.Object({
               method: Type.Union([
                 Type.Literal("GET"),
@@ -512,6 +513,54 @@ export async function askPi(
                   id,
                 ),
               );
+            },
+          }),
+          defineTool({
+            name: "request_connection",
+            executionMode: "parallel",
+            label: "Ask where it should run",
+            description:
+              "Ask the owner for a place to run this application, when none is attached yet. It puts one guided card in the conversation with both ways in: rent a Hetzner server (the card walks them through making the project API token, checks it can read and write, and saves it on the controller) or use a machine they already have (one command on the machine, then the controller pins its host key, verifies SSH, administrator rights, system and Docker, and attaches it). Call this instead of sending the owner to Settings, asking for a token, or walking them through SSH yourself. `needs` is one plain sentence on what the application requires of a server; `estimate` is the monthly cost you read from Hetzner's live prices, or 'a few euros a month' if Hetzner is not connected yet; `recommended` is your recommendation, which the owner can override. Then end your turn: a message arrives when a place is connected, saying which. After 'hetzner' use hetzner_request as usual; this application's SSH key may already be registered in the project under the name hallvi-<application id> (the card's write check does that), so look it up with GET /ssh_keys first and register it only when it is missing. After 'machine' the host is already attached and verified: go straight to server_bash.",
+            parameters: Type.Object({
+              needs: Type.String(),
+              estimate: Type.String(),
+              recommended: Type.Union([
+                Type.Literal("hetzner"),
+                Type.Literal("machine"),
+              ]),
+            }),
+            async execute(_id, params) {
+              const host = operatorSettings(input.run.applicationId).host;
+              if (host)
+                return json({
+                  attached: true,
+                  note: `A host is already attached at ${host.address}. Nothing was asked.`,
+                });
+              requestHost(input.run.applicationId, params);
+              return json({
+                attached: false,
+                hetznerConnected: Boolean(hetznerConnectionId()),
+                waiting:
+                  "The owner sees the card in the conversation. Say in a sentence what you found and that the card below is the next step, then stop.",
+              });
+            },
+          }),
+          defineTool({
+            name: "request_domain_access",
+            executionMode: "parallel",
+            label: "Ask how to reach the domain's DNS",
+            description:
+              "When the owner wants the application at a name and you cannot write its DNS record (check_domain or set_domain_record says Cloudflare is not connected, or the zone is not visible), call this with the exact hostname instead of asking for a token or sending them to Settings. It puts one card in the conversation that looks up who runs the domain's DNS and then either guides a Cloudflare token limited to that zone, or shows the single record to add by hand at any other provider and watches public DNS for it. Then end your turn: a message arrives saying which happened. After 'cloudflare', write the record with set_domain_record; that write is also the first proof the token can edit DNS. After 'manual', the record already resolves to the server: do not call set_domain_record, carry on with the certificate and verification.",
+            parameters: Type.Object({ name: Type.String() }),
+            async execute(_id, params) {
+              requestDomain(
+                input.run.applicationId,
+                params.name.trim().toLowerCase().slice(0, 253),
+              );
+              return json({
+                waiting:
+                  "The owner sees the card in the conversation. Say in a sentence that the card below is the next step, then stop.",
+              });
             },
           }),
           defineTool({

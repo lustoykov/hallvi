@@ -1,4 +1,5 @@
 import { NewApplicationScreen } from "@/components/hallvi/new-application-screen";
+import { listApplications } from "@/server/db";
 import {
   currentGithubConnectionId,
   readGithubConnection,
@@ -10,5 +11,10 @@ export default function NewApplicationPage() {
   const githubLogin = currentGithubConnectionId()
     ? (readGithubConnection()?.account.login ?? null)
     : null;
-  return <NewApplicationScreen githubLogin={githubLogin} />;
+  return (
+    <NewApplicationScreen
+      githubLogin={githubLogin}
+      first={listApplications().length === 0}
+    />
+  );
 }
