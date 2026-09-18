@@ -169,8 +169,8 @@ export function ReachLadder({
                     your server&rsquo;s IP address written as a name by
                     sslip.io, a free public service; a certificate cannot be
                     issued for a bare IP address here yet. If that service is
-                    ever down the name stops working and the private link still
-                    does.
+                    ever down the name stops working; the application keeps
+                    running, and Hallvi can reopen the private link.
                   </p>
                 </details>
                 <button
