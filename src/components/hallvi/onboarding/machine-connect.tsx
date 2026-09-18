@@ -213,9 +213,10 @@ export function MachineConnect({
         <p className="hv-ob-fine">
           It needs 64-bit Linux that you can already sign in to, where you are
           root or can use sudo. Hallvi is tested on Ubuntu 24.04; it checks
-          anything else before relying on it. Other software on the machine is
-          left alone, but an administrator key can reach it, so a machine
-          holding things you cannot afford to lose is a poor first choice.
+          anything else before relying on it. Use a dedicated test server with
+          non-sensitive data for your first run. Hallvi uses an administrator
+          key, so it can also reach unrelated software and files on this
+          machine.
         </p>
         <ModeLine
           mode={mode}
