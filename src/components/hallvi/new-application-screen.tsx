@@ -16,7 +16,7 @@ import { WelcomeSteps } from "./welcome-steps";
 /** What Little Server says while nobody is typing, one line at a time. */
 const CHATTER = [
   "Hello! Got something you want running?",
-  "Paste a repository and I’ll read it. No forms about it, promise.",
+  "Paste a repository when you’re ready. No forms about it, promise.",
   "No server yet? I can rent a small one, or use a machine you have.",
   "Nothing gets rented until you have seen the plan and the price.",
   "I check that it really works before I call it done.",
@@ -139,6 +139,7 @@ export function NewApplicationScreen({
   }
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setInterval(
       () => setChatter((line) => line + 1),
       6500,
@@ -146,10 +147,9 @@ export function NewApplicationScreen({
     return () => window.clearInterval(timer);
   }, []);
 
-  // Little Server follows the form and keeps the owner company: a wave, a
-  // listening antenna once there is a repository, the wrench while it is
-  // read, a worried look when it could not be. Left alone it waves and dances
-  // now and then, says a little more about itself, and dances when clicked.
+  // Little Server follows the form and keeps the owner company. Selecting a
+  // repository is interest, not evidence that Hallvi has inspected it; adding
+  // only checks access and creates the application record.
   const mood = error
     ? "attention"
     : busy
@@ -161,15 +161,15 @@ export function NewApplicationScreen({
   const said = error
     ? "Hmm, that did not work. The reason is under the field."
     : busy
-      ? `Reading ${derivedName || "the repository"}…`
+      ? `Adding ${derivedName || "the application"}…`
       : derivedName
-        ? `Ooh, ${derivedName}. I’ll read it first and tell you what it needs.`
+        ? `Ooh, ${derivedName}. Add it when you’re ready.`
         : chatter === 0 && !first
           ? "Hello again. What’s next?"
           : CHATTER[chatter % CHATTER.length];
 
   return (
-    <main className={s.page}>
+    <main className={`${s.page} ${w.welcomePage}`}>
       <header className={s.topbar}>
         <Link className={s.brand} href={applicationsHref}>
           <HallviMark size={28} onDark />
@@ -229,7 +229,7 @@ export function NewApplicationScreen({
               someone else&rsquo;s open-source project.
             </p>
             <form
-              className={s.form}
+              className={`${s.form} ${w.form}`}
               onSubmit={(event) => {
                 event.preventDefault();
                 void createApplication();
@@ -277,10 +277,9 @@ export function NewApplicationScreen({
                 </p>
               )}
               <p className={s.scope}>
-                Nothing is rented or changed at this step. A new application
-                starts on <strong>Pi decides</strong>: Hallvi decides when to
-                ask for your approval. Switch to <strong>Always ask</strong>{" "}
-                there if every command should wait for your approval.
+                This step only adds the repository to Hallvi; it does not rent
+                or change a server. By default, Hallvi decides when a command
+                needs your approval. You can change that from the conversation.
               </p>
               {error && (
                 <p role="alert" className={s.error}>
@@ -292,7 +291,7 @@ export function NewApplicationScreen({
                   Creation continues if you leave this page.
                 </p>
               )}
-              <div className={s.actions}>
+              <div className={`${s.actions} ${w.actions}`}>
                 {/* With nothing added yet there is nowhere to go back to. */}
                 {first ? (
                   <span />
@@ -302,12 +301,12 @@ export function NewApplicationScreen({
                   </Link>
                 )}
                 <button
-                  className={s.primary}
+                  className={`${s.primary} ${w.submit}`}
                   disabled={!ready || busy || !repositoryUrl.trim()}
                   type="submit"
                 >
                   {busy && <SpinnerGap className="spin" />}
-                  {busy ? "Checking repository…" : "Add application"}
+                  {busy ? "Adding application…" : "Add application"}
                 </button>
               </div>
             </form>

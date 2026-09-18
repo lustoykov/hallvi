@@ -45,6 +45,10 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 - [ ] **One fresh-user journey on that exact candidate.** Have someone outside the development setup install it, connect their model and required accounts, add a repository, deploy to a real host, use the result and return after restart. Record the candidate and concrete friction; dated proofs and synthetic UI checks do not establish this gate. Keep the useful application behavior, not only a green HTTP check, in the walkthrough.
 - [ ] **Clear authority before connecting.** Finish the beta safety communication item above and verify it in that walkthrough: what host/provider access permits, what Pi decides versus Always ask means, practical scoped-account/test-server precautions and an independent recovery copy. Keep this contextual and short rather than introduce another workflow.
 
+## First-use experience
+
+- [ ] **A continuous first application.** Fit narrow windows, carry the app and caretaker through ChatGPT connection, disclose optional model preferences, and start repository inspection from one explicit action. The first request explains requirements before server selection; connection alone does not start work.
+
 ## Applications home
 
 - [x] **A warmer arrival — [PR #140](https://github.com/lustoykov/hallvi/pull/140).** Unite each application and its caretaker in a colored card, add an optional greeting, and shorten the first-time introduction. Verified desktop, mobile and the common single-app view.

@@ -77,7 +77,7 @@ export async function createApplication(input: CreateApplicationInput) {
     insertMessage(
       chat.id,
       "assistant",
-      `I created ${name}. I’m checking access to the repository so we can work out what it needs.`,
+      `I’ve added ${name}. Next, I can read its repository and explain what it needs to run.`,
       "hallvi",
     );
     return application;

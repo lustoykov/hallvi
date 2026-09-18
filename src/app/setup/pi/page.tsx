@@ -10,6 +10,7 @@ export default async function PiSetupPage({
   searchParams: Promise<{
     application?: string | string[];
     chat?: string | string[];
+    onboarding?: string | string[];
   }>;
 }) {
   const [initialStatus, params] = await Promise.all([
