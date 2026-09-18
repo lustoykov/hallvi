@@ -20,6 +20,7 @@ import {
   type DomainProgress,
 } from "@/components/hallvi/onboarding/domain-connect";
 import { HetznerConnect } from "@/components/hallvi/onboarding/hetzner-connect";
+import { JourneyRail } from "@/components/hallvi/onboarding/journey-rail";
 import {
   HostRequest,
   type ConnectedHost,
@@ -331,6 +332,22 @@ export function OnboardingPrototype() {
         />
       ) : (
         <main className="hvp-chat">
+          <JourneyRail
+            application={APP}
+            facts={{
+              read: past("host"),
+              placeWaiting: saved.stage === "host",
+              placed: past("deploy"),
+              deployed: saved.stage === "running",
+              opens: saved.stage === "running",
+            }}
+            working={saved.stage === "inspect" || saved.stage === "deploy"}
+            says={null}
+            waitingOnYou={saved.stage === "model" || saved.stage === "propose"}
+            started
+            canStart={false}
+            onStart={() => undefined}
+          />
           <Msg from="you">Get {saved.repo} running.</Msg>
 
           {saved.stage === "model" && (

@@ -46,6 +46,7 @@ import {
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import { useConnectionRequests } from "./onboarding/connection-requests";
+import { JourneyRail } from "./onboarding/journey-rail";
 import {
   SecretRequests,
   SecretRequestsChip,
@@ -478,6 +479,24 @@ export function ChatPane({
     };
   }, [applicationId, requestPending]);
 
+  // The running turn, said the same way its own status line says it.
+  const running = view.messages.find(
+    (message) => message.status === "queued" || message.status === "running",
+  );
+  const railActivity = running
+    ? runActivity({
+        runId: running.id,
+        status: running.status as "queued" | "running",
+        startedAt: runs.find((run) => run.assistantMessageId === running.id)
+          ?.startedAt,
+        hasDraft: Boolean(running.body?.trim()),
+        workerAlive,
+        executions: view.executions ?? [],
+        activity: view.piActivity ?? [],
+        now,
+      })
+    : null;
+
   return (
     <section className="hv-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -514,6 +533,23 @@ export function ChatPane({
       )}
       <Conversation className="hv-conversation">
         <ConversationContent className="hv-messages">
+          {connections.journey && view.application && (
+            <JourneyRail
+              application={view.application.name}
+              facts={connections.journey}
+              working={requestPending}
+              says={railActivity?.says ?? null}
+              waitingOnYou={
+                Boolean(railActivity?.waitingOnYou) ||
+                secrets.some((secret) => !secret.establishedAt)
+              }
+              started={view.messages.some((message) => message.role === "user")}
+              canStart={piReady && !busy && !requestPending && Boolean(onTell)}
+              onStart={() =>
+                onTell?.("Please read this repository and get it running.")
+              }
+            />
+          )}
           {reconnecting && (
             <p className="hv-stream-notice" role="status">
               <SpinnerGap className="spin" aria-hidden="true" />

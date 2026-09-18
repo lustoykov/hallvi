@@ -376,3 +376,8 @@
     margin-left: max(24px, calc((100vw - 392px - 780px) / 2));
   }
 }
+
+/* The prototype's own bar is sticky too; the rail sits under it. */
+.hvp .hv-rail {
+  top: 52px;
+}

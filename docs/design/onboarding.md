@@ -62,6 +62,15 @@ flowchart TD
    later. GitHub is a quiet link for private repositories, and the typed
    address is kept across that trip. ChatGPT, if missing, is asked for in the
    conversation after the request is saved; preferences wait.
+   After it, the conversation is not an empty page: **Little Server stays
+   above the transcript with a four-stop rail** (read it, a place to run,
+   deploy, open it). Each stop is read from a record (a request, an attached
+   host, a deployment record, an access record), never from a timer. While Pi
+   works the current stop carries a travelling band and the bubble repeats
+   the turn's own status line; when something waits for the owner the stop
+   turns amber and Little Server points at it; on arrival it celebrates, and
+   on later visits the rail is gone. Before the first message it offers "Get
+   it running", so nobody has to guess what to type.
 2. **"Where should it run?" is one card with two whole journeys.** Pi's
    recommendation is marked, not imposed. A connected Hetzner account collapses
    that side to one button.

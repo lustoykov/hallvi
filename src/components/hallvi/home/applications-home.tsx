@@ -36,8 +36,9 @@ type HomeApplication = ApplicationListItem & { href: string };
  * The application's situation, read from the list item. Five words the card
  * can say at its top right, and the caretaker's face and prop follow them:
  * a mug when all is fine, a wrench while working, a clipboard when nobody
- * has looked lately, a magnifier and a worried face when something waits,
- * a box for an application that is not deployed yet.
+ * has looked lately, a magnifier and a worried face when something waits.
+ * A new application's caretaker simply stands ready and waves: the card's
+ * "New" says the rest, and the box it used to hold read as awkward.
  */
 type Situation = "fine" | "working" | "needs" | "stale" | "new";
 
@@ -64,7 +65,6 @@ function moodOf(situation: Situation, active: boolean): MascotMood {
   if (situation === "needs") return "attention";
   if (situation === "working") return "working";
   if (situation === "stale") return "checking";
-  if (situation === "new") return "carrying";
   return active ? "waving" : "ready";
 }
 

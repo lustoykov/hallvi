@@ -22,6 +22,7 @@ import type { ConnectionRequest } from "@/server/connection-requests";
 import { directAddress, ReachLadder, type Reach } from "./access-card";
 import { DomainConnect, type DomainProgress } from "./domain-connect";
 import { HostRequest, type ConnectedHost } from "./host-request";
+import type { JourneyFacts } from "./journey-rail";
 import { RequestCard } from "./pieces";
 import {
   isHomeAddress,
@@ -147,7 +148,7 @@ export function useConnectionRequests({
   );
 
   if (!enabled || !held || !transport || !applicationId)
-    return { at: () => null, rest: null, waiting: 0 };
+    return { at: () => null, rest: null, waiting: 0, journey: null };
 
   const progress = (kind: ConnectionRequest["kind"], value: unknown) => {
     setHeld({
@@ -283,7 +284,24 @@ export function useConnectionRequests({
       </RequestCard>,
     );
 
+  const hostRequest = held.requests.find((request) => request.kind === "host");
+  const journey: JourneyFacts = {
+    read:
+      Boolean(hostRequest) ||
+      Boolean(held.hostAddress) ||
+      information.some((record) => !record.retiredAt),
+    placeWaiting: Boolean(hostRequest && !hostRequest.settledAt),
+    placed: Boolean(held.hostAddress),
+    deployed: information.some(
+      (record) =>
+        !record.retiredAt &&
+        record.presentation?.content?.kind === "deployment",
+    ),
+    opens: Boolean(access),
+  };
+
   return {
+    journey,
     at: (messageId: string) => cards.get(messageId) ?? null,
     /** Cards whose asking message is not in this transcript. */
     rest: cards.get(null) ?? null,

@@ -30,8 +30,10 @@ Changed:
 - **The caretaker's face and hands say the state.** Fine: a mug of coffee,
   smiling, and it dances. Working: the wrench. Not looked at lately: the
   clipboard. Something waiting: a magnifier held up and a worried face,
-  never an angry one. Not deployed yet: a cardboard box in both arms. A
-  caretaker whose application needs something does not dance.
+  never an angry one. Not deployed yet: it stands ready and waves, and the
+  card says "New"; the cardboard box it first held was dropped on 18 September
+  because it read as awkward. A caretaker whose application needs something
+  does not dance.
 - **The card has a hierarchy**: name and purpose with one word of state at the
   right ("Fine", "Working", "Needs me", "Not checked", "New"); the screen; the
   condition in one line; what runs, as chips; the address as the link; More.
