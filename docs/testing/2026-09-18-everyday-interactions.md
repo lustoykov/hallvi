@@ -1,7 +1,8 @@
 # Everyday interactions — 18 September 2026
 
-Candidate: `codex/delight-pass`, based on `00b790ab` (PR #137). This report and
-its images belong to the same implementation change.
+Candidate: `c651c063`, based on `00b790ab` (PR #137); [PR #138](https://github.com/lustoykov/hallvi/pull/138). This report and
+its images belong to the same implementation change. Later tracking edits do
+not change the tested source.
 
 The review used an isolated local app with the actual routes, SQLite records,
 and worker, but synthetic model and provider responses. It establishes UI and

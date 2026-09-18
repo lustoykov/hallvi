@@ -47,7 +47,7 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 ## Conversation controls
 
-- [ ] **Everyday interaction polish — in review.** Copy completed replies, keep keyboard focus useful after sending and returning, carry conversation context through Settings and GitHub connection, simplify repeat application setup, and keep Home consistent with current recorded problems and recovery.
+- [x] **Everyday interaction polish — [PR #138](https://github.com/lustoykov/hallvi/pull/138).** Copy completed replies, keep keyboard focus useful after sending and returning, carry conversation context through Settings and GitHub connection, simplify repeat application setup, and keep Home consistent with current recorded problems and recovery.
 
 - [x] **Send next and conversation continuity.** Explicit follow-ups wait in the existing durable message queue; Stop cancels active and waiting replies in that conversation. Contextual questions preserve the owner's draft and destination, and drafts survive tab closure. [Interaction contract](docs/operator-design.md#interaction-while-pi-is-busy).
 - [ ] **Steer and contextual side chats — deferred.** Review native steering boundaries, opening contextual side chats and concurrent read-only explanations separately. Existing read-only tool restrictions remain; these controls are not prerequisites for first deployment.
