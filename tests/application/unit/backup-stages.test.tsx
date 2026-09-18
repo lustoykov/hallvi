@@ -4,12 +4,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { BackupStages } from "@/components/haldur/backup-stages";
+import { BackupStages } from "@/components/hallvi/backup-stages";
 import {
   protectionFromRecords,
   protectionVerdict,
-} from "@/components/haldur/backups-records";
-import { storageFromRecords } from "@/components/haldur/storage-records";
+} from "@/components/hallvi/backups-records";
+import { storageFromRecords } from "@/components/hallvi/storage-records";
 import type { Ref, SavedInformation } from "@/server/operator-data";
 
 const APP = "11111111-2222-4333-8444-555555555555";

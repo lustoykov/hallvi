@@ -38,7 +38,7 @@ export const suites = [
     id: "smoke",
     name: "Browser smoke",
     command: "npm run test:e2e:smoke",
-    scope: "2 desktop journeys through Haldur",
+    scope: "2 desktop journeys through Hallvi",
     cost: "No AI calls",
     ci: "Every PR",
     ciDetail: "",
@@ -166,8 +166,8 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     // runs.
     const env = {
       ...process.env,
-      HALDUR_LIVE_EVALS: "",
-      HALDUR_LIVE_JUDGE: "",
+      HALLVI_LIVE_EVALS: "",
+      HALLVI_LIVE_JUDGE: "",
       ...command.env,
       FORCE_COLOR: "0",
     };
@@ -316,7 +316,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         }
         return;
       }
-      if (request.headers["x-haldur-testing-token"] !== token) {
+      if (request.headers["x-hallvi-testing-token"] !== token) {
         json({ error: "Reload the dashboard to reconnect" }, 403);
         return;
       }
@@ -448,11 +448,11 @@ if (
 ) {
   const root = process.cwd();
   if (!existsSync(join(root, "tests/browser", "journeys.ts")))
-    throw new Error("Run from the Haldur repository");
+    throw new Error("Run from the Hallvi repository");
   const dashboard = createDashboard(root);
   dashboard.server.listen(4317, "127.0.0.1", () =>
     console.log(
-      "Haldur Testing: http://127.0.0.1:4317 (local only; no checks start automatically)",
+      "Hallvi Testing: http://127.0.0.1:4317 (local only; no checks start automatically)",
     ),
   );
   dashboard.server.on("error", (error) => {

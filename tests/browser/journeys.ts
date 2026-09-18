@@ -110,7 +110,7 @@ export const browserJourneys = [
     id: "durable-requests",
     name: "Reconnect and cancel durable replies",
     description:
-      "Close the browser while Haldur works, recover saved progress, cancel a request and explicitly retry its reply.",
+      "Close the browser while Hallvi works, recover saved progress, cancel a request and explicitly retry its reply.",
     smoke: false,
   },
   {
@@ -129,9 +129,9 @@ export const browserJourneys = [
   },
   {
     id: "controller-protection",
-    name: "Haldur's own protection",
+    name: "Hallvi's own protection",
     description:
-      "State Haldur's own copies on Backups: unprotected without storage, copied but not yet recoverable, and recoverable once the owner saves the kit.",
+      "State Hallvi's own copies on Backups: unprotected without storage, copied but not yet recoverable, and recoverable once the owner saves the kit.",
     smoke: false,
   },
 ] as const;

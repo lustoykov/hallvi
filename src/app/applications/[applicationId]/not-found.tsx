@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import s from "@/components/haldur/applications.module.css";
+import s from "@/components/hallvi/applications.module.css";
 
 export default function ApplicationNotFound() {
   return (

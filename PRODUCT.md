@@ -8,9 +8,9 @@ web
 
 ## Purpose
 
-**Haldur is the agent for self-hosted software.** It helps individuals and small teams deploy an application stack on a server they control, keep it healthy and protect its data.
+**Hallvi is the agent for self-hosted software.** It helps individuals and small teams deploy an application stack on a server they control, keep it healthy and protect its data.
 
-**Haldur carries out the setup, asks for access or decisions when necessary, and verifies that it works.** Conversation drives the work; stable application views show the same recorded state. The user should not need to assemble infrastructure or follow a deployment wizard.
+**Hallvi carries out the setup, asks for access or decisions when necessary, and verifies that it works.** Conversation drives the work; stable application views show the same recorded state. The user should not need to assemble infrastructure or follow a deployment wizard.
 
 ## Architecture direction
 
@@ -60,15 +60,15 @@ This is the longer-term support target, not a list of shipped capabilities or pr
 | Delivery | Configuration/secrets, required ports, private service connections, domains, automatic HTTPS and appropriate CDN setup. Release a selected revision on request; reuse GitHub Actions where useful. |
 | Protection | Database and persistent-file backups to Cloudflare R2 or AWS S3, retention, an isolated restore that boots the restored application and checks it, and manual recovery. Protect controller state separately. |
 | Care | Logs, health, traffic/resource observations, job results, backup status, investigation and in-app issues. External notification providers are an agreed expansion; provider selection is still open. |
-| Controller | Haldur may run on the application host or separately. Its state and lifecycle remain independent of the managed stack. |
+| Controller | Hallvi may run on the application host or separately. Its state and lifecycle remain independent of the managed stack. |
 
-A source repository need not belong to the user, and GitHub Actions is not mandatory for prebuilt software. Existing external services remain usable, with explicit limits on what Haldur can observe or manage.
+A source repository need not belong to the user, and GitHub Actions is not mandatory for prebuilt software. Existing external services remain usable, with explicit limits on what Hallvi can observe or manage.
 
 Use one representative application in each of the [three complexity tiers](docs/operator-design.md#three-application-complexity-tiers): lightweight, medium and more complicated. Prove the same general architecture progressively. Exact repositories remain to be selected; this is not a certification matrix or a user-facing classification.
 
 ## Operating boundary
 
-**Haldur changes what surrounds the application, never what is inside it, except through a PR the owner merges.** Its application-code proposals are limited to small operability changes.
+**Hallvi changes what surrounds the application, never what is inside it, except through a PR the owner merges.** Its application-code proposals are limited to small operability changes.
 
 - It prepares both repository and host: Docker/Compose, process definitions, environment/secrets, required packages, storage and networking. It runs existing migrations and performs authorized releases, restarts and compatible rollbacks.
 - It surfaces application exceptions, wrong behavior and migration-code defects with impact, evidence and a copyable coding-agent handoff. The owner-merged fix returns through ordinary release verification.
@@ -85,7 +85,7 @@ user's PC, server or provider account just because work finished. Removal stays
 within the requested application operation or an agreed retention policy, with
 exact ownership, retained-data and dependency checks. Disposable artifacts from
 that operation and isolated workspaces may be removed; application data,
-credentials, history and unrelated resources remain. A Haldur folder or
+credentials, history and unrelated resources remain. A Hallvi folder or
 label alone is not disposal permission. Permission modes change approval prompts,
 not the scope of the user's request. The runtime does not auto-load contributor
 instructions; general server shell access still relies on Pi following this
@@ -95,7 +95,7 @@ Pi determines what to inspect, recommend and execute within the user's request a
 
 ## Experience
 
-Preserve the existing sidebar as the starting structure: it guides users on what deserves care. Pi decides how to provide that care. View interiors and conversation interactions may change wherever the main deployment journey benefits. The [design reference](src/components/haldur/DESIGN.md) provides visual language; the [UI reference](docs/design/screens.md) distinguishes redesign guidance from existing and simulated surfaces.
+Preserve the existing sidebar as the starting structure: it guides users on what deserves care. Pi decides how to provide that care. View interiors and conversation interactions may change wherever the main deployment journey benefits. The [design reference](src/components/hallvi/DESIGN.md) provides visual language; the [UI reference](docs/design/screens.md) distinguishes redesign guidance from existing and simulated surfaces.
 
 An Application has its own identity, connected resources and history. One main conversation owns changes; read-only side conversations share relevant evidence and retain separate drafts/history. Users can queue a follow-up, steer active work or discuss it in a side chat. A second independent deployment of the same source is another Application; there is no mandatory Production/Staging hierarchy.
 
@@ -103,7 +103,7 @@ Pi decides what matters and what to surface within a stable, carefully designed 
 
 The presentation architecture connects persisted observations and execution evidence to shared view models, then to deliberately designed components. Pi supplies structured facts and evidence; components own layout, hierarchy and interaction. The [presentation contract](docs/presentation-contract.md) defines the mapping needed by the reference designs. A successful deployment also needs a coherent experience: the user can understand what is happening, handle any decision, open the result, and return to consistent information after a refresh. Judge visual quality against the reference designs using real application data. The roadmap places acceptance of this simple journey before expansion to more complicated applications.
 
-**Most first users run something small.** A person's first application on Haldur is usually a personal tool or a test with a handful of visitors and little data. Do not greet them with infrastructure: no backup warnings, monitoring setup or hardening checklists on day one. Nudge in proportion to what is at stake, and let the nudge grow as the data or the traffic does: a 12 MB dashboard with no copy says nothing, a growing photo library gets a quiet sentence, a large one with no copy gets a clear one. The same rule applies to every view: the amount of care the product asks for should match the amount there is to lose.
+**Most first users run something small.** A person's first application on Hallvi is usually a personal tool or a test with a handful of visitors and little data. Do not greet them with infrastructure: no backup warnings, monitoring setup or hardening checklists on day one. Nudge in proportion to what is at stake, and let the nudge grow as the data or the traffic does: a 12 MB dashboard with no copy says nothing, a growing photo library gets a quiet sentence, a large one with no copy gets a clear one. The same rule applies to every view: the amount of care the product asks for should match the amount there is to lose.
 
 Recommend one sensible path and let the user override it. Ask for missing access, private inputs or consequential decisions, not a mandatory setup questionnaire. Chat explains work, logs expose execution details and selected records make outcomes discoverable. A view without evidence should say it has not been assessed rather than imply health or absence of infrastructure.
 
@@ -115,7 +115,7 @@ Prefer general tools, native runtime capabilities and small shared-record/presen
 
 Optional plugins remain a possible extension for specialised integrations. Plugin packaging, distribution and execution/UI interfaces are deferred; they are not requirements for the deployment redesign. Future access by other agents should use the same application operator and shared evidence rather than create competing writers. Do not build an extension framework ahead of a concrete need.
 
-There is an exploratory commercial opportunity for managed tool-action review and security hardening, either within Haldur Cloud or as a separate product for other applications that give LLMs tools. A focused LLM-as-judge service with clear review UX, integration and execution evidence is one possible starting point. Its effectiveness, scope and business model need validation; a judge alone must not be marketed as guaranteed prompt-injection protection. This is a later product idea, not a second product build commitment or an expansion of the current sprint.
+There is an exploratory commercial opportunity for managed tool-action review and security hardening, either within Hallvi Cloud or as a separate product for other applications that give LLMs tools. A focused LLM-as-judge service with clear review UX, integration and execution evidence is one possible starting point. Its effectiveness, scope and business model need validation; a judge alone must not be marketed as guaranteed prompt-injection protection. This is a later product idea, not a second product build commitment or an expansion of the current sprint.
 
 ## Development priority
 

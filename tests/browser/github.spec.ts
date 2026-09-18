@@ -86,7 +86,7 @@ test(
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".hd-repository-notice");
+    const notice = page.locator(".hv-repository-notice");
     await expect(notice).toContainText(
       "Connect GitHub, then run the repository check.",
     );
@@ -137,7 +137,7 @@ test(
     ).toEqual(refreshed.repository);
     await page.goto(path);
     await openConversation(page);
-    await expect(page.locator(".hd-repository-notice")).toHaveCount(0);
+    await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
   },
 );
 
@@ -199,7 +199,7 @@ test(
     scenario({ login: "success" });
     await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
-      page.getByText("Separate login for Haldur", { exact: true }),
+      page.getByText("Separate login for Hallvi", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("status").filter({ hasText: "Repository checks passed." }),
@@ -220,7 +220,7 @@ test(
       page.getByRole("link", { name: "Choose repositories on GitHub" }),
     ).toHaveAttribute(
       "href",
-      "https://github.com/apps/qa-haldur-app/installations/new",
+      "https://github.com/apps/qa-hallvi-app/installations/new",
     );
     await page.setViewportSize({ width: 1394, height: 1354 });
     await page.screenshot({
@@ -238,7 +238,7 @@ test(
     await page.getByRole("button", { name: "Change", exact: true }).click();
     await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
-      page.getByText("Separate login for Haldur", { exact: true }),
+      page.getByText("Separate login for Hallvi", { exact: true }),
     ).toBeVisible();
     writeFileSync(
       join(fixture.state, "github-scenario.json"),
@@ -270,7 +270,7 @@ test(
         exact: true,
       }),
     });
-    await expect(repositoryResult).toContainText("Grant Haldur read access");
+    await expect(repositoryResult).toContainText("Grant Hallvi read access");
     await expect(repositoryResult).toContainText("choose Check again");
     const afterReconnect = await (await page.request.get(`/api${path}`)).json();
     await page.reload();
@@ -281,7 +281,7 @@ test(
     writeFileSync(join(fixture.state, "github-scenario.json"), "{}");
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".hd-repository-notice");
+    const notice = page.locator(".hv-repository-notice");
     await expect(notice).toContainText("read access");
     await notice
       .getByRole("button", { name: "Check again", exact: true })
@@ -327,7 +327,7 @@ test(
     const old = expireAccess();
     await page.reload();
     await openConversation(page);
-    await expect(page.locator(".hd-repository-notice")).toHaveCount(0);
+    await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
     // Checking again renews the expired access without another login.
     expect((await checkAgain()).status()).toBe(200);
     expect(
@@ -360,7 +360,7 @@ test(
     await checkAgain();
     await page.goto(appUrl);
     await openConversation(page);
-    await expect(page.locator(".hd-repository-notice")).toBeVisible();
+    await expect(page.locator(".hv-repository-notice")).toBeVisible();
     await page.goto("/setup/github");
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
       "Sign in again",

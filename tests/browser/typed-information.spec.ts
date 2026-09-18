@@ -126,7 +126,7 @@ test("records render in chat and their views, survive refresh, and update by rec
         now,
       );
     await page.goto(`/applications/${appId}`);
-    const chat = page.locator(".hd-chat-pane");
+    const chat = page.locator(".hv-chat-pane");
     const cards = (scope: typeof chat) =>
       scope.locator("[data-information-id]");
     await expect(cards(chat)).toHaveCount(3);
@@ -154,7 +154,7 @@ test("records render in chat and their views, survive refresh, and update by rec
       .getByRole("button", { name: "Overview", exact: true })
       .first()
       .click();
-    const overview = page.locator(".hd-section-overview");
+    const overview = page.locator(".hv-section-overview");
     // Overview reads the same records. With nothing establishing that the
     // application works, every lane has to say which kind of silence it is:
     // nobody looked, or somebody looked and it is not working.

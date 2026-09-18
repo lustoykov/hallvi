@@ -33,7 +33,7 @@ writeFileSync(
     stdio: ["ignore", "pipe", "inherit"],
     // The export reads the schema only, but the configuration file creates the
     // database's directory; keep that out of the checkout's own state.
-    env: { ...process.env, HALDUR_DB_PATH: "dist/.export/unused.db" },
+    env: { ...process.env, HALLVI_DB_PATH: "dist/.export/unused.db" },
   }),
 );
 rmSync("dist/.export", { recursive: true, force: true });

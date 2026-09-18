@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { stateLocation } from "./state-location.mjs";
 const path =
-  process.env.HALDUR_DB_PATH ??
+  process.env.HALLVI_DB_PATH ??
   stateLocation(process.cwd(), { hidden: true }).database;
 const { version } = JSON.parse(
   readFileSync(

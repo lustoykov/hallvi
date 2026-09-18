@@ -13,7 +13,7 @@ import {
   hiddenSections,
   recordedSections,
   visibleSections,
-} from "../../../src/components/haldur/application-sections";
+} from "../../../src/components/hallvi/application-sections";
 import type { SavedInformation } from "../../../src/server/operator-data";
 
 const record = (

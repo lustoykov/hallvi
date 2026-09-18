@@ -246,21 +246,21 @@ test.describe("the logs filter", () => {
         ),
         "nothing captured",
       );
-      const before = await page.locator(".hd-logs-output").count();
+      const before = await page.locator(".hv-logs-output").count();
       expect(before).toBeGreaterThan(0);
 
       await box.fill("zzz-no-such-thing-anywhere");
       await page.waitForTimeout(300);
       // A blank page below the box reads as a page that broke, not as a search
       // that found nothing.
-      expect(await page.locator(".hd-logs-output").count()).toBe(0);
+      expect(await page.locator(".hv-logs-output").count()).toBe(0);
       const said = await page.locator("main").innerText();
       expect(said).toMatch(/Nothing captured contains/i);
       expect(said).toMatch(/Clear the filter/i);
 
       await box.fill("");
       await page.waitForTimeout(300);
-      expect(await page.locator(".hd-logs-output").count()).toBe(before);
+      expect(await page.locator(".hv-logs-output").count()).toBe(before);
     },
   );
 });

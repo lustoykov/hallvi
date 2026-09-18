@@ -77,7 +77,7 @@ export async function createApplication(input: CreateApplicationInput) {
       chat.id,
       "assistant",
       `I created ${name}. I’m checking access to the repository so we can work out what it needs.`,
-      "haldur",
+      "hallvi",
     );
     return application;
   });
@@ -281,7 +281,7 @@ export function createChat(applicationId: string, title?: string) {
     chat.id,
     "assistant",
     `This is a read-only side chat for ${application.name}. I can explain the application and its execution history. Send commands and changes to the main conversation.`,
-    "haldur",
+    "hallvi",
   );
   // Chat administration is visible in the chat list; it is not an application
   // event.

@@ -470,7 +470,7 @@ export async function writeDomainRecord(change: {
     content,
     ttl,
     proxied,
-    comment: `managed-by=haldur${change.owner ? ` app=${change.owner}` : ""}`,
+    comment: `managed-by=hallvi${change.owner ? ` app=${change.owner}` : ""}`,
   };
   let action: DomainRecordOutcome["action"] = "created";
   if (existing) {

@@ -13,13 +13,13 @@ let store: typeof import("@/server/pi-activity");
 let directory: string;
 
 beforeAll(async () => {
-  directory = mkdtempSync(join(tmpdir(), "hd-activity-"));
-  process.env.HALDUR_CONFIG_DIR = directory;
+  directory = mkdtempSync(join(tmpdir(), "hv-activity-"));
+  process.env.HALLVI_CONFIG_DIR = directory;
   store = await import("@/server/pi-activity");
 });
 
 afterAll(() => {
-  delete process.env.HALDUR_CONFIG_DIR;
+  delete process.env.HALLVI_CONFIG_DIR;
   rmSync(directory, { recursive: true, force: true });
 });
 

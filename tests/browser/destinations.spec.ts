@@ -155,7 +155,7 @@ for (const [label, base] of [
 
           // The sidebar agrees with where we are.
           const active = await page
-            .locator("[aria-current='page'], .hd-nav-item[data-active='true']")
+            .locator("[aria-current='page'], .hv-nav-item[data-active='true']")
             .allInnerTexts()
             .catch(() => []);
           if (active.length === 0)

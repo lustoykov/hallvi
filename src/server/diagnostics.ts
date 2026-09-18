@@ -163,13 +163,13 @@ export function diagnosticLogPath(
   filename: "replies.ndjson" | "spans.ndjson" = "replies.ndjson",
 ) {
   const dbPath =
-    process.env.HALDUR_DB_PATH ??
+    process.env.HALLVI_DB_PATH ??
     stateLocation(/* turbopackIgnore: true */ process.cwd(), { hidden: true })
       .database;
   // Runtime output files must not be included in the application build.
   return join(
     /* turbopackIgnore: true */
-    (process.env.HALDUR_LOG_DIR?.trim() || undefined) ??
+    (process.env.HALLVI_LOG_DIR?.trim() || undefined) ??
       join(dirname(dbPath), "diagnostics"),
     filename,
   );

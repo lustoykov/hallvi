@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { StandInNotice } from "@/components/haldur/stand-in-notice";
+import { StandInNotice } from "@/components/hallvi/stand-in-notice";
 
 import "./globals.css";
-import "./haldur.css";
+import "./hallvi.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Haldur",
+  title: "Hallvi",
   description: "Deploy and operate applications on infrastructure you own.",
 };
 

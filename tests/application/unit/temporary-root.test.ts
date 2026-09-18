@@ -13,12 +13,12 @@ import {
   removeTemporaryRoot,
 } from "../../temporary-root.mjs";
 
-it("creates roots only under /tmp/haldur-* and deletes exactly that root, never through symlinks", () => {
-  const keep = createTemporaryRoot("/tmp/haldur-test-keep-");
+it("creates roots only under /tmp/hallvi-* and deletes exactly that root, never through symlinks", () => {
+  const keep = createTemporaryRoot("/tmp/hallvi-test-keep-");
   writeFileSync(join(keep, "real.txt"), "stays");
-  const root = createTemporaryRoot("/tmp/haldur-test-");
+  const root = createTemporaryRoot("/tmp/hallvi-test-");
   try {
-    expect(root).toMatch(/^\/tmp\/haldur-test-[A-Za-z0-9]{6}$/);
+    expect(root).toMatch(/^\/tmp\/hallvi-test-[A-Za-z0-9]{6}$/);
     mkdirSync(join(root, "app"), { recursive: true });
     writeFileSync(join(root, "state.db"), "sqlite");
     symlinkSync(keep, join(root, "app", "node_modules"), "dir"); // The fixture links the real node_modules the same way.
@@ -31,24 +31,24 @@ it("creates roots only under /tmp/haldur-* and deletes exactly that root, never 
     removeTemporaryRoot(keep);
   }
 });
-it("refuses prefixes and paths that are not Haldur scratch roots", () => {
+it("refuses prefixes and paths that are not Hallvi scratch roots", () => {
   for (const prefix of [
     "/tmp/other-",
-    "/var/tmp/haldur-e2e-",
-    "haldur-e2e-",
-    "/tmp/haldur-",
-    "/tmp/haldur-e2e",
+    "/var/tmp/hallvi-e2e-",
+    "hallvi-e2e-",
+    "/tmp/hallvi-",
+    "/tmp/hallvi-e2e",
   ]) {
     expect(() => createTemporaryRoot(prefix), prefix).toThrow();
   }
   for (const path of [
     "/tmp",
-    "/tmp/haldur-e2e-",
-    "/tmp/haldur-e2e-abc123/..",
-    "/tmp/haldur-e2e-abc123/state",
+    "/tmp/hallvi-e2e-",
+    "/tmp/hallvi-e2e-abc123/..",
+    "/tmp/hallvi-e2e-abc123/state",
     homedir(),
     resolve("tests/results"),
-    resolve(".haldur"),
+    resolve(".hallvi"),
   ]) {
     expect(() => removeTemporaryRoot(path), path).toThrow();
   }

@@ -9,9 +9,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { architectureFromRecords } from "@/components/haldur/architecture-records";
-import { JourneyDirection } from "@/components/haldur/architecture-prototype/journey-v2";
-import type { Recheck } from "@/components/haldur/architecture-prototype/use-recheck";
+import { architectureFromRecords } from "@/components/hallvi/architecture-records";
+import { JourneyDirection } from "@/components/hallvi/architecture-prototype/journey-v2";
+import type { Recheck } from "@/components/hallvi/architecture-prototype/use-recheck";
 import type { SavedInformation } from "@/server/operator-data";
 
 const APPLICATION = "26820a4b-a4c2-49f8-8002-678503aeb385";
@@ -49,7 +49,7 @@ const map: SavedInformation = {
       kind: "topology",
       from: "observed",
       parts: [
-        part("controller", "controller", "Haldur controller"),
+        part("controller", "controller", "Hallvi controller"),
         part("paper-host", "host", "paper-26820a4b"),
         part("paperless-web", "web", "Paperless-ngx"),
         part("paperless-db-process", "private", "PostgreSQL"),

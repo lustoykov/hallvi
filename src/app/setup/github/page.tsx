@@ -1,4 +1,4 @@
-import { GithubSetupScreen } from "@/components/haldur/github-setup-screen";
+import { GithubSetupScreen } from "@/components/hallvi/github-setup-screen";
 import { getGithubSetupStatus } from "@/server/github-setup";
 import { setupReturnDestination } from "@/server/setup-return";
 

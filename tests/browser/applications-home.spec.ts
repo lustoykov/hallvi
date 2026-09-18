@@ -11,7 +11,7 @@ test.use({ isolatedApp: true });
 // its screen or More; search, once there is enough to search, never leaves
 // them on a card that opens something else; and the empty page offers the
 // one thing to do. There is no offer at the top of the page any more; talking
-// to Haldur starts inside the application.
+// to Hallvi starts inside the application.
 test(
   "home lists applications, follows the selected one, and search preserves navigation",
   journey("application-shell"),
@@ -78,7 +78,7 @@ test(
     await alpha.getByRole("link", { name: "More" }).click();
     await expect(page).toHaveURL(new RegExp(`/applications/${ids[0]}$`));
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeVisible();
   },
 );

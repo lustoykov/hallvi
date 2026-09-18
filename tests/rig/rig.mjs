@@ -1,4 +1,4 @@
-// Local real-Pi rig: Haldur's own web app, worker, SQLite records, Pi
+// Local real-Pi rig: Hallvi's own web app, worker, SQLite records, Pi
 // runtime, workspace, Compose resolver, registry pinning and executor, run from
 // a copy of this checkout with stand-ins at external boundaries only:
 //   - GitHub API (stand-ins/github-api.ts): exact mirrors of public
@@ -7,7 +7,7 @@
 //   - Hetzner API (stand-ins/hetzner.ts): a provider that "creates" a server
 //     at 127.0.0.1 and keeps its state in the rig directory.
 //   - SSH (bin/ssh, first on PATH). Rig A runs each host command with this
-//     machine's shell and Docker engine, mapping /opt/haldur and
+//     machine's shell and Docker engine, mapping /opt/hallvi and
 //     /run/lock into the rig directory (bin/flock and bin/timeout emulate
 //     util-linux and coreutils), and stands-ins/native-compose.ts binds
 //     published listeners to loopback, the provider firewall's role. Rig B
@@ -147,7 +147,7 @@ if (!existsSync(join(state, "github-connection.json")))
       id: "00000000-0000-4000-8000-00000000a0d1",
       mode: "app",
       clientId: "Iv1.rig",
-      slug: "rig-haldur",
+      slug: "rig-hallvi",
       token: "ghu_RIG-SYNTHETIC",
       expiresAt: null,
       account: { id: 42, login: "rig-owner" },
@@ -164,14 +164,14 @@ if (!existsSync(join(state, "pi-settings.json"))) {
 
 const env = {
   ...process.env,
-  HALDUR_DB_PATH: join(state, "haldur.db"),
-  HALDUR_LOG_DIR: join(state, "diagnostics"),
-  HALDUR_CONFIG_DIR: state,
+  HALLVI_DB_PATH: join(state, "hallvi.db"),
+  HALLVI_LOG_DIR: join(state, "diagnostics"),
+  HALLVI_CONFIG_DIR: state,
   PI_CODING_AGENT_DIR: agent,
-  HALDUR_GITHUB_CLIENT_ID: "Iv1.rig",
-  HALDUR_GITHUB_APP_SLUG: "rig-haldur",
+  HALLVI_GITHUB_CLIENT_ID: "Iv1.rig",
+  HALLVI_GITHUB_APP_SLUG: "rig-hallvi",
   NEXT_TELEMETRY_DISABLED: "1",
-  HALDUR_TRACING: "0",
+  HALLVI_TRACING: "0",
   SG_RIG_MIRROR_DIR: join(results, "upstream"),
   SG_RIG_HOST_ROOT: host,
   // With a real sshd published by host/ssh.mjs, the shims stop emulating SSH

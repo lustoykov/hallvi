@@ -7,8 +7,8 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { reachFromRecords } from "@/components/haldur/reach-records";
-import { publishOffer } from "@/components/haldur/reach-prototype/reach-story";
+import { reachFromRecords } from "@/components/hallvi/reach-records";
+import { publishOffer } from "@/components/hallvi/reach-prototype/reach-story";
 import {
   APP,
   NOW,
@@ -136,7 +136,7 @@ describe("security", () => {
     const at = "2026-09-13T11:45:00.000Z";
     const story = read([
       states(
-        { kind: "firewall", id: "hd-38e37237" },
+        { kind: "firewall", id: "hv-38e37237" },
         {
           at,
           facts: [
@@ -150,7 +150,7 @@ describe("security", () => {
     expect(story.firewall).toEqual({
       state: "read",
       provider: "Hetzner",
-      name: "hd-38e37237",
+      name: "hv-38e37237",
       at,
       detail: "22 from anywhere; everything else denied",
     });

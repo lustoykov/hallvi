@@ -69,18 +69,18 @@ function tracer() {
               flushInterval: 2,
               mediaUploadEnabled: false,
               shouldExportSpan: ({ otelSpan }) =>
-                otelSpan.instrumentationScope.name === "haldur",
+                otelSpan.instrumentationScope.name === "hallvi",
             })
           : undefined,
     );
     provider = new NodeTracerProvider({
-      resource: resourceFromAttributes({ "service.name": "haldur" }),
+      resource: resourceFromAttributes({ "service.name": "hallvi" }),
       spanProcessors: remote ? [local, remote] : [local],
     });
   }
   // Explicit parent contexts: no global provider, auto-instrumentation, or
   // captured HTTP headers. The only spans exported are created below.
-  return provider.getTracer("haldur");
+  return provider.getTracer("hallvi");
 }
 
 function optionalTelemetry<T>(work: () => T): T | undefined {
@@ -98,13 +98,13 @@ export function beginRunDiagnostics(run: PiRun) {
       {
         startTime: new Date(run.createdAt),
         attributes: {
-          "haldur.run.id": run.id,
-          "haldur.application.id": run.applicationId,
+          "hallvi.run.id": run.id,
+          "hallvi.application.id": run.applicationId,
           "langfuse.session.id": run.chatId,
-          "haldur.retry_of": run.retryOfId ?? "",
-          "langfuse.trace.name": "Haldur reply",
-          "haldur.payload_policy": "Content omitted; metadata only",
-          "haldur.cost_basis":
+          "hallvi.retry_of": run.retryOfId ?? "",
+          "langfuse.trace.name": "Hallvi reply",
+          "hallvi.payload_policy": "Content omitted; metadata only",
+          "hallvi.cost_basis":
             "API price estimates are not subscription charges",
         },
       },
@@ -160,11 +160,11 @@ export function beginRunDiagnostics(run: PiRun) {
       const span = step.span;
       if (!span) return;
       const attrs: Record<string, string | number | boolean> = {
-        "haldur.outcome": outcome,
+        "hallvi.outcome": outcome,
       };
-      if (outcome === "incomplete") attrs["haldur.incomplete"] = true;
+      if (outcome === "incomplete") attrs["hallvi.incomplete"] = true;
       for (const [key, value] of Object.entries(metadata))
-        attrs[`haldur.${key}`] = value;
+        attrs[`hallvi.${key}`] = value;
       if (metadata.model) attrs["gen_ai.request.model"] = metadata.model;
       if (metadata.provider) attrs["gen_ai.provider.name"] = metadata.provider;
       if (typeof metadata.inputTokens === "number")
@@ -237,7 +237,7 @@ export function beginRunDiagnostics(run: PiRun) {
       if (omitted)
         logDiagnostic("execution.omitted", run, { omitted, traceId });
       optionalTelemetry(() => {
-        root?.setAttribute("haldur.outcome", status);
+        root?.setAttribute("hallvi.outcome", status);
         root?.setStatus({
           code:
             status === "succeeded" ? SpanStatusCode.OK : SpanStatusCode.ERROR,

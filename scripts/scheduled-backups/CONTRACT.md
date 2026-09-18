@@ -70,7 +70,7 @@ never appears in stdout, receipts or errors.
 
 ## Receipt
 
-One file per run under `/var/lib/haldur/backups/<deploymentId>/runs/`,
+One file per run under `/var/lib/hallvi/backups/<deploymentId>/runs/`,
 written atomically. This is the exact shape the controller receives:
 
 ```json
@@ -263,13 +263,13 @@ Bounded and stable. No SDK text, no exception messages, no paths, no addresses.
 
 ## What a run does
 
-1. Take `/run/lock/haldur-<deploymentId>.lock` with a non-blocking
+1. Take `/run/lock/hallvi-<deploymentId>.lock` with a non-blocking
    exclusive `flock`, the same lock the controller takes for deploy and
    recreate. Held, and the run exits 75 without recording anything.
 2. Write the `running` receipt durably before touching the source.
 3. Check that every running container the controller labeled still carries
-   this deployment id and revision in its `haldur.deployment` and
-   `haldur.revision` labels, whatever its service is called. State
+   this deployment id and revision in its `hallvi.deployment` and
+   `hallvi.revision` labels, whatever its service is called. State
    owners run unlabeled so a release never recreates them; the configuration
    hash binds them instead. A redeploy since the config was written stops the
    run as `source-identity-mismatch` before the source is touched, rather than
@@ -337,9 +337,9 @@ forget the paperwork.
 
 ## Test overrides
 
-`HALDUR_BACKUP_ROOT`, `HALDUR_LOCK_DIR`, `HALDUR_SOURCE_ROOT` and
-`HALDUR_HELPER_STAGE_ROOT` relocate the state directory, the lock, the
+`HALLVI_BACKUP_ROOT`, `HALLVI_LOCK_DIR`, `HALLVI_SOURCE_ROOT` and
+`HALLVI_HELPER_STAGE_ROOT` relocate the state directory, the lock, the
 deployment root and the capture helper's staging directory. They exist for the
-unit tests. Production uses `/var/lib/haldur/backups`, `/run/lock`,
-`/opt/haldur` and `/var/tmp` — the last is fixed inside the capture helper,
+unit tests. Production uses `/var/lib/hallvi/backups`, `/run/lock`,
+`/opt/hallvi` and `/var/tmp` — the last is fixed inside the capture helper,
 so it must not be moved on a real host.

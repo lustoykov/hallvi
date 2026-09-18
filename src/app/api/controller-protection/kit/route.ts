@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * The passphrase that opens Haldur's own copies. It is deliberately not
+ * The passphrase that opens Hallvi's own copies. It is deliberately not
  * part of the application view: a page asks for it when it is about to show
  * it, and the owner asks for it again from Settings.
  */

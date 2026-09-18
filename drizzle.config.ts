@@ -5,7 +5,7 @@ import { defineConfig } from "drizzle-kit";
 import { stateLocation } from "./scripts/state-location.mjs";
 
 const databasePath =
-  process.env.HALDUR_DB_PATH ??
+  process.env.HALLVI_DB_PATH ??
   stateLocation(process.cwd(), { hidden: true }).database;
 mkdirSync(dirname(databasePath), { recursive: true });
 

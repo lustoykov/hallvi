@@ -11,7 +11,7 @@ export async function openConversation(page: Page) {
   await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}(?:[?#].*)?$/, {
     timeout: 30_000,
   });
-  if (await page.locator(".hd-chat-column").isVisible()) return;
+  if (await page.locator(".hv-chat-column").isVisible()) return;
   const url = new URL(page.url());
   const view = await (
     await page.request.get(`/api${url.pathname}${url.search}`)
@@ -26,7 +26,7 @@ export async function openConversation(page: Page) {
       exact: true,
     })
     .click();
-  await expect(page.locator(".hd-chat-column")).toBeVisible();
+  await expect(page.locator(".hv-chat-column")).toBeVisible();
 }
 // Opens the History destination: operations, saved requirements and
 // application activity.

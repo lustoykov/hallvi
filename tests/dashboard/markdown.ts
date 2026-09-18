@@ -155,10 +155,10 @@ export function renderMarkdown(source: string): string {
  */
 export function guidePage(body: string, title: string) {
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(title)} · Haldur Testing</title><link rel="stylesheet" href="/dashboard.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(title)} · Hallvi Testing</title><link rel="stylesheet" href="/dashboard.css"></head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/"><strong>Haldur</strong><span class="brand-tag">Testing</span></a>
+    <a class="brand" href="/"><strong>Hallvi</strong><span class="brand-tag">Testing</span></a>
     <nav class="pages" aria-label="Pages"><a href="/">Run checks</a><a href="/evals">Eval runs</a><a href="/about">How it works</a></nav>
     <nav class="resources" aria-label="Resources"><a href="/guide" aria-current="page">Acceptance guide</a><a href="http://127.0.0.1:3000/applications" target="_blank" rel="noreferrer">Open app</a></nav>
   </header>

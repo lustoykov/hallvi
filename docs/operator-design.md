@@ -12,7 +12,7 @@ The repository documentation was reconciled with this design on 12 September 202
 
 ## Product premise
 
-Haldur gives a capable model general tools to operate an application and relies on its intelligence to investigate, execute, verify and recommend next steps. Improved models should improve the operator without requiring an expanding catalog of application-specific workflows and rules.
+Hallvi gives a capable model general tools to operate an application and relies on its intelligence to investigate, execute, verify and recommend next steps. Improved models should improve the operator without requiring an expanding catalog of application-specific workflows and rules.
 
 The product's differentiation belongs in:
 
@@ -27,7 +27,7 @@ The product guides users on **what deserves care**. Pi decides **how to provide 
 
 ### Default application access
 
-Applications are private by default: bind application ports and reverse proxies to server loopback, keep application HTTP/HTTPS firewall ports closed, and use an SSH tunnel bound to the controller PC's `127.0.0.1`. Pi opens/reuses the tunnel with `open_server_port` through the normal permission boundary and gives the user its local URL. The tool checks local HTTP response status; Pi must also verify application behavior and server IPv4/IPv6 exposure. Public application access requires an explicit user request. A local link works on the PC running Haldur while its SSH tunnel is alive; reopening after disconnect/reboot is an explicit tool call, not an automatic recovery service. A remote controller requires a separate user access arrangement.
+Applications are private by default: bind application ports and reverse proxies to server loopback, keep application HTTP/HTTPS firewall ports closed, and use an SSH tunnel bound to the controller PC's `127.0.0.1`. Pi opens/reuses the tunnel with `open_server_port` through the normal permission boundary and gives the user its local URL. The tool checks local HTTP response status; Pi must also verify application behavior and server IPv4/IPv6 exposure. Public application access requires an explicit user request. A local link works on the PC running Hallvi while its SSH tunnel is alive; reopening after disconnect/reboot is an explicit tool call, not an automatic recovery service. A remote controller requires a separate user access arrangement.
 
 ### Current focus: the main deployment journey
 
@@ -126,9 +126,9 @@ For the deferred conversation-controls milestone, use the familiar queue/steer/s
 
 Verified against the locally installed `@earendil-works/pi-coding-agent` version `0.84.4`: `AgentSession.followUp()` waits until there are no more tool calls or steering messages; `AgentSession.steer()` delivers after the current assistant turn's tool calls finish, before the next model call. `prompt()` also accepts either behavior while streaming. The runtime exposes queue state and queue-update events for UI integration. Steering does not itself cancel an already-running server command.
 
-Pi's `SessionManager` also provides session branching/forking primitives. These are possible building blocks for side-chat context, not a built-in guarantee of read-only behavior or a finished side-chat UI. Haldur supplies the read-only tool set and chooses what context to include.
+Pi's `SessionManager` also provides session branching/forking primitives. These are possible building blocks for side-chat context, not a built-in guarantee of read-only behavior or a finished side-chat UI. Hallvi supplies the read-only tool set and chooses what context to include.
 
-Source for this check: installed `dist/core/agent-session.d.ts`, `dist/core/agent-session.js` and `dist/core/session-manager.d.ts`. This establishes available runtime primitives, not that Haldur has wired them into its current per-request run lifecycle. Keep application integration small: route messages to the live session, expose pending/delivered state, using its existing queue state. Cross-process restoration of pending messages is not a prerequisite for the first slice; normal session history still provides conversational continuity.
+Source for this check: installed `dist/core/agent-session.d.ts`, `dist/core/agent-session.js` and `dist/core/session-manager.d.ts`. This establishes available runtime primitives, not that Hallvi has wired them into its current per-request run lifecycle. Keep application integration small: route messages to the live session, expose pending/delivered state, using its existing queue state. Cross-process restoration of pending messages is not a prerequisite for the first slice; normal session history still provides conversational continuity.
 
 ### General tools and independent permissions
 
@@ -140,7 +140,7 @@ Permissions govern execution independently of deployment, backup or other workfl
 
 The executor runs tools, handles credentials and records execution output and known outcomes. Errors and incomplete results return to Pi, which investigates and corrects through the same general tools. Do not add dedicated recovery tools, reconciliation workflows, cleanup journals or a framework of pending-effect holds. A lost connection is reported honestly; Pi can inspect the host to determine what happened.
 
-[Jev](https://docs.typesafe.ai/introduction), TypeSafe's model for typed choices, scores and probabilities, is a viable candidate to test for failure triage: classify a bounded, redacted error excerpt as likely DNS, credentials, storage, application failure or insufficient evidence. Compare whether this helps Pi investigate faster than using the native error directly. These are provisional interpretations; Pi still verifies the cause. Jev has not been evaluated or selected for Haldur, and typed outputs do not guarantee correct judgments.
+[Jev](https://docs.typesafe.ai/introduction), TypeSafe's model for typed choices, scores and probabilities, is a viable candidate to test for failure triage: classify a bounded, redacted error excerpt as likely DNS, credentials, storage, application failure or insufficient evidence. Compare whether this helps Pi investigate faster than using the native error directly. These are provisional interpretations; Pi still verifies the cause. Jev has not been evaluated or selected for Hallvi, and typed outputs do not guarantee correct judgments.
 
 Use a simple Codex-style approval interaction: a pending tool call asks the UI, waits asynchronously for a decision, and continues or declines within the active turn. Do not require an approval table, ending or restarting a turn, replay logic, or restoration of a pending approval after a worker restart.
 
@@ -328,7 +328,7 @@ Conversation identity appears in the page header and corresponding navigation en
 
 ### Controller storage versus the deployed application's database
 
-The controller uses SQLite. The storage checkpoint replaced the legacy `deployments` and `application_operations` tables with the four in [Architecture](architecture.md#what-is-stored); neither exists any more. There is no requirement to provision a separate hosted database for Haldur merely to use Hetzner.
+The controller uses SQLite. The storage checkpoint replaced the legacy `deployments` and `application_operations` tables with the four in [Architecture](architecture.md#what-is-stored); neither exists any more. There is no requirement to provision a separate hosted database for Hallvi merely to use Hetzner.
 
 A database needed by the deployed application is a separate concern. Pi determines that requirement from the repository and prepares the appropriate database on the target as part of deployment. A lightweight application may not need one at all.
 

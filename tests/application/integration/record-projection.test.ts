@@ -9,7 +9,7 @@
 import { expect, it, describe } from "vitest";
 
 import type { Ref, SavedInformation } from "@/server/operator-data";
-import { architectureFromRecords } from "@/components/haldur/architecture-records";
+import { architectureFromRecords } from "@/components/hallvi/architecture-records";
 import {
   checkAsNow,
   checkAsRecorded,
@@ -83,7 +83,7 @@ const mapRecord = record({
       {
         id: "controller",
         kind: "controller",
-        name: "Haldur",
+        name: "Hallvi",
         role: "Runs the work",
         plain: "This PC",
       },
@@ -232,7 +232,7 @@ describe("1 · the first observations produce the designed map", () => {
     expect(model.openness).toBe("restricted");
   });
 
-  it("gives Haldur no tag of its own to be wrong about", () => {
+  it("gives Hallvi no tag of its own to be wrong about", () => {
     expect(model.byId.controller.quiet).toBe(true);
   });
 });

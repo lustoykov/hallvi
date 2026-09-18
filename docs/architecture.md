@@ -127,7 +127,7 @@ cards, it is composed from the same records.
 
 ## Publishing at a domain
 
-Merged in [PR #76](https://github.com/lustoykov/haldur/pull/76) on 15 September 2026, this lets the main operator make a privately
+Merged in [PR #76](https://github.com/lustoykov/hallvi/pull/76) on 15 September 2026, this lets the main operator make a privately
 deployed application answer at a hostname the owner supplies, over HTTPS, from
 the internet. It adds two tools and no workflow, table or approval type. The
 public request path is browser → DNS → a reverse proxy on the deployment server
@@ -178,11 +178,11 @@ claims to have observed a renewal.
 
 ## Provisioning
 
-Merged in [PR #56](https://github.com/lustoykov/haldur/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
+Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
 
 ## Protecting the controller
 
-When a backup destination is connected, the worker copies Haldur's own
+When a backup destination is connected, the worker copies Hallvi's own
 records and keys after each piece of work and once a day, encrypted, under the
 bucket's `controller/` prefix, keeping the last fourteen.
 [controller-protection.ts](../src/server/controller-protection.ts) owns it, and
@@ -203,7 +203,7 @@ controller stays manual; see
 - One DNS provider and one host provider are implemented. An IPv6 publishing
   path is not proved.
 - Nothing retrieves an application's own logs; the Logs destination holds what
-  Haldur's own commands printed, and says so.
+  Hallvi's own commands printed, and says so.
 - The worker runs one turn at a time for the whole controller. Native queueing
   and parallel read-only side work are deferred.
 

@@ -272,7 +272,7 @@ export async function checkPublicAccess(
   const reading: PublicAccessReading = {
     checkedAt: new Date().toISOString(),
     checkedFrom:
-      "The PC running Haldur, over its own internet connection and its own DNS resolvers.",
+      "The PC running Hallvi, over its own internet connection and its own DNS resolvers.",
     name: null,
     dns: null,
     expectAddress,
@@ -325,7 +325,7 @@ export async function checkPublicAccess(
       const response = await fetch(httpsUrl, {
         redirect: "follow",
         signal: signal ?? AbortSignal.timeout(20_000),
-        headers: { "user-agent": "Haldur public access check" },
+        headers: { "user-agent": "Hallvi public access check" },
       });
       const body = await response.text().catch(() => "");
       const title = /<title[^>]*>([^<]{1,200})/i.exec(body)?.[1]?.trim();
@@ -361,7 +361,7 @@ export async function checkPublicAccess(
       const response = await fetch(plainUrl, {
         redirect: "manual",
         signal: signal ?? AbortSignal.timeout(15_000),
-        headers: { "user-agent": "Haldur public access check" },
+        headers: { "user-agent": "Hallvi public access check" },
       });
       const location = response.headers.get("location");
       await response.body?.cancel();
@@ -442,7 +442,7 @@ export async function publicUrlReachable(url: string) {
       method: "GET",
       redirect: "follow",
       signal: AbortSignal.timeout(6000),
-      headers: { "user-agent": "Haldur access check" },
+      headers: { "user-agent": "Hallvi access check" },
     });
     await response.body?.cancel();
     return response.status < 500;

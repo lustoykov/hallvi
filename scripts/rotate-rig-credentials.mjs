@@ -43,7 +43,7 @@ for (const app of existsSync(operatorDir) ? readdirSync(operatorDir) : []) {
       "-N",
       "",
       "-C",
-      `haldur-${app.slice(0, 8)}-rotated`,
+      `hallvi-${app.slice(0, 8)}-rotated`,
       "-f",
       key,
     ],

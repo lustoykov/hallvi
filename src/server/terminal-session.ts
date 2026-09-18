@@ -40,7 +40,7 @@ const failures: { failure: TerminalFailure; detail: string; test: RegExp }[] = [
   {
     failure: "host-key",
     detail:
-      "The server presented a different host key than the one on record. Haldur will not connect past that; ask in the conversation to review the connection.",
+      "The server presented a different host key than the one on record. Hallvi will not connect past that; ask in the conversation to review the connection.",
     test: /host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|key_from_blob|no matching host key/i,
   },
   {
