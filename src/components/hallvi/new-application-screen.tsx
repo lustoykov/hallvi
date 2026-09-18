@@ -1,5 +1,6 @@
 "use client";
 
+import { HallviMark } from "./hallvi-mark";
 import { SpinnerGap } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -171,7 +172,8 @@ export function NewApplicationScreen({
     <main className={s.page}>
       <header className={s.topbar}>
         <Link className={s.brand} href={applicationsHref}>
-          <span className="hv-app-mark">H</span>Hallvi
+          <HallviMark size={28} onDark />
+          Hallvi
         </Link>
         {!first && <Link href={applicationsHref}>All applications</Link>}
       </header>

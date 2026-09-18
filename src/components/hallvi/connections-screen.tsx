@@ -1,5 +1,6 @@
 "use client";
 
+import { HallviMark } from "./hallvi-mark";
 import { ArrowLeft, Check, Warning } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -152,7 +153,7 @@ export function ConnectionsScreen({
     <main className={`hv-setup-shell ${s.root}`}>
       <header className="hv-setup-topbar">
         <Link className="hv-setup-brand" href="/applications">
-          <span className="hv-app-mark">H</span>
+          <HallviMark size={28} onDark />
           <span>Hallvi</span>
         </Link>
         <Link

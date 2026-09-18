@@ -45,6 +45,9 @@ const STOPS = [
   { id: "open", label: "Open it", doing: "Opening a way in" },
 ] as const;
 
+const needsYouLater = (waiting: boolean) =>
+  waiting ? ("pointing" as const) : ("working" as const);
+
 export function JourneyRail({
   application,
   facts,
@@ -80,36 +83,55 @@ export function JourneyRail({
   // whether it was unfinished when this page opened is decided once.
   const [watched] = useState(!finished);
   const [dances, setDances] = useState(0);
-  if (finished && !watched) return null;
+  // After that, Hallvi is only in the row while there is something to say:
+  // a turn running, or something waiting. The stops have served their turn.
+  const later = finished && !watched;
+  if (later && !working && !waitingOnYou) return null;
 
   const needsYou = waitingOnYou || (facts.placeWaiting && !working);
-  const mood = finished
-    ? "celebrating"
-    : needsYou
-      ? "pointing"
-      : working
-        ? "working"
-        : started
-          ? "ready"
-          : "waving";
-  const line = finished
-    ? `${application} is running. Open it from the card below.`
-    : needsYou
-      ? facts.placeWaiting
-        ? "Your turn: the card below asks where it should run."
-        : "Your turn: something below is waiting for you."
-      : working
-        ? `${says ?? STOPS[at]!.doing}…`
-        : started
-          ? "I’m here. Tell me what you’d like next."
-          : canStart
-            ? `I’ve added ${application}. Shall I read it and get it running?`
-            : `I’ve added ${application}. Connect ChatGPT below and I’ll get started.`;
+  const mood = later
+    ? needsYouLater(waitingOnYou)
+    : finished
+      ? "celebrating"
+      : needsYou
+        ? "pointing"
+        : working
+          ? "working"
+          : started
+            ? "ready"
+            : "waving";
+  const line = later
+    ? waitingOnYou
+      ? "Your turn: something below is waiting for you."
+      : `${says ?? "Working"}…`
+    : finished
+      ? `${application} is running. Open it from the card below.`
+      : needsYou
+        ? facts.placeWaiting
+          ? "Your turn: the card below asks where it should run."
+          : "Your turn: something below is waiting for you."
+        : working
+          ? `${says ?? STOPS[at]!.doing}…`
+          : started
+            ? "I’m here. Tell me what you’d like next."
+            : canStart
+              ? `I’ve added ${application}. Shall I read it and get it running?`
+              : `I’ve added ${application}. Connect ChatGPT below and I’ll get started.`;
 
   return (
     <section
       className="hv-rail"
-      data-tone={finished ? "done" : needsYou ? "waiting" : "working"}
+      data-tone={
+        later
+          ? waitingOnYou
+            ? "waiting"
+            : "working"
+          : finished
+            ? "done"
+            : needsYou
+              ? "waiting"
+              : "working"
+      }
       aria-label="Progress of the first deployment"
     >
       <button
@@ -137,34 +159,36 @@ export function JourneyRail({
           </button>
         )}
       </p>
-      <ol className="hv-rail-stops">
-        {STOPS.map((stop, index) => {
-          const state = done[index]
-            ? "done"
-            : index === at
-              ? needsYou
-                ? "waiting"
-                : "current"
-              : "pending";
-          return (
-            <li key={stop.id} data-state={state}>
-              <span className="hv-rail-mark" aria-hidden="true">
-                {done[index] ? <Check weight="bold" /> : index + 1}
-              </span>
-              {stop.label}
-              <span className="hv-visually-hidden">
-                {state === "done"
-                  ? ", done"
-                  : state === "waiting"
-                    ? ", waiting for you"
-                    : state === "current"
-                      ? ", current"
-                      : ""}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      {!later && (
+        <ol className="hv-rail-stops">
+          {STOPS.map((stop, index) => {
+            const state = done[index]
+              ? "done"
+              : index === at
+                ? needsYou
+                  ? "waiting"
+                  : "current"
+                : "pending";
+            return (
+              <li key={stop.id} data-state={state}>
+                <span className="hv-rail-mark" aria-hidden="true">
+                  {done[index] ? <Check weight="bold" /> : index + 1}
+                </span>
+                {stop.label}
+                <span className="hv-visually-hidden">
+                  {state === "done"
+                    ? ", done"
+                    : state === "waiting"
+                      ? ", waiting for you"
+                      : state === "current"
+                        ? ", current"
+                        : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }

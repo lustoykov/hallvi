@@ -4,6 +4,7 @@
 // guided steps, the check list, the copyable line and the one field a secret
 // is pasted into. Nothing here knows a provider.
 
+import { HallviMark } from "../hallvi-mark";
 import {
   ArrowSquareOut,
   Check as CheckIcon,
@@ -36,9 +37,7 @@ export function RequestCard({
   return (
     <section className="hv-ob" data-state={state} aria-label={label}>
       <div className="hv-ob-who">
-        <span className="hv-ob-avatar" aria-hidden="true">
-          H
-        </span>
+        <HallviMark />
         <strong>Hallvi</strong>
         <span>{asks}</span>
       </div>

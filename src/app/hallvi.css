@@ -47,6 +47,40 @@
   font: 600 11px var(--mono);
   letter-spacing: 0.02em;
 }
+/* Hallvi's face, at any size: two eyes and a smile on a navy tile. */
+.hv-mark {
+  --size: 22px;
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--size) * 0.19);
+  width: calc(var(--size) * 0.92);
+  height: var(--size);
+  border-radius: calc(var(--size) * 0.28);
+  background: var(--navy, #172238);
+  transform: rotate(-5deg);
+}
+.hv-mark[data-on-dark] {
+  background: rgb(255 255 255 / 12%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 22%);
+}
+.hv-mark i {
+  width: max(2px, calc(var(--size) * 0.085));
+  height: calc(var(--size) * 0.23);
+  margin-top: calc(var(--size) * -0.16);
+  border-radius: 2px;
+  background: #dfe8fb;
+}
+.hv-mark b {
+  position: absolute;
+  bottom: calc(var(--size) * 0.22);
+  width: calc(var(--size) * 0.3);
+  height: calc(var(--size) * 0.13);
+  border-bottom: max(1.5px, calc(var(--size) * 0.055)) solid #dfe8fb;
+  border-radius: 50%;
+}
 /* The application name opens the switcher; its repository sits beneath.
    No select-box chrome at rest. */
 .hv-application-picker {

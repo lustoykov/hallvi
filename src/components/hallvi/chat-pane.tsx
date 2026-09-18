@@ -1,5 +1,6 @@
 "use client";
 
+import { HallviMark } from "./hallvi-mark";
 import {
   Archive,
   ArrowClockwise,
@@ -587,12 +588,13 @@ export function ChatPane({
                   id={`hv-message-${message.id}`}
                 >
                   <div className="hv-message-heading">
-                    <span
-                      className={`hv-avatar ${engineer ? "user" : ""}`}
-                      aria-hidden="true"
-                    >
-                      {engineer ? "You" : "H"}
-                    </span>
+                    {engineer ? (
+                      <span className="hv-avatar user" aria-hidden="true">
+                        You
+                      </span>
+                    ) : (
+                      <HallviMark />
+                    )}
                     <strong>{engineer ? "You" : "Hallvi"}</strong>
                     {message.source === "hallvi" && (
                       <span className="hv-source-tag">
