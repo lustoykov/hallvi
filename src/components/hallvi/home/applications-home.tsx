@@ -4,6 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
+  ArrowRight,
   ArrowUpRight,
   GearSix,
   Globe,
@@ -67,69 +68,21 @@ function moodOf(situation: Situation, active: boolean): MascotMood {
   return active ? "waving" : "ready";
 }
 
-const COUNT = [
-  "No",
-  "One",
-  "Two",
-  "Three",
-  "Four",
-  "Five",
-  "Six",
-  "Seven",
-  "Eight",
-  "Nine",
-  "Ten",
-  "Eleven",
-  "Twelve",
-];
-const names = (items: HomeApplication[]) => {
-  const list = items.map((item) => item.name);
-  return list.length <= 1
-    ? list.join("")
-    : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
-};
-
-/** The collection in two or three sentences: what is so, never what to do. */
+/** A compact reading of the collection; details stay with each application. */
 function summary(items: HomeApplication[]) {
-  const by = (situation: Situation) =>
-    items.filter((item) => situationOf(item) === situation);
-  const needs = by("needs"),
-    working = by("working"),
-    stale = by("stale"),
-    fresh = by("new"),
-    fine = by("fine");
-  const n = items.length;
-  const head = `${COUNT[n] ?? n} application${n === 1 ? "" : "s"}.`;
+  const count = (situation: Situation) =>
+    items.filter((item) => situationOf(item) === situation).length;
+  const needs = count("needs");
+  const working = count("working");
+  const stale = count("stale");
+  const fresh = count("new");
   const parts = [
-    working.length &&
-      `${names(working)} ${working.length > 1 ? "are" : "is"} being worked on`,
-    needs.length &&
-      `${names(needs)} ${needs.length > 1 ? "have" : "has"} something waiting`,
-    stale.length &&
-      `${names(stale)} ${stale.length > 1 ? "haven't" : "hasn't"} been looked at lately`,
-    fresh.length &&
-      `${names(fresh)} ${fresh.length > 1 ? "are" : "is"} new to Hallvi`,
-  ].filter((part): part is string => Boolean(part));
-  const middle = parts.length
-    ? `${parts.slice(0, -1).join(", ")}${parts.length > 1 ? ", and " : ""}${parts.at(-1)}.`
-    : "";
-  const tail =
-    fine.length === n
-      ? n === 1
-        ? "It is fine."
-        : "All of them are fine."
-      : fine.length
-        ? fine.length === 1
-          ? `${fine[0].name} is fine.`
-          : `The other ${COUNT[fine.length]?.toLowerCase() ?? fine.length} are fine.`
-        : "";
-  return [
-    head,
-    middle && middle.charAt(0).toUpperCase() + middle.slice(1),
-    tail,
-  ]
-    .filter(Boolean)
-    .join(" ");
+    needs && `${needs} ${needs === 1 ? "needs" : "need"} attention`,
+    working && `${working} in progress`,
+    stale && `${stale} awaiting a fresh check`,
+    fresh && `${fresh} new`,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Latest recorded checks passed.";
 }
 
 export function ApplicationsHome({
@@ -174,29 +127,37 @@ export function ApplicationsHome({
         </Link>
       </header>
       <div className={s.content}>
-        {/* The page opens with what is so, in a sentence or two, and never
-            with a list of things to do. Most first users run something
-            small; the card below says what runs and where, and leaves
-            protection to the application's own pages until the data has
-            earned a nudge. */}
         <section className={s.greeting} aria-labelledby="home-heading">
-          <div>
-            <p className={s.hello}>Hello, I&rsquo;m Hallvi.</p>
+          <div className={s.welcome}>
             <h1 id="home-heading">
-              {applications.length === 1 ? "Your app is" : "Your apps are"}
+              Your {applications.length === 1 ? "app," : "apps,"}
               <br />
               <em>in good company.</em>
             </h1>
+            <p>
+              {applications.length
+                ? "Pick an app. Pick up where you left off."
+                : "A little help for the software you make your own."}
+            </p>
           </div>
-          {/* With one application its card already says how it is. The
-              sentence earns its place once there are several to sum up. */}
-          {applications.length > 1 && <p>{summary(applications)}</p>}
+          {applications.length > 0 && (
+            <div className={s.addApplication}>
+              <Link className={s.primary} href="/applications/new">
+                <Plus aria-hidden="true" />
+                Add application
+              </Link>
+              <p>Start with a GitHub repository.</p>
+            </div>
+          )}
         </section>
         {applications.length > 0 && (
           <div className={s.collectionHeading}>
-            <h2 id="applications-heading">
-              Your applications <span>{applications.length}</span>
-            </h2>
+            <div className={s.collectionIntro}>
+              <h2 id="applications-heading">
+                Your applications <span>{applications.length}</span>
+              </h2>
+              <p>{summary(applications)}</p>
+            </div>
             {applications.length > 4 && (
               <label className={s.search}>
                 <MagnifyingGlass aria-hidden="true" />
@@ -208,10 +169,6 @@ export function ApplicationsHome({
                 />
               </label>
             )}
-            <Link className={s.add} href={"/applications/new"}>
-              <Plus aria-hidden="true" />
-              Add application
-            </Link>
           </div>
         )}
         {!applications.length ? (
@@ -222,13 +179,13 @@ export function ApplicationsHome({
             <h2>Add your first application</h2>
             <p>
               Start with a GitHub repository. Hallvi inspects it, recommends a
-              server and deploys when you approve.
+              server and helps you get it running.
             </p>
             <Link className={s.primary} href={"/applications/new"}>
               <Plus aria-hidden="true" />
               Add application
             </Link>
-            <small>Nothing is bought or changed until you approve it.</small>
+            <small>Adding a repository doesn’t rent a server.</small>
           </div>
         ) : (
           <>
@@ -317,7 +274,10 @@ export function ApplicationsHome({
                       <p
                         className={`${s.state} ${s[`tone_${item.condition.tone}`]}`}
                       >
-                        {item.condition.text}
+                        {situation === "new" &&
+                        item.condition.text === "New application"
+                          ? "No deployment recorded yet."
+                          : item.condition.text}
                       </p>
                       <div className={s.foot}>
                         <div>
@@ -349,7 +309,7 @@ export function ApplicationsHome({
                           )}
                         </div>
                         <Link className={s.more} href={item.href}>
-                          More
+                          Open app <ArrowRight aria-hidden="true" />
                         </Link>
                       </div>
                     </div>

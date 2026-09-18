@@ -240,6 +240,18 @@ A light, Railway-inspired shell gives application facts and conversation room to
 
 Source authority: `application-shell.css`, `application-navigation.tsx`, `operator-shell.tsx` and the `*-page.tsx` destinations; inherited controls and fonts come from `src/app/hallvi.css` and `src/app/globals.css`. Review captures are in project-root `.impeccable/review/`: `conversation-desktop.png`, `desktop.png`, and `mobile.png`. These are visual evidence of the exercised slice, not a promise of current host health.
 
+## Applications home
+
+The “in good company” identity pairs each application with its caretaker and
+an explicitly illustrated preview. The welcome heading and continuation copy
+stay together; a solid blue Add application action sits beside them on desktop
+and below on mobile. A compact summary belongs with the application collection,
+not in a distant hero paragraph. Detailed conditions stay on their cards;
+recorded checks are not a promise of continuous monitoring. Card preview tints
+carry the caretaker’s color, while blue remains the action color. Use explicit
+Open app links rather than More. One application keeps its larger side-by-side
+composition; multiple applications use a compact collection.
+
 ## Adopted interaction direction (9 September)
 
 Fable A is the selected experience: conversation first, inline operation receipts and quiet navigation marks, with stable full-page application views. There is no permanent right pane, split mode or floating window. Operations are shared across conversations and application views; completed evidence stays historical while application facts reflect later verified work.
