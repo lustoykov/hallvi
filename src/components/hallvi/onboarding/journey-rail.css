@@ -1,19 +1,15 @@
-/* Hallvi and the four stops of a first deployment, in the pane's top row.
- * One quiet line: a small Little Server, what is happening in words, and the
- * stops at the right. Nothing sweeps or fills; a turn in progress is a small
- * spinner beside its own status. */
+/* The welcome owns the top of an untouched conversation. After the first
+ * request, these four quiet stops move beside the composer, immediately above
+ * the single live activity row. */
 
 .hv-chat-top:empty {
   display: none;
 }
 .hv-rail {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 0 20px 0 8px;
-  border-bottom: 1px solid var(--line, #e7e9ee);
-  background: #fff;
+  flex: none;
+  padding: 7px 24px;
+  border-top: 1px solid var(--line, #e7e9ee);
+  background: var(--panel, #f7f8fa);
 }
 .hv-rail-mascot {
   flex: none;
@@ -39,48 +35,6 @@
 .hv-rail-mascot .mascot-fallback {
   display: none;
 }
-.hv-rail-says {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: 13px;
-  color: var(--ink-2, #3e4a60);
-  animation: hv-rail-say 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.hv-rail-says > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hv-rail[data-tone="waiting"] .hv-rail-says {
-  color: #9a4b10;
-  font-weight: 500;
-}
-.hv-rail[data-tone="done"] .hv-rail-says {
-  color: #0f7a4e;
-  font-weight: 500;
-}
-@keyframes hv-rail-say {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-}
-.hv-rail-spin {
-  flex: none;
-  width: 13px;
-  height: 13px;
-  color: var(--muted, #687183);
-  animation: hv-rail-turn 0.9s linear infinite;
-}
-@keyframes hv-rail-turn {
-  to {
-    transform: rotate(360deg);
-  }
-}
 .hv-rail-start {
   flex: none;
   display: inline-flex;
@@ -101,11 +55,13 @@
 }
 
 .hv-rail-stops {
-  flex: none;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  margin: 0;
+  width: min(100%, var(--hv-measure, 760px));
+  min-height: 24px;
+  margin: 0 auto;
   padding: 0;
   list-style: none;
 }
@@ -176,13 +132,6 @@
     gap: 0;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .hv-rail-says,
-  .hv-rail-spin {
-    animation: none;
-  }
-}
-
 /* Before the first message, the next useful action occupies the welcome. */
 .hv-first-app {
   display: flex;

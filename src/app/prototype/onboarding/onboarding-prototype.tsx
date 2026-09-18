@@ -344,10 +344,8 @@ export function OnboardingPrototype() {
               deployed: saved.stage === "running",
               opens: saved.stage === "running",
             }}
-            working={saved.stage === "inspect" || saved.stage === "deploy"}
-            says={null}
             waitingOnYou={saved.stage === "model" || saved.stage === "propose"}
-            started
+            placement="progress"
             canStart={false}
             onStart={() => undefined}
           />
