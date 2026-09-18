@@ -377,7 +377,10 @@
   }
 }
 
-/* The prototype's own bar is sticky too; the rail sits under it. */
+/* In the product the rail is the pane's top row; here it sticks under the
+ * prototype's own bar. */
 .hvp .hv-rail {
+  position: sticky;
   top: 52px;
+  z-index: 2;
 }

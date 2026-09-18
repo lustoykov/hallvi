@@ -187,7 +187,7 @@ export function OnboardingPrototype() {
         await wait(500);
         const kind = simRef.current.cloudflare;
         return kind === "connected"
-          ? { kind, zone }
+          ? { kind, zone, edit: "reported" as const }
           : kind === "zone-hidden"
             ? { kind, visible: ["my-other-site.dev"] }
             : { kind };

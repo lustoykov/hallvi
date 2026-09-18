@@ -28,7 +28,7 @@ export interface HostRequestProgress {
 }
 
 export type ConnectedHost =
-  | { kind: "hetzner"; servers: number }
+  | { kind: "hetzner"; servers: number; reused?: boolean }
   | { kind: "machine"; user: string; address: string; os: string };
 
 export function HostRequest({
@@ -70,11 +70,15 @@ export function HostRequest({
       >
         {connected.kind === "hetzner" ? (
           <Receipt
-            title={`Hetzner connected · can read and make changes · ${
-              connected.servers === 0
-                ? "empty project"
-                : `${connected.servers} other server${connected.servers === 1 ? "" : "s"} in the project`
-            }`}
+            title={
+              connected.reused
+                ? "Using the Hetzner account you connected earlier"
+                : `Hetzner connected · can read and make changes · ${
+                    connected.servers === 0
+                      ? "empty project"
+                      : `${connected.servers} other server${connected.servers === 1 ? "" : "s"} in the project`
+                  }`
+            }
           >
             <HetznerKept />
           </Receipt>
@@ -158,7 +162,9 @@ export function HostRequest({
           <button
             type="button"
             className="hv-ob-primary"
-            onClick={() => onConnected({ kind: "hetzner", servers: 0 })}
+            onClick={() =>
+              onConnected({ kind: "hetzner", servers: 0, reused: true })
+            }
           >
             Use my Hetzner account
           </button>

@@ -1,5 +1,5 @@
 "use client";
-import { Warning } from "@phosphor-icons/react";
+import { CaretUpDown, ShieldCheck, Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
 import { plainText, whereItRan } from "./execution-text";
 import type {
@@ -175,39 +175,69 @@ export function OperatorConsole({
     <div className="hv-operator-console">
       {settingsOnly && settings && (
         <>
-          <div className="hv-operator-toolbar">
-            {main && (
-              <div className="hv-modes">
-                <span id="hv-modes-label">Permissions</span>
-                <div role="radiogroup" aria-labelledby="hv-modes-label">
-                  {modes.map((mode) => (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={settings.permissionMode === mode.id}
-                      disabled={busy !== null}
-                      onClick={() =>
-                        void save({ ...settings, permissionMode: mode.id })
-                      }
-                    >
-                      {mode.label}
-                    </button>
-                  ))}
-                </div>
-                <span
-                  className="hv-modes-means"
-                  data-loud={settings.permissionMode === "bypass" || undefined}
-                >
-                  {settings.permissionMode === "bypass" && (
-                    <Warning weight="fill" aria-hidden="true" />
-                  )}
-                  {modes.find((mode) => mode.id === settings.permissionMode)
-                    ?.means ?? ""}
-                </span>
+          {main && (
+            <div className="hv-mode">
+              <button
+                type="button"
+                className="hv-mode-button"
+                popoverTarget="hv-mode-menu"
+                data-loud={settings.permissionMode === "bypass" || undefined}
+                title={
+                  modes.find((mode) => mode.id === settings.permissionMode)
+                    ?.means
+                }
+                aria-label={`Permissions: ${
+                  modes.find((mode) => mode.id === settings.permissionMode)
+                    ?.label
+                }. Change`}
+              >
+                {settings.permissionMode === "bypass" ? (
+                  <Warning weight="fill" aria-hidden="true" />
+                ) : (
+                  <ShieldCheck aria-hidden="true" />
+                )}
+                {modes.find((mode) => mode.id === settings.permissionMode)
+                  ?.label ?? "Permissions"}
+                <CaretUpDown weight="bold" aria-hidden="true" />
+              </button>
+              <div
+                id="hv-mode-menu"
+                popover="auto"
+                className="hv-mode-menu"
+                role="radiogroup"
+                aria-label="Permissions"
+                onBeforeToggle={(event) => {
+                  if (event.newState !== "open") return;
+                  // Above the composer it belongs to, where there is room.
+                  const menu = event.currentTarget;
+                  const opener = menu.previousElementSibling;
+                  const box = opener?.getBoundingClientRect();
+                  if (!box) return;
+                  menu.style.left = `${box.left}px`;
+                  menu.style.bottom = `${window.innerHeight - box.top + 6}px`;
+                }}
+              >
+                {modes.map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={settings.permissionMode === mode.id}
+                    disabled={busy !== null}
+                    onClick={(event) => {
+                      event.currentTarget
+                        .closest<HTMLElement>("[popover]")
+                        ?.hidePopover();
+                      void save({ ...settings, permissionMode: mode.id });
+                    }}
+                  >
+                    <strong>{mode.label}</strong>
+                    <span>{mode.means}</span>
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
       {!settingsOnly &&

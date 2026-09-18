@@ -118,7 +118,11 @@ export async function POST(
         // An account connected earlier: nothing to check, only to choose.
         if (!hetznerConnectionId())
           throw new Error("Hetzner is not connected on this controller.");
-        settleHost(applicationId, { kind: "hetzner", servers: 0 });
+        settleHost(applicationId, {
+          kind: "hetzner",
+          servers: 0,
+          reused: true,
+        });
         return { settled: true };
       case "hetzner": {
         const outcome = await checkHetznerToken(applicationId, body.token);

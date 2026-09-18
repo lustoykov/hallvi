@@ -516,23 +516,11 @@ export function ChatPane({
           )}
         </header>
       )}
-      {/* The bar means work is moving. With no worker reading the queue it
-          would be an animation over a message nobody has picked up. */}
-      {(busy !== null || (requestPending && workerAlive !== false)) && (
-        <div className="hv-busy-bar" aria-hidden="true" />
-      )}
-
-      {view.application && chatId && view.chats[0]?.id === chatId && (
-        <OperatorConsole
-          key={`settings:${view.application.id}:${chatId}`}
-          applicationId={view.application.id}
-          chatId={chatId}
-          main={view.chats[0]?.id === chatId}
-          settingsOnly
-        />
-      )}
-      <Conversation className="hv-conversation">
-        <ConversationContent className="hv-messages">
+      {/* The pane's first row. It is always here in the main conversation,
+          because the grid below it counts rows; it is empty once the first
+          deployment has arrived. */}
+      {secretsHere && (
+        <div className="hv-chat-top">
           {connections.journey && view.application && (
             <JourneyRail
               application={view.application.name}
@@ -550,6 +538,10 @@ export function ChatPane({
               }
             />
           )}
+        </div>
+      )}
+      <Conversation className="hv-conversation">
+        <ConversationContent className="hv-messages">
           {reconnecting && (
             <p className="hv-stream-notice" role="status">
               <SpinnerGap className="spin" aria-hidden="true" />
@@ -1014,8 +1006,19 @@ export function ChatPane({
             value={composer}
           />
           <div className="hv-composer-bar">
-            <span className="hv-composer-hint">
-              <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
+            <span className="hv-composer-left">
+              {view.application && chatId && view.chats[0]?.id === chatId && (
+                <OperatorConsole
+                  key={`settings:${view.application.id}:${chatId}`}
+                  applicationId={view.application.id}
+                  chatId={chatId}
+                  main
+                  settingsOnly
+                />
+              )}
+              <span className="hv-composer-hint">
+                <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
+              </span>
             </span>
             <button
               className="hv-send"

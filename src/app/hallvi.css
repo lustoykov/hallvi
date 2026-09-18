@@ -317,34 +317,6 @@
 .hv-pane-title span.ready {
   color: var(--green-text);
 }
-/* Indeterminate progress under the chat header while a request runs. */
-.hv-busy-bar {
-  position: absolute;
-  z-index: 2;
-  top: 55px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  overflow: hidden;
-  pointer-events: none;
-}
-.hv-busy-bar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 40%;
-  border-radius: 2px;
-  background: var(--blue);
-  animation: hv-busy 1.1s var(--ease) infinite;
-}
-@keyframes hv-busy {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(260%);
-  }
-}
 .hv-text-button {
   display: inline-flex;
   gap: 6px;
@@ -803,6 +775,12 @@
   gap: 12px;
   padding: 4px 8px 8px 14px;
 }
+.hv-composer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
 .hv-composer-hint {
   color: var(--muted);
   font-size: 11px;
@@ -1210,8 +1188,7 @@
     animation-duration: 0.01ms !important;
   }
   .hv-application-menu,
-  .hv-application-picker svg,
-  .hv-busy-bar::after {
+  .hv-application-picker svg {
     transition: none;
     animation: none;
   }

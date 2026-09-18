@@ -64,11 +64,22 @@ export type DnsHost =
   | { kind: "unreachable" };
 
 export type CloudflareOutcome =
-  | { kind: "connected"; zone: string }
+  | {
+      kind: "connected";
+      zone: string;
+      /**
+       * Whether Cloudflare's own zone listing reports DNS edit for this
+       * token. Some tokens are listed without permissions; then it is
+       * unknown until the first record is written, and is said so.
+       */
+      edit: "reported" | "unknown";
+    }
   | { kind: "unreachable" }
   | { kind: "rejected" }
   /** The token is active and cannot see the zone. Says which it can see. */
-  | { kind: "zone-hidden"; visible: string[] };
+  | { kind: "zone-hidden"; visible: string[] }
+  /** It sees the zone, and Cloudflare reports it may only read its DNS. */
+  | { kind: "cannot-edit" };
 
 export interface OnboardingTransport {
   checkHetzner(token: string): Promise<HetznerOutcome>;

@@ -40,7 +40,12 @@ export const domainProgressSchema = z.strictObject({
 });
 
 const connectedHostSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("hetzner"), servers: z.number().int() }),
+  z.strictObject({
+    kind: z.literal("hetzner"),
+    servers: z.number().int(),
+    /** An account connected earlier was chosen; nothing was checked now. */
+    reused: z.boolean().optional(),
+  }),
   z.strictObject({
     kind: z.literal("machine"),
     user: z.string().max(64),
@@ -55,7 +60,7 @@ const requestSchema = z.discriminatedUnion("kind", [
     requestedAt: z.string(),
     settledAt: z.string().nullable(),
     needs: z.string().max(400),
-    estimate: z.string().max(80),
+    estimate: z.string().max(240),
     recommended: z.enum(["hetzner", "machine"]),
     progress: hostProgressSchema,
     connected: connectedHostSchema.nullable(),
@@ -117,11 +122,15 @@ export function requestHost(
   const open = listConnectionRequests(applicationId).find(
     (item) => item.kind === "host" && !item.settledAt,
   );
+  // Pi writes these sentences, and a long one must shorten, not vanish: a
+  // request that fails its own schema on the way back is a card nobody sees.
   return put(applicationId, {
     kind: "host",
     requestedAt: open?.requestedAt ?? new Date().toISOString(),
     settledAt: null,
-    ...input,
+    needs: input.needs.trim().slice(0, 400),
+    estimate: input.estimate.trim().slice(0, 240),
+    recommended: input.recommended,
     progress:
       open?.kind === "host"
         ? open.progress

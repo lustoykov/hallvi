@@ -72,9 +72,10 @@ export function ModeLine({
           </>
         ) : mode === "pi-decides" ? (
           <>
-            You are on <b>Pi decides</b>: Hallvi is instructed to ask before it
-            can {action}, but in this mode asking is its judgment, not a lock.
-            Choose Always ask for a guaranteed prompt.
+            You are on <b>Pi decides</b>: whether to ask first is Hallvi&rsquo;s
+            judgment, and it may take connecting as your go-ahead to {action} as
+            it proposed. Choose Always ask if you want a prompt before that
+            happens.
           </>
         ) : (
           <>

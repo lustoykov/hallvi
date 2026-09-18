@@ -84,16 +84,25 @@ function settle(outcome: CloudflareOutcome, zone: string): Check[] {
   const active: Check = { ...PLAN[1]!, state: "passed" };
   if (outcome.kind === "zone-hidden")
     return [reached, active, { ...PLAN[2]!, state: "failed" }];
+  const sees: Check = { ...PLAN[2]!, state: "passed", detail: zone };
+  if (outcome.kind === "cannot-edit")
+    return [reached, active, sees, { ...PLAN[3]!, state: "failed" }];
   return [
     reached,
     active,
-    { ...PLAN[2]!, state: "passed", detail: zone },
-    {
-      ...PLAN[3]!,
-      state: "unproven",
-      detail:
-        "Cloudflare has no way to ask this without changing something. It is proven when Hallvi writes your record.",
-    },
+    sees,
+    outcome.edit === "reported"
+      ? {
+          ...PLAN[3]!,
+          state: "passed",
+          detail: "Cloudflare lists DNS edit for this token in that zone.",
+        }
+      : {
+          ...PLAN[3]!,
+          state: "unproven",
+          detail:
+            "Cloudflare did not list this token’s permissions. It is proven when Hallvi writes your record.",
+        },
   ];
 }
 
@@ -147,7 +156,7 @@ export function DomainConnect({
         <Receipt
           title={
             way === "cloudflare"
-              ? `Cloudflare connected for ${zone} · DNS edit proven by the record Hallvi wrote`
+              ? `Cloudflare connected for ${zone}`
               : `${name} points at ${serverAddress} · added by you`
           }
         >
@@ -391,6 +400,16 @@ export function DomainConnect({
                 It may have been deleted or rolled on Cloudflare, or only part
                 of it was copied. Tokens cannot be shown again: create a new one
                 with the link in step 1.
+              </p>
+            </Problem>
+          )}
+          {outcome?.kind === "cannot-edit" && (
+            <Problem title={`The token can see ${zone}, but only read its DNS`}>
+              <p>
+                Cloudflare lists it without DNS edit. On Cloudflare, open the
+                token under My Profile › API Tokens, choose Edit, set Zone · DNS
+                to <b>Edit</b> and save; the same token then works. Press Check
+                and connect again. Nothing was saved.
               </p>
             </Problem>
           )}

@@ -121,16 +121,17 @@ export async function connectCloudflare(input: {
  * reached, whether the token is active, and whether it can see the zone. A
  * zone the token cannot see is reported with the zones it can, because that
  * is a scope chosen on Cloudflare's page and not a missing domain. Whether it
- * may edit DNS cannot be asked without writing, so it is not claimed here.
+ * may edit DNS is read from the permissions Cloudflare lists beside the zone.
  */
 export async function connectCloudflareForZone(input: {
   token: string;
   zone: string;
 }): Promise<
-  | { kind: "connected"; zone: string }
+  | { kind: "connected"; zone: string; edit: "reported" | "unknown" }
   | { kind: "unreachable" }
   | { kind: "rejected" }
   | { kind: "zone-hidden"; visible: string[] }
+  | { kind: "cannot-edit" }
 > {
   const value = input.token.trim();
   if (!/^[A-Za-z0-9_-]{30,200}$/.test(value)) return { kind: "rejected" };
@@ -147,18 +148,29 @@ export async function connectCloudflareForZone(input: {
   } catch (error) {
     return answered(error) ? { kind: "rejected" } : { kind: "unreachable" };
   }
-  let zones: { name: string }[];
+  let zones: { name: string; permissions?: string[] }[];
   try {
-    zones = await callWith<{ name: string }[]>(value, "/zones?per_page=50");
+    zones = await callWith<typeof zones>(value, "/zones?per_page=50");
   } catch (error) {
     // Active, and not allowed to list zones: it can see none of them.
     if (!answered(error)) return { kind: "unreachable" };
     zones = [];
   }
-  if (!zones.some((zone) => zone.name === input.zone))
-    return { kind: "zone-hidden", visible: zones.map((zone) => zone.name) };
+  const zone = zones.find((item) => item.name === input.zone);
+  if (!zone)
+    return { kind: "zone-hidden", visible: zones.map((item) => item.name) };
+  // Cloudflare lists what the token may do in each zone it can see, so DNS
+  // edit is read rather than tried. A listing without permissions says
+  // nothing either way.
+  const listed = zone.permissions?.length ? zone.permissions : null;
+  if (listed && !listed.includes("#dns_records:edit"))
+    return { kind: "cannot-edit" };
   await connectCloudflare({ token: value });
-  return { kind: "connected", zone: input.zone };
+  return {
+    kind: "connected",
+    zone: input.zone,
+    edit: listed ? "reported" : "unknown",
+  };
 }
 
 interface CloudflareBody<T> {

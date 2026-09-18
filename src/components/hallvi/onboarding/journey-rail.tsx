@@ -9,10 +9,12 @@
 //
 // Every stop is read from what is recorded — a request, an attached host, a
 // deployment record, an access record — never from a timer or a guess at how
-// far along Pi is. What moves while Pi works is the stop it is on, because
-// that is all anyone knows; nothing here counts up to a hundred.
+// far along Pi is. While Pi works there is a small spinner beside the turn's
+// own status line and nothing else moves: work of unknown length gets no bar.
+// It lives in the pane's top row, small, so it keeps no room from the
+// conversation; permissions moved to the composer to make that row free.
 
-import { ArrowRight, Check } from "@phosphor-icons/react";
+import { ArrowRight, Check, SpinnerGap } from "@phosphor-icons/react";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
@@ -124,49 +126,45 @@ export function JourneyRail({
           danceRequest={dances + (finished ? 1 : 0)}
         />
       </button>
-      <div className="hv-rail-body">
-        <p className="hv-rail-says" key={line} role="status">
-          {line}
-          {!started && !working && canStart && !finished && (
-            <button type="button" className="hv-rail-start" onClick={onStart}>
-              Get it running <ArrowRight weight="bold" aria-hidden="true" />
-            </button>
-          )}
-        </p>
-        <ol className="hv-rail-stops">
-          {STOPS.map((stop, index) => {
-            const state = done[index]
-              ? "done"
-              : index === at
-                ? needsYou
-                  ? "waiting"
-                  : working
-                    ? "active"
-                    : "next"
-                : "pending";
-            return (
-              <li key={stop.id} data-state={state}>
-                <span className="hv-rail-mark" aria-hidden="true">
-                  {done[index] ? <Check weight="bold" /> : index + 1}
-                </span>
-                <span className="hv-rail-label">
-                  {stop.label}
-                  <span className="hv-visually-hidden">
-                    {state === "done"
-                      ? ", done"
-                      : state === "active"
-                        ? ", in progress"
-                        : state === "waiting"
-                          ? ", waiting for you"
-                          : ""}
-                  </span>
-                </span>
-                <span className="hv-rail-bar" aria-hidden="true" />
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+      <p className="hv-rail-says" key={line} role="status">
+        {working && !needsYou && (
+          <SpinnerGap className="hv-rail-spin" aria-hidden="true" />
+        )}
+        <span>{line}</span>
+        {!started && !working && canStart && !finished && (
+          <button type="button" className="hv-rail-start" onClick={onStart}>
+            Get it running <ArrowRight weight="bold" aria-hidden="true" />
+          </button>
+        )}
+      </p>
+      <ol className="hv-rail-stops">
+        {STOPS.map((stop, index) => {
+          const state = done[index]
+            ? "done"
+            : index === at
+              ? needsYou
+                ? "waiting"
+                : "current"
+              : "pending";
+          return (
+            <li key={stop.id} data-state={state}>
+              <span className="hv-rail-mark" aria-hidden="true">
+                {done[index] ? <Check weight="bold" /> : index + 1}
+              </span>
+              {stop.label}
+              <span className="hv-visually-hidden">
+                {state === "done"
+                  ? ", done"
+                  : state === "waiting"
+                    ? ", waiting for you"
+                    : state === "current"
+                      ? ", current"
+                      : ""}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
