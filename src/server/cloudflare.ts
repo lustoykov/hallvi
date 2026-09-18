@@ -123,16 +123,18 @@ export async function connectCloudflare(input: {
  * is a scope chosen on Cloudflare's page and not a missing domain. Whether it
  * may edit DNS is read from the permissions Cloudflare lists beside the zone.
  */
-export async function connectCloudflareForZone(input: {
-  token: string;
-  zone: string;
-}): Promise<
+type ZoneOutcome =
   | { kind: "connected"; zone: string; edit: "reported" | "unknown" }
   | { kind: "unreachable" }
   | { kind: "rejected" }
   | { kind: "zone-hidden"; visible: string[] }
-  | { kind: "cannot-edit" }
-> {
+  | { kind: "cannot-edit" };
+
+/** What one token can do for one zone. Saves nothing. */
+async function inspectTokenForZone(input: {
+  token: string;
+  zone: string;
+}): Promise<ZoneOutcome> {
   const value = input.token.trim();
   if (!/^[A-Za-z0-9_-]{30,200}$/.test(value)) return { kind: "rejected" };
   // `callWith` throws its own sentence once Cloudflare has answered; any
@@ -165,12 +167,33 @@ export async function connectCloudflareForZone(input: {
   const listed = zone.permissions?.length ? zone.permissions : null;
   if (listed && !listed.includes("#dns_records:edit"))
     return { kind: "cannot-edit" };
-  await connectCloudflare({ token: value });
   return {
     kind: "connected",
     zone: input.zone,
     edit: listed ? "reported" : "unknown",
   };
+}
+
+export async function connectCloudflareForZone(input: {
+  token: string;
+  zone: string;
+}): Promise<ZoneOutcome> {
+  const outcome = await inspectTokenForZone(input);
+  if (outcome.kind === "connected")
+    await connectCloudflare({ token: input.token.trim() });
+  return outcome;
+}
+
+/**
+ * Whether the Cloudflare connection this controller already has will do for
+ * a zone, so an owner who connected it earlier is not asked for a token again.
+ */
+export async function existingCloudflareForZone(
+  zone: string,
+): Promise<ZoneOutcome | { kind: "not-connected" }> {
+  const held = token();
+  if (!held) return { kind: "not-connected" };
+  return inspectTokenForZone({ token: held, zone });
 }
 
 interface CloudflareBody<T> {

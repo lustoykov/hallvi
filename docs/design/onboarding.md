@@ -247,6 +247,48 @@ sequenceDiagram
   zone outside a token's scope is reported as hidden, with what is visible,
   and nothing is saved; key shapes and the machine line.
 
+## Live run, 18 September 2026
+
+One real journey on the owner's Default Hetzner project (empty beforehand) and
+Cloudflare zone, with existing credentials reused and never printed. The
+server is a labelled, registered development fixture.
+
+- **Hetzner path, end to end.** "Get it running" sent the first message; Pi
+  read the repository, read live prices and called `request_connection` by
+  itself; the card appeared with Pi's own estimate; "Use my Hetzner account"
+  settled it and the continuation message was sent without the owner typing;
+  Pi rented a CX23 (€5.99 a month), installed Docker, started Uptime Kuma
+  2.5.5 on loopback, proved the data survives a container replacement, and
+  opened a private link. From this computer the link answered (302 to the
+  application's setup page) and port 3001 did not answer from the internet.
+  The rail went from "Read it" to "Open it" from records alone.
+- **Existing-machine path.** The card's one command was run on that server
+  and printed its line; pasting the line passed every check (host key pinned,
+  key sign-in, root, Ubuntu 24.04 x86_64, Docker present), folded the card
+  into a receipt, and resumed Pi unprompted.
+- **Publishing guard.** Asked for the direct address, Pi found Uptime Kuma's
+  unclaimed setup page and asked for an administrator password through the
+  secure field instead of publishing. That value is the owner's to type, so
+  the sslip.io address and the domain stop here until they do.
+- **Domain lookup.** Public DNS named Cloudflare for the owner's zone, and the
+  existing connection is reported by Cloudflare as able to edit its DNS, so
+  the card offers "Let Hallvi add the record" and asks for no token.
+
+What the run changed: a request whose estimate overran its own schema was
+written and then dropped on read, so the card never appeared (now clamped on
+write); the shortcut receipt claimed a write check that had not run; the
+Pi-decides line promised a prompt before renting and Pi rented without one;
+Cloudflare's zone listing reports permissions, so DNS edit is read rather
+than called unprovable; a machine reports Docker's bridges among its
+addresses, so only the one signed in to is offered first; a Cloudflare
+connection made earlier is used instead of asking again. The repository
+workspace image is amd64 and failed on this arm64 Mac; Pi worked from the
+server instead. That is outside this change and worth its own fix.
+
+**Not exercised live:** pasting a Hetzner or Cloudflare token (needs the
+owner's hands; a read-only and a read-write Hetzner token are the useful
+pair), a home-network machine, the sslip.io certificate, and a domain record.
+
 ## Still to prove or build
 
 - A fresh journey on a **real Hetzner project** and on a **real machine**

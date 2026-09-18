@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { connectCloudflareForZone } from "@/server/cloudflare";
+import {
+  connectCloudflareForZone,
+  existingCloudflareForZone,
+} from "@/server/cloudflare";
 import {
   checkHetznerToken,
   checkMachine,
@@ -62,6 +65,12 @@ const action = z.discriminatedUnion("action", [
     action: z.literal("cloudflare"),
     token: z.string().min(1).max(200),
     zone: name,
+  }),
+  z.strictObject({
+    action: z.literal("cloudflare-existing"),
+    zone: name,
+    /** The owner chose to use it; without this it is only looked at. */
+    use: z.boolean().optional(),
   }),
   z.strictObject({
     action: z.literal("resolves"),
@@ -153,6 +162,12 @@ export async function POST(
       case "cloudflare": {
         const outcome = await connectCloudflareForZone(body);
         if (outcome.kind === "connected")
+          settleDomain(applicationId, "cloudflare");
+        return { outcome };
+      }
+      case "cloudflare-existing": {
+        const outcome = await existingCloudflareForZone(body.zone);
+        if (body.use && outcome.kind === "connected")
           settleDomain(applicationId, "cloudflare");
         return { outcome };
       }

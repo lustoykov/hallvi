@@ -86,6 +86,10 @@ export interface OnboardingTransport {
   checkMachine(line: MachineLine, address: string): Promise<MachineOutcome>;
   whoHostsDns(name: string): Promise<DnsHost>;
   checkCloudflare(token: string, zone: string): Promise<CloudflareOutcome>;
+  /** Whether a Cloudflare connection made earlier already covers the zone. */
+  existingCloudflare(
+    zone: string,
+  ): Promise<CloudflareOutcome | { kind: "not-connected" }>;
   /** Public DNS, asked again: does the name hand out the address yet? */
   recordResolves(name: string, address: string): Promise<boolean>;
 }

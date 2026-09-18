@@ -319,19 +319,46 @@ export function MachineConnect({
                     </dl>
                     <fieldset className="hv-ob-addresses">
                       <legend>Address Hallvi should use</legend>
-                      {line.addresses.map((candidate, index) => (
-                        <label key={candidate}>
-                          <input
-                            type="radio"
-                            name="hv-ob-address"
-                            checked={target === candidate}
-                            onChange={() => setAddress(candidate)}
-                          />
-                          <code>{candidate}</code>
-                          {index === 0 && <em>the one you signed in to</em>}
-                          {isHomeAddress(candidate) && <em>home network</em>}
-                        </label>
-                      ))}
+                      {/* The address the owner signed in to is nearly always
+                          the one. The rest are whatever the machine has,
+                          Docker's own bridges included, so they wait. */}
+                      {line.addresses
+                        .filter(
+                          (candidate, index) =>
+                            index === 0 || candidate === address,
+                        )
+                        .map((candidate, index) => (
+                          <label key={candidate}>
+                            <input
+                              type="radio"
+                              name="hv-ob-address"
+                              checked={target === candidate}
+                              onChange={() => setAddress(candidate)}
+                            />
+                            <code>{candidate}</code>
+                            {index === 0 && <em>the one you signed in to</em>}
+                            {isHomeAddress(candidate) && <em>home network</em>}
+                          </label>
+                        ))}
+                      {line.addresses.length > 1 && (
+                        <details className="hv-ob-more">
+                          <summary>
+                            Other addresses this machine reported
+                          </summary>
+                          <p>
+                            {line.addresses.slice(1).map((candidate) => (
+                              <button
+                                type="button"
+                                className="hv-ob-quiet"
+                                key={candidate}
+                                onClick={() => setAddress(candidate)}
+                              >
+                                <code>{candidate}</code>
+                              </button>
+                            ))}
+                          </p>
+                        </details>
+                      )}
                       <label>
                         Another
                         <input

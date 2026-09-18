@@ -55,3 +55,11 @@ saved records (`listApplicationItems`). Kind and purpose are read from the
 repository name (`application-kind.ts`); unknown software gets the generic
 screen and its repository as the purpose. The screens are drawings; their
 lines and numbers are decorative and never read from the host.
+
+## Fewer words (18 September 2026)
+
+The owner found the page's loose sentences random. It now opens "Hello, I'm
+Hallvi." over the heading; the collection summary appears only with more than
+one application, because a single card already says how its application is;
+the "Click a caretaker" hint and the footer tagline are gone. One application
+gets the wide layout (`data-solo`), and none goes straight to the welcome.

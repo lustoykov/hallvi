@@ -73,6 +73,11 @@ function transportFor(applicationId: string): OnboardingTransport {
         token,
         zone,
       }).catch(() => ({ kind: "unreachable" as const })),
+    existingCloudflare: (zone) =>
+      ask<Awaited<ReturnType<OnboardingTransport["existingCloudflare"]>>>({
+        action: "cloudflare-existing",
+        zone,
+      }).catch(() => ({ kind: "not-connected" as const })),
     recordResolves: (name, address) =>
       ask<boolean>({ action: "resolves", name, address }).catch(() => false),
   };
@@ -229,9 +234,17 @@ export function useConnectionRequests({
           progress={request.progress as DomainProgress}
           onProgress={(value) => progress("domain", value)}
           done={Boolean(request.settledAt)}
-          onReady={(via) => {
+          onReady={async (via) => {
+            const { name, host } = request.progress;
+            // A connection made earlier settles here; one pasted just now
+            // already has, and settling twice changes nothing.
+            if (via === "cloudflare" && host && "zone" in host)
+              await post({
+                action: "cloudflare-existing",
+                zone: host.zone,
+                use: true,
+              });
             void read();
-            const { name } = request.progress;
             onTell(
               via === "cloudflare"
                 ? `Cloudflare is connected for ${name}. Please point ${name} at the server and publish the application there.`

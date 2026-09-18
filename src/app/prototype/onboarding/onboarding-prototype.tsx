@@ -192,6 +192,9 @@ export function OnboardingPrototype() {
             ? { kind, visible: ["my-other-site.dev"] }
             : { kind };
       },
+      async existingCloudflare() {
+        return { kind: "not-connected" as const };
+      },
       async recordResolves() {
         asks.current += 1;
         return asks.current >= 3;

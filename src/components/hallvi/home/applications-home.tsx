@@ -180,16 +180,17 @@ export function ApplicationsHome({
             protection to the application's own pages until the data has
             earned a nudge. */}
         <section className={s.greeting} aria-labelledby="home-heading">
-          <h1 id="home-heading">
-            {applications.length === 1 ? "Your app is" : "Your apps are"}
-            <br />
-            <em>in good company.</em>
-          </h1>
-          <p>
-            {applications.length
-              ? summary(applications)
-              : "Nothing here yet. Add an application and a caretaker arrives with it."}
-          </p>
+          <div>
+            <p className={s.hello}>Hello, I&rsquo;m Hallvi.</p>
+            <h1 id="home-heading">
+              {applications.length === 1 ? "Your app is" : "Your apps are"}
+              <br />
+              <em>in good company.</em>
+            </h1>
+          </div>
+          {/* With one application its card already says how it is. The
+              sentence earns its place once there are several to sum up. */}
+          {applications.length > 1 && <p>{summary(applications)}</p>}
         </section>
         {applications.length > 0 && (
           <div className={s.collectionHeading}>
@@ -363,7 +364,7 @@ export function ApplicationsHome({
               </div>
             )}
             <div className={s.controls}>
-              <span>Click a caretaker to say hello.</span>
+              <span />
               <button onClick={() => setPaused((value) => !value)}>
                 {paused ? (
                   <Play aria-hidden="true" />
@@ -375,9 +376,6 @@ export function ApplicationsHome({
             </div>
           </>
         )}
-        <footer className={s.footer}>
-          Software you own. Help when you need it.
-        </footer>
       </div>
     </main>
   );

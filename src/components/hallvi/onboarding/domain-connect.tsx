@@ -140,6 +140,8 @@ export function DomainConnect({
   const [looking, setLooking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<CloudflareOutcome | null>(null);
+  // A Cloudflare connection made earlier that already covers this zone.
+  const [existing, setExisting] = useState<"reported" | "unknown" | null>(null);
   const staged = useStagedChecks();
   const { name, host, way } = progress;
   const zone =
@@ -178,6 +180,11 @@ export function DomainConnect({
     if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(wanted)) return;
     setLooking(true);
     const found = await transport.whoHostsDns(wanted);
+    const held =
+      found.kind === "cloudflare"
+        ? await transport.existingCloudflare(found.zone)
+        : null;
+    setExisting(held?.kind === "connected" ? held.edit : null);
     setLooking(false);
     onProgress({
       name: wanted,
@@ -316,7 +323,26 @@ export function DomainConnect({
         />
       )}
 
-      {host?.kind === "cloudflare" && way === "cloudflare" && (
+      {host?.kind === "cloudflare" && way === "cloudflare" && existing && (
+        <div className="hv-ob-path">
+          <p className="hv-ob-lede">
+            Cloudflare is already connected here, and{" "}
+            {existing === "reported"
+              ? "Cloudflare lists DNS edit for that connection in "
+              : "that connection can see "}
+            <b>{zone}</b>. No new token is needed.
+          </p>
+          <ModeLine mode={mode} action="change your DNS" />
+          <button
+            type="button"
+            className="hv-ob-primary"
+            onClick={() => onReady("cloudflare")}
+          >
+            Let Hallvi add the record
+          </button>
+        </div>
+      )}
+      {host?.kind === "cloudflare" && way === "cloudflare" && !existing && (
         <div className="hv-ob-path">
           <div className="hv-ob-grant">
             <h4>What you are giving Hallvi</h4>
