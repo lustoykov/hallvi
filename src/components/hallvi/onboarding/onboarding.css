@@ -109,12 +109,30 @@
 
 /* ---------- The two places it can run ---------- */
 
+.hv-ob-hidden,
+.hv-ob-choices input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.hv-ob-choices label:has(input:focus-visible) {
+  outline: 2px solid var(--ob-blue);
+  outline-offset: 2px;
+}
 .hv-ob-choices {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.hv-ob-choices button {
+.hv-ob-choices label {
+  position: relative;
   display: grid;
   grid-template-columns: 20px 1fr;
   align-content: start;
@@ -131,10 +149,10 @@
     border-color 140ms ease,
     background-color 140ms ease;
 }
-.hv-ob-choices button:hover {
+.hv-ob-choices label:hover {
   border-color: #9fb4e6;
 }
-.hv-ob-choices button[aria-checked="true"] {
+.hv-ob-choices label:has(input:checked) {
   border-color: var(--ob-blue);
   background: #f4f7ff;
   box-shadow: inset 0 0 0 1px var(--ob-blue);
@@ -222,7 +240,7 @@
   color: var(--ob-muted);
   cursor: pointer;
 }
-.hv-ob-switch button[aria-selected="true"] {
+.hv-ob-switch button[aria-pressed="true"] {
   background: #fff;
   color: var(--ob-ink);
   box-shadow: 0 0 0 1px var(--ob-line);

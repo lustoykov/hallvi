@@ -288,21 +288,19 @@ export function DomainConnect({
           {host.kind === "cloudflare" && (
             <div
               className="hv-ob-switch"
-              role="tablist"
+              role="group"
               aria-label="Who adds the record"
             >
               <button
-                role="tab"
                 type="button"
-                aria-selected={way === "cloudflare"}
+                aria-pressed={way === "cloudflare"}
                 onClick={() => onProgress({ ...progress, way: "cloudflare" })}
               >
                 Hallvi adds it
               </button>
               <button
-                role="tab"
                 type="button"
-                aria-selected={way === "manual"}
+                aria-pressed={way === "manual"}
                 onClick={() => onProgress({ ...progress, way: "manual" })}
               >
                 I&rsquo;ll add it myself

@@ -166,19 +166,17 @@ export function HetznerConnect({
         <ModeLine mode={mode} action="rent the server" />
       </div>
 
-      <div className="hv-ob-switch" role="tablist" aria-label="How to connect">
+      <div className="hv-ob-switch" role="group" aria-label="How to connect">
         <button
-          role="tab"
           type="button"
-          aria-selected={guided}
+          aria-pressed={guided}
           onClick={() => setGuided(true)}
         >
           Guide me
         </button>
         <button
-          role="tab"
           type="button"
-          aria-selected={!guided}
+          aria-pressed={!guided}
           onClick={() => setGuided(false)}
         >
           I have a token

@@ -114,17 +114,17 @@ export function HostRequest({
       <p className="hv-ob-said">
         {needs} Where should {application} run?
       </p>
-      <div
-        className="hv-ob-choices"
-        role="radiogroup"
-        aria-label="Where it runs"
-      >
-        <button
-          type="button"
-          role="radio"
-          aria-checked={progress.choice === "hetzner"}
-          onClick={() => choose("hetzner")}
-        >
+      {/* Real radio inputs, so arrow keys, focus and the screen reader's
+          "1 of 2" all come from the browser. */}
+      <fieldset className="hv-ob-choices">
+        <legend className="hv-ob-hidden">Where it runs</legend>
+        <label>
+          <input
+            type="radio"
+            name="hv-ob-where"
+            checked={progress.choice === "hetzner"}
+            onChange={() => choose("hetzner")}
+          />
           <HardDrives aria-hidden="true" />
           <strong>
             Rent a new server
@@ -138,13 +138,14 @@ export function HostRequest({
               ? "Your Hetzner account is already connected."
               : "Needs a Hetzner account; Hallvi walks you through it."}
           </span>
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={progress.choice === "machine"}
-          onClick={() => choose("machine")}
-        >
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="hv-ob-where"
+            checked={progress.choice === "machine"}
+            onChange={() => choose("machine")}
+          />
           <Desktop aria-hidden="true" />
           <strong>
             Use a machine I already have
@@ -154,8 +155,8 @@ export function HostRequest({
             A VPS from any provider, or a Linux computer at home, that you can
             sign in to over SSH. No new cost.
           </span>
-        </button>
-      </div>
+        </label>
+      </fieldset>
 
       {progress.choice === "hetzner" &&
         (hetznerConnected ? (

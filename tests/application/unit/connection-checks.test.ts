@@ -144,3 +144,17 @@ it("reads a pasted machine line and refuses one without a full fingerprint", () 
     parseMachineLine("hallvi-machine user=deploy port=22 key=SHA256:short"),
   ).toBeNull();
 });
+
+it("keeps a host request whose sentences run long, instead of dropping the card", async () => {
+  const { requestHost, listConnectionRequests } =
+    await import("../../../src/server/connection-requests");
+  requestHost(application, {
+    needs: "n".repeat(900),
+    estimate: "€5.99/month ".repeat(60),
+    recommended: "hetzner",
+  });
+  const [request] = listConnectionRequests(application);
+  expect(request?.kind).toBe("host");
+  expect(request?.kind === "host" && request.estimate.length).toBe(240);
+  expect(request?.kind === "host" && request.needs.length).toBe(400);
+});
