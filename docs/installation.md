@@ -18,9 +18,9 @@ checkout do not share a database.
   installation. On macOS: `xcode-select --install`. On Debian or Ubuntu:
   `sudo apt-get install -y build-essential python3 curl openssh-client`.
 - `ssh`, which Hallvi uses to reach application servers.
-- Docker, only for Pi's repository workspace: reading and building a
-  repository. Conversations, server work and every page work without it, and
-  Pi says so when the workspace is unavailable.
+- A running local Docker Engine for repository inspection and packaging.
+  Start Docker before choosing **Read repository**. The interface and server
+  tools can run without it, but the first repository inspection cannot.
 
 Node.js is not needed. The installer downloads Node.js 24 from nodejs.org,
 checks it against the published checksum and keeps it inside the program
@@ -28,7 +28,8 @@ directory, so the service does not depend on a shell's version manager.
 
 ## Build the package
 
-The repository is private, so there is no download link yet. From a checkout:
+The repository is private, so there is no public download link yet. Building
+requires Node.js 22; the installed service uses its own Node.js 24. From a checkout:
 
 ```bash
 npm ci
@@ -39,6 +40,11 @@ This writes `dist/hallvi-<version>.tgz`: the built interface, the Pi worker
 as plain JavaScript, the database schema, the lockfile and `install.sh`. The
 archive is the same for every platform; dependencies are installed on the
 machine that runs them.
+
+For a beta handoff, include the archive's SHA-256 checksum and source revision.
+Verify the checksum before extracting it (`shasum -a 256` on macOS or
+`sha256sum` on Linux). After installation, `hallvi status` prints the installed revision and service status. The [beta walkthrough](beta-walkthrough.md) describes the
+fresh-user acceptance check.
 
 ## Install
 
@@ -73,8 +79,8 @@ hallvi status     # service, interface and Pi worker
 hallvi logs -f
 ```
 
-`start` and `stop` are the only two states. There is no state in which Server
-Guy is stopped now and comes back by itself later.
+`start` and `stop` are the only two states. There is no state in which Hallvi
+is stopped now and comes back by itself later.
 
 - **macOS** runs it as a launchd agent. It starts when you log in, which on a
   personal Mac is when the machine is usable at all. It pauses while the Mac
@@ -85,8 +91,10 @@ Guy is stopped now and comes back by itself later.
   status of a running service says so and prints the one command that needs
   `sudo`.
 
-If the interface or the worker stops unexpectedly, the service exits and the
-service manager starts both again within a few seconds. A conversation that was
+If the interface or the worker stops unexpectedly, the service shuts down the
+other process and the service manager starts both again. Active browser
+connections can delay the interface's shutdown, so recovery may take tens of
+seconds. A conversation that was
 being answered at that moment shows as interrupted and can be retried.
 
 ## On a virtual machine
@@ -114,7 +122,7 @@ hallvi remote you@vm.example.com
 ```
 
 Paste the `Host hallvi` block it prints into `~/.ssh/config` on the laptop,
-then. Every local forward explicitly binds the laptop's `127.0.0.1`, even when
+then run the command below. Every local forward explicitly binds the laptop's `127.0.0.1`, even when
 the laptop's SSH defaults allow forwarded ports on other interfaces:
 
 ```bash
@@ -165,6 +173,11 @@ discard the state as well, delete those two directories yourself.
 ## Limits today
 
 - No download link or signed release; the package is built from a checkout.
+- The service has been exercised on Apple-silicon macOS and Ubuntu 24.04 x64.
+  macOS Intel, Linux arm64 and other Linux distributions are installation
+  targets, not completed beta acceptance checks. See the
+  [dated installation evidence](testing/2026-09-17-installation.md) and the
+  [current rehearsal](testing/2026-09-18-beta-rehearsal.md).
 - Two dependencies compile during installation, so a compiler is required.
 - No schema migrations between versions (see Upgrade).
 - Pi's repository workspace still needs Docker. Running it directly on the
