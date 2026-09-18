@@ -130,6 +130,31 @@ answers into what its page needs, and a `*-page.tsx` that draws it. The
 conversation shows the same records as cards; the page is not a list of the
 cards, it is composed from the same records.
 
+## Repository workspace architecture
+
+The repository workspace runs natively on the local Docker Engine's Linux
+architecture: amd64 or arm64. The controller reads the daemon's architecture,
+selects the matching immutable Node image, and includes that architecture in
+the workspace image cache key. PowerShell and Compose are pinned downloads
+with separate checksums for each architecture. This avoids requiring x86
+emulation on Apple-silicon Macs.
+
+```mermaid
+flowchart LR
+  Engine[Local Docker Engine architecture] --> Select{amd64 or arm64}
+  Select --> Base[Matching pinned Node image]
+  Base --> Tools[Matching PowerShell and Compose binaries]
+  Tools --> Workspace[Isolated repository workspace]
+  Source[Repository snapshot] --> Workspace
+  Workspace --> Findings[Inspection results for Pi]
+```
+
+Only the workspace architecture follows the controller's engine. Deployment
+image resolution retains its existing Linux amd64 default. The workspace's
+non-root user, absent network, read-only container filesystem, temporary
+repository volume and lack of controller credentials or Docker socket remain
+unchanged.
+
 ## Publishing at a domain
 
 Merged in [PR #76](https://github.com/lustoykov/hallvi/pull/76) on 15 September 2026, this lets the main operator make a privately

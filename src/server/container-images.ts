@@ -112,12 +112,13 @@ async function pullToken(
 }
 
 /**
- * Resolve a public image tag to the host's immutable Linux amd64 image
+ * Resolve a public image tag to an immutable Linux image
  * through the registry's own distribution API and anonymous token flow.
  */
 export async function pinContainerImage(
   reference: string,
   signal: AbortSignal,
+  architecture: "amd64" | "arm64" = "amd64",
 ) {
   imageReferenceSchema.parse(reference);
   const { repository, version, registry, name } = parse(reference);
@@ -160,10 +161,12 @@ export async function pinContainerImage(
   if (Array.isArray(selected.body.manifests)) {
     const platform = selected.body.manifests.find(
       (m: { platform?: { os?: string; architecture?: string } }) =>
-        m.platform?.os === "linux" && m.platform.architecture === "amd64",
+        m.platform?.os === "linux" && m.platform.architecture === architecture,
     );
     if (!platform || !/^sha256:[0-9a-f]{64}$/.test(platform.digest))
-      throw new Error(`No Linux amd64 image is available for ${reference}.`);
+      throw new Error(
+        `No Linux ${architecture} image is available for ${reference}.`,
+      );
     selected = await manifest(platform.digest);
   }
   return `${repository}@${selected.digest}`;
