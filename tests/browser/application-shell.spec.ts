@@ -188,11 +188,16 @@ test(
       page.getByRole("heading", { name: "Environment Variables", exact: true }),
     ).toBeVisible();
     await nav.getByRole("button", { name: "Backups", exact: true }).click();
-    // Backups is a designed destination now, and its own empty state says the
-    // same thing in its own words: nobody has looked, which is never the same
-    // as there being nothing to find.
+    // Unknown inventory and missing protection are stated separately: neither
+    // is presented as proof that there is nothing to back up.
     await expect(
-      page.getByText(/Nothing here has been looked at yet/),
+      page.getByText(
+        "Hallvi has not established what this application keeps on disk.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByText("No plan has been established", { exact: true }),
     ).toBeVisible();
     await page.goBack();
     await expect(

@@ -11,7 +11,7 @@
 import { Desktop, HardDrives } from "@phosphor-icons/react";
 
 import { HetznerConnect, HetznerKept } from "./hetzner-connect";
-import { MachineConnect } from "./machine-connect";
+import { MachineConnect, machineKeyLabel } from "./machine-connect";
 import { Receipt, RequestCard } from "./pieces";
 import {
   isHomeAddress,
@@ -88,9 +88,10 @@ export function HostRequest({
           >
             <p className="hv-ob-fine">
               Hallvi signs in with a key made for this application, and only to
-              the machine whose identity you pasted. Remove the{" "}
-              <code>hallvi-</code> line from <code>~/.ssh/authorized_keys</code>{" "}
-              on the machine to take the access away.
+              the machine whose identity you pasted. Remove the line ending in{" "}
+              <code>{machineKeyLabel(publicKey)}</code> from{" "}
+              <code>~/.ssh/authorized_keys</code> on the machine to take the
+              access away.
               {isHomeAddress(connected.address) &&
                 " It is on your home network: Hallvi reaches it only from that network."}
             </p>

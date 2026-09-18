@@ -2,14 +2,27 @@
 // provider that did not answer has not judged the credential, a credential of
 // the wrong kind is not saved, and a zone a token cannot see is not reported
 // as a zone that does not exist.
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { recogniseCloudflare } from "../../../src/components/hallvi/onboarding/domain-connect";
 import { recogniseHetzner } from "../../../src/components/hallvi/onboarding/hetzner-connect";
-import { parseMachineLine } from "../../../src/components/hallvi/onboarding/machine-connect";
+import {
+  machineCommand,
+  machineKeyLabel,
+  parseMachineLine,
+} from "../../../src/components/hallvi/onboarding/machine-connect";
 
 const application = "6f1c2a3e-7b5d-4c8e-9a10-2b3c4d5e6f70";
 const token = "a".repeat(64);
@@ -143,6 +156,50 @@ it("reads a pasted machine line and refuses one without a full fingerprint", () 
   expect(
     parseMachineLine("hallvi-machine user=deploy port=22 key=SHA256:short"),
   ).toBeNull();
+});
+
+it("labels a machine key and collapses prior copies to that exact line", () => {
+  const sharedHeader = "AAAAC3NzaC1lZDI1NTE5AAAAI";
+  const publicKey = `ssh-ed25519 ${sharedHeader}${"A".repeat(40)}`;
+  const otherPublicKey = `ssh-ed25519 ${sharedHeader}${"B".repeat(40)}`;
+  const label = machineKeyLabel(publicKey);
+  const command = machineCommand(publicKey);
+  const home = mkdtempSync(join(tmpdir(), "hallvi-machine-key-"));
+  const ssh = join(home, ".ssh");
+  const authorizedKeys = join(ssh, "authorized_keys");
+  mkdirSync(ssh);
+  writeFileSync(
+    authorizedKeys,
+    [`ssh-ed25519 ${"B".repeat(68)} owner`, publicKey, `${publicKey} old`].join(
+      "\n",
+    ) + "\n",
+  );
+
+  expect(label).toBe("hallvi-AAAAAAAAAAAAAAAAAAAA");
+  expect(machineKeyLabel(publicKey)).toBe(label);
+  expect(machineKeyLabel(otherPublicKey)).not.toBe(label);
+  expect(command).toContain(`replacement='${publicKey} ${label}'`);
+  expect(command).toContain("$1 == kind && $2 == encoded");
+  expect(command).toContain(
+    "(tmp=$(mktemp ~/.ssh/authorized_keys.hallvi.XXXXXX)",
+  );
+  expect(command).toContain('chmod 600 "$tmp" && mv "$tmp"');
+  expect(command).toContain('mv "$tmp" ~/.ssh/authorized_keys)');
+  expect(command).not.toContain(`echo '${publicKey}' >>`);
+
+  const install = command.split(" && set --")[0]!;
+  try {
+    execFileSync("/bin/sh", ["-c", `${install} && ${install}`], {
+      env: { ...process.env, HOME: home },
+    });
+    expect(readFileSync(authorizedKeys, "utf8").trim().split("\n")).toEqual([
+      `ssh-ed25519 ${"B".repeat(68)} owner`,
+      `${publicKey} ${label}`,
+    ]);
+    expect(statSync(authorizedKeys).mode & 0o777).toBe(0o600);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 it("keeps a host request whose sentences run long, instead of dropping the card", async () => {
