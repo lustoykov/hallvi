@@ -8,10 +8,10 @@ test.use({ isolatedApp: true });
 // The page is the caretakers over their applications: one card each, with
 // the drawn screen, one word of state and what runs. What has to keep
 // working: the reader recognises an application and opens it from its name,
-// its screen or More; search, once there is enough to search, never leaves
+// its screen or Open app; search, once there is enough to search, never leaves
 // them on a card that opens something else; and the empty page offers the
-// one thing to do. There is no offer at the top of the page any more; talking
-// to Hallvi starts inside the application.
+// one thing to do. The welcome offers another application; continuing work
+// starts inside an existing application.
 test(
   "home lists applications, follows the selected one, and search preserves navigation",
   journey("application-shell"),
@@ -62,7 +62,7 @@ test(
     await expect(
       alpha.getByRole("link", { name: "Open Home alpha" }),
     ).toHaveAttribute("href", `/applications/${ids[0]}`);
-    await expect(alpha.getByRole("link", { name: "More" })).toHaveAttribute(
+    await expect(alpha.getByRole("link", { name: "Open app" })).toHaveAttribute(
       "href",
       `/applications/${ids[0]}`,
     );
@@ -71,6 +71,8 @@ test(
     await expect(alpha.getByText("New", { exact: true })).toBeVisible();
     await expect(alpha.getByText(/backed up|backup/i)).toHaveCount(0);
 
+    // The collection and search remain usable on a narrow screen.
+    await page.setViewportSize({ width: 390, height: 844 });
     const search = page.getByRole("textbox", { name: "Find an application" });
     await search.fill("home beta");
     await expect(list.getByRole("listitem")).toHaveCount(1);
@@ -82,7 +84,7 @@ test(
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(list.getByRole("listitem")).toHaveCount(names.length);
 
-    await alpha.getByRole("link", { name: "More" }).click();
+    await alpha.getByRole("link", { name: "Open app" }).click();
     await expect(page).toHaveURL(new RegExp(`/applications/${ids[0]}$`));
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),

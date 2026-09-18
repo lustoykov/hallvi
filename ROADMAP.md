@@ -45,6 +45,10 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 - [ ] **One fresh-user journey on that exact candidate.** Have someone outside the development setup install it, connect their model and required accounts, add a repository, deploy to a real host, use the result and return after restart. Record the candidate and concrete friction; dated proofs and synthetic UI checks do not establish this gate. Keep the useful application behavior, not only a green HTTP check, in the walkthrough.
 - [ ] **Clear authority before connecting.** Finish the beta safety communication item above and verify it in that walkthrough: what host/provider access permits, what Pi decides versus Always ask means, practical scoped-account/test-server precautions and an independent recovery copy. Keep this contextual and short rather than introduce another workflow.
 
+## Applications home
+
+- [x] **Welcome and collection polish — [PR #139](https://github.com/lustoykov/hallvi/pull/139).** Group the welcome copy, place a compact status summary with the apps, strengthen Add application and card color, and replace vague More links. Preserve the caretaker identity and recorded status meanings.
+
 ## Conversation controls
 
 - [x] **Everyday interaction polish — [PR #138](https://github.com/lustoykov/hallvi/pull/138).** Copy completed replies, keep keyboard focus useful after sending and returning, carry conversation context through Settings and GitHub connection, simplify repeat application setup, and keep Home consistent with current recorded problems and recovery.
