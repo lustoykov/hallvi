@@ -173,7 +173,7 @@ export function NewApplicationScreen({
         <Link className={s.brand} href={applicationsHref}>
           <span className="hv-app-mark">H</span>Hallvi
         </Link>
-        <Link href={applicationsHref}>All applications</Link>
+        {!first && <Link href={applicationsHref}>All applications</Link>}
       </header>
       <section className={w.welcome} aria-labelledby="new-application-heading">
         <div className={w.hero}>
@@ -290,9 +290,14 @@ export function NewApplicationScreen({
                 </p>
               )}
               <div className={s.actions}>
-                <Link href={applicationsHref}>
-                  {busy ? "Back to applications" : "Cancel"}
-                </Link>
+                {/* With nothing added yet there is nowhere to go back to. */}
+                {first ? (
+                  <span />
+                ) : (
+                  <Link href={applicationsHref}>
+                    {busy ? "Back to applications" : "Cancel"}
+                  </Link>
+                )}
                 <button
                   className={s.primary}
                   disabled={!ready || busy || !repositoryUrl.trim()}

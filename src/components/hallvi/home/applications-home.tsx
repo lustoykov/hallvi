@@ -181,7 +181,7 @@ export function ApplicationsHome({
             earned a nudge. */}
         <section className={s.greeting} aria-labelledby="home-heading">
           <h1 id="home-heading">
-            Your apps are
+            {applications.length === 1 ? "Your app is" : "Your apps are"}
             <br />
             <em>in good company.</em>
           </h1>
@@ -231,7 +231,13 @@ export function ApplicationsHome({
           </div>
         ) : (
           <>
-            <ul className={s.collection} aria-label="Applications">
+            <ul
+              className={s.collection}
+              aria-label="Applications"
+              // One application is the common case, and it gets the room: its
+              // caretaker stands beside a card wide enough to read.
+              data-solo={applications.length === 1 ? "" : undefined}
+            >
               {visible.map((item, index) => {
                 const { kind, purpose } = applicationKind(
                   item.source,
