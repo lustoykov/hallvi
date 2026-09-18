@@ -29,7 +29,7 @@ const modes = [
   {
     id: "pi-decides",
     label: "Pi decides",
-    means: "Pi asks before anything consequential.",
+    means: "Pi judges when permission is needed and asks through a tool.",
   },
   {
     id: "bypass",

@@ -18,12 +18,16 @@ test(
   async ({ page }) => {
     test.setTimeout(180_000);
     await page.goto("/applications");
+    await expect(page).toHaveURL(/\/applications\/new$/);
     await expect(
-      page.getByRole("heading", { name: "Add your first application" }),
+      page.getByRole("heading", { name: "Hi, I’m Hallvi." }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Add application", exact: true }),
-    ).toHaveAttribute("href", "/applications/new");
+      page.getByRole("heading", { name: "What do you want to run?" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Add application", exact: true }),
+    ).toBeDisabled();
 
     const ids: string[] = [];
     const names = [
@@ -44,7 +48,7 @@ test(
       expect(response.status()).toBe(201);
       ids.push((await response.json()).application.id);
     }
-    await page.reload();
+    await page.goto("/applications");
 
     const list = page.getByRole("list", { name: "Applications" });
     await expect(list.getByRole("listitem")).toHaveCount(names.length);

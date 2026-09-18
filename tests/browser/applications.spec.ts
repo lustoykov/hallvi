@@ -168,7 +168,9 @@ test(
     // unchanged 10s reply assertion, plus the final reload and state check.
     test.setTimeout(120_000);
     await page.goto("/");
-    await expect(page).toHaveURL(/\/applications$/);
+    // The fixture is worker-scoped: another smoke journey may already have
+    // created an application, but the root must always enter applications.
+    await expect(page).toHaveURL(/\/applications(?:\/new)?$/);
     await addApplication(page, "smoke-app");
     await openConversation(page);
     const message = "What should we check before deploying?";
@@ -228,7 +230,7 @@ test(
     await expect(disconnect).toBeFocused();
     await page.getByLabel("Reasoning effort").selectOption("medium");
     await page.getByRole("button", { name: "View applications" }).click();
-    await expect(page).toHaveURL(/\/applications$/);
+    await expect(page).toHaveURL(/\/applications(?:\/new)?$/);
     await page.goto("/setup/pi");
     await expect(page.getByLabel("Reasoning effort")).toHaveValue("medium");
   },
@@ -281,12 +283,12 @@ test(
 );
 
 test(
-  "P1-05 applications isolate Decisions and unsent drafts",
+  "P1-05 applications isolate messages and unsent drafts",
   journey("isolation"),
   async ({ page }) => {
     const first = await addApplication(page, "isolation-first");
     await openConversation(page);
-    await send(page, "priority: First app only");
+    await send(page, "First app only");
     await page
       .getByRole("textbox", { name: "Message Hallvi" })
       .fill("Unsent draft");
@@ -294,9 +296,14 @@ test(
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toHaveValue("");
-    expect((await view(page)).decisions).toEqual([]);
+    expect((await view(page)).messages).not.toContainEqual(
+      expect.objectContaining({ body: "First app only" }),
+    );
     await page.goto(first);
-    expect((await view(page)).decisions[0].value).toBe("First app only");
+    await openConversation(page);
+    await expect(
+      page.getByText("[QA fixture reply] First app only", { exact: true }),
+    ).toBeVisible();
   },
 );
 
