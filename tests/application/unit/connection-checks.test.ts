@@ -9,6 +9,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -158,7 +159,9 @@ it("reads a pasted machine line and refuses one without a full fingerprint", () 
 });
 
 it("labels a machine key and collapses prior copies to that exact line", () => {
-  const publicKey = `ssh-ed25519 ${"A".repeat(68)}`;
+  const sharedHeader = "AAAAC3NzaC1lZDI1NTE5AAAAI";
+  const publicKey = `ssh-ed25519 ${sharedHeader}${"A".repeat(40)}`;
+  const otherPublicKey = `ssh-ed25519 ${sharedHeader}${"B".repeat(40)}`;
   const label = machineKeyLabel(publicKey);
   const command = machineCommand(publicKey);
   const home = mkdtempSync(join(tmpdir(), "hallvi-machine-key-"));
@@ -172,9 +175,13 @@ it("labels a machine key and collapses prior copies to that exact line", () => {
     ) + "\n",
   );
 
-  expect(label).toBe("hallvi-AAAAAAAAAAAA");
+  expect(label).toBe("hallvi-AAAAAAAAAAAAAAAAAAAA");
+  expect(machineKeyLabel(publicKey)).toBe(label);
+  expect(machineKeyLabel(otherPublicKey)).not.toBe(label);
   expect(command).toContain(`replacement='${publicKey} ${label}'`);
   expect(command).toContain("$1 == kind && $2 == encoded");
+  expect(command).toContain("mktemp ~/.ssh/authorized_keys.hallvi.XXXXXX");
+  expect(command).toContain('chmod 600 "$tmp" && mv "$tmp"');
   expect(command).not.toContain(`echo '${publicKey}' >>`);
 
   const install = command.split(" && set --")[0]!;
@@ -186,6 +193,7 @@ it("labels a machine key and collapses prior copies to that exact line", () => {
       `ssh-ed25519 ${"B".repeat(68)} owner`,
       `${publicKey} ${label}`,
     ]);
+    expect(statSync(authorizedKeys).mode & 0o777).toBe(0o600);
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
