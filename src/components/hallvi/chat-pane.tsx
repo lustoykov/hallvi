@@ -601,6 +601,8 @@ export function ChatPane({
             const provisional = message.status !== "completed";
             const inProgress =
               message.status === "queued" || message.status === "running";
+            const queuedFollowUp =
+              message.status === "queued" && message.id !== inFlight?.id;
             const retried =
               run !== undefined &&
               runs.some((attempt) => attempt.retryOfId === run.id);
@@ -693,33 +695,44 @@ export function ChatPane({
                             </MessageResponse>
                           </details>
                         )}
-                        {run && !readOnly && !retried && !inProgress && (
-                          <button
-                            className="hv-run-action hv-primary-button"
-                            disabled={busy !== null}
-                            onClick={() => {
-                              if (historyUnavailable) onNewChat();
-                              else if (failure.action.kind === "ask")
-                                continueAfterSecrets(failure.action.draft!);
-                              else onRunAction(run.id, "retry");
-                            }}
-                            type="button"
-                          >
-                            {!inProgress && (
-                              <ArrowClockwise
-                                aria-hidden="true"
-                                weight="bold"
-                              />
-                            )}
-                            {historyUnavailable
-                              ? "Start a new chat"
-                              : // A command that exited non-zero will exit
-                                // non-zero again, so retrying it is a way
-                                // of not reading the error. The control
-                                // follows what actually failed.
-                                failure.action.label}
-                          </button>
-                        )}
+                        {run &&
+                          !readOnly &&
+                          !retried &&
+                          (!inProgress || queuedFollowUp) && (
+                            <button
+                              className={
+                                queuedFollowUp
+                                  ? "hv-run-stop"
+                                  : "hv-run-action hv-primary-button"
+                              }
+                              disabled={busy !== null}
+                              onClick={() => {
+                                if (queuedFollowUp)
+                                  onRunAction(run.id, "cancel");
+                                else if (historyUnavailable) onNewChat();
+                                else if (failure.action.kind === "ask")
+                                  continueAfterSecrets(failure.action.draft!);
+                                else onRunAction(run.id, "retry");
+                              }}
+                              type="button"
+                            >
+                              {!inProgress && (
+                                <ArrowClockwise
+                                  aria-hidden="true"
+                                  weight="bold"
+                                />
+                              )}
+                              {queuedFollowUp
+                                ? "Cancel queued message"
+                                : historyUnavailable
+                                  ? "Start a new chat"
+                                  : // A command that exited non-zero will exit
+                                    // non-zero again, so retrying it is a way
+                                    // of not reading the error. The control
+                                    // follows what actually failed.
+                                    failure.action.label}
+                            </button>
+                          )}
                       </div>
                     ) : view.piActivity &&
                       hasActivity(view.piActivity, message.id) ? null : (
