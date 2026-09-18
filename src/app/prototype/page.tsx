@@ -26,6 +26,12 @@ export default function PrototypeIndexPage() {
       </p>
       <ul>
         <li>
+          <Link href="/prototype/onboarding">Onboarding</Link> — the proposed
+          journey from a repository to a working address and a domain. The
+          conversation is scripted and every provider is simulated; see{" "}
+          <code>docs/design/onboarding.md</code>.
+        </li>
+        <li>
           <Link href="/prototype/little-server">Little Server</Link> — the
           mascot in every mood, which no record produces.
         </li>
