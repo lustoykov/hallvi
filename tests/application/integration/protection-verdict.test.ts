@@ -344,7 +344,7 @@ describe("which copy a restore actually proved", () => {
     expect(said.state).toBe("offsite-untested");
     expect(said.tone).toBe("warning");
     expect(said.limit).toContain("worked at least once");
-    expect(said.next?.label).toBe("Test a restore of the newest copy");
+    expect(said.next?.label).toBe("Test the newest copy");
   });
 
   it("a restore naming no copy says so, rather than vouching for the newest", () => {
