@@ -4,7 +4,39 @@
 
 **The agent for self-hosted software.** Deploy one application stack on a server you control, keep it healthy and protect its data. Conversation drives setup and operations; stable views show the same recorded facts and results.
 
-The target is Docker Compose on one instance, with PostgreSQL or SQLite, required Redis/Valkey services, workers, scheduled commands and persistent files. Compute starts with Hetzner + BYOM; backups with R2 + S3. **Coolify is a reference, not a parity requirement.**
+## Install Hallvi
+
+Hallvi runs in the background on your Mac or Linux machine. Use it in your
+browser to connect your model account, add a repository and deploy it to a
+Linux application server. The machine running Hallvi and the application
+server have separate requirements.
+
+**Private beta:** there is no public download yet. Obtain the release archive
+and matching checksum from the maintainer; you do not need to clone this
+repository or install Node.js to use that archive.
+
+| Your machine | Start here |
+| --- | --- |
+| macOS | [macOS installation](docs/installation.md#macos) |
+| Ubuntu / Debian Linux with systemd | [Linux installation](docs/installation.md#linux) |
+| Another machine, including a Mac mini or Linux VM | [Remote browser access](docs/installation.md#on-another-machine) after installing there |
+
+The service has been exercised on Apple-silicon macOS and Ubuntu 24.04 x64.
+Other installation targets and verification limits are listed in the
+[installation guide](docs/installation.md#supported-machines).
+The current package needs compiler tools during installation and a running
+local Docker Engine before **Read repository**. Direct repository execution
+with optional Docker is decided but not implemented yet.
+
+After installation, open <http://127.0.0.1:4747> on the machine running Hallvi.
+Follow [your first deployment](docs/installation.md#your-first-deployment).
+For service commands, upgrades and troubleshooting, see the
+[full installation guide](docs/installation.md).
+
+Application deployments target Docker Compose on one Linux instance, with
+PostgreSQL or SQLite, required Redis/Valkey services, workers, scheduled
+commands and persistent files. Compute starts with Hetzner or a machine you
+provide; backups with R2 or S3.
 
 ## Current direction
 
@@ -43,7 +75,9 @@ machine and carry deployment work through the main operator. Dated proofs
 establish capability on earlier revisions; they do not replace the exact
 candidate walkthrough still open in the roadmap.
 
-## Run
+## Development
+
+<a id="run"></a>
 
 To use Hallvi rather than develop it, install it as a background service:
 [Installing Hallvi](docs/installation.md). `npm run package` builds the
