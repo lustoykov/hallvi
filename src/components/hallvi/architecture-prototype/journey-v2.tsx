@@ -43,12 +43,10 @@ import {
   type ApplicationSection,
 } from "../application-sections";
 import type { PageContext } from "../deployment-prototype/page-head";
-import type { Recheck } from "./use-recheck";
 import { CertaintyTag } from "./bits";
 /** What the architecture page hands this journey. */
 export interface DirectionProps {
   model: ArchitectureModel;
-  recheck: Recheck;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
   page?: PageContext;
@@ -474,7 +472,6 @@ function Card({
   dim,
   lit,
   arriving,
-  popped,
   compact,
   tight,
   placeAt,
@@ -489,7 +486,6 @@ function Card({
   dim: boolean;
   lit: boolean;
   arriving: boolean;
-  popped: boolean;
   compact?: boolean;
   /** The box is too short for a sentence; show the dot and the name only. */
   tight?: boolean;
@@ -502,7 +498,7 @@ function Card({
   return (
     <button
       type="button"
-      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${tight ? " is-tight" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${popped ? " is-popped" : ""}${part.checking ? " is-checking" : ""}`}
+      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${tight ? " is-tight" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${part.checking ? " is-checking" : ""}`}
       data-c={certainty}
       style={{ ...(placeAt ?? place)(rect), ["--i" as string]: index }}
       onClick={(event) => {
@@ -715,7 +711,6 @@ function gapPart(gap: Gap, headline: string): Part {
 
 export function JourneyDirection({
   model,
-  recheck,
   onOpenDestination,
   onAsk,
   page,
@@ -739,7 +734,6 @@ export function JourneyDirection({
   const [touring, setTouring] = useState(false);
   const [lit, setLit] = useState<Set<string>>(() => new Set());
   const [arriving, setArriving] = useState<Set<string>>(() => new Set());
-  const [popped, setPopped] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [shift, setShift] = useState<Certainty | null>(null);
   const section = useRef<HTMLElement>(null);
@@ -915,21 +909,6 @@ export function JourneyDirection({
     };
   }, [model.condition.certainty]);
 
-  // A pass pops the checked cards; a failure opens where it happened.
-  useEffect(() => {
-    const local: number[] = [];
-    const at = (fn: () => void, ms: number) =>
-      local.push(window.setTimeout(fn, ms));
-    if (recheck.phase === "passed") {
-      at(() => setPopped(true), 120);
-      at(() => setPopped(false), 1200);
-    } else if (recheck.phase === "failed" && recheck.active) {
-      const failed = recheck.active;
-      at(() => setSelected(failed), 120);
-    }
-    return () => local.forEach((timer) => window.clearTimeout(timer));
-  }, [recheck.phase, recheck.active]);
-
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") setSelected(null);
@@ -950,12 +929,6 @@ export function JourneyDirection({
     : null;
   const planned = model.status !== "live";
   const host = model.byId.host;
-  const order = [
-    "host",
-    "gate:http",
-    "app",
-    ...services.map((s) => s.id),
-  ].filter((id): id is string => Boolean(id && model.byId[id]));
   const current = model.journeys.find((item) => item.id === journey);
   const selectedPart = selected
     ? (model.byId[selected] ?? (ghostPart?.id === selected ? ghostPart : null))
@@ -971,7 +944,6 @@ export function JourneyDirection({
     dim: !onPath.has(part.id) && !touring,
     lit: lit.has(part.id),
     arriving: arriving.has(part.id),
-    popped: popped && order.includes(part.id),
     onSelect: (id: string) =>
       setSelected((currentId) => (currentId === id ? null : id)),
   });
@@ -1047,7 +1019,7 @@ export function JourneyDirection({
         >
           <button
             type="button"
-            className={`axj2-server-head${selected === "host" ? " is-selected" : ""}${host?.checking ? " is-checking" : ""}${popped ? " is-popped" : ""}`}
+            className={`axj2-server-head${selected === "host" ? " is-selected" : ""}${host?.checking ? " is-checking" : ""}`}
             data-c={host?.evidence.certainty}
             onClick={(event) => {
               event.stopPropagation();
@@ -1292,7 +1264,6 @@ export function JourneyDirection({
             dim={false}
             lit={false}
             arriving={false}
-            popped={false}
             ghost
             placeAt={place}
             // The headline already says nothing has looked. The subtitle said

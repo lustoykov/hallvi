@@ -11,20 +11,11 @@ import { describe, expect, it } from "vitest";
 
 import { architectureFromRecords } from "@/components/hallvi/architecture-records";
 import { JourneyDirection } from "@/components/hallvi/architecture-prototype/journey-v2";
-import type { Recheck } from "@/components/hallvi/architecture-prototype/use-recheck";
 import type { SavedInformation } from "@/server/operator-data";
 
 const APPLICATION = "26820a4b-a4c2-49f8-8002-678503aeb385";
 const NOW = Date.parse("2026-09-13T18:00:00.000Z");
 const AT = "2026-09-13T17:55:00.000Z";
-
-const idle: Recheck = {
-  phase: "idle",
-  marks: {},
-  active: null,
-  run: () => undefined,
-  reset: () => undefined,
-};
 
 const part = (id: string, kind: string, name: string, role = "", plain = "") =>
   ({ id, kind, name, role, plain }) as never;
@@ -112,7 +103,6 @@ describe("a map with two backing services and three volumes", () => {
     const html = renderToStaticMarkup(
       <JourneyDirection
         model={model}
-        recheck={idle}
         onOpenDestination={() => undefined}
         onAsk={() => undefined}
       />,
