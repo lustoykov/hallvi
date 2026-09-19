@@ -150,7 +150,7 @@ function startWorker() {
       return;
     }
     console.error(
-      `The Pi worker exited ${how} again. Stopping the application rather than leaving messages queued with nothing to answer them.`,
+      `The Pi worker exited ${how} again. Stopping the application rather than leaving it unable to accept a message.`,
     );
     stop("SIGTERM");
     process.exitCode ??= code ?? 1;

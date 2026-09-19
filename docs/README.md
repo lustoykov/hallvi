@@ -1,6 +1,6 @@
 # Documentation
 
-Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-design.md) for the agreed redesign and open questions, and [Roadmap](../ROADMAP.md) for reviewable delivery stages. [Architecture](architecture.md) describes what is implemented today, at schema 15, rather than restrictions the redesign must preserve.
+Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-design.md) for the agreed redesign and open questions, and [Roadmap](../ROADMAP.md) for reviewable delivery stages. [Architecture](architecture.md) describes what is implemented today, at schema 18, rather than restrictions the redesign must preserve.
 
 | Reference | Purpose |
 | --- | --- |

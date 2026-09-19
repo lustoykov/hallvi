@@ -10,21 +10,22 @@ nothing. There is no workflow engine, no plan entity and no state machine: the
 old deployment and operation workers, their mutation endpoints and their
 approval cards were removed, and nothing replaced them.
 
-The first chat of an application is its permanent main conversation.
-Conversations own current status and response pointers; messages own response
-text, structured blocks and completion metadata. The worker and the API still
-call a response projection a "run", though no runs table remains. Permissions
-and the host reference live on the application; execution evidence lives in
-files. See the storage [verification](testing/2026-09-12-operator-execution.md).
+The first chat of an application is its permanent main conversation. Pi keeps
+what is said in it: messages, replies, what waits and what is running are read
+from Pi's session on every view, and the database holds only the
+conversation's title, its application and the id of that session. Evidence
+records still call the place they are shown a "run"; it is the reply Pi's
+transcript puts the tool call under. Permissions and the host reference live
+on the application; execution evidence lives in files. See the storage [verification](testing/2026-09-12-operator-execution.md).
 
 ## The shape of it
 
 ```mermaid
 flowchart TD
     UI[Conversation and destination pages] --> API[Next.js route handlers]
-    API --> DB[(SQLite: applications, conversations,<br/>messages, saved information)]
-    API -->|accepted, queued| DB
-    Worker[Node worker running Pi, one turn at a time] --> DB
+    API --> DB[(SQLite: applications, conversations,<br/>saved information)]
+    API -->|worker.sock: send, continue, stop, read| Worker
+    Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] --> DB
     Worker --> Tools[Twenty tools]
     Tools --> Host[Application server over SSH]
     Tools --> Providers[Hetzner, Cloudflare, GitHub, object storage]
@@ -36,21 +37,21 @@ flowchart TD
     Pages --> UI
 ```
 
-The web process accepts and reads. It never runs a turn: a message is saved
-queued, and the worker — a separate process holding an exclusive lock on the
-database — claims it, runs it, and writes what happened. That separation is
-why a crash takes one process rather than the server, and why the product has
-to say when no worker is running.
+The web process never opens a Pi session and never runs a turn. It asks the
+worker, a separate process that alone owns Pi's sessions, over a Unix socket
+beside the database: a message is accepted only once Pi has durably taken it,
+and the conversation shown is what Pi holds. That separation is why a crash
+takes one process rather than the server, and why the product says so, and
+accepts nothing, when no worker is running.
 
 ## What is stored
 
-Four tables, in [db-schema.ts](../src/server/db-schema.ts), at schema 15:
+Three tables, in [db-schema.ts](../src/server/db-schema.ts), at schema 18:
 
 | Table | What it holds |
 | --- | --- |
 | `applications` | The application, its repository, its permission mode and its host reference. |
 | `conversations` | One permanent main conversation per application, plus read-only side chats. |
-| `messages` | Both sides of every turn, with structured blocks, status and completion metadata. |
 | `saved_information` | Everything Pi established, with its presentation: what it is about, what it states, its facts and its checks. |
 
 Everything a destination page says about an application comes from

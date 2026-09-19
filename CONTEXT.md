@@ -40,11 +40,11 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Operation receipt**: The interactive presentation of an operation's origin, progress, required decision, evidence and outcome, drawn by `operation-receipt.tsx`. A receipt is not a second copy of execution state.
 
-**Reply** (`pi-conversation.ts`): What Pi said and did between two of the owner's messages, as one transcript row. Its evidence and approvals attach to it. It is not a unit of scheduling: Pi's `AgentLane` decides what runs and when, and Hallvi records what happened. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
+**Reply** (`pi-transcript.ts`): What Pi said and did between two of the owner's messages, as one item in the conversation. It is projected from Pi's history on every read and stored nowhere else; it is named after the message it answers. Evidence is placed under it by the id Pi gave each tool call. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
 
-**Waiting message**: An accepted message Pi has not read yet. Until Pi *acknowledges* taking it, Hallvi holds it and will hand it over; from then on it is Pi's, under the entry id Pi gave it, to queue, run, cancel and restore. It becomes *delivered* when Pi reads it, or *cancelled* when the conversation is stopped first or Pi could not be started. After a worker goes away, a message Pi holds keeps waiting until the owner continues or stops the conversation.
+**Waiting message**: A message Pi has durably taken and not read yet: an entry in Pi's queue, under the id its sender gave it. Pi orders it, reads it, or drops it on Stop. After a worker goes away it keeps waiting until the owner continues or stops the conversation.
 
-**Acknowledgment**: The worker's record that Pi has durably taken a message. The boundary between Hallvi's durable intake and Pi's durable queue: Hallvi never hands over a message it has an acknowledgment for.
+**Session owner** (`pi-owner.ts`, `worker-link.ts`): The worker, as the only process that opens a Pi session. The app asks it over `worker.sock` to read, send, continue, stop or forget; a send is answered once Pi has durably taken the message. **Interrupted** means Pi holds an open operation or a queue that this worker is not running: nothing runs until the owner chooses Continue or Stop.
 
 ## Execution and evidence
 
