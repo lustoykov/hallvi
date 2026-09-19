@@ -87,8 +87,9 @@ components:
   button-primary:
     backgroundColor: "{colors.blue}"
     textColor: "{colors.surface}"
-    rounded: "{rounded.control}"
-    padding: "8px 12px"
+    rounded: "{rounded.card}"
+    height: "34px"
+    padding: "0 14px"
   button-primary-hover:
     backgroundColor: "{colors.blue-hover}"
   button-secondary:
@@ -474,7 +475,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 
 ### Buttons and fields
 
-Inherited: blue primary with a 7px radius, white secondary, password inputs with a `field-line` border. Inside records the primary button is 8px by 12px and the input 8px by 10px at 12px type.
+One primary button everywhere (19 September): 34px tall (`--button-height`), 0 by 14px padding, 13px at weight 560, 8px radius, 15px icons, action blue with `--button-shadow` — a faint top light and a short shadow — so it reads as the action without sheer size. The home call to action, the setup and connection footers, the new-application form, dialogs and the Deployment “Open” button all use it; none is 44px or full-width on desktop. Secondary buttons share the height on white with a `field-line` border and no shadow. Smaller variants stay small and take the same shadow: the 32px Send, the 30px in-transcript retry and record pills, the onboarding rail start. Every primary uses `--blue` and `--blue-hover`; no file hard-codes its own blue. Password inputs keep a `field-line` border; inside records the input is 8px by 10px at 12px type.
 
 ## Do's and Don'ts
 

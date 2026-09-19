@@ -89,7 +89,7 @@
   flex-shrink: 0;
 }
 .hv-record .hv-info-open {
-  min-height: 40px;
+  min-height: var(--button-height);
   color: var(--surface, #fff);
 }
 .hv-record[data-context="overview"][data-kind="application-access"] h3 {

@@ -78,20 +78,21 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 10px 20px;
-  background: #285ad8;
+  min-height: var(--button-height);
+  padding: 0 14px;
+  background: var(--blue);
+  box-shadow: var(--button-shadow);
   color: #fff !important;
   border: 0;
   border-radius: 8px;
   text-decoration: none;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 560;
   cursor: pointer;
   white-space: nowrap;
 }
 .primary:hover:not(:disabled) {
-  background: #204ab5;
+  background: var(--blue-hover);
 }
 .primary:disabled {
   opacity: 0.55;

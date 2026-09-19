@@ -672,10 +672,10 @@ export function BackupStages({
           <button
             type="button"
             className="bs-primary"
+            title="Opens the conversation with this request drafted"
             onClick={() => onAsk(verdict.next!.draft)}
           >
             {verdict.next.label}
-            <em>opens the conversation</em>
           </button>
         )}
       </section>
