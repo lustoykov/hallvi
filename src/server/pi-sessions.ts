@@ -10,6 +10,7 @@ import {
   type LaneQueuedItem,
   type Session,
 } from "@earendil-works/pi-agent-core";
+import { abortedTips } from "./pi-transcript";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import { and, eq, isNull } from "drizzle-orm";
 import {
@@ -248,14 +249,13 @@ export async function readNativeConversation(
     const meta = open
       ? (await session.getValue(operationMeta(open), ctx))?.value
       : undefined;
-    const abortedAt = new Set<string>();
-    for (const id of [state?.currentOperationId, state?.lastOperationId]) {
-      const result = id
-        ? (await session.getValue(operationResult(id), ctx))?.value
-        : undefined;
-      if (result?.status === "aborted" && result.tipId)
-        abortedAt.add(result.tipId);
-    }
+    // Every operation in the branch, not only the newest: a reply stopped
+    // three turns ago is still stopped, and reading only the current and last
+    // operation turned it into a completed one as soon as another turn ran.
+    const abortedAt = await abortedTips(
+      entries,
+      async (id) => (await session.getValue(operationResult(id), ctx))?.value,
+    );
     return {
       entries,
       abortedAt,

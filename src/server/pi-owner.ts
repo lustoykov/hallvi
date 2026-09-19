@@ -23,11 +23,12 @@ import {
   removeNativeSessions,
 } from "./pi-sessions";
 import {
+  abortedTips,
   holds,
   laneView,
   MESSAGE_TAG,
   projectTranscript,
-  tagOf,
+  queueOperation,
   unfinished,
   type Transcript,
 } from "./pi-transcript";
@@ -96,9 +97,6 @@ const toPi = (message: SentMessage): AgentMessage =>
     [MESSAGE_TAG]: message.id,
   }) as AgentMessage;
 
-/** The operation in which Pi reads its queue, named after its first entry. */
-const queueOperation = (entryId: string) => `queue:${entryId}`;
-
 const NOTHING: Transcript = {
   status: "idle",
   messages: [],
@@ -141,20 +139,10 @@ export function sessionOwner(
           { order: "oldestFirst" },
           ctx,
         );
-        // Pi keeps how each operation ended, and the entry it ended at. An
-        // operation begins at one of the owner's messages and is named after
-        // it: a prompt's after the message's own id, a queue read's after the
-        // entry id of the first message Pi read from the queue.
-        const abortedAt = new Set<string>();
-        for (const entry of entries) {
-          if (entry.type !== "message" || entry.message.role !== "user")
-            continue;
-          for (const id of [tagOf(entry.message), queueOperation(entry.id)]) {
-            const result = id && (await session.lane.getResult(id, ctx));
-            if (result && result.status === "aborted" && result.tipId)
-              abortedAt.add(result.tipId);
-          }
-        }
+        // Pi keeps how each operation ended, and the entry it ended at.
+        const abortedAt = await abortedTips(entries, (id) =>
+          session.lane.getResult(id, ctx),
+        );
         read = { tipId, entries, abortedAt };
       }
       return read;

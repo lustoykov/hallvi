@@ -120,6 +120,40 @@ export const laneView = (snapshot: LaneSnapshot): LaneView => ({
   queues: snapshot.queues,
 });
 
+/** The operation in which Pi reads its queue, named after its first entry. */
+export const queueOperation = (entryId: string) => `queue:${entryId}`;
+
+/**
+ * The entries at which Pi says an operation was aborted.
+ *
+ * An operation begins at one of the owner's messages and is named after it:
+ * a prompt's after the message's own id, a queue read's after the entry id of
+ * the first message Pi read from the queue. Both are asked for, over every
+ * message in the branch, because a reply stopped three turns ago is still
+ * stopped — a reader that only asks about the newest operation quietly
+ * promotes old cancelled work to completed.
+ *
+ * The caller says how a result is fetched: a driving worker asks its lane, a
+ * reader asks Pi's stored session. The derivation is the same either way.
+ */
+export async function abortedTips(
+  history: Entry[],
+  resultOf: (
+    operationId: string,
+  ) => Promise<{ status: string; tipId?: string | null } | undefined>,
+) {
+  const abortedAt = new Set<string>();
+  for (const entry of history) {
+    if (entry.type !== "message" || entry.message.role !== "user") continue;
+    for (const id of [tagOf(entry.message), queueOperation(entry.id)]) {
+      const result = id ? await resultOf(id) : undefined;
+      if (result?.status === "aborted" && result.tipId)
+        abortedAt.add(result.tipId);
+    }
+  }
+  return abortedAt;
+}
+
 /** True while anything of Pi's is unfinished: an operation, or a queue. */
 export function unfinished(lane: LaneView) {
   return Boolean(lane.operation) || lane.queues.length > 0;

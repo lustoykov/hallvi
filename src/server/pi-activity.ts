@@ -130,8 +130,9 @@ function safeStringify(value: unknown) {
  * Pi's calls and its own words, in the order Pi recorded them.
  *
  * A call with no result is one that never reported an end: it is running while
- * this worker is driving the conversation, and interrupted otherwise — which
- * is exactly what a reader needs to know after a restart.
+ * the reply it belongs to is being written, and interrupted otherwise — which
+ * is what a reader needs to know after a restart, and keeps a call from an
+ * older stopped reply from springing back to life when a new reply starts.
  */
 export function activityFromTranscript(input: {
   applicationId: string;
@@ -144,7 +145,20 @@ export function activityFromTranscript(input: {
       record.toolCallId ? [[record.toolCallId, record] as const] : [],
     ),
   );
-  const driving = transcript.status === "working";
+  /**
+   * Whether the reply a call belongs to is the one being written now.
+   *
+   * Per reply, never per conversation. A call with no result under a reply
+   * that was stopped or interrupted turns is finished business, and reading
+   * the conversation's own status made every one of them spring back to
+   * "running" the moment a later reply started.
+   */
+  const live = new Map(
+    transcript.messages.map((message) => [
+      message.id,
+      message.status === "running",
+    ]),
+  );
   const tools: ActivityRecord[] = Object.entries(transcript.calls).map(
     ([id, call]) => {
       const execution = executionOf.get(id);
@@ -167,7 +181,7 @@ export function activityFromTranscript(input: {
             ? call.result.failed
               ? "failed"
               : "succeeded"
-            : driving
+            : live.get(call.replyId)
               ? "running"
               : "interrupted",
         executionId: execution?.id,

@@ -681,6 +681,20 @@ it("Stop after continuing an idle lane's queue says stopped, from the result of 
     "pi [cancelled] I will ask first.",
   ]);
   expect(listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
+
+  // A later turn, and a worker that went away in between, do not rewrite how
+  // that stopped one ended: its operation is the one Pi read the queue in,
+  // and a reader that only asked about the newest operation called it
+  // completed.
+  await a.send("hello again");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  await loseWorker();
+  await startWorker();
+  expect((await a.transcript()).slice(-3)).toEqual([
+    "pi [cancelled] I will ask first.",
+    "you [delivered] hello again",
+    "pi [completed] reply: hello again",
+  ]);
 });
 
 it("a second worker steps aside without touching what the first is doing", async () => {
@@ -862,4 +876,37 @@ it("reads a conversation nobody is running without asking the model provider", a
   ]);
   // Sending still needs the provider, and says so.
   await expect(a.send("and now?")).rejects.toThrow();
+});
+
+it("keeps an older stopped reply stopped, and its calls with it, after a later turn", async () => {
+  const a = application("shop");
+  await a.send("[approve] restart it");
+  await until(() => expect(approval(a.id)).toBeTruthy());
+  await a.stop();
+  const stopped = (await a.snapshot()).messages.at(-1)!;
+  expect(stopped.status).toBe("cancelled");
+
+  // A new turn runs to the end. The old reply is history and stays stopped,
+  // read from the same session both while a worker holds it and after one
+  // has been replaced.
+  await a.send("hello again");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  const later = await a.snapshot();
+  expect(later.messages.find((m) => m.id === stopped.id)?.status).toBe(
+    "cancelled",
+  );
+  expect(
+    later.piActivity!.filter((record) => record.runId === stopped.id),
+  ).toMatchObject([{ status: "succeeded" }, { status: "interrupted" }]);
+
+  await loseWorker();
+  await startWorker();
+  const afterRestart = await a.snapshot();
+  expect(afterRestart.messages.find((m) => m.id === stopped.id)?.status).toBe(
+    "cancelled",
+  );
+  expect(
+    afterRestart.piActivity!.find((record) => record.runId === stopped.id)
+      ?.status,
+  ).toBe("succeeded");
 });

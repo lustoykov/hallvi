@@ -14,16 +14,25 @@ const APPLICATION = "11111111-2222-4333-8444-555555555555";
 const REPLY = "reply:asked";
 const AT = "2026-09-20T08:00:00.000Z";
 
-const reply = (id = REPLY): ChatMessage => ({
+const reply = (
+  id = REPLY,
+  status: ChatMessage["status"] = "completed",
+): ChatMessage => ({
   id,
   chatId: "chat",
   role: "assistant",
   body: "",
   source: "pi",
-  status: "completed",
+  status,
   createdAt: AT,
   revision: 0,
 });
+
+/** The conversation as it reads while Pi is writing this reply. */
+const working = {
+  status: "working" as const,
+  messages: [reply(REPLY, "running")],
+};
 
 function transcript(
   calls: Record<string, Partial<TranscriptCall>>,
@@ -94,8 +103,8 @@ it("says a call failed when Pi's own result says it failed", () => {
   expect(row).toMatchObject({ status: "failed", result: "no such host" });
 });
 
-it("reads a call with no result as running while Pi is working", () => {
-  const [row] = read(transcript({ call: {} }, { status: "working" }));
+it("reads a call with no result as running while its reply is being written", () => {
+  const [row] = read(transcript({ call: {} }, working));
   expect(row.status).toBe("running");
 });
 
@@ -157,9 +166,7 @@ it("reads the text out of a runtime result object", () => {
 });
 
 it("carries what a call in flight has streamed back", () => {
-  const [row] = read(
-    transcript({ call: { preview: "line one\n" } }, { status: "working" }),
-  );
+  const [row] = read(transcript({ call: { preview: "line one\n" } }, working));
   expect(row).toMatchObject({ preview: "line one\n", status: "running" });
 });
 
@@ -190,4 +197,36 @@ it("orders replies as the transcript does, whatever the clock did", () => {
 
 it("has nothing to say about a conversation with no calls", () => {
   expect(read(transcript({}))).toEqual([]);
+});
+
+it("leaves an older unfinished call alone while a newer reply runs", () => {
+  // The old reply was stopped with a call still open; the new one is being
+  // written now. Reading the conversation's status made both read "running".
+  const stopped = reply("reply:old", "cancelled");
+  const current = reply("reply:new", "running");
+  const rows = read({
+    status: "working",
+    messages: [stopped, current],
+    said: [],
+    calls: {
+      old: {
+        replyId: stopped.id,
+        sequence: 1,
+        tool: "server_bash",
+        args: {},
+        at: AT,
+      },
+      fresh: {
+        replyId: current.id,
+        sequence: 1,
+        tool: "server_bash",
+        args: {},
+        at: AT,
+      },
+    },
+  });
+  expect(rows.map((row) => [row.id, row.status])).toEqual([
+    ["old", "interrupted"],
+    ["fresh", "running"],
+  ]);
 });
