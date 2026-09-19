@@ -83,11 +83,15 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
  * unanswered would each remove the other's. With the lock held, whatever is
  * at the path is stale, and replacing it is safe. `owned` runs once this
  * process is the owner and before it answers anything.
+ *
+ * Ownership is not the socket's to give up: closing the server only stops
+ * intake. The owner calls `release` when it has let go of every session, or
+ * never, and the operating system releases the lock when the process ends.
  */
 export async function serveWorker(
   handle: (action: string, body: unknown) => Promise<unknown>,
   owned?: () => void,
-): Promise<Server | null> {
+): Promise<{ server: Server; release: () => void } | null> {
   const lock = new Database(`${realpathSync(databasePath())}.worker-lock`, {
     timeout: 0,
   });
@@ -119,9 +123,6 @@ export async function serveWorker(
       );
     });
   });
-  // Held for as long as this process serves, and referenced from here so it
-  // is not collected while it does.
-  server.once("close", () => lock.close());
   await new Promise<void>((resolve, reject) => {
     server.once("error", (error) => {
       lock.close();
@@ -135,5 +136,7 @@ export async function serveWorker(
       resolve();
     });
   });
-  return server;
+  // The lock is referenced from what is returned, so it is not collected
+  // while this process is the owner.
+  return { server, release: () => lock.close() };
 }

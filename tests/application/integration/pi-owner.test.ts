@@ -32,6 +32,8 @@ import {
 const synthetic = vi.hoisted(() => ({
   runtime: undefined as unknown,
   model: undefined as unknown,
+  /** When set, letting go of a session waits for it, as a slow write would. */
+  cleanup: undefined as Promise<void> | undefined,
 }));
 vi.mock("../../../src/server/pi-configuration", async (original) => ({
   ...(await original<object>()),
@@ -50,7 +52,9 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
     prompt(reason: string) {
       return reason;
     }
-    async dispose() {}
+    async dispose() {
+      await synthetic.cleanup;
+    }
   },
 }));
 
@@ -230,13 +234,7 @@ async function startWorker() {
 }
 /** As a worker that dies: Pi is told nothing, and keeps what it had. */
 async function loseWorker() {
-  if (!worker) return;
-  const closed = once(worker.server, "close");
-  worker.server.close();
-  worker.server.closeAllConnections();
-  await worker.owner.close();
-  // Ownership goes with the server: the next worker can only start after it.
-  await closed;
+  await worker?.close();
   worker = null;
 }
 
@@ -647,6 +645,32 @@ it("a second worker steps aside without touching what the first is doing", async
   decideExecution(a.id, waiting, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   expect((await a.transcript()).at(-1)).toBe("pi [completed] finished");
+});
+
+it("stays the owner through shutdown until its sessions are let go, and only then can another start", async () => {
+  const a = application("shop");
+  await a.send("hello");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  await a.snapshot(); // the conversation is open in this worker, for reading
+  let finish!: () => void;
+  synthetic.cleanup = new Promise((resolve) => (finish = resolve));
+  try {
+    const closing = worker!.close();
+    // Intake has stopped; the sessions have not been let go yet.
+    await expect(a.send("anybody?")).rejects.toBeInstanceOf(
+      WorkerUnavailableError,
+    );
+    expect(await ownSessions()).toBeNull();
+
+    finish();
+    await closing;
+  } finally {
+    synthetic.cleanup = undefined;
+    finish();
+  }
+  worker = await ownSessions({ stopTimeoutMs: 2_000 });
+  expect(worker).not.toBeNull();
+  expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: hello");
 });
 
 it("of workers starting in the same instant over a dead worker's socket, exactly one becomes the owner", async () => {

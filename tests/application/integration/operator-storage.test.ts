@@ -109,11 +109,11 @@ it("removal goes through the worker that owns the histories, and cascades only a
     /worker is not running/,
   );
   expect(store.getApplication(app)).toBeTruthy();
-  const { server } = (await ownSessions())!;
+  const worker = (await ownSessions())!;
   try {
     await removeApplication(app, "example/app");
   } finally {
-    await new Promise((closed) => server.close(closed));
+    await worker.close();
   }
   for (const table of ["applications", "conversations", "saved_information"])
     expect(

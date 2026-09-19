@@ -35,7 +35,7 @@ export async function runPiWorker(signal: AbortSignal) {
     throw new PiWorkerBusyError(
       "A Pi worker is already running for this database.",
     );
-  const { owner, server } = owned;
+  const { owner } = owned;
   try {
     // A send is answered once Pi has the message, so the first one should
     // not also wait for the SDK to load.
@@ -58,8 +58,7 @@ export async function runPiWorker(signal: AbortSignal) {
       await delay(250, undefined, { signal }).catch(() => undefined);
     }
   } finally {
-    server.close();
-    server.closeAllConnections();
-    await owner.close();
+    // Ownership is held until every session is let go, or the process ends.
+    await owned.close();
   }
 }

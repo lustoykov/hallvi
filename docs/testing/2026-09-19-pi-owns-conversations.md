@@ -164,3 +164,12 @@ Afterwards: application suite 942 passed, 3 skipped; typecheck, eslint (no
 errors) and prettier clean; the 14 browser journeys that use the real worker
 process (applications, experience continuity, worker restart, transcript)
 pass.
+
+A fourth, from review of `6b4b698e`: the lock was released when the socket
+server closed, before the worker had let go of its sessions, so a replacement
+could become the owner while Pi was still finishing writes. The lock is now
+released only after session cleanup, or by the operating system when the
+process ends; closing the socket only stops intake. Covered: with session
+cleanup held pending during shutdown, sends fail, a replacement is refused,
+and it starts once cleanup finishes; the test fails with the old order.
+Application suite afterwards: 943 passed, 3 skipped.

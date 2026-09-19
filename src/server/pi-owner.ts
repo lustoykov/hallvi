@@ -487,6 +487,23 @@ export async function ownSessions(
   options: Parameters<typeof sessionOwner>[0] = {},
 ) {
   const owner = sessionOwner(options);
-  const server = await serveWorker(owner.handle, owner.recover);
-  return server ? { owner, server } : null;
+  const serving = await serveWorker(owner.handle, owner.recover);
+  if (!serving) return null;
+  return {
+    owner,
+    /**
+     * Stop answering, let go of every session, and only then stop being the
+     * owner. Pi's close waits for what it is still writing, and no other
+     * process may open those sessions until it has finished.
+     */
+    async close() {
+      serving.server.close();
+      serving.server.closeAllConnections();
+      try {
+        await owner.close();
+      } finally {
+        serving.release();
+      }
+    },
+  };
 }
