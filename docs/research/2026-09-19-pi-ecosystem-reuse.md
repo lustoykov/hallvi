@@ -2,6 +2,11 @@
 
 Date: 2026-09-19. Status: source and package audit; no runtime proof of fit.
 
+Follow-up: [runtime evolution and strategy](2026-09-19-pi-runtime-evolution.md)
+records Fable's later isolated experiments, the three Hallvi designs, and
+upstream history. It corrects the initial uncertainty around reusing
+authentication, tools and compaction; Hallvi integration remains unverified.
+
 ## Decision
 
 Before finalizing Hallvi's remaining queue adapter, evaluate the published
