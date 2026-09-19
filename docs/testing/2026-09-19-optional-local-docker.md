@@ -1,7 +1,7 @@
 # Optional local Docker — 19 September 2026
 
 Verification of the change that makes local Docker optional for Pi's
-repository workspace, on branch `claude/hallvi-optional-docker-01f3a8` based on
+repository workspace, in [PR #153](https://github.com/lustoykov/hallvi/pull/153), based on
 `f3232cbb`. [Pi's workspace](../installation.md#pis-workspace) describes the
 behavior; [Architecture](../architecture.md#repository-workspace-architecture)
 draws the boundary.
