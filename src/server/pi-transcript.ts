@@ -4,7 +4,7 @@
 // what waits and what is running. Nothing here is stored: it is projected on
 // every read, and Hallvi's execution evidence is placed into it by the id Pi
 // gave each tool call.
-import type { LaneSnapshot } from "@earendil-works/pi-agent-core";
+import type { Entry, LaneSnapshot } from "@earendil-works/pi-agent-core";
 
 import type { ConversationStatus } from "./operator-data";
 import type { ChatMessage } from "./types";
@@ -44,6 +44,25 @@ function textOf(content: unknown) {
     .join("");
 }
 
+/**
+ * What to do about a model failure. Pi keeps the provider's own words; the
+ * page gets advice, never those words.
+ */
+function advice(errorMessage: string | undefined) {
+  const said = errorMessage ?? "";
+  return `${
+    /\b(401|403)\b|unauthori|invalid_grant|forbidden/i.test(said)
+      ? "The model connection was rejected. Open Settings and reconnect."
+      : /\b429\b|rate.?limit|usage.?limit|quota/i.test(said)
+        ? "The model reports a usage or rate limit. Check the account allowance, then retry."
+        : /\b5\d\d\b|overloaded|network|fetch failed|ECONN|ETIMEDOUT|ENOTFOUND/i.test(
+              said,
+            )
+          ? "The model service could not be reached. Check your connection and retry."
+          : "Hallvi could not finish this attempt. Check Settings or retry."
+  } Check execution history for any effects.`;
+}
+
 const at = (timestamp: number | undefined) =>
   new Date(timestamp ?? 0).toISOString();
 
@@ -53,12 +72,15 @@ export function unfinished(snapshot: LaneSnapshot) {
 }
 
 /**
- * `driving` is the one fact Pi's records cannot hold: whether this worker is
- * running the lane right now. Unfinished work that nobody is driving was
- * interrupted, and stays so until its owner continues or stops it.
+ * `history` is Pi's whole branch: its lane snapshot holds only what the model
+ * is still sent, which a compaction shortens. `driving` is the one fact Pi's
+ * records cannot hold: whether this worker is running the lane right now.
+ * Unfinished work that nobody is driving was interrupted, and stays so until
+ * its owner continues or stops it.
  */
 export function projectTranscript(
   chatId: string,
+  history: Entry[],
   snapshot: LaneSnapshot,
   driving: boolean,
 ): Transcript {
@@ -125,12 +147,10 @@ export function projectTranscript(
           ? "cancelled"
           : "completed";
     to.error =
-      message.stopReason === "error"
-        ? (message.errorMessage ?? "The model failed.")
-        : null;
+      message.stopReason === "error" ? advice(message.errorMessage) : null;
   };
 
-  for (const entry of snapshot.transcript) {
+  for (const entry of history) {
     if (entry.type !== "message") continue;
     const message = entry.message as {
       role: string;
@@ -208,12 +228,12 @@ export function projectTranscript(
 }
 
 /** Whether Pi already holds a message with this id, read or still queued. */
-export function holds(snapshot: LaneSnapshot, id: string) {
+export function holds(history: Entry[], snapshot: LaneSnapshot, id: string) {
   return (
     snapshot.queues.some(
       (item) => item.type === "message" && tagOf(item.message) === id,
     ) ||
-    snapshot.transcript.some(
+    history.some(
       (entry) => entry.type === "message" && tagOf(entry.message) === id,
     )
   );

@@ -45,6 +45,9 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
     const asked = request(
       {
         socketPath: workerSocketPath(),
+        // One connection per question: a kept one may belong to a worker that
+        // has since gone.
+        agent: false,
         path: `/${action}`,
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,7 +71,10 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
       reject(
         ["ENOENT", "ECONNREFUSED"].includes(error.code ?? "")
           ? new WorkerUnavailableError()
-          : error,
+          : new Error(
+              "Hallvi's worker stopped answering. If this was a message, sending it again is safe: Pi never takes the same one twice.",
+              { cause: error },
+            ),
       ),
     );
     asked.end(JSON.stringify(body));

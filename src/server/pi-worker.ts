@@ -1,9 +1,6 @@
 import { cleanupPiWorkspaces } from "./pi-workspace";
 import { copyDue, protectController } from "./controller-protection";
 import { setTimeout as delay } from "node:timers/promises";
-import { listApplications } from "./db";
-import { applicationsWithActivity, settleRunningActivity } from "./pi-activity";
-import { settleRunningExecutions } from "./operator-execution";
 import { sessionOwner } from "./pi-owner";
 import { serveWorker } from "./worker-link";
 
@@ -38,12 +35,6 @@ export async function runPiWorker(signal: AbortSignal) {
       "A Pi worker is already running for this database.",
     );
   try {
-    // A crash never reaches a worker's own cleanup, so evidence still marked
-    // running belongs to work that no longer exists. Pi's sessions are left
-    // as they are: nothing is opened, and nothing runs, until somebody asks.
-    for (const applicationId of applicationsWithActivity())
-      settleRunningActivity(applicationId, null);
-    for (const { id } of listApplications()) settleRunningExecutions(id, null);
     await cleanupPiWorkspaces().catch(() => undefined);
     console.info("Pi worker ready.");
     let nextProtectionCheck = 0;

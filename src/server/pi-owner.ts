@@ -8,6 +8,7 @@ import {
   BACKGROUND_CONTEXT as ctx,
   reduceLaneSnapshot,
   type AgentMessage,
+  type Entry,
   type LaneSnapshot,
 } from "@earendil-works/pi-agent-core";
 import { existsSync } from "node:fs";
@@ -15,7 +16,9 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { assertChatWritable, loadChat } from "./applications";
 import { openPiSession, watchPiSession } from "./pi";
+import { listApplications } from "./db";
 import {
+  applicationsWithActivity,
   endActivity,
   settleRunningActivity,
   startActivity,
@@ -50,6 +53,8 @@ interface Opened extends Scope {
   /** Pi's lane as it stands, kept current by Pi's own reducer. */
   snapshot: () => LaneSnapshot;
   fresh: () => Promise<LaneSnapshot>;
+  /** Pi's whole branch, read again only when its tip has moved. */
+  history: () => Promise<Entry[]>;
   /** One trace per stretch of work. */
   trace(id: string | null): void;
   close: () => Promise<void>;
@@ -75,6 +80,15 @@ const NOTHING: Transcript = {
 export function sessionOwner(
   options: { signal?: AbortSignal; stopTimeoutMs?: number } = {},
 ) {
+  // A crash never reaches a worker's own cleanup, so evidence still marked
+  // running belongs to work that no longer exists. Pi's sessions are left as
+  // they are: nothing is opened, and nothing runs, until somebody asks.
+  for (const applicationId of applicationsWithActivity())
+    settleRunningActivity(applicationId, null);
+  for (const { id } of listApplications()) settleRunningExecutions(id, null);
+
+  /** The worker is going away: Pi keeps what it has, and nothing goes on. */
+  let closing = false;
   const opened = new Map<string, Opened>();
   /** One thing at a time per conversation; reads of an open one skip this. */
   const lines = new Map<string, Promise<unknown>>();
@@ -95,6 +109,19 @@ export function sessionOwner(
     watch.start((event) => {
       if (reduceLaneSnapshot(snapshot, event)) void fresh();
     });
+    let read: { tipId: string | null; entries: Entry[] } | undefined;
+    const history = async () => {
+      const { tipId } = snapshot;
+      if (read?.tipId !== tipId)
+        read = {
+          tipId,
+          entries: await session.lane.findEntries(
+            { order: "oldestFirst" },
+            ctx,
+          ),
+        };
+      return read.entries;
+    };
     // Evidence of what Pi's tools did, written as it happens and kept under
     // the id Pi gave the call. Where it sits in the conversation is Pi's.
     const recording = watchPiSession(session.harness, {
@@ -120,6 +147,7 @@ export function sessionOwner(
       lane: session.lane,
       snapshot: () => snapshot,
       fresh,
+      history,
       driving: false,
       trace(id: string | null) {
         diagnostics?.finish("completed");
@@ -175,7 +203,7 @@ export function sessionOwner(
     conversation.trace(operationId);
     void (async () => {
       let step = first;
-      while (!options.signal?.aborted) {
+      while (!closing) {
         const settled = await step().then(
           () => true,
           (error) => {
@@ -185,7 +213,7 @@ export function sessionOwner(
             return false;
           },
         );
-        if (options.signal?.aborted) return;
+        if (closing) return;
         const next = await inLine(conversation.chatId, async () => {
           const { queues, operation } = await conversation.fresh();
           if (settled && queues.length && !operation)
@@ -234,19 +262,20 @@ export function sessionOwner(
     return Boolean(chat.nativeSessionId) || existsSync(earlierHistoryPath(scope));
   }
 
+  const project = async (open: Opened) =>
+    projectTranscript(
+      open.chatId,
+      await open.history(),
+      open.snapshot(),
+      open.driving,
+    );
+
   const actions = {
     async transcript(scope: Scope): Promise<Transcript> {
       const open = opened.get(scope.chatId);
-      if (open) return projectTranscript(scope.chatId, open.snapshot(), open.driving);
+      if (open) return project(open);
       if (!hasHistory(scope)) return NOTHING;
-      return inLine(scope.chatId, async () => {
-        const conversation = await ensure(scope);
-        return projectTranscript(
-          scope.chatId,
-          conversation.snapshot(),
-          conversation.driving,
-        );
-      });
+      return inLine(scope.chatId, async () => project(await ensure(scope)));
     },
 
     /** Resolves once Pi has durably taken the message, and not before. */
@@ -256,7 +285,12 @@ export function sessionOwner(
         const conversation = hasHistory(scope) ? await ensure(scope) : undefined;
         const snapshot = await conversation?.fresh();
         // An answer that was lost on its way back is sent again. Pi has it.
-        if (snapshot && holds(snapshot, message.id)) return { accepted: true };
+        if (
+          conversation &&
+          snapshot &&
+          holds(await conversation.history(), snapshot, message.id)
+        )
+          return { accepted: true };
         if (conversation?.driving) {
           const queued = await (message.delivery === "steer"
             ? conversation.lane.steer(toPi(message), undefined, ctx)
@@ -363,9 +397,9 @@ export function sessionOwner(
      * The worker is going away. Nothing is aborted: Pi keeps each operation
      * and queue as it is, and nothing runs again until its owner continues.
      */
-    close: () =>
-      Promise.all([...opened.values()].map((open) => open.close())).then(
-        () => undefined,
-      ),
+    async close() {
+      closing = true;
+      await Promise.all([...opened.values()].map((open) => open.close()));
+    },
   };
 }
