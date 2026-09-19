@@ -1,0 +1,111 @@
+.hv-wm-peek {
+  flex: none;
+  align-self: flex-end;
+  width: 34px;
+  height: 27px;
+  margin: -12px 0 -1px;
+  overflow: hidden;
+  border-bottom: 1px solid transparent;
+  pointer-events: none;
+  animation: hv-wm-ledge 18s linear -9.5s infinite;
+}
+.hv-wm {
+  display: block;
+  overflow: visible;
+  animation: hv-wm-peek 18s ease-in-out -9.5s infinite;
+}
+/* Up for five seconds in every eighteen; the first visit comes early. */
+@keyframes hv-wm-peek {
+  0%,
+  60%,
+  96%,
+  100% {
+    transform: translateY(104%);
+  }
+  64%,
+  92% {
+    transform: translateY(6%);
+  }
+}
+/* A hairline to stand behind, only while he is up. */
+@keyframes hv-wm-ledge {
+  0%,
+  59%,
+  97%,
+  100% {
+    border-bottom-color: transparent;
+  }
+  62%,
+  94% {
+    border-bottom-color: #d8dee8;
+  }
+}
+.hv-wm-tip {
+  fill: #c5d2f7;
+  animation: hv-wm-pulse 1.4s ease-in-out infinite alternate;
+}
+.hv-wm-antenna,
+.hv-wm-eyes {
+  transform-box: fill-box;
+}
+.hv-wm-antenna {
+  transform-origin: 50% 100%;
+  animation: hv-wm-sway 3.2s ease-in-out infinite alternate;
+}
+.hv-wm-antenna[data-side="1"] {
+  animation-delay: -1.1s;
+}
+.hv-wm-eyes {
+  transform-origin: 50% 50%;
+  translate: 1.2px 0;
+  animation: hv-wm-blink 4.6s infinite;
+}
+.hv-wm-arm {
+  transform-origin: 30px 22px;
+  animation: hv-wm-turn 0.7s ease-in-out infinite alternate;
+}
+.hv-wm-body {
+  animation: hv-wm-bob 1.4s ease-in-out infinite alternate;
+}
+@keyframes hv-wm-sway {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(7deg);
+  }
+}
+@keyframes hv-wm-blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.12);
+  }
+}
+@keyframes hv-wm-turn {
+  from {
+    transform: rotate(-16deg);
+  }
+  to {
+    transform: rotate(20deg);
+  }
+}
+@keyframes hv-wm-pulse {
+  to {
+    fill: #285ad8;
+  }
+}
+@keyframes hv-wm-bob {
+  to {
+    transform: translateY(0.8px);
+  }
+}
+/* A visit is decoration; without motion there is nothing to show. */
+@media (prefers-reduced-motion: reduce) {
+  .hv-wm-peek {
+    display: none;
+  }
+}
