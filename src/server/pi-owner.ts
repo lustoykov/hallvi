@@ -29,6 +29,7 @@ import {
   holds,
   MESSAGE_TAG,
   projectTranscript,
+  tagOf,
   unfinished,
   type Transcript,
 } from "./pi-transcript";
@@ -54,8 +55,11 @@ interface Opened extends Scope {
   /** Pi's lane as it stands, kept current by Pi's own reducer. */
   snapshot: () => LaneSnapshot;
   fresh: () => Promise<LaneSnapshot>;
-  /** Pi's whole branch, read again only when its tip has moved. */
-  history: () => Promise<Entry[]>;
+  /**
+   * Pi's whole branch, and where Pi says an operation was aborted: both read
+   * again only when the branch's tip has moved.
+   */
+  history: () => Promise<{ entries: Entry[]; abortedAt: Set<string> }>;
   /** One trace per stretch of work, ended with how Pi says it ended. */
   trace(id: string | null, outcome?: PiReply["status"]): void;
   close: () => Promise<void>;
@@ -112,18 +116,28 @@ export function sessionOwner(
     watch.start((event) => {
       if (reduceLaneSnapshot(snapshot, event)) void fresh();
     });
-    let read: { tipId: string | null; entries: Entry[] } | undefined;
+    let read:
+      | { tipId: string | null; entries: Entry[]; abortedAt: Set<string> }
+      | undefined;
     const history = async () => {
       const { tipId } = snapshot;
-      if (read?.tipId !== tipId)
-        read = {
-          tipId,
-          entries: await session.lane.findEntries(
-            { order: "oldestFirst" },
-            ctx,
-          ),
-        };
-      return read.entries;
+      if (read?.tipId !== tipId) {
+        const entries = await session.lane.findEntries(
+          { order: "oldestFirst" },
+          ctx,
+        );
+        // A prompt's operation is named after its message. Pi keeps how each
+        // one ended, and the entry it ended at.
+        const abortedAt = new Set<string>();
+        for (const entry of entries) {
+          const id = entry.type === "message" && tagOf(entry.message);
+          const result = id && (await session.lane.getResult(id, ctx));
+          if (result && result.status === "aborted" && result.tipId)
+            abortedAt.add(result.tipId);
+        }
+        read = { tipId, entries, abortedAt };
+      }
+      return read;
     };
     // Evidence of what Pi's tools did, written as it happens and kept under
     // the id Pi gave the call. Where it sits in the conversation is Pi's.
@@ -280,13 +294,16 @@ export function sessionOwner(
     );
   }
 
-  const project = async (open: Opened) =>
-    projectTranscript(
+  const project = async (open: Opened) => {
+    const { entries, abortedAt } = await open.history();
+    return projectTranscript(
       open.chatId,
-      await open.history(),
+      entries,
+      abortedAt,
       open.snapshot(),
       open.driving,
     );
+  };
 
   const actions = {
     async transcript(scope: Scope): Promise<Transcript> {
@@ -330,7 +347,7 @@ export function sessionOwner(
         const held =
           conversation &&
           snapshot &&
-          holds(await conversation.history(), snapshot, message.id);
+          holds((await conversation.history()).entries, snapshot, message.id);
         if (held && held !== message.body)
           throw new WorkerRefusal(
             "This request key was already used for a different message.",

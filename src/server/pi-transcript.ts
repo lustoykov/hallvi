@@ -80,6 +80,8 @@ export function unfinished(snapshot: LaneSnapshot) {
 export function projectTranscript(
   chatId: string,
   history: Entry[],
+  /** Entries at which Pi says an operation was aborted. */
+  abortedAt: ReadonlySet<string>,
   snapshot: LaneSnapshot,
   driving: boolean,
 ): Transcript {
@@ -151,6 +153,11 @@ export function projectTranscript(
 
   for (const entry of history) {
     if (entry.type !== "message") continue;
+    // Stopped mid-call, Pi's last words are a finished message and a tool
+    // result; that the reply was cut is in Pi's record of the operation.
+    const cut = () => {
+      if (reply && abortedAt.has(entry.id)) reply.status = "cancelled";
+    };
     const message = entry.message as {
       role: string;
       content: unknown;
@@ -170,8 +177,11 @@ export function projectTranscript(
         createdAt: at(message.timestamp ?? entry.timestamp),
         revision: 0,
       });
-    } else if (message.role === "assistant") assistant(entry.id, message);
-    else if (
+    } else if (message.role === "assistant") {
+      assistant(entry.id, message);
+      cut();
+    } else if (message.role === "toolResult") cut();
+    if (
       message.role === "toolResult" &&
       message.toolCallId &&
       shown.has(message.toolCallId)

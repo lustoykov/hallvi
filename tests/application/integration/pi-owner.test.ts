@@ -439,9 +439,11 @@ it("Stop ends an approval wait and a streaming answer, drops what waited, and sa
   await a.send("then check the logs");
   await a.stop();
   await until(async () => expect(await a.status()).toBe("idle"));
+  // Pi's last words were a finished message and a tool call; that the reply
+  // was stopped is read from Pi's own record of the operation.
   expect(await a.transcript()).toEqual([
     "you [delivered] [approve] restart it",
-    "pi [completed] I will ask first.",
+    "pi [cancelled] I will ask first.",
   ]);
   // Nothing was approved, so nothing ran, and the record says it was cut.
   expect(listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
@@ -522,6 +524,9 @@ it("after a restart Stop is there with nothing queued, and ends what Pi held", a
 
   await a.stop();
   expect(await a.status()).toBe("idle");
+  expect((await a.transcript()).at(-1)).toBe(
+    "pi [cancelled] I will ask first.",
+  );
   expect(requests).toEqual(["[approve] restart it"]);
   await a.send("hello");
   await until(async () => expect(await a.status()).toBe("idle"));

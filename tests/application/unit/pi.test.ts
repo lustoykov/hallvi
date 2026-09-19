@@ -97,8 +97,11 @@ beforeEach(() => {
     harness: {
       ...harness,
       lane: async () => ({
+        getModel: vi.fn(async () => undefined),
         setModel: vi.fn(),
+        getThinkingLevel: vi.fn(async () => undefined),
         setThinkingLevel: vi.fn(),
+        getActiveTools: vi.fn(async () => []),
         setActiveTools: vi.fn(),
       }),
     },

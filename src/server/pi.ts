@@ -940,18 +940,25 @@ export async function openPiSession(
     harness = created.harness;
     const lane = await harness.lane("main", BACKGROUND_CONTEXT);
     // Hallvi's setup chooses the model, not what an earlier history recorded.
-    await lane.setModel(
-      { provider: model.provider, modelId: model.id },
-      BACKGROUND_CONTEXT,
-    );
-    await lane.setThinkingLevel(
-      configuration.reasoningEffort,
-      BACKGROUND_CONTEXT,
-    );
-    await lane.setActiveTools(
-      tools.map((tool) => tool.name),
-      BACKGROUND_CONTEXT,
-    );
+    // Pi writes each change to the history, so only a change is set: opening
+    // a conversation to read it writes nothing.
+    const current = await lane.getModel(BACKGROUND_CONTEXT);
+    if (current?.provider !== model.provider || current.id !== model.id)
+      await lane.setModel(
+        { provider: model.provider, modelId: model.id },
+        BACKGROUND_CONTEXT,
+      );
+    if (
+      (await lane.getThinkingLevel(BACKGROUND_CONTEXT)) !==
+      configuration.reasoningEffort
+    )
+      await lane.setThinkingLevel(
+        configuration.reasoningEffort,
+        BACKGROUND_CONTEXT,
+      );
+    const names = tools.map((tool) => tool.name);
+    if ((await lane.getActiveTools(BACKGROUND_CONTEXT)).join() !== names.join())
+      await lane.setActiveTools(names, BACKGROUND_CONTEXT);
     return { harness, lane, close };
   } catch (error) {
     await close();
