@@ -89,7 +89,12 @@ function FlowNote({
             detail: `Nobody has asked for anything in the last ${WINDOW_MINUTES} minutes.`,
           }
         : traffic.state === "lost"
-          ? { title: "The log stopped. Trying again…", detail: traffic.detail }
+          ? {
+              title: "The log stopped. Trying again…",
+              // Only a reason is worth a second line.
+              detail:
+                traffic.detail === "The log stopped." ? null : traffic.detail,
+            }
           : traffic.state === "no-server"
             ? {
                 title: "No server is connected",
@@ -213,7 +218,7 @@ export function OverviewLive({
             )
           }
         >
-          <div className="ovl-now-flow">
+          <div className="ovl-now-flow" data-live={traffic.state === "live"}>
             {/* Nothing is drawn that is not there: no log, no picture. */}
             {(traffic.state === "live" || traffic.requests > 0) && (
               <RequestFlow traffic={traffic} name={name} />

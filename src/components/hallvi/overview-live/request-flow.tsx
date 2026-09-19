@@ -103,6 +103,12 @@ export function RequestFlow({
   useEffect(() => {
     live.current = drawn;
   }, [drawn]);
+  const failingNow = useRef(new Set<string>());
+  useEffect(() => {
+    failingNow.current = new Set(
+      traffic.lanes.filter((lane) => lane.failed > 0).map((lane) => lane.name),
+    );
+  }, [traffic.lanes]);
   const { onArrival } = traffic;
 
   useEffect(() => {
@@ -134,7 +140,7 @@ export function RequestFlow({
     const draw = () => {
       context.clearRect(0, 0, W, H);
       for (const item of live.current) {
-        const failing = item.lane.failed > 0;
+        const failing = failingNow.current.has(item.lane.name);
         context.strokeStyle = `rgba(${failing ? RED : BLUE}, ${failing ? 0.24 : 0.18})`;
         context.lineWidth = 0.8;
         for (const points of item.threads) {
@@ -200,21 +206,26 @@ export function RequestFlow({
         <i />
         {name}
       </p>
-      {drawn.map((item) => (
-        <p
-          key={item.lane.name}
-          className="ovl-flow-end"
-          data-failing={item.lane.failed > 0}
-          style={{ top: `${(item.y / H) * 100}%` }}
-        >
-          <b>{item.lane.name}</b>
-          <span>
-            {item.lane.failed > 0
-              ? `${item.lane.failed} of ${item.lane.requests} failed`
-              : item.lane.requests.toLocaleString("en-US")}
-          </span>
-        </p>
-      ))}
+      {drawn.map((item) => {
+        // Where a lane sits is held still; what it says is never held.
+        const lane =
+          traffic.lanes.find((one) => one.name === item.lane.name) ?? item.lane;
+        return (
+          <p
+            key={lane.name}
+            className="ovl-flow-end"
+            data-failing={lane.failed > 0}
+            style={{ top: `${(item.y / H) * 100}%` }}
+          >
+            <b>{lane.name}</b>
+            <span>
+              {lane.failed > 0
+                ? `${lane.failed} of ${lane.requests} failed`
+                : lane.requests.toLocaleString("en-US")}
+            </span>
+          </p>
+        );
+      })}
     </div>
   );
 }

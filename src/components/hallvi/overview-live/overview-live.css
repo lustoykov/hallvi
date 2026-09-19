@@ -134,14 +134,15 @@
 }
 .ovl-flow-app {
   position: absolute;
-  left: 3%;
+  /* Its right edge meets the threads, however short the name. */
+  right: 78%;
   top: 50%;
   transform: translateY(-50%);
   margin: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: 19.5%;
+  max-width: 20%;
   padding: 7px 14px 7px 12px;
   border-radius: 999px;
   border: 1px solid #d9e2f5;
@@ -199,6 +200,21 @@
   gap: 8px;
   padding: 0 20%;
   text-align: center;
+}
+/* A picture of a moment ago is drawn as one: faded, under what is true now. */
+.ovl-now-flow[data-live="false"] .ovl-flow {
+  opacity: 0.28;
+  transition: opacity var(--base) var(--ease-out);
+}
+.ovl-now-flow[data-live="false"] .ovl-note > * {
+  position: relative;
+}
+.ovl-now-flow[data-live="false"] .ovl-note::before {
+  content: "";
+  position: absolute;
+  inset: 34% 22%;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.86);
 }
 .ovl-note b {
   font-size: 15px;

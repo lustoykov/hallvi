@@ -46,6 +46,16 @@ describe("the access log", () => {
     expect(parseCaddyLine(line)?.visitor).toBe(parsed?.visitor);
   });
 
+  it("counts a failed request once", () => {
+    // Caddy also reports a 502 through its error logger, with the same
+    // request and status. Seen on a real server: every failure was doubled.
+    const error = line
+      .replace("http.log.access.log0", "http.log.error.log0")
+      .replace("handled request", "dial tcp 172.18.0.2:9090: connect: refused");
+    expect(parseCaddyLine(error)).toBeNull();
+    expect(parseCaddyLine(line)?.status).toBe(500);
+  });
+
   it("ignores everything that is not a request", () => {
     expect(parseCaddyLine("hallvi-following")).toBeNull();
     expect(parseCaddyLine('{"level":"info","msg":"serving"}')).toBeNull();

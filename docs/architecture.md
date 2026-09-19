@@ -120,7 +120,7 @@ keepalive, terminal, forwarding and output handling.
 Overview follows the proxy's access log while it is open, and keeps nothing.
 [access-log.ts](../src/server/access-log.ts) owns it; the rule that lets the
 controller run this without a prompt is in
-[operator design](operator-design.md#general-tools-and-independent-permissions).
+[Product](../PRODUCT.md#what-the-modes-cover).
 
 ```mermaid
 sequenceDiagram

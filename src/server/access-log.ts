@@ -78,6 +78,7 @@ export function parseCaddyLine(line: string): AccessLine | null {
   const start = line.indexOf("{");
   if (start < 0) return null;
   let entry: {
+    logger?: unknown;
     ts?: unknown;
     status?: unknown;
     duration?: unknown;
@@ -93,6 +94,14 @@ export function parseCaddyLine(line: string): AccessLine | null {
   } catch {
     return null;
   }
+  // A failed request is written twice: once by the access logger and once by
+  // `http.log.error`, with the same request and status. Only the first is a
+  // request; counting both doubled every failure on a real server.
+  if (
+    typeof entry.logger === "string" &&
+    !entry.logger.startsWith("http.log.access")
+  )
+    return null;
   const request = entry.request;
   if (
     !request ||
@@ -124,26 +133,38 @@ export function followAccessLog(
 ) {
   return new Promise<{ exitCode: number | null; said: string }>(
     (resolve, reject) => {
+      // A terminal, and the command as an argument rather than on stdin.
+      // Without one, closing the page ended the SSH session and left the
+      // follow running on the server until its next write — on a quiet site,
+      // indefinitely. With one, the server hangs the process up when the
+      // connection goes. The command holds no `$`, backtick or double quote:
+      // its only variable part is a name or path whose shape excludes them.
       const child = spawn(
         "ssh",
         [
           ...managedSshOptions(host),
-          "-T",
+          "-tt",
           "-o",
           "ConnectTimeout=10",
+          // A page that says "live" has to find out quickly that it is not:
+          // three missed answers, five seconds apart. At the shell's 15 and 2
+          // a blackholed connection went on claiming live for 40 seconds.
           "-o",
-          "ServerAliveInterval=15",
+          "ServerAliveInterval=5",
           "-o",
-          "ServerAliveCountMax=2",
+          "ServerAliveCountMax=3",
+          "-o",
+          "LogLevel=ERROR",
           `${host.user}@${host.address}`,
-          "bash -s",
+          `bash -c "${followCommand(source)}"`,
         ],
-        { signal },
+        { signal, stdio: ["pipe", "pipe", "pipe"] },
       );
       let rest = "";
       let said = "";
       child.stdout.on("data", (chunk: Buffer) => {
-        const lines = (rest + chunk.toString("utf8")).split("\n");
+        // A terminal ends its lines with a carriage return as well.
+        const lines = (rest + chunk.toString("utf8")).split(/\r?\n/);
         rest = (lines.pop() ?? "").slice(-20_000);
         for (const text of lines) {
           if (text.trim() === READY) {
@@ -152,7 +173,11 @@ export function followAccessLog(
           }
           const parsed = parseCaddyLine(text);
           if (parsed) onLine(parsed);
-          else if (text.trim()) said = text.trim().slice(0, 300);
+          // What went wrong is said in words by ssh, docker or tail. A line
+          // of the log itself is never an explanation: on a real server the
+          // last unread line was Caddy's error entry, address and all.
+          else if (text.trim() && !text.includes("{"))
+            said = text.trim().slice(0, 200);
         }
       });
       child.stderr.on("data", (chunk: Buffer) => {
@@ -162,8 +187,8 @@ export function followAccessLog(
         signal.aborted ? resolve({ exitCode: null, said }) : reject(error),
       );
       child.on("close", (exitCode) => resolve({ exitCode, said }));
+      // Left open and unused: end-of-input on a terminal is a keystroke.
       child.stdin.on("error", () => {});
-      child.stdin.end(followCommand(source) + "\n");
     },
   );
 }

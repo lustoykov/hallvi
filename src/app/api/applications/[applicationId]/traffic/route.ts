@@ -63,6 +63,7 @@ export async function GET(
 
         send({ type: "state", state: "connecting" });
         let pending: AccessLine[] = [];
+        let answered = false;
         flush = setInterval(() => {
           if (!pending.length) return;
           // A burst is summarised by its newest lines; the page is a picture
@@ -80,15 +81,20 @@ export async function GET(
           source,
           (line) => pending.push(line),
           session.signal,
-          () => send({ type: "state", state: "live" }),
+          () => {
+            answered = true;
+            send({ type: "state", state: "live" });
+          },
         )
           .then(({ exitCode, said }) => {
             send({
               type: "state",
               state: "lost",
               detail:
+                // Only a session that never answered was refused. One that
+                // had been following simply stopped, whatever ssh exits with.
                 said ||
-                (exitCode === 255
+                (!answered && exitCode === 255
                   ? "The server did not accept the connection."
                   : "The log stopped."),
             });
