@@ -187,7 +187,10 @@ export function OverviewLive({
   const typical = [...p95].sort((a, b) => a - b)[Math.floor(p95.length / 2)];
   const health =
     reachable === "open"
-      ? { word: "Answering", state: "well" }
+      ? // What the check establishes is that the way in is open. For a
+        // private application that is the tunnel, not the application: on a
+        // real server this tile said "Answering" over a column of 502s.
+        { word: "The way in is open", state: "well" }
       : reachable === "closed"
         ? { word: "The way in is closed", state: "bad" }
         : { word: "Asking…", state: "asking" };

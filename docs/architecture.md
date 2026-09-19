@@ -274,9 +274,10 @@ controller stays manual; see
 - Nothing retrieves an application's own logs; the Logs destination holds what
   Hallvi's own commands printed, and says so.
 - Live requests need Caddy writing JSON access logs and a record saying where.
-  Other proxies and formats are not read. The follow has been exercised
-  against a local container over SSH (file source); the container source and
-  a provisioned host have not been run end to end.
+  Other proxies and formats are not read. Both sources were
+  [run on a rented server](testing/2026-09-19-overview-live.md) with a record
+  Pi wrote. A private application has no proxy until the owner asks for this,
+  and a dead connection takes about fifteen seconds to notice.
 - The worker runs one turn at a time for the whole controller. Native queueing
   and parallel read-only side work are deferred.
 
