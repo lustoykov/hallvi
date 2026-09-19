@@ -59,8 +59,8 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 - [x] **Everyday interaction polish — [PR #138](https://github.com/lustoykov/hallvi/pull/138).** Copy completed replies, keep keyboard focus useful after sending and returning, carry conversation context through Settings and GitHub connection, simplify repeat application setup, and keep Home consistent with current recorded problems and recovery.
 
-- [x] **Send next and conversation continuity.** Explicit follow-ups wait in the existing durable message queue; Stop cancels active and waiting replies in that conversation. Contextual questions preserve the owner's draft and destination, and drafts survive tab closure. [Interaction contract](docs/operator-design.md#interaction-while-pi-is-busy).
-- [ ] **Steer and contextual side chats — deferred.** Review native steering boundaries, opening contextual side chats and concurrent read-only explanations separately. Existing read-only tool restrictions remain; these controls are not prerequisites for first deployment.
+- [x] **Send next, Steer and conversation continuity.** A conversation runs on Pi's `AgentHarness`/`AgentLane` (published 0.85.1): Pi owns queued messages, their identity, order, cancellation, execution and restoration after a restart; Hallvi keeps the durable intake, the acknowledgment that Pi took a message, permissions, evidence and the transcript. Applications work at the same time; one conversation per application and per server address. Stop is the cancellation control. Contextual questions preserve the owner's draft and destination, and drafts survive tab closure. [Interaction contract](docs/operator-design.md#interaction-while-pi-is-busy), [who owns what](docs/architecture/conversation-lifecycle.md).
+- [ ] **Contextual side chats — deferred.** Opening contextual side chats and concurrent read-only explanations need a per-conversation history lock. Existing read-only tool restrictions remain; these are not prerequisites for first deployment.
 
 ## Later milestone: Pi heartbeat and state synchronization
 

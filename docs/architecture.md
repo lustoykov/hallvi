@@ -59,8 +59,8 @@ runtime table: a release, a backup copy, a restore test and a certificate are
 all records with a subject and a claim.
 
 Three things live in files beside the database rather than in it. Native Pi
-conversation history, under `pi-sessions/<application>/<chat>.jsonl`, because
-the SDK owns it. Execution evidence — every command, its output and its
+conversation history, under `pi-sessions/<application>/<chat>/`, because Pi's
+session repository owns it and its format. Execution evidence — every command, its output and its
 outcome — under `operator/<application>/executions/`, because a command's
 output is large and append-only. And local diagnostics, under `diagnostics/`.
 
@@ -241,8 +241,8 @@ controller stays manual; see
   path is not proved.
 - Nothing retrieves an application's own logs; the Logs destination holds what
   Hallvi's own commands printed, and says so.
-- The worker runs one turn at a time for the whole controller. Native queueing
-  and parallel read-only side work are deferred.
+- One conversation per application runs at a time, and applications run
+  beside each other. Parallel read-only side work is deferred.
 
 ## Source and proof
 

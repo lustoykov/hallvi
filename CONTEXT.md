@@ -40,9 +40,11 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Operation receipt**: The interactive presentation of an operation's origin, progress, required decision, evidence and outcome, drawn by `operation-receipt.tsx`. A receipt is not a second copy of execution state.
 
-**Reply** (`pi-conversation.ts`): What Pi said and did between two of the owner's messages, as one transcript row. Its evidence and approvals attach to it. It is not a unit of scheduling: Pi's native session decides what runs and when, and Hallvi records what happened. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
+**Reply** (`pi-conversation.ts`): What Pi said and did between two of the owner's messages, as one transcript row. Its evidence and approvals attach to it. It is not a unit of scheduling: Pi's `AgentLane` decides what runs and when, and Hallvi records what happened. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
 
-**Waiting message**: An accepted message Pi has not read yet. It becomes *delivered* when Pi reads it, *cancelled* when the conversation is stopped first or Pi could not be started, or *interrupted* when Hallvi stopped as Pi read it and Pi kept no record. Only a waiting message is ever handed to Pi.
+**Waiting message**: An accepted message Pi has not read yet. Until Pi *acknowledges* taking it, Hallvi holds it and will hand it over; from then on it is Pi's, under the entry id Pi gave it, to queue, run, cancel and restore. It becomes *delivered* when Pi reads it, or *cancelled* when the conversation is stopped first or Pi could not be started. After a worker goes away, a message Pi holds keeps waiting until the owner continues or stops the conversation.
+
+**Acknowledgment**: The worker's record that Pi has durably taken a message. The boundary between Hallvi's durable intake and Pi's durable queue: Hallvi never hands over a message it has an acknowledgment for.
 
 ## Execution and evidence
 

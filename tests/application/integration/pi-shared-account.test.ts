@@ -1,3 +1,10 @@
+import {
+  AgentHarness,
+  BACKGROUND_CONTEXT as ctx,
+  JsonlSessionRepo,
+} from "@earendil-works/pi-agent-core";
+import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +23,8 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
+
+const keysTheProviderSaw: Array<string | undefined> = [];
 
 async function runtime(authPath: string, refreshes: string[]) {
   const created = await ModelRuntime.create({
@@ -48,14 +57,38 @@ async function runtime(authPath: string, refreshes: string[]) {
       },
       getApiKey: (credentials) => credentials.access,
     },
+    streamSimple: (model, _context, options) => {
+      keysTheProviderSaw.push(options?.apiKey);
+      const stream = createAssistantMessageEventStream();
+      const message = {
+        role: "assistant" as const,
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        content: [{ type: "text" as const, text: "ok" }],
+        stopReason: "stop" as const,
+        timestamp: Date.now(),
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+      };
+      stream.push({ type: "start", partial: message });
+      stream.push({ type: "done", reason: "stop", message });
+      return stream;
+    },
     models: [
       {
         id: "synthetic",
         name: "Synthetic",
         reasoning: false,
         input: ["text"],
-        contextWindow: 8_192,
-        maxTokens: 2_048,
+        contextWindow: 272_000,
+        maxTokens: 32_000,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       },
     ],
@@ -93,4 +126,44 @@ it("two conversations on one expired account refresh it once and both get the ne
   expect(
     JSON.parse(readFileSync(authPath, "utf8"))["shared-account-test"],
   ).toMatchObject({ access: "access-2", refresh: "refresh-2" });
+});
+
+it("the harness authenticates through Pi's own ModelRuntime, refresh included", async () => {
+  const authPath = join(root, "auth.json");
+  writeFileSync(
+    authPath,
+    JSON.stringify({
+      "shared-account-test": {
+        type: "oauth",
+        access: "access-1",
+        refresh: "refresh-1",
+        expires: Date.now() - 1_000,
+      },
+    }),
+    { mode: 0o600 },
+  );
+  const refreshes: string[] = [];
+  keysTheProviderSaw.length = 0;
+  // Exactly what Hallvi composes: coding-agent's runtime handed to agent-core.
+  const models = await runtime(authPath, refreshes);
+  const repo = new JsonlSessionRepo({
+    fileSystem: new NodeExecutionEnv({ cwd: root }),
+    sessionsRoot: join(root, "sessions"),
+  });
+  const { harness } = await AgentHarness.create(
+    {
+      session: await repo.create({ cwd: root }, ctx),
+      models,
+      model: models.getModel("shared-account-test", "synthetic")!,
+      systemPrompt: "x",
+      tools: [],
+    },
+    ctx,
+  );
+  const lane = await harness.lane("main", ctx);
+  const run = await lane.prompt("hello", undefined, ctx);
+  await harness.close(ctx);
+  expect(run.ok && run.value.status).toBe("completed");
+  expect(refreshes).toEqual(["refresh-1"]);
+  expect(keysTheProviderSaw).toEqual(["access-2"]);
 });

@@ -1,4 +1,11 @@
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import {
+  BACKGROUND_CONTEXT as ctx,
+  type AgentHarness,
+  type AgentLane,
+  type AgentMessage,
+  type LaneQueuedItem,
+  type OperationResultRecord,
+} from "@earendil-works/pi-agent-core";
 
 /** A durable user message the API accepted, delivered as its owner chose. */
 export interface AcceptedMessage {
@@ -9,34 +16,32 @@ export interface AcceptedMessage {
 
 export interface OperatorRecords {
   /**
-   * Pi began reading this message. Called synchronously, before Pi persists it
-   * and before any model call is made for it.
+   * Pi has durably taken the message: from here on it is Pi's to queue, order,
+   * run, cancel and restore, and Hallvi never hands it over again. `entryId`
+   * is the id Pi keeps it under, known at once for a queued message and once
+   * Pi has written it for a prompt.
    */
+  admitted(messageId: string, entryId: string | null): void;
+  /** Pi began reading the message, before any model call is made for it. */
   seen(messageId: string): void;
-  /**
-   * Pi wrote the message into its own history as this entry. The id is Pi's,
-   * and is how the message is found there afterwards, or found to be missing.
-   */
-  persisted(messageId: string, entryId: string): void;
   /** One finished assistant message, in transcript order. */
   said(text: string): void;
   /** Pi's latest answer ended in an error. Pi still goes on to what waits. */
   errored(error: Error): void;
 }
 
-/**
- * How Pi's run ended, and nothing about what runs next: that is read from the
- * durable messages, where Stop has already been recorded.
- */
 export interface OperatorOutcome {
   status: "idle" | "stopped" | "failed";
   /** Why Pi could not start or finish its last answer. */
   error?: unknown;
 }
 
-const PROMPT = { expandPromptTemplates: false, source: "rpc" } as const;
+/** Every message handed to Pi carries the id of Hallvi's record of it. */
+const TAG = "hallviMessageId";
+const tagOf = (message: unknown) =>
+  (message as Record<string, unknown> | undefined)?.[TAG] as string | undefined;
 
-function text(content: unknown) {
+function said(content: unknown) {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
@@ -44,109 +49,184 @@ function text(content: unknown) {
     .join("");
 }
 
+function toPi(message: Pick<AcceptedMessage, "id" | "body">): AgentMessage {
+  return {
+    role: "user",
+    content: [{ type: "text", text: message.body }],
+    timestamp: Date.now(),
+    [TAG]: message.id,
+  } as AgentMessage;
+}
+
 /**
- * One live stretch of a conversation: a prompt and everything Pi's own queues
- * deliver after it. Pi decides when each message runs; this only hands
- * messages over and says which durable message Pi has just read.
+ * What Pi already holds when a conversation is opened, by Hallvi message id.
+ * This is the whole of the reconciliation between the two: it covers the
+ * instant between Pi taking a message and Hallvi recording that it had.
+ */
+export async function heldByPi(lane: AgentLane, unacknowledged: string[]) {
+  const watch = await lane.watch(ctx);
+  watch.unsubscribe();
+  const { queues, operation } = watch.snapshot;
+  const consumed = new Map<string, string>();
+  if (unacknowledged.length)
+    for (const entry of await lane.findEntries(undefined, ctx)) {
+      const id = entry.type === "message" ? tagOf(entry.message) : undefined;
+      if (id && unacknowledged.includes(id)) consumed.set(id, entry.id);
+    }
+  return {
+    /** The operation a worker left open, if any. Its id is a message id. */
+    openOperationId: operation?.id,
+    queued: queues.flatMap((item) => {
+      const id = item.type === "message" ? tagOf(item.message) : undefined;
+      return id ? [{ messageId: id, entryId: item.entryId }] : [];
+    }),
+    /** Read by Pi already, under these entry ids. */
+    consumed,
+  };
+}
+
+/**
+ * One live stretch of a conversation on Pi's lane: a prompt, or the operation
+ * a dead worker left open, and everything Pi's own queues deliver after it.
+ * Pi owns identity, order, cancellation, execution and restoration. This hands
+ * messages over, acknowledges that Pi has them, and reports what Pi does.
  */
 export function liveOperator(
-  session: AgentSession,
-  first: AcceptedMessage,
+  harness: AgentHarness,
+  lane: AgentLane,
+  start: AcceptedMessage | "resume" | "sweep",
   records: OperatorRecords,
 ) {
-  // Pi's queued messages carry no identity and Pi matches them by text,
-  // steering before follow-ups. This is the same rule in the same order, with
-  // ids.
-  const waiting: AcceptedMessage[] = [];
-  let prompting: string | undefined = first.id;
-  let reading: { id: string; message: unknown } | undefined;
   let stopped = false;
-  let error: unknown;
   let settled = false;
+  /** Looking at what Pi still holds: nothing new is handed over meanwhile. */
+  let closing = false;
+  let queued: LaneQueuedItem[] = [];
+  let handing: Promise<void> = Promise.resolve();
 
-  const unsubscribe = session.subscribe((event) => {
-    if (event.type === "message_start" && event.message.role === "user") {
-      let id = prompting;
-      prompting = undefined;
-      if (!id) {
-        const body = text(event.message.content);
-        const match = (delivery: AcceptedMessage["delivery"]) =>
-          waiting.findIndex((m) => m.delivery === delivery && m.body === body);
-        const index = match("steer") === -1 ? match("next") : match("steer");
-        if (index !== -1) id = waiting.splice(index, 1)[0].id;
+  const listening = [
+    harness.events.on("queue_update", (event) => {
+      queued = event.queues;
+    }),
+    harness.events.on("message_start", (event) => {
+      const id = event.message.role === "user" && tagOf(event.message);
+      if (id) records.seen(id);
+    }),
+    harness.events.on("message_end", (event) => {
+      const { message } = event;
+      const id = message.role === "user" && tagOf(message);
+      if (id && event.entryId) records.admitted(id, event.entryId);
+      if (message.role !== "assistant") return;
+      const text = said(message.content);
+      if (text.trim()) records.said(text);
+      if (message.stopReason === "error")
+        records.errored(new Error(message.errorMessage ?? "The model failed."));
+    }),
+  ];
+
+  /** Put a message to an idle lane. Its id makes a second attempt harmless. */
+  async function prompt(message: Pick<AcceptedMessage, "id" | "body">) {
+    const admission = await lane.accept(
+      { kind: "prompt", operationId: message.id, prompt: toPi(message) },
+      ctx,
+    );
+    if (
+      !admission.ok &&
+      !(
+        admission.error._tag === "LaneBusy" &&
+        admission.error.operationId === message.id
+      )
+    )
+      throw new Error(admission.error.message);
+    records.admitted(message.id, null);
+    return drive(message.id);
+  }
+
+  async function drive(operationId: string) {
+    const driven = await lane.drive({ operationId, waitForRetry: true }, ctx);
+    if (!driven.ok) throw new Error(driven.error.message);
+    if (driven.value.kind !== "settled")
+      throw new Error("Pi left the operation waiting on a deferred response.");
+    return driven.value.outcome;
+  }
+
+  const done: Promise<OperatorOutcome> = (async () => {
+    let outcome: OperationResultRecord | undefined;
+    try {
+      if (start === "resume") {
+        const resumed = await lane.resume(ctx);
+        if (!resumed.ok) throw new Error(resumed.error.message);
+        if (resumed.value.status === "suspended")
+          throw new Error(
+            "Pi left the operation waiting on a deferred response.",
+          );
+        outcome = resumed.value;
+      } else if (start !== "sweep") outcome = await prompt(start);
+      else {
+        const watch = await lane.watch(ctx);
+        watch.unsubscribe();
+        queued = watch.snapshot.queues;
       }
-      if (id) {
-        reading = { id, message: event.message };
-        records.seen(id);
+      // A message queued as Pi finished is still Pi's, on an idle lane that
+      // will not read it. It is taken back by its id and put as the prompt.
+      for (;;) {
+        closing = true;
+        await handing;
+        const next = stopped ? undefined : queued[0];
+        if (!next || next.type !== "message") break;
+        closing = false;
+        const taken = await lane.cancelQueued(next.entryId, ctx);
+        if (!taken.ok) throw new Error(taken.error.message);
+        queued = queued.filter((item) => item.entryId !== next.entryId);
+        const id = tagOf(next.message);
+        if (taken.value.kind === "cancelled" && id)
+          outcome = await prompt({
+            id,
+            body: said((next.message as { content?: unknown }).content),
+          });
       }
-    }
-    if (event.type === "message_end" && event.message === reading?.message) {
-      const { id, message } = reading;
-      reading = undefined;
-      // Pi appends the entry right after its listeners return.
-      queueMicrotask(() => {
-        const entry = session.sessionManager
-          .getEntries()
-          .findLast((e) => e.type === "message" && e.message === message);
-        if (entry) records.persisted(id, entry.id);
-      });
-    }
-    if (event.type === "message_end" && event.message.role === "assistant") {
-      const said = text(event.message.content);
-      if (said.trim()) records.said(said);
-      error =
-        event.message.stopReason === "error"
-          ? new Error(event.message.errorMessage ?? "The model failed.")
-          : undefined;
-      if (error) records.errored(error as Error);
-    }
-  });
-
-  // A session only reports itself busy once its preflight has passed. Until
-  // then a second message would race the first into agent.prompt().
-  let ready!: () => void;
-  let handing = new Promise<void>((resolve) => (ready = resolve));
-
-  const done: Promise<OperatorOutcome> = session
-    .prompt(first.body, { ...PROMPT, preflightResult: () => ready() })
-    .then(() => session.waitForIdle())
-    .catch((thrown: unknown) => {
-      error = thrown ?? new Error("Pi could not start.");
-    })
-    .then(() => {
-      ready();
-      settled = true;
-      unsubscribe();
+      return stopped || outcome?.status === "aborted"
+        ? { status: "stopped" as const }
+        : outcome?.status === "failed"
+          ? { status: "failed" as const, error: outcome.error }
+          : { status: "idle" as const };
+    } catch (error) {
       return stopped
         ? { status: "stopped" as const }
-        : error
-          ? { status: "failed" as const, error }
-          : { status: "idle" as const };
-    });
+        : { status: "failed" as const, error };
+    } finally {
+      settled = true;
+      for (const off of listening) off();
+    }
+  })();
 
   return {
     done,
-    /** False once this stretch has ended: route the message to a new one. */
+    /** False when nothing can be handed over right now: leave it and retry. */
     deliver(message: AcceptedMessage) {
-      if (settled || stopped) return false;
-      waiting.push(message);
+      if (settled || stopped || closing) return false;
       handing = handing.then(async () => {
-        // Not handed over, its durable record still says waiting.
-        if (settled || stopped || !session.isStreaming) return;
-        await session.prompt(message.body, {
-          ...PROMPT,
-          streamingBehavior:
-            message.delivery === "steer" ? "steer" : "followUp",
-        });
+        if (settled || stopped) return;
+        const result = await (message.delivery === "steer"
+          ? lane.steer(toPi(message), undefined, ctx)
+          : lane.followUp(toPi(message), undefined, ctx));
+        if (result.ok) records.admitted(message.id, result.value.entryId);
       });
       return true;
     },
-    /** Pi's abort continues into its queues, so they are emptied first. */
+    /** Pi's abort ends the operation and empties its queues itself. */
     async stop() {
       stopped = true;
-      session.clearQueue();
-      session.abortCompaction();
-      await session.abort();
+      await lane.abort(ctx);
+      return done;
+    },
+    /**
+     * The worker is going away. Nothing is aborted: Pi keeps the operation and
+     * its queue as they are, and restores them for whoever opens it next.
+     */
+    async leave() {
+      stopped = true;
+      await harness.close(ctx);
       return done;
     },
   };

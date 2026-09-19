@@ -211,21 +211,43 @@ describe("conversation recovery and assistant branding", () => {
     expect(html.match(/Waiting for the model/g)).toHaveLength(1);
   });
 
-  it("keeps an instruction Pi never recorded, and says it did not run", () => {
+  it("after a worker went away, shows what Pi still holds without pretending it is about to run", () => {
     const html = render({
       messages: [
+        asked,
+        {
+          id: run.assistantMessageId,
+          chatId: chat.id,
+          role: "assistant",
+          source: "pi",
+          body: "Restarting the service",
+          createdAt: failedAt,
+          startedAt: failedAt,
+          responseTo: asked.id,
+          error:
+            "The worker stopped. Whether the last command finished is not known: read execution evidence before continuing. Nothing is run again by itself.",
+          status: "interrupted",
+          revision: 2,
+        },
         {
           ...asked,
-          status: "interrupted",
-          error:
-            "Hallvi stopped as this reached Pi. Pi has no record of it and did not act on it. It was not sent again; send it again when ready.",
+          id: "held",
+          body: "Then publish it",
+          status: "waiting",
+          admittedAt: failedAt,
         },
       ],
     });
-    expect(html).toContain("Deploy it");
-    expect(html).toContain("Not run");
-    expect(html).toContain("Pi has no record of it");
-    expect(html).toContain("Send again</button>");
+    expect(html).toContain("Then publish it");
+    expect(html).toContain(
+      "Pi holds this and has not read it. It runs when you continue the conversation; Stop cancels it.",
+    );
+    expect(html).not.toContain("Waiting to start");
+    expect(html).toContain("Stop + cancel 1 waiting");
+    // Nobody stopped it, and nothing claims that nothing had run.
+    expect(html).toContain("Interrupted");
+    expect(html).toContain("Whether the last command finished is not known");
+    expect(html).not.toContain("Nothing had run");
   });
 
   it("uses one assistant name and a matching composer accessible label", () => {

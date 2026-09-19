@@ -56,7 +56,8 @@ import {
   saveOperatorSettings,
 } from "../../../src/server/operator-execution";
 import { listActivity } from "../../../src/server/pi-activity";
-import { nativeEntryIds } from "../../../src/server/pi-sessions";
+import { openNativeChatSession } from "../../../src/server/pi-sessions";
+import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/pi-agent-core";
 import {
   converse,
   PiWorkerDrainError,
@@ -69,6 +70,8 @@ let root: string;
 let requests: string[];
 let live: Map<string, ReturnType<typeof converse>>;
 let shutdown: AbortController;
+/** What the scripted model says its context holds, to bring on compaction. */
+let contextUsed = 10;
 
 function assistant(
   model: Model<Api>,
@@ -86,11 +89,11 @@ function assistant(
     errorMessage,
     timestamp: Date.now(),
     usage: {
-      input: 10,
+      input: contextUsed,
       output: 1,
       cacheRead: 0,
       cacheWrite: 0,
-      totalTokens: 11,
+      totalTokens: contextUsed + 1,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
   };
@@ -116,6 +119,7 @@ beforeAll(async () => {
     allowModelNetwork: false,
   });
   let calls = 0;
+  const flaked = new Set<string>();
   runtime.registerProvider("hallvi-worker-test", {
     api: "hallvi-worker-test",
     apiKey: "SYNTHETIC-NO-NETWORK",
@@ -144,6 +148,14 @@ beforeAll(async () => {
               error: assistant(model, [], "aborted"),
             }),
           );
+        return stream;
+      }
+      // Pi retries what a provider says is temporary, by itself.
+      if (text.includes("[flaky]") && !flaked.has(text)) {
+        flaked.add(text);
+        const failed = assistant(model, [], "error", "overloaded_error");
+        stream.push({ type: "start", partial: failed });
+        stream.push({ type: "error", reason: "error", error: failed });
         return stream;
       }
       const message = text.includes("[fail]")
@@ -189,8 +201,9 @@ beforeAll(async () => {
         name: "Synthetic",
         reasoning: false,
         input: ["text"],
-        contextWindow: 8_192,
-        maxTokens: 2_048,
+        // Room for Hallvi's real system prompt, as a real model has.
+        contextWindow: 272_000,
+        maxTokens: 32_000,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       },
     ],
@@ -201,6 +214,7 @@ beforeAll(async () => {
 beforeEach(() => {
   store.db().$client.exec("DELETE FROM applications");
   requests = [];
+  contextUsed = 10;
   live = new Map();
   shutdown = new AbortController();
 });
@@ -248,13 +262,16 @@ function application(name: string, address?: string) {
 }
 
 /** The worker's loop, until the conversation's records say what is expected. */
-async function until(check: () => unknown, options = {}) {
-  for (let tick = 0; tick < 400; tick++) {
+async function until(
+  check: () => unknown,
+  { ticks = 400, ...options }: { ticks?: number; drainTimeoutMs?: number } = {},
+) {
+  for (let tick = 0; tick < ticks; tick++) {
     route(live, { signal: shutdown.signal, drainTimeoutMs: 300, ...options });
     try {
       return check();
     } catch (error) {
-      if (tick === 399) throw error;
+      if (tick === ticks - 1) throw error;
     }
     await delay(10);
   }
@@ -294,11 +311,10 @@ it("answers one application while another waits for its owner's approval", async
   expect(new Set(listActivity(a.id).map((r) => r.runId))).toEqual(
     new Set([reply.id]),
   );
-  // Each delivered message carries the id Pi's own history keeps it under.
-  const asked = chatSnapshot(a.id, a.chat).messages[0];
-  expect(nativeEntryIds(a.id, a.chat)).toContain(
-    store.getMessage(asked.id)?.nativeEntryId,
-  );
+  // Pi acknowledged the message and named the entry it keeps it under.
+  const asked = store.getMessage(chatSnapshot(a.id, a.chat).messages[0].id)!;
+  expect(asked.admittedAt).toBeTruthy();
+  expect(asked.nativeEntryId).toBeTruthy();
   expect(listExecutions(b.id)).toEqual([]);
   expect(listActivity(b.id).every((r) => r.kind === "message")).toBe(true);
 });
@@ -421,21 +437,137 @@ it("records a model failure on the reply without leaking the provider's words", 
   expect(a.transcript().join()).not.toContain("invalid_grant");
 });
 
-it("a worker shutting down leaves its conversations interrupted, not finished", async () => {
-  const a = application("shop");
+/** A worker goes away mid-approval with a follow-up Pi already holds. */
+async function workerGoesAway(a: ReturnType<typeof application>) {
   a.send("[approve] restart it");
-  a.send("then publish it");
   await until(() => expect(status(a.chat)).toBe("awaiting-approval"));
-  await until(() => expect(live.get(a.chat)!.given.size).toBe(2));
+  const waiting = a.send("then publish it");
+  await until(() =>
+    expect(store.getMessage(waiting.id)?.nativeEntryId).toBeTruthy(),
+  );
+  const heldAs = store.getMessage(waiting.id)!.nativeEntryId;
   shutdown.abort();
   await Promise.all([...live.values()].map((c) => c.stop().then(() => c.done)));
+  // A new worker process: nothing in memory, only the records and Pi's files.
+  live = new Map();
+  shutdown = new AbortController();
+  return { waiting, heldAs };
+}
+
+it("a worker going away interrupts nothing in Pi, and a worker coming back runs nothing", async () => {
+  const a = application("shop");
+  const { waiting, heldAs } = await workerGoesAway(a);
   expect(status(a.chat)).toBe("interrupted");
+  await until(() => undefined);
+  await delay(150);
+  await until(() => expect(live.size).toBe(0));
   expect(a.transcript()).toEqual([
     "you [delivered] [approve] restart it",
-    expect.stringMatching(/^pi \[interrupted\] The worker stopped/),
-    // Pi never read it. It still waits for the next worker.
+    expect.stringMatching(
+      /^pi \[interrupted\] The worker stopped.*not known.*Nothing is run again by itself/,
+    ),
+    // Pi holds it under the same id, and it has not run.
     "you [waiting] then publish it",
   ]);
+  expect(store.getMessage(waiting.id)?.nativeEntryId).toBe(heldAs);
+  expect(requests).toEqual(["[approve] restart it"]);
+
+  // The owner continues. Pi resumes what it had open: the interrupted call is
+  // not made again, the model is told its outcome is unknown, and then what
+  // waited runs, in order, before the message that continued it.
+  a.send("carry on");
+  await until(() => expect(status(a.chat)).toBe("idle"));
+  expect(a.transcript().slice(2)).toEqual([
+    "pi [completed] finished",
+    "you [delivered] then publish it",
+    "pi [completed] reply: then publish it",
+    "you [delivered] carry on",
+    "pi [completed] reply: carry on",
+  ]);
+  expect(listExecutions(a.id).map((e) => e.status)).toEqual(["interrupted"]);
+  expect(requests).toEqual([
+    "[approve] restart it",
+    "<toolResult>",
+    "then publish it",
+    "carry on",
+  ]);
+});
+
+it("Stop after a worker went away ends what Pi held instead of resuming it", async () => {
+  const a = application("shop");
+  await workerGoesAway(a);
+  stopConversation(a.id, a.chat);
+  expect(a.transcript()).toEqual([
+    "you [delivered] [approve] restart it",
+    "pi [cancelled] Stopped. Commands already started may have changed the server; check execution history.",
+    "you [cancelled] then publish it",
+  ]);
+  // The next message is answered by itself: nothing resumes, nothing queued
+  // comes back with it.
+  a.send("what happened?");
+  await until(() => expect(status(a.chat)).toBe("idle"));
+  expect(a.transcript().slice(-2)).toEqual([
+    "you [delivered] what happened?",
+    "pi [completed] reply: what happened?",
+  ]);
+  expect(requests).toEqual(["[approve] restart it", "what happened?"]);
+});
+
+it("hands over once a message Pi took in the instant before Hallvi recorded it", async () => {
+  const a = application("shop");
+  const sent = a.send("deploy it");
+  // Pi took it and the worker died before acknowledging: the record still
+  // says Hallvi holds it.
+  const lost = converse(
+    { applicationId: a.id, chatId: a.chat },
+    { id: sent.id, body: sent.body, delivery: "next" },
+    { signal: shutdown.signal },
+  );
+  await lost.done;
+  store
+    .db()
+    .$client.prepare(
+      "UPDATE messages SET admitted_at = NULL, native_entry_id = NULL, status = 'waiting' WHERE id = ?",
+    )
+    .run(sent.id);
+  store
+    .db()
+    .$client.prepare("DELETE FROM messages WHERE response_to = ?")
+    .run(sent.id);
+  requests.length = 0;
+  await until(() => expect(store.getMessage(sent.id)?.admittedAt).toBeTruthy());
+  await until(() => expect(live.size).toBe(0));
+  // Pi had already read it, so it is acknowledged and not put to Pi again.
+  expect(requests).toEqual([]);
+  expect(store.getMessage(sent.id)?.status).toBe("delivered");
+});
+
+it("leaves retrying and compaction to Pi, and reports the conversation truthfully through both", async () => {
+  const a = application("shop");
+  a.send("[flaky] status?");
+  await until(() => expect(status(a.chat)).toBe("idle"), { ticks: 1_500 });
+  expect(a.transcript()).toEqual([
+    "you [delivered] [flaky] status?",
+    "pi [completed] reply: [flaky] status?",
+  ]);
+  // The model now reports a nearly full context. Pi compacts before the next
+  // answer, through the same runtime, and the conversation simply continues.
+  contextUsed = 265_000;
+  a.send("and the logs?");
+  await until(() => expect(status(a.chat)).toBe("idle"));
+  contextUsed = 10;
+  a.send("thanks");
+  await until(() => expect(status(a.chat)).toBe("idle"));
+  expect(a.transcript().slice(-2)).toEqual([
+    "you [delivered] thanks",
+    "pi [completed] reply: thanks",
+  ]);
+  const history = await openNativeChatSession(a.id, a.chat);
+  const kinds = (await history.session.findEntries(undefined, ctx)).map(
+    (entry) => entry.type,
+  );
+  await history.release();
+  expect(kinds).toContain("compaction");
 });
 
 it("a session that will not stop poisons the worker instead of being overlapped", async () => {

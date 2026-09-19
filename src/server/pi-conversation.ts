@@ -1,7 +1,7 @@
 import { listActivity } from "./pi-activity";
 import { workerPresence } from "./worker-presence";
 import { listExecutions } from "./operator-execution";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   db,
   getChat,
@@ -19,7 +19,6 @@ import {
 import { sendChatMessageRequestSchema } from "./schemas";
 import { logDiagnostic, type DiagnosticFailure } from "./diagnostics";
 import { listInformation } from "./saved-information";
-import { nativeEntryIds } from "./pi-sessions";
 import type { ChatMessage, ChatSnapshot, PiReply } from "./types";
 
 // A conversation is durable messages and one status. The owner's messages wait
@@ -44,6 +43,18 @@ function runningReply(chatId: string) {
     .select()
     .from(messages)
     .where(and(eq(messages.chatId, chatId), eq(messages.status, "running")))
+    .get();
+}
+
+function latestReply(chatId: string) {
+  return db()
+    .select()
+    .from(messages)
+    .where(and(eq(messages.chatId, chatId), eq(messages.role, "assistant")))
+    .orderBy(
+      desc(sql`coalesce(${messages.startedAt}, ${messages.createdAt})`),
+      desc(sql`rowid`),
+    )
     .get();
 }
 
@@ -151,7 +162,13 @@ export function sendChatMessage(
 export function stopConversation(applicationId: string, chatId: string) {
   return withTransaction(() => {
     loadChat(applicationId, chatId);
-    const reply = runningReply(chatId);
+    // After a restart the reply is interrupted and Pi still holds its
+    // operation. Stopping settles that too: the worker then ends the operation
+    // instead of resuming it when the conversation is next opened.
+    const latest = latestReply(chatId);
+    const reply =
+      runningReply(chatId) ??
+      (latest?.status === "interrupted" ? latest : undefined);
     if (reply)
       touch(reply.id, {
         status: "cancelled",
@@ -176,13 +193,16 @@ export function stopConversation(applicationId: string, chatId: string) {
 
 // ---- The worker's side: what Pi's events mean for the durable record. ----
 
-/** Every message still waiting, oldest first, with where it belongs. */
+/**
+ * Every message Hallvi still holds: accepted, and not yet taken by Pi. Oldest
+ * first, with where it belongs. What Pi has taken is Pi's to run.
+ */
 export function waitingMessages() {
   return db()
     .select({ message: messages, applicationId: chats.applicationId })
     .from(messages)
     .innerJoin(chats, eq(chats.id, messages.chatId))
-    .where(eq(messages.status, "waiting"))
+    .where(and(eq(messages.status, "waiting"), isNull(messages.admittedAt)))
     .orderBy(asc(messages.createdAt), asc(sql`${messages}.rowid`))
     .all();
 }
@@ -221,6 +241,7 @@ export function messageSeen(
     touch(id, {
       status: "delivered",
       error: null,
+      admittedAt: message.admittedAt ?? at,
       startedAt: at,
       finishedAt: null,
     }).run();
@@ -346,45 +367,76 @@ export function settleConversation(
   );
 }
 
-/** Pi wrote the message into its own history: from here on Pi remembers it. */
-export function messagePersisted(id: string, nativeEntryId: string) {
-  db().update(messages).set({ nativeEntryId }).where(eq(messages.id, id)).run();
+/**
+ * The acknowledgment: Pi has durably taken the message. `entryId` is the id Pi
+ * keeps it under, when Pi has said.
+ */
+export function messageAdmitted(
+  id: string,
+  nativeEntryId: string | null,
+  /** Pi had already read it when Hallvi learned that Pi had it at all. */
+  read = false,
+) {
+  db()
+    .update(messages)
+    .set({
+      admittedAt: sql`coalesce(${messages.admittedAt}, ${now()})`,
+      ...(nativeEntryId ? { nativeEntryId } : {}),
+      ...(read ? { status: "delivered" as const, startedAt: now() } : {}),
+    })
+    .where(eq(messages.id, id))
+    .run();
+}
+
+/** How each of the owner's messages stands, to reconcile with what Pi holds. */
+export function messageStates(chatId: string) {
+  return new Map(
+    listMessages(chatId)
+      .filter((message) => message.role === "user")
+      .map((message) => [message.id, message]),
+  );
 }
 
 /**
- * A worker that died mid-conversation says so, once, at the next start. Work
- * is never replayed. The message Pi was reading when it died is looked up in
- * Pi's own history by the entry id Pi gave it. When it is not there, Pi will
- * not remember it and nothing was recorded as run under it, but whether the
- * model had begun to answer cannot be known: the conversation says exactly
- * that, keeps the instruction, and does not send it again by itself.
+ * The owner continued an interrupted conversation and Pi resumes the operation
+ * it had open: what Pi writes from here is a new reply under the same message.
+ */
+export function replyResumed(chatId: string) {
+  return withTransaction(() => {
+    const interrupted = latestReply(chatId);
+    if (interrupted?.status !== "interrupted") return null;
+    const at = now();
+    const reply = insertMessage(chatId, "assistant", "", "pi", "running");
+    db()
+      .update(messages)
+      .set({ responseTo: interrupted.responseTo, startedAt: at })
+      .where(eq(messages.id, reply.id))
+      .run();
+    setChat(chatId, "working");
+    return getPiReply(reply.id)!;
+  });
+}
+
+/** Whether the conversation's newest reply was cut short by a worker going. */
+export function replyInterrupted(chatId: string) {
+  return latestReply(chatId)?.status === "interrupted";
+}
+
+/**
+ * A worker that died mid-conversation says so, once, at the next start, and
+ * nothing runs because of it. Pi restores its own operation and queue when the
+ * conversation is next opened, which happens when the owner continues or
+ * stops it. What waits keeps waiting, visibly.
  */
 export function interruptConversations() {
   for (const reply of db()
     .select()
     .from(messages)
     .where(eq(messages.status, "running"))
-    .all()) {
-    const chat = getChat(reply.chatId);
-    const asked = reply.responseTo ? getMessage(reply.responseTo) : null;
+    .all())
     settleConversation(
       reply.chatId,
       "interrupted",
-      "The worker stopped. Read execution evidence before continuing; commands are not replayed.",
+      "The worker stopped. Whether the last command finished is not known: read execution evidence before continuing. Nothing is run again by itself.",
     );
-    if (
-      chat &&
-      asked?.status === "delivered" &&
-      !(
-        asked.nativeEntryId &&
-        nativeEntryIds(chat.applicationId, chat.id).has(asked.nativeEntryId)
-      )
-    )
-      touch(asked.id, {
-        status: "interrupted",
-        error:
-          "Hallvi stopped as Pi was reading this. It is not in Pi's history, so Pi will not remember it, and nothing was recorded as run under it. Whether the model had begun to answer is not known. It was not sent again; send it again when ready.",
-        finishedAt: now(),
-      }).run();
-  }
 }

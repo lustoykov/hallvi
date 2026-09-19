@@ -79,7 +79,12 @@ export const messages = sqliteTable(
     requestKey: text("request_key"),
     /** How the owner sent it: after Pi's current work, or into it. */
     delivery: text("delivery").$type<ChatMessage["delivery"]>(),
-    /** The entry Pi wrote this message into its own history as. */
+    /**
+     * When Pi durably took this message. From then on it is Pi's to queue,
+     * run, cancel and restore, and Hallvi never hands it over again.
+     */
+    admittedAt: text("admitted_at"),
+    /** The id Pi keeps this message under, queued and then in its history. */
     nativeEntryId: text("native_entry_id"),
     error: text("error"),
     startedAt: text("started_at"),

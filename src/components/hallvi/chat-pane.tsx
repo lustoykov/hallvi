@@ -76,11 +76,11 @@ const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   waiting: "Waiting",
   running: "Draft",
   failed: "Failed",
-  // Both of these mean the reader stopped it. The status line beneath says
-  // "Stopped", and a tag reading "Cancelled" beside it made one action look
-  // like two different outcomes.
+  // The reader stopped it. The status line beneath says "Stopped", and a tag
+  // reading "Cancelled" beside it made one action look like two outcomes.
   cancelled: "Stopped",
-  interrupted: "Stopped",
+  // Nobody stopped it: the worker went away, and how far it got is not known.
+  interrupted: "Interrupted",
 };
 
 function CopyReply({ body }: { body: string }) {
@@ -430,8 +430,12 @@ export function ChatPane({
   const waiting = (view.messages ?? []).filter(
     (message) => message.status === "waiting",
   );
-  /** Accepted, and Pi has not begun: a worker has yet to pick it up. */
-  const notStarted = !inFlight && waiting.length > 0;
+  /**
+   * Accepted, and a worker has yet to hand it to Pi. What Pi already holds
+   * after a worker went away is not about to start: it waits for the owner.
+   */
+  const notStarted =
+    !inFlight && waiting.some((message) => !message.admittedAt);
   const inFlightActivity = runActivity({
     runId: inFlight?.id,
     status: inFlight ? "running" : notStarted ? "queued" : "",
@@ -682,10 +686,14 @@ export function ChatPane({
                           <p className="hv-run-status" role="status">
                             {historyUnavailable
                               ? message.error
-                              : message.status === "cancelled" ||
-                                  message.status === "interrupted"
+                              : message.status === "cancelled"
                                 ? stopOutcome(view.executions, message.id)
-                                : failure.says}
+                                : message.status === "interrupted"
+                                  ? // Not the reader's Stop, and never "nothing
+                                    // had run": the reply says what is unknown.
+                                    (message.error ??
+                                    stopOutcome(view.executions, message.id))
+                                  : failure.says}
                           </p>
                         )}
                         {message.body && !inProgress && (
@@ -735,7 +743,9 @@ export function ChatPane({
                               ? "Pi reads this after its current step, before it carries on. It does not interrupt a running command or a pending approval."
                               : inFlight
                                 ? "Pi reads this when its current work is done."
-                                : "Waiting for Pi to start."
+                                : message.admittedAt
+                                  ? "Pi holds this and has not read it. It runs when you continue the conversation; Stop cancels it."
+                                  : "Waiting for Pi to start."
                             : message.error}
                         </p>
                         {!readOnly && message.status !== "waiting" && last && (

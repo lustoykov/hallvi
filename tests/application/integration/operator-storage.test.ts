@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
@@ -12,7 +12,7 @@ import { getOperatorView } from "../../../src/server/operator-view";
 import {
   sendChatMessage,
   messageSeen,
-  messagePersisted,
+  messageAdmitted,
   writeReply,
   settleConversation,
   stopConversation,
@@ -166,53 +166,34 @@ it("Stop settles what waits as never started, and nothing delivers it later", ()
   expect(waitingIds()).toEqual([]);
   expect(store.getChat(chat)?.status).toBe("idle");
 });
-it("after an interruption, keeps an instruction Pi's history does not hold and says what is not known", () => {
-  // Pi's own history, as the crash left it: one entry.
-  const sessions = join(root, "pi-sessions", app);
-  mkdirSync(sessions, { recursive: true });
-  writeFileSync(
-    join(sessions, `${chat}.jsonl`),
-    [
-      {
-        type: "session",
-        id: "s",
-        version: 3,
-        timestamp: "2026-01-01",
-        cwd: "/",
-      },
-      { type: "message", id: "entry-kept", message: { role: "user" } },
-    ]
-      .map((entry) => JSON.stringify(entry))
-      .join("\n") + '\n{"type":"message","id":"entry-to',
-  );
-  const interruptedAfter = (persistedAs?: string) => {
-    const sent = sendChatMessage(app, chat, "Publish it", randomUUID());
-    const reply = read(sent.id);
-    if (persistedAs) messagePersisted(sent.id, persistedAs);
-    interruptConversations();
-    expect(store.getMessage(reply.id)?.status).toBe("interrupted");
-    expect(store.getChat(chat)?.status).toBe("interrupted");
-    return store.getMessage(sent.id)!;
-  };
+it("never routes again what Pi has acknowledged taking, across an interruption", () => {
+  const first = sendChatMessage(app, chat, "Deploy the app", randomUUID());
+  read(first.id);
+  const held = sendChatMessage(app, chat, "Then publish it", randomUUID());
+  const unsent = sendChatMessage(app, chat, "And tidy up", randomUUID());
+  // The acknowledgment: Pi took it, and named the entry it keeps it under.
+  messageAdmitted(held.id, "entry-7");
+  expect(waitingIds()).toEqual([unsent.id]);
 
-  // Pi kept it: delivered stands, and only the reply is interrupted.
-  expect(interruptedAfter("entry-kept")).toMatchObject({
-    status: "delivered",
-    error: null,
+  interruptConversations();
+
+  // Both still wait where the owner can see them. Only the one Hallvi still
+  // holds is Hallvi's to hand over; the other is restored by Pi, same id.
+  expect(store.getChat(chat)?.status).toBe("interrupted");
+  expect(store.getMessage(held.id)).toMatchObject({
+    status: "waiting",
+    nativeEntryId: "entry-7",
   });
-  // Pi named an entry that never reached its file, whole or torn, or Hallvi
-  // stopped before Pi named one. Either way the instruction is kept, nothing
-  // claims the model did or did not begin, and it is not sent again.
-  for (const persistedAs of ["entry-never-flushed", "entry-torn", undefined]) {
-    expect(interruptedAfter(persistedAs)).toMatchObject({
-      status: "interrupted",
-      body: "Publish it",
-      error: expect.stringMatching(
-        /not in Pi's history.*Whether the model had begun to answer is not known.*not sent again/,
-      ),
-    });
-    expect(waitingIds()).toEqual([]);
-  }
+  expect(waitingIds()).toEqual([unsent.id]);
+  // Stop settles all of it, the interrupted reply included, so the worker
+  // ends Pi's operation instead of resuming it.
+  stopConversation(app, chat);
+  expect(
+    chatSnapshot(app, chat)
+      .messages.slice(-4)
+      .map((m) => m.status),
+  ).toEqual(["delivered", "cancelled", "cancelled", "cancelled"]);
+  expect(waitingIds()).toEqual([]);
 });
 it("shares one outcome between chat and two views while keeping working knowledge unsurfaced", () => {
   const asked = sendChatMessage(app, chat, "Inspect", randomUUID());

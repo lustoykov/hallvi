@@ -8,7 +8,11 @@ import { announceWorker } from "./worker-presence";
 import { beginRunDiagnostics } from "./tracing";
 import { NativeSessionError } from "./pi-sessions";
 import { openPiSession, PiUnavailableError, watchPiSession } from "./pi";
-import { liveOperator, type AcceptedMessage } from "./pi-operator";
+import {
+  BACKGROUND_CONTEXT,
+  createCustomMessage,
+} from "@earendil-works/pi-agent-core";
+import { heldByPi, liveOperator, type AcceptedMessage } from "./pi-operator";
 import {
   applicationsWithActivity,
   endActivity,
@@ -22,8 +26,11 @@ import {
   conversationContext,
   failToStart,
   interruptConversations,
-  messagePersisted,
+  messageAdmitted,
   messageSeen,
+  messageStates,
+  replyInterrupted,
+  replyResumed,
   settleConversation,
   waitingMessages,
   writeReply,
@@ -126,7 +133,11 @@ export function converse(
         options.drainTimeoutMs ?? 5_000,
       );
       try {
-        await (operator?.stop() ?? done);
+        // A worker going away aborts nothing: Pi keeps the operation and its
+        // queue, and restores them. Only the owner's Stop ends them.
+        await ((options.signal?.aborted
+          ? operator?.leave()
+          : operator?.stop()) ?? done);
       } finally {
         clearTimeout(timer);
       }
@@ -149,9 +160,50 @@ export function converse(
         options,
       );
       close = opened.close;
-      const watch = watchPiSession(opened.session, {
+      const { harness, lane } = opened;
+
+      // The one reconciliation between Hallvi's records and Pi's: what Pi
+      // already holds. It covers the instant between Pi taking a message and
+      // Hallvi recording that, and a Stop given while no worker held the lane.
+      const rows = messageStates(scope.chatId);
+      const held = await heldByPi(
+        lane,
+        [...rows.values()]
+          .filter((row) => row.status === "waiting" && !row.admittedAt)
+          .map((row) => row.id),
+      );
+      for (const [id, entryId] of held.consumed)
+        messageAdmitted(id, entryId, true);
+      for (const { messageId, entryId } of held.queued)
+        if (rows.get(messageId)?.status === "waiting")
+          messageAdmitted(messageId, entryId);
+        else await lane.cancelQueued(entryId, BACKGROUND_CONTEXT);
+      let start: Parameters<typeof liveOperator>[2] =
+        held.queued.some((item) => item.messageId === first.id) ||
+        held.consumed.has(first.id)
+          ? "sweep"
+          : first;
+      if (held.openOperationId) {
+        // A worker that went away left this operation open. Pi restored it and
+        // ran nothing. The owner has now continued the conversation, so Pi
+        // resumes it: an interrupted tool is not run again, and the model is
+        // told its outcome is unknown. If the owner stopped it instead, it is
+        // ended here, and with it whatever Pi still had queued.
+        const never = rows.get(held.openOperationId)?.status === "waiting";
+        if (never) messageAdmitted(held.openOperationId, null);
+        if (never || replyInterrupted(scope.chatId)) {
+          if (!never) {
+            reply = replyResumed(scope.chatId) ?? undefined;
+            if (reply) diagnostics = beginRunDiagnostics(reply);
+          }
+          if (start !== "sweep" && held.openOperationId !== first.id)
+            early.unshift(first);
+          start = "resume";
+        } else await lane.abort(BACKGROUND_CONTEXT);
+      }
+
+      const watch = watchPiSession(harness, {
         onActivity: (event) => diagnostics?.signal(event),
-        onPhase: () => void (stopping && operator?.stop()),
         onText(text) {
           if (text.length <= 10_000) draft = text;
         },
@@ -176,15 +228,19 @@ export function converse(
       });
       // Pi reads current state through its tools. This says only what its own
       // history cannot: how Hallvi saw the previous reply end.
-      await opened.session.sendCustomMessage(
-        {
-          customType: "hallvi-conversation",
-          content: conversationContext(scope.applicationId, scope.chatId),
-          display: false,
-        },
-        { triggerTurn: false },
-      );
-      operator = liveOperator(opened.session, first, {
+      if (start !== "resume")
+        await lane.appendMessage(
+          createCustomMessage(
+            "hallvi-conversation",
+            conversationContext(scope.applicationId, scope.chatId),
+            false,
+            undefined,
+            Date.now(),
+          ),
+          BACKGROUND_CONTEXT,
+        );
+      operator = liveOperator(harness, lane, start, {
+        admitted: (id, entryId) => messageAdmitted(id, entryId),
         seen(id) {
           endReply(replyError ? "failed" : "completed");
           const next = messageSeen(id, {
@@ -199,7 +255,6 @@ export function converse(
           diagnostics = beginRunDiagnostics(next);
           watch.reply();
         },
-        persisted: messagePersisted,
         said(text) {
           if (reply)
             writeReply(reply.id, (draft = savedDraft = text.slice(0, 10_000)));
@@ -208,8 +263,10 @@ export function converse(
           replyError = advice(error).said;
         },
       });
-      for (const message of early.splice(0)) operator.deliver(message);
-      if (stopping) void operator.stop();
+      for (const message of early.splice(0))
+        if (!operator.deliver(message)) given.delete(message.id);
+      if (stopping)
+        void (options.signal?.aborted ? operator.leave() : operator.stop());
       const outcome = await Promise.race([operator.done, poisoned]);
       watch.unsubscribe();
       const failed = outcome.status === "failed" ? advice(outcome.error) : null;
@@ -224,7 +281,7 @@ export function converse(
         scope.chatId,
         status,
         status === "interrupted"
-          ? "The worker stopped before this finished. Read execution evidence before continuing; commands are not replayed."
+          ? "The worker stopped before this finished. Whether the last command finished is not known: read execution evidence before continuing. Nothing is run again by itself."
           : (failed?.said ?? null),
         failed?.failure,
       );
@@ -246,9 +303,8 @@ export function converse(
     /** The reply being written, so the worker can tell it was stopped. */
     reply: () => reply,
     deliver(message: AcceptedMessage) {
-      given.add(message.id);
-      if (operator) operator.deliver(message);
-      else early.push(message);
+      if (operator ? operator.deliver(message) : early.push(message))
+        given.add(message.id);
     },
     stop,
     /** Streamed text reaches the page between Pi's own message boundaries. */

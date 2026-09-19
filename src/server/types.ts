@@ -60,6 +60,8 @@ export interface ChatMessage {
     | "interrupted";
   /** How the owner sent it: after Pi's current work, or into it. */
   delivery?: "next" | "steer" | null;
+  /** When Pi durably took the message; until then Hallvi still holds it. */
+  admittedAt?: string | null;
   /** The sender's idempotency key: the same send twice is one message. */
   requestKey?: string | null;
   /** The owner's message this reply was written under. */

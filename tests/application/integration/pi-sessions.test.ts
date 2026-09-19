@@ -1,11 +1,15 @@
+import {
+  AgentHarness,
+  BACKGROUND_CONTEXT,
+} from "@earendil-works/pi-agent-core";
+import { createModels } from "@earendil-works/pi-ai";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { eq } from "drizzle-orm";
 import {
-  appendFileSync,
-  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -59,187 +63,160 @@ afterAll(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-it("persists a private header and SQLite identity before any assistant message, then reopens across database restarts", async () => {
+/** Pi's own history files for one conversation, wherever Pi put them. */
+const historyFiles = (chat = chatId) => {
+  const directory = join(root, "pi-sessions", applicationId, chat);
+  return existsSync(directory)
+    ? (readdirSync(directory, { recursive: true }) as string[])
+        .filter((name) => name.endsWith(".jsonl"))
+        .map((name) => join(directory, name))
+    : [];
+};
+const ctx = BACKGROUND_CONTEXT;
+
+it("keeps one private history per conversation, tied to its chat, and reopens it across database restarts", async () => {
   const first = await openNativeChatSession(applicationId, chatId);
-  const id = first.sessionManager.getSessionId();
+  const id = first.session.metadata.id;
+  await first.release();
   expect(association()).toBe(id);
-  expect(
-    JSON.parse(readFileSync(pathFor(), "utf8").split("\n")[0]),
-  ).toMatchObject({ type: "session", id });
-  expect(statSync(pathFor()).mode & 0o777).toBe(0o600);
-  expect(statSync(dirname(pathFor())).mode & 0o777).toBe(0o700);
-  expect(statSync(join(root, "pi-sessions")).mode & 0o777).toBe(0o700);
-  first.sessionManager.appendMessage({
-    role: "user",
-    content: "Remember this native message",
-    timestamp: Date.now(),
-  });
-  first.release();
-  first.release();
-  store.db().$client.close();
+  const [file] = historyFiles();
+  expect(statSync(file).mode & 0o077).toBe(0);
+  globalThis.__hallviDb?.$client.close();
   delete globalThis.__hallviDb;
-  const resumed = await openNativeChatSession(applicationId, chatId);
-  expect(resumed.sessionManager.getSessionId()).toBe(id);
-  expect(resumed.sessionManager.buildSessionContext().messages).toMatchObject([
-    { role: "user", content: "Remember this native message" },
-  ]);
-  resumed.release();
-  const separate = await openNativeChatSession(applicationId, otherChatId);
-  expect(separate.sessionManager.getSessionId()).not.toBe(id);
-  expect(separate.sessionManager.buildSessionContext().messages).toEqual([]);
-  separate.release();
+  const reopened = await openNativeChatSession(applicationId, chatId);
+  expect(reopened.session.metadata.id).toBe(id);
+  await reopened.release();
+  expect(historyFiles()).toEqual([file]);
+  // A conversation's history never leaks into another's.
+  const other = await openNativeChatSession(applicationId, otherChatId);
+  expect(other.session.metadata.id).not.toBe(id);
+  await other.release();
 });
 
-it("starts with empty native context instead of importing disposable SQLite chat text", async () => {
-  store.insertMessage(chatId, "user", "Old chat text", "user");
-  store.insertMessage(chatId, "assistant", "Old answer", "pi");
-  const opened = await openNativeChatSession(applicationId, chatId);
-  expect(opened.sessionManager.buildSessionContext().messages).toEqual([]);
-  expect(opened.sessionManager.getEntries()).toEqual([]);
-  opened.release();
-  expect(store.listMessages(chatId)).toHaveLength(2);
-});
-
-it("does not copy a waiting message into the native history before Pi reads it", async () => {
-  store.insertMessage(chatId, "user", "New accepted input", "user", "waiting");
-  const opened = await openNativeChatSession(applicationId, chatId);
-  expect(opened.sessionManager.buildSessionContext().messages).toEqual([]);
-  opened.release();
-});
-
-it("restores a native compaction entry and the surviving native message through the SDK", async () => {
+it("reports a missing established history instead of silently starting a new one", async () => {
   const first = await openNativeChatSession(applicationId, chatId);
-  first.sessionManager.appendMessage({
-    role: "user",
-    content: "Old native message",
-    timestamp: 1,
+  await first.release();
+  rmSync(join(root, "pi-sessions", applicationId, chatId), {
+    recursive: true,
   });
-  const kept = first.sessionManager.appendMessage({
-    role: "user",
-    content: "Recent native message",
-    timestamp: 2,
-  });
-  const compaction = first.sessionManager.appendCompaction(
-    "Native compacted context",
-    kept,
-    80_000,
-  );
-  first.release();
-  const reopened = await openNativeChatSession(applicationId, chatId);
-  expect(reopened.sessionManager.getEntry(compaction)).toMatchObject({
-    type: "compaction",
-    summary: "Native compacted context",
-    firstKeptEntryId: kept,
-  });
-  const context = JSON.stringify(
-    reopened.sessionManager.buildSessionContext().messages,
-  );
-  expect(context).toContain("Native compacted context");
-  expect(context).toContain("Recent native message");
-  expect(context).not.toContain("Old native message");
-  reopened.release();
-});
-
-it.each([
-  "empty",
-  "missing",
-  "mismatched",
-  "malformed",
-  "partial-tail",
-  "unreadable",
-])(
-  "fails safely for an established %s file without recreating or modifying it",
-  async (damage) => {
-    const initial = await openNativeChatSession(applicationId, chatId);
-    const originalId = initial.sessionManager.getSessionId();
-    initial.release();
-    if (damage === "empty") writeFileSync(pathFor(), "");
-    if (damage === "missing") rmSync(pathFor());
-    if (damage === "mismatched") {
-      const lines = readFileSync(pathFor(), "utf8").split("\n");
-      const header = JSON.parse(lines[0]);
-      lines[0] = JSON.stringify({ ...header, id: "another-native-session" });
-      writeFileSync(pathFor(), lines.join("\n"));
-    }
-    if (damage === "malformed") appendFileSync(pathFor(), "{bad-json}\n");
-    if (damage === "partial-tail")
-      appendFileSync(pathFor(), '{"type":"message","id":');
-    if (damage === "unreadable") chmodSync(pathFor(), 0o200);
-    // Read before permission removal on ordinary user accounts.
-    const damaged =
-      damage === "unreadable" || damage === "missing"
-        ? null
-        : readFileSync(pathFor(), "utf8");
-    await expect(
-      openNativeChatSession(applicationId, chatId),
-    ).rejects.toMatchObject({ code: "history-unavailable" });
-    expect(association()).toBe(originalId);
-    if (damage !== "unreadable" && damage !== "missing")
-      expect(readFileSync(pathFor(), "utf8")).toBe(damaged);
-  },
-);
-
-it.each([false, true])(
-  "recovers interrupted initial file creation (header already initialized: %s)",
-  async (initialized) => {
-    mkdirSync(dirname(pathFor()), { recursive: true, mode: 0o700 });
-    writeFileSync(pathFor(), "", { mode: 0o600, flag: "wx" });
-    const id = initialized
-      ? SessionManager.open(
-          pathFor(),
-          dirname(pathFor()),
-          process.cwd(),
-        ).getSessionId()
-      : undefined;
-    expect(association()).toBeNull();
-    const opened = await openNativeChatSession(applicationId, chatId);
-    if (id) expect(opened.sessionManager.getSessionId()).toBe(id);
-    expect(association()).toBe(opened.sessionManager.getSessionId());
-    opened.release();
-  },
-);
-
-it("releases its lock after an association failure and adopts the initialized header on retry", async () => {
-  store
-    .db()
-    .$client.exec(
-      "CREATE TRIGGER reject_native_association BEFORE UPDATE OF native_session_id ON conversations BEGIN SELECT RAISE(ABORT, 'synthetic association failure'); END",
-    );
-  try {
-    await expect(
-      openNativeChatSession(applicationId, chatId),
-    ).rejects.toMatchObject({ code: "history-unavailable" });
-    expect(association()).toBeNull();
-  } finally {
-    store.db().$client.exec("DROP TRIGGER reject_native_association");
-  }
-  const headerId = JSON.parse(
-    readFileSync(pathFor(), "utf8").split("\n")[0],
-  ).id;
-  const reopened = await openNativeChatSession(applicationId, chatId);
-  expect(reopened.sessionManager.getSessionId()).toBe(headerId);
-  reopened.release();
-});
-
-it("does not adopt an unassociated file that already contains a native conversation", async () => {
-  mkdirSync(dirname(pathFor()), { recursive: true, mode: 0o700 });
-  writeFileSync(pathFor(), "", { mode: 0o600 });
-  const other = SessionManager.open(
-    pathFor(),
-    dirname(pathFor()),
-    process.cwd(),
-  );
-  other.appendMessage({
-    role: "user",
-    content: "Unknown native history",
-    timestamp: 1,
-  });
-  const original = readFileSync(pathFor(), "utf8");
   await expect(
     openNativeChatSession(applicationId, chatId),
   ).rejects.toMatchObject({ code: "history-unavailable" });
-  expect(association()).toBeNull();
-  expect(readFileSync(pathFor(), "utf8")).toBe(original);
+  expect(historyFiles()).toEqual([]);
+  // The failed open let go of the application again.
+  const other = await openNativeChatSession(applicationId, otherChatId);
+  await other.release();
+});
+
+it("opens a history written before the upgrade through Pi's own repository, and leaves the original for rollback", async () => {
+  // A representative earlier history, written by the session manager the
+  // earlier version used: a tool call and its result, a compaction, more talk.
+  mkdirSync(dirname(pathFor()), { recursive: true });
+  writeFileSync(pathFor(), "", { mode: 0o600 });
+  const earlier = SessionManager.open(pathFor(), dirname(pathFor()), root);
+  const assistant = (content: unknown[], stopReason = "stop") =>
+    ({
+      role: "assistant",
+      api: "openai-codex-responses",
+      provider: "openai-codex",
+      model: "gpt-5.6-sol",
+      content,
+      stopReason,
+      timestamp: 2,
+      usage: {
+        input: 10,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 11,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    }) as never;
+  earlier.appendMessage({ role: "user", content: "Deploy it", timestamp: 1 });
+  earlier.appendMessage(
+    assistant(
+      [{ type: "toolCall", id: "call-1", name: "server_bash", arguments: {} }],
+      "toolUse",
+    ),
+  );
+  earlier.appendMessage({
+    role: "toolResult",
+    toolCallId: "call-1",
+    toolName: "server_bash",
+    content: [{ type: "text", text: "container started" }],
+    isError: false,
+    timestamp: 3,
+  } as never);
+  const kept = earlier.appendMessage({
+    role: "user",
+    content: "Is it up?",
+    timestamp: 4,
+  });
+  earlier.appendCompaction("Deployed the application.", kept, 1_000);
+  earlier.appendMessage(assistant([{ type: "text", text: "It is up." }]));
+  store
+    .db()
+    .update(chats)
+    .set({ nativeSessionId: earlier.getSessionId() })
+    .where(eq(chats.id, chatId))
+    .run();
+  const original = readFileSync(pathFor());
+
+  const opened = await openNativeChatSession(applicationId, chatId);
+  expect(opened.session.metadata.id).toBe(earlier.getSessionId());
+  const { harness } = await AgentHarness.create(
+    {
+      session: opened.session,
+      models: createModels(),
+      model: { provider: "none", id: "none" } as never,
+      systemPrompt: "x",
+      tools: [],
+    },
+    ctx,
+  );
+  const lane = await harness.lane("main", ctx);
+  const entries = await lane.findEntries(undefined, ctx);
+  expect(entries.map((entry) => entry.type).sort()).toEqual([
+    "compaction",
+    "message",
+    "message",
+    "message",
+    "message",
+    "message",
+  ]);
+  expect(JSON.stringify(entries)).toContain("container started");
+  // Writing through Pi turns its copy into Pi's current format.
+  await lane.appendCustomEntry("hallvi-upgrade-check", undefined, ctx);
+  await harness.close(ctx);
+  await opened.release();
+  const [imported] = historyFiles();
+  expect(
+    JSON.parse(readFileSync(imported, "utf8").split("\n")[0]),
+  ).toMatchObject({ v: 4, id: earlier.getSessionId() });
+  // The original is byte for byte what it was: the earlier version still
+  // reads it, and removing the conversation's directory is the rollback.
+  expect(readFileSync(pathFor()).equals(original)).toBe(true);
+  expect(
+    SessionManager.open(pathFor(), dirname(pathFor()), root).getEntries(),
+  ).toHaveLength(6);
+  // A second open uses Pi's copy and does not import again.
+  const again = await openNativeChatSession(applicationId, chatId);
+  expect(await again.session.findEntries(undefined, ctx)).toHaveLength(7);
+  await again.release();
+  expect(historyFiles()).toEqual([imported]);
+});
+
+it("refuses a damaged earlier history rather than half-reading it", async () => {
+  mkdirSync(dirname(pathFor()), { recursive: true });
+  writeFileSync(
+    pathFor(),
+    '{"type":"session","version":3,"id":"s","timestamp":"2026-01-01T00:00:00.000Z","cwd":"/"}\n{"type":"message","id":"a"\n',
+    { mode: 0o600 },
+  );
+  await expect(
+    openNativeChatSession(applicationId, chatId),
+  ).rejects.toMatchObject({ code: "history-unavailable" });
+  expect(historyFiles()).toEqual([]);
 });
 
 it("blocks a second writer and removal until release, and retains lock files after removal", async () => {
@@ -252,7 +229,7 @@ it("blocks a second writer and removal until release, and retains lock files aft
     NativeSessionError,
   );
   expect(remove).not.toHaveBeenCalled();
-  first.release();
+  await first.release();
   removeNativeApplicationSessions(applicationId, remove);
   expect(remove).toHaveBeenCalledOnce();
   expect(store.getApplication(applicationId)).toBeNull();
@@ -274,7 +251,7 @@ it("rejects cross-application identity and path traversal before creating sessio
 
 it("the OS releases an abandoned application lock when its worker exits", async () => {
   const initial = await openNativeChatSession(applicationId, chatId);
-  initial.release();
+  await initial.release();
   const lockPath = join(
     root,
     "pi-sessions",
@@ -301,7 +278,7 @@ it("the OS releases an abandoned application lock when its worker exits", async 
     child.kill("SIGKILL");
     await exited;
     const resumed = await openNativeChatSession(applicationId, chatId);
-    resumed.release();
+    await resumed.release();
   } finally {
     child.kill("SIGKILL");
   }

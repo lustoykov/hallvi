@@ -63,7 +63,7 @@ function assertCurrentSchema(
   }
   if (version !== schemaVersion.version) {
     throw new Error(
-      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker, then run npm run db:push. Other prototype versions require an explicit fresh database.`,
+      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker. Schema 15 is upgraded in place, keeping the original, by npm run db:upgrade; an empty database is created by npm run db:push.`,
     );
   }
 }

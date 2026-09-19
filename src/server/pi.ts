@@ -44,7 +44,6 @@ import {
   listExecutions,
 } from "./operator-execution";
 import { loadApplication, repositoryAccess } from "./applications";
-import { dirname } from "node:path";
 
 import { configuredPiRuntime } from "./pi-configuration";
 import { openNativeChatSession } from "./pi-sessions";
@@ -177,8 +176,6 @@ export interface PiSessionEvents {
   /** Every tool call, in order, with what went in and what came back. */
   onTool?: (event: PiToolEvent) => void;
   onActivity?: (event: ExecutionSignal) => void;
-  /** A phase began. The place to re-apply a Stop the SDK has not yet seen. */
-  onPhase?: () => void;
 }
 
 /**
@@ -191,6 +188,49 @@ export interface PiSessionScope {
   reply: () => string;
 }
 
+type PiHarness = import("@earendil-works/pi-agent-core").AgentHarness;
+
+/** A tool as Hallvi and Pi's coding agent define one. */
+interface DefinedTool {
+  name: string;
+  label: string;
+  description: string;
+  parameters: import("typebox").TSchema;
+  prepareArguments?: (args: unknown) => never;
+  constrainedSampling?: unknown;
+  execute(
+    id: string,
+    params: never,
+    signal?: AbortSignal,
+    onUpdate?: (partial: never) => void,
+  ): Promise<unknown>;
+}
+
+/**
+ * The same definition under the harness's call shape. The schema, argument
+ * preparation and sampling constraint are Pi's fields and pass through; only
+ * the order of `execute`'s arguments differs, and cancellation arrives on the
+ * context instead of as a bare signal.
+ */
+function forHarness(tool: DefinedTool) {
+  return {
+    name: tool.name,
+    label: tool.label,
+    description: tool.description,
+    parameters: tool.parameters,
+    prepareArguments: tool.prepareArguments,
+    constrainedSampling: tool.constrainedSampling,
+    execute: (
+      id: string,
+      params: unknown,
+      onUpdate: (partial: never) => void,
+      _toolContext: unknown,
+      _invocation: unknown,
+      context: { abortSignal: AbortSignal | undefined },
+    ) => tool.execute(id, params as never, context.abortSignal, onUpdate),
+  } as import("@earendil-works/pi-agent-core").AgentHarnessTool<undefined>;
+}
+
 /**
  * Open this conversation's native session with its tools. Pi owns everything
  * that happens in it; `close` waits for Pi to settle and releases the history.
@@ -201,17 +241,13 @@ export async function openPiSession(
 ) {
   options.signal?.throwIfAborted();
   const sdk = await import("@earendil-works/pi-coding-agent");
-  const {
-    createAgentSession,
-    defineTool,
-    DefaultResourceLoader,
-    SettingsManager,
-  } = sdk;
+  const { AgentHarness, BACKGROUND_CONTEXT } =
+    await import("@earendil-works/pi-agent-core");
+  const { defineTool } = sdk;
   // Open and validate history before provider/auth work. A missing established
   // history is a recovery error, not permission to silently start a new Chat.
   const native = await openNativeChatSession(scope.applicationId, scope.chatId);
-  let session:
-    Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined;
+  let harness: PiHarness | undefined;
   const builtinWorkspace = new PiWorkspace({
     applicationId: scope.applicationId,
     chatId: scope.chatId,
@@ -223,13 +259,12 @@ export async function openPiSession(
   // the SDK cannot settle within its bounded drain deadline.
   const close = async () => {
     try {
-      await session?.waitForIdle();
+      await harness?.close(BACKGROUND_CONTEXT);
     } finally {
-      session?.dispose();
       try {
         await builtinWorkspace.dispose();
       } finally {
-        native.release();
+        await native.release();
       }
     }
   };
@@ -877,46 +912,51 @@ export async function openPiSession(
             }
           : tool,
       );
-    const cwd = process.cwd();
-    const agentDir = dirname(native.sessionManager.getSessionFile()!);
-    const settingsManager = SettingsManager.inMemory();
-    const loader = new DefaultResourceLoader({
-      cwd,
-      agentDir,
-      settingsManager,
-      systemPromptOverride: () => SYSTEM_PROMPT,
-      appendSystemPromptOverride: () => [
-        PI_WORKSPACE_PROMPT,
-        main
-          ? "You are the main operator. You may execute work for this application."
-          : "You are a read-only side chat. Explain the application and its execution evidence. You cannot run commands or change files, records or the server. Tell the user to send operational work to the main conversation.",
-      ],
-      skillsOverride: () => ({ skills: [], diagnostics: [] }),
-      agentsFilesOverride: () => ({ agentsFiles: [] }),
-      promptsOverride: () => ({ prompts: [], diagnostics: [] }),
-      noContextFiles: true,
-      noExtensions: true,
-      noPromptTemplates: true,
-      noSkills: true,
-      noThemes: true,
-    });
-    await loader.reload();
     options.signal?.throwIfAborted();
-    ({ session } = await createAgentSession({
-      cwd,
-      agentDir,
-      model,
-      modelRuntime,
-      thinkingLevel: configuration.reasoningEffort,
-      settingsManager,
-      tools: [...workspaceTools, ...recordTools, ...operatorTools].map(
-        (tool) => tool.name,
-      ),
-      customTools: [...workspaceTools, ...recordTools, ...operatorTools],
-      resourceLoader: loader,
-      sessionManager: native.sessionManager,
-    }));
-    return { session, close };
+    const tools = [...workspaceTools, ...recordTools, ...operatorTools];
+    const created = await AgentHarness.create(
+      {
+        session: native.session,
+        // Pi's own runtime: credentials, refresh and model access stay its.
+        models: modelRuntime,
+        model,
+        thinkingLevel: configuration.reasoningEffort,
+        systemPrompt: [
+          SYSTEM_PROMPT,
+          PI_WORKSPACE_PROMPT,
+          main
+            ? "You are the main operator. You may execute work for this application."
+            : "You are a read-only side chat. Explain the application and its execution evidence. You cannot run commands or change files, records or the server. Tell the user to send operational work to the main conversation.",
+        ].join("\n\n"),
+        tools: tools.map((tool) => forHarness(tool as DefinedTool)),
+        activeToolNames: tools.map((tool) => tool.name),
+        // The harness has one setting for a whole turn's tool calls and does
+        // not read a tool's own executionMode. Every call that changes a
+        // server, a file or a record was sequential; one at a time for all of
+        // them keeps that, at the cost of reads no longer overlapping.
+        toolExecution: "sequential",
+        // One message per turn, as the conversation shows them.
+        steeringMode: "one-at-a-time",
+        followUpMode: "one-at-a-time",
+      },
+      BACKGROUND_CONTEXT,
+    );
+    harness = created.harness;
+    const lane = await harness.lane("main", BACKGROUND_CONTEXT);
+    // Hallvi's setup chooses the model, not what an earlier history recorded.
+    await lane.setModel(
+      { provider: model.provider, modelId: model.id },
+      BACKGROUND_CONTEXT,
+    );
+    await lane.setThinkingLevel(
+      configuration.reasoningEffort,
+      BACKGROUND_CONTEXT,
+    );
+    await lane.setActiveTools(
+      tools.map((tool) => tool.name),
+      BACKGROUND_CONTEXT,
+    );
+    return { harness, lane, close };
   } catch (error) {
     await close();
     if (options.signal?.aborted) throw error;
@@ -928,18 +968,15 @@ export async function openPiSession(
 }
 
 /** Pi's events as Hallvi records them. `reply()` restarts per-reply keys. */
-export function watchPiSession(
-  session: Awaited<ReturnType<typeof openPiSession>>["session"],
-  options: PiSessionEvents,
-) {
+export function watchPiSession(harness: PiHarness, options: PiSessionEvents) {
   let response = "";
   let generation = 0;
   let compaction = 0;
   let retry = 0;
   let toolSequence = 0;
   const toolKeys = new Map<string, string>();
-  const unsubscribe = session.subscribe((event) => {
-    if (event.type === "tool_execution_start") {
+  const off = [
+    harness.events.on("tool_start", (event) => {
       const key = `tool:${++toolSequence}`;
       toolKeys.set(event.toolCallId, key);
       options.onActivity?.({
@@ -954,14 +991,15 @@ export function watchPiSession(
         tool: event.toolName,
         args: event.args,
       });
-    }
-    if (event.type === "tool_execution_update")
+    }),
+    harness.events.on("tool_update", (event) =>
       options.onTool?.({
         type: "update",
         id: event.toolCallId,
         partial: event.partialResult,
-      });
-    if (event.type === "tool_execution_end") {
+      }),
+    ),
+    harness.events.on("tool_end", (event) => {
       const key = toolKeys.get(event.toolCallId);
       if (key)
         options.onActivity?.({ type: "end", key, failed: event.isError });
@@ -972,20 +1010,22 @@ export function watchPiSession(
         result: event.result,
         isError: event.isError,
       });
-    }
-    if (event.type === "compaction_start")
+    }),
+    harness.events.on("compaction_start", () =>
       options.onActivity?.({
         type: "start",
         key: `compaction:${++compaction}`,
         kind: "compaction",
-      });
-    if (event.type === "compaction_end")
+      }),
+    ),
+    harness.events.on("compaction_end", (event) =>
       options.onActivity?.({
         type: "end",
         key: `compaction:${compaction}`,
-        failed: event.aborted || !!event.errorMessage,
-      });
-    if (event.type === "auto_retry_start") {
+        failed: event.status === "failed" || event.status === "aborted",
+      }),
+    ),
+    harness.events.on("retry_start", (event) => {
       const key = `retry:${++retry}`;
       options.onActivity?.({ type: "start", key, kind: "retry" });
       options.onActivity?.({
@@ -993,38 +1033,38 @@ export function watchPiSession(
         key,
         metadata: { attempt: event.attempt },
       });
-    }
-    if (event.type === "turn_start" || event.type === "compaction_start") {
-      // compaction_start precedes creation of the SDK's abort controller, and
-      // an earlier abort can settle before the agent loop starts. Whoever
-      // stopped this conversation re-applies it to each newly started phase.
-      queueMicrotask(() => options.onPhase?.());
-    }
-    if (event.type === "message_start" && event.message.role === "assistant") {
+    }),
+    harness.events.on("message_start", (event) => {
+      if (event.message.role !== "assistant") return;
       response = "";
       options.onActivity?.({
         type: "start",
         key: `model:${++generation}`,
         kind: "model",
       });
-    }
-    if (event.type === "message_end" && event.message.role === "assistant") {
+    }),
+    harness.events.on("message_update", (event) => {
+      if (event.event.type !== "text_delta") return;
+      response += event.event.delta;
+      options.onText?.(response);
+    }),
+    harness.events.on("message_end", ({ message }) => {
+      if (message.role !== "assistant") return;
       options.onActivity?.({
         type: "end",
         key: `model:${generation}`,
         failed:
-          event.message.stopReason === "error" ||
-          event.message.stopReason === "aborted",
+          message.stopReason === "error" || message.stopReason === "aborted",
         metadata: {
-          model: event.message.model,
-          provider: event.message.provider,
-          inputTokens: event.message.usage?.input,
-          outputTokens: event.message.usage?.output,
-          cacheReadTokens: event.message.usage?.cacheRead,
-          cacheWriteTokens: event.message.usage?.cacheWrite,
+          model: message.model,
+          provider: message.provider,
+          inputTokens: message.usage?.input,
+          outputTokens: message.usage?.output,
+          cacheReadTokens: message.usage?.cacheRead,
+          cacheWriteTokens: message.usage?.cacheWrite,
         },
       });
-      const said = event.message.content
+      const said = message.content
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("");
@@ -1034,17 +1074,10 @@ export function watchPiSession(
           sequence: ++toolSequence,
           text: said,
         });
-    }
-    if (
-      event.type === "message_update" &&
-      event.assistantMessageEvent.type === "text_delta"
-    ) {
-      response += event.assistantMessageEvent.delta;
-      options.onText?.(response);
-    }
-  });
+    }),
+  ];
   return {
-    unsubscribe,
+    unsubscribe: () => off.forEach((stop) => stop()),
     reply() {
       response = "";
       generation = compaction = retry = toolSequence = 0;

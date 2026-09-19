@@ -212,6 +212,20 @@ worker = spawn(process.execPath, ["--import", "tsx", "src/worker.ts"], {
   env,
   stdio: "inherit",
 });
+// A restart journey kills this worker outright and starts another the same
+// way; what it needs to do that is here, and holds nothing but fixture values.
+writeFileSync(
+  join(root, "worker.json"),
+  JSON.stringify({
+    pid: worker.pid,
+    app,
+    env: Object.fromEntries(
+      Object.entries(env).filter(([name]) =>
+        /^(HALLVI_|PI_CODING_AGENT_DIR$|PATH$|HOME$)/.test(name),
+      ),
+    ),
+  }),
+);
 child = spawn(
   process.execPath,
   [
