@@ -131,7 +131,8 @@ test(
       page.getByText("[QA fixture reply] Cancel me [slow-cancel]", {
         exact: true,
       }),
-    ).toBeVisible();
+      // The synthetic reply alone takes six seconds.
+    ).toBeVisible({ timeout: 20_000 });
     await openConversation(page);
     await expect(
       page
