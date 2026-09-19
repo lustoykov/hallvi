@@ -5,7 +5,7 @@ import type { ExecutionRecord } from "../../src/server/operator-execution";
 import { test, expect } from "./fixtures";
 import { exchange, scriptWorker, seedToolCall } from "./scripted-worker";
 
-test.use({ isolatedApp: true });
+test.use({ scriptedWorker: true });
 
 test("server output streams inline, preserves reading position and stays readable on completion @journey-streaming-output", async ({
   page,

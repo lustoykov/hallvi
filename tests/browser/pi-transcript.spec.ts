@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test, expect } from "./fixtures";
 import { exchange, scriptWorker } from "./scripted-worker";
 
-test.use({ isolatedApp: true });
+test.use({ scriptedWorker: true });
 
 test("Pi text stays once in order through completion and reload @journey-streaming-output", async ({
   page,

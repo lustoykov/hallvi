@@ -25,7 +25,7 @@ import {
 } from "./scripted-worker";
 
 // The page is what is under test; Pi's side of the conversation is scripted.
-test.use({ isolatedApp: true });
+test.use({ scriptedWorker: true });
 
 const earlier = (chatId: string) =>
   Array.from({ length: 24 }, (_, index) => ({

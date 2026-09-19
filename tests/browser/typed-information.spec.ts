@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test, expect } from "./fixtures";
 import { exchange, scriptWorker } from "./scripted-worker";
 
-test.use({ isolatedApp: true });
+test.use({ scriptedWorker: true });
 
 test("records render in chat and their views, survive refresh, and update by record ID @journey-shared-information @smoke", async ({
   page,

@@ -15,7 +15,7 @@ import type { Transcript } from "../../src/server/pi-transcript";
  * Stand in for the worker on its own socket, answering with a transcript the
  * spec writes. What these journeys check is the page: the app reads the
  * transcript over the real socket, places the evidence on disk into it, and
- * draws it. Needs `isolatedApp`, because the fixture's real worker is stopped.
+ * draws it. Needs `scriptedWorker`, because the fixture's real worker is stopped.
  */
 export async function scriptWorker(
   fixture: { state: string },
