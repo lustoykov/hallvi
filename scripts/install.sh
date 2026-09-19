@@ -1,18 +1,15 @@
 #!/bin/sh
-# Installs or upgrades Hallvi for the current user, from the unpacked
-# archive this file sits in. Nothing here needs root.
+# Installs or upgrades Hallvi for the current user from a verified, unpacked
+# platform archive. The outer install-hallvi.sh checks the archive checksum.
 #
 #   program   ~/.local/lib/hallvi     replaced on every install
 #   command   ~/.local/bin/hallvi
 #   state     ~/.local/share/hallvi   never touched by install or uninstall
 #   model     ~/.config/hallvi/pi     never touched by install or uninstall
 #
-# Node.js is downloaded into the program directory rather than taken from the
-# machine: a background service does not see a shell's version manager, and the
-# two native modules must be built against the Node that will load them.
+# Node.js and native dependencies are already inside this platform archive.
 set -eu
 
-NODE_MAJOR=24
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 home="$HOME/.local/lib/hallvi"
 bin="$HOME/.local/bin"
@@ -20,33 +17,17 @@ bin="$HOME/.local/bin"
 say() { printf '%s\n' "$*"; }
 fail() { printf 'install: %s\n' "$*" >&2; exit 1; }
 
-case "$(uname -s)" in
-  Darwin) os=darwin ;;
-  Linux) os=linux ;;
-  *) fail "Hallvi installs on macOS and Linux." ;;
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64) os=darwin; platform=darwin-arm64 ;;
+  Linux-x86_64 | Linux-amd64) os=linux; platform=linux-x64 ;;
+  *) fail "supported releases target Apple-silicon macOS and Ubuntu 24.04 x64." ;;
 esac
-case "$(uname -m)" in
-  arm64 | aarch64) arch=arm64 ;;
-  x86_64 | amd64) arch=x64 ;;
-  *) fail "unsupported processor: $(uname -m)" ;;
-esac
-
-# node-pty compiles on installation, and better-sqlite3 does when it has no
-# prebuilt binary for this machine.
-missing=""
-for tool in cc make python3 tar curl ssh; do
-  command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
-done
-if [ -n "$missing" ]; then
-  say "Missing:$missing"
-  if [ "$os" = darwin ]; then
-    say "Install Apple's command line tools with: xcode-select --install"
-  else
-    say "On Debian or Ubuntu: sudo apt-get install -y build-essential python3 curl openssh-client"
-    say "On Fedora: sudo dnf install -y gcc-c++ make python3 curl openssh-clients"
-  fi
-  exit 1
-fi
+[ "$(id -u)" -ne 0 ] || fail "run as your ordinary user, without sudo."
+[ -x "$source_dir/node/bin/node" ] || fail "the archive has no Node.js runtime."
+[ -d "$source_dir/node_modules" ] || fail "the archive has no dependencies."
+archive_platform=$("$source_dir/node/bin/node" -e 'console.log(require(process.argv[1]).platform)' "$source_dir/dist/release.json")
+[ "$archive_platform" = "$platform" ] ||
+  fail "this archive targets $archive_platform, not $platform."
 if [ "$os" = linux ] && ! command -v systemctl >/dev/null 2>&1; then
   fail "the background service needs systemd, which this machine does not have."
 fi
@@ -73,8 +54,21 @@ require_installation() {
 # would otherwise read as "not running" and lose its program while serving.
 require_installation "$home" "Hallvi"
 if [ "$os" = darwin ]; then
-  launchctl print "gui/$(id -u)/com.hallvi" >/dev/null 2>&1 &&
-    running=yes || running=no
+  running=no
+  for attempt in 1 2 3; do
+    if launchctl print "gui/$(id -u)/com.hallvi" >/dev/null 2>&1; then
+      running=yes
+      break
+    fi
+    [ -f "$HOME/Library/LaunchAgents/com.hallvi.plist" ] || break
+    [ "$attempt" = 3 ] || sleep 1
+  done
+  # `hallvi stop` removes its plist. If it remains but launchctl cannot
+  # confirm the job, avoid replacing a possibly serving program.
+  if [ "$running" = no ] &&
+    [ -f "$HOME/Library/LaunchAgents/com.hallvi.plist" ]; then
+    fail "cannot confirm the existing Mac service state; retry from the logged-in user's session."
+  fi
 else
   { systemctl --user is-enabled hallvi.service >/dev/null 2>&1 ||
     systemctl --user is-active --quiet hallvi.service; } &&
@@ -86,41 +80,41 @@ upgrade=no
 
 mkdir -p "$HOME/.local/lib" "$bin"
 staging=$(mktemp -d "$HOME/.local/lib/hallvi.installing.XXXXXX")
-cleanup_staging() {
+backup=""
+committed=no
+stopped=no
+cleanup() {
+  result=$?
+  trap - EXIT
+  if [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
+    if [ -d "$home" ] && is_installation "$home"; then rm -rf "$home"; fi
+    if [ ! -e "$home" ]; then
+      mv "$backup" "$home"
+      if [ "$was_running" = yes ]; then "$bin/hallvi" start || :; fi
+      say "The previous Hallvi program was restored."
+    else
+      say "Could not restore automatically; previous program is at $backup" >&2
+    fi
+  elif [ "$committed" = no ] && [ "$stopped" = yes ] &&
+    [ "$was_running" = yes ] && is_installation "$home"; then
+    "$bin/hallvi" start || :
+  fi
   [ -z "${staging:-}" ] || rm -rf "$staging"
+  exit "$result"
 }
-trap cleanup_staging EXIT
+trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
-mkdir -p "$staging/app"
-
-say "Downloading Node.js $NODE_MAJOR for $os-$arch"
-base="https://nodejs.org/dist/latest-v$NODE_MAJOR.x"
-sums=$(curl -fsSL "$base/SHASUMS256.txt")
-file=$(printf '%s\n' "$sums" | awk -v s="-$os-$arch.tar.gz" \
-  'substr($2, length($2) - length(s) + 1) == s { print $2 }')
-[ -n "$file" ] || fail "nodejs.org lists no Node.js $NODE_MAJOR for $os-$arch."
-curl -fsSL "$base/$file" -o "$staging/node.tar.gz"
-expected=$(printf '%s\n' "$sums" | awk -v f="$file" '$2 == f { print $1 }')
-if command -v sha256sum >/dev/null 2>&1; then
-  actual=$(sha256sum "$staging/node.tar.gz" | awk '{ print $1 }')
-else
-  actual=$(shasum -a 256 "$staging/node.tar.gz" | awk '{ print $1 }')
-fi
-[ "$expected" = "$actual" ] || fail "the Node.js download did not match its checksum."
-mkdir "$staging/node"
-tar -xzf "$staging/node.tar.gz" -C "$staging/node" --strip-components 1
-rm "$staging/node.tar.gz"
-
-say "Copying Hallvi"
-cp -RP "$source_dir/." "$staging/app/"
-rm -f "$staging/app/install.sh"
-
-say "Installing dependencies (this compiles two native modules)"
+say "Preparing prebuilt Hallvi for $platform"
+cp -RP "$source_dir/." "$staging/"
+mkdir "$staging/app"
+for part in .next node_modules package.json package-lock.json next.config.ts scripts dist; do
+  mv "$staging/$part" "$staging/app/$part"
+done
+rm "$staging/install.sh"
 (
   cd "$staging/app"
-  PATH="$staging/node/bin:$PATH" npm ci --omit=dev --no-audit --no-fund --no-update-notifier \
-    --loglevel=error
-)
+  "$staging/node/bin/node" --input-type=module -e "import Database from 'better-sqlite3'; import pty from 'node-pty'; new Database(':memory:').close(); pty.spawn('/bin/sh', ['-c', 'exit'], {})"
+) >/dev/null 2>&1 || fail "prebuilt native dependencies cannot load on this machine."
 
 # Refuse an incompatible archive while the current version is still intact and
 # serving. The check only reads an existing database; a new installation has
@@ -148,8 +142,13 @@ if [ "$running" = yes ]; then
     ! systemctl --user is-active --quiet hallvi.service ||
       fail "Hallvi is still running; nothing was replaced."
   fi
+  stopped=yes
 fi
-rm -rf "$home"
+if [ "$upgrade" = yes ]; then
+  backup=$(mktemp -d "$HOME/.local/lib/hallvi.previous.XXXXXX")
+  rmdir "$backup"
+  mv "$home" "$backup"
+fi
 mv "$staging" "$home"
 staging=""
 
@@ -162,9 +161,26 @@ chmod +x "$bin/hallvi"
 # A new installation starts. An upgrade returns to the state it found.
 if [ "$upgrade" = no ] || [ "$was_running" = yes ]; then
   "$bin/hallvi" start ||
-    say "Installed, but Hallvi is not answering yet: hallvi logs"
+    fail "Hallvi did not become ready; check hallvi logs."
 else
   say "Installed. Hallvi was stopped before and stays stopped: hallvi start"
+fi
+committed=yes
+if [ -n "$backup" ]; then rm -rf "$backup"; backup=""; fi
+
+if [ "$upgrade" = no ]; then
+  browser_url=$("$bin/hallvi" url)
+  if [ -n "${SSH_CONNECTION:-}" ] ||
+    { [ "$os" = linux ] && [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; }; then
+    say "Hallvi is ready on this machine. To continue in your laptop browser:"
+    say "  $bin/hallvi remote $(id -un)@server-address"
+    say "Follow its SSH instructions, then open $browser_url on the laptop."
+  elif [ "$os" = darwin ]; then
+    open "$browser_url" || say "Open $browser_url in your browser."
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$browser_url" >/dev/null 2>&1 ||
+      say "Open $browser_url in your browser."
+  fi
 fi
 
 case ":$PATH:" in

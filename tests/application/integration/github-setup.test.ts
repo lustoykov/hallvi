@@ -201,9 +201,11 @@ describe("explicit GitHub consent and storage", () => {
     expect((await detectGithubCliLogin()).candidate?.account).toEqual(account);
     await expect(connectedGithubCredential()).rejects.toThrow("Connect GitHub");
   });
-  it("requires App registration for the supported connection path", async () => {
+  it("explains when a release has no private-repository App", async () => {
     vi.stubEnv("HALLVI_GITHUB_CLIENT_ID", "");
-    await expect(startGithubLogin()).rejects.toThrow("client ID");
+    await expect(startGithubLogin()).rejects.toThrow(
+      "Private repository connection is not configured",
+    );
     expect(device).not.toHaveBeenCalled();
     await expect(
       adoptGithubCliLogin(credentialFingerprint(token, "gh")),
@@ -248,7 +250,7 @@ describe("GitHub device flow", () => {
     expect(statSync(githubConnectionPath()).mode & 0o777).toBe(0o600);
   });
   it.each([
-    ["access_denied", "cancelled"],
+    ["access_denied", "denied"],
     ["expired_token", "expired"],
     ["device_flow_disabled", "failed"],
   ])(

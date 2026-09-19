@@ -5,9 +5,10 @@ as a background service, so you can close the terminal and use it in your
 browser. On macOS it starts when you log in and pauses during sleep; on Linux
 it can start at boot without a login.
 
-You do not need to clone the repository or install Node.js. The installer
-supplies its own Node.js runtime. The current package does need compiler tools
-and internet access to download Node.js and install dependencies.
+You do not need to clone the repository or install Node.js, npm, Python or a
+compiler. Each release archive includes Node.js 22 and dependencies built for
+its named platform. The installer checks the archive against its matching
+SHA-256 file before changing the installed program.
 
 [macOS](#macos) · [Linux](#linux) · [First deployment](#your-first-deployment) ·
 [Troubleshooting](#troubleshooting) · [Remote access](#on-another-machine) ·
@@ -15,10 +16,18 @@ and internet access to download Node.js and install dependencies.
 
 ## Get the package
 
-Hallvi is in private beta. There is no public download yet; obtain
-`hallvi-0.1.0.tgz` and its matching `hallvi-0.1.0.tgz.sha256` from the maintainer.
-Keep both files in the same directory. The instructions below use version
-`0.1.0`; substitute the supplied version if it differs.
+Hallvi is in private beta. There is no public download yet. Obtain these three
+files from the maintainer, keeping them in the same directory:
+
+- `install-hallvi.sh`
+- `hallvi-0.1.0-darwin-arm64.tgz` **or** `hallvi-0.1.0-linux-x64.tgz`
+- the matching `.tgz.sha256` file
+
+The names above use version `0.1.0`; substitute the supplied version if it
+differs. Use the Mac archive on Apple silicon and the Linux archive on Ubuntu
+24.04 x64. The installer rejects a mismatched platform or checksum. Obtain the
+checksum through the same trusted release channel as the archive; a checksum
+does not authenticate an untrusted distributor.
 
 Contributors creating a package should use [Build a release archive](#build-a-release-archive).
 Installing a supplied archive does not require a source checkout.
@@ -27,87 +36,62 @@ Installing a supplied archive does not require a source checkout.
 
 | Platform | Current evidence |
 | --- | --- |
-| macOS, Apple silicon | Service installation exercised |
-| Ubuntu 24.04, x64 | Installation, restart and upgrade rehearsal exercised |
-| macOS, Intel | Installer target; beta acceptance not completed |
-| glibc Linux with systemd, arm64 / other distributions | Installer targets; beta acceptance not completed |
+| macOS, Apple silicon | Prebuilt release target; candidate verification recorded with each release |
+| Ubuntu 24.04, x64 | Prebuilt release target; candidate verification recorded with each release |
+| macOS, Intel; other Linux architectures/distributions | No prebuilt release target yet |
 
-Alpine/musl Linux and Windows are not supported by this installer. The
-[installation evidence](testing/2026-09-17-installation.md) and
-[beta rehearsal](testing/2026-09-18-beta-rehearsal.md) identify the tested
-revisions; they do not certify a newer archive.
+Alpine/musl Linux and Windows are not supported. The
+[earlier installation evidence](testing/2026-09-17-installation.md) and
+[beta rehearsal](testing/2026-09-18-beta-rehearsal.md) used the former
+source-plus-compile archive and do not certify a new prebuilt archive.
 
 ## macOS
 
-1. Install Apple's command line tools if they are not already installed:
-
-   ```bash
-   xcode-select --install
-   ```
-
-   Finish the installation dialog before continuing. If macOS says the tools
-   are already installed, continue.
-
-2. In Terminal, go to the directory containing the archive and checksum. For
-   example, if you saved them in Downloads:
+1. In Terminal, go to the directory containing the supplied files and run:
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c hallvi-0.1.0.tgz.sha256 &&
-     tar -xzf hallvi-0.1.0.tgz &&
-     ./hallvi-0.1.0/install.sh
+   sh ./install-hallvi.sh ./hallvi-0.1.0-darwin-arm64.tgz
    ```
 
-   Verification must report `OK`. The chained commands stop if verification
-   fails. Run the installer as your normal logged-in user, without `sudo`.
+   Run as your normal logged-in user, without `sudo`. The installer verifies
+   the matching `.sha256` file and reports service, interface and worker
+   readiness.
 
-3. Check the result and open Hallvi:
+2. Open Hallvi:
 
    ```bash
-   ~/.local/bin/hallvi status
    open http://127.0.0.1:4747
    ```
 
-The installer downloads Node.js and compiles native dependencies; let it finish.
 Hallvi starts automatically on a new installation. It runs as your login's
 background service, not before login or while the Mac is asleep.
 
 ## Linux
 
-These commands are for Ubuntu or Debian with systemd. Use an ordinary user
-account; `sudo` is only for installing system prerequisites.
+These commands are for Ubuntu 24.04 x64 with a systemd user session. Use an
+ordinary user account over SSH or at the machine.
 
-1. Install the prerequisites:
-
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y build-essential python3 curl openssh-client
-   ```
-
-   Other glibc distributions need equivalent compiler, `make`, Python 3,
-   `curl`, `tar` and SSH tools, plus a working systemd user session.
-
-2. From the directory containing the archive and checksum, run:
+1. From the directory containing the supplied files, run:
 
    ```bash
-   sha256sum -c hallvi-0.1.0.tgz.sha256 &&
-     tar -xzf hallvi-0.1.0.tgz &&
-     ./hallvi-0.1.0/install.sh
+   sh ./install-hallvi.sh ./hallvi-0.1.0-linux-x64.tgz
    ```
 
-   Verification must report `OK`. The chained commands stop if verification
-   fails. Do not run `install.sh` with `sudo`.
+   Run without `sudo`. The installer verifies the archive, installs the user
+   service and checks both the interface and worker.
 
-3. Check the service:
+2. To use Hallvi from a laptop, run this on the Ubuntu machine with its
+   address, then follow the printed SSH configuration on the laptop:
 
    ```bash
-   ~/.local/bin/hallvi status
+   ~/.local/bin/hallvi remote you@vm.example.com
    ```
 
-   Open <http://127.0.0.1:4747> in a browser on that machine. If you installed
-   over SSH, follow [remote access](#on-another-machine) to use your laptop's
-   browser. If status says boot without login needs an extra command, run the
-   `sudo loginctl enable-linger ...` command it prints.
+   A headless VPS needs no desktop browser. Open Hallvi in the laptop browser
+   after starting the printed SSH connection. If status says boot without
+   login needs an extra command, run the `sudo loginctl enable-linger ...`
+   command it prints.
 
 ## Your first deployment
 
@@ -133,11 +117,12 @@ application server serve different purposes.
 | What happened | What to do |
 | --- | --- |
 | Checksum fails or the checksum file is missing | Stop and obtain the matching archive and checksum together. Do not skip verification. |
-| Installer reports missing compiler tools | Finish the macOS command line tools installation, or install the Linux prerequisites above, then rerun `install.sh`. |
+| Installer rejects the platform | Use the archive for Apple-silicon macOS or Ubuntu 24.04 x64. Other platforms have no prebuilt release yet. |
+| Prebuilt dependency cannot load | Keep the current installation. Report the archive name, OS version and `hallvi status` output to the maintainer. |
 | `hallvi: command not found` | Use `~/.local/bin/hallvi` instead. Optionally add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file. |
 | Browser cannot open Hallvi | Run `~/.local/bin/hallvi status`, then `~/.local/bin/hallvi logs`. If it is stopped, run `~/.local/bin/hallvi start`. Use the address status prints. |
 | Installed on another computer, but the laptop cannot connect | `127.0.0.1` refers to the computer running your browser. Follow [remote access](#on-another-machine). |
-| Repository inspection says Docker is unavailable | Start the local Docker Engine and retry. Direct execution is not available in the current package. |
+| Repository inspection says Docker is unavailable | On the current main revision, start Docker Engine and retry. A separate change is in progress to make local execution the default; verify it in the particular release before relying on it. |
 | Linux service does not survive logout or start at boot | Check `~/.local/bin/hallvi status` and follow its lingering instruction. |
 | Linux reports that it cannot connect to the user service manager | Run from a normal login session for the installing user on a systemd machine, rather than through `sudo`. |
 | Upgrade reports a schema mismatch | Keep the installed version and follow [Upgrade](#upgrade). Do not delete the database to bypass the check. |
@@ -158,8 +143,9 @@ and private data from any logs you share.
 
 Optional settings go in `~/.local/share/hallvi/hallvi.env`, one
 `NAME=value` per line, read at every start: `HALLVI_PORT` to move the
-interface, and the GitHub App values from [GitHub setup](integrations/github.md)
-for private repositories. Public repositories need no login.
+interface. A release with a configured GitHub App can connect private
+repositories; see [GitHub setup](integrations/github.md). Public repositories
+need no login.
 
 ## The service
 
@@ -227,8 +213,9 @@ On the machine running Hallvi, print the configuration for your laptop:
 ```
 
 Paste the `Host hallvi` block it prints into `~/.ssh/config` on the laptop,
-then run the command below. Every local forward explicitly binds the laptop's `127.0.0.1`, even when
-the laptop's SSH defaults allow forwarded ports on other interfaces:
+then run the command below. Every local forward explicitly binds the laptop's
+`127.0.0.1`, even when its SSH defaults allow forwarded ports on other
+interfaces:
 
 ```bash
 ssh -N hallvi
@@ -238,7 +225,10 @@ Keep that running while you use Hallvi, and open
 <http://127.0.0.1:4747> on the laptop. A private application link Pi opens, for
 example `http://127.0.0.1:4757`, now works in the laptop's browser as it is
 written. Connecting ChatGPT and GitHub uses device codes, so both work through
-the same connection with nothing further to forward.
+the same connection with nothing further to forward. If the SSH session drops,
+rerun `ssh -N hallvi`; the Hallvi service, saved account connections and
+conversation remain on the VPS. A private application link may need Pi to
+reopen it after a service restart.
 
 If one of those ports is already used on the laptop, `ssh` refuses to start and
 names it. Free the port, or move the whole installation with `HALLVI_PORT`
@@ -250,12 +240,13 @@ note explains why.
 
 ## Upgrade
 
-Build or obtain the new archive and run its `install.sh`. It prepares the new
-program completely — download, dependencies, native compiles — while the old
-one keeps serving, checks that the new version can open the existing database,
+Obtain the new platform archive and checksum, then run `install-hallvi.sh`
+against it. Verification, unpacking, native-module loading and the database
+compatibility check happen while the old service keeps serving. The installer
 then stops the service, swaps the program and returns the service to the state
 it found: running if it was running, stopped if you had stopped it. A failed
-check or stop leaves the old installation as it was. State is not touched.
+check or stop leaves the old installation in place; if the replacement fails
+to start, the installer restores the previous program. State is not touched.
 
 A new version that changes the database schema is refused before the installed
 program is replaced. It says which versions are involved and changes nothing.
@@ -283,21 +274,26 @@ an authorized source checkout using Node.js 22 and locked dependencies:
 ```bash
 npm ci
 npm run package
-cd dist
-shasum -a 256 hallvi-0.1.0.tgz > hallvi-0.1.0.tgz.sha256
 ```
 
-On Linux, use `sha256sum` instead of `shasum -a 256`. Substitute the package
-version if it differs. Distribute the archive and checksum together, with the
-source revision and the verification performed on that candidate. The
-[beta walkthrough](beta-walkthrough.md) defines the fresh-user acceptance check.
+Run `npm run package` once on Apple-silicon macOS and once on Ubuntu 24.04
+x64. It downloads pinned Node.js 22 from nodejs.org, checks its published
+SHA-256 value, builds the app and installs locked production dependencies on
+that platform. It verifies the native modules load, then writes
+`dist/hallvi-0.1.0-<platform>.tgz`, its `.sha256`, and
+`dist/install-hallvi.sh`. Distribute the three files together with the source
+revision and verification performed on that candidate. The
+[beta walkthrough](beta-walkthrough.md) defines the fresh-user acceptance
+check. Packaging does not publish a release.
 
-The archive contains the built interface, Pi worker, schema, lockfile and
-installer. The same archive targets every supported platform; dependencies
-are installed on the recipient's machine. The installer downloads Node.js 24
-from nodejs.org, verifies its published checksum and keeps it inside the
-program directory. Users still need the compiler prerequisites above, but not Node.js 22 or
-a source checkout.
+When packaging from a source copy without `.git`, set
+`HALLVI_SOURCE_REVISION` to the full commit SHA that copy came from. The
+archive records it in `dist/release.json`.
+
+The archive contains the built interface, separate Pi worker, schema, Node.js
+22 and production dependencies. The recipient does not run `npm ci` or compile
+native modules. Native code is tied to its operating system, architecture,
+Node ABI and Linux C library; build and verify each advertised target.
 
 Development remains separate: `npm run dev` in a checkout, described in the
 [README](../README.md#development). An installation and a development checkout
@@ -306,12 +302,14 @@ do not share a database by default.
 ## Limits today
 
 - No download link or signed release; the package is built from a checkout.
-- The service has been exercised on Apple-silicon macOS and Ubuntu 24.04 x64.
-  macOS Intel, Linux arm64 and other Linux distributions are installation
-  targets, not completed beta acceptance checks. See the
-  [dated installation evidence](testing/2026-09-17-installation.md) and the
-  [current rehearsal](testing/2026-09-18-beta-rehearsal.md).
-- Native dependencies can compile during installation, so a compiler is required.
+  Public binaries with private source versus invited testers with repository
+  access remains an owner decision. Shipped JavaScript can be inspected even
+  when the source repository is private.
+- The former archive was exercised on Apple-silicon macOS and Ubuntu 24.04
+  x64. That [dated evidence](testing/2026-09-17-installation.md) does not
+  certify this prebuilt package; each candidate needs its own trial.
+- macOS Intel, Linux arm64 and other Linux distributions have no prebuilt
+  release target yet.
 - No schema migrations between versions (see Upgrade).
 - Pi's repository workspace still needs Docker. Running it directly on the
   machine is decided in the concept note and is a separate change.

@@ -27,7 +27,13 @@ export const disconnectGithubSchema = z.strictObject({
 });
 
 type LoginStatus =
-  "starting" | "waiting" | "connected" | "cancelled" | "expired" | "failed";
+  | "starting"
+  | "waiting"
+  | "connected"
+  | "cancelled"
+  | "denied"
+  | "expired"
+  | "failed";
 export interface GithubLoginAttempt {
   id: string;
   status: LoginStatus;
@@ -146,7 +152,7 @@ export async function startGithubLogin(): Promise<GithubLoginAttempt> {
   const app = githubAppRegistration();
   if (!app)
     throw new GithubAccessError(
-      "Configure Hallvi’s GitHub App client ID and slug before connecting an account.",
+      "Private repository connection is not configured in this Hallvi release. Public repositories still work without GitHub sign-in.",
     );
   const state = coordinator();
   if (
@@ -257,12 +263,14 @@ export async function pollGithubLogin(id: string): Promise<GithubLoginAttempt> {
           failure.data.error === "expired_token"
             ? "expired"
             : failure.data.error === "access_denied"
-              ? "cancelled"
+              ? "denied"
               : "failed";
         attempt.view.message =
           failure.data.error === "access_denied"
-            ? "GitHub sign-in was cancelled."
-            : "GitHub sign-in ended. Start again.";
+            ? "GitHub denied this sign-in. Start again if you want to connect."
+            : failure.data.error === "expired_token"
+              ? "The GitHub code expired. Start sign-in again."
+              : "GitHub sign-in ended. Start again.";
         attempt.deviceCode = undefined;
         return publicAttempt(attempt);
       }

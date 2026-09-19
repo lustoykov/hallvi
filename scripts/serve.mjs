@@ -54,6 +54,21 @@ if (!checkingInstalled) mkdirSync(data, { recursive: true, mode: 0o700 });
 // Settings an installation keeps for itself, such as the GitHub App's client
 // ID. Values already in the environment win, as they do for `--env-file`.
 if (existsSync(state.settings)) process.loadEnvFile(state.settings);
+// A release can carry its distributor's public App identity. Local settings
+// can deliberately replace it, but a partially configured local override is
+// never mixed with the release's other value.
+const releaseGithubApp = join(program, "dist", "github-app.json");
+if (
+  existsSync(releaseGithubApp) &&
+  !process.env.HALLVI_GITHUB_CLIENT_ID &&
+  !process.env.HALLVI_GITHUB_APP_SLUG
+) {
+  const app = JSON.parse(readFileSync(releaseGithubApp, "utf8"));
+  if (app.clientId && app.slug) {
+    process.env.HALLVI_GITHUB_CLIENT_ID = app.clientId;
+    process.env.HALLVI_GITHUB_APP_SLUG = app.slug;
+  }
+}
 
 // The model account stays where development keeps it, so a machine that
 // already connected ChatGPT does not connect again. An owner who moves the

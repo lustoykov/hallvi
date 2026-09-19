@@ -424,6 +424,13 @@ export function PiSetupScreen({
                       >
                         Open OpenAI &amp; enter code <ArrowSquareOut />
                       </a>
+                      <p className={s.hint}>
+                        On another browser, open{" "}
+                        <code className={s.verificationUrl}>
+                          {attempt.verificationUri}
+                        </code>
+                        .
+                      </p>
                       {attempt.expiresAt && (
                         <p className={s.hint}>
                           Code expires at{" "}
