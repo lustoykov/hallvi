@@ -5,6 +5,9 @@
 // is the Timeline the owner chose on 10 Sep 2026; under it sit the map in
 // miniature, recent work, and one quiet line of ideas.
 
+import { useSearchParams } from "next/navigation";
+import { OverviewAlternatives } from "../overview-alternatives-prototype/alternatives";
+
 import { ArrowRight, CaretDown, Lightbulb } from "@phosphor-icons/react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -60,6 +63,13 @@ export function OverviewDirection({
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
 }) {
+  const search = useSearchParams();
+  const requested = search.get("variant");
+  const variant =
+    process.env.NODE_ENV !== "production" &&
+    (requested === "A" || requested === "B" || requested === "C")
+      ? requested
+      : null;
   const fallback = useMemo(
     () => buildOverview({ model, operations, chats, onOpenConversation }),
     [model, operations, chats, onOpenConversation],
@@ -89,7 +99,7 @@ export function OverviewDirection({
         {page.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
         <div className="axj3-title">
           <h1>Overview</h1>
-          {!planned && (
+          {!planned && !variant && (
             <AccessLink
               openUrl={page.openUrl}
               name={model.headline}
@@ -101,20 +111,29 @@ export function OverviewDirection({
         </div>
       </header>
 
-      <TimelineHero
-        model={model}
-        record={record}
-        overview={overview}
-        recheck={recheck}
-        page={page}
-        offset={offset}
-        pointed={pointed}
-        onPoint={setPointed}
-        onShow={openArchitecture}
-        onAsk={onAsk}
-        onOpenDestination={onOpenDestination}
-        timeline={timeline}
-      />
+      {variant && timeline ? (
+        <OverviewAlternatives
+          variant={variant}
+          overview={overview}
+          timeline={timeline}
+          model={model}
+        />
+      ) : (
+        <TimelineHero
+          model={model}
+          record={record}
+          overview={overview}
+          recheck={recheck}
+          page={page}
+          offset={offset}
+          pointed={pointed}
+          onPoint={setPointed}
+          onShow={openArchitecture}
+          onAsk={onAsk}
+          onOpenDestination={onOpenDestination}
+          timeline={timeline}
+        />
+      )}
 
       <div className="axo-lower">
         <MiniMap

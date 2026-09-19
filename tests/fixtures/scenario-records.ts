@@ -135,7 +135,15 @@ export function scenarios(): Scenario[] {
   const serving = "aaaaaaaa-0000-4000-8000-000000000009";
   const backupFailed = "aaaaaaaa-0000-4000-8000-00000000000a";
 
+  const overviewPreview = "eeeeeeee-0000-4000-8000-000000000019";
   return [
+    {
+      id: overviewPreview,
+      name: "Scenario · Overview design review",
+      shows:
+        "Synthetic reconstruction of the owner's screenshot: old checks, untested backup copies, and closed access. UI comparison only.",
+      records: overviewPreviewRecords(overviewPreview),
+    },
     {
       id: failing,
       name: "Scenario · failing",
@@ -1784,5 +1792,101 @@ function servingExecutions(): ScenarioExecution[] {
       exitCode: 0,
       ago: 4 * MINUTE,
     },
+  ];
+}
+
+// Throwaway fixture for the Overview alternatives. No owner data is read.
+function overviewPreviewRecords(id: string): SavedInformation[] {
+  const base = notesRecords(id).map((item) => ({
+    ...item,
+    establishedAt: ago(11 * HOUR),
+    createdAt: ago(11 * HOUR),
+    updatedAt: ago(11 * HOUR),
+  }));
+  return [
+    ...base,
+    states(
+      id,
+      { kind: "application", id },
+      {
+        at: ago(11 * HOUR),
+        title: "Notes",
+        views: ["architecture", "overview"],
+        content: {
+          kind: "topology",
+          from: "observed",
+          parts: [
+            {
+              id: "notes-host",
+              kind: "host",
+              name: "Notes server",
+              role: "the application server",
+              plain: "the server",
+            },
+            {
+              id: "notes",
+              kind: "web",
+              name: "Notes",
+              role: "the application",
+              plain: "your notes application",
+            },
+            {
+              id: "notes-data",
+              kind: "volume",
+              name: "Saved notes",
+              role: "application data",
+              plain: "your saved notes",
+            },
+          ],
+          edges: [
+            { from: "notes-host", to: "notes", network: "private" },
+            { from: "notes", to: "notes-data", network: "disk" },
+          ],
+        },
+      },
+    ),
+    record(id, {
+      at: ago(11 * HOUR),
+      title: "The application passed its checks",
+      about: [{ kind: "application", id }],
+      checks: [
+        check("http", "passed", "liveness", { label: "Application responded" }),
+        check("read", "passed", "liveness", { label: "Saved notes opened" }),
+      ],
+    }),
+    states(
+      id,
+      { kind: "backup-plan", id: "overview-nightly" },
+      {
+        at: ago(60 * HOUR),
+        title: "Backups set up",
+        views: ["backups", "overview"],
+        facts: [
+          fact("covers", "notes-data"),
+          fact("destination", "Separate backup storage"),
+          fact("destination-kind", "off-site"),
+          fact("schedule", "Daily", "configuration", "planned"),
+        ],
+        checks: [check("configured", "passed", "configuration")],
+      },
+    ),
+    ...[36, 16].map((hours, index) =>
+      states(
+        id,
+        { kind: "backup-copy", id: `overview-copy-${index}` },
+        {
+          at: ago(hours * HOUR),
+          title: "Backup copied",
+          views: ["backups", "overview"],
+          facts: [
+            fact("plan", "overview-nightly"),
+            fact("covers", "notes-data"),
+            fact("destination", "Separate backup storage"),
+            fact("destination-kind", "off-site"),
+          ],
+          checks: [check("written", "passed", "identity")],
+        },
+      ),
+    ),
   ];
 }
