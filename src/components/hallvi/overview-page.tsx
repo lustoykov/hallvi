@@ -24,6 +24,8 @@ import {
   logFromRecords,
   overviewFromRecords,
 } from "./overview-records";
+import { usageFromRecords } from "./monitoring-records";
+import { OverviewLive } from "./overview-live/overview-live";
 import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag } from "./presentation";
@@ -207,6 +209,10 @@ export function OverviewPage({
     () => overviewReturnVisit(records, application),
     [records, application],
   );
+  const usage = useMemo(
+    () => usageFromRecords(records, application.id),
+    [records, application.id],
+  );
 
   // Where the application answers, from the record that says so.
   const openUrl =
@@ -217,6 +223,29 @@ export function OverviewPage({
           record.presentation?.content?.kind === "application-access" &&
           record.presentation.url,
       )?.presentation?.url ?? null;
+
+  // Deployed: the page is what is happening now, around what is recorded.
+  // Everything before that is still a journey, and keeps its own pages.
+  if (returnVisit.deployed)
+    return (
+      <OverviewLive
+        applicationId={application.id}
+        name={application.name}
+        title={model?.headline ?? application.name}
+        mapped={Boolean(model)}
+        built={built}
+        usage={usage}
+        condition={condition}
+        now={now}
+        chrome={chrome}
+        openUrl={openUrl}
+        restricted={model?.restricted ?? false}
+        reachable={reachable}
+        onReopen={onReopen}
+        onAsk={onAsk}
+        onOpenDestination={onOpenDestination}
+      />
+    );
 
   if (model) {
     const live: LiveRecord = { application };

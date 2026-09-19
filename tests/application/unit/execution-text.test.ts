@@ -146,8 +146,8 @@ describe("the full payload, for a disclosure", () => {
 
 describe("which machine a command ran on", () => {
   // The console printed "on your server" over a shell command and the raw
-  // recorded target over everything else, so a container on this Mac, a
-  // tunnel this Mac holds open and a call to Hetzner all arrived as prose the
+  // recorded target over everything else, so a container on this PC, a
+  // tunnel this PC holds open and a call to Hetzner all arrived as prose the
   // reader had to decode — and the one that can break the application read
   // like the rest of them.
 
@@ -162,11 +162,11 @@ describe("which machine a command ran on", () => {
       whereItRan({ tool: "bash", target: "Repository workspace" }),
     ).toEqual({
       said: "In the repository copy",
-      detail: "a scratch copy on this Mac, not the server",
+      detail: "a scratch copy on this PC, not the server",
     });
   });
 
-  it("puts controller-side work on this Mac", () => {
+  it("puts controller-side work on this PC", () => {
     for (const tool of [
       "open_server_port",
       "server_public_key",
@@ -174,7 +174,7 @@ describe("which machine a command ran on", () => {
       "check_public_access",
     ])
       expect(whereItRan({ tool, target: "Private access" })?.said, tool).toBe(
-        "On this Mac",
+        "On this PC",
       );
   });
 

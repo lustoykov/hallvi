@@ -50,7 +50,7 @@ describe("offering a way in", () => {
       onAsk: () => undefined,
     });
     // Not "Reopen access": the owner asked what that meant, and the honest
-    // answer is that a connection this Mac holds open has dropped.
+    // answer is that a connection this PC holds open has dropped.
     expect(html).toContain("Open the connection again");
     expect(html).toContain("The tunnel is closed");
     // Never a link to an address that has just been found not to answer.
@@ -65,7 +65,7 @@ describe("offering a way in", () => {
       onAsk: () => undefined,
     });
     expect(html).toContain('href="http://127.0.0.1:18000"');
-    expect(html).toContain("from this Mac only");
+    expect(html).toContain("from this PC only");
   });
 
   it("says it is still checking rather than claiming the tunnel is up", () => {
@@ -78,8 +78,8 @@ describe("offering a way in", () => {
     expect(html).toContain("checking that the tunnel still answers");
   });
 
-  it("does not withhold a public address because this Mac's tunnel is down", () => {
-    // A public address is answered by the server, whatever this Mac is doing.
+  it("does not withhold a public address because this PC's tunnel is down", () => {
+    // A public address is answered by the server, whatever this PC is doing.
     const html = draw({
       view: view("public"),
       now: NOW,

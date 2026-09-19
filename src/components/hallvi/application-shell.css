@@ -387,15 +387,17 @@
   padding: 8px 10px;
   font-size: 13px;
 }
+/* Room on both sides of the groove: a lifted row beside it is a card, and a
+   card needs air before the line. */
 .hv-application-navigation .hv-nav-group-start {
-  margin-top: 12px;
+  margin-top: 19px;
   position: relative;
 }
 /* A groove rather than a rule: one dark hairline, one light under it. */
 .hv-nav-group-start::before {
   content: "";
   position: absolute;
-  top: -6px;
+  top: -10px;
   left: 0;
   right: 0;
   height: 2px;

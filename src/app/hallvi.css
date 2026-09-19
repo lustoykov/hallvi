@@ -916,9 +916,10 @@
   border: 0;
   border-radius: 8px;
   background: var(--blue);
+  box-shadow: var(--button-shadow);
   color: #fff;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 560;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -939,6 +940,7 @@
   transform: translateY(1px);
 }
 .hv-send:disabled {
+  box-shadow: none;
   background: #dfe5ef;
   color: #7d889d;
   cursor: not-allowed;
@@ -1211,13 +1213,13 @@
 
 .hv-primary-button,
 .hv-secondary-button {
-  min-height: 36px;
+  min-height: var(--button-height);
   padding: 0 14px;
   border-radius: var(--radius);
   border: 1px solid var(--blue);
   background: var(--blue);
   color: #fff;
-  font-weight: 600;
+  font-weight: 560;
   font-size: 13px;
   display: inline-flex;
   align-items: center;
@@ -1227,6 +1229,9 @@
   transition:
     background-color var(--fast) var(--ease),
     border-color var(--fast) var(--ease);
+}
+.hv-primary-button {
+  box-shadow: var(--button-shadow);
 }
 .hv-primary-button:disabled {
   opacity: 0.55;

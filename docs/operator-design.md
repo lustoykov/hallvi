@@ -143,6 +143,8 @@ The three modes are defined in [Product](../PRODUCT.md#permission-modes).
 
 Permissions govern execution independently of deployment, backup or other workflow categories. Workspace execution must be accounted for alongside server execution. An important published record is not automatically an approval request, and permission does not require manufacturing a release proposal.
 
+The modes govern what Pi composes. Hallvi's own fixed, read-only observations — the machine check, the way in, and requests as they arrive on Overview — are a closed list outside them; [Product](../PRODUCT.md#what-the-modes-cover) owns the list and the conditions an observation must meet.
+
 The executor runs tools, handles credentials and records execution output and known outcomes. Errors and incomplete results return to Pi, which investigates and corrects through the same general tools. Do not add dedicated recovery tools, reconciliation workflows, cleanup journals or a framework of pending-effect holds. A lost connection is reported honestly; Pi can inspect the host to determine what happened.
 
 [Jev](https://docs.typesafe.ai/introduction), TypeSafe's model for typed choices, scores and probabilities, is a viable candidate to test for failure triage: classify a bounded, redacted error excerpt as likely DNS, credentials, storage, application failure or insufficient evidence. Compare whether this helps Pi investigate faster than using the native error directly. These are provisional interpretations; Pi still verifies the cause. Jev has not been evaluated or selected for Hallvi, and typed outputs do not guarantee correct judgments.

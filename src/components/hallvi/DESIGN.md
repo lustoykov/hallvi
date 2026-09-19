@@ -87,8 +87,9 @@ components:
   button-primary:
     backgroundColor: "{colors.blue}"
     textColor: "{colors.surface}"
-    rounded: "{rounded.control}"
-    padding: "8px 12px"
+    rounded: "{rounded.card}"
+    height: "34px"
+    padding: "0 14px"
   button-primary-hover:
     backgroundColor: "{colors.blue-hover}"
   button-secondary:
@@ -222,7 +223,9 @@ Pi decides what a view says. This decides how it is said, so a destination nobod
 
 **Motion is for state, not arrival.** `--fast` for the press of a control, `--base` for a state changing, nothing on page entrance. Every transition has a reduced-motion answer in the same file.
 
-**Overview uses the chosen Timeline composition.** The live route uses the reference layout: an application action in the header, a hero of four rails (Checks, Backups, Server, Access; `lane-rails.tsx`, shared with Database), a dark recorded-work log, then an architecture miniature and recent work. It reads shared records directly; the prototype scenario engine and retired operation model do not run here. Check `subject` places an observation on its lane, and `establishedAt` places it in time. A mark proves an observation at that time, never continuous uptime or a backup schedule. Missing evidence reads “Not established”. Clicking a mark opens its original record. Since 17 September the lanes are rails, not dots on a time axis: stops are evenly spaced and worded as things that happened, the quiet between them is written on the line, each lane opens with the question it answers and one plain sentence, only the stretch from the last stop to now wears the lane's state, and "Earlier" pages back through history. Kept deliberately quiet: hairline rails, small rings, colour only on that last stretch.
+**Overview is live once there is something to be live about (19 September).** A page built on a last-known state is stale between looks, so for an application with a verified deployment the largest thing on Overview is not a state: it is the proxy's access log, followed over SSH while the page is open (`overview-live/`, `src/server/access-log.ts`). Requests are drawn as threads — a lane is a bundle of hairlines fanning from the application to one group of paths, as wide as its share of the last five minutes, and a request is a short streak of light along one thread. Nothing moves unless a real line was written; a failed request runs out part way and leaves one small red ring; backlog is counted but never replayed as if it were happening now. Addresses and query strings stay on the controller. Around it sit recorded tiles, each saying when it was true: the way in, the log as it is written, the last day Hallvi read, what wants the owner, speed, what has been assessed, what happened. With no `access-log` record the tile says nobody has looked and offers to ask — never an empty picture that reads as no traffic. One light tint for the live tile, no dark surfaces. Chosen from a switchable prototype on the real route over four rounds; the options and the verdict are on the `prototype/landing-page-directions` branch.
+
+**Before a verified deployment, Overview keeps the Timeline composition.** That route uses the reference layout: an application action in the header, a hero of four rails (Checks, Backups, Server, Access; `lane-rails.tsx`, shared with Database), a dark recorded-work log, then an architecture miniature and recent work. It reads shared records directly; the prototype scenario engine and retired operation model do not run here. Check `subject` places an observation on its lane, and `establishedAt` places it in time. A mark proves an observation at that time, never continuous uptime or a backup schedule. Missing evidence reads “Not established”. Clicking a mark opens its original record. Since 17 September the lanes are rails, not dots on a time axis: stops are evenly spaced and worded as things that happened, the quiet between them is written on the line, each lane opens with the question it answers and one plain sentence, only the stretch from the last stop to now wears the lane's state, and "Earlier" pages back through history. Kept deliberately quiet: hairline rails, small rings, colour only on that last stretch.
 
 **Typed content keeps meaning separate from layout.** Deployment results expose source, running image, material changes and checks; application access exposes the entry point and, for private access, the SSH route. Chat folds deployment details. Overview gives the application link prominence; destination views expand the relevant details. Both render the same saved record and reuse the certainty tag, body disclosure, timestamps and tone tokens. `presentation.content.kind` selects these product-owned components; Pi never supplies layout or styling.
 
@@ -474,7 +477,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 
 ### Buttons and fields
 
-Inherited: blue primary with a 7px radius, white secondary, password inputs with a `field-line` border. Inside records the primary button is 8px by 12px and the input 8px by 10px at 12px type.
+One primary button everywhere (19 September): 34px tall (`--button-height`), 0 by 14px padding, 13px at weight 560, 8px radius, 15px icons, action blue with `--button-shadow` — a faint top light and a short shadow — so it reads as the action without sheer size. The home call to action, the setup and connection footers, the new-application form, dialogs and the Deployment “Open” button all use it; none is 44px or full-width on desktop. Secondary buttons share the height on white with a `field-line` border and no shadow. Smaller variants stay small and take the same shadow: the 32px Send, the 30px in-transcript retry and record pills, the onboarding rail start. Every primary uses `--blue` and `--blue-hover`; no file hard-codes its own blue. Password inputs keep a `field-line` border; inside records the input is 8px by 10px at 12px type.
 
 ## Do's and Don'ts
 

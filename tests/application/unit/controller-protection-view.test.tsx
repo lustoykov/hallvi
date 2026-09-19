@@ -63,7 +63,7 @@ const draw = (
 
 it("keeps recoverable controller protection in one compact disclosure", () => {
   const markup = draw([PLAN()], controller());
-  expect(markup.split("Hallvi on this Mac")).toHaveLength(3);
+  expect(markup.split("Hallvi on this PC")).toHaveLength(3);
   expect(markup).toContain("recovery kit saved");
   expect(markup).toContain("It keeps the last 14 copies");
   expect(markup).not.toContain("Save your recovery kit");
@@ -96,7 +96,7 @@ it("uses the same truthful surface when application evidence is sparse", () => {
     }),
   );
   expect(markup).toContain("Nobody has looked at whether this application");
-  expect(markup).toContain("Hallvi on this Mac");
+  expect(markup).toContain("Hallvi on this PC");
   expect(markup).toContain("Not copied");
   expect(markup).toContain("Connect backup storage");
   expect(markup).toContain("Application data still needs its own backup plan");
@@ -104,7 +104,7 @@ it("uses the same truthful surface when application evidence is sparse", () => {
 
 it("keeps the controller disclosure present on a sparse recoverable page", () => {
   const markup = draw([], controller());
-  expect(markup).toContain("Hallvi on this Mac");
+  expect(markup).toContain("Hallvi on this PC");
   expect(markup).toContain("recovery kit saved");
   expect(markup).not.toContain("Save your recovery kit");
 });
@@ -132,5 +132,5 @@ it("shows an actual failed controller copy and its reason", () => {
 });
 
 it("says nothing about a controller it has no facts for", () => {
-  expect(draw([PLAN()])).not.toContain("Hallvi on this Mac");
+  expect(draw([PLAN()])).not.toContain("Hallvi on this PC");
 });

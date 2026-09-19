@@ -980,7 +980,7 @@ export function protectionVerdict(
             ? ""
             : ` The newest copy would also go with the server.${elsewhere}`),
       next: {
-        label: "Test a restore of the newest copy",
+        label: "Test the newest copy",
         draft:
           "Restore the newest backup copy — not an older one — into an isolated copy of this application, verify the data and files are actually there, and record which copy it proved.",
       },

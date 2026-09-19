@@ -72,7 +72,7 @@ export function ControllerProtectionBand({
   return (
     <details
       className="cpb"
-      aria-label="Hallvi on this Mac"
+      aria-label="Hallvi on this PC"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
@@ -85,7 +85,7 @@ export function ControllerProtectionBand({
           )}
         </span>
         <span className="cpb-summary-copy">
-          <b>Hallvi on this Mac</b>
+          <b>Hallvi on this PC</b>
           <small>{controllerSentence(facts, now)}</small>
         </span>
         <CaretRight className="cpb-chevron" weight="bold" aria-hidden="true" />
@@ -101,7 +101,7 @@ export function ControllerProtectionBand({
         ) : !facts.connected ? (
           <>
             <p className="cpb-say">
-              Losing this Mac would lose Hallvi’s conversations, connections,
+              Losing this PC would lose Hallvi’s conversations, connections,
               deployment access and decisions. Connect storage to copy those
               rebuild dependencies. Application data still needs its own backup
               plan.
