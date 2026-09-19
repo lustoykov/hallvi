@@ -42,7 +42,7 @@ import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
 import { hasActivity, PiActivity } from "./pi-activity";
-import { useOffScreen } from "./use-off-screen";
+import { WorkingMascot } from "./working-mascot";
 import {
   runActivity,
   runFailure,
@@ -194,7 +194,10 @@ function Doing({ activity }: { activity: RunActivity }) {
   const clock = useClockReady();
   return (
     <>
-      <span data-waiting={activity.waitingOnYou || undefined}>
+      <span
+        className={activity.waitingOnYou ? undefined : "hv-sheen"}
+        data-waiting={activity.waitingOnYou || undefined}
+      >
         {activity.says}
       </span>
       {clock && activity.since && (
@@ -449,10 +452,6 @@ export function ChatPane({
     now,
   });
   /** Whether the transcript shortcut is useful beside the persistent status. */
-  const inFlightAway = useOffScreen(
-    inFlight ? `hv-message-${inFlight.id}` : null,
-    Boolean(inFlight),
-  );
   const requestPending = view.messages.some(
     (message) => message.status === "queued" || message.status === "running",
   );
@@ -544,6 +543,12 @@ export function ChatPane({
   const showFirstWelcome =
     firstConversation && !requestPending && pendingMessage === null;
 
+  const stopLabel =
+    inFlight?.status === "queued"
+      ? "Cancel queued message"
+      : queuedFollowUps > 0
+        ? `Stop + cancel ${queuedFollowUps} queued`
+        : "Stop";
   return (
     <section className="hv-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -649,7 +654,7 @@ export function ChatPane({
                           : "Recorded event"}
                       </span>
                     )}
-                    {provisional && (
+                    {provisional && message.status !== "running" && (
                       <span
                         className={`hv-source-tag ${inProgress ? "live" : "failed"}`}
                       >
@@ -843,6 +848,20 @@ export function ChatPane({
                     onOpen={openDestination}
                   />
                   {receipts(anchored.get(message.id))}
+                  {/* The one live line of a turn, at the end of the reply it
+                      belongs to. The words carry the motion; Little Server
+                      visits now and then. Stop lives in the composer. */}
+                  {message.id === inFlight?.id && (
+                    <div className="hv-still-working">
+                      {workerAlive !== false && (
+                        <SpinnerGap className="spin" aria-hidden="true" />
+                      )}
+                      <span className="hv-still-what" role="status">
+                        <Doing activity={inFlightActivity} />
+                      </span>
+                      {workerAlive !== false && <WorkingMascot />}
+                    </div>
+                  )}
                 </Message>
                 {/* The request Pi raised on this message, drawn at the point
                     it was asked rather than wherever the reader is now. */}
@@ -940,54 +959,6 @@ export function ChatPane({
             placement="progress"
           />
         )}
-
-      {/* One persistent owner for live turn status and its stop action. It
-          follows the deployment phases so the current work is nearest the
-          composer even when a long reply has scrolled its heading away. */}
-      {inFlight && (
-        <div className="hv-still-working">
-          {workerAlive !== false && (
-            <SpinnerGap className="spin" aria-hidden="true" />
-          )}
-          <span className="hv-still-what" role="status">
-            <Doing activity={inFlightActivity} />
-          </span>
-          {inFlightAway && (
-            <button
-              type="button"
-              className="hv-still-show"
-              onClick={() =>
-                document
-                  .getElementById(`hv-message-${inFlight.id}`)
-                  ?.scrollIntoView({
-                    block: "center",
-                    behavior: window.matchMedia(
-                      "(prefers-reduced-motion: reduce)",
-                    ).matches
-                      ? "auto"
-                      : "smooth",
-                  })
-              }
-            >
-              Show
-            </button>
-          )}
-          {inFlightRun && !readOnly && (
-            <button
-              type="button"
-              className="hv-run-stop"
-              disabled={busy !== null}
-              onClick={() => onRunAction(inFlightRun.id, "cancel")}
-            >
-              {inFlight.status === "queued"
-                ? "Cancel queued message"
-                : queuedFollowUps > 0
-                  ? `Stop + cancel ${queuedFollowUps} queued`
-                  : "Stop"}
-            </button>
-          )}
-        </div>
-      )}
 
       <form
         className="hv-composer"
@@ -1124,18 +1095,33 @@ export function ChatPane({
                 <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
               </span>
             </span>
-            <button
-              className="hv-send"
-              disabled={!composer.trim() || sendDisabled || busy !== null}
-              type="submit"
-            >
-              {busy === "message" ? (
-                <SpinnerGap className="spin" aria-hidden="true" />
-              ) : (
-                <PaperPlaneRight weight="fill" aria-hidden="true" />
-              )}
-              {requestPending ? "Send next" : "Send"}
-            </button>
+            {/* While a turn runs and nothing is typed, Send's place is Stop.
+                Typing brings Send next back, so a follow-up can be queued. */}
+            {inFlightRun && !readOnly && !composer.trim() ? (
+              <button
+                className="hv-stop"
+                disabled={busy !== null}
+                type="button"
+                aria-label={stopLabel}
+                title={stopLabel}
+                onClick={() => onRunAction(inFlightRun.id, "cancel")}
+              >
+                <i aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                className="hv-send"
+                disabled={!composer.trim() || sendDisabled || busy !== null}
+                type="submit"
+              >
+                {busy === "message" ? (
+                  <SpinnerGap className="spin" aria-hidden="true" />
+                ) : (
+                  <PaperPlaneRight weight="fill" aria-hidden="true" />
+                )}
+                {requestPending ? "Send next" : "Send"}
+              </button>
+            )}
           </div>
         </div>
       </form>

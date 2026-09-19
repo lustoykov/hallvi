@@ -1234,6 +1234,22 @@
   cursor: default;
   opacity: 0.7;
 }
+/* In the column the application is the first lifted thing. */
+.hv-identity-navigation .hv-identity {
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #fff, #fbfcfe);
+  box-shadow: var(--raise);
+}
+.hv-identity-navigation .hv-identity:hover {
+  background: #fff;
+}
+.hv-identity-navigation .hv-identity-mark {
+  background: linear-gradient(160deg, #35466a, #172238);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 22%),
+    0 1px 2px rgb(var(--shade) / 35%);
+}
 .hv-navigation-head {
   display: flex;
   flex-direction: column;

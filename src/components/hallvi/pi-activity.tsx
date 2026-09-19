@@ -31,7 +31,6 @@ import {
   MagnifyingGlass,
   PencilSimple,
   Question,
-  SpinnerGap,
   Terminal,
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
@@ -383,7 +382,10 @@ function Quiet({
         onClick={() => setOpen(!open)}
       >
         <CaretRight weight="bold" aria-hidden="true" />
-        <span>{summarise(records)}</span>
+        {/* Running is said by the words themselves, once. */}
+        <span className={working ? "hv-sheen" : undefined}>
+          {summarise(records)}
+        </span>
         {place && (
           <span className="hv-did-where">
             {place}
@@ -402,16 +404,7 @@ function Quiet({
             "+1" beside "2 failed" reads as twelve failures. */}
         <span className="hv-did-gap" aria-hidden="true" />
         <em>
-          {working ? (
-            <>
-              <SpinnerGap
-                weight="bold"
-                aria-hidden="true"
-                className="hv-did-spin"
-              />
-              working
-            </>
-          ) : wrong ? (
+          {wrong && !working ? (
             // A decline is the reader's own decision and a stop is their
             // interruption; neither is an error, and colouring them like one
             // would teach them to distrust the colour.
@@ -454,27 +447,22 @@ function Row({ record }: { record: ActivityRecord }) {
         onClick={() => setOpen(!open)}
       >
         <Icon weight="regular" aria-hidden="true" />
-        <span className="hv-did-verb">{verb}</span>
+        <span
+          className={`hv-did-verb${record.status === "running" ? " hv-sheen" : ""}`}
+        >
+          {verb}
+        </span>
         {detail && <span className="hv-did-subject">{detail}</span>}
         <span className="hv-did-state">
-          {record.status === "running" ? (
-            <>
-              <SpinnerGap
-                weight="bold"
-                aria-hidden="true"
-                className="hv-did-spin"
-              />
-              working
-            </>
-          ) : record.status === "declined" ? (
-            "not run"
-          ) : record.status === "interrupted" ? (
-            "stopped"
-          ) : record.status === "failed" ? (
-            "failed"
-          ) : (
-            (took ?? "")
-          )}
+          {record.status === "running"
+            ? ""
+            : record.status === "declined"
+              ? "not run"
+              : record.status === "interrupted"
+                ? "stopped"
+                : record.status === "failed"
+                  ? "failed"
+                  : (took ?? "")}
         </span>
       </button>
       {open && (

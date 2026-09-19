@@ -163,17 +163,6 @@
   color: var(--failed, #a6312b);
 }
 
-.hv-did-spin {
-  font-size: 11px;
-  color: var(--muted, #687183);
-  animation: hv-did-spin 0.9s linear infinite;
-}
-@keyframes hv-did-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* ---------- What a call actually said ---------- */
 
 .hv-did-detail {
@@ -215,9 +204,6 @@
   .hv-did-head > svg {
     transition-duration: 1ms;
   }
-  .hv-did-spin {
-    animation-duration: 2.4s;
-  }
 }
 
 /* One mark per call, in the order they ran.
@@ -251,22 +237,11 @@
 }
 .hv-did-marks i[data-outcome="running"] {
   background: var(--working-text, #2852a6);
-  animation: hv-did-pulse 1.6s ease-in-out infinite;
 }
 .hv-did-marks b {
   font-size: 10.5px;
   font-weight: 500;
   color: var(--faint, #8b95a5);
-}
-@keyframes hv-did-pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hv-did-marks i[data-outcome="running"] {
-    animation: none;
-  }
 }
 
 /* A failure says so in its own colour, and its group opens itself. A decline

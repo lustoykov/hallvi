@@ -6,7 +6,11 @@ colors:
   muted: "#687183"
   line: "#e7e9ee"
   surface: "#ffffff"
-  navigation: "#f7f8fa"
+  navigation-top: "#e9eef9"
+  navigation-bottom: "#e1e8f6"
+  navigation-groove: "#d2dbee"
+  navigation-text: "#344363"
+  shade: "rgb(28 52 110)"
   context: "#fafbfc"
   blue: "#285ad8"
   blue-hover: "#2350c4"
@@ -97,10 +101,10 @@ components:
     rounded: "{rounded.control}"
     padding: "10px"
   navigation-selected:
-    backgroundColor: "{colors.selected-bg}"
-    textColor: "{colors.selected-text}"
-    rounded: "{rounded.control}"
-    padding: "10px"
+    backgroundColor: "{colors.surface}"
+    textColor: "#172238"
+    rounded: "9px"
+    padding: "8px 10px"
   architecture-card:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.container}"
@@ -294,13 +298,26 @@ destination, or the current conversation. There
 is one place to switch application. `application-identity.tsx` also carries
 `topbar` and `breadcrumb` placements, compared live in `/prototype/shell`.
 
-Conversation progress stays beside the composer. Before the first request,
-the welcome explains the next action. During first setup, a compact row shows
-the four recorded milestones: Read it, A place to run, Deploy, Open it. A
-separate live line immediately below says what Hallvi is doing now, with
-elapsed time and Stop. That live status has one visible owner; it does not
-repeat above the transcript or inside the active reply. Completed setup removes
-the milestones, while later turns keep the same live activity position.
+Before the first request, the welcome explains the next action. During first
+setup, a compact row beside the composer shows the four recorded milestones:
+Read it, A place to run, Deploy, Open it. Completed setup removes it.
+
+**Hallvi working (19 September).** A running turn has one live line, at the end
+of the reply it belongs to: a small spinner, what Hallvi is doing now, and the
+elapsed time. It has no box and no button. "Running" is said once per thing and
+by the words themselves — `.hv-sheen`, a slow band of ink over muted text — on
+the live line, on a running group in the transcript and on a running call
+inside it; nothing pairs a spinner with the word "working", the running reply
+wears no "Draft" tag, and a server command's card leaves "Running" to its own
+terminal bar. Little Server (`working-mascot.tsx`, flat, 30px) rises from
+behind the end of the live line for about five seconds in every eighteen,
+tightens something and goes; his slot is always reserved so the words never
+move, and he is absent under reduced motion. Stop is an icon — a ring with a
+square — in Send's place in the composer while a turn runs and nothing is
+typed; the first character brings "Send next" back. Its accessible name says
+what it cancels ("Stop + cancel 1 queued"). Chosen from a switchable prototype
+on the real shell; the options and the verdict are on the
+`prototype/ux-sidebar-and-working` branch.
 
 ## Conversation-first design language from Fable
 
@@ -318,7 +335,8 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 ### Neutral
 
 - **Ink, muted, line** (`ink`, `muted`, `line`): text, secondary text and separators, scoped to the shell as before.
-- **Surfaces** (`surface`, `navigation`, `context`, `card-surface`): white work surfaces, the cool grey navigation column, the tinted bars and headers, and the faintly blue card surface for approval and activity cards.
+- **Surfaces** (`surface`, `context`, `card-surface`): white work surfaces, the tinted bars and headers, and the faintly blue card surface for approval and activity cards.
+- **The column** (`navigation-top` to `navigation-bottom`, `navigation-groove`, `navigation-text`): a faint tint of the action blue, recessed behind the white workspace. `shade` is the one blue-navy every shadow in the shell is mixed from, so depth reads as one light.
 - **Inspected grey** (`inspected-bg` with `muted` text): the chip for a read-only inspection. Grey because reading changes nothing.
 
 ### State
@@ -363,9 +381,9 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 ## Layout
 
-The workspace shell is unchanged: a 240px navigation column, a 56px top bar, and a workspace that fills the rest. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
+The workspace shell: a 240px navigation column, a 56px top bar, and a workspace that fills the rest. Beside the column the top bar and workspace form one sheet, its top-left corner rounded 14px and set 8px down, casting a soft shadow onto the column; on a phone the navigation is a strip above it and there is no sheet edge. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
 
-A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”, and, when work elsewhere is live, a suggestion chip. While a destination is open and an action is working or waiting, the top bar shows a **work strip** on the right: state chip, action title, nothing else. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit label becomes “Send next”; queued text has an explicit waiting state. Stop also cancels queued follow-ups in that conversation. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.
+A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”, and, when work elsewhere is live, a suggestion chip. While a destination is open and an action is working or waiting, the top bar shows a **work strip** on the right: state chip, action title, nothing else. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit control is the Stop icon until something is typed, then “Send next”; queued text has an explicit waiting state. Stop also cancels queued follow-ups in that conversation. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.
 
 Receipts sit under the message that started the work, inside the message column, and stretch to the message width. Activity cards and origin lines sit at the top of a destination’s content, above the first heading, so the first thing a view says is what is happening to it right now.
 
@@ -375,13 +393,13 @@ The dark bar at the very bottom of the exploration (variant tabs, scenario stepp
 
 ## Elevation & Depth
 
-Flat, as before. State is carried by tint and one-pixel borders, not by shadow. A receipt, approval card or activity card is a bordered rectangle on white; its state tints the border (`working-line`, `waiting-line`, `failed-line`) and sometimes the surface (`waiting-surface`, `failed-surface`, `card-surface`). Focus stays a two-pixel blue outline.
+Two levels, one light (19 September). The navigation column is recessed; the workspace is a sheet resting on it. Within the column, what is selected is lifted off it (`--raise`: a hairline ring and a short shadow on white): the application identity, the selected destination or conversation, and the new-conversation button. Group separators are grooves — one dark hairline with a light one under it — rather than rules. On the sheet, top-level cards keep their one-pixel border and gain `--lift`, a short soft shadow: the composer, command cards, and each destination's lead cards. Both shadows are mixed from `shade`. Focus stays a two-pixel blue outline; the composer's focus ring sits over its lift.
 
-The only shadow in the conversation-first option belongs to the exploration bar. The floating window of option D used `--shadow-l`; it is not part of this language.
+State is still carried by tint and one-pixel borders. A receipt, approval card or activity card is a bordered rectangle on white; its state tints the border (`working-line`, `waiting-line`, `failed-line`) and sometimes the surface (`waiting-surface`, `failed-surface`, `card-surface`).
 
 ### Named Rules
 
-**The Tint, Not Shadow Rule.** If a card needs to say something about state, change its border or surface tint. Never lift it.
+**The Tint, Not Shadow Rule.** Depth says where something sits — column, sheet, card — and never what state it is in. If a card needs to say something about state, change its border or surface tint. Never lift it further.
 
 ## Shapes
 
@@ -477,7 +495,8 @@ Inherited: blue primary with a 7px radius, white secondary, password inputs with
 - **Don't** put the same approval card in two places at once in this option; the decision lives in the receipt.
 - **For existing receipts**, use their established states and tints consistently. New shared-record presentation is designed around the deployment journey rather than forced into this operation state model.
 - **Do** use designed presentation components. Pi chooses content and placement; the current operation fields are not a required schema for new shared records.
-- **Don't** lift a card with a shadow to signal state.
+- **Don't** lift a card with a shadow to signal state; `--lift` is the same on every card.
+- **Don't** put a spinner beside the word "working", or a second "Running" on something that already says it.
 
 
 ## Application journey polish (9 September)
