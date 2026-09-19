@@ -1,4 +1,4 @@
-import { openConversation, openHistory } from "./workspace-helpers";
+import { openConversation } from "./workspace-helpers";
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
 
@@ -37,7 +37,7 @@ test(
     expect(new URL(secondChatUrl).searchParams.get("chat")).toMatch(
       /^[\da-f-]{36}$/,
     );
-    await page.getByRole("button", { name: "Deploy application" }).click();
+    await page.getByRole("button", { name: "Main operator" }).click();
     await openConversation(page);
     await expect(composer).toHaveValue("Main chat draft");
     await page.getByRole("button", { name: "Conversation 2" }).click();
@@ -94,20 +94,20 @@ test(
 );
 
 test(
-  "a long saved requirement fits History at desktop widths, and IME composition does not send",
+  "IME composition does not send",
   journey("chat-navigation"),
-  async ({ page }, testInfo) => {
+  async ({ page }) => {
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })
-      .fill("https://github.com/qa/history-navigation");
+      .fill("https://github.com/qa/ime-composition");
     await page
       .getByRole("button", { name: "Add application", exact: true })
       .click();
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {
       timeout: 30_000,
     });
-    const message = `priority: ${"reliability-".repeat(24)}`;
+    const message = "Composed text";
     const composer = page.getByRole("textbox", {
       name: "Message Hallvi",
       exact: true,
@@ -125,19 +125,5 @@ test(
     await expect(
       page.getByText(`[QA fixture reply] ${message}`, { exact: true }),
     ).toBeVisible();
-    // The saved requirement is listed in History, and a long value wraps.
-    await openHistory(page);
-    const saved = page.locator("#history-requirements");
-    for (const width of [1440, 1280]) {
-      await page.setViewportSize({ width, height: 900 });
-      await expect(saved.locator(".hv-history-records strong")).toBeVisible();
-      const fits = await saved.evaluate(
-        (element) => element.scrollWidth <= element.clientWidth,
-      );
-      expect(fits).toBe(true);
-      await page.screenshot({
-        path: testInfo.outputPath(`history-${width}.png`),
-      });
-    }
   },
 );

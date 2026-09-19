@@ -100,7 +100,7 @@ test(
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeEnabled();
-    await expect(page.locator(".hv-busy-bar")).toBeVisible();
+    await expect(page.locator(".hv-still-working")).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("durable-reply-in-progress.png"),
       fullPage: true,
@@ -113,10 +113,8 @@ test(
     await page.getByRole("button", { name: "Stop" }).click();
     expect((await (await cancellation).json()).status).toBe("cancelled");
     await page.reload();
-    await expect(
-      page.getByRole("button", { name: "Retry reply" }),
-    ).toBeVisible();
-    await expect(page.locator(".hv-busy-bar")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(page.locator(".hv-still-working")).toHaveCount(0);
     await page.getByText("Show unfinished draft", { exact: true }).click();
     await openConversation(page);
     await expect(page.locator(".hv-run-progress details")).toContainText(
@@ -127,7 +125,7 @@ test(
       path: testInfo.outputPath("durable-cancelled-reply.png"),
       fullPage: true,
     });
-    await page.getByRole("button", { name: "Retry reply" }).click();
+    await page.getByRole("button", { name: "Try again" }).click();
     await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Cancel me [slow-cancel]", {
@@ -247,11 +245,12 @@ test(
       .fill("Hello [fail-once]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    // The pane shows one user-safe line for any failed attempt; the worker's
-    // exact error stays in the run record.
-    await expect(
-      page.getByText("Something went wrong. Please retry.", { exact: true }),
-    ).toBeVisible();
+    // The failed attempt offers another go; the worker's exact error stays in
+    // the run record.
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(page.getByText("QA simulated provider failure.")).toHaveCount(
+      0,
+    );
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toHaveValue("");
@@ -265,7 +264,7 @@ test(
       before.messages.length + 2,
     );
     await page.reload();
-    await page.getByRole("button", { name: "Retry reply" }).click();
+    await page.getByRole("button", { name: "Try again" }).click();
     await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Hello [fail-once]", { exact: true }),
@@ -308,45 +307,12 @@ test(
 );
 
 test(
-  "P1-06/07 revision uses lookup; fabricated replacement returns a recoverable tool error",
-  journey("revision"),
-  async ({ page }) => {
-    await addApplication(page, "revision-app");
-    await openConversation(page);
-    await send(page, "priority: Lowest cost");
-    const oldId = (await view(page)).decisions[0].id;
-    await openConversation(page);
-    await send(page, "replace-priority: Fast recovery");
-    const revised = await view(page);
-    expect(revised.decisions).toHaveLength(1);
-    expect(revised.decisions[0].id).not.toBe(oldId);
-    expect(revised.decisions[0].value).toBe("Fast recovery");
-    await page
-      .getByRole("textbox", { name: "Message Hallvi" })
-      .fill("invalid-replacement: reject this");
-    await openConversation(page);
-    await page.getByRole("button", { name: "Send", exact: true }).click();
-    await openConversation(page);
-    await expect(
-      page.getByText(
-        "[QA fixture reply] Replacement rejected; no Decision was staged.",
-        { exact: true },
-      ),
-    ).toBeVisible();
-    expect((await view(page)).messages).toHaveLength(
-      revised.messages.length + 2,
-    );
-    expect((await view(page)).decisions).toEqual(revised.decisions);
-  },
-);
-
-test(
   "P1-09 confirmed removal permits a genuinely fresh application",
   journey("removal"),
   async ({ page }) => {
     const oldPath = await addApplication(page, "removal-app");
     await openConversation(page);
-    await send(page, "priority: Disposable decision");
+    await send(page, "Disposable message");
     await page
       .getByRole("button", { name: "Switch application: removal-app" })
       .click();
@@ -363,7 +329,9 @@ test(
     await expect(page).toHaveURL(/\/applications\/new$/);
     const freshPath = await addApplication(page, "removal-app");
     expect(freshPath).not.toBe(oldPath);
-    expect((await view(page)).decisions).toEqual([]);
+    expect((await view(page)).messages).not.toContainEqual(
+      expect.objectContaining({ body: "Disposable message" }),
+    );
     expect((await page.request.get(`/api${oldPath}`)).status()).toBe(404);
   },
 );
@@ -389,8 +357,12 @@ test(
       page.getByRole("button", { name: "View applications" }),
     ).toBeDisabled();
     await page.goto(path);
+    // A draft can still be written; it cannot be sent until ChatGPT is back.
+    await page
+      .getByRole("textbox", { name: "Message Hallvi" })
+      .fill("Hello after disconnect");
     await expect(
-      page.getByRole("textbox", { name: "Message Hallvi" }),
+      page.getByRole("button", { name: "Send", exact: true }),
     ).toBeDisabled();
     expect((await view(page)).messages).toEqual(before.messages);
   },
@@ -472,5 +444,42 @@ test(
     expect((await view(page)).messages).toHaveLength(
       before.messages.length + 2,
     );
+  },
+);
+
+test(
+  "SSE acceptance removes the pending copy even before the send response arrives",
+  journey("slow-reply"),
+  async ({ page }) => {
+    await addApplication(page, "acceptance-race");
+    let release: () => void = () => {};
+    const delayed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/messages", async (route) => {
+      const response = await route.fetch();
+      await delayed;
+      await route.fulfill({ response });
+    });
+    try {
+      await openConversation(page);
+      await page
+        .getByRole("textbox", { name: "Message Hallvi" })
+        .fill("Acceptance race");
+      await openConversation(page);
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await openConversation(page);
+      await expect(
+        page.getByText("[QA fixture reply] Acceptance race", { exact: true }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByText("Acceptance race", { exact: true }),
+      ).toHaveCount(1);
+      await expect(
+        page.getByText("Saving message…", { exact: false }),
+      ).toHaveCount(0);
+    } finally {
+      release();
+    }
   },
 );

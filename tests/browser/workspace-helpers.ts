@@ -28,12 +28,3 @@ export async function openConversation(page: Page) {
     .click();
   await expect(page.locator(".hv-chat-column")).toBeVisible();
 }
-// Opens the History destination: operations, saved requirements and
-// application activity.
-export async function openHistory(page: Page) {
-  const button = page
-    .getByRole("navigation", { name: "Application workspace" })
-    .getByRole("button", { name: /^History/ });
-  if ((await button.getAttribute("aria-current")) !== "page")
-    await button.click();
-}
