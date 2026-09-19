@@ -212,7 +212,7 @@ export function ReleasesPanel({
   const said = releaseHeadline(view);
   const { running, access } = view;
   // Only a private address depends on the tunnel. A public one is answered by
-  // the server whatever this Mac is doing.
+  // the server whatever this PC is doing.
   const closed = Boolean(access?.localOnly) && reachable === "closed";
 
   return (
@@ -245,7 +245,7 @@ export function ReleasesPanel({
             // been told is untrue.
             // "Reopen access" named a thing the reader has no picture of.
             // What is true is that this application answers only through a
-            // connection this Mac holds open, and that connection dropped.
+            // connection this PC holds open, and that connection dropped.
             <>
               {onReopen ? (
                 <button
@@ -262,7 +262,7 @@ export function ReleasesPanel({
               )}
               <small>
                 The tunnel is closed, so <code>{access.url}</code> does not
-                answer from this Mac.
+                answer from this PC.
               </small>
             </>
           ) : access ? (
@@ -274,7 +274,7 @@ export function ReleasesPanel({
                 {access.localOnly
                   ? reachable === "checking"
                     ? "Private — checking that the tunnel still answers"
-                    : "Private — from this Mac only, while the tunnel is up"
+                    : "Private — from this PC only, while the tunnel is up"
                   : "Public"}
                 <br />
                 <code>{access.url}</code>
