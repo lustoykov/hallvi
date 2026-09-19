@@ -49,9 +49,12 @@ export function saveInformation(
     )
       throw new Error("Evidence execution not found in this application.");
   }
-  if (
+  // An ID Pi chose for a record it is creating is not a mistake to refuse:
+  // the ID belongs to this application and naming it is how Pi refers back
+  // to the record later. Save under it, whether or not it is already there.
+  const existing =
     id &&
-    !db()
+    db()
       .select()
       .from(savedInformation)
       .where(
@@ -60,11 +63,9 @@ export function saveInformation(
           eq(savedInformation.applicationId, applicationId),
         ),
       )
-      .get()
-  )
-    throw new Error("Saved information not found.");
+      .get();
   const now = new Date().toISOString();
-  if (id)
+  if (id && existing)
     return db()
       .update(savedInformation)
       .set({ ...value, updatedAt: now })
@@ -80,7 +81,7 @@ export function saveInformation(
     .insert(savedInformation)
     .values({
       ...value,
-      id: randomUUID(),
+      id: id || randomUUID(),
       applicationId,
       createdAt: now,
       updatedAt: now,

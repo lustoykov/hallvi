@@ -102,6 +102,28 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
     (await getOperatorView(app, chat)).information?.[0].retiredAt,
   ).toBeTruthy();
 });
+it("saves a record under the ID its author chose, and updates it there", () => {
+  const chosen = "3b59539b-a80c-4511-a247-05561b0fede4";
+  const created = saveInformation(
+    app,
+    { title: "Private access is ready", body: "Open it on this computer." },
+    chosen,
+  );
+  expect(created.id).toBe(chosen);
+  expect(listInformation(app, "private access").map((r) => r.id)).toEqual([
+    chosen,
+  ]);
+  // The same ID again is the update it was always meant to be, not a second
+  // record.
+  saveInformation(
+    app,
+    { title: "Private access is ready", body: "The link is open again." },
+    chosen,
+  );
+  const again = listInformation(app, "private access");
+  expect(again).toHaveLength(1);
+  expect(again[0].body).toBe("The link is open again.");
+});
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
   saveInformation(app, { title: "Note", body: "Saved" });
   // Without the owner nothing is removed: a history must not be orphaned.
