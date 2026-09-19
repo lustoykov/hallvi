@@ -6,7 +6,7 @@
 // thread jump and the record's one sentence.
 
 import { ArrowRight, CaretDown, ChatCircleText } from "@phosphor-icons/react";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 
 import type {
   ApplicationOperation,
@@ -92,7 +92,6 @@ export function FeedRow({
   onToggle,
   flash,
   onJump,
-  decisionFor,
   onOpenConversation,
   onOpenDestination,
   className,
@@ -104,7 +103,6 @@ export function FeedRow({
   onToggle: () => void;
   flash: boolean;
   onJump: (id: string) => void;
-  decisionFor?: (operation: ApplicationOperation) => ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
   /** The line's own state for the row, such as "is-linked". */
@@ -212,7 +210,6 @@ export function FeedRow({
             </div>
           </div>
         )}
-        {decisionFor?.(op)}
       </div>
       <div className="axh-actions">
         {evidence && (

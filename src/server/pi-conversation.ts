@@ -139,8 +139,6 @@ export async function chatSnapshot(
     ],
     executions: placed.executions,
     piActivity: placed.piActivity,
-    operations: [],
-    activity: [],
     information: listInformation(applicationId, "", true).filter(
       (r) => r.presentation,
     ),

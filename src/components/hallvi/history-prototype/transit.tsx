@@ -30,7 +30,6 @@ export interface HistoryDirectionProps {
   onFilter: (filter: Filter) => void;
   now: number;
   head: ReactNode;
-  decisionFor?: (operation: ApplicationOperation) => ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
 }
@@ -53,7 +52,6 @@ export function TransitHistory({
   onFilter,
   now,
   head,
-  decisionFor,
   onOpenConversation,
   onOpenDestination,
 }: HistoryDirectionProps) {
@@ -138,7 +136,6 @@ export function TransitHistory({
         }
         flash={flash === entry.op.id}
         onJump={jump}
-        decisionFor={decisionFor}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
         className={thread && lit === thread ? "is-linked" : undefined}

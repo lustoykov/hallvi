@@ -1585,53 +1585,6 @@
   white-space: nowrap;
 }
 
-/* ---------- Reply references: what a reply saved, pointing at History ---------- */
-
-.hv-message-refs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-}
-.hv-message-refs > span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.hv-message-ref {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--ink-2);
-  font-size: 11.5px;
-  cursor: pointer;
-  transition: border-color var(--fast) var(--ease);
-}
-.hv-message-ref:hover {
-  border-color: #9eb6e7;
-}
-.hv-message-ref em {
-  font-style: normal;
-  font-weight: 600;
-  color: var(--blue-text);
-}
-.hv-message-ref.done em {
-  color: var(--green-text);
-}
-.hv-message-ref.replaced {
-  border-style: dashed;
-}
-.hv-message-ref.replaced em {
-  color: var(--muted);
-}
-
 /* ---------- History: filters and grouped operations ---------- */
 
 .hv-history-filters {

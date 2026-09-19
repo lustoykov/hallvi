@@ -75,9 +75,7 @@
   text-transform: uppercase;
   color: var(--muted);
 }
-.hv-band-head .hv-op-links {
-  margin: 0;
-}
+
 .hv-section-content .hv-section-note {
   font-size: var(--view-meta);
   line-height: 1.65;
@@ -188,9 +186,6 @@
 .hv-condition > .hv-condition-aside {
   margin-left: auto;
   flex: 0 0 auto;
-}
-.hv-condition-aside .hv-op-links {
-  margin: 0;
 }
 
 /* Some work is outstanding without changing the verdict above it: failed
@@ -878,10 +873,6 @@
   align-items: baseline;
   padding: 9px 0;
 }
-.hv-attempts > li > .hv-op-rel {
-  font-size: var(--view-meta);
-  white-space: nowrap;
-}
 
 /* A process, a database or a service: a titled group, not a card. */
 .hv-stack-item {
@@ -954,9 +945,7 @@
   line-height: 1.7;
   max-width: 72ch;
 }
-.hv-possible .hv-op-links {
-  margin-top: 4px;
-}
+
 .hv-planned-section {
   padding: 16px 0 0;
   margin: 0;
@@ -1303,9 +1292,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.hv-adaptive-shell .hv-workstrip {
-  margin-left: auto;
-}
 
 /* ---------- Narrow screens ---------- */
 
@@ -1381,10 +1367,7 @@
     grid-template-columns: auto minmax(0, 1fr);
     gap: 4px 12px;
   }
-  .hv-attempts > li > .hv-op-rel {
-    grid-column: 1 / -1;
-    margin-left: 0;
-  }
+
   .hv-stack-item {
     padding: 14px;
   }
@@ -1459,13 +1442,6 @@
   border-left: 1px solid var(--line);
 }
 
-/* A link-shaped control inside a column stack must not stretch. */
-.hv-overview-block > .hv-op-link,
-.hv-band > .hv-op-link,
-.hv-section-content > .hv-op-link,
-.hv-section-content > .hv-op-links {
-  align-self: flex-start;
-}
 .hv-overview-block .hv-band-head h3 {
   margin: 0;
   font-size: var(--view-meta);
@@ -1473,9 +1449,6 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
-}
-.hv-overview-block .hv-band-head .hv-op-link {
-  align-self: baseline;
 }
 
 /* A state word sits at its own width, not the column's. */
@@ -1617,9 +1590,6 @@
   .hv-topbar-where {
     display: none;
   }
-  .hv-adaptive-shell .hv-workstrip {
-    margin: 8px 0;
-  }
 }
 
 /* Architecture: the detail strip carries the way into the destination. */
@@ -1651,28 +1621,6 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-}
-
-/* Activity marks: one thing moves at a time. A change that touches five
-   destinations sets five marks, but only the destination it is mainly
-   about animates; the rest are quiet, smaller and static. */
-.hv-nav-indicator.working,
-.hv-nav-indicator.needs-you,
-.hv-nav-indicator.failed {
-  animation: none;
-}
-.hv-nav-indicator:not(.primary) {
-  width: 5px;
-  height: 5px;
-  opacity: 0.5;
-}
-.hv-nav-indicator.working.primary {
-  animation: hv-mark-pulse 1.8s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hv-nav-indicator.working.primary {
-    animation: none;
-  }
 }
 
 /* Grouped variables drop the source column: the group heading says it. */
@@ -1743,8 +1691,7 @@
 .hv-history-open strong {
   font-size: var(--view-body);
 }
-.hv-history-open small,
-.hv-history-open .hv-op-rel {
+.hv-history-open small {
   font-size: var(--view-meta);
 }
 .hv-history-open:hover strong {
@@ -1777,17 +1724,6 @@
   margin: 8px 0 0;
   color: var(--ok);
   font-size: var(--view-meta);
-}
-.hv-op-more {
-  font-size: var(--view-meta);
-}
-.hv-op-more summary {
-  cursor: pointer;
-  color: var(--blue-text);
-  padding: 4px 0;
-}
-.hv-op-more .hv-op-links {
-  margin-top: 6px;
 }
 
 .hv-deployment-summary > p {
@@ -1850,9 +1786,10 @@
   .hv-view-back {
     display: none;
   }
-  .hv-view-bar:not(:has(.hv-suggest)) {
+  .hv-view-bar {
     display: none;
   }
+
   .hv-destinations {
     padding-right: 24px;
     mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);

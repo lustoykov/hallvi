@@ -141,7 +141,6 @@ export function historyFromRecords({
         // id. Until the projection receives a resolvable pair, rendering a
         // conversation action would send the reader to an empty chat id.
         origin: null,
-        mentions: [],
         startedAt: record.establishedAt!,
         updatedAt: record.establishedAt!,
         summary: record.body,
@@ -190,7 +189,6 @@ export function historyFromRecords({
       state: executionState[execution.status] ?? "inspected",
       destinations: ["logs"] as ApplicationSection[],
       origin: { chatId: execution.chatId, messageId: execution.runId },
-      mentions: [],
       startedAt: execution.createdAt,
       updatedAt: execution.finishedAt ?? execution.createdAt,
       summary:

@@ -19,7 +19,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 
 import {
@@ -32,7 +31,6 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
-import type { ApplicationOperation } from "@/server/operation-record";
 import type { Chat, ChatMessage, OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
@@ -61,8 +59,6 @@ import {
   secretRequestPoint,
   type SecretRequest,
 } from "./secret-request";
-import { OperationReceipt, OperationReferences } from "./operation-receipt";
-import type { RecordReference } from "./record-references";
 
 /** The message a view or Overview asked to reveal; the nonce repeats it. */
 export interface MessageHighlight {
@@ -225,14 +221,9 @@ export function ChatPane({
   onContinue,
   onTell,
   onNewChat,
-  references,
-  onReveal,
-  operations = [],
   now = 0,
   onOpenDestination,
-  onOpenConversation,
   highlight,
-  decisionFor,
   reachable,
   workerAlive,
 }: {
@@ -261,18 +252,9 @@ export function ChatPane({
    */
   onTell?: (message: string) => void;
   onNewChat: () => void;
-  /** Records each reply produced, shown as a line under it. */
-  references?: Map<string, RecordReference[]>;
-  /** Opens the application's History, where saved records are listed. */
-  onReveal?: () => void;
-  /** The application's operations; receipts render in their origin chat. */
-  operations?: ApplicationOperation[];
   now?: number;
   onOpenDestination?: (destination: ApplicationSection) => void;
-  onOpenConversation?: (chatId: string, messageId: string | null) => void;
   highlight?: MessageHighlight | null;
-  /** The real decision controls for an operation while it needs one. */
-  decisionFor?: (operation: ApplicationOperation) => ReactNode;
   /**
    * Whether the tunnel behind an access record's URL is still open, so a
    * record card in the transcript does not offer a link that stopped working.
@@ -286,39 +268,7 @@ export function ChatPane({
 }) {
   const chatId = activeChat?.id ?? null;
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  // Receipts sit under the reply that started the work. One whose reply is
-  // not in this transcript (an older record, or a reply not saved yet) is
-  // still shown, at the end, so no operation is ever lost.
-  const own = operations.filter(
-    (operation) => operation.origin?.chatId === chatId,
-  );
-  const messageIds = new Set(view.messages.map((message) => message.id));
-  const anchored = new Map<string, ApplicationOperation[]>();
-  const unanchored: ApplicationOperation[] = [];
-  for (const operation of own) {
-    // A record made before origins were kept anchors to the first recorded
-    // reply after it started, which is the reply that announced it.
-    const messageId =
-      operation.origin?.messageId ??
-      view.messages.find(
-        (message) =>
-          message.role === "assistant" &&
-          message.source === "hallvi" &&
-          message.createdAt >= operation.startedAt,
-      )?.id;
-    if (messageId && messageIds.has(messageId))
-      anchored.set(messageId, [...(anchored.get(messageId) ?? []), operation]);
-    else unanchored.push(operation);
-  }
-  const mentioned = (messageId: string) =>
-    operations.filter((operation) =>
-      operation.mentions.some(
-        (mention) =>
-          mention.chatId === chatId && mention.messageId === messageId,
-      ),
-    );
   const openDestination = onOpenDestination ?? (() => {});
-  const openConversation = onOpenConversation ?? (() => {});
   const messageCount = view.messages.length;
   /**
    * Open a record from its own address.
@@ -382,22 +332,6 @@ export function ChatPane({
     );
     return () => window.clearTimeout(timer);
   }, [highlight, messageCount]);
-  const receipts = (list: ApplicationOperation[] | undefined) =>
-    list?.map((operation) => (
-      <OperationReceipt
-        key={operation.id}
-        operation={operation}
-        now={now}
-        onOpen={openDestination}
-        onOpenOperation={(id) => {
-          const linked = operations.find((item) => item.id === id);
-          if (linked?.origin)
-            openConversation(linked.origin.chatId, linked.origin.messageId);
-          else openDestination("history");
-        }}
-        decision={decisionFor?.(operation)}
-      />
-    ));
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("message");
     if (id)
@@ -845,29 +779,6 @@ export function ChatPane({
                     }
                     return null;
                   })}
-                  {references?.get(message.id)?.length ? (
-                    <div className="hv-message-refs">
-                      <span>Saved from this reply</span>
-                      {references.get(message.id)!.map((reference) => (
-                        <button
-                          className={`hv-message-ref ${reference.tone}`}
-                          key={reference.key}
-                          onClick={() => onReveal?.()}
-                          title="Open in History"
-                          type="button"
-                        >
-                          {reference.label} <em>{reference.status}</em>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <OperationReferences
-                    operations={mentioned(message.id)}
-                    chats={view.chats}
-                    onOpenConversation={openConversation}
-                    onOpen={openDestination}
-                  />
-                  {receipts(anchored.get(message.id))}
                   {/* The one live line of a turn, at the end of the reply it
                       belongs to. The words carry the motion; Little Server
                       visits now and then. Stop lives in the composer. */}
@@ -897,11 +808,6 @@ export function ChatPane({
               </Fragment>
             );
           })}
-          {unanchored.length > 0 && (
-            <div className="hv-message hv-message-assistant hv-message-receipts">
-              {receipts(unanchored)}
-            </div>
-          )}
 
           {view.application && chatId && (
             <OperatorConsole

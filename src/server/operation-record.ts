@@ -1,10 +1,6 @@
-// The application-level operation record: one shape for every piece of agent
-// work. Chat receipts, view activity cards, navigation marks, Overview and
-// History all read it; none keeps its own copy.
-//
-// It is a shape and nothing else now. The builders that made one out of a
-// deployment record are gone with that model; what produces operations today
-// is `historyFromRecords`, out of the records Pi saves.
+// One piece of work as History draws it. A shape and nothing else:
+// `historyFromRecords` builds it from the records Pi saves and the executions
+// that ran around them.
 import type { ApplicationSection } from "@/components/hallvi/application-sections";
 
 /**
@@ -30,28 +26,6 @@ export interface OperationStep {
   state: "done" | "active" | "pending" | "failed";
   at?: string;
 }
-
-/**
- * What the user is asked to do while an operation waits. An approval may
- * need protected inputs; a failure offers recovery. Generic, so any
- * capability's record can carry one; the deployment keeps its own form.
- */
-export type OperationDecision =
-  | {
-      kind: "approval";
-      note: string;
-      /** A cost or scope line shown beside the action. */
-      cost?: string | null;
-      inputs: { name: string; hint?: string; secret?: boolean }[];
-      action: string;
-    }
-  | {
-      kind: "recovery";
-      note?: string | null;
-      retry?: string | null;
-      cancel?: string | null;
-      inputs?: { name: string; hint?: string; secret?: boolean }[];
-    };
 
 export interface ApplicationOperation {
   id: string;
@@ -82,16 +56,12 @@ export interface ApplicationOperation {
    * conversation started, such as a snapshot taken from a view.
    */
   origin: { chatId: string; messageId: string | null } | null;
-  /** Replies elsewhere that referred to this operation instead of repeating. */
-  mentions: { chatId: string; messageId: string; at: string }[];
   startedAt: string;
   updatedAt: string;
   summary: string;
   steps?: OperationStep[];
   /** What the user is asked to decide while the operation is proposed. */
   approval?: { note: string; action: string };
-  /** Decision controls for the generic card; absent for the deployment. */
-  decision?: OperationDecision | null;
   evidence?: string;
   /** What has to happen next after a failure. */
   next?: string;
@@ -99,5 +69,4 @@ export interface ApplicationOperation {
   resolvedById?: string;
   waitingForId?: string | null;
   waitingForTitle?: string | null;
-  preconditions?: Record<string, string | null>;
 }

@@ -14,7 +14,6 @@ import type {
   ApplicationRecord,
   ChatSnapshot,
   OperatorView,
-  ChatMessage,
 } from "@/server/types";
 
 import { api } from "./api";
@@ -24,7 +23,6 @@ import {
 } from "./application-identity";
 import { ApplicationSectionView } from "./application-section-view";
 import {
-  applicationSections,
   hiddenSections,
   sectionFromHash,
   recordedSections,
@@ -37,18 +35,10 @@ import "./views.css";
 import { OperatorConsole } from "./operator-console";
 import { TerminalPanel } from "./terminal/terminal-panel";
 import { ChatPane, type MessageHighlight } from "./chat-pane";
-import {
-  conversationMarks,
-  featuredOperation,
-  labelOf,
-  navigationIndicators,
-  stepDetail,
-} from "./operation-model";
-import { StateChip } from "./operation-receipt";
+import { labelOf } from "./operation-model";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { RenameApplicationDialog } from "./rename-application-dialog";
 import { DemoContext } from "./external-link";
-import { recordReferences } from "./record-references";
 import {
   acceptedDraftCanClear,
   clearPendingSubmission,
@@ -61,34 +51,6 @@ import {
   writePendingSubmission,
   type ConversationContext,
 } from "./conversation-continuity";
-
-/** Pi's transcript is the conversation: what arrives replaces what was. */
-const mergeMessages = (_current: ChatMessage[], incoming: ChatMessage[]) =>
-  incoming;
-
-/**
- * When each destination was last looked at, per browser. A confirmed change
- * newer than this shows a mark until the destination is opened. A first
- * visit counts everything as seen, so old work does not glow.
- */
-function readSeen(applicationId: string | undefined) {
-  const all = () =>
-    Object.fromEntries(
-      applicationSections.map((section) => [
-        section.id,
-        new Date().toISOString(),
-      ]),
-    ) as Partial<Record<ApplicationSection, string>>;
-  if (typeof window === "undefined" || !applicationId) return all();
-  try {
-    const stored = localStorage.getItem(`hv-seen:${applicationId}`);
-    return stored
-      ? (JSON.parse(stored) as Partial<Record<ApplicationSection, string>>)
-      : all();
-  } catch {
-    return all();
-  }
-}
 
 /**
  * An unsent draft, kept per conversation in this browser.
@@ -133,43 +95,14 @@ export function OperatorShell({
     null,
   );
   const recordVisible = activeSection !== null;
-  const [seen, setSeen] = useState<Partial<Record<ApplicationSection, string>>>(
-    {},
-  );
-  const [seenApplicationId, setSeenApplicationId] = useState<string | null>(
-    null,
-  );
-  const seenLoaded = seenApplicationId === initialView.application?.id;
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSeen(readSeen(initialView.application?.id));
-      setSeenApplicationId(initialView.application?.id ?? null);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [initialView.application?.id]);
   const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => {
-    const id = initialView.application?.id;
-    if (!id || !seenLoaded) return;
-    try {
-      localStorage.setItem(`hv-seen:${id}`, JSON.stringify(seen));
-    } catch {
-      /* a browser without storage simply forgets what was looked at */
-    }
-  }, [seen, seenLoaded, initialView.application?.id]);
-  // Leaving a destination records that it was looked at; the marks derive
-  // from that timestamp and the operations, and clear on their own.
   function selectSection(section: ApplicationSection | null) {
-    setActiveSection((current) => {
-      if (current && current !== section)
-        setSeen((seen) => ({ ...seen, [current]: new Date().toISOString() }));
-      return section;
-    });
+    setActiveSection(section);
     const url = new URL(window.location.href);
     const hash = section ? `#${section}` : "";
     if (url.hash !== hash) {
@@ -277,12 +210,7 @@ export function OperatorShell({
     {
       const next = await api.view(applicationId, selectedChatId);
       setView((current) =>
-        current.selectedChatId === next.selectedChatId
-          ? {
-              ...next,
-              messages: mergeMessages(current.messages, next.messages),
-            }
-          : current,
+        current.selectedChatId === next.selectedChatId ? next : current,
       );
     }
   }, [applicationId, selectedChatId, demo]);
@@ -313,10 +241,6 @@ export function OperatorShell({
       clearInterval(timer);
     };
   }, [refreshDeployment, working]);
-  const references = recordReferences(view);
-  // Operations are projected from saved records; the deployment model that
-  // used to produce them is gone, and so is the empty list it produced.
-  const operations = view.operations ?? [];
   // Which hideable destinations the records establish.
   // Whether the tunnel behind a private access record is still open. The
   // record is a claim about a moment; the tunnel is a process, and it dies
@@ -409,18 +333,6 @@ export function OperatorShell({
   // under the facts a destination fetches for itself while it is open.
   const facts: ApplicationFacts = { ...view.facts };
   const [stackRevealed, setStackRevealed] = useState(false);
-  // The open destination is being looked at: it never shows "updated".
-  const indicators = navigationIndicators(operations, seen);
-  // Browser read marks become available only after hydration. Keep the server
-  // and first client render identical, and do not flash old work as new.
-  if (!seenLoaded)
-    for (const section of applicationSections)
-      if (indicators[section.id]?.tone === "updated")
-        delete indicators[section.id];
-  if (activeSection && indicators[activeSection]?.tone === "updated")
-    delete indicators[activeSection];
-  const chatMarks = conversationMarks(operations, view.chats);
-  const featured = featuredOperation(operations, activeSection, selectedChatId);
 
   useEffect(() => {
     if (!applicationId || !selectedChatId) return;
@@ -438,13 +350,11 @@ export function OperatorShell({
         current.selectedChatId === selectedChatId
           ? {
               ...current,
-              messages: mergeMessages(current.messages, snapshot.messages),
-              activity: snapshot.activity ?? current.activity,
-              information: snapshot.information ?? current.information,
-              executions: snapshot.executions ?? current.executions,
-              worker: snapshot.worker ?? current.worker,
-              piActivity: snapshot.piActivity ?? current.piActivity,
-              operations: snapshot.operations ?? current.operations,
+              messages: snapshot.messages,
+              information: snapshot.information,
+              executions: snapshot.executions,
+              worker: snapshot.worker,
+              piActivity: snapshot.piActivity,
             }
           : current,
       );
@@ -491,12 +401,7 @@ export function OperatorShell({
           .then((next) => {
             if (active)
               setView((current) =>
-                current.selectedChatId === selectedChatId
-                  ? {
-                      ...next,
-                      messages: mergeMessages(current.messages, next.messages),
-                    }
-                  : current,
+                current.selectedChatId === selectedChatId ? next : current,
               );
           })
           .catch(() => {
@@ -522,11 +427,7 @@ export function OperatorShell({
   }
 
   function applyView(next: OperatorView) {
-    setView((current) =>
-      current.selectedChatId === next.selectedChatId
-        ? { ...next, messages: mergeMessages(current.messages, next.messages) }
-        : next,
-    );
+    setView(next);
     // The transcript is navigable state; keep it when this page is refreshed.
     const url = new URL(window.location.href);
     if (next.selectedChatId) url.searchParams.set("chat", next.selectedChatId);
@@ -885,24 +786,6 @@ export function OperatorShell({
             <strong>{where.title}</strong>
             {where.detail && <span>{where.detail}</span>}
           </div>
-          {activeSection && featured && (
-            <button
-              type="button"
-              className="hv-workstrip"
-              onClick={() =>
-                featured.origin
-                  ? openConversation(
-                      featured.origin.chatId,
-                      featured.origin.messageId,
-                    )
-                  : selectSection(featured.destinations[0])
-              }
-              aria-label={`Active work: ${featured.title}`}
-            >
-              <StateChip state={featured.state} detail={stepDetail(featured)} />
-              <span>{featured.title}</span>
-            </button>
-          )}
           {applicationId && (
             <button
               type="button"
@@ -966,8 +849,6 @@ export function OperatorShell({
           onSection={selectSection}
           onChat={selectChat}
           onCreate={createChat}
-          indicators={indicators}
-          chatMarks={chatMarks}
           sections={visibleSections(activeSection, recordedHere)}
           hidden={hiddenSections(activeSection, recordedHere)}
           revealed={stackRevealed}
@@ -999,16 +880,6 @@ export function OperatorShell({
                     <ArrowLeft aria-hidden="true" />
                     Back to {activeChat?.title ?? "the conversation"}
                   </button>
-                  {featured &&
-                    !featured.destinations.includes(activeSection) && (
-                      <button
-                        type="button"
-                        className="hv-suggest"
-                        onClick={() => selectSection(featured.destinations[0])}
-                      >
-                        Hallvi is in {labelOf(featured.destinations[0])} · show
-                      </button>
-                    )}
                 </div>
               }
             >
@@ -1089,13 +960,9 @@ export function OperatorShell({
               onStop={stopConversation}
               onContinue={continueConversation}
               onNewChat={createChat}
-              onReveal={() => selectSection("history")}
-              references={references}
               view={view}
-              operations={operations}
               now={now}
               onOpenDestination={selectSection}
-              onOpenConversation={openConversation}
               highlight={highlight}
             />
           </div>

@@ -82,17 +82,6 @@ export interface PiReply {
   startedAt: string | null;
 }
 
-export interface Decision {
-  id: string;
-  applicationId: string;
-  sourceMessageId: string;
-  kind: "launch-priority";
-  label: string;
-  value: string;
-  supersededById: string | null;
-  createdAt: string;
-}
-
 export interface Observation {
   id: string;
   applicationId: string;
@@ -106,34 +95,18 @@ export interface Observation {
 }
 
 /**
- * One meaningful application event: a saved or changed requirement, a
- * repository access result, or retained history of retired preparation work.
- * Reply execution is not an Activity Event; it travels with its Chat reply.
- */
-export interface ActivityEvent {
-  id: string;
-  applicationId: string;
-  kind: string;
-  summary: string;
-  detail: string;
-  createdAt: string;
-}
-
-/**
  * The authoritative Chat state delivered over SSE and on demand: its status,
- * its messages, the application's operations and Activity.
+ * its messages, and the evidence and records placed beside them.
  */
 export interface ChatSnapshot {
   status: import("./operator-data").ConversationStatus;
-  executions?: import("./operator-execution").ExecutionRecord[];
+  executions: import("./operator-execution").ExecutionRecord[];
   /** Whether the worker that owns Pi's sessions answered. */
-  worker?: { alive: boolean };
-  information?: import("./operator-data").SavedInformation[];
-  operations?: import("./operation-record").ApplicationOperation[];
+  worker: { alive: boolean };
+  information: import("./operator-data").SavedInformation[];
   /** What Pi ran, in order. */
-  piActivity?: import("./pi-activity").ActivityRecord[];
+  piActivity: import("./pi-activity").ActivityRecord[];
   messages: ChatMessage[];
-  activity: ActivityEvent[];
 }
 
 /** The application page: conversations and the shared application records. */
@@ -148,7 +121,6 @@ export interface OperatorView {
    */
   secrets?: import("./application-secrets").SecretRequest[];
 
-  operations?: import("./operation-record").ApplicationOperation[];
   /** What Pi ran in this application's conversations, in order. */
   piActivity?: import("./pi-activity").ActivityRecord[];
   application: ApplicationRecord | null;
@@ -163,9 +135,6 @@ export interface OperatorView {
   chats: ChatSummary[];
   selectedChatId: string | null;
   messages: ChatMessage[];
-  /** Active saved requirements. */
-  decisions: Decision[];
-  activity: ActivityEvent[];
   /**
    * Facts the controller can read from its own durable records, carried on
    * the view so the shell's existing poll refreshes them. A view that fetches
@@ -179,12 +148,6 @@ export interface CreateApplicationInput {
   requestKey?: string;
   name?: string;
   repositoryUrl: string;
-}
-
-export interface PiDecision {
-  kind: "launch-priority";
-  value: string;
-  replaces?: string;
 }
 
 export interface PiTurnResult {
