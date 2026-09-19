@@ -144,6 +144,18 @@ operations:
 - **Program and state are separate directories.** Upgrade and uninstall replace
   or remove the program and never touch state.
 
+```mermaid
+flowchart LR
+  source[Committed Hallvi source] --> build[Build on each target platform]
+  build --> release[Platform archive, checksum and installer]
+  release --> verify[Verify checksum and native modules]
+  verify --> service[User service on loopback]
+  service --> local[Browser on the same machine]
+  service --> forward[SSH forwards for fixed ports]
+  forward --> laptop[Laptop browser]
+  service --> state[(Controller and account state)]
+```
+
 Homebrew and Linux packages are distribution conveniences after the archive is
 proved; neither removes the need to solve trusted downloads, signing and
 GitHub App distribution. A container image remains a possible virtual-machine
