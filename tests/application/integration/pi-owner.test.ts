@@ -34,6 +34,7 @@ const synthetic = vi.hoisted(() => ({
   model: undefined as unknown,
   /** When set, letting go of a session waits for it, as a slow write would. */
   cleanup: undefined as Promise<void> | undefined,
+  cleanupFailsFor: undefined as string | undefined,
 }));
 vi.mock("../../../src/server/pi-configuration", async (original) => ({
   ...(await original<object>()),
@@ -46,6 +47,7 @@ vi.mock("../../../src/server/pi-configuration", async (original) => ({
 vi.mock("../../../src/server/pi-workspace", async (original) => ({
   ...(await original<object>()),
   PiWorkspace: class {
+    constructor(private options: { chatId: string }) {}
     async unavailable() {
       return "The repository workspace is not part of this test.";
     }
@@ -53,6 +55,8 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
       return reason;
     }
     async dispose() {
+      if (this.options.chatId === synthetic.cleanupFailsFor)
+        throw new Error("Workspace cleanup failed.");
       await synthetic.cleanup;
     }
   },
@@ -647,31 +651,57 @@ it("a second worker steps aside without touching what the first is doing", async
   expect((await a.transcript()).at(-1)).toBe("pi [completed] finished");
 });
 
-it("stays the owner through shutdown until its sessions are let go, and only then can another start", async () => {
-  const a = application("shop");
-  await a.send("hello");
-  await until(async () => expect(await a.status()).toBe("idle"));
-  await a.snapshot(); // the conversation is open in this worker, for reading
-  let finish!: () => void;
-  synthetic.cleanup = new Promise((resolve) => (finish = resolve));
-  try {
-    const closing = worker!.close();
-    // Intake has stopped; the sessions have not been let go yet.
-    await expect(a.send("anybody?")).rejects.toBeInstanceOf(
-      WorkerUnavailableError,
-    );
-    expect(await ownSessions()).toBeNull();
+it.each([false, true])(
+  "stays the owner until every session cleanup settles (one fails: %s)",
+  async (failCleanup) => {
+    const a = application("shop");
+    const b = application("notes");
+    await a.send("hello");
+    await b.send("hello");
+    await until(async () => expect(await a.status()).toBe("idle"));
+    await until(async () => expect(await b.status()).toBe("idle"));
+    await a.snapshot(); // both conversations are open for reading
+    await b.snapshot();
+    let finish!: () => void;
+    synthetic.cleanup = new Promise((resolve) => (finish = resolve));
+    synthetic.cleanupFailsFor = failCleanup ? a.chat : undefined;
+    try {
+      let settled = false;
+      const closing = worker!.close().then(
+        () => {
+          settled = true;
+        },
+        (error: unknown) => {
+          settled = true;
+          return error;
+        },
+      );
+      // Intake has stopped; the sessions have not been let go yet.
+      await expect(a.send("anybody?")).rejects.toBeInstanceOf(
+        WorkerUnavailableError,
+      );
+      expect(settled).toBe(false);
+      expect(await ownSessions()).toBeNull();
 
-    finish();
-    await closing;
-  } finally {
-    synthetic.cleanup = undefined;
-    finish();
-  }
-  worker = await ownSessions({ stopTimeoutMs: 2_000 });
-  expect(worker).not.toBeNull();
-  expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: hello");
-});
+      finish();
+      const failure = await closing;
+      if (failCleanup) {
+        expect(failure).toBeInstanceOf(AggregateError);
+        expect((failure as AggregateError).errors).toEqual([
+          new Error("Workspace cleanup failed."),
+        ]);
+      } else expect(failure).toBeUndefined();
+    } finally {
+      synthetic.cleanup = undefined;
+      synthetic.cleanupFailsFor = undefined;
+      finish();
+    }
+    worker = await ownSessions({ stopTimeoutMs: 2_000 });
+    expect(worker).not.toBeNull();
+    expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: hello");
+    expect((await b.transcript()).at(-1)).toBe("pi [completed] reply: hello");
+  },
+);
 
 it("of workers starting in the same instant over a dead worker's socket, exactly one becomes the owner", async () => {
   await loseWorker();

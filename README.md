@@ -108,7 +108,7 @@ Open <http://127.0.0.1:3000>. That one command starts three processes: the appli
 
 The worker stays a separate process, the only one that opens Pi's sessions; the app reaches it over a socket beside the database ([what the launcher does when it stops](docs/architecture/development-start.md)). If it exits unexpectedly, the launcher says so and starts it once more; if it exits again, the launcher stops the children it started and exits non-zero rather than leaving the application unable to accept a message. A worker that finds another one already serving this database steps aside, and the launcher leaves that running worker alone. For debugging, `npm run worker` still starts one on its own from the same checkout.
 
-Accepted messages are saved and stay queued until a worker picks them up. When none is running, the conversation says so above the composer and on the waiting message instead of showing a reply in progress. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
+Messages are accepted only after the running worker has saved them in Pi. When no worker is available, sending fails visibly and the composer keeps the draft. After a restart, Pi keeps unfinished work until the owner chooses Continue or Stop. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
 
 ### Private application access
 

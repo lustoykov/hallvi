@@ -176,7 +176,8 @@ const user = (textValue, id) => ({
   await a.lane.prompt("next prompt", undefined, ctx);
   note("B. a stranded follow-up and the next prompt", { requests: a.requests });
 }
-// C. accept with caller operation id + tagged prompt; message_end entry id; LaneBusy; streaming updates
+// C. accept with caller operation id + tagged prompt; message_end entry id;
+// LaneBusy; streaming updates
 {
   const c = await open(repo);
   const seen = [];

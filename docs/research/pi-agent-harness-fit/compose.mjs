@@ -181,7 +181,8 @@ const grepForHarness = {
       params,
       hasAbortSignal: Boolean(context.abortSignal),
     });
-    // Hallvi: workspace.execute("grep", toolCallId, params, context.abortSignal, onUpdate)
+    // Hallvi delegates to workspace.execute, passing the tool name, call id,
+    // parameters, abort signal and update callback.
     return {
       content: [{ type: "text", text: "notes.txt:1: the needle is here" }],
       details: {},

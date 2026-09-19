@@ -477,7 +477,16 @@ export function sessionOwner(
      */
     async close() {
       closing = true;
-      await Promise.all([...opened.values()].map((open) => open.close()));
+      // One failed cleanup must not release ownership while another session
+      // is still closing. Report failures only after every attempt settles.
+      const results = await Promise.allSettled(
+        [...opened.values()].map((open) => open.close()),
+      );
+      const errors = results.flatMap((result) =>
+        result.status === "rejected" ? [result.reason] : [],
+      );
+      if (errors.length)
+        throw new AggregateError(errors, "Pi session cleanup failed.");
     },
   };
 }

@@ -173,3 +173,15 @@ process ends; closing the socket only stops intake. Covered: with session
 cleanup held pending during shutdown, sends fail, a replacement is refused,
 and it starts once cleanup finishes; the test fails with the old order.
 Application suite afterwards: 943 passed, 3 skipped.
+
+Review of `29c8724d` reproduced the same lifetime gap when one of two session
+cleanups failed: `Promise.all` rejected before the other cleanup finished.
+Shutdown now waits for all cleanup attempts to settle, then reports their
+errors together. The lifetime test covers both successful cleanup and one
+failure while the second session is still pending, and verifies both histories
+are readable by the replacement owner.
+
+Final local verification: 944 application tests passed, 3 skipped; typecheck
+passed; eslint had no errors (31 existing warnings), and prettier passed.
+The browser worker-restart journey passed against the real worker process,
+with a scripted model. The real-provider run was not repeated.
