@@ -13,7 +13,6 @@ export interface ApplicationListItem {
   /** "Web · PostgreSQL 16 · 3 jobs" or "Not deployed yet". */
   stack: string;
   attention: number;
-  protection: string;
   /**
    * The recorded access URL, including its protocol and port.
    * Reference data may use a hostname.
