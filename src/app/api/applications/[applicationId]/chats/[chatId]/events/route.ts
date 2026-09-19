@@ -12,7 +12,7 @@ export async function GET(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
-    let latest = JSON.stringify(chatSnapshot(applicationId, chatId));
+    let latest = JSON.stringify(await chatSnapshot(applicationId, chatId));
     let timer: ReturnType<typeof setInterval> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let closed = false;
@@ -40,15 +40,22 @@ export async function GET(
         // Reconnect always starts with authoritative latest state; no token
         // history, cursor retention, or missed frame can lose an accepted run.
         controller.enqueue(encoder.encode(`data: ${latest}\n\n`));
-        timer = setInterval(() => {
+        let reading = false;
+        timer = setInterval(async () => {
+          if (reading) return;
+          reading = true;
           try {
-            const next = JSON.stringify(chatSnapshot(applicationId, chatId));
-            if (next !== latest) {
+            const next = JSON.stringify(
+              await chatSnapshot(applicationId, chatId),
+            );
+            if (next !== latest && !closed) {
               latest = next;
               controller.enqueue(encoder.encode(`data: ${next}\n\n`));
             }
           } catch {
             close();
+          } finally {
+            reading = false;
           }
         }, 500);
         heartbeat = setInterval(

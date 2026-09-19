@@ -1,10 +1,10 @@
 import { controllerProtectionFacts } from "./controller-protection";
 import { listActivity } from "./pi-activity";
-import { workerPresence } from "./worker-presence";
+import { chatSnapshot } from "./pi-conversation";
 import { listExecutions } from "./operator-execution";
 import { listSecrets } from "./application-secrets";
 import { listInformation } from "./saved-information";
-import { listApplicationChatSummaries, listMessages } from "./db";
+import { listApplicationChatSummaries } from "./db";
 import { loadApplication, loadChat, repositoryAccess } from "./applications";
 import type { OperatorView } from "./types";
 
@@ -13,10 +13,10 @@ import type { OperatorView } from "./types";
  * conversation, every conversation, and the records they share. Without a
  * selected chat, the first active conversation is shown.
  */
-export function getOperatorView(
+export async function getOperatorView(
   applicationId: string,
   chatId?: string,
-): OperatorView {
+): Promise<OperatorView> {
   const application = chatId
     ? loadChat(applicationId, chatId).application
     : loadApplication(applicationId);
@@ -27,6 +27,10 @@ export function getOperatorView(
     chats[0] ??
     null;
   const access = repositoryAccess(application);
+  // The selected conversation comes from Pi, with evidence placed into it.
+  const conversation = selected
+    ? await chatSnapshot(application.id, selected.id)
+    : null;
   return {
     application: {
       id: application.id,
@@ -45,15 +49,13 @@ export function getOperatorView(
         : null,
       connected: access.connected,
     },
-    executions: listExecutions(applicationId),
-    piActivity: listActivity(applicationId),
+    executions: conversation?.executions ?? listExecutions(applicationId),
+    piActivity: conversation?.piActivity ?? listActivity(applicationId),
     operations: [],
-    // A queued message is only being worked on if something is reading the
-    // queue. The page says which, rather than spinning either way.
-    worker: workerPresence(),
+    worker: conversation?.worker,
     chats,
     selectedChatId: selected?.id ?? null,
-    messages: selected ? listMessages(selected.id) : [],
+    messages: conversation?.messages ?? [],
     decisions: [],
     information: listInformation(application.id, "", true).filter(
       (r) => r.presentation,

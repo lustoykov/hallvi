@@ -26,9 +26,7 @@ import {
   listInformation,
   saveInformation,
   retireInformation,
-  attachMessageBlock,
 } from "./saved-information";
-import { getMessage } from "./db";
 import { Type } from "typebox";
 import { PiWorkspace, piWorkspaceTools } from "./pi-workspace";
 import { applicationWorkspaceSource } from "./pi-workspace-source";
@@ -174,14 +172,10 @@ export interface PiSessionEvents {
   onActivity?: (event: ExecutionSignal) => void;
 }
 
-/**
- * One conversation's tools and where their evidence goes. `reply` names the
- * reply Pi is writing when a tool is called; it changes as Pi reads messages.
- */
+/** One conversation's tools. Their evidence is kept under Pi's call ids. */
 export interface PiSessionScope {
   applicationId: string;
   chatId: string;
-  reply: () => string;
 }
 
 type PiHarness = import("@earendil-works/pi-agent-core").AgentHarness;
@@ -251,8 +245,6 @@ export async function openPiSession(
     source: () =>
       applicationWorkspaceSource(scope.applicationId, options.signal),
   });
-  // Never release the native-file lock on a timer. The worker terminates if
-  // the SDK cannot settle within its bounded drain deadline.
   const close = async () => {
     try {
       await harness?.close(BACKGROUND_CONTEXT);
@@ -302,7 +294,7 @@ export async function openPiSession(
               label: "Save application information",
               executionMode: "sequential",
               description:
-                "Save/update a record, or retire one by ID. record: {title, body, evidence:[{type:'message'|'execution',id} or {type:'url',url}], establishedAt:ISO timestamp|null, presentation:null or {about?:[{kind,id}],states?:{ref:{kind,id},presence:'present'|'absent'},views:string[],role:'recommendation'|'status'|'outcome',status:'info'|'verified'|'failed'|'warning',checks:[{key,label,status:'passed'|'failed'|'info',claim,basis,about?:{kind,id},detail?,freshFor?}],facts:[{key,label,value,claim,basis,mono?,freshFor?}],nextStep?:string,url?:http URL,content?:{kind:'deployment',repositoryUrl,revision,server,changes:string[],image?,services?:[{process,image,digest?}]}|{kind:'application-access',mode:'private'|'public',server,localPort?:number,remotePort?:number}|{kind:'topology',from:'observed'|'plan',parts:[{id,kind,name,role,plain,owner?}],edges:[{from,to,network,label?}]}|{kind:'access-log',proxy,format:'caddy-json',source:{type:'container',name}|{type:'file',path}}}}. Private access requires a 127.0.0.1 URL matching localPort and a remotePort. Omit presentation for knowledge kept for future work. showInChat renders a surfaced record in this response. Never store secrets.",
+                "Save/update a record, or retire one by ID. record: {title, body, evidence:[{type:'execution',id} or {type:'url',url}], establishedAt:ISO timestamp|null, presentation:null or {about?:[{kind,id}],states?:{ref:{kind,id},presence:'present'|'absent'},views:string[],role:'recommendation'|'status'|'outcome',status:'info'|'verified'|'failed'|'warning',checks:[{key,label,status:'passed'|'failed'|'info',claim,basis,about?:{kind,id},detail?,freshFor?}],facts:[{key,label,value,claim,basis,mono?,freshFor?}],nextStep?:string,url?:http URL,content?:{kind:'deployment',repositoryUrl,revision,server,changes:string[],image?,services?:[{process,image,digest?}]}|{kind:'application-access',mode:'private'|'public',server,localPort?:number,remotePort?:number}|{kind:'topology',from:'observed'|'plan',parts:[{id,kind,name,role,plain,owner?}],edges:[{from,to,network,label?}]}|{kind:'access-log',proxy,format:'caddy-json',source:{type:'container',name}|{type:'file',path}}}}. Private access requires a 127.0.0.1 URL matching localPort and a remotePort. Omit presentation for knowledge kept for future work. showInChat renders a surfaced record in this response. Never store secrets.",
               parameters: Type.Object({
                 action: Type.Union([
                   Type.Literal("save"),
@@ -313,8 +305,6 @@ export async function openPiSession(
                 showInChat: Type.Optional(Type.Boolean()),
               }),
               async execute(_id, params) {
-                if (getMessage(scope.reply())?.status !== "running")
-                  throw new Error("This reply has ended.");
                 if (params.action === "retire") {
                   if (!params.id) throw new Error("A record ID is required.");
                   return json(
@@ -326,11 +316,6 @@ export async function openPiSession(
                   params.record,
                   params.id,
                 );
-                if (params.showInChat && record.presentation)
-                  attachMessageBlock(scope.applicationId, scope.reply(), {
-                    type: "saved-information",
-                    id: record.id,
-                  });
                 return json(record);
               },
             }),
@@ -406,6 +391,7 @@ export async function openPiSession(
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -442,6 +428,7 @@ export async function openPiSession(
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -466,6 +453,7 @@ export async function openPiSession(
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -497,6 +485,7 @@ export async function openPiSession(
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -550,6 +539,7 @@ export async function openPiSession(
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -811,7 +801,7 @@ export async function openPiSession(
               ttl: Type.Optional(Type.Number({ minimum: 1, maximum: 86400 })),
               replace: Type.Optional(Type.Boolean()),
             }),
-            async execute(id, params) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "set_domain_record",
@@ -826,6 +816,7 @@ export async function openPiSession(
                         }),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -854,6 +845,7 @@ export async function openPiSession(
                   () => checkPublicAccess(params, signal ?? options.signal),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -865,7 +857,7 @@ export async function openPiSession(
             description:
               "In Pi decides mode, ask the user to approve the proposed action before proceeding. Describe the concrete action and its effects. Bypass returns immediately. Always ask already prompts at execution; do not request duplicate approval there.",
             parameters: Type.Object({ action: Type.String() }),
-            async execute(id, params) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "request_approval",
@@ -874,6 +866,7 @@ export async function openPiSession(
                   async () => ({ approved: true }),
                   true,
                   id,
+                  signal,
                 ),
               );
             },
@@ -908,6 +901,7 @@ export async function openPiSession(
                     ),
                   false,
                   id,
+                  signal,
                 );
                 return "declined" in result ? json(result) : result;
               },

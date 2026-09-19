@@ -5,7 +5,6 @@ import {
   type Session,
 } from "@earendil-works/pi-agent-core";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import Database from "better-sqlite3";
 import { and, eq, isNull } from "drizzle-orm";
 import {
   chmodSync,
@@ -20,17 +19,16 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { databasePath, db } from "./db";
-import { applications, chats } from "./db-schema";
+import { chats } from "./db-schema";
 
-// Keep native handles reachable until explicit settlement/release, including
-// when a poisoned worker abandons its pending SDK promise before process exit.
-const activeApplicationLocks = new Set<() => void>();
+// Only the worker calls into this file. It is the one owner of session
+// storage: the app asks it over the worker link and never opens a history.
 const RECOVERY_MESSAGE =
   "Conversation history unavailable. Start a new chat to continue.";
 
 export class NativeSessionError extends Error {
   constructor(
-    public readonly code: "history-unavailable" | "busy" | "not-found",
+    public readonly code: "history-unavailable" | "not-found",
     message: string,
     options?: ErrorOptions,
   ) {
@@ -83,44 +81,15 @@ function applicationDirectory(applicationId: string) {
   return privateDirectory(join(storageRoot(), validatedId(applicationId)));
 }
 
-function sessionPath(applicationId: string, chatId: string) {
+/** Where a history from before Pi's session repository would be. */
+export function earlierHistoryPath(scope: {
+  applicationId: string;
+  chatId: string;
+}) {
   return join(
-    applicationDirectory(applicationId),
-    `${validatedId(chatId)}.jsonl`,
+    applicationDirectory(scope.applicationId),
+    `${validatedId(scope.chatId)}.jsonl`,
   );
-}
-
-// A separate SQLite file supplies an OS-released lock without holding an app
-// database transaction over model execution. Keep its inode when removing data.
-function acquireApplicationLock(applicationId: string) {
-  const lockPath = join(
-    privateDirectory(join(storageRoot(), ".locks")),
-    `${validatedId(applicationId)}.sqlite`,
-  );
-  if (existsSync(lockPath) && !lstatSync(lockPath).isFile())
-    throw unavailable();
-  const lock = new Database(lockPath, { timeout: 0 });
-  try {
-    chmodSync(lockPath, 0o600);
-    lock.exec("BEGIN EXCLUSIVE");
-  } catch (cause) {
-    lock.close();
-    throw new NativeSessionError(
-      "busy",
-      "This application's conversation is still running. Cancel it and wait for it to stop before removing its history.",
-      { cause },
-    );
-  }
-  let released = false;
-  const release = () => {
-    if (!released) {
-      lock.close();
-      released = true;
-      activeApplicationLocks.delete(release);
-    }
-  };
-  activeApplicationLocks.add(release);
-  return release;
 }
 
 /**
@@ -155,7 +124,10 @@ export type NativeSession = Session<JsonlSessionMetadata>;
  * files in it and their format. A history from before that layout is copied
  * in, never moved: the original stays where the earlier version reads it.
  */
-async function openLockedSession(applicationId: string, chatId: string) {
+export async function openNativeChatSession(
+  applicationId: string,
+  chatId: string,
+) {
   const chat = ownedChat(applicationId, chatId);
   const root = privateDirectory(
     join(applicationDirectory(applicationId), validatedId(chatId)),
@@ -166,7 +138,7 @@ async function openLockedSession(applicationId: string, chatId: string) {
   });
   try {
     let found = await repo.list(undefined, BACKGROUND_CONTEXT);
-    const earlier = sessionPath(applicationId, chatId);
+    const earlier = earlierHistoryPath({ applicationId, chatId });
     if (
       !found.length &&
       existsSync(earlier) &&
@@ -201,74 +173,18 @@ async function openLockedSession(applicationId: string, chatId: string) {
     keepPrivate();
     return {
       session,
-      async close() {
+      async release() {
         await repo.close(BACKGROUND_CONTEXT);
         keepPrivate();
       },
     };
-  } catch (error) {
-    await repo.close(BACKGROUND_CONTEXT).catch(() => undefined);
-    throw error;
-  }
-}
-
-/**
- * Open this conversation's history as its one writer. Pi's repository does not
- * stop a second process from opening the same file, so the application lock
- * is what makes that true; `release` closes the history before letting go.
- */
-export async function openNativeChatSession(
-  applicationId: string,
-  chatId: string,
-) {
-  ownedChat(applicationId, chatId);
-  let unlock: (() => void) | undefined;
-  try {
-    unlock = acquireApplicationLock(applicationId);
-    const release = unlock;
-    const { session, close } = await openLockedSession(applicationId, chatId);
-    return {
-      session,
-      async release() {
-        try {
-          await close();
-        } finally {
-          release();
-        }
-      },
-    };
   } catch (cause) {
-    unlock?.();
-    if (cause instanceof NativeSessionError) throw cause;
-    throw unavailable(cause);
+    await repo.close(BACKGROUND_CONTEXT).catch(() => undefined);
+    throw cause instanceof NativeSessionError ? cause : unavailable(cause);
   }
 }
 
-// The caller stops and settles active conversations first. Keep record
-// removal and session cleanup inside the same lock so a worker cannot reopen
-// between them.
-export function removeNativeApplicationSessions(
-  applicationId: string,
-  removeApplicationRecords: () => void,
-) {
-  validatedId(applicationId);
-  if (
-    !db()
-      .select({ id: applications.id })
-      .from(applications)
-      .where(eq(applications.id, applicationId))
-      .get()
-  )
-    throw new NativeSessionError("not-found", "Application not found.");
-  const release = acquireApplicationLock(applicationId);
-  try {
-    const path = applicationDirectory(applicationId);
-    removeApplicationRecords();
-    rmSync(path, {
-      recursive: true,
-      force: true,
-    });
-  } finally {
-    release();
-  }
+/** Remove every history an application has. */
+export function removeNativeSessions(applicationId: string) {
+  rmSync(applicationDirectory(applicationId), { recursive: true, force: true });
 }

@@ -18,14 +18,15 @@ export async function POST(
     const { applicationId, chatId } = await context.params;
     const body = await parseJsonRequest(request, sendChatMessageRequestSchema);
     return Response.json(
-      sendChatMessage(
+      await sendChatMessage(
         applicationId,
         chatId,
         body.message,
         body.requestKey,
         body.delivery,
       ),
-      { status: 202 },
+      // Pi has the message: this is not a promise to deliver it later.
+      { status: 201 },
     );
   });
 }
@@ -37,7 +38,7 @@ export async function GET(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
-    return Response.json(chatSnapshot(applicationId, chatId), {
+    return Response.json(await chatSnapshot(applicationId, chatId), {
       headers: { "Cache-Control": "no-store" },
     });
   });

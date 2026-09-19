@@ -5,7 +5,6 @@ import {
   getChat,
   insertApplication,
   insertChat,
-  insertMessage,
   insertObservation,
   latestObservation,
   listApplicationChats,
@@ -22,7 +21,7 @@ import {
   currentGithubConnectionId,
   readGithubConnection,
 } from "./github-connection";
-import { removeNativeApplicationSessions } from "./pi-sessions";
+import { askWorker } from "./worker-link";
 import type { ApplicationRecord, Chat, CreateApplicationInput } from "./types";
 
 export class ExistingApplicationConflictError extends Error {}
@@ -73,13 +72,7 @@ export async function createApplication(input: CreateApplicationInput) {
       },
       input.requestKey,
     );
-    const chat = insertChat(application.id, "Main operator");
-    insertMessage(
-      chat.id,
-      "assistant",
-      `I’ve added ${name}. Next, I can read its repository and explain what it needs to run.`,
-      "hallvi",
-    );
+    insertChat(application.id, "Main operator");
     return application;
   });
   await observeRepository(application.id);
@@ -263,7 +256,10 @@ export function renameApplication(applicationId: string, name: string) {
   return loadApplication(applicationId);
 }
 
-export function removeApplication(applicationId: string, repository: string) {
+export async function removeApplication(
+  applicationId: string,
+  repository: string,
+) {
   const application = loadApplication(applicationId);
   if (
     repository !==
@@ -274,9 +270,10 @@ export function removeApplication(applicationId: string, repository: string) {
     );
   // Delete the identity too: adding the repository again gets new IDs, so old
   // in-flight messages/observations cannot repopulate the new application.
-  removeNativeApplicationSessions(application.id, () => {
-    deleteApplication(application.id);
-  });
+  // The worker owns the histories, so it removes them; it refuses while one
+  // of them is running.
+  await askWorker("forget", { scope: { applicationId: application.id } });
+  deleteApplication(application.id);
   return { removedApplicationId: application.id };
 }
 
@@ -287,12 +284,6 @@ export function createChat(applicationId: string, title?: string) {
   const chat = insertChat(
     application.id,
     title?.trim() || `Conversation ${chatNumber}`,
-  );
-  insertMessage(
-    chat.id,
-    "assistant",
-    `This is a read-only side chat for ${application.name}. I can explain the application and its execution history. Send commands and changes to the main conversation.`,
-    "hallvi",
   );
   // Chat administration is visible in the chat list; it is not an application
   // event.

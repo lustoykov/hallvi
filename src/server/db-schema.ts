@@ -41,10 +41,7 @@ export const chats = sqliteTable(
       .references(() => applications.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     kind: text("kind").$type<"main" | "side">().notNull().default("side"),
-    status: text("status")
-      .$type<ConversationStatus>()
-      .notNull()
-      .default("idle"),
+    /** The Pi session that holds this conversation. Pi keeps the rest. */
     nativeSessionId: text("native_session_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -54,47 +51,6 @@ export const chats = sqliteTable(
     uniqueIndex("one_main_conversation")
       .on(table.applicationId)
       .where(sql`${table.kind} = 'main'`),
-  ],
-);
-export const messages = sqliteTable(
-  "messages",
-  {
-    id: text("id").primaryKey(),
-    chatId: text("conversation_id")
-      .notNull()
-      .references(() => chats.id, { onDelete: "cascade" }),
-    role: text("role").$type<ChatMessage["role"]>().notNull(),
-    body: text("body").notNull(),
-    blocks: text("blocks", { mode: "json" })
-      .$type<MessageBlock[]>()
-      .notNull()
-      .default([]),
-    source: text("source").$type<ChatMessage["source"]>().notNull(),
-    status: text("status")
-      .$type<ChatMessage["status"]>()
-      .notNull()
-      .default("completed"),
-    revision: integer("revision").notNull().default(0),
-    responseTo: text("response_to"),
-    requestKey: text("request_key"),
-    /** How the owner sent it: after Pi's current work, or into it. */
-    delivery: text("delivery").$type<ChatMessage["delivery"]>(),
-    /**
-     * When Pi durably took this message. From then on it is Pi's to queue,
-     * run, cancel and restore, and Hallvi never hands it over again.
-     */
-    admittedAt: text("admitted_at"),
-    /** The id Pi keeps this message under, queued and then in its history. */
-    nativeEntryId: text("native_entry_id"),
-    error: text("error"),
-    startedAt: text("started_at"),
-    finishedAt: text("finished_at"),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-  },
-  (table) => [
-    index("messages_conversation").on(table.chatId, table.createdAt),
-    uniqueIndex("message_request").on(table.chatId, table.requestKey),
   ],
 );
 export const savedInformation = sqliteTable(
