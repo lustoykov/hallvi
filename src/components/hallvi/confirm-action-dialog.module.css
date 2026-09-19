@@ -55,8 +55,11 @@
   border-radius: 7px;
   background: white;
   color: #192338;
-  padding: 11px 16px;
+  min-height: var(--button-height);
+  padding: 0 14px;
   font: inherit;
+  font-size: 13px;
+  font-weight: 560;
   cursor: pointer;
 }
 .dialog .danger {
@@ -94,5 +97,6 @@
 .dialog .primary {
   background: var(--blue);
   border-color: var(--blue);
+  box-shadow: var(--button-shadow);
   color: white;
 }

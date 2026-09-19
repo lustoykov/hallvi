@@ -84,6 +84,10 @@
   overflow-wrap: anywhere;
   font-size: 12px;
 }
+.verificationUrl {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
 .heading {
   margin-bottom: 28px;
 }
@@ -141,17 +145,19 @@
   padding: 22px 30px;
 }
 .primary {
-  min-height: 44px;
-  padding: 12px 20px;
+  min-height: var(--button-height);
+  padding: 0 14px;
   display: inline-flex;
-  gap: 14px;
+  gap: 8px;
   align-items: center;
   justify-content: center;
   background: var(--blue);
+  box-shadow: var(--button-shadow);
   color: white;
   border: 0;
   border-radius: var(--radius);
-  font-weight: 600 !important;
+  font-size: 13px;
+  font-weight: 560 !important;
   text-decoration: none;
   flex-shrink: 0;
   transition: background-color var(--fast) var(--ease);
@@ -541,6 +547,50 @@
 }
 .caretaker :global([data-fallback="true"] .mascot-fallback) {
   display: block;
+}
+/* Settings → Workspace: one choice between two ways of working. */
+.choices {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.choice:has(input:checked) {
+  border-color: var(--blue);
+  background: #f6f9ff;
+}
+.choice input {
+  margin: 3px 0 0;
+  accent-color: var(--blue);
+}
+.choice > span {
+  display: grid;
+  gap: 6px;
+}
+.choice strong em {
+  margin-left: 8px;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .preferences {
   border-top: 1px solid #e1e6ef;

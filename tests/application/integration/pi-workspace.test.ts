@@ -1,8 +1,10 @@
-// A Run's Pi workspace against a synthetic Docker Engine on a unix socket:
-// the real Docker client and transport, no containers. The real-container
-// proof is the opt-in pi-workspace.docker.test.ts.
+// A Run's Pi workspace, with Docker isolation chosen, against a synthetic
+// Docker Engine on a unix socket: the real Docker client and transport, no
+// containers. The real-container proof is the opt-in
+// pi-workspace.docker.test.ts; the default, directly on this computer, is
+// pi-workspace-direct.test.ts.
 import * as sdk from "@earendil-works/pi-coding-agent";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
@@ -51,6 +53,7 @@ type Mount = { Type: string };
 
 const variables = [
   "DOCKER_HOST",
+  "HALLVI_CONFIG_DIR",
   "HALLVI_DB_PATH",
   "HALLVI_PROBE_TOKEN",
 ] as const;
@@ -225,6 +228,11 @@ beforeEach(async () => {
   root = createTemporaryRoot("/tmp/hallvi-pi-workspace-");
   // Workspace ownership labels and event logs belong to this scratch root.
   process.env.HALLVI_DB_PATH = join(root, "hallvi.db");
+  process.env.HALLVI_CONFIG_DIR = root;
+  writeFileSync(
+    join(root, "workspace.json"),
+    JSON.stringify({ isolation: "docker" }),
+  );
   process.env.DOCKER_HOST = `unix://${join(root, "docker.sock")}`;
   discovery.missing = false;
   imagePinning.calls = [];
@@ -399,7 +407,7 @@ it("cancels during shared runtime preparation without creating a late workspace"
   expect(engine.containers).toEqual([]);
 });
 
-it("reports a missing Docker Engine as tool feedback and never runs the built-in on the controller", async () => {
+it("reports a missing Docker Engine as tool feedback and never runs the built-in on this computer instead", async () => {
   discovery.missing = true;
   const target = join(root, "controller.txt");
   const tools = piWorkspaceTools(
@@ -412,7 +420,7 @@ it("reports a missing Docker Engine as tool feedback and never runs the built-in
   ] as const)
     await expect(
       tools.find((tool) => tool.name === name)!.execute(name, args),
-    ).rejects.toThrow(/Docker Engine/);
+    ).rejects.toThrow(/Docker isolation is selected[\s\S]*Docker Engine/);
   expect(existsSync(target)).toBe(false);
   expect(engine.requests).toEqual([]);
 });

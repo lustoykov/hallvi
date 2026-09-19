@@ -201,6 +201,32 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
       .default([]),
   }),
   z.strictObject({
+    kind: z.literal("access-log"),
+    /**
+     * Where the proxy writes one line per request, so the controller can
+     * follow it while Overview is open. The controller builds the command
+     * itself from these fields and nothing else: a container name or a file
+     * path, each a closed shape with no room for shell. Pi never supplies
+     * command text here, which is why following it needs no approval.
+     */
+    proxy: z.string().trim().min(1).max(80),
+    /** The only format the controller can read today. */
+    format: z.literal("caddy-json"),
+    source: z.discriminatedUnion("type", [
+      z.strictObject({
+        type: z.literal("container"),
+        name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/),
+      }),
+      z.strictObject({
+        type: z.literal("file"),
+        path: z
+          .string()
+          .regex(/^\/[A-Za-z0-9_.\/-]{1,300}$/)
+          .refine((value) => !value.includes(".."), "No parent segments."),
+      }),
+    ]),
+  }),
+  z.strictObject({
     kind: z.literal("usage"),
     /**
      * A window of readings Hallvi took from the server when it looked:

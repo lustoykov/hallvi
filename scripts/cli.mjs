@@ -54,6 +54,7 @@ const domain = `gui/${userInfo().uid}`;
 // docker. The person's PATH at `start` is kept, ahead of the usual places.
 const path = [
   ...new Set([
+    join(app, "..", "node", "bin"),
     ...(process.env.PATH ?? "").split(":").filter(Boolean),
     "/opt/homebrew/bin",
     "/usr/local/bin",
@@ -268,7 +269,11 @@ async function status() {
   console.log(`  state      ${data}`);
   console.log(`  logs       hallvi logs`);
   if (!up) console.log("Look at `hallvi logs` for the reason.");
-  return up ? 0 : 1;
+  if (up) {
+    console.log("Open the interface address in a browser on this machine.");
+    console.log("From a laptop, run: hallvi remote user@server-address");
+  }
+  return up && workerAlive() ? 0 : 1;
 }
 
 function logs() {
@@ -357,6 +362,7 @@ const commands = {
   stop,
   restart: () => (stop(), start()),
   status,
+  url: () => console.log(`http://127.0.0.1:${installedPorts().web}`),
   logs,
   remote,
   uninstall,
@@ -376,6 +382,7 @@ if (Object.hasOwn(commands, command)) {
   stop       stop, and stay stopped until the next start
   restart    stop, then start
   status     whether the service, the interface and the Pi worker are up
+  url        browser address on the machine using Hallvi
   logs [-f]  what the service has printed
   remote [user@host]
              SSH settings for using this installation from another machine

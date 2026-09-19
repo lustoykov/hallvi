@@ -267,7 +267,7 @@ export function OperatorConsole({
                   {/* Which machine, said as a machine.
                     "on your server" was printed over `server_bash` and the
                     recorded target verbatim over everything else, so a
-                    workspace container, a tunnel on this Mac and a call to
+                    workspace container, a tunnel on this PC and a call to
                     Hetzner all arrived as prose a reader had to decode — and
                     the one thing that could break the application read like
                     the rest. "root@192.0.2.10:22" is a login string, not how

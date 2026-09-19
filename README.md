@@ -11,24 +11,28 @@ browser to connect your model account, add a repository and deploy it to a
 Linux application server. The machine running Hallvi and the application
 server have separate requirements.
 
-**Private beta:** there is no public download yet. Obtain the release archive
-and matching checksum from the maintainer; you do not need to clone this
-repository or install Node.js to use that archive.
+**Private beta:** there is no public download yet. Obtain the platform release
+archive, matching checksum and installer script from the maintainer; you do not
+need to clone this repository or install Node.js, npm, Python or a compiler.
 
 | Your machine | Start here |
 | --- | --- |
-| macOS | [macOS installation](docs/installation.md#macos) |
-| Ubuntu / Debian Linux with systemd | [Linux installation](docs/installation.md#linux) |
+| Apple-silicon macOS | [macOS installation](docs/installation.md#macos) |
+| Ubuntu 24.04 x64 with systemd | [Linux installation](docs/installation.md#linux) |
 | Another machine, including a Mac mini or Linux VM | [Remote browser access](docs/installation.md#on-another-machine) after installing there |
 
-The service has been exercised on Apple-silicon macOS and Ubuntu 24.04 x64.
-Other installation targets and verification limits are listed in the
-[installation guide](docs/installation.md#supported-machines).
-The current package needs compiler tools during installation and a running
-local Docker Engine before **Read repository**. Direct repository execution
-with optional Docker is decided but not implemented yet.
+The [integrated prebuilt candidate](docs/testing/2026-09-19-integrated-prebuilt-installation.md)
+was installed on Apple-silicon macOS and Ubuntu 24.04 x64. On the installed
+Ubuntu controller, real Pi inspected a public repository, deployed it to a
+separate test host, and reopened private access after a restart with app data
+intact. External-user acceptance remains open. See
+[supported machines](docs/installation.md#supported-machines).
+Pi reads repositories on this computer by default; local Docker is optional.
+Choose **In Docker** in **Settings → Workspace** if you want an isolated
+workspace. See [Pi’s workspace](docs/installation.md#pis-workspace).
 
-After installation, open <http://127.0.0.1:4747> on the machine running Hallvi.
+After a local installation, open <http://127.0.0.1:4747>. For a headless VPS,
+use the [laptop browser handoff](docs/installation.md#on-another-machine).
 Follow [your first deployment](docs/installation.md#your-first-deployment).
 For service commands, upgrades and troubleshooting, see the
 [full installation guide](docs/installation.md).
@@ -62,6 +66,7 @@ Hallvi can execute commands on your application server with the connected accoun
 
 - Use the most capable supported model available to you. No model is immune to prompt injection, and general intelligence alone does not establish security.
 - Prefer a dedicated test server and non-sensitive data during beta. Keep unrelated systems and credentials outside its reach, and scope connected accounts to the resources you intend Hallvi to manage.
+- Pi works on its copy of your repository on the computer running Hallvi, as your user account. Hallvi keeps its own credentials out of those commands, but they can reach whatever your account can. For software you don't trust, choose **In Docker** in Settings → Workspace; see [Pi's workspace](docs/installation.md#pis-workspace).
 - Use **Always ask** when you want to inspect commands before execution; the other two [permission modes](PRODUCT.md#permission-modes) ask less. Review matters even for reads that could disclose private data.
 - Keep tested recovery copies that the managed server and its credentials cannot delete. Backups help recovery; they cannot undo data theft. Avoid exposing sensitive production data unless you accept the current access risks.
 

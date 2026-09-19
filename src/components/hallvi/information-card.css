@@ -328,11 +328,12 @@
 .hv-info-open {
   border-color: var(--blue);
   background: var(--blue);
+  box-shadow: var(--button-shadow);
   color: #fff;
 }
 .hv-info-open:hover {
-  background: #2350c4;
-  border-color: #2350c4;
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
 }
 
 /* ---------- Evidence ---------- */

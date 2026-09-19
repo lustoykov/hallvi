@@ -34,6 +34,38 @@ worker restart does not replay a pending call. A release or backup proposal is
 not a prerequisite for executing an authorized task, and the selected mode must
 actually prevent an unapproved call from executing.
 
+#### What the modes cover
+
+The modes govern **what Pi composes**: every server command, workspace command
+and provider call whose text or arguments came from the model. In Always ask,
+none of it runs without the owner's approval, and that includes the work of
+setting up anything listed below.
+
+They do not govern **Hallvi's own observations**. These are a closed list, not a
+category Pi or a plugin can add to:
+
+| Observation | Started by | What runs |
+| --- | --- | --- |
+| Machine check | The owner pressing Check on a connection card | A fixed probe of OS, Docker, memory and disk |
+| The way in | An application page being open | A local check of the tunnel, or a request to the public address |
+| Requests as they arrive | Overview being open | A fixed follow of the proxy's access log, where an `access-log` record says it is |
+
+An observation has to meet every one of these, or it is Pi's work and goes
+through the modes:
+
+- Its command text is fixed in Hallvi's code. A record may supply at most a value
+  whose shape cannot carry a command, such as a container name or a path.
+- It only reads. It changes nothing on the server, the provider or the
+  repository, and Hallvi keeps nothing it read beyond the page that shows it.
+- The owner's own action starts it, the page shows that it is running, and it
+  ends when that page goes away.
+
+So observations do not prompt in any mode, and a dropped connection that
+reconnects is the same observation continuing, not a new request. What Always
+ask still promises is unchanged: nothing the model wrote has run unapproved,
+including turning access logging on and recording where the log is. Retiring
+that record ends the observation.
+
 ### Empty means unassessed, never healthy
 
 A destination with no records says nobody has looked. That is not a claim that
@@ -84,7 +116,7 @@ workflows, reset data or change the operating scope.
 user's PC, server or provider account just because work finished. Removal stays
 within the requested application operation or an agreed retention policy, with
 exact ownership, retained-data and dependency checks. Disposable artifacts from
-that operation and isolated workspaces may be removed; application data,
+that operation and Pi's repository workspaces may be removed; application data,
 credentials, history and unrelated resources remain. A Hallvi folder or
 label alone is not disposal permission. Permission modes change approval prompts,
 not the scope of the user's request. The runtime does not auto-load contributor

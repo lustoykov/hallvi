@@ -1,4 +1,5 @@
-// Pi's real built-in implementations in the real per-run workspace container.
+// Pi's real built-in implementations in the real per-run workspace container,
+// with Docker isolation chosen in Settings → Workspace.
 // Opt in with HALLVI_DOCKER_TESTS=1 on a host with a reachable Docker
 // Engine. The first run builds the workspace image, which needs network.
 import * as sdk from "@earendil-works/pi-coding-agent";
@@ -20,7 +21,11 @@ import {
   piWorkspaceTools,
 } from "../../../src/server/pi-workspace";
 
-const variables = ["HALLVI_DB_PATH", "HALLVI_PROBE_TOKEN"] as const;
+const variables = [
+  "HALLVI_CONFIG_DIR",
+  "HALLVI_DB_PATH",
+  "HALLVI_PROBE_TOKEN",
+] as const;
 
 describe.skipIf(process.env.HALLVI_DOCKER_TESTS !== "1")(
   "Pi built-ins in the real workspace container",
@@ -33,6 +38,11 @@ describe.skipIf(process.env.HALLVI_DOCKER_TESTS !== "1")(
       root = createTemporaryRoot("/tmp/hallvi-pi-docker-");
       // Workspace ownership labels and event logs belong to this root.
       process.env.HALLVI_DB_PATH = join(root, "hallvi.db");
+      process.env.HALLVI_CONFIG_DIR = root;
+      writeFileSync(
+        join(root, "workspace.json"),
+        JSON.stringify({ isolation: "docker" }),
+      );
       process.env.HALLVI_PROBE_TOKEN = "controller-only-credential";
     });
     afterAll(async () => {

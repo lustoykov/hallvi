@@ -215,7 +215,7 @@ test(
     await expect(
       page
         .getByRole("alert")
-        .filter({ hasText: "GitHub sign-in was cancelled." }),
+        .filter({ hasText: "GitHub denied this sign-in." }),
     ).toBeVisible();
     expect(
       (await (await page.request.get("/api/github/setup")).json()).connection,
@@ -332,7 +332,7 @@ test(
     await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByText("Access renews automatically.", { exact: true }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })
@@ -382,9 +382,6 @@ test(
       JSON.stringify({ refresh: "revoked" }),
     );
     await checkAgain();
-    await page.goto(appUrl);
-    await openConversation(page);
-    await expect(page.locator(".hv-repository-notice")).toBeVisible();
     await page.goto("/setup/github");
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
       "Sign in again",

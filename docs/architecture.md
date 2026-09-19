@@ -115,6 +115,38 @@ share [managedSshOptions](../src/server/managed-ssh.ts) for the saved SSH key,
 port and pinned-host verification policy. Each caller retains its own timeout,
 keepalive, terminal, forwarding and output handling.
 
+### Requests as they arrive
+
+Overview follows the proxy's access log while it is open, and keeps nothing.
+[access-log.ts](../src/server/access-log.ts) owns it; the rule that lets the
+controller run this without a prompt is in
+[Product](../PRODUCT.md#what-the-modes-cover).
+
+```mermaid
+sequenceDiagram
+  participant Pi
+  participant Records as Saved records
+  participant Page as Overview (browser)
+  participant Route as GET /traffic (SSE)
+  participant Server as Application server
+  Pi->>Server: turn on Caddy JSON access logging (through the boundary)
+  Pi->>Records: save access-log {container name | file path}
+  Page->>Route: EventSource
+  Route->>Records: newest access-log record
+  Route->>Server: ssh, fixed command: docker logs -f | tail -F
+  Server-->>Route: one JSON line per request
+  Route-->>Page: method, path without query, status, ms, salted visitor label
+  Page->>Route: page closes
+  Route->>Server: session ends
+```
+
+One SSH session per open page, ended when the page goes away. The record's
+fields are closed shapes that cannot carry shell, the command only reads, and
+client addresses and query strings never leave the controller: the page gets a
+label salted per process, enough to count visitors and nothing else. With no
+`access-log` record the stream answers `no-log` and the page offers to ask Pi;
+it does not go looking for a log by itself.
+
 ## From a record to a page
 
 A record is checked when it is written, not when it is read.
@@ -139,28 +171,74 @@ cards, it is composed from the same records.
 
 ## Repository workspace architecture
 
-The repository workspace runs natively on the local Docker Engine's Linux
-architecture: amd64 or arm64. The controller reads the daemon's architecture,
-selects the matching immutable Node image, and includes that architecture in
-the workspace image cache key. PowerShell and Compose are pinned downloads
-with separate checksums for each architecture. This avoids requiring x86
-emulation on Apple-silicon Macs.
+Pi's read, write, edit, bash, powershell, grep, find and ls tools work on a
+copy of the application's repository, never on Hallvi's own tree. Settings →
+Workspace chooses where that copy lives; the choice is read once per turn
+([workspace-isolation.ts](../src/server/workspace-isolation.ts)) and never
+changes during it. Both modes run Pi's own tool implementations through the
+same [bridge](../scripts/pi-workspace/bridge.mjs), keep the same run journal,
+permission checks and cancellation rule, and seed the same filtered snapshot:
+credential paths are left out and credential-shaped text is redacted.
 
 ```mermaid
 flowchart LR
-  Engine[Local Docker Engine architecture] --> Select{amd64 or arm64}
-  Select --> Base[Matching pinned Node image]
-  Base --> Tools[Matching PowerShell and Compose binaries]
-  Tools --> Workspace[Isolated repository workspace]
-  Source[Repository snapshot] --> Workspace
-  Workspace --> Findings[Inspection results for Pi]
+  subgraph Controller["Hallvi worker (holds credentials)"]
+    Pi[Pi session] --> Gate[Permission mode and read-only side chats]
+    Gate --> Choice{Settings → Workspace}
+  end
+  Choice -->|On this computer, default| Direct
+  Choice -->|In Docker| Ready{Local Docker answers?}
+  Ready -->|No| Withdrawn[Tools withdrawn this turn, reason told to the owner]
+  Ready -->|Yes| Container
+  subgraph Direct["Scratch folder in the temp directory, as the user's account"]
+    Bridge1[bridge.mjs child process] --> Copy1[Repository copy]
+  end
+  subgraph Container["Container: no network, read-only root, no host files"]
+    Bridge2[bridge.mjs via docker exec] --> Copy2[Repository copy on tmpfs]
+  end
+  Controller -. "minimal env: no tokens, no HALLVI_*" .-> Bridge1
+  Controller -. "file tools: paths inside the folder only" .-> Bridge1
+  Bridge1 -. "shell is not confined: reaches what the account can" .-> Home[(User's files, including Hallvi's state)]
+  Pi -->|server_bash over SSH| Server[Application server: Docker and Compose]
 ```
 
-Only the workspace architecture follows the controller's engine. Deployment
-image resolution retains its existing Linux amd64 default. The workspace's
-non-root user, absent network, read-only container filesystem, temporary
-repository volume and lack of controller credentials or Docker socket remain
-unchanged.
+**On this computer** (the default) creates
+`<temp>/hallvi-workspaces/<owner>-<pid>-<id>`, owner-only, and runs each tool
+call as a child process of the worker with the folder as its working
+directory. Two precautions apply, and neither is isolation. The child's
+environment is built from a short allowlist — `PATH`, `HOME`, user, shell,
+locale, terminal, time zone and temporary directory — so the provider tokens,
+GitHub credentials and `HALLVI_*` locations the service holds are not passed
+on. File tools refuse a path whose real location, after `~`, `@` and links are
+resolved, is outside the folder; Hallvi's database, configuration and
+credential files are all outside it. A shell command is not confined and can
+reach anything the account can, and the prompt says so to Pi. Cancellation or
+the three-minute deadline sends `SIGTERM`, on which the bridge aborts Pi's
+tool so it kills the command's process tree, then `SIGKILL` after five seconds;
+the workspace then ends and nothing is replayed. At the end of the turn the
+folder's regular files, links not followed, are kept as `workspace.tar` in the
+run journal (up to 64 MiB) and the folder is removed. A worker that starts
+removes folders left by a worker of the same installation that is no longer
+running.
+
+**In Docker** runs natively on the local engine's Linux architecture, amd64
+or arm64. The controller reads the daemon's architecture, selects the matching
+immutable Node image, and includes that architecture in the workspace image
+cache key. PowerShell and Compose are pinned downloads with separate checksums
+for each architecture, so Apple-silicon Macs need no x86 emulation. The
+container runs as a non-root user with no network, a read-only root, a
+temporary repository volume, and no controller files, credentials or Docker
+socket. If Docker is chosen and the engine does not answer when a turn starts,
+the workspace tools are not offered that turn and Pi is told why; if it stops
+mid-turn, the tool call fails and the workspace ends. Neither case falls back
+to the direct mode.
+
+Only the machine running Hallvi dropped its Docker requirement. Compose files
+are validated and images built on the application server, which runs Docker
+Compose; the direct mode has no bundled Compose binary, and the prompt directs
+Pi to the server for that. Files reach the server through `server_bash`, as
+before; nothing is extracted from the workspace into the controller except the
+opaque journal archive.
 
 ## Publishing at a domain
 
@@ -241,6 +319,11 @@ controller stays manual; see
   path is not proved.
 - Nothing retrieves an application's own logs; the Logs destination holds what
   Hallvi's own commands printed, and says so.
+- Live requests need Caddy writing JSON access logs and a record saying where.
+  Other proxies and formats are not read. Both sources were
+  [run on a rented server](testing/2026-09-19-overview-live.md) with a record
+  Pi wrote. A private application has no proxy until the owner asks for this,
+  and a dead connection takes about fifteen seconds to notice.
 - One conversation per application runs at a time, and applications run
   beside each other. Parallel read-only side work is deferred.
 

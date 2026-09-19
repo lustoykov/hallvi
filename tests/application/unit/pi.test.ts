@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn(),
   configure: vi.fn(),
   workspace: vi.fn(),
+  unavailable: vi.fn(),
+  workspacePrompt: vi.fn(),
   main: vi.fn(),
   execute: vi.fn(),
   host: vi.fn(),
@@ -56,8 +58,11 @@ vi.mock("../../../src/server/operator-execution", () => ({
 vi.mock("../../../src/server/pi-workspace", async (original) => ({
   ...(await original<typeof import("../../../src/server/pi-workspace")>()),
   PiWorkspace: class {
+    path = "/workspace";
     execute = mocks.workspace;
     dispose = mocks.dispose;
+    unavailable = mocks.unavailable;
+    prompt = mocks.workspacePrompt;
   },
 }));
 import { openPiSession, describePiFailure } from "../../../src/server/pi";
@@ -99,6 +104,7 @@ beforeEach(() => {
     },
     open: [],
   });
+  mocks.unavailable.mockResolvedValue(null);
   mocks.workspace.mockResolvedValue({
     content: [{ type: "text", text: "file" }],
     details: {},
@@ -175,6 +181,17 @@ it("side chats have no shell, approval or mutation tools", async () => {
   await call("read", "read", { path: "README.md" });
   expect(mocks.workspace).toHaveBeenCalled();
   expect(mocks.execute).not.toHaveBeenCalled();
+});
+it("withdraws every workspace tool with its reason when the chosen Docker isolation is unavailable", async () => {
+  const reason = "Docker isolation is selected, and Docker cannot be used.";
+  mocks.unavailable.mockResolvedValue(reason);
+  await openPiSession(scope);
+  const names = mocks.create.mock.calls[0][0].activeToolNames as string[];
+  for (const name of ["read", "write", "edit", "bash", "grep", "find", "ls"])
+    expect(names).not.toContain(name);
+  expect(names).toContain("server_bash");
+  expect(mocks.workspacePrompt).toHaveBeenCalledWith(reason);
+  expect(mocks.workspace).not.toHaveBeenCalled();
 });
 it("a declined file mutation never reaches the workspace", async () => {
   mocks.execute.mockResolvedValue({ declined: true });

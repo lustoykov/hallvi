@@ -1,8 +1,16 @@
-// Run Pi's own implementation inside the workspace, not in the controller.
+// Run Pi's own implementation in the workspace, not in the controller: inside
+// the Docker container at /workspace, or as a child process in the scratch
+// folder named by the first argument, with an environment Hallvi stripped.
 import * as pi from "@earendil-works/pi-coding-agent";
 
+const root = process.argv[2] ?? "/workspace";
+// Hallvi stops a cancelled call with SIGTERM. Aborting lets Pi's shell tools
+// kill the command's whole process tree before this process exits.
+const cancel = new AbortController();
+process.on("SIGTERM", () => cancel.abort());
+
 // Pi's default PowerShell launcher is Windows-only. Its supported operations
-// hook lets the same tool use pwsh in this Linux workspace. Encode the script
+// hook lets the same tool use pwsh on Linux and macOS. Encode the script
 // so Bash never interprets its variables or quoting.
 const bashOperations = pi.createLocalBashOperations();
 const powershellOperations = {
@@ -36,10 +44,10 @@ const line = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
 try {
   const factory = factories[input.name];
   if (!factory) throw new Error("Unknown built-in tool");
-  const result = await factory("/workspace").execute(
+  const result = await factory(root).execute(
     input.id,
     input.args,
-    undefined,
+    cancel.signal,
     // The built-in tools take an update callback as their fourth argument and
     // send the result so far; passing nothing is why nothing used to stream.
     (partial) => line({ partial }),
