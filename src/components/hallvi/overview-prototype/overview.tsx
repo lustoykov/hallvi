@@ -98,7 +98,15 @@ export function OverviewDirection({
       <header className="axj3-head">
         {page.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
         <div className="axj3-title">
-          <h1>Overview</h1>
+          <h1>
+            {variant === "A"
+              ? "Application pulse"
+              : variant === "B"
+                ? "Activity map"
+                : variant === "C"
+                  ? "Journal"
+                  : "Overview"}
+          </h1>
           {!planned && !variant && (
             <AccessLink
               openUrl={page.openUrl}
@@ -135,47 +143,49 @@ export function OverviewDirection({
         />
       )}
 
-      <div className="axo-lower">
-        <MiniMap
-          model={model}
-          reduced={reduced}
-          highlight={pointed}
-          onOpen={openArchitecture}
-        />
-        <div className="axo-recent">
-          <h2>Recent work</h2>
-          {overview.recent.length === 0 && (
-            <p className="axo-recent-empty">
-              {planned ? "Nothing has run yet." : "No work recorded yet."}
-            </p>
-          )}
-          {overview.recent.map((item) => (
+      {!variant && (
+        <div className="axo-lower">
+          <MiniMap
+            model={model}
+            reduced={reduced}
+            highlight={pointed}
+            onOpen={openArchitecture}
+          />
+          <div className="axo-recent">
+            <h2>Recent work</h2>
+            {overview.recent.length === 0 && (
+              <p className="axo-recent-empty">
+                {planned ? "Nothing has run yet." : "No work recorded yet."}
+              </p>
+            )}
+            {overview.recent.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="axo-recent-row"
+                disabled={!item.open}
+                onClick={item.open ?? undefined}
+              >
+                <OpChip state={item.state} />
+                <b>{item.title}</b>
+                <small>
+                  {item.from ? `from ${item.from}` : "automatic"} · {item.when}
+                </small>
+              </button>
+            ))}
             <button
-              key={item.id}
               type="button"
-              className="axo-recent-row"
-              disabled={!item.open}
-              onClick={item.open ?? undefined}
+              className="ax-textlink"
+              onClick={() => onOpenDestination("history")}
             >
-              <OpChip state={item.state} />
-              <b>{item.title}</b>
-              <small>
-                {item.from ? `from ${item.from}` : "automatic"} · {item.when}
-              </small>
+              Open History
+              <ArrowRight weight="bold" />
             </button>
-          ))}
-          <button
-            type="button"
-            className="ax-textlink"
-            onClick={() => onOpenDestination("history")}
-          >
-            Open History
-            <ArrowRight weight="bold" />
-          </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {overview.ideas.length > 0 && (
+      {overview.ideas.length > 0 && !variant && (
         <div className="axo-quiet-wrap">
           <button
             type="button"
