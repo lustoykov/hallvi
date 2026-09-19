@@ -58,7 +58,10 @@ type Part = {
   arguments?: Record<string, unknown>;
 };
 
-/** A tool result as Pi stores it: the tool's own words, and whether it failed. */
+/**
+ * A tool result as Pi stores it: the tool's own words, and whether it
+ * failed.
+ */
 type ToolResult = {
   role: string;
   toolCallId?: string;
