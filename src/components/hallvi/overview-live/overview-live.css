@@ -1,0 +1,490 @@
+/* Overview for a deployed application: one live tile, and recorded ones. */
+
+/* The shared head brings no padding of its own; its page does. */
+.ovl > .axj3-head {
+  max-width: 1180px;
+  padding: 22px 36px 0;
+}
+.ovl-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* The live tile sets the height of the first two rows. Recorded tiles are
+     as tall as what they have to say, so a new application is not a wall of
+     empty boxes. */
+  grid-template-rows: 212px 212px;
+  grid-auto-rows: minmax(112px, auto);
+  gap: 14px;
+  max-width: 1180px;
+  padding: 18px 36px 48px;
+}
+.ovl-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--lift);
+  overflow: hidden;
+}
+.ovl-tile.is-wide {
+  grid-column: span 2;
+}
+.ovl-tile h2 {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ovl-tile h2 button,
+.ovl-ask {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.ovl-tile h2 button {
+  opacity: 0;
+  transition: opacity var(--fast);
+}
+.ovl-tile:hover h2 button,
+.ovl-tile h2 button:focus-visible {
+  opacity: 1;
+}
+.ovl-ask {
+  align-self: flex-start;
+  margin-top: auto;
+  padding-top: 10px;
+}
+.ovl-ask:hover,
+.ovl-tile h2 button:hover {
+  text-decoration: underline;
+}
+.ovl-empty,
+.ovl-foot {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 46ch;
+}
+.ovl-foot {
+  margin-top: auto;
+  font-size: 12px;
+}
+.ovl-number {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ovl-number.is-small {
+  font-size: 28px;
+}
+.ovl-number small {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+/* Right now */
+.ovl-now {
+  grid-column: span 3;
+  grid-row: span 2;
+  padding-bottom: 0;
+  border-color: #dce5f7;
+  background: linear-gradient(180deg, #f6f8fe, #fff 80%);
+}
+.ovl-now-flow {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 0;
+}
+.ovl-flow {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1100 / 500;
+}
+.ovl-flow canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ovl-flow-app {
+  position: absolute;
+  /* Its right edge meets the threads, however short the name. */
+  right: 78%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 20%;
+  padding: 7px 14px 7px 12px;
+  border-radius: 999px;
+  border: 1px solid #d9e2f5;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ovl-flow-app i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--blue);
+}
+.ovl-flow-app[data-failing="true"] i {
+  background: var(--failed);
+}
+.ovl-flow-end {
+  position: absolute;
+  left: 83%;
+  right: 0;
+  margin: 0;
+  transform: translateY(-50%);
+  display: grid;
+  gap: 1px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.ovl-flow-end b {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ovl-flow-end span {
+  font-size: 11.5px;
+  color: #8b95a5;
+  font-variant-numeric: tabular-nums;
+}
+.ovl-flow-end[data-failing="true"] b,
+.ovl-flow-end[data-failing="true"] span {
+  color: var(--failed);
+}
+.ovl-note {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20%;
+  text-align: center;
+}
+/* A picture of a moment ago is drawn as one: faded, under what is true now. */
+.ovl-now-flow[data-live="false"] .ovl-flow {
+  opacity: 0.28;
+  transition: opacity var(--base) var(--ease-out);
+}
+.ovl-now-flow[data-live="false"] .ovl-note > * {
+  position: relative;
+}
+.ovl-now-flow[data-live="false"] .ovl-note::before {
+  content: "";
+  position: absolute;
+  inset: 34% 22%;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.86);
+}
+.ovl-note b {
+  font-size: 15px;
+  font-weight: 600;
+}
+.ovl-note p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.ovl-note button {
+  margin-top: 8px;
+}
+
+/* The way in */
+.ovl-health.is-well {
+  background: linear-gradient(160deg, #eaf8f1, #fff 70%);
+  border-color: var(--verified-line);
+}
+.ovl-health.is-bad {
+  background: linear-gradient(160deg, #fdf1f0, #fff 70%);
+  border-color: var(--failed-line);
+}
+.ovl-beat {
+  position: relative;
+  flex: 1;
+}
+.ovl-beat b,
+.ovl-beat i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin: -12px;
+  border-radius: 999px;
+  background: #b4bccb;
+}
+.ovl-beat i {
+  opacity: 0;
+}
+.is-well .ovl-beat b,
+.is-well .ovl-beat i {
+  background: var(--verified);
+}
+.is-bad .ovl-beat b {
+  background: var(--failed);
+}
+.is-well .ovl-beat i {
+  animation: ovl-beat 2.4s ease-out infinite;
+}
+.is-well .ovl-beat i + i {
+  animation-delay: 1.2s;
+}
+@keyframes ovl-beat {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0;
+    transform: scale(4);
+  }
+}
+.ovl-health-word {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.is-well .ovl-health-word {
+  color: var(--verified-text);
+}
+.is-bad .ovl-health-word {
+  color: var(--failed);
+}
+.ovl-health .ovl-foot {
+  margin-top: 0;
+}
+
+/* As it is written */
+.ovl-tape {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  -webkit-mask-image: linear-gradient(#000 80%, transparent);
+  mask-image: linear-gradient(#000 80%, transparent);
+}
+.ovl-tape li {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 28px;
+  gap: 8px;
+  padding: 4px 0;
+  color: var(--muted);
+  white-space: nowrap;
+  animation: ovl-in var(--base) var(--ease-out);
+}
+.ovl-tape b {
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ovl-tape i {
+  font-style: normal;
+  color: var(--verified-text);
+}
+.ovl-tape li[data-failed],
+.ovl-tape li[data-failed] b,
+.ovl-tape li[data-failed] i {
+  color: var(--failed);
+}
+@keyframes ovl-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+
+/* Recorded tiles */
+.ovl-area {
+  width: 100%;
+  height: 84px;
+  margin: 10px 0 8px;
+}
+.ovl-area polygon {
+  fill: #edf3ff;
+}
+.ovl-area polyline {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.ovl-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 84px;
+  margin-top: 12px;
+}
+.ovl-bars i {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: #9db8f0;
+}
+.ovl-needs,
+.ovl-vitals,
+.ovl-recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ovl-needs {
+  display: grid;
+  gap: 10px;
+}
+.ovl-needs li {
+  display: grid;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 2px solid var(--waiting-line);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.ovl-needs li[data-tone="failed"] {
+  border-left-color: var(--failed);
+}
+.ovl-needs span {
+  color: var(--muted);
+}
+.ovl-needs .ovl-ask {
+  margin-top: 2px;
+}
+.ovl-vitals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 18px;
+  flex: 1;
+  align-content: start;
+}
+.ovl-vitals button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ovl-vitals button:hover {
+  background: var(--context);
+}
+.ovl-vitals b {
+  order: -1;
+}
+.ovl-vitals .hv-tag {
+  justify-self: end;
+}
+.ovl-vitals button > span:last-child {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ovl-unmapped {
+  max-width: none;
+}
+.ovl-unmapped .ovl-ask {
+  display: inline;
+}
+.ovl-recent li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.ovl-recent li:last-child {
+  border-bottom: 0;
+}
+.ovl-recent b,
+.ovl-recent button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.ovl-recent button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ovl-recent button:hover {
+  color: var(--link);
+}
+.ovl-recent span {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .ovl-grid {
+    grid-template-columns: 1fr 1fr;
+    padding: 16px;
+  }
+  .ovl-now {
+    grid-column: span 2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-well .ovl-beat i,
+  .ovl-tape li {
+    animation: none;
+  }
+}
