@@ -34,6 +34,7 @@ import {
 } from "./pi-transcript";
 import { settleRunningExecutions } from "./operator-execution";
 import { beginRunDiagnostics } from "./tracing";
+import type { PiReply } from "./types";
 import { WorkerRefusal } from "./worker-link";
 
 export interface Scope {
@@ -55,8 +56,8 @@ interface Opened extends Scope {
   fresh: () => Promise<LaneSnapshot>;
   /** Pi's whole branch, read again only when its tip has moved. */
   history: () => Promise<Entry[]>;
-  /** One trace per stretch of work. */
-  trace(id: string | null): void;
+  /** One trace per stretch of work, ended with how Pi says it ended. */
+  trace(id: string | null, outcome?: PiReply["status"]): void;
   close: () => Promise<void>;
   /** Set while this worker runs the lane. */
   driving: boolean;
@@ -152,8 +153,8 @@ export function sessionOwner(
       history,
       driving: false,
       done: undefined as Promise<void> | undefined,
-      trace(id: string | null) {
-        diagnostics?.finish("completed");
+      trace(id: string | null, outcome: PiReply["status"] = "completed") {
+        diagnostics?.finish(outcome);
         const now = new Date().toISOString();
         diagnostics = id
           ? beginRunDiagnostics({
@@ -231,6 +232,15 @@ export function sessionOwner(
             conversation.chatId,
           );
           conversation.driving = false;
+          const ended = conversation.snapshot().lastResult?.status;
+          conversation.trace(
+            null,
+            ended === "aborted"
+              ? "cancelled"
+              : ended === "completed"
+                ? "completed"
+                : "failed",
+          );
           await shut(conversation);
           return null;
         });
@@ -283,7 +293,26 @@ export function sessionOwner(
       const open = opened.get(scope.chatId);
       if (open) return project(open);
       if (!hasHistory(scope)) return NOTHING;
-      return inLine(scope.chatId, async () => project(await ensure(scope)));
+      return inLine(scope.chatId, async () =>
+        project(await ensure(scope)),
+      ).catch((error) => ({
+        // A history that cannot be opened is said where it would have been.
+        ...NOTHING,
+        messages: [
+          {
+            id: `unavailable:${scope.chatId}`,
+            chatId: scope.chatId,
+            role: "assistant" as const,
+            body: "",
+            source: "pi" as const,
+            status: "failed" as const,
+            error: error instanceof Error ? error.message : String(error),
+            createdAt: loadChat(scope.applicationId, scope.chatId).chat
+              .createdAt,
+            revision: 0,
+          },
+        ],
+      }));
     },
 
     /** Resolves once Pi has durably taken the message, and not before. */

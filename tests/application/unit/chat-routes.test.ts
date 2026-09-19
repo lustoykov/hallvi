@@ -56,7 +56,7 @@ describe("Chat request validation", () => {
       applicationContext,
     );
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     expect(mocks.createChat).toHaveBeenCalledWith(
       "application-id",
       "Cost questions",
@@ -71,7 +71,7 @@ describe("Chat request validation", () => {
       applicationContext,
     );
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     expect(mocks.createChat).toHaveBeenCalledWith("application-id", undefined);
   });
 
@@ -103,7 +103,7 @@ describe("Chat request validation", () => {
       chatContext,
     );
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     expect(mocks.sendChatMessage).toHaveBeenCalledWith(
       "application-id",
       "chat-id",

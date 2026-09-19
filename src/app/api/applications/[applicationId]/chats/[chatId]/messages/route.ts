@@ -25,8 +25,8 @@ export async function POST(
         body.requestKey,
         body.delivery,
       ),
-      // Pi has the message: this is not a promise to deliver it later.
-      { status: 201 },
+      // Accepted means Pi has durably taken it; its answer is still to come.
+      { status: 202 },
     );
   });
 }

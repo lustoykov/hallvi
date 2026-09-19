@@ -58,7 +58,7 @@ test(
     const data = { message: "Hello [slow]", requestKey: crypto.randomUUID() };
     const response = await page.request.post(endpoint, { data });
     // Answered once Pi has durably taken the message.
-    expect(response.status()).toBe(201);
+    expect(response.status()).toBe(202);
     const sent = (snapshot: { messages: { requestKey?: string }[] }) =>
       snapshot.messages.filter((m) => m.requestKey === data.requestKey);
     expect(sent(await response.json())).toHaveLength(1);
