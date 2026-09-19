@@ -7,11 +7,12 @@ Node 22.23.2, locked install, `pi-agent-core`, `pi-ai` and `pi-coding-agent`
 all exactly 0.85.1. The design this proves is
 [Interaction while Pi is busy](../operator-design.md#interaction-while-pi-is-busy).
 
-Code under test: tree `95c1ea0a` (commit `55601611` before the branch was
-tidied). The real-provider run, the application suite, typecheck, lint, format
-and the browser journeys below were all made on that tree. Commits after it
-change only documentation, one comment's length and the name of a research
-probe; `git diff 95c1ea0a HEAD --stat` shows exactly that.
+Code under test: commit `55601611`, kept as the tag
+`tested/pi-owns-conversations`. The real-provider run, the application suite,
+typecheck, lint, format and the browser journeys below were all made on it.
+The branch was then tidied into one commit; what differs from the tag is
+documentation, one comment's length and the name of a research probe, which
+`git diff tested/pi-owns-conversations claude/pi-agent-harness --stat` shows.
 
 Scripted-model results and real-provider results are kept apart. A scripted
 result is never offered as evidence about the real provider or a host.
