@@ -287,7 +287,9 @@ export function OperatorConsole({
                       <Tag tone={states[item.status]!.tone}>
                         {states[item.status]!.word}
                       </Tag>
-                    ) : (
+                    ) : item.tool === "server_bash" ? null : (
+                      // A server command says Running in its own terminal
+                      // bar; a second chip above it said the same thing twice.
                       <Working>Running</Working>
                     )}
                     {typeof item.exitCode === "number" && (

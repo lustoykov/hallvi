@@ -172,9 +172,9 @@ test("Send next waits behind active work and Stop cancels its waiting follow-up"
     expect(state.active).toBe(runId);
     await page.reload();
     await expect(cancel).toBeVisible();
+    // Stop sits where Send does; its name says what else it cancels.
     await page
-      .locator(`#hv-message-${runId}`)
-      .getByRole("button", { name: /^Stop/ })
+      .getByRole("button", { name: "Stop + cancel 1 queued", exact: true })
       .click();
     await expect(cancel).toHaveCount(0);
     await expect

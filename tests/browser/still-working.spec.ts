@@ -107,35 +107,31 @@ test(
 
     await page.goto(`/applications/${appId}`);
 
-    // The transcript says which machine, and that the command has gone quiet,
-    // rather than "Working for 2m 30s" over a command that may be wedged.
-    const status = page.locator(".hv-run-status");
-    await expect(status).toContainText("Running a command on the server");
-    await expect(status).toContainText("quiet for");
-
-    // With the turn on screen the composer says nothing: the status line is
-    // right there and repeating it would be the same sentence twice.
-    const bar = page.locator(".hv-still-working");
-    await expect(bar).toHaveCount(0);
-
-    // Scroll it away — which is how the owner met this, having read an answer
-    // and carried on down the page — and the composer picks it up.
-    await page
-      .getByText("Earlier step 1.", { exact: true })
-      .scrollIntoViewIfNeeded();
-    await expect(bar).toBeVisible();
-    await expect(bar).toContainText("Running a command on the server");
+    // The reply itself says which machine, and that the command has gone
+    // quiet, rather than "Working for 2m 30s" over a command that may be
+    // wedged. One line, at the end of the turn it belongs to.
+    const line = page.locator(`#hv-message-${runId} .hv-still-working`);
+    await expect(line).toContainText("Running a command on the server");
+    await expect(line).toContainText("quiet for");
+    await expect(page.locator(".hv-still-working")).toHaveCount(1);
     await page.screenshot({ path: "tests/results/still-working-desktop.png" });
-    // It points at the turn rather than leaving the reader to find it.
-    await bar.getByRole("button", { name: "Show", exact: true }).click();
-    await expect(page.locator(`#hv-message-${runId}`)).toBeInViewport();
+
+    // Stop is where Send is while nothing is typed, and Send next comes back
+    // with the first character so a follow-up can still be queued.
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    const stop = page.getByRole("button", { name: "Stop", exact: true });
+    await expect(stop).toBeVisible();
+    await composer.fill("And then");
+    await expect(stop).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Send next", exact: true }),
+    ).toBeVisible();
+    await composer.fill("");
 
     // A decision nobody has made is not the turn working. It outranks
     // everything else and says who it is waiting on.
     update({ status: "awaiting-approval" });
-    await expect(page.locator(".hv-run-status")).toContainText(
-      "Waiting for you to approve a command",
-    );
+    await expect(line).toContainText("Waiting for you to approve a command");
 
     // The turn finishes.
     update({
@@ -153,10 +149,10 @@ test(
       .prepare("UPDATE conversations SET status = 'idle' WHERE id = ?")
       .run(chat.id);
 
-    await expect(bar).toHaveCount(0);
+    await expect(page.locator(".hv-still-working")).toHaveCount(0);
+    await expect(stop).toHaveCount(0);
 
     // The conversation now takes the next message, which is the whole point.
-    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     await composer.fill("Now deploy the new revision.");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
@@ -183,10 +179,9 @@ test(
   "an outstanding secret request is reachable once it scrolls away",
   journey("still-working"),
   async ({ page, fixture }) => {
-    // The chip above the composer and the in-flight line are now the same
-    // mechanism: watch the thing in the transcript, appear only while it is
-    // out of sight. The chip had no browser coverage at all, so this is also
-    // the first proof that it does what its comment says.
+    // The chip above the composer watches the request in the transcript and
+    // appears only while it is out of sight. It had no browser coverage at
+    // all, so this is also the first proof that it does what its comment says.
     const created = await page.request.post("/api/applications", {
       data: {
         requestKey: randomUUID(),
