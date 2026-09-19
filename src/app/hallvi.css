@@ -1534,39 +1534,6 @@
 .hv-chat-column > .hv-chat-pane {
   grid-row: 2;
 }
-/* Repository access that has not passed, with the way to check it again. */
-.hv-repository-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 24px;
-  border-bottom: 1px solid var(--line);
-  background: #fffaf0;
-  color: var(--ink);
-  font-size: 13px;
-  line-height: 1.5;
-}
-.hv-repository-notice p {
-  margin: 0;
-}
-.hv-repository-notice button {
-  flex: none;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #fff;
-  color: var(--ink);
-  cursor: pointer;
-}
-.hv-repository-notice button:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-.hv-repository-notice a {
-  flex: none;
-}
-
 /* Quiet controls: small buttons, one solid primary at a time. */
 
 @keyframes hv-pulse {

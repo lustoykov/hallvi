@@ -30,13 +30,6 @@ export const browserJourneys = [
     smoke: true,
   },
   {
-    id: "activity-history",
-    name: "Inspect application Activity and reply recovery",
-    description:
-      "Keep Activity to saved requirements and repository checks, preserve normal Chat, reload, cancel, retry, and record a GitHub disconnect once.",
-    smoke: false,
-  },
-  {
     id: "add-application",
     name: "Add application and chat",
     description:
@@ -54,14 +47,14 @@ export const browserJourneys = [
     id: "provider-failure",
     name: "Recover from a provider failure",
     description:
-      "Keep the accepted message after failure, then retry its reply without duplicating the message or saving partial Decisions.",
+      "Keep the accepted message after failure, then retry its reply without duplicating the message.",
     smoke: false,
   },
   {
     id: "isolation",
     name: "Keep applications separate",
     description:
-      "Switch applications without leaking Decisions or unsent drafts.",
+      "Switch applications without leaking messages or unsent drafts.",
     smoke: false,
   },
   {
@@ -72,31 +65,24 @@ export const browserJourneys = [
     smoke: false,
   },
   {
-    id: "revision",
-    name: "Revise a Decision safely",
-    description:
-      "Replace the exact Decision; reject a fabricated replacement without saving partial changes.",
-    smoke: false,
-  },
-  {
     id: "removal",
     name: "Remove and recreate an application",
     description:
-      "Require the repository name as confirmation; recreate it with fresh IDs and no old Decisions.",
+      "Require the repository name as confirmation; recreate it with fresh IDs and none of the old conversation.",
     smoke: false,
   },
   {
     id: "disconnect",
     name: "Disconnect without losing history",
     description:
-      "Keep chats, disable new messages and require consent before reusing a discovered login.",
+      "Keep chats, hold new messages unsent and require consent before reusing a discovered login.",
     smoke: false,
   },
   {
     id: "slow-reply",
     name: "Handle a slow reply and double Enter",
     description:
-      "Save one message pair and preserve the next draft typed while waiting.",
+      "Save one message pair, preserve the next draft typed while waiting, and drop the pending copy once the message is accepted.",
     smoke: false,
   },
   {
