@@ -28,7 +28,6 @@ const item = (
   condition: { tone: "muted", text: "Not deployed" },
   stack: "Not deployed yet",
   attention: 0,
-  protection: "",
   ...over,
 });
 

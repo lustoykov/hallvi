@@ -325,7 +325,9 @@ export function OverviewPage({
                     ? "Out of date"
                     : condition.certainty === "failed"
                       ? "Failed"
-                      : "Not assessed"}
+                      : condition.certainty === "warning"
+                        ? "Limited"
+                        : "Not assessed"}
               </Tag>
               {condition.text}
             </p>

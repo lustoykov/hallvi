@@ -24,11 +24,12 @@
 // Nothing here invents a fact. A missing input reads unknown — never healthy,
 // and never absent.
 
-import type {
-  Claim,
-  Ref,
-  SavedInformation,
-  SubjectKind,
+import {
+  subjectKinds,
+  type Claim,
+  type Ref,
+  type SavedInformation,
+  type SubjectKind,
 } from "./operator-data";
 
 type Presentation = NonNullable<SavedInformation["presentation"]>;
@@ -311,6 +312,67 @@ export function checkAsRecorded(
     : check.status === "info"
       ? "noted"
       : "passed";
+}
+
+export type Reading = "failed" | "warning" | "stale" | "verified" | "unknown";
+
+/**
+ * Pi's judgements and the checks' readings, worst first. A failed judgement
+ * or check outranks everything and never ages; a warning is a judgement that
+ * outranks a passing check on the same record; one stale claim makes the
+ * whole stale, because reporting "verified" on the strength of the freshest
+ * check would hide the one that has lapsed.
+ */
+export function worstReading(
+  judgements: (string | undefined)[],
+  readings: ReturnType<typeof checkAsNow>[],
+): Reading {
+  if (judgements.includes("failed") || readings.includes("failed"))
+    return "failed";
+  if (judgements.includes("warning")) return "warning";
+  if (readings.includes("stale")) return "stale";
+  if (readings.includes("verified")) return "verified";
+  return "unknown";
+}
+
+/**
+ * The application's condition, from every subject its records mention — the
+ * list's card and Overview's headline both ask this, so they cannot disagree.
+ *
+ * Every subject, not only the application: a check that failed on its domain
+ * is the application in trouble, whichever subject it was filed under. For
+ * each subject only the newest record with a decisive judgement counts, so an
+ * informational observation cannot clear a failure and a verified recovery
+ * replaces an older one. Events state no subject and judge nothing current.
+ */
+export function applicationReading(
+  records: SavedInformation[],
+  applicationId: string,
+  now: number,
+) {
+  const refs = new Map<string, Ref>(
+    [
+      { kind: "application" as const, id: applicationId },
+      ...subjectKinds.flatMap((kind) => subjectsMentioned(records, kind)),
+    ].map((ref) => [refKey(ref), ref]),
+  );
+  const decisive = records.filter((record) =>
+    ["failed", "warning", "verified"].includes(
+      record.presentation?.status ?? "",
+    ),
+  );
+  const judgements = [...refs.values()].flatMap((ref) => {
+    const presence = presenceOf(decisive, ref);
+    return presence.known ? [presence.record] : [];
+  });
+  const checks = [...refs.values()].flatMap((ref) => [
+    ...currentChecks(records, ref).values(),
+  ]);
+  const reading = worstReading(
+    judgements.map((record) => record.presentation?.status),
+    checks.map((item) => checkAsNow(item.value, item.record, now)),
+  );
+  return { reading, judgements, checks };
 }
 
 export type Tag =

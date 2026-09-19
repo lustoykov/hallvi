@@ -9,20 +9,23 @@
 //
 // Everything here reads the same projection Architecture does. Overview adds
 // no vocabulary of its own: its four lanes come from the subject kind a check
-// was about, and its headline condition comes from the one record that states
-// the application itself.
+// was about, and its headline condition is the applications list's reading of
+// every subject the records mention.
 
 import { clip, commandOf, essence } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { Ref, SavedInformation } from "@/server/operator-data";
 import type { ChatSummary } from "@/server/types";
 import {
+  applicationReading,
   checkAsNow,
   currentChecks,
   currentFacts,
   freshnessOf,
   laneOf,
   presenceOf,
+  refKey,
+  worstReading,
   type Lane,
   type RecordCheck,
 } from "@/server/record-projection";
@@ -191,16 +194,10 @@ function byLane(records: SavedInformation[]) {
  */
 function readLane(held: Held[], now: number): Certainty {
   if (!held.length) return "unknown";
-  const judged = new Set(
-    held.map((item) => item.record.presentation?.status).filter(Boolean),
+  return worstReading(
+    held.map((item) => item.record.presentation?.status),
+    held.map((item) => checkAsNow(item.check, item.record, now)),
   );
-  if (judged.has("failed")) return "failed";
-  const readings = held.map((item) => checkAsNow(item.check, item.record, now));
-  if (readings.includes("failed")) return "failed";
-  if (judged.has("warning")) return "warning";
-  if (readings.includes("stale")) return "stale";
-  if (readings.includes("verified")) return "verified";
-  return "unknown";
 }
 
 /**
@@ -540,42 +537,57 @@ export function overviewFromRecords({
 }
 
 /**
- * The application's own condition, which is the one thing Overview cannot
- * assemble from its lanes: healthy, stale, failed, or nobody has looked.
- * It comes from the record that states the application, and from that
- * record's own `establishedAt` — evidence gathered an hour ago is an hour
- * old however recently it was written down.
+ * The application's condition: the applications list's reading, from every
+ * subject its records mention, in Overview's longer words. Evidence gathered
+ * an hour ago is an hour old however recently it was written down.
  */
 export function applicationCondition(
   records: SavedInformation[],
   applicationId: string,
   now: number,
 ): { certainty: Certainty; text: string } {
-  const ref: Ref = { kind: "application", id: applicationId };
-  const held = [...currentChecks(records, ref).values()];
-  if (!held.length)
+  const { reading, judgements, checks } = applicationReading(
+    records,
+    applicationId,
+    now,
+  );
+  const application = refKey({ kind: "application", id: applicationId });
+  const judged = (status: string) =>
+    judgements.find((record) => record.presentation?.status === status);
+  if (reading === "failed") {
+    const failedJudgement = judged("failed");
+    if (failedJudgement)
+      return {
+        certainty: "failed",
+        text: `A recorded condition failed: ${sentence(failedJudgement.title)}`,
+      };
+    const failed = checks.find((item) => item.value.status === "failed")!;
+    const about = failed.value.about ?? failed.record.presentation?.states?.ref;
+    return {
+      certainty: "failed",
+      text:
+        about && refKey(about) === application
+          ? "A check on the application did not pass."
+          : `"${failed.value.label}" did not pass.`,
+    };
+  }
+  if (reading === "warning")
+    return {
+      certainty: "warning",
+      text: `A recorded condition has a limit: ${sentence(judged("warning")!.title)}`,
+    };
+  if (!checks.length)
     return {
       certainty: "unknown",
       text: "Nothing on record says whether the application is working.",
     };
-  const readings = held.map((item) => checkAsNow(item.value, item.record, now));
-  const newest = held
-    .map((item) => item.record.establishedAt)
-    .filter((at): at is string => Boolean(at))
-    .sort()
-    .at(-1);
-  if (readings.includes("failed"))
-    return {
-      certainty: "failed",
-      text: "A check on the application did not pass.",
-    };
-  if (readings.includes("stale")) {
+  if (reading === "stale") {
     // The lapsed claim's own time, not the newest of all of them. Five checks
     // four minutes old beside one twenty-one hours old produced "It held when
     // it was last checked, 4 min ago. Enough time has passed that it may have
     // changed." — a sentence that argues with itself, and whose number is
     // about the wrong observation.
-    const lapsed = held
+    const lapsed = checks
       .filter((item) => checkAsNow(item.value, item.record, now) === "stale")
       .map((item) => item.record.establishedAt)
       .filter((at): at is string => Boolean(at))
@@ -588,14 +600,20 @@ export function applicationCondition(
         : "It held when it was last checked; enough time has passed that it may have changed.",
     };
   }
-  if (readings.includes("verified"))
+  if (reading === "verified") {
+    const newest = checks
+      .map((item) => item.record.establishedAt)
+      .filter((at): at is string => Boolean(at))
+      .sort()
+      .at(-1);
     return {
       certainty: "verified",
       text: newest
-        ? `The application's own checks held, ${when(newest, now)}.`
-        : "The application's own checks held when they were last read.",
+        ? `The checks on record held, ${when(newest, now)}.`
+        : "The checks on record held when they were last read.",
     };
-  const anyFreshness = held
+  }
+  const anyFreshness = checks
     .map((item) => freshnessOf(item.value, item.record, now).kind)
     .find((kind) => kind !== "fresh");
   return {
@@ -605,4 +623,9 @@ export function applicationCondition(
         ? "A record was written about the application, but it established nothing."
         : "The application has records, but none that say whether it is working.",
   };
+}
+
+/** Pi's title as the end of a sentence. */
+function sentence(title: string) {
+  return /[.!?]$/.test(title) ? title : `${title}.`;
 }

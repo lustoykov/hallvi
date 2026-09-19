@@ -1,16 +1,10 @@
 import type { ApplicationListItem } from "@/components/hallvi/applications-screen";
 import { listApplications } from "./db";
 import {
-  checkAsNow,
-  currentChecks,
+  applicationReading,
   presenceOf,
-  subjectsMentioned,
   subjectsOfKind,
 } from "./record-projection";
-import { subjectKinds, type Ref } from "./operator-data";
-
-/** Every kind a record can be about; the list reads checks from all of them. */
-const SUBJECT_KINDS = subjectKinds;
 import type { SavedInformation } from "./operator-data";
 import { listInformation } from "./saved-information";
 
@@ -25,9 +19,9 @@ import { listInformation } from "./saved-information";
  * returns to in order to check on their software could not tell them which of
  * their applications was in trouble.
  *
- * The rule is the same one Overview uses, from the same records: what the
- * application's own checks say, aged by the reader's clock. Nothing here
- * invents a state, and an application nobody has checked says so.
+ * The condition is the one Overview's headline reads, from the same records
+ * and the same reader's clock. Nothing here invents a state, and an application
+ * nobody has checked says so.
  */
 export function listApplicationItems(): ApplicationListItem[] {
   const now = Date.now();
@@ -41,7 +35,6 @@ export function listApplicationItems(): ApplicationListItem[] {
       source: `${application.repositoryOwner}/${application.repositoryName}`,
       condition: applicationListCondition(records, application.id, now),
       stack: stackOf(records),
-      protection: protectionOf(records),
       attention: records.filter(
         (r) => r.presentation?.role === "recommendation",
       ).length,
@@ -52,14 +45,7 @@ export function listApplicationItems(): ApplicationListItem[] {
 
 /**
  * Short enough for a card, and never more certain than the record allows.
- *
- * Every check the application's records carry, on any subject — not only the
- * ones on the application subject itself. Reading the narrow set let the list
- * show "Checks held" in green for an application whose own Overview said "A
- * check did not pass" two clicks away, because the failing check belonged to
- * its domain rather than to the application. The list has no lane beside it to
- * qualify a green, so it has to account for the same evidence the destination
- * does.
+ * The reading is Overview's headline reading; only the words are the card's.
  */
 export function applicationListCondition(
   records: SavedInformation[],
@@ -67,37 +53,20 @@ export function applicationListCondition(
   now: number,
 ): ApplicationListItem["condition"] {
   if (!records.length) return { tone: "muted", text: "New application" };
-  const refs: Ref[] = [
-    { kind: "application", id: applicationId },
-    ...SUBJECT_KINDS.flatMap((kind) => subjectsMentioned(records, kind)),
-  ];
-  // A current state record can judge a result as failed or limited even when
-  // its individual checks passed. Read only the newest statement for each
-  // subject with a decisive judgment: an informational observation cannot
-  // clear a failure. Events state no subject; verified recovery replaces an
-  // older failure for the same thing.
-  const judged = records.filter((record) =>
-    ["failed", "warning", "verified"].includes(
-      record.presentation?.status ?? "",
-    ),
+  const { reading, judgements, checks } = applicationReading(
+    records,
+    applicationId,
+    now,
   );
-  const currentJudgements = refs.flatMap((ref) => {
-    const presence = presenceOf(judged, ref);
-    return presence.known ? [presence.record.presentation?.status] : [];
-  });
-  if (currentJudgements.includes("failed"))
-    return { tone: "bad", text: "A recorded condition failed" };
-  const held = refs.flatMap((ref) => [...currentChecks(records, ref).values()]);
-  const readings = held.map((item) => checkAsNow(item.value, item.record, now));
-  if (readings.includes("failed"))
-    return { tone: "bad", text: "A check did not pass" };
-  if (currentJudgements.includes("warning"))
+  if (reading === "failed")
+    return judgements.some((record) => record.presentation?.status === "failed")
+      ? { tone: "bad", text: "A recorded condition failed" }
+      : { tone: "bad", text: "A check did not pass" };
+  if (reading === "warning")
     return { tone: "warn", text: "A recorded condition has a limit" };
-  if (!held.length) return { tone: "muted", text: "Not checked yet" };
-  if (readings.includes("stale"))
-    return { tone: "warn", text: "Checked a while ago" };
-  if (readings.includes("verified"))
-    return { tone: "live", text: "Checks held" };
+  if (!checks.length) return { tone: "muted", text: "Not checked yet" };
+  if (reading === "stale") return { tone: "warn", text: "Checked a while ago" };
+  if (reading === "verified") return { tone: "live", text: "Checks held" };
   return { tone: "muted", text: "Recorded, not established" };
 }
 
@@ -133,29 +102,4 @@ function stackOf(records: SavedInformation[]) {
     stores ? `${stores} ${stores === 1 ? "service" : "services"}` : "",
   ].filter(Boolean);
   return said.join(" · ");
-}
-
-/**
- * Backups, on the same three-state rule the rest of the product keeps: a copy
- * on record, an absence somebody established, or nobody having looked. The
- * third is never drawn as the second.
- */
-function protectionOf(records: SavedInformation[]) {
-  const copies = subjectsOfKind(records, "backup-copy").filter((ref) => {
-    const presence = presenceOf(records, ref);
-    return presence.known && presence.presence === "present";
-  }).length;
-  if (copies)
-    return copies === 1
-      ? "1 copy off the server"
-      : `${copies} copies off the server`;
-  const plans = subjectsOfKind(records, "backup-plan");
-  if (!plans.length) return "";
-  const stated = plans.map((ref) => presenceOf(records, ref));
-  if (
-    stated.some((presence) => presence.known && presence.presence === "present")
-  )
-    return "A backup plan, no copy yet";
-  if (stated.some((presence) => presence.known)) return "Not backed up";
-  return "";
 }

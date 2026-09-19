@@ -319,6 +319,14 @@ one lane distinguish four readings without any of them being guessed:
 | failed | a check ran and did not pass |
 | unassessed | no record states the application |
 
+The headline and the applications list read the condition one way,
+`applicationReading` in the record projection: every subject the records
+mention, not only the application, and Pi's newest decisive judgement on each
+beside the current checks. A failed judgement or check comes first, then a
+warning (**limited**), then stale, then healthy. A domain whose check failed is
+the application in trouble, and a passing check does not clear Pi's own
+`failed`.
+
 Preserving the original timestamp is the whole point. A record written now
 about evidence gathered an hour ago is stale, and saying so is the difference
 between a page that reports and a page that reassures.
