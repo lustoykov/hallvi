@@ -126,22 +126,92 @@ with lingering on Linux, serving the web interface on loopback. The service
 keeps the interface and the worker running as a pair, restarts them after a
 crash and survives a reboot, which used to take two terminals.
 
-The packaging spike settled on the smallest thing that works:
+The packaging direction keeps one small CLI for installing, checking and
+reaching Hallvi, with the browser for repositories, account connection and
+operations:
 
-- **An installer script over an archive**, not a single binary or a container
-  image. The archive holds the built interface, the worker bundled to plain
-  JavaScript and the schema; nothing at run time compiles or uses `tsx`,
-  `drizzle-kit` or `next dev`. A container image remains a possible format for
-  the virtual machine rung; it was not needed to get there.
-- **Node.js is downloaded into the program directory**, checksum-verified, so a
-  service never depends on a shell's version manager and the native modules are
-  built against the Node that loads them.
-- **`node-pty` and `better-sqlite3` are installed on the target machine** from
-  the packed lockfile. `node-pty` compiles, so installation needs a compiler.
-  Prebuilt per-platform archives would remove that and need a release pipeline
-  this repository does not have yet.
+- **One verified installer command over a platform archive.** The archive
+  holds the built interface, separate worker, schema, Node.js 22 and locked
+  production dependencies. Native modules are built in the packaging
+  environment, so an end user installs without npm, Python or a compiler.
+  Apple-silicon macOS and Ubuntu 24.04 x64 are the first targets; each
+  candidate still needs installation evidence on both.
+- **A small service CLI, not a second product UI.** `hallvi status` checks the
+  interface and worker; `hallvi remote` prints every loopback SSH forward
+  needed by a laptop browser. Device-code authorization happens on the laptop
+  while Hallvi polls on the machine where it runs.
 - **Program and state are separate directories.** Upgrade and uninstall replace
   or remove the program and never touch state.
+
+```mermaid
+flowchart LR
+  source[Committed Hallvi source] --> build[Build on each target platform]
+  build --> release[Platform archive, checksum and installer]
+  release --> verify[Verify checksum and native modules]
+  verify --> service[User service on loopback]
+  service --> local[Browser on the same machine]
+  service --> forward[SSH forwards for fixed ports]
+  forward --> laptop[Laptop browser]
+  service --> state[(Controller and account state)]
+```
+
+Homebrew and Linux packages are distribution conveniences after the archive is
+proved; neither removes the need to solve trusted downloads, signing and
+GitHub App distribution. A container image remains a possible virtual-machine
+format. Public network hosting would require Hallvi user authentication.
+For self-service beta, the simplest proposed channel is public prebuilt
+archives and checksums from a trusted release location while the source
+repository stays private. Invited testers can receive the same three files
+through a private channel in the meantime, but that remains a manual handoff.
+The source repository's privacy does not hide JavaScript shipped in an
+archive. No download URL, App visibility change or publication is selected
+by this document.
+
+### First-use and return journeys
+
+The actor is the person installing Hallvi. Their first task is complete when
+the service and worker answer, their selected repository is readable, ChatGPT
+is connected, and the browser returns them to that repository's conversation.
+The machine running Hallvi can be a desktop or a headless VPS; the application
+host Pi manages is a separate machine in these journeys.
+
+| State | Desktop Mac or Linux PC | Headless Ubuntu VPS and laptop |
+| --- | --- | --- |
+| I1 — verify | In Terminal: `sh install-hallvi.sh archive.tgz` checks platform and checksum. A mismatch stops before the service changes. | The same command runs over SSH on the VPS. No graphical browser is expected there. |
+| I2 — ready | Terminal shows service, interface URL and worker. Open the URL in this computer's browser. | `hallvi remote user@host` prints forwards for interface, browser terminal and private links. On the laptop, `ssh -N hallvi` holds them open, then the browser opens `127.0.0.1:4747`. |
+| I3 — repository | Paste a public repository and continue without GitHub login. For a private repository, connect an account and grant the App access to selected repositories. | The same browser states appear on the laptop. The VPS only serves Hallvi and performs provider polling. |
+| I4 — model | The browser shows the OpenAI device URL, code, expiry, waiting and Cancel. Success returns to the original application and its draft; cancellation or failure offers retry. | Open the code URL in the laptop browser. No provider callback or extra VPS port is needed. |
+| I5 — inspect | Choose **Read repository** to start the original task. Connecting an account alone does not start it. | The browser action reaches the VPS worker through the SSH forward. Pi reaches the separate application host over its managed connection. |
+
+GitHub account sign-in and selected-repository App installation are two
+visible steps. The account state says **waiting**, **denied**, **expired**,
+**cancelled**, **connected** or **retry**. Once connected, repository access
+shows **not granted**, **checking**, **passed** or a concrete failed check.
+Cancelling or retrying a replacement sign-in keeps a previously working
+connection until a new one succeeds. A public repository can proceed without
+either GitHub step. If this release has no distributable App configuration,
+private access is shown as unavailable rather than asking each end user to
+register an App.
+
+After logout or restart, `hallvi status` shows whether the service and worker
+are ready; the browser keeps the saved application and account connection.
+If only SSH forwarding is lost, the laptop browser cannot reach Hallvi until
+the user reruns `ssh -N hallvi`. The VPS service and its work continue. A
+private application link opened through Hallvi may close after a service
+restart and must be reopened through Pi. An expired or revoked provider login
+returns to its device-code retry while preserving the application and draft.
+
+This split follows two concrete precedents without copying their extra
+surface area. [OpenClaw's CLI onboarding](https://github.com/openclaw/openclaw/blob/9f7b308b2dd18f5a27027b70d66205bd46cde961/docs/cli/onboard.md)
+detects a headless or SSH session and prints a browser URL and forwarding
+instructions. Hallvi prints the complete fixed-port SSH handoff after
+installation, then keeps setup in the existing browser UI. The
+[OpenAI Codex login in pinned Pi 0.84.4](https://github.com/earendil-works/pi/blob/v0.84.4/packages/ai/src/auth/oauth/openai-codex.ts)
+offers device code specifically for headless use, with a browser URL, code,
+expiry and polling; Hallvi already selects that method for ChatGPT on both
+desktop and VPS. Pi also supports a manual redirect-code fallback for its
+different browser callback flow. Hallvi does not need that fallback for
+device-code login or another CLI account wizard.
 
 Neither rung needs local Docker. Pi's repository workspace runs directly on
 the user's machine by default, in a scratch folder holding the repository copy,

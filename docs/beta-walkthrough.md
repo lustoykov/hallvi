@@ -6,7 +6,10 @@ outside the development setup, using their own accounts and the normal product
 screens. An agent's rehearsal does not complete that acceptance step.
 
 1. Follow [Installing Hallvi](installation.md) from an empty installation.
-   Open the address it prints. Start Docker before inspecting a repository.
+   Open the address it prints. Leave **Settings → Workspace** on its default
+   **On this computer** setting for a machine without local Docker. If you
+   deliberately choose **In Docker**, start the local Docker Engine before
+   inspecting a repository.
 2. Add a public repository for an app you want to try. Connect ChatGPT when
    Hallvi asks, then choose **Read repository**. Confirm that the explanation
    matches the app and gives you a clear next step. Stop here if it cannot

@@ -10,24 +10,61 @@ Connect GitHub through Hallvi's configured GitHub App device flow. Hallvi stores
 
 Legacy response fields are compatibility details, not a second supported login method. GitHub CLI credential adoption is retired.
 
-## Register a local GitHub App once
+## App configuration for a distributed release
 
-This is deployment configuration, not something each person must do on every login.
+The release distributor configures **one** Hallvi GitHub App. An end user
+connects their own GitHub account to that App and chooses which repositories
+it may read; they do not register an App. GitHub states that a private App can
+only be installed by its owning account, while an App set to **Any account**
+can be installed by other users. The current personal App configuration has
+not been verified as distributable, so private-repository beta access remains
+pending that decision. [GitHub visibility rules](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/making-a-github-app-public-or-private).
 
-1. Open [GitHub App registration](https://github.com/settings/apps/new). Use a recognizable name and the Hallvi repository as the homepage.
-2. Enable **Device Flow** and leave user-token expiration enabled. Device login does not need a redirect URI. Leave **Request user authorization during installation** disabled; Hallvi initiates that separately.
-3. Disable webhooks. Choose **Repository permissions → Contents → Read-only**. Metadata read access is mandatory; leave all other repository, account and organization permissions unset.
-4. For a personal prototype, choose **Only on this account**. Broader distribution needs a deliberate change to this registration and a separate production security review.
-5. Create the App. Copy its public **Client ID** and URL slug into `.env.local`:
+The distributor should review the App's identity, homepage, ownership and
+permissions before including it in a candidate:
+
+1. Use **Any account** for external selected-repository installs. Marketplace
+   publication is a separate option, not required to make the App public.
+2. Enable **Device Flow** and keep user-token expiration enabled. Device login
+   needs no callback URL. Leave **Request user authorization during
+   installation** disabled because Hallvi initiates sign-in separately.
+3. Disable webhooks. Choose **Repository permissions → Contents → Read-only**.
+   Metadata read is mandatory; leave other repository, account and
+   organization permissions unset. Hallvi does not need write access or a
+   private key for this user device flow.
+4. Review the public client ID and slug. Build the archive with both
+   `HALLVI_RELEASE_GITHUB_CLIENT_ID` and
+   `HALLVI_RELEASE_GITHUB_APP_SLUG`; `npm run package` includes only these
+   public values in `dist/github-app.json`. A release without both values
+   clearly shows private access as unavailable. Do not put client secrets,
+   private keys or user tokens in the archive.
+5. Test with a different GitHub account: device sign-in, selected-repository
+   installation, a private repository check, permission denial and retry.
+   A personal owner's existing installation is not external-user proof.
+
+[GitHub registration options](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app).
+
+For a personal development checkout, the owner can still register a private
+App and set its public **Client ID** and URL slug in `.env.local`:
 
    ```dotenv
    HALLVI_GITHUB_CLIENT_ID=your_public_client_id
    HALLVI_GITHUB_APP_SLUG=your-app-slug
    ```
 
-6. Restart Hallvi after editing environment configuration. Open Settings → GitHub, start sign-in, and enter the displayed code at GitHub. The page polls at GitHub's requested interval and slows down if told to.
-7. Use **Choose repositories on GitHub** to install the App for **only selected repositories**. Sign-in identifies the user; installation grants repository access. Both are needed. Either may be completed first.
-8. Add an application to check its repository. Reconnecting from Settings automatically checks existing applications. If you grant repository permissions after that check, open the application and choose **Check again** in its repository notice.
+For an installed service, local overrides go in
+`~/.local/share/hallvi/hallvi.env` and require `hallvi restart`. The release
+App identity is used when no local override exists.
+
+In the browser, open Settings → GitHub, start sign-in and enter the displayed
+code at GitHub. Hallvi polls at GitHub's requested interval and slows down if
+told to. Use **Choose repositories on GitHub** to install the App for **only
+selected repositories**. Sign-in identifies the user; installation grants
+repository access. Both are needed for a private repository and either can
+come first. Add an application to check its repository. Reconnecting from
+Settings automatically checks existing applications. After changing access,
+open an application and choose **Check again** in its repository notice.
+Public repositories need neither GitHub step.
 
 The device flow exchanges the public client ID and device code for a user access token; no App secret is required. Keep private keys/client secrets out of the distributed app, git and browser. A real installation and device sign-in were verified without generating either. GitHub's own [user access-token documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app) describes the supported flow and expiration.
 

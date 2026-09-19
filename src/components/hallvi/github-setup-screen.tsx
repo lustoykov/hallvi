@@ -296,6 +296,13 @@ export function GithubSetupScreen({
                 >
                   Open GitHub <ArrowSquareOut />
                 </a>
+                <p className={s.hint}>
+                  On another browser, open{" "}
+                  <code className={s.verificationUrl}>
+                    {attempt.verificationUrl}
+                  </code>
+                  .
+                </p>
                 <p role="status">
                   <SpinnerGap className="spin" /> Waiting for sign-in…
                 </p>
@@ -380,28 +387,15 @@ export function GithubSetupScreen({
                 )}
                 {!status.registration && (
                   <details className={s.connectionHelp} open>
-                    <summary>Register the Hallvi GitHub App</summary>
+                    <summary>
+                      Private repository connection is unavailable
+                    </summary>
                     <p>
-                      The owner of this Hallvi installation needs to register
-                      its GitHub App. Set these values, then restart Hallvi:
+                      This Hallvi release has no GitHub App configured. You can
+                      still add public repositories without signing in. Ask the
+                      person who supplied this release to enable private
+                      repository access.
                     </p>
-                    <code>
-                      HALLVI_GITHUB_CLIENT_ID
-                      <br />
-                      HALLVI_GITHUB_APP_SLUG
-                    </code>
-                    <p>
-                      Enable device flow, Contents: read and write, and Pull
-                      requests: read and write. Keep user-token expiration
-                      enabled.
-                    </p>
-                    <a
-                      href="https://github.com/settings/apps/new"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Register GitHub App
-                    </a>
                   </details>
                 )}
                 {status.detected.issue && (
@@ -462,6 +456,13 @@ export function GithubSetupScreen({
                   ? "Existing applications are checked automatically after reconnecting. New applications are checked when you add them."
                   : "Connect an account to check repository access for your applications."}
             </p>
+            {!connected && (
+              <p className={s.hint}>
+                Public repositories work without a GitHub connection. For a
+                private repository, sign in and then give the Hallvi App access
+                to that repository on GitHub.
+              </p>
+            )}
             {visibleCheck && (
               <div
                 className={s.repositoryChecks}
@@ -539,15 +540,24 @@ export function GithubSetupScreen({
           <footer className={s.footer}>
             {visibleCheck?.checking ? (
               <button className={s.primary} disabled>
-                {returnToAdd ? "Back to add application" : "View applications"}
+                {returnTo?.label ??
+                  (returnToAdd
+                    ? "Back to add application"
+                    : "View applications")}
                 <ArrowRight />
               </button>
             ) : (
               <Link
                 className={s.primary}
-                href={returnToAdd ? "/applications/new" : "/applications"}
+                href={
+                  returnTo?.href ??
+                  (returnToAdd ? "/applications/new" : "/applications")
+                }
               >
-                {returnToAdd ? "Back to add application" : "View applications"}
+                {returnTo?.label ??
+                  (returnToAdd
+                    ? "Back to add application"
+                    : "View applications")}
                 <ArrowRight />
               </Link>
             )}
