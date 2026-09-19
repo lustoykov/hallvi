@@ -54,11 +54,13 @@ identity for another account. This candidate truthfully offers public
 repositories without sign-in and shows private connection as unavailable until
 a reviewed App identity is configured. A trusted download location, signing,
 fresh external-user OAuth, native repository inspection and a real deployment
-on this exact candidate remain open. The archived revision tested here still needs Docker for local repository
-inspection. PR #154 now includes PR #153’s optional-Docker implementation;
-these retained archives do not contain that integration. On the combined
-source, 175 focused workspace, account-setup and installed-port tests passed
-on Node.js 22, together with TypeScript and shell/Node syntax checks. Rebuild
-and test both platform archives before using this evidence for the combined
-release.
+on this exact candidate remain open. The archived revision tested here still
+needs Docker for local repository inspection. PR #154 now includes PR #153’s
+optional-Docker implementation; these retained archives do not contain that
+integration. On the combined source, 175 focused workspace, account-setup and
+installed-port tests passed on Node.js 22, together with TypeScript and
+shell/Node syntax checks. The later
+[integrated candidate](2026-09-19-integrated-prebuilt-installation.md) was built
+and installed on both platforms; its separate record describes what that run
+verified and the remaining account and deployment gates.
 Other CPU/OS targets and a real macOS logout/login were not checked.

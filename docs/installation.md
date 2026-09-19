@@ -36,8 +36,8 @@ Installing a supplied archive does not require a source checkout.
 
 | Platform | Current evidence |
 | --- | --- |
-| macOS, Apple silicon | [19 September prebuilt candidate](testing/2026-09-19-prebuilt-installation.md) installed and upgraded |
-| Ubuntu 24.04, x64 | [19 September prebuilt candidate](testing/2026-09-19-prebuilt-installation.md) installed, upgraded and survived reboot |
+| macOS, Apple silicon | [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed; the earlier archive also passed a same-schema upgrade |
+| Ubuntu 24.04, x64 | [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, reinstalled and survived reboot |
 | macOS, Intel; other Linux architectures/distributions | No prebuilt release target yet |
 
 Alpine/musl Linux and Windows are not supported. The
@@ -340,9 +340,10 @@ do not share a database by default.
   Public binaries with private source versus invited testers with repository
   access remains an owner decision. Shipped JavaScript can be inspected even
   when the source repository is private.
-- The [19 September candidate](testing/2026-09-19-prebuilt-installation.md)
-  was exercised on Apple-silicon macOS and Ubuntu 24.04 x64. Each later
-  archive still needs its own trial.
+- The [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md)
+  was installed on Apple-silicon macOS and Ubuntu 24.04 x64. Real repository
+  inspection and deployment from that installed candidate still need fresh
+  account authorization. Each later archive needs its own trial.
 - macOS Intel, Linux arm64 and other Linux distributions have no prebuilt
   release target yet.
 - No schema migrations between versions (see Upgrade).
