@@ -229,7 +229,10 @@ async function answers(url) {
 function workerAlive() {
   return new Promise((done) => {
     const probe = connect(
-      join(dirname(process.env.HALLVI_DB_PATH ?? state.database), "worker.sock"),
+      join(
+        dirname(process.env.HALLVI_DB_PATH ?? state.database),
+        "worker.sock",
+      ),
     );
     probe.once("connect", () => done(true) ?? probe.destroy());
     probe.once("error", () => done(false));
@@ -261,7 +264,9 @@ async function status() {
   console.log(
     `  interface  ${up ? url : "not answering, or answering with errors"}`,
   );
-  console.log(`  Pi worker  ${(await workerAlive()) ? "running" : "not running yet"}`);
+  console.log(
+    `  Pi worker  ${(await workerAlive()) ? "running" : "not running yet"}`,
+  );
   console.log(`  state      ${data}`);
   console.log(`  logs       hallvi logs`);
   if (!up) console.log("Look at `hallvi logs` for the reason.");

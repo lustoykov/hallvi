@@ -67,24 +67,22 @@ function placeEvidence(
       record.executionId ? [[record.executionId, record.id] as const] : [],
     ),
   );
-  const said = transcript.said.map(
-    (each): ActivityRecord => ({
-      kind: "message",
-      id: `${each.replyId}:said:${each.sequence}`,
-      applicationId: "",
-      runId: each.replyId,
-      sequence: each.sequence,
-      tool: "",
-      text: each.text,
-      args: "",
-      preview: "",
-      result: "",
-      status: "succeeded",
-      truncated: false,
-      startedAt: each.at,
-      finishedAt: each.at,
-    }),
-  );
+  const said = transcript.said.map((each): ActivityRecord => ({
+    kind: "message",
+    id: `${each.replyId}:said:${each.sequence}`,
+    applicationId: "",
+    runId: each.replyId,
+    sequence: each.sequence,
+    tool: "",
+    text: each.text,
+    args: "",
+    preview: "",
+    result: "",
+    status: "succeeded",
+    truncated: false,
+    startedAt: each.at,
+    finishedAt: each.at,
+  }));
   const blocks = new Map<string, MessageBlock[]>();
   for (const record of [...tools].sort((a, b) => a.sequence - b.sequence)) {
     const call = calls[record.id];

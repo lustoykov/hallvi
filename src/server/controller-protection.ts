@@ -562,7 +562,7 @@ export async function protectController(
   trigger: ControllerCopy["trigger"],
   options: {
     access?: DestinationAccess;
-    /** Pi is working in some conversation: the worker, which owns them, says. */
+    /** Pi is working in some conversation. The worker owns them, and says. */
     changeRunning?: boolean;
   } = {},
 ): Promise<ControllerCopy | null> {

@@ -13,8 +13,7 @@ import type { ChatMessage } from "./types";
 export const MESSAGE_TAG = "hallviMessageId";
 export const tagOf = (message: unknown) =>
   (message as Record<string, unknown> | undefined)?.[MESSAGE_TAG] as
-    | string
-    | undefined;
+    string | undefined;
 
 export interface Transcript {
   status: ConversationStatus;

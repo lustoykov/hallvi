@@ -15,15 +15,12 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { spawn } from "node:child_process";
-import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
 import { chats } from "../../../src/server/db-schema";
 import {
-  NativeSessionError,
   openNativeChatSession,
   removeNativeSessions,
 } from "../../../src/server/pi-sessions";

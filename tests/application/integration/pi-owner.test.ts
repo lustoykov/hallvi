@@ -15,7 +15,15 @@ import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // The app and the worker as they run: the installed SDK, a real database, the
 // real socket between them. Only the model is scripted, and the repository
@@ -335,9 +343,7 @@ it("a send repeated after a lost answer is one instruction, read once", async ()
   const next = randomUUID();
   await a.send("and then check it", "next", next);
   await a.send("and then check it", "next", next);
-  expect((await a.transcript()).at(-1)).toBe(
-    "you [waiting] and then check it",
-  );
+  expect((await a.transcript()).at(-1)).toBe("you [waiting] and then check it");
 
   decideExecution(a.id, approval(a.id)!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
@@ -389,7 +395,12 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
     { type: "execution", id: snapshot.executions![0].id },
   ]);
   expect(
-    snapshot.piActivity!.map((r) => [r.runId, r.sequence, r.kind, r.text ?? r.tool]),
+    snapshot.piActivity!.map((r) => [
+      r.runId,
+      r.sequence,
+      r.kind,
+      r.text ?? r.tool,
+    ]),
   ).toEqual([
     [reply.id, 1, "message", "I will ask first."],
     [reply.id, 2, "tool", "request_approval"],
@@ -557,7 +568,9 @@ it("leaves retrying, compaction and failure to Pi, and gives the page advice ins
   const a = application("shop");
   await a.send("[flaky] first");
   await until(async () => expect(await a.status()).toBe("idle"));
-  expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: [flaky] first");
+  expect((await a.transcript()).at(-1)).toBe(
+    "pi [completed] reply: [flaky] first",
+  );
 
   contextUsed = 260_000;
   await a.send("second");
@@ -566,7 +579,9 @@ it("leaves retrying, compaction and failure to Pi, and gives the page advice ins
   await a.send("third");
   await until(async () => expect(await a.status()).toBe("idle"));
   // Compaction changed what the model is sent, not what the page shows.
-  expect((await a.transcript()).filter((line) => line.startsWith("you"))).toEqual([
+  expect(
+    (await a.transcript()).filter((line) => line.startsWith("you")),
+  ).toEqual([
     "you [delivered] [flaky] first",
     "you [delivered] second",
     "you [delivered] third",

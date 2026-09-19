@@ -219,7 +219,10 @@ export function sessionOwner(
           if (settled && queues.length && !operation)
             return `queue:${queues[0].entryId}`;
           // Whatever a call never reported ending did not survive the stretch.
-          settleRunningActivity(conversation.applicationId, conversation.chatId);
+          settleRunningActivity(
+            conversation.applicationId,
+            conversation.chatId,
+          );
           settleRunningExecutions(
             conversation.applicationId,
             conversation.chatId,
@@ -259,7 +262,9 @@ export function sessionOwner(
 
   function hasHistory(scope: Scope) {
     const { chat } = loadChat(scope.applicationId, scope.chatId);
-    return Boolean(chat.nativeSessionId) || existsSync(earlierHistoryPath(scope));
+    return (
+      Boolean(chat.nativeSessionId) || existsSync(earlierHistoryPath(scope))
+    );
   }
 
   const project = async (open: Opened) =>
@@ -282,7 +287,9 @@ export function sessionOwner(
     send: (scope: Scope, message: SentMessage) =>
       inLine(scope.chatId, async () => {
         assertChatWritable(loadChat(scope.applicationId, scope.chatId).chat);
-        const conversation = hasHistory(scope) ? await ensure(scope) : undefined;
+        const conversation = hasHistory(scope)
+          ? await ensure(scope)
+          : undefined;
         const snapshot = await conversation?.fresh();
         // An answer that was lost on its way back is sent again. Pi has it.
         if (
@@ -386,8 +393,7 @@ export function sessionOwner(
   return {
     handle(action: string, body: unknown) {
       const act = actions[action as keyof typeof actions] as
-        | ((...input: unknown[]) => Promise<unknown>)
-        | undefined;
+        ((...input: unknown[]) => Promise<unknown>) | undefined;
       if (!act) throw new Error(`Unknown request: ${action}`);
       const { scope, message } = body as { scope: Scope; message?: unknown };
       return Promise.resolve(act(scope, message));

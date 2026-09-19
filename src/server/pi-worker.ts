@@ -22,8 +22,7 @@ async function keepControllerCopy(
   changeRunning: boolean,
 ) {
   try {
-    if (copyDue(trigger))
-      await protectController(trigger, { changeRunning });
+    if (copyDue(trigger)) await protectController(trigger, { changeRunning });
   } catch (error) {
     console.warn(
       `Hallvi could not copy its own records: ${error instanceof Error ? error.message : "unknown reason"}`,

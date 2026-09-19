@@ -115,7 +115,8 @@ export async function serveWorker(
         (value) => reply(200, value ?? {}),
         (error) =>
           reply(error instanceof WorkerRefusal ? 409 : 500, {
-            error: error instanceof Error ? error.message : "The worker failed.",
+            error:
+              error instanceof Error ? error.message : "The worker failed.",
             code: error instanceof WorkerRefusal ? error.code : "failed",
           }),
       );

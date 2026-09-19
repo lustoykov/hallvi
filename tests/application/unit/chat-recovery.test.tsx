@@ -239,7 +239,7 @@ describe("conversation recovery and assistant branding", () => {
     expect(html).toContain("This conversation was interrupted");
     expect(html).toMatch(/<button[^>]*>Continue<\/button>/);
     expect(html).toMatch(/<button[^>]*>Stop<\/button>/);
-    // The interrupted reply offers no "try again" that would send a new message.
+    // The interrupted reply offers no "try again" that would send something.
     expect(html).not.toContain("Try again");
     // Nobody stopped it, and nothing claims that nothing had run.
     expect(html).toContain("Interrupted");

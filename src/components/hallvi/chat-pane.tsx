@@ -544,9 +544,7 @@ export function ChatPane({
     firstConversation && !requestPending && pendingMessage === null;
 
   const stopLabel =
-    waiting.length > 0
-      ? `Stop + cancel ${waiting.length} waiting`
-      : "Stop";
+    waiting.length > 0 ? `Stop + cancel ${waiting.length} waiting` : "Stop";
   return (
     <section className="hv-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -712,27 +710,30 @@ export function ChatPane({
                           !inProgress &&
                           last &&
                           message.status !== "interrupted" && (
-                          <button
-                            className="hv-run-action hv-primary-button"
-                            disabled={busy !== null}
-                            onClick={() => {
-                              if (historyUnavailable) onNewChat();
-                              else if (failure.action.kind === "ask")
-                                continueAfterSecrets(failure.action.draft!);
-                              else if (asked) onTell?.(asked.body);
-                            }}
-                            type="button"
-                          >
-                            <ArrowClockwise aria-hidden="true" weight="bold" />
-                            {historyUnavailable
-                              ? "Start a new chat"
-                              : // A command that exited non-zero will exit
-                                // non-zero again, so retrying it is a way
-                                // of not reading the error. The control
-                                // follows what actually failed.
-                                failure.action.label}
-                          </button>
-                        )}
+                            <button
+                              className="hv-run-action hv-primary-button"
+                              disabled={busy !== null}
+                              onClick={() => {
+                                if (historyUnavailable) onNewChat();
+                                else if (failure.action.kind === "ask")
+                                  continueAfterSecrets(failure.action.draft!);
+                                else if (asked) onTell?.(asked.body);
+                              }}
+                              type="button"
+                            >
+                              <ArrowClockwise
+                                aria-hidden="true"
+                                weight="bold"
+                              />
+                              {historyUnavailable
+                                ? "Start a new chat"
+                                : // A command that exited non-zero will exit
+                                  // non-zero again, so retrying it is a way
+                                  // of not reading the error. The control
+                                  // follows what actually failed.
+                                  failure.action.label}
+                            </button>
+                          )}
                       </div>
                     ) : view.piActivity &&
                       hasActivity(view.piActivity, message.id) ? null : (
@@ -1036,10 +1037,9 @@ export function ChatPane({
             <div>
               <strong>No worker is running</strong>
               <p>
-                Nothing can be sent or shown until it runs again; what you
-                have typed is kept. Restart Hallvi with{" "}
-                <code>hallvi restart</code>, then check it with{" "}
-                <code>hallvi status</code>.
+                Nothing can be sent or shown until it runs again; what you have
+                typed is kept. Restart Hallvi with <code>hallvi restart</code>,
+                then check it with <code>hallvi status</code>.
                 {process.env.NODE_ENV === "development" && (
                   <>
                     {" "}

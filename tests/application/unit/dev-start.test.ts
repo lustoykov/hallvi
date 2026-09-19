@@ -1,10 +1,7 @@
-// One development command means one resolved environment, and a queue whose
-// reader can be shown to exist. Both of those are claims a reader acts on:
-// the first decides which database and which ChatGPT connection three
-// processes use, and the second decides whether a waiting message is being
-// worked on or sitting there.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, hostname, tmpdir } from "node:os";
+// One development command means one resolved environment: it decides which
+// database and which ChatGPT connection three processes use.
+import { mkdtempSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 
