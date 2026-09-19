@@ -18,9 +18,11 @@ checkout do not share a database.
   installation. On macOS: `xcode-select --install`. On Debian or Ubuntu:
   `sudo apt-get install -y build-essential python3 curl openssh-client`.
 - `ssh`, which Hallvi uses to reach application servers.
-- A running local Docker Engine for repository inspection and packaging.
-  Start Docker before choosing **Read repository**. The interface and server
-  tools can run without it, but the first repository inspection cannot.
+
+Docker is not needed on this machine. Pi reads and packages your repository
+in a scratch folder here; [Pi's workspace](#pis-workspace) describes that and
+the optional Docker isolation. Application servers are different: they run your
+application with Docker Compose, and Pi installs it there when it is missing.
 
 Node.js is not needed. The installer downloads Node.js 24 from nodejs.org,
 checks it against the published checksum and keeps it inside the program
@@ -96,6 +98,40 @@ other process and the service manager starts both again. Active browser
 connections can delay the interface's shutdown, so recovery may take tens of
 seconds. A conversation that was
 being answered at that moment shows as interrupted and can be retried.
+
+## Pi's workspace
+
+Pi works on a copy of your repository: it reads the source, writes packaging
+such as a Dockerfile or Compose file, and runs checks. Settings → Workspace
+decides where.
+
+**On this computer** is the default. Each conversation turn gets a scratch
+folder in the system's temporary directory holding the repository copy, and
+Pi's commands run there as your user account, with its network and the tools
+you have installed. Two precautions apply, and neither is a sandbox:
+
+- Commands start with a minimal environment (`PATH`, `HOME`, locale and a
+  few like them). The tokens, GitHub credentials and `HALLVI_*` settings the
+  service was started with are not passed on.
+- Pi's file tools (read, write, edit, search, list) refuse any path outside the
+  folder, including through a link, so they cannot open Hallvi's database,
+  configuration or credential files.
+
+A shell command is not limited that way. It can read and change whatever your
+account can, including Hallvi's state directory and your SSH keys. Pi is told to
+stay inside the folder; nothing enforces it. Prefer this mode for software you
+trust.
+
+**In Docker** runs the same tools in a container with no network, a read-only
+system and none of your files or credentials. It needs a running local Docker
+Engine (Docker Desktop, OrbStack, Colima or the Docker service); the first use
+builds the workspace image, which needs network access. If Docker is chosen and
+not running, Pi's workspace tools are withdrawn for that turn and Pi says why.
+Hallvi never runs the workspace on this computer instead. Start Docker or
+change the setting; the Workspace page shows whether Docker answers.
+
+The folder or container is removed when the turn ends. A copy of its files, up
+to 64 MB, stays with the run's journal under the state directory.
 
 ## On a virtual machine
 
@@ -180,8 +216,9 @@ discard the state as well, delete those two directories yourself.
   [current rehearsal](testing/2026-09-18-beta-rehearsal.md).
 - Two dependencies compile during installation, so a compiler is required.
 - No schema migrations between versions (see Upgrade).
-- Pi's repository workspace still needs Docker. Running it directly on the
-  machine is decided in the concept note and is a separate change.
+- On this computer, Pi's workspace is a precaution rather than isolation; see
+  [Pi's workspace](#pis-workspace). A first search there may download `rg`
+  or `fd` into the temporary directory when neither is installed.
 - Private application links close when the service restarts or the machine
   reboots. The Overview shows the link as closed; ask Pi to open it again.
 - One installation per user account.

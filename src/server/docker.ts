@@ -110,13 +110,6 @@ export interface DockerResponse {
   truncated: boolean;
 }
 
-export interface ContainerLogs {
-  stdout: string;
-  stderr: string;
-  combined: string;
-  truncated: boolean;
-}
-
 /** Splits Docker's multiplexed log stream into stdout and stderr. */
 export function demultiplex(buffer: Buffer) {
   let stdout = "";
@@ -335,27 +328,6 @@ export class DockerClient {
     );
   }
 
-  async waitContainer(
-    id: string,
-    options: { timeoutMs: number; signal?: AbortSignal },
-  ): Promise<{ exitCode: number | null; timedOut: boolean }> {
-    try {
-      const result = await this.json<{ StatusCode: number }>(
-        `/containers/${id}/wait`,
-        {
-          method: "POST",
-          timeoutMs: options.timeoutMs,
-          signal: options.signal,
-        },
-      );
-      return { exitCode: result.StatusCode, timedOut: false };
-    } catch (error) {
-      if (error instanceof DockerError && error.code === "ETIMEDOUT")
-        return { exitCode: null, timedOut: true };
-      throw error;
-    }
-  }
-
   async stopContainer(id: string, seconds = 5) {
     const response = await this.request(`/containers/${id}/stop?t=${seconds}`, {
       method: "POST",
@@ -375,32 +347,6 @@ export class DockerClient {
     });
     if (response.status >= 400 && response.status !== 404)
       throw new DockerError(response.body.toString("utf8"), response.status);
-  }
-
-  async containerLogs(id: string, maxBytes: number): Promise<ContainerLogs> {
-    const response = await this.request(
-      `/containers/${id}/logs?stdout=true&stderr=true&tail=all`,
-      { maxBytes: maxBytes * 2 + 4096 },
-    );
-    if (response.status >= 400)
-      throw new DockerError(response.body.toString("utf8"), response.status);
-    const { stdout, stderr } = demultiplex(response.body);
-    const bound = (text: string) =>
-      text.length > maxBytes ? text.slice(text.length - maxBytes) : text;
-    const combined = bound(
-      [stdout && `[stdout]\n${stdout}`, stderr && `[stderr]\n${stderr}`]
-        .filter(Boolean)
-        .join("\n"),
-    );
-    return {
-      stdout: bound(stdout),
-      stderr: bound(stderr),
-      combined,
-      truncated:
-        response.truncated ||
-        stdout.length > maxBytes ||
-        stderr.length > maxBytes,
-    };
   }
 
   async putArchive(id: string, path: string, tar: Buffer) {

@@ -25,7 +25,7 @@ From the repository, run the documented [development setup](../../README.md#run)
 - `npm run scenarios -- <port>` serves every scenario state through the real pages, from the records in `tests/fixtures/scenario-records.ts`. It prints one address per scenario, and each destination is a fragment on that address.
 - `/prototype` indexes what is left that has no records behind it; production returns 404 for these routes.
 - `/applications` and `/applications/[id]` use real application records.
-- `/setup/pi` and `/setup/github` are real controller settings, not isolated demo accounts.
+- `/setup/pi`, `/setup/github` and `/setup/workspace` are real controller settings, not isolated demo accounts.
 
 The reference shell that replayed invented scenario state has been retired: a state that renders only in a layout the product does not ship proves nothing about the page an owner opens. Scenario records are the replacement, and they are read by the same components a real application uses. Keep synthetic records out of a real application's database — the scenarios command builds its own.
 
