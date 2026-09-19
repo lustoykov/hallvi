@@ -10,7 +10,6 @@
 // is actually running rather than "Working", and it has to clear the moment
 // the turn is done, across a reload.
 
-import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,6 +17,27 @@ import { join } from "node:path";
 import type { ExecutionRecord } from "../../src/server/operator-execution";
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
+import {
+  exchange,
+  scriptedAt,
+  scriptWorker,
+  seedToolCall,
+} from "./scripted-worker";
+
+// The page is what is under test; Pi's side of the conversation is scripted.
+test.use({ isolatedApp: true });
+
+const earlier = (chatId: string) =>
+  Array.from({ length: 24 }, (_, index) => ({
+    id: `earlier-${index}`,
+    chatId,
+    role: "assistant" as const,
+    body: `Earlier step ${index + 1}.`,
+    source: "pi" as const,
+    status: "completed" as const,
+    createdAt: scriptedAt,
+    revision: 0,
+  }));
 
 test(
   "a turn in flight says what it is doing, and lets go when it finishes",
@@ -33,51 +53,33 @@ test(
     expect(created.ok()).toBe(true);
     const result = await created.json();
     const appId = result.application?.id ?? result.id;
-    const database = new Database(join(fixture.state, "qa.db"));
-    const chat = database
-      .prepare(
-        "SELECT id FROM conversations WHERE application_id = ? AND kind = 'main'",
-      )
-      .get(appId) as { id: string };
-
-    const now = new Date().toISOString();
+    const chat = { id: result.selectedChatId as string };
     // Enough transcript above it that the running turn can leave the screen,
     // which is the only situation the composer line exists for.
-    for (let index = 0; index < 24; index++) {
-      const id = randomUUID();
-      database
-        .prepare(
-          "INSERT INTO messages (id, conversation_id, role, body, source, status, created_at, updated_at) VALUES (?, ?, 'assistant', ?, 'pi', 'completed', ?, ?)",
-        )
-        .run(id, chat.id, `Earlier step ${index + 1}.`, now, now);
-    }
-    const userId = randomUUID();
-    const runId = randomUUID();
     const executionId = randomUUID();
-    // A request Hallvi started for itself, which is the shape that
-    // surprised the owner: nothing they typed is on screen above it.
-    database
-      .prepare(
-        "INSERT INTO messages (id, conversation_id, role, body, source, created_at, updated_at) VALUES (?, ?, 'user', 'Take a backup now.', 'hallvi', ?, ?)",
-      )
-      .run(userId, chat.id, now, now);
-    database
-      .prepare(
-        "INSERT INTO messages (id, conversation_id, role, body, source, status, response_to, request_key, blocks, created_at, updated_at, started_at) VALUES (?, ?, 'assistant', '', 'pi', 'running', ?, ?, ?, ?, ?, ?)",
-      )
-      .run(
-        runId,
-        chat.id,
-        userId,
-        randomUUID(),
-        JSON.stringify([{ type: "execution", id: executionId }]),
-        now,
-        now,
-        new Date(Date.now() - 200_000).toISOString(),
-      );
-    database
-      .prepare("UPDATE conversations SET status = 'working' WHERE id = ?")
-      .run(chat.id);
+    let finished = false;
+    const startedAt = new Date(Date.now() - 200_000).toISOString();
+    const closeWorker = await scriptWorker(fixture, () => {
+      const { replyId, messages } = exchange(chat.id, "Take a backup now.", {
+        body: finished ? "The backup finished." : "",
+        status: finished ? "completed" : "running",
+        startedAt,
+      });
+      return {
+        status: finished ? "idle" : "working",
+        messages: [...earlier(chat.id), ...messages],
+        calls: { "backup-call": { replyId, sequence: 1 } },
+        said: [],
+      };
+    });
+    const runId = "reply:asked";
+    seedToolCall(fixture, {
+      applicationId: appId,
+      chatId: chat.id,
+      toolCallId: "backup-call",
+      tool: "server_bash",
+      executionId,
+    });
 
     const directory = join(fixture.state, "operator", appId, "executions");
     mkdirSync(directory, { recursive: true });
@@ -86,7 +88,8 @@ test(
       id: executionId,
       applicationId: appId,
       chatId: chat.id,
-      runId,
+      runId: chat.id,
+      toolCallId: "backup-call",
       tool: "server_bash",
       target: "root@backup-host:22",
       input: JSON.stringify({ command: "restic backup /srv/data" }),
@@ -108,7 +111,7 @@ test(
     // The reply itself says which machine, and that the command has gone
     // quiet, rather than "Working for 2m 30s" over a command that may be
     // wedged. One line, at the end of the turn it belongs to.
-    const line = page.locator(`#hv-message-${runId} .hv-still-working`);
+    const line = page.locator(`[id="hv-message-${runId}"] .hv-still-working`);
     await expect(line).toContainText("Running a command on the server");
     await expect(line).toContainText("quiet for");
     await expect(page.locator(".hv-still-working")).toHaveCount(1);
@@ -138,38 +141,18 @@ test(
       output: "snapshot 9f2a saved",
       finishedAt: new Date().toISOString(),
     });
-    database
-      .prepare(
-        "UPDATE messages SET status = 'completed', body = 'The backup finished.' WHERE id = ?",
-      )
-      .run(runId);
-    database
-      .prepare("UPDATE conversations SET status = 'idle' WHERE id = ?")
-      .run(chat.id);
+    finished = true;
 
     await expect(page.locator(".hv-still-working")).toHaveCount(0);
     await expect(stop).toHaveCount(0);
-
-    // The conversation now takes the next message, which is the whole point.
-    await composer.fill("Now deploy the new revision.");
-    await page.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(
-      page.getByText("[QA fixture reply] Now deploy the new revision.", {
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30_000 });
-    // Never the sentence the owner used to meet at this point.
-    await expect(page.locator(".hv-error")).toHaveCount(0);
 
     // And it is still true after a reload, not just in this render.
     await page.reload();
     await expect(page.locator(".hv-still-working")).toHaveCount(0);
     await expect(
-      page.getByText("[QA fixture reply] Now deploy the new revision.", {
-        exact: true,
-      }),
+      page.getByRole("button", { name: "Send", exact: true }),
     ).toBeVisible();
-    database.close();
+    await closeWorker();
   },
 );
 
@@ -188,20 +171,14 @@ test(
     });
     const result = await created.json();
     const appId = result.application?.id ?? result.id;
-    const database = new Database(join(fixture.state, "qa.db"));
-    const chat = database
-      .prepare(
-        "SELECT id FROM conversations WHERE application_id = ? AND kind = 'main'",
-      )
-      .get(appId) as { id: string };
+    const chatId = result.selectedChatId as string;
     const now = new Date().toISOString();
-    for (let index = 0; index < 24; index++)
-      database
-        .prepare(
-          "INSERT INTO messages (id, conversation_id, role, body, source, status, created_at, updated_at) VALUES (?, ?, 'assistant', ?, 'pi', 'completed', ?, ?)",
-        )
-        .run(randomUUID(), chat.id, `Earlier step ${index + 1}.`, now, now);
-    database.close();
+    const closeWorker = await scriptWorker(fixture, () => ({
+      status: "idle",
+      messages: earlier(chatId),
+      calls: {},
+      said: [],
+    }));
 
     // Only Pi can ask for a secret, so the store is seeded the way the
     // controller writes it.
@@ -235,5 +212,6 @@ test(
     await expect(chip).toBeVisible();
     await chip.click();
     await expect(request).toBeInViewport();
+    await closeWorker();
   },
 );

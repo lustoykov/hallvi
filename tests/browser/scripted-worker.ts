@@ -1,4 +1,10 @@
-import { readFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 
@@ -48,13 +54,16 @@ export async function scriptWorker(
   return () => new Promise((done) => server.close(done));
 }
 
+/** One time for everything scripted: a transcript at rest does not change. */
+export const scriptedAt = new Date().toISOString();
+
 /** One owner's message and the reply Pi is writing, or wrote, under it. */
 export function exchange(
   chatId: string,
   asked: string,
   reply: { body: string; status: "running" | "completed"; startedAt?: string },
 ) {
-  const now = new Date().toISOString();
+  const now = scriptedAt;
   const replyId = "reply:asked";
   return {
     replyId,
@@ -85,4 +94,49 @@ export function exchange(
       },
     ],
   };
+}
+
+/**
+ * The record the worker writes when Pi calls a tool, under Pi's id for the
+ * call. It is what ties an execution record to its place in the transcript.
+ */
+export function seedToolCall(
+  fixture: { state: string },
+  call: {
+    applicationId: string;
+    chatId: string;
+    toolCallId: string;
+    tool: string;
+    executionId?: string;
+    status?: "running" | "succeeded";
+  },
+) {
+  const directory = join(
+    fixture.state,
+    "operator",
+    call.applicationId,
+    "activity",
+  );
+  mkdirSync(directory, { recursive: true });
+  const path = join(directory, `${call.toolCallId}.json`);
+  const now = new Date().toISOString();
+  writeFileSync(
+    `${path}.tmp`,
+    JSON.stringify({
+      kind: "tool",
+      id: call.toolCallId,
+      applicationId: call.applicationId,
+      runId: call.chatId,
+      sequence: 1,
+      tool: call.tool,
+      args: "{}",
+      preview: "",
+      result: "",
+      status: call.status ?? "running",
+      executionId: call.executionId,
+      truncated: false,
+      startedAt: now,
+    }),
+  );
+  renameSync(`${path}.tmp`, path);
 }

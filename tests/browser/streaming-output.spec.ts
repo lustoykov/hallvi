@@ -1,9 +1,11 @@
-import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExecutionRecord } from "../../src/server/operator-execution";
 import { test, expect } from "./fixtures";
+import { exchange, scriptWorker, seedToolCall } from "./scripted-worker";
+
+test.use({ isolatedApp: true });
 
 test("server output streams inline, preserves reading position and stays readable on completion @journey-streaming-output", async ({
   page,
@@ -18,38 +20,31 @@ test("server output streams inline, preserves reading position and stays readabl
   expect(created.ok()).toBe(true);
   const result = await created.json();
   const appId = result.application?.id ?? result.id;
-  const database = new Database(join(fixture.state, "qa.db"));
-  const chat = database
-    .prepare(
-      "SELECT id FROM conversations WHERE application_id = ? AND kind = 'main'",
-    )
-    .get(appId) as { id: string };
+  const chat = { id: result.selectedChatId as string };
   const now = new Date().toISOString();
-  const userId = randomUUID();
-  const runId = randomUUID();
   const executionId = randomUUID();
-  database
-    .prepare(
-      "INSERT INTO messages (id, conversation_id, role, body, source, created_at, updated_at) VALUES (?, ?, 'user', 'Show the command output.', 'user', ?, ?)",
-    )
-    .run(userId, chat.id, now, now);
-  database
-    .prepare(
-      "INSERT INTO messages (id, conversation_id, role, body, source, status, response_to, request_key, blocks, created_at, updated_at, started_at) VALUES (?, ?, 'assistant', 'Here is the command running on the server.', 'pi', 'running', ?, ?, ?, ?, ?, ?)",
-    )
-    .run(
-      runId,
+  // Pi's side: a reply in progress whose one call is the server command.
+  const closeWorker = await scriptWorker(fixture, () => {
+    const { replyId, messages } = exchange(
       chat.id,
-      userId,
-      randomUUID(),
-      JSON.stringify([{ type: "execution", id: executionId }]),
-      now,
-      now,
-      now,
+      "Show the command output.",
+      { body: "Here is the command running on the server.", status: "running" },
     );
-  database
-    .prepare("UPDATE conversations SET status = 'working' WHERE id = ?")
-    .run(chat.id);
+    return {
+      status: "working",
+      messages,
+      calls: { "call-1": { replyId, sequence: 1 } },
+      said: [],
+    };
+  });
+  const runId = chat.id;
+  seedToolCall(fixture, {
+    applicationId: appId,
+    chatId: chat.id,
+    toolCallId: "call-1",
+    tool: "server_bash",
+    executionId,
+  });
   const directory = join(fixture.state, "operator", appId, "executions");
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `${executionId}.json`);
@@ -58,6 +53,7 @@ test("server output streams inline, preserves reading position and stays readabl
     applicationId: appId,
     chatId: chat.id,
     runId,
+    toolCallId: "call-1",
     tool: "server_bash",
     target: "root@fixture-server:22",
     input: JSON.stringify({
@@ -75,11 +71,12 @@ test("server output streams inline, preserves reading position and stays readabl
     renameSync(`${path}.tmp`, path);
   }
   try {
-    update({});
+    // A command earns a card once there is output to watch.
+    update({ output: "Pulling images" });
     await page.goto(`/applications/${appId}`);
     const card = page.locator(`#execution-${executionId}`);
     const output = card.getByRole("region", { name: "Command output" });
-    await expect(output).toContainText("Waiting for command output");
+    await expect(output).toContainText("Pulling images");
     // What ran is a caption above the output, not a second scrolling pane.
     // Two clipped panes in one dark box read as two terminals running two
     // things, which is the single most confusing thing on this screen.
@@ -175,19 +172,21 @@ test("server output streams inline, preserves reading position and stays readabl
     ).toBe(false);
     await card.locator("summary").click();
     await expect(output).not.toBeVisible();
-    await page.reload();
-    await expect(card.locator("summary")).toHaveText("Command and output");
-    await card.locator("summary").click();
-    await expect(output).toContainText("Container web started.");
+    // A failure is shown on the same card, with the command's own words.
     update({
       status: "failed",
       exitCode: 3,
       output: JSON.stringify({ output: "missing service", exitCode: 3 }),
     });
+    await card.locator("summary").click();
     await expect(card.getByText("Failed", { exact: true })).toBeVisible();
     await expect(card.getByText("exit 3", { exact: true })).toBeVisible();
     await expect(output).toHaveText("missing service");
+    // After a reload the finished call is folded into the reply's transcript,
+    // at the place Pi made it.
+    await page.reload();
+    await expect(page.getByRole("button", { name: /1 command/ })).toBeVisible();
   } finally {
-    database.close();
+    await closeWorker();
   }
 });

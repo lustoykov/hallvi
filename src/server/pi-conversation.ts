@@ -83,13 +83,16 @@ function placeEvidence(
     startedAt: each.at,
     finishedAt: each.at,
   }));
+  const executionOf = new Map(
+    tools.map((record) => [record.id, record.executionId]),
+  );
   const blocks = new Map<string, MessageBlock[]>();
-  for (const record of [...tools].sort((a, b) => a.sequence - b.sequence)) {
-    const call = calls[record.id];
-    if (!call) continue;
+  for (const [toolCallId, call] of Object.entries(calls).sort(
+    ([, a], [, b]) => a.sequence - b.sequence,
+  )) {
     const mine = blocks.get(call.replyId) ?? [];
-    if (record.executionId)
-      mine.push({ type: "execution", id: record.executionId });
+    const executionId = executionOf.get(toolCallId);
+    if (executionId) mine.push({ type: "execution", id: executionId });
     if (call.informationId)
       mine.push({ type: "saved-information", id: call.informationId });
     blocks.set(call.replyId, mine);
