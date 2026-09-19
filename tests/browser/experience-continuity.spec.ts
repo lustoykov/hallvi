@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import Database from "better-sqlite3";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
 
@@ -138,15 +137,14 @@ test("Send next and Steer wait on active work, and Stop settles them as not star
   const view = await response.json();
   const appId = view.application.id;
   const chatId = view.selectedChatId;
-  const db = new Database(join(fixture.state, "qa.db"));
-  const active = () =>
+  const transcript = async () =>
     (
-      db
-        .prepare(
-          "SELECT count(*) AS count FROM messages WHERE conversation_id = ? AND status IN ('waiting', 'running')",
+      (await (
+        await page.request.get(
+          `/api/applications/${appId}/chats/${chatId}/messages`,
         )
-        .get(chatId) as { count: number }
-    ).count;
+      ).json()) as { messages: { role: string; status: string }[] }
+    ).messages.slice(1);
   try {
     await page.goto(`/applications/${appId}`);
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
@@ -185,30 +183,22 @@ test("Send next and Steer wait on active work, and Stop settles them as not star
       .getByRole("button", { name: "Stop + cancel 2 waiting", exact: true })
       .click();
     await expect(waiting).toHaveCount(0);
-    await expect.poll(active).toBe(0);
-    // Both instructions stay in the transcript, and neither ever runs.
+    // Pi's abort ended its answer and emptied its queues, as the button said:
+    // neither instruction is Pi's any more, and neither ever runs.
     await expect(
       page.getByText("Explain the result afterwards.", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByText("Not started because the conversation was stopped.", {
-        exact: true,
-      }),
-    ).toHaveCount(2);
+    ).toHaveCount(0);
     await page.waitForTimeout(2_000);
     await page.screenshot({
       path: testInfo.outputPath("stopped-with-waiting-messages.png"),
       fullPage: true,
     });
-    expect(
-      db
-        .prepare(
-          "SELECT count(*) AS count FROM messages WHERE conversation_id = ? AND role = 'assistant' AND source = 'pi'",
-        )
-        .get(chatId),
-    ).toEqual({ count: 1 });
+    expect((await transcript()).map((m) => `${m.role} ${m.status}`)).toEqual([
+      "user delivered",
+      "assistant cancelled",
+    ]);
   } finally {
-    db.close();
+    // Nothing to release: the page and the API are the only readers.
   }
 });
 

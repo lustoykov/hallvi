@@ -60,6 +60,8 @@ interface Opened extends Scope {
   close: () => Promise<void>;
   /** Set while this worker runs the lane. */
   driving: boolean;
+  /** Settles when this worker has let go of the lane. */
+  done?: Promise<void>;
 }
 
 const toPi = (message: SentMessage): AgentMessage =>
@@ -149,6 +151,7 @@ export function sessionOwner(
       fresh,
       history,
       driving: false,
+      done: undefined as Promise<void> | undefined,
       trace(id: string | null) {
         diagnostics?.finish("completed");
         const now = new Date().toISOString();
@@ -201,7 +204,7 @@ export function sessionOwner(
   ) {
     conversation.driving = true;
     conversation.trace(operationId);
-    void (async () => {
+    conversation.done = (async () => {
       let step = first;
       while (!closing) {
         const settled = await step().then(
@@ -292,12 +295,16 @@ export function sessionOwner(
           : undefined;
         const snapshot = await conversation?.fresh();
         // An answer that was lost on its way back is sent again. Pi has it.
-        if (
+        const held =
           conversation &&
           snapshot &&
-          holds(await conversation.history(), snapshot, message.id)
-        )
-          return { accepted: true };
+          holds(await conversation.history(), snapshot, message.id);
+        if (held && held !== message.body)
+          throw new WorkerRefusal(
+            "This request key was already used for a different message.",
+            "conflict",
+          );
+        if (held) return { accepted: true };
         if (conversation?.driving) {
           const queued = await (message.delivery === "steer"
             ? conversation.lane.steer(toPi(message), undefined, ctx)
@@ -347,30 +354,32 @@ export function sessionOwner(
       }),
 
     /** Pi's abort ends its operation and empties its queues. */
-    stop: (scope: Scope) =>
-      inLine(scope.chatId, async () => {
-        if (!hasHistory(scope)) return {};
+    async stop(scope: Scope) {
+      if (!hasHistory(scope)) return {};
+      const stopped = inLine(scope.chatId, async () => {
         const conversation = await ensure(scope);
-        const stopped = (async () => {
-          if ((await conversation.fresh()).operation)
-            await conversation.lane.abort(ctx);
-          // Without an operation there is nothing to abort, only a queue.
-          for (const item of (await conversation.fresh()).queues)
-            await conversation.lane.cancelQueued(item.entryId, ctx);
-        })();
-        const late = Symbol();
-        if (
-          (await Promise.race([
-            stopped,
-            delay(options.stopTimeoutMs ?? 10_000, late),
-          ])) === late
-        )
-          throw new WorkerRefusal(
-            "Pi has not stopped yet. A command may still be finishing; try again in a moment.",
-            "stopping",
-          );
-        return {};
-      }),
+        if ((await conversation.fresh()).operation)
+          await conversation.lane.abort(ctx);
+        // Without an operation there is nothing to abort, only a queue.
+        for (const item of (await conversation.fresh()).queues)
+          await conversation.lane.cancelQueued(item.entryId, ctx);
+        // Wrapped, so the line is not held while the driver lets go: letting
+        // go is itself something the driver does in this line.
+        return { done: conversation.done };
+      }).then(({ done }) => done);
+      const late = Symbol();
+      if (
+        (await Promise.race([
+          stopped,
+          delay(options.stopTimeoutMs ?? 10_000, late),
+        ])) === late
+      )
+        throw new WorkerRefusal(
+          "Pi has not stopped yet. A command may still be finishing; try again in a moment.",
+          "stopping",
+        );
+      return {};
+    },
 
     /** Remove every history an application has. */
     async forget(scope: { applicationId: string }) {

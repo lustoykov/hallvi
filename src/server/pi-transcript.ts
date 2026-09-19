@@ -226,14 +226,16 @@ export function projectTranscript(
   return { status, messages, calls, said };
 }
 
-/** Whether Pi already holds a message with this id, read or still queued. */
+/** The text of the message Pi holds under this id, read or still queued. */
 export function holds(history: Entry[], snapshot: LaneSnapshot, id: string) {
-  return (
-    snapshot.queues.some(
+  const held =
+    snapshot.queues.find(
       (item) => item.type === "message" && tagOf(item.message) === id,
-    ) ||
-    history.some(
+    ) ??
+    history.find(
       (entry) => entry.type === "message" && tagOf(entry.message) === id,
-    )
-  );
+    );
+  return held?.type === "message"
+    ? textOf((held.message as { content: unknown }).content)
+    : undefined;
 }
