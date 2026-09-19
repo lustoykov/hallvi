@@ -62,19 +62,9 @@ import {
   type ConversationContext,
 } from "./conversation-continuity";
 
-function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
-  const byId = new Map(current.map((message) => [message.id, message]));
-  const received = new Set(incoming.map((message) => message.id));
-  return [
-    ...incoming.map((message) => {
-      const previous = byId.get(message.id);
-      return previous && previous.revision > message.revision
-        ? previous
-        : message;
-    }),
-    ...current.filter((message) => !received.has(message.id)),
-  ];
-}
+/** Pi's transcript is the conversation: what arrives replaces what was. */
+const mergeMessages = (_current: ChatMessage[], incoming: ChatMessage[]) =>
+  incoming;
 
 /**
  * When each destination was last looked at, per browser. A confirmed change
@@ -848,6 +838,14 @@ export function OperatorShell({
     });
   }
 
+  function continueConversation() {
+    if (!application || !activeChat) return;
+    void run("continue", async () => {
+      await api.continueConversation(application.id, activeChat.id);
+      return api.view(application.id, activeChat.id);
+    });
+  }
+
   const identity = (
     <ApplicationIdentity
       variant={identityVariant}
@@ -1089,6 +1087,7 @@ export function OperatorShell({
               reconnecting={reconnecting}
               workerAlive={view.worker?.alive}
               onStop={stopConversation}
+              onContinue={continueConversation}
               onNewChat={createChat}
               onReveal={() => selectSection("history")}
               references={references}

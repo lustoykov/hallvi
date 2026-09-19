@@ -73,8 +73,11 @@ export function projectTranscript(
   const replyFor = (entryId: string, timestamp: number) => {
     if (reply) return reply;
     sequence = 0;
+    const asked = messages.findLast((m) => m.role === "user")?.id;
     reply = {
-      id: `reply:${entryId}`,
+      // Named after the message it answers, so it is the same reply while it
+      // streams, once Pi has written it, and after an interruption.
+      id: `reply:${asked ?? entryId}`,
       chatId,
       role: "assistant",
       body: "",
@@ -82,7 +85,7 @@ export function projectTranscript(
       status: "completed",
       createdAt: at(timestamp),
       startedAt: at(timestamp),
-      responseTo: messages.findLast((m) => m.role === "user")?.id ?? null,
+      responseTo: asked ?? null,
       revision: 0,
     };
     messages.push(reply);
@@ -139,6 +142,7 @@ export function projectTranscript(
       reply = undefined;
       messages.push({
         id: tagOf(message) ?? entry.id,
+        requestKey: tagOf(message),
         chatId,
         role: "user",
         body: textOf(message.content),
@@ -189,6 +193,7 @@ export function projectTranscript(
     if (item.type !== "message") continue;
     messages.push({
       id: tagOf(item.message) ?? item.entryId,
+      requestKey: tagOf(item.message),
       chatId,
       role: "user",
       body: textOf((item.message as { content: unknown }).content),
