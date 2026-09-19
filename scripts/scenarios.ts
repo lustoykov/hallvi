@@ -64,12 +64,8 @@ const application = db.prepare(
    values (?, ?, ?, ?, ?, 'always-ask', ?, ?)`,
 );
 const conversation = db.prepare(
-  `insert into conversations (id, application_id, title, kind, status, created_at, updated_at)
-   values (?, ?, 'Main operator', 'main', 'idle', ?, ?)`,
-);
-const message = db.prepare(
-  `insert into messages (id, conversation_id, role, body, blocks, source, status, created_at, updated_at)
-   values (?, ?, 'assistant', ?, '[]', 'hallvi', 'completed', ?, ?)`,
+  `insert into conversations (id, application_id, title, kind, created_at, updated_at)
+   values (?, ?, 'Main operator', 'main', ?, ?)`,
 );
 const information = db.prepare(
   `insert into saved_information (id, application_id, title, body, evidence, established_at, presentation, created_at, updated_at, retired_at)
@@ -132,9 +128,6 @@ const built = scenarios().map((scenario) => {
   );
   const chatId = randomUUID();
   conversation.run(chatId, scenario.id, now, now);
-  // One line saying what this application is for, so the conversation beside
-  // the destinations is not an empty panel the reader has to interpret.
-  message.run(randomUUID(), chatId, `Scenario: ${scenario.shows}`, now, now);
   for (const record of scenario.records)
     information.run(
       record.id,
