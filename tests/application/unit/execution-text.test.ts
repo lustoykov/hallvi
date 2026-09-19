@@ -157,12 +157,12 @@ describe("which machine a command ran on", () => {
     ).toEqual({ said: "On the server", detail: "203.0.113.7" });
   });
 
-  it("does not call a workspace container the server", () => {
+  it("does not call the repository workspace the server", () => {
     expect(
       whereItRan({ tool: "bash", target: "Repository workspace" }),
     ).toEqual({
       said: "In the repository copy",
-      detail: "an isolated container on this PC",
+      detail: "a scratch copy on this PC, not the server",
     });
   });
 

@@ -14,7 +14,7 @@ flowchart TD
     E -->|No or uncertain| G[Preserve and explain]
 ```
 
-Pi's isolated workspace disposal is owned by the runtime. Contributor cleanup
+Disposal of Pi's repository workspace is owned by the runtime. Contributor cleanup
 rules are not loaded into the product session, and running a development server
 does not make its users' deployments disposable. General remote shell access is
 not a deletion sandbox; the runtime prompt governs Pi's use of that access.

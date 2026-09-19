@@ -80,8 +80,8 @@ export function clip(text: string, limit: number): string {
  *
  * Four different places, and the console called three of them nothing and one
  * of them "your server". They are not alike: a command on the application's
- * host can break the application, one in the workspace container touches a
- * copy of the repository on this PC, one against a provider's API spends
+ * host can break the application, one in the workspace touches a copy of the
+ * repository on this PC, one against a provider's API spends
  * money, and opening a tunnel changes only what this PC can reach. A reader
  * deciding whether to approve something needs to know which of those it is.
  *
@@ -89,7 +89,8 @@ export function clip(text: string, limit: number): string {
  */
 const WORKSPACE = {
   said: "In the repository copy",
-  detail: "an isolated container on this PC",
+  // True in both workspace modes; only the Docker choice is isolated.
+  detail: "a scratch copy on this PC, not the server",
 };
 const PLACES: Record<string, { said: string; detail?: string }> = {
   server_bash: { said: "On the server" },

@@ -34,7 +34,7 @@ for (const path of [
   "scripts/dev-environment.mjs",
   "scripts/state-location.mjs",
   "scripts/installed-ports.mjs",
-  // Pi's workspace image is built from these files at run time.
+  // The workspace bridge runs from here, and the Docker image is built from it.
   "scripts/pi-workspace",
   "dist/worker.mjs",
   "dist/worker.mjs.map",

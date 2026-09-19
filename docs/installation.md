@@ -111,10 +111,10 @@ account; `sudo` is only for installing system prerequisites.
 
 ## Your first deployment
 
-1. Start your local Docker Engine before choosing **Read repository**. The
-   current repository inspection and packaging tools still require it.
-   Running the workspace directly on your machine, with Docker optional, is
-   [decided but not implemented](design/always-on-concept.md#packaging).
+1. Choose where Pi works in **Settings → Workspace**. **On this computer**
+   is the default and needs no Docker. If you choose **In Docker**, start your
+   local Docker Engine before choosing **Read repository**. See
+   [Pi’s workspace](#pis-workspace) for the access each mode permits.
 2. Open Hallvi and add the public GitHub repository you want to deploy.
 3. Connect ChatGPT when prompted, then choose **Read repository**. A public
    repository does not need GitHub login. Private repositories require the
@@ -125,8 +125,9 @@ account; `sudo` is only for installing system prerequisites.
 5. Ask Hallvi to deploy the app and open the application link it provides.
 
 Installing Hallvi on your Mac does not make that Mac the Linux deployment
-server. Likewise, the local Docker workspace and Docker/Compose on the
-application server serve different purposes.
+server. The optional local Docker workspace and Docker/Compose on the application
+server serve different purposes. Pi installs Docker/Compose on the application
+server when needed.
 
 ## Troubleshooting
 
@@ -137,7 +138,7 @@ application server serve different purposes.
 | `hallvi: command not found` | Use `~/.local/bin/hallvi` instead. Optionally add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file. |
 | Browser cannot open Hallvi | Run `~/.local/bin/hallvi status`, then `~/.local/bin/hallvi logs`. If it is stopped, run `~/.local/bin/hallvi start`. Use the address status prints. |
 | Installed on another computer, but the laptop cannot connect | `127.0.0.1` refers to the computer running your browser. Follow [remote access](#on-another-machine). |
-| Repository inspection says Docker is unavailable | Start the local Docker Engine and retry. Direct execution is not available in the current package. |
+| Repository inspection says Docker is unavailable | Start the local Docker Engine and retry, or choose **On this computer** in **Settings → Workspace**. Hallvi never switches modes automatically. |
 | Linux service does not survive logout or start at boot | Check `~/.local/bin/hallvi status` and follow its lingering instruction. |
 | Linux reports that it cannot connect to the user service manager | Run from a normal login session for the installing user on a systemd machine, rather than through `sudo`. |
 | Upgrade reports a schema mismatch | Keep the installed version and follow [Upgrade](#upgrade). Do not delete the database to bypass the check. |
@@ -191,6 +192,40 @@ other process and the service manager starts both again. Active browser
 connections can delay the interface's shutdown, so recovery may take tens of
 seconds. A conversation that was
 being answered at that moment shows as interrupted and can be retried.
+
+## Pi's workspace
+
+Pi works on a copy of your repository: it reads the source, writes packaging
+such as a Dockerfile or Compose file, and runs checks. Settings → Workspace
+decides where.
+
+**On this computer** is the default. Each conversation turn gets a scratch
+folder in the system's temporary directory holding the repository copy, and
+Pi's commands run there as your user account, with its network and the tools
+you have installed. Two precautions apply, and neither is a sandbox:
+
+- Commands start with a minimal environment (`PATH`, `HOME`, locale and a
+  few like them). The tokens, GitHub credentials and `HALLVI_*` settings the
+  service was started with are not passed on.
+- Pi's file tools (read, write, edit, search, list) refuse any path outside the
+  folder, including through a link, so they cannot open Hallvi's database,
+  configuration or credential files.
+
+A shell command is not limited that way. It can read and change whatever your
+account can, including Hallvi's state directory and your SSH keys. Pi is told to
+stay inside the folder; nothing enforces it. Prefer this mode for software you
+trust.
+
+**In Docker** runs the same tools in a container with no network, a read-only
+system and none of your files or credentials. It needs a running local Docker
+Engine (Docker Desktop, OrbStack, Colima or the Docker service); the first use
+builds the workspace image, which needs network access. If Docker is chosen and
+not running, Pi's workspace tools are withdrawn for that turn and Pi says why.
+Hallvi never runs the workspace on this computer instead. Start Docker or
+change the setting; the Workspace page shows whether Docker answers.
+
+The folder or container is removed when the turn ends. A copy of its files, up
+to 64 MB, stays with the run's journal under the state directory.
 
 ## On another machine
 
@@ -313,8 +348,9 @@ do not share a database by default.
   [current rehearsal](testing/2026-09-18-beta-rehearsal.md).
 - Native dependencies can compile during installation, so a compiler is required.
 - No schema migrations between versions (see Upgrade).
-- Pi's repository workspace still needs Docker. Running it directly on the
-  machine is decided in the concept note and is a separate change.
+- On this computer, Pi's workspace is a precaution rather than isolation; see
+  [Pi's workspace](#pis-workspace). A first search there may download `rg`
+  or `fd` into the temporary directory when neither is installed.
 - Private application links close when the service restarts or the machine
   reboots. The Overview shows the link as closed; ask Pi to open it again.
 - One installation per user account.

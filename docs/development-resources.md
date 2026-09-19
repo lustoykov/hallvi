@@ -29,7 +29,7 @@ keep the ownership, dependency and retention checks below. Uncertain targets
 remain untouched.
 
 Pi's operational boundary is defined in [Product](../PRODUCT.md#operating-boundary)
-and its runtime prompt. Automatic disposal of isolated Pi workspaces and agreed
+and its runtime prompt. Automatic disposal of Pi's repository workspaces and agreed
 backup retention are separate, narrowly scoped product behavior; they do not
 inherit this development policy.
 

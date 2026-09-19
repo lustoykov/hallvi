@@ -116,7 +116,7 @@ workflows, reset data or change the operating scope.
 user's PC, server or provider account just because work finished. Removal stays
 within the requested application operation or an agreed retention policy, with
 exact ownership, retained-data and dependency checks. Disposable artifacts from
-that operation and isolated workspaces may be removed; application data,
+that operation and Pi's repository workspaces may be removed; application data,
 credentials, history and unrelated resources remain. A Hallvi folder or
 label alone is not disposal permission. Permission modes change approval prompts,
 not the scope of the user's request. The runtime does not auto-load contributor
