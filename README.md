@@ -24,8 +24,9 @@ need to clone this repository or install Node.js, npm, Python or a compiler.
 The [prebuilt installation candidate](docs/testing/2026-09-19-prebuilt-installation.md)
 was exercised on Apple-silicon macOS and Ubuntu 24.04 x64. Each later archive
 needs its own trial. See [supported machines](docs/installation.md#supported-machines).
-The current main revision still needs a local Docker Engine before **Read repository**.
-Direct repository execution with optional Docker is separate, unmerged work.
+Pi reads repositories on this computer by default; local Docker is optional.
+Choose **In Docker** in **Settings → Workspace** if you want an isolated
+workspace. See [Pi’s workspace](docs/installation.md#pis-workspace).
 
 After a local installation, open <http://127.0.0.1:4747>. For a headless VPS,
 use the [laptop browser handoff](docs/installation.md#on-another-machine).
@@ -62,6 +63,7 @@ Hallvi can execute commands on your application server with the connected accoun
 
 - Use the most capable supported model available to you. No model is immune to prompt injection, and general intelligence alone does not establish security.
 - Prefer a dedicated test server and non-sensitive data during beta. Keep unrelated systems and credentials outside its reach, and scope connected accounts to the resources you intend Hallvi to manage.
+- Pi works on its copy of your repository on the computer running Hallvi, as your user account. Hallvi keeps its own credentials out of those commands, but they can reach whatever your account can. For software you don't trust, choose **In Docker** in Settings → Workspace; see [Pi's workspace](docs/installation.md#pis-workspace).
 - Use **Always ask** when you want to inspect commands before execution; the other two [permission modes](PRODUCT.md#permission-modes) ask less. Review matters even for reads that could disclose private data.
 - Keep tested recovery copies that the managed server and its credentials cannot delete. Backups help recovery; they cannot undo data theft. Avoid exposing sensitive production data unless you accept the current access risks.
 

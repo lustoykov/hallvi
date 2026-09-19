@@ -46,6 +46,7 @@ if (process.versions.node.split(".")[0] !== "22")
 const name = `hallvi-${version}-${platform}`;
 const root = join("dist", "package");
 const target = join(root, name);
+
 const archive = join("dist", `${name}.tgz`);
 const nodeArchive = join(root, "node.tar.gz");
 const nodeFile = `node-v${NODE_VERSION}-${platform}.tar.gz`;

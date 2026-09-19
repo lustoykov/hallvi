@@ -5,7 +5,7 @@ export function SettingsNav({
   current,
   returnTo,
 }: {
-  current: "pi" | "github" | "connections";
+  current: "pi" | "github" | "connections" | "workspace";
   /** The conversation Settings was opened from; every tab keeps it. */
   returnTo?: { query: string };
 }) {
@@ -31,6 +31,12 @@ export function SettingsNav({
         aria-current={current === "github" ? "page" : undefined}
       >
         GitHub
+      </Link>
+      <Link
+        href={`/setup/workspace${query}`}
+        aria-current={current === "workspace" ? "page" : undefined}
+      >
+        Workspace
       </Link>
       {process.env.NODE_ENV === "development" && (
         <span className={s.developerLinks}>

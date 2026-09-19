@@ -52,11 +52,12 @@ Retain the shared card, primary-button, and help-panel radii above. Controls use
 
 ## Components
 
-- **Navigation:** reuse [SettingsNav](../../src/components/hallvi/settings-nav.tsx): “ChatGPT & model” and “GitHub”, with an underline and `aria-current="page"` for the active route.
+- **Navigation:** reuse [SettingsNav](../../src/components/hallvi/settings-nav.tsx): “Connections”, “ChatGPT & model”, “GitHub” and “Workspace”, with an underline and `aria-current="page"` for the active route.
 - **Actions:** primary controls have a 44px minimum height, 12px by 20px padding, and a darker blue hover. Secondary actions remain text buttons. Preserve the visible focus outline (2px in the primary blue, offset 3px, shared by every screen) and disabled treatment.
 - **Account choice:** distinguish a detected login from an accepted connection. Show the account and credential source, explicit reuse, an alternative login when available, and a way to retain the current connection.
 - **Device sign-in:** show the code, copy feedback, provider link, stable waiting announcement, expiry, and cancel action. While replacing an account, name the account still in use. Keep the changing countdown outside the live announcement.
 - **Repository access:** show GitHub App installation guidance only for an App connection. Existing CLI/environment connections use their existing permissions. Account connection does not claim repository verification; adding an application checks access and the exact commit.
+- **Workspace choice:** two radio cards, “On this computer” (default) and “In Docker”, each with one short paragraph that states what it does and does not protect. The Docker card shows whether Docker answers now; a Docker choice that cannot be met says so without offering to switch. Saving applies from the next message.
 - **Help and errors:** keep inline copy concise; disclose storage details in the titled popover. Show actionable errors near the account controls. Disconnect uses the existing confirmation dialog.
 - **Return path:** the [GitHub route](../../src/app/setup/github/page.tsx) preserves `from=add` as “Back to add application”; otherwise the footer says “View applications”.
 

@@ -7,8 +7,7 @@ each place means for care that continues when nobody is looking.
 
 Rungs 1 and 2 are implemented as an installed background service;
 [Installing Hallvi](../installation.md) is the practical account and the
-owner of every path, port and command. Rung 3 and the workspace change under
-Packaging are not implemented. Nothing here adds monitoring, scheduled care or
+owner of every path, port and command. Rung 3 is not implemented. Nothing here adds monitoring, scheduled care or
 public access: an always-on installation is where such work could later run,
 not that work.
 
@@ -214,19 +213,20 @@ desktop and VPS. Pi also supports a manual redirect-code fallback for its
 different browser callback flow. Hallvi does not need that fallback for
 device-code login or another CLI account wizard.
 
-Still open:
-
-- how the decided workspace change lands. Pi's repository workspace is a local
-  Docker container today. The owner decided it runs directly on the user's
-  machine by default, in a scratch folder holding the repository copy, under
-  two hygiene rules that are not a sandbox: Hallvi's own tokens are
-  stripped from the environment of anything Pi runs, and Pi's file tools refuse
-  to read Hallvi's configuration and credential files. Docker becomes an
-  optional sandbox for people deploying software they do not trust. When it is
-  configured and unavailable, the workspace tools are withdrawn with a plain
-  reason, never a silent fallback. Hallvi itself never runs inside that
-  sandbox; a container image stays a packaging format for the virtual machine
-  rung.
+Neither rung needs local Docker. Pi's repository workspace runs directly on
+the user's machine by default, in a scratch folder holding the repository copy,
+under two hygiene rules that are not a sandbox: anything Pi runs starts from a
+minimal environment without Hallvi's tokens, and Pi's file tools refuse paths
+outside the folder, which keeps them off Hallvi's configuration and credential
+files. Docker is an optional isolated workspace, chosen in Settings →
+Workspace, for people deploying software they do not trust. When it is chosen
+and unavailable, the workspace tools are withdrawn with a plain reason, never a
+silent fallback. Hallvi itself never runs inside that container; a container
+image stays a possible packaging format for the virtual machine rung.
+[Installing Hallvi](../installation.md#pis-workspace) describes both modes,
+and [Architecture](../architecture.md#repository-workspace-architecture) draws
+the boundary. Application servers keep their own Docker and Compose
+requirement; only the machine running Hallvi dropped it.
 
 A desktop wrapper is worth building only if the Mac rung turns out to need
 one.
