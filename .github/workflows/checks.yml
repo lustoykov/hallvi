@@ -1,4 +1,4 @@
-name: Haldur checks
+name: Hallvi checks
 on:
   pull_request:
   push:

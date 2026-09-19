@@ -116,6 +116,86 @@ export async function connectCloudflare(input: {
   return { account: chosen };
 }
 
+/**
+ * Checks a token for one zone before saving it: whether Cloudflare could be
+ * reached, whether the token is active, and whether it can see the zone. A
+ * zone the token cannot see is reported with the zones it can, because that
+ * is a scope chosen on Cloudflare's page and not a missing domain. Whether it
+ * may edit DNS is read from the permissions Cloudflare lists beside the zone.
+ */
+type ZoneOutcome =
+  | { kind: "connected"; zone: string; edit: "reported" | "unknown" }
+  | { kind: "unreachable" }
+  | { kind: "rejected" }
+  | { kind: "zone-hidden"; visible: string[] }
+  | { kind: "cannot-edit" };
+
+/** What one token can do for one zone. Saves nothing. */
+async function inspectTokenForZone(input: {
+  token: string;
+  zone: string;
+}): Promise<ZoneOutcome> {
+  const value = input.token.trim();
+  if (!/^[A-Za-z0-9_-]{30,200}$/.test(value)) return { kind: "rejected" };
+  // `callWith` throws its own sentence once Cloudflare has answered; any
+  // other failure is the request never completing.
+  const answered = (error: unknown) =>
+    error instanceof Error && error.message.startsWith("Cloudflare refused");
+  try {
+    const verified = await callWith<{ status: string }>(
+      value,
+      "/user/tokens/verify",
+    );
+    if (verified.status !== "active") return { kind: "rejected" };
+  } catch (error) {
+    return answered(error) ? { kind: "rejected" } : { kind: "unreachable" };
+  }
+  let zones: { name: string; permissions?: string[] }[];
+  try {
+    zones = await callWith<typeof zones>(value, "/zones?per_page=50");
+  } catch (error) {
+    // Active, and not allowed to list zones: it can see none of them.
+    if (!answered(error)) return { kind: "unreachable" };
+    zones = [];
+  }
+  const zone = zones.find((item) => item.name === input.zone);
+  if (!zone)
+    return { kind: "zone-hidden", visible: zones.map((item) => item.name) };
+  // Cloudflare lists what the token may do in each zone it can see, so DNS
+  // edit is read rather than tried. A listing without permissions says
+  // nothing either way.
+  const listed = zone.permissions?.length ? zone.permissions : null;
+  if (listed && !listed.includes("#dns_records:edit"))
+    return { kind: "cannot-edit" };
+  return {
+    kind: "connected",
+    zone: input.zone,
+    edit: listed ? "reported" : "unknown",
+  };
+}
+
+export async function connectCloudflareForZone(input: {
+  token: string;
+  zone: string;
+}): Promise<ZoneOutcome> {
+  const outcome = await inspectTokenForZone(input);
+  if (outcome.kind === "connected")
+    await connectCloudflare({ token: input.token.trim() });
+  return outcome;
+}
+
+/**
+ * Whether the Cloudflare connection this controller already has will do for
+ * a zone, so an owner who connected it earlier is not asked for a token again.
+ */
+export async function existingCloudflareForZone(
+  zone: string,
+): Promise<ZoneOutcome | { kind: "not-connected" }> {
+  const held = token();
+  if (!held) return { kind: "not-connected" };
+  return inspectTokenForZone({ token: held, zone });
+}
+
 interface CloudflareBody<T> {
   success: boolean;
   result: T;
@@ -129,7 +209,7 @@ async function call<T>(
   const held = token();
   if (!held)
     throw new Error(
-      "Connect Cloudflare in Settings › Connections, or set CLOUDFLARE_API_TOKEN in the controller's environment.",
+      "Cloudflare is not connected yet. It is connected in the conversation when a domain needs it (request_domain_access), in Settings › Connections, or by CLOUDFLARE_API_TOKEN in the controller's environment.",
     );
   return callWith<T>(held, path, options);
 }
@@ -470,7 +550,7 @@ export async function writeDomainRecord(change: {
     content,
     ttl,
     proxied,
-    comment: `managed-by=haldur${change.owner ? ` app=${change.owner}` : ""}`,
+    comment: `managed-by=hallvi${change.owner ? ` app=${change.owner}` : ""}`,
   };
   let action: DomainRecordOutcome["action"] = "created";
   if (existing) {

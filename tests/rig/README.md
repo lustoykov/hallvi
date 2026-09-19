@@ -1,6 +1,6 @@
 # Local real-Pi rig
 
-Runs Haldur's own web app, worker, records, Pi runtime and executor against local Docker with stand-ins at external boundaries only, so a real model can deploy, update, protect and investigate an application end to end without buying infrastructure. It is an evidence tool, not a test suite: runs use model credits and produce private records under the ignored `tests/results/rig/`.
+Runs Hallvi's own web app, worker, records, Pi runtime and executor against local Docker with stand-ins at external boundaries only, so a real model can deploy, update, protect and investigate an application end to end without buying infrastructure. It is an evidence tool, not a test suite: runs use model credits and produce private records under the ignored `tests/results/rig/`.
 
 ## What is real and what stands in
 
@@ -10,14 +10,14 @@ Runs Haldur's own web app, worker, records, Pi runtime and executor against loca
 | Model | The configured Pi model. Only `pi-settings.json` is copied; the credential it names is read in place. |
 | GitHub API | [`stand-ins/github-api.ts`](stand-ins/github-api.ts.txt): exact mirrors made by [`mirror.mjs`](mirror.mjs); other public repositories pass through to GitHub unauthenticated and read-only. |
 | Hetzner API | [`stand-ins/hetzner.ts`](stand-ins/hetzner.ts.txt): a fixed small x86 offer; the "server" is 127.0.0.1. |
-| SSH | [`bin/ssh`](bin/ssh) runs each host command with the local shell and Docker engine, mapping `/opt/haldur` and `/run/lock` into the rig directory. Cloud-init waiting and the metadata guard are skipped, so the event "Metadata access restricted" is not true in this rig. [`bin/flock`](bin/flock) emulates util-linux `flock`. |
+| SSH | [`bin/ssh`](bin/ssh) runs each host command with the local shell and Docker engine, mapping `/opt/hallvi` and `/run/lock` into the rig directory. Cloud-init waiting and the metadata guard are skipped, so the event "Metadata access restricted" is not true in this rig. [`bin/flock`](bin/flock) emulates util-linux `flock`. |
 | Published HTTP | [`stand-ins/native-compose.ts`](stand-ins/native-compose.ts.txt) binds executed listeners to loopback; retained snapshots and facts keep what Pi authored. |
 
 On macOS with Docker Desktop, the shell transport cannot run the scheduled-backup installer (systemd) or the runner (it reads volume data from host paths). Backup proofs use Rig B.
 
 ## Rig B: a Linux host container
 
-[`host/start.mjs`](host/start.mjs) runs [`host/Dockerfile`](host/Dockerfile): Ubuntu with systemd as PID 1, its own dockerd with Compose, and Python for the backup runner, publishing HTTP on 127.0.0.1:80. With `--host-container <name>`, `rig.mjs` sends every host command, unchanged, to `docker exec` in that container, where the product's real paths, systemd units and host-path volume reads apply. The native-compose stand-in is not used. Storage is MinIO inside the host as `https://s3.rig.amazonaws.com`, which satisfies the product's S3 endpoint rule. A rig CA is trusted only by the host's `haldur-*` units, through a systemd drop-in that stands in for a public certificate authority. The bucket is created inside MinIO's own network namespace, because that name also resolves publicly.
+[`host/start.mjs`](host/start.mjs) runs [`host/Dockerfile`](host/Dockerfile): Ubuntu with systemd as PID 1, its own dockerd with Compose, and Python for the backup runner, publishing HTTP on 127.0.0.1:80. With `--host-container <name>`, `rig.mjs` sends every host command, unchanged, to `docker exec` in that container, where the product's real paths, systemd units and host-path volume reads apply. The native-compose stand-in is not used. Storage is MinIO inside the host as `https://s3.rig.amazonaws.com`, which satisfies the product's S3 endpoint rule. A rig CA is trusted only by the host's `hallvi-*` units, through a systemd drop-in that stands in for a public certificate authority. The bucket is created inside MinIO's own network namespace, because that name also resolves publicly.
 
 - The host masks `systemd-binfmt` and runs systemd in a private cgroup namespace. `binfmt_misc` is one table for the whole Docker Desktop VM: an unmasked systemd erased the engine's Rosetta handler for amd64, which broke every other amd64 container until it was restored (see the [follow-up plan](../../docs/testing/2026-09-11-bookstack-followups.md)).
 - Rig B and Rig A both need 127.0.0.1:80, so run one at a time.
@@ -39,7 +39,7 @@ SG_RIG_WORKFLOW=tests/results/rig/workflow-hc SG_RIG_PI_SETTINGS=/path/to/pi-set
 
 ```bash
 node tests/rig/mirror.mjs linuxserver/docker-bookstack v26.03.5-ls263 v26.05.4-ls283
-SG_RIG_PI_SETTINGS=/path/to/.haldur/pi-settings.json node tests/rig/rig.mjs bookstack 3396
+SG_RIG_PI_SETTINGS=/path/to/.hallvi/pi-settings.json node tests/rig/rig.mjs bookstack 3396
 ```
 
 `--state-from <rig root>` starts a new rig from another rig's records and host files, to replay an earlier state with changed code. Change a mirror's default branch by editing its `head.json`.

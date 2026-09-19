@@ -1,0 +1,1636 @@
+/* Operator workspace: the application shell, its conversation and the
+   destination views. Tokens live in globals.css. */
+
+.hv-shell {
+  height: 100vh;
+  min-width: 1060px;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 52px auto minmax(0, 1fr);
+  color: var(--ink);
+  background: #fff;
+  font-size: 13px;
+}
+
+/* ---------- Top bar: identity, quiet context, Settings ---------- */
+
+.hv-topbar {
+  height: 52px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--navy);
+  color: #fff;
+}
+.hv-app-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hv-brand {
+  display: inline-flex;
+  margin-right: 6px;
+  border-radius: 8px;
+  color: #fff;
+  text-decoration: none;
+}
+.hv-app-mark {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.02em;
+}
+/* Hallvi's face, at any size: two eyes and a smile on a navy tile. */
+.hv-mark {
+  --size: 22px;
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--size) * 0.19);
+  width: calc(var(--size) * 0.92);
+  height: var(--size);
+  border-radius: calc(var(--size) * 0.28);
+  background: var(--navy, #172238);
+  transform: rotate(-5deg);
+}
+.hv-mark[data-on-dark] {
+  background: rgb(255 255 255 / 12%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 22%);
+}
+.hv-mark i {
+  width: max(2px, calc(var(--size) * 0.085));
+  height: calc(var(--size) * 0.23);
+  margin-top: calc(var(--size) * -0.16);
+  border-radius: 2px;
+  background: #dfe8fb;
+}
+.hv-mark b {
+  position: absolute;
+  bottom: calc(var(--size) * 0.22);
+  width: calc(var(--size) * 0.3);
+  height: calc(var(--size) * 0.13);
+  border-bottom: max(1.5px, calc(var(--size) * 0.055)) solid #dfe8fb;
+  border-radius: 50%;
+}
+/* The application name opens the switcher; its repository sits beneath.
+   No select-box chrome at rest. */
+.hv-application-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 360px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+.hv-application-picker > span {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+}
+.hv-application-picker strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.hv-application-picker small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #aeb8ca;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+.hv-application-picker svg {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  color: #aeb8ca;
+  transition: transform var(--fast) var(--ease);
+}
+.hv-application-picker:hover {
+  background: rgb(255 255 255 / 8%);
+}
+.hv-application-picker:has(~ .hv-application-menu:popover-open) {
+  background: rgb(255 255 255 / 10%);
+  border-color: rgb(255 255 255 / 14%);
+}
+.hv-application-picker:has(~ .hv-application-menu:popover-open) svg {
+  transform: rotate(180deg);
+}
+.hv-application-picker:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.hv-application-picker:focus-visible,
+.hv-brand:focus-visible,
+.hv-settings-link:focus-visible {
+  outline: 2px solid #b1c8ff;
+  outline-offset: 3px;
+}
+/* Top-layer menu: the picker positions it on open (positionApplicationMenu);
+   the inset below is only a fallback. */
+.hv-application-menu {
+  position: fixed;
+  inset: 52px auto auto 60px;
+  width: 320px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid #d3dbe7;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: var(--shadow-l);
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 140ms var(--ease),
+    transform 140ms var(--ease);
+}
+@starting-style {
+  .hv-application-menu:popover-open {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.hv-application-menu .hv-application-menu-label {
+  display: block;
+  padding: 8px 10px 6px;
+}
+.hv-application-menu a,
+.hv-application-menu button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ink);
+  background: transparent;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.35;
+  transition: background-color var(--fast) var(--ease);
+}
+.hv-application-menu a:hover,
+.hv-application-menu button:hover {
+  background: #f1f4f9;
+}
+.hv-application-menu :is(a, button):focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+.hv-application-menu a[aria-current] {
+  background: var(--blue-soft);
+}
+.hv-application-menu a div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hv-application-menu a strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-application-menu small {
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-application-menu-mark {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--navy);
+  color: #fff;
+  font: 600 11px var(--mono);
+}
+.hv-application-menu :is(a, button) > svg {
+  width: 15px;
+  height: 15px;
+  justify-self: center;
+  color: #53617a;
+}
+.hv-application-menu a[aria-current] > svg {
+  color: var(--blue);
+}
+.hv-application-menu hr {
+  margin: 6px 4px;
+  border: 0;
+  border-top: 1px solid #e3e8f0;
+}
+.hv-application-menu .hv-remove-application {
+  color: var(--red);
+}
+.hv-application-menu .hv-remove-application > svg {
+  color: inherit;
+}
+.hv-application-menu .hv-remove-application:hover {
+  background: var(--red-soft);
+}
+
+/* Settings names the connection it needs in words; no colour-only dot. */
+.hv-settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 8px;
+  color: #dce5f3;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+.hv-settings-link svg {
+  width: 15px;
+  height: 15px;
+  color: #aeb8ca;
+  flex: none;
+}
+.hv-settings-link:hover {
+  border-color: rgb(255 255 255 / 30%);
+  background: var(--navy-2);
+}
+
+/* Section labels for record views and menus. */
+.hv-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- Workspace columns ---------- */
+
+.hv-workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 220px minmax(380px, 1fr) 400px;
+}
+.hv-chat-pane {
+  min-height: 0;
+  min-width: 0;
+}
+
+/* ---------- Chat ---------- */
+
+.hv-chat-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.hv-pane-title {
+  min-height: 56px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.hv-pane-title > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hv-pane-title strong {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hv-pane-title span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hv-pane-title span.ready {
+  color: var(--green-text);
+}
+.hv-text-button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--blue-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+.hv-text-button:hover:not(:disabled) {
+  background: var(--blue-soft);
+}
+.hv-text-button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.hv-text-button svg {
+  width: 14px;
+}
+.hv-conversation {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.hv-messages {
+  max-width: 780px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.hv-message {
+  width: 100%;
+  max-width: 92%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hv-message-user {
+  margin-left: auto;
+  align-items: flex-end;
+}
+.hv-message-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hv-avatar {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  font: 600 9px var(--mono);
+}
+.hv-avatar.user {
+  background: var(--blue);
+  font-size: 8px;
+}
+.hv-message-heading strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.hv-message-heading time {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.hv-source-tag {
+  border-radius: 5px;
+  padding: 2px 6px;
+  background: #eef1f6;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.hv-message-content {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.hv-message-user .hv-message-content {
+  margin-left: auto;
+  padding: 10px 14px;
+  border-radius: 12px 12px 4px 12px;
+  background: var(--blue-soft);
+}
+.hv-message-context {
+  display: inline-flex;
+  margin: 0 0 7px;
+  padding: 2px 8px;
+  border: 1px solid #c7d6f5;
+  border-radius: 999px;
+  background: #fff;
+  color: #2852a6;
+  font-size: 11px;
+  font-weight: 600;
+}
+.hv-message-response {
+  overflow-wrap: anywhere;
+}
+.hv-message-response > :first-child {
+  margin-top: 0;
+}
+.hv-message-response > :last-child {
+  margin-bottom: 0;
+}
+.hv-message-response p,
+.hv-message-response ul,
+.hv-message-response ol,
+.hv-message-response blockquote,
+.hv-message-response pre {
+  margin: 0 0 10px;
+}
+.hv-message-response .hv-md-heading {
+  margin-top: 14px;
+}
+.hv-message-response ul,
+.hv-message-response ol {
+  padding-left: 22px;
+}
+.hv-message-response li {
+  margin: 3px 0;
+}
+.hv-message-response li::marker {
+  color: var(--muted);
+}
+.hv-message-response code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eef1f6;
+  color: #2c3852;
+  font: 12.5px/1.45 var(--mono);
+}
+.hv-message-user .hv-message-response code {
+  background: rgb(40 90 216 / 10%);
+}
+.hv-message-response pre {
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: #f3f5f9;
+  overflow-x: auto;
+}
+.hv-message-response pre code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+.hv-message-response blockquote {
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid #c9d4e4;
+  color: var(--ink-2);
+}
+.hv-message-response a {
+  color: var(--blue-text);
+  text-underline-offset: 3px;
+}
+.hv-reply-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.hv-reply-copy button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hv-reply-copy button:hover {
+  background: var(--panel);
+  color: var(--ink-2);
+}
+.hv-reply-copy button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.hv-reply-copy svg {
+  width: 13px;
+  height: 13px;
+}
+.hv-reply-copy span:not(:empty) {
+  color: var(--red);
+}
+/* Return to the live edge.
+   This was a 32px circle at left:50%, which put it exactly on the middle of
+   the reading column: the one control whose whole job is to help you read was
+   sitting on the sentence you were reading. The transcript is a centred
+   column inside a much wider workspace, so there is an empty gutter either
+   side of it — the control belongs there, where it can be reached without
+   covering a word. It also says what it does now; an unlabelled circle
+   floating over prose is a guess. */
+.hv-conversation-scroll {
+  position: absolute;
+  right: 24px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--line, #e7e9ee);
+  border-radius: 999px;
+  color: var(--ink-2, #3e4a60);
+  background: #fff;
+  box-shadow: var(--shadow-m);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.hv-conversation-scroll:hover {
+  color: var(--blue, #285ad8);
+  border-color: #cad4e4;
+}
+.hv-conversation-scroll svg {
+  width: 13px;
+  height: 13px;
+}
+.hv-reply-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.hv-reply-pending svg {
+  width: 15px;
+}
+/* The one live line of a turn, at the end of the reply it belongs to. No box:
+   this is Hallvi working, not a problem. The words carry the motion. */
+.hv-still-working {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.hv-still-working > svg {
+  width: 13px;
+  flex: none;
+}
+.hv-still-what {
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.hv-error {
+  padding: 10px 12px;
+  border: 1px solid #efb9b5;
+  border-radius: var(--radius);
+  background: var(--red-soft);
+  color: #983933;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ---------- Durable replies: queued, streaming, failed ---------- */
+
+.hv-stream-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #e7c9a3;
+  border-radius: var(--radius);
+  background: var(--amber-soft);
+  color: #79563b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.hv-stream-notice svg {
+  width: 14px;
+  flex: none;
+  color: var(--amber);
+}
+.hv-source-tag.live {
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+.hv-source-tag.failed {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+.hv-run-progress {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+/* While Pi works this is the whole announcement: a pulse, how long, and a
+   quiet way to stop. It should read as a status line, not as an alert. */
+.hv-run-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+/* The elapsed time, set apart from the sentence. It is the half that moves,
+   and a reader checking on a long turn is looking for whether it still is. */
+.hv-run-elapsed {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+/* A turn stopped on the reader is not a turn that is working. */
+.hv-run-status [data-waiting] {
+  color: var(--ink);
+  font-weight: 500;
+}
+.hv-run-status svg {
+  width: 12px;
+  flex: none;
+  color: var(--muted);
+  opacity: 0.85;
+  animation: hv-run-pulse 1.6s ease-in-out infinite;
+}
+@keyframes hv-run-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Stopping is available, never loud: a word, at the end of the status line. */
+.hv-run-progress:has(.hv-run-stop) {
+  grid-auto-flow: column;
+  grid-template-columns: max-content max-content;
+  justify-content: start;
+  align-items: baseline;
+  gap: 12px;
+}
+.hv-run-stop {
+  align-self: baseline;
+  justify-self: start;
+  margin: 0;
+  padding: 1px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line-2, #d8dee8);
+}
+.hv-run-stop:hover {
+  color: var(--ink, #202838);
+}
+.hv-run-stop[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.hv-message-failed .hv-run-status {
+  color: var(--amber-text);
+}
+/* A caret at the end of a draft says "still writing" without any copy. */
+.hv-message-live .hv-message-response > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 3px;
+  border-radius: 1px;
+  background: var(--blue);
+  vertical-align: -2px;
+  animation: hv-blink 1s steps(2, jump-none) infinite;
+}
+@keyframes hv-blink {
+  to {
+    opacity: 0;
+  }
+}
+.hv-run-draft {
+  padding: 8px 12px;
+  border: 1px dashed #c9d4e3;
+  border-radius: var(--radius);
+  color: var(--ink-2);
+}
+.hv-run-draft summary {
+  cursor: pointer;
+  color: var(--blue-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.hv-run-draft[open] summary {
+  margin-bottom: 8px;
+}
+.hv-run-action {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.hv-run-action svg {
+  width: 13px;
+}
+
+/* ---------- Composer ---------- */
+
+.hv-composer {
+  flex: none;
+  min-width: 0;
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+.hv-composer-box {
+  border: 1px solid #c9d4e4;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--lift, none);
+  transition:
+    border-color var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease);
+}
+.hv-composer-box:focus-within {
+  border-color: var(--blue);
+  box-shadow: var(--ring), var(--lift, 0 0 #0000);
+}
+.hv-composer-box.disabled {
+  background: var(--panel);
+}
+.hv-composer-context,
+.hv-context-return {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 0;
+  color: #2852a6;
+  font-size: 12px;
+}
+.hv-composer-context span {
+  padding: 3px 4px 3px 8px;
+  border: 1px solid #c7d6f5;
+  border-radius: 999px;
+  background: #edf3ff;
+  font-weight: 600;
+}
+.hv-composer-context button {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  margin-left: -10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #2852a6;
+  cursor: pointer;
+}
+.hv-composer-context button:hover {
+  background: #dbe7ff;
+}
+.hv-composer-context button:focus-visible,
+.hv-context-return button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.hv-composer-context svg {
+  width: 12px;
+  height: 12px;
+}
+.hv-context-return {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #f7f9fd;
+  color: var(--muted);
+}
+.hv-context-return button {
+  border: 0;
+  background: transparent;
+  color: #315bc6;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hv-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  max-height: 240px;
+  padding: 12px 14px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  field-sizing: content;
+}
+.hv-composer textarea::placeholder {
+  color: #6f7a90;
+}
+.hv-composer textarea:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.hv-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 8px 8px 14px;
+}
+.hv-composer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.hv-composer-hint {
+  color: var(--muted);
+  font-size: 11px;
+}
+.hv-composer-hint kbd {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.hv-send {
+  flex-shrink: 0;
+  min-width: 72px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    transform var(--fast) var(--ease);
+}
+.hv-send svg {
+  width: 14px;
+  height: 14px;
+}
+.hv-send:hover:not(:disabled) {
+  background: var(--blue-hover);
+}
+.hv-send:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.hv-send:disabled {
+  background: #dfe5ef;
+  color: #7d889d;
+  cursor: not-allowed;
+}
+/* Stop takes Send's place while a turn runs: a ring with a square in it. */
+.hv-stop {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+.hv-stop i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.75px solid var(--ink);
+  border-radius: 999px;
+  transition: background-color var(--fast) var(--ease);
+}
+.hv-stop i::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+.hv-stop:hover:not(:disabled) i {
+  background: rgb(25 35 56 / 8%);
+}
+.hv-stop:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hv-archived-notice,
+.hv-pi-required {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.hv-pi-required {
+  border-color: #e7c9a3;
+  background: var(--amber-soft);
+  color: var(--ink);
+}
+.hv-pi-required > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--amber);
+  flex: none;
+}
+.hv-pi-required strong {
+  font-weight: 600;
+}
+.hv-pi-required p {
+  margin: 0;
+  color: #79563b;
+  font-size: 12px;
+}
+.hv-pi-required code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f4e3cd;
+  font-size: 11px;
+}
+.hv-pi-required a {
+  margin-left: auto;
+  color: #784112;
+  font-weight: 600;
+  white-space: nowrap;
+  text-underline-offset: 3px;
+}
+
+/* Block flow, not a grid: sections keep their content height inside the
+   scrolling column even though they clip horizontally. */
+
+.hv-check-list {
+  display: grid;
+  gap: 6px;
+}
+.hv-check {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 12px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid #d5dde9;
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease);
+}
+.hv-check:hover {
+  border-color: #9eb6e7;
+  box-shadow: var(--shadow-s);
+}
+.hv-check > svg {
+  width: 12px;
+  color: #9aa6ba;
+  justify-self: end;
+}
+.hv-check-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid #c6d0e0;
+  border-radius: 50%;
+  color: #fff;
+}
+.hv-check-icon svg {
+  width: 11px;
+}
+.hv-check-icon.passed {
+  border-color: var(--green);
+  background: var(--green);
+}
+.hv-check-icon.blocked {
+  border-color: var(--amber);
+  background: var(--amber);
+}
+.hv-check-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.hv-check-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.hv-check-copy strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.hv-check-result {
+  color: var(--ink-2);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hv-check-status {
+  align-self: start;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hv-check-status.passed {
+  color: var(--green-text);
+}
+.hv-check-status.blocked {
+  color: var(--amber-text);
+}
+
+.hv-decision-list {
+  display: grid;
+  border: 1px solid #d6dee9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fff;
+}
+
+.hv-decision-list a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14px;
+  gap: 3px 8px;
+  align-items: center;
+  padding: 10px 12px;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-2);
+  transition: background-color var(--fast) var(--ease);
+}
+.hv-decision-list a:hover {
+  background: #f6f8fb;
+}
+.hv-decision-list a:last-child {
+  border-bottom: 0;
+}
+.hv-decision-list strong {
+  grid-column: 1;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.hv-decision-list svg {
+  grid-column: 2;
+  grid-row: 1;
+  width: 13px;
+  color: var(--muted);
+}
+
+.hv-receipt {
+  border: 1px solid #d4dde9;
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #fff;
+}
+.hv-receipt > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hv-receipt > div:first-child > svg {
+  width: 18px;
+  color: var(--ink-2);
+}
+.hv-receipt > div:first-child span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hv-receipt strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.hv-receipt small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.hv-receipt em {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hv-receipt em.passed {
+  color: var(--green-text);
+}
+.hv-receipt em.failed {
+  color: var(--amber-text);
+}
+.hv-receipt em.unavailable {
+  color: var(--muted);
+}
+.hv-receipt p {
+  margin: 8px 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ---------- Buttons ---------- */
+
+.hv-primary-button,
+.hv-secondary-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--blue);
+  background: var(--blue);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+.hv-primary-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.hv-primary-button svg,
+.hv-secondary-button svg {
+  width: 15px;
+}
+.hv-secondary-button {
+  border-color: #c9d4e3;
+  background: #fff;
+  color: var(--ink);
+}
+.hv-primary-button:hover:not(:disabled) {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+.hv-secondary-button:hover:not(:disabled) {
+  background: #f4f7fb;
+  border-color: #b4c2d6;
+}
+
+/* Header and actions stay put; only the body scrolls. The panel slides in
+   once, from the edge it belongs to. */
+
+@starting-style {
+  .hv-drawer-layer[open]::backdrop {
+    background: rgb(19 29 48 / 0%);
+  }
+  .hv-drawer-layer[open] .hv-detail-drawer {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+
+.spin {
+  animation: hv-spin 0.9s linear infinite;
+}
+/* "This is running", said by the words themselves: a slow band of ink over
+   muted text. One per running thing, instead of a spinner beside each. */
+.hv-sheen {
+  background: linear-gradient(
+      90deg,
+      var(--muted) 38%,
+      var(--ink) 50%,
+      var(--muted) 62%
+    )
+    0 0 / 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hv-sheen 2.4s linear infinite;
+}
+@keyframes hv-sheen {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hv-sheen {
+    background: none;
+    color: inherit;
+    animation: none;
+  }
+}
+@keyframes hv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1280px) {
+  .hv-workspace {
+    grid-template-columns: 190px minmax(360px, 1fr) 360px;
+  }
+  .hv-messages {
+    padding-inline: 20px;
+  }
+}
+
+/* ---------- Settings and list pages share the top bar ---------- */
+
+.hv-setup-shell {
+  min-height: 100vh;
+  color: var(--ink);
+  background: var(--canvas);
+}
+.hv-setup-topbar {
+  height: 56px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--navy);
+  color: #fff;
+}
+.hv-setup-brand,
+.hv-setup-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.hv-setup-brand {
+  font-size: 14px;
+  font-weight: 600;
+}
+.hv-setup-back {
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #cad3e3;
+  font-size: 13px;
+  transition:
+    color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+.hv-setup-back:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
+.hv-setup-back svg {
+  width: 15px;
+}
+
+@media (max-width: 540px) {
+  .hv-composer {
+    padding-inline: 12px;
+  }
+  .hv-composer-hint {
+    display: none;
+  }
+  .hv-setup-topbar {
+    padding: 0 15px;
+  }
+  .hv-setup-brand > span:last-child {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hv-setup-shell *,
+  .hv-setup-shell *::before,
+  .hv-setup-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+  }
+  .hv-application-menu,
+  .hv-application-picker svg {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---------- Transcript: requests Hallvi started ---------- */
+
+.hv-message-request {
+  opacity: 0.92;
+}
+
+/* ---------- Reply cards: a request's state and its actions ---------- */
+
+.hv-run-card-heading small {
+  color: #536078;
+  font-size: 12px;
+}
+
+.hv-run-card-actions a {
+  color: #2852a6;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hv-run-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hv-run-card {
+  border: 1px solid var(--line, #d8e0ec);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+.hv-check-result-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #2852a6;
+}
+.hv-check-results,
+.hv-check-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hv-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2f8;
+  color: #3a4660;
+  text-transform: capitalize;
+}
+.hv-outcome.passed {
+  background: #e3f5ec;
+  color: #0c7248;
+}
+.hv-outcome.failed {
+  background: #fde8e6;
+  color: #9c312a;
+}
+.hv-outcome.running {
+  background: #e4ecfb;
+  color: #285ad8;
+}
+.hv-outcome.not-run,
+.hv-outcome.not-applicable {
+  background: #eef2f8;
+  color: #536078;
+}
+.hv-run-card.passed {
+  border-color: #9fd3b7;
+}
+.hv-run-card.failed {
+  border-color: #efb0aa;
+}
+.hv-run-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.hv-run-card-summary {
+  margin: 0;
+  font-size: 13px;
+}
+.hv-check-results {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.hv-check-result-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+}
+.hv-check-result-summary {
+  color: #3a4660;
+}
+.hv-check-steps {
+  list-style: none;
+  padding-left: 12px;
+}
+.hv-check-steps li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.hv-check-steps li.failed {
+  color: #9c312a;
+}
+.hv-check-steps li.passed {
+  color: #0c7248;
+}
+.hv-check-output {
+  margin: 6px 0 0;
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  background: #172238;
+  color: #e8edf5;
+  padding: 8px 10px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------- Chat column: an optional notice above the conversation ---------- */
+
+.hv-chat-column {
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.hv-chat-column > .hv-chat-pane {
+  grid-row: 2;
+}
+/* Quiet controls: small buttons, one solid primary at a time. */
+
+@keyframes hv-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.hv-demo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+}
+.hv-demo-link em {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #fff1d6;
+  color: #7a4a00;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- Reply references: what a reply saved, pointing at History ---------- */
+
+.hv-message-refs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hv-message-refs > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hv-message-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease);
+}
+.hv-message-ref:hover {
+  border-color: #9eb6e7;
+}
+.hv-message-ref em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--blue-text);
+}
+.hv-message-ref.done em {
+  color: var(--green-text);
+}
+.hv-message-ref.replaced {
+  border-style: dashed;
+}
+.hv-message-ref.replaced em {
+  color: var(--muted);
+}
+
+/* ---------- History: filters and grouped operations ---------- */
+
+.hv-history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hv-history-filters button {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.hv-history-filters button[aria-pressed="true"] {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue-text);
+  font-weight: 600;
+}
+
+.hv-section-reading {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}

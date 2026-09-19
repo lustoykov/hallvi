@@ -15,6 +15,9 @@ import {
 import { readTar } from "../../../src/server/tar";
 
 const discovery = vi.hoisted(() => ({ missing: false }));
+const imagePinning = vi.hoisted(() => ({
+  calls: [] as Array<{ reference: string; architecture?: string }>,
+}));
 vi.mock("../../../src/server/docker", async (original) => {
   const actual = await original<typeof import("../../../src/server/docker")>();
   return {
@@ -27,8 +30,14 @@ vi.mock("../../../src/server/docker", async (original) => {
 // Pinning the base image asks a public registry; these tests stay offline.
 vi.mock("../../../src/server/container-images", async (original) => ({
   ...(await original<typeof import("../../../src/server/container-images")>()),
-  pinContainerImage: async (reference: string) =>
-    `${reference}@sha256:${"0".repeat(64)}`,
+  pinContainerImage: async (
+    reference: string,
+    _signal: AbortSignal,
+    architecture?: string,
+  ) => {
+    imagePinning.calls.push({ reference, architecture });
+    return `${reference}@sha256:${"0".repeat(64)}`;
+  },
 }));
 
 import {
@@ -42,8 +51,8 @@ type Mount = { Type: string };
 
 const variables = [
   "DOCKER_HOST",
-  "HALDUR_DB_PATH",
-  "HALDUR_PROBE_TOKEN",
+  "HALLVI_DB_PATH",
+  "HALLVI_PROBE_TOKEN",
 ] as const;
 const saved = Object.fromEntries(
   variables.map((name) => [name, process.env[name]]),
@@ -64,7 +73,13 @@ function syntheticEngine() {
   const state = {
     sockets: new Set<Duplex>(),
     prepare: undefined as undefined | ((response: ServerResponse) => void),
-    requests: [] as Array<{ method: string; path: string; body: Buffer }>,
+    requests: [] as Array<{
+      method: string;
+      path: string;
+      url: string;
+      body: Buffer;
+    }>,
+    architecture: "arm64",
     containers: [] as Array<{
       id: string;
       config: { HostConfig: Record<string, unknown> };
@@ -100,11 +115,18 @@ function syntheticEngine() {
       /^\/v[\d.]+/,
       "",
     );
-    state.requests.push({ method: request.method!, path, body });
+    state.requests.push({
+      method: request.method!,
+      path,
+      url: request.url!,
+      body,
+    });
     const reply = (status: number, value?: unknown) => {
       response.writeHead(status, { "content-type": "application/json" });
       response.end(value === undefined ? undefined : JSON.stringify(value));
     };
+    if (path === "/info")
+      return reply(200, { Architecture: state.architecture });
     const [, kind, id, action] = path.split("/");
     if (kind === "images")
       return image
@@ -200,11 +222,12 @@ function syntheticEngine() {
 }
 
 beforeEach(async () => {
-  root = createTemporaryRoot("/tmp/haldur-pi-workspace-");
+  root = createTemporaryRoot("/tmp/hallvi-pi-workspace-");
   // Workspace ownership labels and event logs belong to this scratch root.
-  process.env.HALDUR_DB_PATH = join(root, "haldur.db");
+  process.env.HALLVI_DB_PATH = join(root, "hallvi.db");
   process.env.DOCKER_HOST = `unix://${join(root, "docker.sock")}`;
   discovery.missing = false;
+  imagePinning.calls = [];
   engine = syntheticEngine();
   await new Promise<void>((resolve) =>
     server.listen(join(root, "docker.sock"), resolve),
@@ -224,7 +247,7 @@ afterEach(async () => {
 
 it("starts one isolated container on first use and keeps a Run's sequential calls in it", async () => {
   const secret = `ghp_${"S".repeat(36)}`;
-  process.env.HALDUR_PROBE_TOKEN = secret;
+  process.env.HALLVI_PROBE_TOKEN = secret;
   const file = (path: string, content: string) => ({
     path,
     mode: 0o644,
@@ -305,6 +328,17 @@ it("starts one isolated container on first use and keeps a Run's sequential call
     "@earendil-works/pi-coding-agent":
       controller.dependencies["@earendil-works/pi-coding-agent"],
   });
+  expect(imagePinning.calls).toEqual([
+    { reference: "node:24-bookworm-slim", architecture: "arm64" },
+  ]);
+  const buildUrl = engine.requests.find(
+    (request) => request.path === "/build",
+  )!.url;
+  const buildQuery = new URL(buildUrl, "http://docker").searchParams;
+  expect(buildQuery.get("platform")).toBe("linux/arm64");
+  expect(JSON.parse(buildQuery.get("buildargs")!)).toEqual({
+    WORKSPACE_ARCH: "arm64",
+  });
 
   // No network, host paths, Docker socket or controller credentials reach any
   // container, including one that loads the snapshot.
@@ -333,13 +367,13 @@ it("starts one isolated container on first use and keeps a Run's sequential call
       .sort(),
   ).toEqual([
     ".env.example",
-    ".haldur-source.txt",
+    ".hallvi-source.txt",
     "src/config.js",
     "src/server.js",
   ]);
   expect(
     seeded
-      .find((entry) => entry.path === ".haldur-source.txt")!
+      .find((entry) => entry.path === ".hallvi-source.txt")!
       .content.toString(),
   ).toContain("qa/example@abc123");
 });

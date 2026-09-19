@@ -1,4 +1,4 @@
-// The `haldur` command of an installation: start, stop and inspect the
+// The `hallvi` command of an installation: start, stop and inspect the
 // background service, and say how to reach it from another machine.
 //
 // One rule keeps it understandable: `start` means running now and after every
@@ -33,7 +33,7 @@ const app = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const home = homedir();
 let state;
 try {
-  const chosen = process.env.HALDUR_DATA_DIR?.trim();
+  const chosen = process.env.HALLVI_DATA_DIR?.trim();
   state = chosen
     ? stateFiles(resolve(chosen))
     : stateLocation(join(home, ".local", "share"));
@@ -43,14 +43,14 @@ try {
 }
 const data = state.directory;
 const mac = process.platform === "darwin";
-const LABEL = "com.haldur";
-const UNIT = "haldur.service";
+const LABEL = "com.hallvi";
+const UNIT = "hallvi.service";
 const plist = join(home, "Library", "LaunchAgents", `${LABEL}.plist`);
 const unit = join(home, ".config", "systemd", "user", UNIT);
 const log = join(data, "logs", "service.log");
 const domain = `gui/${userInfo().uid}`;
 
-// A service does not inherit a shell's PATH, and Haldur runs ssh, git and
+// A service does not inherit a shell's PATH, and Hallvi runs ssh, git and
 // docker. The person's PATH at `start` is kept, ahead of the usual places.
 const path = [
   ...new Set([
@@ -66,8 +66,8 @@ const path = [
 
 const environment = {
   PATH: path,
-  HALDUR_DATA_DIR: data,
-  HALDUR_MANAGED_SERVICE: "1",
+  HALLVI_DATA_DIR: data,
+  HALLVI_MANAGED_SERVICE: "1",
 };
 
 // The installation's own settings, the port among them. The service reads the
@@ -120,7 +120,7 @@ function launchdDefinition() {
 function systemdDefinition() {
   const quoted = (value) => `"${value.replace(/(["\\])/g, "\\$1")}"`;
   return `[Unit]
-Description=Haldur
+Description=Hallvi
 
 [Service]
 ExecStart=${quoted(process.execPath)} ${quoted(join(app, "scripts", "serve.mjs"))}
@@ -160,7 +160,7 @@ function unload() {
   run("launchctl", ["bootout", `${domain}/${LABEL}`], { quiet: true });
   for (let wait = 0; loaded() && wait < 100; wait++)
     spawnSync("sleep", ["0.2"]);
-  if (loaded()) throw new Error("launchd did not stop Haldur in time.");
+  if (loaded()) throw new Error("launchd did not stop Hallvi in time.");
 }
 
 function start() {
@@ -184,7 +184,7 @@ function start() {
     if (!lingering())
       run("loginctl", ["enable-linger", userInfo().username], { quiet: true });
   }
-  console.log("Haldur is starting, and will start with this machine.");
+  console.log("Hallvi is starting, and will start with this machine.");
   return status();
 }
 
@@ -199,9 +199,9 @@ function stop() {
         quiet: true,
       }).status === 0
     )
-      throw new Error("systemd did not stop Haldur; nothing was removed.");
+      throw new Error("systemd did not stop Hallvi; nothing was removed.");
   }
-  console.log("Haldur is stopped, and stays stopped until: haldur start");
+  console.log("Hallvi is stopped, and stays stopped until: hallvi start");
 }
 
 async function answers(url) {
@@ -228,7 +228,7 @@ function workerAlive() {
   try {
     const beat = JSON.parse(
       readFileSync(
-        `${process.env.HALDUR_DB_PATH ?? state.database}.worker-status`,
+        `${process.env.HALLVI_DB_PATH ?? state.database}.worker-status`,
         "utf8",
       ),
     );
@@ -246,7 +246,7 @@ async function status() {
   const release = JSON.parse(
     readFileSync(join(app, "dist", "release.json"), "utf8"),
   );
-  console.log(`Haldur ${release.version} (${release.revision.slice(0, 7)})`);
+  console.log(`Hallvi ${release.version} (${release.revision.slice(0, 7)})`);
   if (!running) {
     console.log("  service    stopped; it does not start with this machine");
     console.log(`  state      ${data}`);
@@ -266,8 +266,8 @@ async function status() {
   );
   console.log(`  Pi worker  ${workerAlive() ? "running" : "not running yet"}`);
   console.log(`  state      ${data}`);
-  console.log(`  logs       haldur logs`);
-  if (!up) console.log("Look at `haldur logs` for the reason.");
+  console.log(`  logs       hallvi logs`);
+  if (!up) console.log("Look at `hallvi logs` for the reason.");
   return up ? 0 : 1;
 }
 
@@ -298,7 +298,7 @@ function logs() {
 }
 
 /**
- * What to put on the machine with the browser when Haldur is on another.
+ * What to put on the machine with the browser when Hallvi is on another.
  * Every port is forwarded to the same number because pages name them: the
  * terminal connects to 127.0.0.1 on its port, and a private application link
  * is http://127.0.0.1 on the port it was opened on.
@@ -311,7 +311,7 @@ function remote() {
   const ports = installedPorts();
   console.log(`# Add to ~/.ssh/config on the machine with your browser:
 
-Host haldur
+Host hallvi
   HostName ${address}
   User ${user}
   ExitOnForwardFailure yes
@@ -320,12 +320,12 @@ ${forwardedPorts(ports)
   .map((port) => `  LocalForward 127.0.0.1:${port} 127.0.0.1:${port}`)
   .join("\n")}
 
-# Then keep this running while you use Haldur:
-#   ssh -N haldur
+# Then keep this running while you use Hallvi:
+#   ssh -N hallvi
 # and open http://127.0.0.1:${ports.web}
 #
 # ${ports.web} is the interface, ${ports.terminal} the browser terminal, and ${ports.privateFirst}-${ports.privateLast} are
-# where private application links open. Haldur listens on this machine's
+# where private application links open. Hallvi listens on this machine's
 # loopback only; this SSH connection is the only way in.`);
 }
 
@@ -333,7 +333,7 @@ function uninstall() {
   // This removes the directory above the program, so be certain that is an
   // installation: run from an unpacked archive or a checkout it would
   // otherwise delete whatever happens to contain them.
-  const installed = join(home, ".local", "lib", "haldur");
+  const installed = join(home, ".local", "lib", "hallvi");
   if (app !== join(installed, "app"))
     throw new Error(
       `This is not the installed copy (${join(installed, "app")}); nothing was removed.`,
@@ -343,10 +343,10 @@ function uninstall() {
     rmSync(unit, { force: true });
     run("systemctl", ["--user", "daemon-reload"], { quiet: true });
   }
-  rmSync(join(home, ".local", "bin", "haldur"), { force: true });
+  rmSync(join(home, ".local", "bin", "hallvi"), { force: true });
   // This file is inside what it removes; Node has already read it.
   rmSync(installed, { recursive: true, force: true });
-  console.log(`Haldur is removed. Everything it knew is kept:
+  console.log(`Hallvi is removed. Everything it knew is kept:
   ${data}
   ${dirname(piAccountLocation(home))}
 Installing again picks it all up. To discard it, delete those two directories.`);
@@ -370,7 +370,7 @@ if (Object.hasOwn(commands, command)) {
     process.exitCode = 1;
   }
 } else {
-  console.log(`Usage: haldur <command>
+  console.log(`Usage: hallvi <command>
 
   start      run in the background now, and whenever this machine starts
   stop       stop, and stay stopped until the next start

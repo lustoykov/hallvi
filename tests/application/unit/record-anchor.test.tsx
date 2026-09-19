@@ -11,7 +11,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { InformationCard } from "../../../src/components/haldur/information-card";
+import { InformationCard } from "../../../src/components/hallvi/information-card";
 import type { SavedInformation } from "../../../src/server/operator-data";
 
 const ID = "bc44dc0c-ea81-4001-a608-bd8febf6cc07";
@@ -48,7 +48,7 @@ const link = (markup: string) => markup.match(/href="#(record-[^"]+)"/)?.[1];
 describe("the anchor a repeated record points at", () => {
   it("is carried by a compact first appearance, and the repeat links to it", () => {
     const first = renderToStaticMarkup(<InformationCard record={routine()} />);
-    expect(first).toContain("hd-result");
+    expect(first).toContain("hv-result");
     expect(anchor(first)).toBe(`record-${ID}`);
     const again = renderToStaticMarkup(
       <InformationCard record={routine()} superseded />,

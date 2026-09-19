@@ -14,6 +14,7 @@ import {
   claimNextPiRun,
   persistPiDraft,
   completePiRun,
+  cancelPiRun,
   interruptRunningPiRuns,
   chatRunSnapshot,
 } from "../../../src/server/pi-runs";
@@ -42,13 +43,13 @@ let app: string;
 let chat: string;
 function reopen() {
   store.db().$client.close();
-  delete globalThis.__haldurDb;
+  delete globalThis.__hallviDb;
 }
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "hd-storage-"));
-  vi.stubEnv("HALDUR_DB_PATH", join(root, "test.db"));
-  vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "config"));
-  pushTestDatabase(process.env.HALDUR_DB_PATH!);
+  root = mkdtempSync(join(tmpdir(), "hv-storage-"));
+  vi.stubEnv("HALLVI_DB_PATH", join(root, "test.db"));
+  vi.stubEnv("HALLVI_CONFIG_DIR", join(root, "config"));
+  pushTestDatabase(process.env.HALLVI_DB_PATH!);
 });
 beforeEach(async () => {
   store.db().$client.exec("DELETE FROM applications");
@@ -79,9 +80,6 @@ it("loads creation, settings and the partial response after reopening the databa
   ).toBe(accepted.run.id);
   const turn = claimNextPiRun()!;
   expect(claimNextPiRun()).toBeNull();
-  expect(() =>
-    sendChatMessage(app, chat, "Another task", randomUUID()),
-  ).toThrow("still working");
   persistPiDraft(turn.id, "I’m inspecting the source.");
   reopen();
   expect(operatorSettings(app).permissionMode).toBe("always-ask");
@@ -102,6 +100,69 @@ it("loads creation, settings and the partial response after reopening the databa
     currentResponseId: null,
   });
   expect(store.getMessage(turn.id)?.status).toBe("completed");
+});
+it("queues explicit follow-ups FIFO without replaying interrupted work", () => {
+  const first = sendChatMessage(app, chat, "First task", randomUUID()).run;
+  const running = claimNextPiRun()!;
+  expect(running.id).toBe(first.id);
+
+  const secondKey = randomUUID();
+  const second = sendChatMessage(app, chat, "Second task", secondKey).run;
+  const third = sendChatMessage(app, chat, "Third task", randomUUID()).run;
+  expect(sendChatMessage(app, chat, "Second task", secondKey).run.id).toBe(
+    second.id,
+  );
+  expect(claimNextPiRun()).toBeNull();
+  expect(store.getChat(chat)?.currentResponseId).toBe(running.id);
+
+  interruptRunningPiRuns();
+  expect(store.getMessage(running.id)?.status).toBe("interrupted");
+  expect(store.getMessage(second.id)?.status).toBe("queued");
+  expect(store.getMessage(third.id)?.status).toBe("queued");
+
+  const resumed = claimNextPiRun()!;
+  expect(resumed.id).toBe(second.id);
+  expect(store.getChat(chat)?.currentResponseId).toBe(second.id);
+  expect(claimNextPiRun()).toBeNull();
+  completePiRun(resumed.id, { message: "Second finished." });
+  expect(claimNextPiRun()?.id).toBe(third.id);
+});
+
+it("stopping active work cancels queued follow-ups before they start", () => {
+  const active = sendChatMessage(app, chat, "Active task", randomUUID()).run;
+  claimNextPiRun();
+  const followUp = sendChatMessage(
+    app,
+    chat,
+    "Use that result next",
+    randomUUID(),
+  ).run;
+
+  cancelPiRun(app, chat, active.id);
+
+  expect(store.getMessage(active.id)?.status).toBe("cancelled");
+  expect(store.getMessage(followUp.id)).toMatchObject({
+    status: "cancelled",
+    error: "Not started because the active reply was stopped.",
+  });
+  expect(store.getChat(chat)).toMatchObject({
+    status: "idle",
+    currentResponseId: null,
+  });
+  expect(claimNextPiRun()).toBeNull();
+});
+it("cancels one queued follow-up without discarding later work", () => {
+  const first = sendChatMessage(app, chat, "First", randomUUID()).run;
+  const second = sendChatMessage(app, chat, "Second", randomUUID()).run;
+
+  cancelPiRun(app, chat, first.id);
+
+  expect(store.getMessage(first.id)?.status).toBe("cancelled");
+  expect(store.getMessage(second.id)?.status).toBe("queued");
+  expect(claimNextPiRun()?.id).toBe(second.id);
+  // A late duplicate request to stop the old row is inert.
+  cancelPiRun(app, chat, first.id);
+  expect(store.getMessage(second.id)?.status).toBe("running");
 });
 it("shares one outcome between chat and two views while keeping working knowledge unsurfaced", () => {
   sendChatMessage(app, chat, "Inspect", randomUUID());

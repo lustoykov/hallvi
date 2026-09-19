@@ -36,8 +36,8 @@ const association = () =>
     .nativeSessionId;
 
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "haldur-native-sessions-"));
-  vi.stubEnv("HALDUR_DB_PATH", join(root, "test.db"));
+  root = mkdtempSync(join(tmpdir(), "hallvi-native-sessions-"));
+  vi.stubEnv("HALLVI_DB_PATH", join(root, "test.db"));
   pushTestDatabase(store.databasePath());
 });
 beforeEach(() => {
@@ -53,8 +53,8 @@ beforeEach(() => {
   otherChatId = store.insertChat(applicationId, "Other").id;
 });
 afterAll(() => {
-  globalThis.__haldurDb?.$client.close();
-  delete globalThis.__haldurDb;
+  globalThis.__hallviDb?.$client.close();
+  delete globalThis.__hallviDb;
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
@@ -77,7 +77,7 @@ it("persists a private header and SQLite identity before any assistant message, 
   first.release();
   first.release();
   store.db().$client.close();
-  delete globalThis.__haldurDb;
+  delete globalThis.__hallviDb;
   const resumed = await openNativeChatSession(applicationId, chatId);
   expect(resumed.sessionManager.getSessionId()).toBe(id);
   expect(resumed.sessionManager.buildSessionContext().messages).toMatchObject([

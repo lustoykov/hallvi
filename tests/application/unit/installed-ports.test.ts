@@ -23,12 +23,12 @@ it("derives every loopback port from one number, without overlap", () => {
   expect(new Set(all).size).toBe(all.length);
   expect(all).toContain(ports.terminal);
   expect(all).toContain(ports.privateLast);
-  expect(installedPorts({ HALDUR_PORT: "5100" }).terminal).toBe(5101);
-  expect(() => installedPorts({ HALDUR_PORT: "80" })).toThrow();
+  expect(installedPorts({ HALLVI_PORT: "5100" }).terminal).toBe(5101);
+  expect(() => installedPorts({ HALLVI_PORT: "80" })).toThrow();
 });
 
 it("binds every generated laptop forward explicitly to loopback", () => {
-  const home = mkdtempSync(join(tmpdir(), "haldur-remote-"));
+  const home = mkdtempSync(join(tmpdir(), "hallvi-remote-"));
   temporary.push(home);
   const output = execFileSync(
     process.execPath,
@@ -39,7 +39,7 @@ it("binds every generated laptop forward explicitly to loopback", () => {
       env: {
         ...process.env,
         HOME: home,
-        HALDUR_DATA_DIR: join(home, "state"),
+        HALLVI_DATA_DIR: join(home, "state"),
       },
     },
   );

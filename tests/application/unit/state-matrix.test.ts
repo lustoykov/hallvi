@@ -10,9 +10,9 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { processesFromRecords } from "@/components/haldur/processes-records";
-import { storageFromRecords } from "@/components/haldur/storage-records";
-import { monitoringFromRecords } from "@/components/haldur/monitoring-records";
+import { processesFromRecords } from "@/components/hallvi/processes-records";
+import { storageFromRecords } from "@/components/hallvi/storage-records";
+import { monitoringFromRecords } from "@/components/hallvi/monitoring-records";
 import {
   currentFacts,
   freshnessOf,
@@ -328,14 +328,14 @@ describe("work that did not run, and work that was stopped", () => {
     // Both were "Cancelled" — one word for "you said no, nothing happened"
     // and for "it was running and was stopped, and how far it got is not
     // known". The second is the more important thing to say.
-    const { stateLabel } = await import("@/components/haldur/operation-model");
+    const { stateLabel } = await import("@/components/hallvi/operation-model");
     expect(stateLabel.declined).toBe("Not run");
     expect(stateLabel.stopped).toBe("Stopped");
   });
 
   it("maps an execution's own status to the right one", async () => {
     const { historyFromRecords } =
-      await import("@/components/haldur/history-records");
+      await import("@/components/hallvi/history-records");
     const execution = (id: string, status: string) =>
       ({
         id,

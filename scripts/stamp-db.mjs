@@ -10,7 +10,7 @@ const { version } = JSON.parse(
 );
 const STAMPABLE_VERSIONS = [0, version];
 const databasePath =
-  process.env.HALDUR_DB_PATH ??
+  process.env.HALLVI_DB_PATH ??
   stateLocation(process.cwd(), { hidden: true }).database;
 const database = new Database(databasePath);
 try {

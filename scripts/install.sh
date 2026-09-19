@@ -1,15 +1,11 @@
 #!/bin/sh
-# Installs or upgrades Haldur for the current user, from the unpacked
+# Installs or upgrades Hallvi for the current user, from the unpacked
 # archive this file sits in. Nothing here needs root.
 #
-#   program   ~/.local/lib/haldur     replaced on every install
-#   command   ~/.local/bin/haldur
-#   state     ~/.local/share/haldur   never touched by install or uninstall
-#   model     ~/.config/haldur/pi     never touched by install or uninstall
-#
-# Haldur was called Server Guy. A machine that still has a Server Guy
-# installation, state or model account is refused until they are moved; see
-# "Moving from Server Guy" in docs/installation.md.
+#   program   ~/.local/lib/hallvi     replaced on every install
+#   command   ~/.local/bin/hallvi
+#   state     ~/.local/share/hallvi   never touched by install or uninstall
+#   model     ~/.config/hallvi/pi     never touched by install or uninstall
 #
 # Node.js is downloaded into the program directory rather than taken from the
 # machine: a background service does not see a shell's version manager, and the
@@ -18,7 +14,7 @@ set -eu
 
 NODE_MAJOR=24
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-home="$HOME/.local/lib/haldur"
+home="$HOME/.local/lib/hallvi"
 bin="$HOME/.local/bin"
 
 say() { printf '%s\n' "$*"; }
@@ -27,7 +23,7 @@ fail() { printf 'install: %s\n' "$*" >&2; exit 1; }
 case "$(uname -s)" in
   Darwin) os=darwin ;;
   Linux) os=linux ;;
-  *) fail "Haldur installs on macOS and Linux." ;;
+  *) fail "Hallvi installs on macOS and Linux." ;;
 esac
 case "$(uname -m)" in
   arm64 | aarch64) arch=arm64 ;;
@@ -56,7 +52,7 @@ if [ "$os" = linux ] && ! command -v systemctl >/dev/null 2>&1; then
 fi
 
 [ -f "$source_dir/scripts/serve.mjs" ] ||
-  fail "run this from the unpacked Haldur archive."
+  fail "run this from the unpacked Hallvi archive."
 
 is_installation() {
   [ -x "$1/node/bin/node" ] &&
@@ -75,19 +71,13 @@ require_installation() {
 
 # Ask the service manager, not the old command: a command that cannot run
 # would otherwise read as "not running" and lose its program while serving.
-for old in "$HOME/.local/lib/server-guy" "$HOME/.local/share/server-guy" \
-  "$HOME/.config/server-guy" "$HOME/Library/LaunchAgents/com.server-guy.plist" \
-  "$HOME/.config/systemd/user/server-guy.service"; do
-  [ ! -e "$old" ] ||
-    fail "$old is from Server Guy. Move it first: see \"Moving from Server Guy\" in docs/installation.md. Nothing was changed."
-done
-require_installation "$home" "Haldur"
+require_installation "$home" "Hallvi"
 if [ "$os" = darwin ]; then
-  launchctl print "gui/$(id -u)/com.haldur" >/dev/null 2>&1 &&
+  launchctl print "gui/$(id -u)/com.hallvi" >/dev/null 2>&1 &&
     running=yes || running=no
 else
-  { systemctl --user is-enabled haldur.service >/dev/null 2>&1 ||
-    systemctl --user is-active --quiet haldur.service; } &&
+  { systemctl --user is-enabled hallvi.service >/dev/null 2>&1 ||
+    systemctl --user is-active --quiet hallvi.service; } &&
     running=yes || running=no
 fi
 was_running=$running
@@ -95,7 +85,7 @@ upgrade=no
 [ -d "$home" ] && upgrade=yes
 
 mkdir -p "$HOME/.local/lib" "$bin"
-staging=$(mktemp -d "$HOME/.local/lib/haldur.installing.XXXXXX")
+staging=$(mktemp -d "$HOME/.local/lib/hallvi.installing.XXXXXX")
 cleanup_staging() {
   [ -z "${staging:-}" ] || rm -rf "$staging"
 }
@@ -121,7 +111,7 @@ mkdir "$staging/node"
 tar -xzf "$staging/node.tar.gz" -C "$staging/node" --strip-components 1
 rm "$staging/node.tar.gz"
 
-say "Copying Haldur"
+say "Copying Hallvi"
 cp -RP "$source_dir/." "$staging/app/"
 rm -f "$staging/app/install.sh"
 
@@ -142,42 +132,42 @@ say "Checking the controller database"
 # so a failed upgrade leaves the old one serving. Its state is elsewhere and is
 # not touched.
 if [ "$running" = yes ]; then
-  "$bin/haldur" stop || {
+  "$bin/hallvi" stop || {
     if [ "$os" = darwin ]; then
-      launchctl bootout "gui/$(id -u)/com.haldur" ||
-        fail "Haldur could not be stopped; nothing was replaced."
+      launchctl bootout "gui/$(id -u)/com.hallvi" ||
+        fail "Hallvi could not be stopped; nothing was replaced."
     else
-      systemctl --user disable --now haldur.service ||
-        fail "Haldur could not be stopped; nothing was replaced."
+      systemctl --user disable --now hallvi.service ||
+        fail "Hallvi could not be stopped; nothing was replaced."
     fi
   }
   if [ "$os" = darwin ]; then
-    ! launchctl print "gui/$(id -u)/com.haldur" >/dev/null 2>&1 ||
-      fail "Haldur is still running; nothing was replaced."
+    ! launchctl print "gui/$(id -u)/com.hallvi" >/dev/null 2>&1 ||
+      fail "Hallvi is still running; nothing was replaced."
   else
-    ! systemctl --user is-active --quiet haldur.service ||
-      fail "Haldur is still running; nothing was replaced."
+    ! systemctl --user is-active --quiet hallvi.service ||
+      fail "Hallvi is still running; nothing was replaced."
   fi
 fi
 rm -rf "$home"
 mv "$staging" "$home"
 staging=""
 
-cat >"$bin/haldur" <<EOF
+cat >"$bin/hallvi" <<EOF
 #!/bin/sh
 exec "$home/node/bin/node" "$home/app/scripts/cli.mjs" "\$@"
 EOF
-chmod +x "$bin/haldur"
+chmod +x "$bin/hallvi"
 
 # A new installation starts. An upgrade returns to the state it found.
 if [ "$upgrade" = no ] || [ "$was_running" = yes ]; then
-  "$bin/haldur" start ||
-    say "Installed, but Haldur is not answering yet: haldur logs"
+  "$bin/hallvi" start ||
+    say "Installed, but Hallvi is not answering yet: hallvi logs"
 else
-  say "Installed. Haldur was stopped before and stays stopped: haldur start"
+  say "Installed. Hallvi was stopped before and stays stopped: hallvi start"
 fi
 
 case ":$PATH:" in
   *":$bin:"*) ;;
-  *) say "Add $bin to your PATH to run 'haldur' by name." ;;
+  *) say "Add $bin to your PATH to run 'hallvi' by name." ;;
 esac

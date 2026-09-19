@@ -388,7 +388,7 @@ every failure reads as still wanting you, which is true and coarse.
 | Field | Source |
 | --- | --- |
 | a captured run | an execution with output |
-| its place | the server, the repository copy, the provider, or Haldur — from the tool |
+| its place | the server, the repository copy, the provider, or Hallvi — from the tool |
 | when it was captured | `finishedAt`, else `createdAt` |
 | its outcome | the exit code, where there is one |
 | streams | those places, with line counts and the newest capture |

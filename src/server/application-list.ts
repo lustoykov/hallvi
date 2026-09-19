@@ -1,4 +1,4 @@
-import type { ApplicationListItem } from "@/components/haldur/applications-screen";
+import type { ApplicationListItem } from "@/components/hallvi/applications-screen";
 import { listApplications } from "./db";
 import {
   checkAsNow,
@@ -39,7 +39,7 @@ export function listApplicationItems(): ApplicationListItem[] {
       id: application.id,
       name: application.name,
       source: `${application.repositoryOwner}/${application.repositoryName}`,
-      condition: conditionOf(records, application.id, now),
+      condition: applicationListCondition(records, application.id, now),
       stack: stackOf(records),
       protection: protectionOf(records),
       attention: records.filter(
@@ -61,7 +61,7 @@ export function listApplicationItems(): ApplicationListItem[] {
  * qualify a green, so it has to account for the same evidence the destination
  * does.
  */
-function conditionOf(
+export function applicationListCondition(
   records: SavedInformation[],
   applicationId: string,
   now: number,
@@ -71,11 +71,29 @@ function conditionOf(
     { kind: "application", id: applicationId },
     ...SUBJECT_KINDS.flatMap((kind) => subjectsMentioned(records, kind)),
   ];
+  // A current state record can judge a result as failed or limited even when
+  // its individual checks passed. Read only the newest statement for each
+  // subject with a decisive judgment: an informational observation cannot
+  // clear a failure. Events state no subject; verified recovery replaces an
+  // older failure for the same thing.
+  const judged = records.filter((record) =>
+    ["failed", "warning", "verified"].includes(
+      record.presentation?.status ?? "",
+    ),
+  );
+  const currentJudgements = refs.flatMap((ref) => {
+    const presence = presenceOf(judged, ref);
+    return presence.known ? [presence.record.presentation?.status] : [];
+  });
+  if (currentJudgements.includes("failed"))
+    return { tone: "bad", text: "A recorded condition failed" };
   const held = refs.flatMap((ref) => [...currentChecks(records, ref).values()]);
-  if (!held.length) return { tone: "muted", text: "Not checked yet" };
   const readings = held.map((item) => checkAsNow(item.value, item.record, now));
   if (readings.includes("failed"))
     return { tone: "bad", text: "A check did not pass" };
+  if (currentJudgements.includes("warning"))
+    return { tone: "warn", text: "A recorded condition has a limit" };
+  if (!held.length) return { tone: "muted", text: "Not checked yet" };
   if (readings.includes("stale"))
     return { tone: "warn", text: "Checked a while ago" };
   if (readings.includes("verified"))

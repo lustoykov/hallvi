@@ -8,9 +8,8 @@ import {
   type Model,
   type Api,
   type SimpleStreamOptions,
-  type ToolCall,
 } from "@earendil-works/pi-ai";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -70,7 +69,7 @@ function streamSynthetic(
   };
   void (async () => {
     try {
-      const root = process.env.HALDUR_QA_ROOT;
+      const root = process.env.HALLVI_QA_ROOT;
       if (!root)
         throw new Error("Synthetic provider requires an isolated QA root.");
       options?.signal?.throwIfAborted();
@@ -79,113 +78,12 @@ function streamSynthetic(
       );
       const userMessage =
         userIndex < 0 ? "" : textOf(context.messages[userIndex]);
-      const results = context.messages
-        .slice(userIndex + 1)
-        .filter((entry) => entry.role === "toolResult");
-      const lastResult = results.at(-1);
-      const searchResults = results
-        .filter(
-          (entry) => entry.toolName === "search_decisions" && !entry.isError,
-        )
-        .map(
-          (entry) =>
-            JSON.parse(textOf(entry)) as {
-              records: Array<{ id: string; value: string }>;
-              nextOffset: number | null;
-            },
-        );
-      const lastSearch = searchResults.at(-1);
-      let tool: ToolCall | undefined;
-      let answer = `[QA fixture reply] ${userMessage}`;
-      if (lastResult?.isError) {
-        answer =
-          "[QA fixture reply] Replacement rejected; no Decision was staged.";
-      } else if (
-        userMessage.startsWith("replace-priority: ") ||
-        userMessage === "lookup-decisions"
-      ) {
-        if (!lastSearch || lastSearch.nextOffset !== null) {
-          tool = {
-            type: "toolCall",
-            id: randomUUID(),
-            name: "search_decisions",
-            arguments: { offset: lastSearch?.nextOffset ?? 0 },
-          };
-        } else if (userMessage === "lookup-decisions") {
-          answer = `[QA saved Decisions] ${
-            searchResults
-              .flatMap((result) => result.records)
-              .map((record) => record.value)
-              .join("; ") || "none"
-          }`;
-        } else if (
-          !results.some((entry) => entry.toolName === "propose_decision")
-        ) {
-          const previous = searchResults
-            .flatMap((result) => result.records)
-            .at(-1);
-          tool = {
-            type: "toolCall",
-            id: randomUUID(),
-            name: "propose_decision",
-            arguments: {
-              kind: "launch-priority",
-              value: userMessage.slice(18),
-              ...(previous ? { replaces: previous.id } : {}),
-            },
-          };
-        }
-      } else if (
-        !results.length &&
-        (userMessage.startsWith("priority: ") ||
-          userMessage.startsWith("invalid-replacement: "))
-      ) {
-        tool = {
-          type: "toolCall",
-          id: randomUUID(),
-          name: "propose_decision",
-          arguments: {
-            kind: "launch-priority",
-            value: userMessage.startsWith("priority: ")
-              ? userMessage.slice(10)
-              : "Must not persist",
-            ...(userMessage.startsWith("invalid-replacement: ")
-              ? { replaces: "00000000-0000-4000-8000-000000000000" }
-              : {}),
-          },
-        };
-      } else if (userMessage.startsWith("recall: ")) {
-        const phrase = userMessage.slice(8);
-        const found = context.messages
-          .slice(0, userIndex)
-          .some((entry) => entry.role === "user" && textOf(entry) === phrase);
-        answer = `[QA native history] ${found ? "found" : "absent"}: ${phrase}`;
-      }
+      const answer = `[QA fixture reply] ${userMessage}`;
 
       stream.push({ type: "start", partial: message });
-      if (tool) {
-        message.content = [tool];
-        message.stopReason = "toolUse";
-        stream.push({
-          type: "toolcall_start",
-          contentIndex: 0,
-          partial: message,
-        });
-        stream.push({
-          type: "toolcall_end",
-          contentIndex: 0,
-          toolCall: tool,
-          partial: message,
-        });
-        stream.push({ type: "done", reason: "toolUse", message });
-        return;
-      }
-
       // Stream a genuine prefix of the final response; interrupted drafts are
       // saved by the production worker and retained in the native transcript.
-      const prefix = answer.startsWith("[QA fixture reply]")
-        ? "[QA fixture reply] "
-        : answer;
+      const prefix = "[QA fixture reply] ";
       message.content = [{ type: "text", text: prefix }];
       stream.push({ type: "text_start", contentIndex: 0, partial: message });
       stream.push({
@@ -194,27 +92,6 @@ function streamSynthetic(
         delta: prefix,
         partial: message,
       });
-      // Deterministic crash barrier: stay after the persisted draft until the
-      // process is killed or cancellation settles normally. Match only a prefix
-      // so a later "recall: ..." request can quote this marker without pausing.
-      if (userMessage.startsWith("[pause-after-draft]")) {
-        const signal = options?.signal;
-        if (!signal)
-          throw new Error("The draft barrier requires cancellation.");
-        await new Promise<never>((_resolve, reject) => {
-          const abort = () => {
-            signal.removeEventListener("abort", abort);
-            reject(new Error("Synthetic generation cancelled."));
-          };
-          signal.addEventListener("abort", abort, { once: true });
-          if (signal.aborted) abort();
-        });
-      }
-      // The process-lifecycle regression deliberately models a provider that
-      // never settles, even after cancellation. Used only in a disposable child.
-      if (userMessage.includes("[unresponsive]")) {
-        await new Promise<void>(() => {});
-      }
       await pause(
         userMessage.includes("[slow-cancel]")
           ? 6_000
@@ -260,7 +137,7 @@ function streamSynthetic(
 }
 
 export async function configuredPiRuntime(sdk: PiSdk) {
-  const root = process.env.HALDUR_QA_ROOT;
+  const root = process.env.HALLVI_QA_ROOT;
   if (!root)
     throw new Error("Synthetic provider requires an isolated QA root.");
   const configuration = readPiConfiguration();
@@ -278,8 +155,8 @@ export async function configuredPiRuntime(sdk: PiSdk) {
   });
   // A separate provider ID and synthetic credential ensure the runtime cannot
   // fall back to a real account or a network provider adapter.
-  modelRuntime.registerProvider("haldur-qa", {
-    api: "haldur-qa",
+  modelRuntime.registerProvider("hallvi-qa", {
+    api: "hallvi-qa",
     apiKey: "QA-NO-NETWORK",
     baseUrl: "https://qa.invalid",
     streamSimple: streamSynthetic,
@@ -295,6 +172,6 @@ export async function configuredPiRuntime(sdk: PiSdk) {
       },
     ],
   });
-  const model = modelRuntime.getModel("haldur-qa", configuration.modelId)!;
+  const model = modelRuntime.getModel("hallvi-qa", configuration.modelId)!;
   return { configuration, modelRuntime, model };
 }

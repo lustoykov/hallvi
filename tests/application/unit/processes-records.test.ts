@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SavedInformation } from "@/server/operator-data";
-import { processesFromRecords } from "@/components/haldur/processes-records";
+import { processesFromRecords } from "@/components/hallvi/processes-records";
 
 const APP = "app-1";
 const now = Date.parse("2026-09-13T12:00:00.000Z");
@@ -369,8 +369,8 @@ describe("two processes from the same image", () => {
             server: "host-1",
             changes: [],
             services: [
-              { process: "shop-web", image: "haldur/shop:1" },
-              { process: "shop-worker", image: "haldur/shop:1" },
+              { process: "shop-web", image: "hallvi/shop:1" },
+              { process: "shop-worker", image: "hallvi/shop:1" },
             ],
           },
         }),

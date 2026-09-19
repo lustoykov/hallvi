@@ -50,10 +50,10 @@ interface Coordinator {
   attempt?: PendingLogin;
 }
 declare global {
-  var __haldurGithubSetups: Map<string, Coordinator> | undefined;
+  var __hallviGithubSetups: Map<string, Coordinator> | undefined;
 }
 function coordinator() {
-  const all = (globalThis.__haldurGithubSetups ??= new Map());
+  const all = (globalThis.__hallviGithubSetups ??= new Map());
   const key = githubConnectionPath();
   if (!all.has(key)) all.set(key, { version: 0 });
   return all.get(key)!;
@@ -92,7 +92,7 @@ export async function getGithubSetupStatus() {
         mode: saved.mode,
         account: saved.account,
         connectedAt: saved.connectedAt,
-        source: saved.mode === "cli" ? saved.source : "Haldur",
+        source: saved.mode === "cli" ? saved.source : "Hallvi",
         expiresAt: saved.mode === "app" ? saved.expiresAt : null,
         automaticRenewal: canRefreshGithubConnection(saved),
         accessUrl:
@@ -129,14 +129,14 @@ export type GithubSetupStatus = Awaited<
 export async function adoptGithubCliLogin(candidateId: string) {
   void candidateId;
   throw new GithubAccessError(
-    "CLI connections are no longer supported. Connect through Haldur's GitHub App.",
+    "CLI connections are no longer supported. Connect through Hallvi's GitHub App.",
     "auth",
   );
 }
 
 export function disconnectGithub() {
   cancelPending(coordinator());
-  // Deletes Haldur's stored token/selection by replacing the one owned
+  // Deletes Hallvi's stored token/selection by replacing the one owned
   // file.
   // gh's keychain/config and environment are never changed.
   saveGithubConnection(null);
@@ -146,7 +146,7 @@ export async function startGithubLogin(): Promise<GithubLoginAttempt> {
   const app = githubAppRegistration();
   if (!app)
     throw new GithubAccessError(
-      "Configure Haldur’s GitHub App client ID and slug before connecting an account.",
+      "Configure Hallvi’s GitHub App client ID and slug before connecting an account.",
     );
   const state = coordinator();
   if (

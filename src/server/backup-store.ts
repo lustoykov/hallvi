@@ -35,6 +35,7 @@ import { z } from "zod";
 
 import { operatorSettings } from "./operator-execution";
 import { piConfigDir } from "./pi-configuration";
+import { managedSshOptions } from "./managed-ssh";
 
 const exec = promisify(execFile);
 
@@ -75,22 +76,7 @@ export async function fetchBackupCopy(
   if (!host)
     throw new Error("Connect a server before copying anything off it.");
 
-  const connection = [
-    "-F",
-    "/dev/null",
-    "-i",
-    host.privateKeyPath,
-    "-o",
-    `UserKnownHostsFile=${host.knownHostsPath}`,
-    "-o",
-    "StrictHostKeyChecking=yes",
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "IdentitiesOnly=yes",
-    "-o",
-    "ConnectTimeout=15",
-  ];
+  const connection = [...managedSshOptions(host), "-o", "ConnectTimeout=15"];
 
   // Ask the host what it thinks the file is, before pulling it. A digest from
   // the far side is the only way to tell a complete copy from a truncated one.
@@ -98,8 +84,6 @@ export async function fetchBackupCopy(
     "ssh",
     [
       ...connection,
-      "-p",
-      String(host.port),
       `${host.user}@${host.address}`,
       // Both values from one round trip, in a form that cannot be confused
       // with a path containing spaces.
@@ -133,8 +117,6 @@ export async function fetchBackupCopy(
       "ssh",
       [
         ...connection,
-        "-p",
-        String(host.port),
         `${host.user}@${host.address}`,
         `cat ${shellQuote(remotePath)}`,
       ],
@@ -182,7 +164,7 @@ export async function fetchBackupCopy(
     covers,
     // The words a record should use, so the page can classify it without
     // reading prose.
-    destination: `${name} on the computer running Haldur`,
+    destination: `${name} on the computer running Hallvi`,
     destinationKind: "controller" as const,
     caveat:
       "This survives losing the application's server and depends on this computer. It is not object storage.",

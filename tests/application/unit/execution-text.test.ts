@@ -15,7 +15,7 @@ import {
   hostOf,
   plainText,
   whereItRan,
-} from "@/components/haldur/execution-text";
+} from "@/components/hallvi/execution-text";
 
 describe("reading the envelope", () => {
   it("takes the command out of a tool payload", () => {
@@ -109,7 +109,7 @@ describe("one readable line for an execution", () => {
     const line = executionLine({
       tool: "server_bash",
       input:
-        '{"command":"set -euo pipefail\\ncode=$(curl --silent --show-error --output /tmp/haldur-check http://example.com)","timeoutSeconds":30}',
+        '{"command":"set -euo pipefail\\ncode=$(curl --silent --show-error --output /tmp/hallvi-check http://example.com)","timeoutSeconds":30}',
     });
     expect(line).not.toContain('{"');
     expect(line).not.toContain("\\n");

@@ -1,9 +1,12 @@
 import type { NextRequest } from "next/server";
 
-import { removeApplication } from "@/server/applications";
+import { z } from "zod";
+
+import { removeApplication, renameApplication } from "@/server/applications";
 import { handle } from "@/server/http";
 import { getOperatorView } from "@/server/operator-view";
 import {
+  assertSameOrigin,
   parseJsonRequest,
   removeApplicationRequestSchema,
 } from "@/server/schemas";
@@ -33,5 +36,21 @@ export async function DELETE(
     );
     const { applicationId } = await context.params;
     return removeApplication(applicationId, repository);
+  });
+}
+
+/** Renames the application. The name is a label; nothing is keyed on it. */
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ applicationId: string }> },
+) {
+  return handle(async () => {
+    assertSameOrigin(request);
+    const { name } = await parseJsonRequest(
+      request,
+      z.strictObject({ name: z.string().trim().min(1).max(120) }),
+    );
+    const { applicationId } = await context.params;
+    return { application: renameApplication(applicationId, name) };
   });
 }

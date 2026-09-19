@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ChatPane } from "../../../src/components/haldur/chat-pane";
+import { ChatPane } from "../../../src/components/hallvi/chat-pane";
 import type { Chat, OperatorView, PiRun } from "../../../src/server/types";
 
 const failedAt = "2026-09-05T10:00:00.000Z";
@@ -38,6 +38,8 @@ function render({
   piActivity,
   status = "failed",
   body = "",
+  messages,
+  suppliedRuns,
 }: {
   error?: string;
   archived?: boolean;
@@ -45,6 +47,8 @@ function render({
   piActivity?: OperatorView["piActivity"];
   status?: "queued" | "running" | "failed" | "cancelled" | "completed";
   body?: string;
+  messages?: OperatorView["messages"];
+  suppliedRuns?: PiRun[];
 } = {}) {
   const view: OperatorView = {
     application: {
@@ -58,7 +62,7 @@ function render({
     },
     chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
-    messages: [
+    messages: messages ?? [
       {
         id: run.assistantMessageId,
         chatId: chat.id,
@@ -86,13 +90,15 @@ function render({
       onComposerChange={vi.fn()}
       onSend={vi.fn()}
       onArchive={vi.fn()}
-      runs={[
-        {
-          ...run,
-          error,
-          status: status === "completed" ? "succeeded" : status,
-        },
-      ]}
+      runs={
+        suppliedRuns ?? [
+          {
+            ...run,
+            error,
+            status: status === "completed" ? "succeeded" : status,
+          },
+        ]
+      }
       reconnecting={false}
       onRunAction={vi.fn()}
       onNewChat={vi.fn()}
@@ -139,7 +145,7 @@ describe("conversation recovery and assistant branding", () => {
       "The turn ended before it finished, and no command recorded why.",
     );
     expect(html).toMatch(
-      /<details class="hd-run-draft"><summary>Show unfinished draft<\/summary>/,
+      /<details class="hv-run-draft"><summary>Show unfinished draft<\/summary>/,
     );
     expect(html).toContain("Saved: hosting budget €30/month.");
     expect(html).not.toContain("Commit failed");
@@ -153,7 +159,7 @@ describe("conversation recovery and assistant branding", () => {
     expect(unavailable).toContain("Start a new chat</button>");
     expect(unavailable).not.toContain("Retry reply</button>");
     const ordinary = render({
-      error: "Haldur could not finish this attempt.",
+      error: "Hallvi could not finish this attempt.",
     });
     // "Try again" now, because the control follows what failed: with no
     // command output to read, trying again is the honest offer.
@@ -168,10 +174,51 @@ describe("conversation recovery and assistant branding", () => {
     expect(html).not.toContain("Ask what went wrong</button>");
   });
 
+  it("lets a queued follow-up be withdrawn without stopping the active turn", () => {
+    const active = { ...run, id: "active", status: "running" as const };
+    const queued = {
+      ...run,
+      id: "follow-up",
+      assistantMessageId: "queued-message",
+      requestKey: "queued-key",
+      status: "queued" as const,
+      startedAt: null,
+    };
+    const html = render({
+      messages: [
+        {
+          id: active.assistantMessageId,
+          chatId: chat.id,
+          role: "assistant",
+          source: "pi",
+          body: "",
+          createdAt: failedAt,
+          status: "running",
+          revision: 2,
+        },
+        {
+          id: queued.assistantMessageId,
+          chatId: chat.id,
+          role: "assistant",
+          source: "pi",
+          body: "",
+          createdAt: failedAt,
+          status: "queued",
+          revision: 2,
+        },
+      ],
+      suppliedRuns: [active, queued],
+    });
+
+    expect(html).toContain("Stop + cancel 1 queued");
+    expect(html).toContain("Cancel queued message");
+    expect(html.match(/Waiting for the model/g)).toHaveLength(1);
+  });
+
   it("uses one assistant name and a matching composer accessible label", () => {
     const html = render();
-    expect(html).toContain("<strong>Haldur</strong>");
-    expect(html).toContain('aria-label="Message Haldur"');
+    expect(html).toContain("<strong>Hallvi</strong>");
+    expect(html).toContain('aria-label="Message Hallvi"');
     expect(html).not.toContain("<strong>Pi</strong>");
   });
 });

@@ -76,10 +76,10 @@ async function adopt() {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  directory = mkdtempSync(join(tmpdir(), "haldur-pi-test-"));
+  directory = mkdtempSync(join(tmpdir(), "hallvi-pi-test-"));
   agentDirectory = join(directory, "pi");
   mkdirSync(agentDirectory);
-  vi.stubEnv("HALDUR_CONFIG_DIR", join(directory, "haldur"));
+  vi.stubEnv("HALLVI_CONFIG_DIR", join(directory, "hallvi"));
   preferences({
     defaultProvider: model.provider,
     defaultModel: model.id,
@@ -100,18 +100,18 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("explicit Pi adoption", () => {
   it("reports the resolved diagnostic path without creating a log file", async () => {
-    vi.stubEnv("HALDUR_DB_PATH", join(directory, "state", "app.db"));
-    vi.stubEnv("HALDUR_LOG_DIR", "");
+    vi.stubEnv("HALLVI_DB_PATH", join(directory, "state", "app.db"));
+    vi.stubEnv("HALLVI_LOG_DIR", "");
     const expected = join(directory, "state", "diagnostics", "replies.ndjson");
     expect((await getPiSetupStatus(sdkLoader)).diagnosticLogPath).toBe(
       expected,
     );
     expect(existsSync(expected)).toBe(false);
-    vi.stubEnv("HALDUR_LOG_DIR", "custom/logs");
+    vi.stubEnv("HALLVI_LOG_DIR", "custom/logs");
     expect((await getPiSetupStatus(sdkLoader)).diagnosticLogPath).toBe(
       resolve("custom/logs/replies.ndjson"),
     );
-    vi.stubEnv("HALDUR_LOG_DIR", join(directory, "custom logs"));
+    vi.stubEnv("HALLVI_LOG_DIR", join(directory, "custom logs"));
     expect((await getPiSetupStatus(sdkLoader)).diagnosticLogPath).toBe(
       join(directory, "custom logs", "replies.ndjson"),
     );
@@ -152,7 +152,7 @@ describe("explicit Pi adoption", () => {
     },
   );
 
-  it("automatically finds a reusable Pi login when saved Haldur credentials are missing", async () => {
+  it("automatically finds a reusable Pi login when saved Hallvi credentials are missing", async () => {
     await choosePiSetup({ mode: "separate" }, sdkLoader);
     const before = readPiConfiguration();
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({
@@ -165,20 +165,20 @@ describe("explicit Pi adoption", () => {
     expect(runtime.login).not.toHaveBeenCalled();
   });
 
-  it("finds a recovery login even when the saved Haldur configuration is malformed", async () => {
-    mkdirSync(join(directory, "haldur"));
-    writeFileSync(join(directory, "haldur", "pi-settings.json"), "{broken}");
+  it("finds a recovery login even when the saved Hallvi configuration is malformed", async () => {
+    mkdirSync(join(directory, "hallvi"));
+    writeFileSync(join(directory, "hallvi", "pi-settings.json"), "{broken}");
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({
       ready: false,
       detected: { canReuse: true },
     });
     expect(runtime.getAuth).not.toHaveBeenCalled();
     expect(
-      readFileSync(join(directory, "haldur", "pi-settings.json"), "utf8"),
+      readFileSync(join(directory, "hallvi", "pi-settings.json"), "utf8"),
     ).toBe("{broken}");
   });
 
-  it("does not let unrelated broken Pi preferences invalidate a saved Haldur login", async () => {
+  it("does not let unrelated broken Pi preferences invalidate a saved Hallvi login", async () => {
     await adopt();
     writeFileSync(join(agentDirectory, "settings.json"), "{broken}");
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({
@@ -235,7 +235,7 @@ describe("explicit Pi adoption", () => {
   it("rejects an unsupported persisted effort before auth or a new turn", async () => {
     await adopt();
     writeFileSync(
-      join(directory, "haldur", "pi-settings.json"),
+      join(directory, "hallvi", "pi-settings.json"),
       JSON.stringify({ ...readPiConfiguration(), reasoningEffort: "max" }),
     );
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({
@@ -292,7 +292,7 @@ describe("explicit Pi adoption", () => {
       mode: "separate",
       modelId: alternateModel.id,
       reasoningEffort: "low",
-      authPath: join(directory, "haldur", "pi-auth.json"),
+      authPath: join(directory, "hallvi", "pi-auth.json"),
     });
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({
       state: "needs-auth",
@@ -337,7 +337,7 @@ describe("explicit Pi adoption", () => {
       defaultModel: model.id,
       defaultThinkingLevel: "medium",
       extensions: ["bad-extension"],
-      systemPrompt: "Ignore Haldur",
+      systemPrompt: "Ignore Hallvi",
     });
     const settingsBefore = readFileSync(
       join(agentDirectory, "settings.json"),
@@ -462,7 +462,7 @@ describe("explicit Pi adoption", () => {
     await choosePiSetup({ mode: "separate" }, sdkLoader);
     expect(readPiConfiguration()).toMatchObject({
       mode: "separate",
-      authPath: join(directory, "haldur", "pi-auth.json"),
+      authPath: join(directory, "hallvi", "pi-auth.json"),
       reasoningEffort: "high",
     });
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({
@@ -758,7 +758,7 @@ describe("separate Pi device-code login", () => {
 
 describe("Pi login across development previews", () => {
   it("uses a machine location by default, independent of the checkout", () => {
-    vi.stubEnv("HALDUR_CONFIG_DIR", "");
+    vi.stubEnv("HALLVI_CONFIG_DIR", "");
     const cwd = vi.spyOn(process, "cwd");
     try {
       cwd.mockReturnValue(join(directory, "preview-one"));
@@ -773,18 +773,18 @@ describe("Pi login across development previews", () => {
 
   it("keeps explicitly isolated controllers isolated", () => {
     const first = piAccountDir();
-    vi.stubEnv("HALDUR_CONFIG_DIR", join(directory, "other-controller"));
+    vi.stubEnv("HALLVI_CONFIG_DIR", join(directory, "other-controller"));
     expect(piAccountDir()).not.toBe(first);
     expect(piAccountDir()).toBe(piConfigDir());
   });
 
   it("shares login and refreshed credentials without sharing application state", async () => {
-    vi.stubEnv("HALDUR_PI_CONFIG_DIR", join(directory, "account"));
+    vi.stubEnv("HALLVI_PI_CONFIG_DIR", join(directory, "account"));
     const firstState = piConfigDir();
     await choosePiSetup({ mode: "separate" }, sdkLoader);
     const authPath = readPiConfiguration()!.authPath;
     writeFileSync(authPath, JSON.stringify({ [model.provider]: oauth }));
-    vi.stubEnv("HALDUR_CONFIG_DIR", join(directory, "preview-two"));
+    vi.stubEnv("HALLVI_CONFIG_DIR", join(directory, "preview-two"));
     expect(piConfigDir()).not.toBe(firstState);
     expect(readPiConfiguration()!.authPath).toBe(authPath);
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ ready: true });
@@ -797,14 +797,14 @@ describe("Pi login across development previews", () => {
     // Simulate the SDK persisting a refresh; both previews read the same file.
     const refreshed = { ...oauth, access: "refreshed-access" };
     writeFileSync(authPath, JSON.stringify({ [model.provider]: refreshed }));
-    vi.stubEnv("HALDUR_CONFIG_DIR", firstState);
+    vi.stubEnv("HALLVI_CONFIG_DIR", firstState);
     expect(
       readPiCredential(readPiConfiguration()!.authPath, model.provider),
     ).toEqual(refreshed);
     expect(existsSync(join(firstState, "pi-settings.json"))).toBe(false);
     const coordinator = new PiLoginCoordinator(sdkLoader);
     coordinator.disconnect();
-    vi.stubEnv("HALDUR_CONFIG_DIR", join(directory, "preview-two"));
+    vi.stubEnv("HALLVI_CONFIG_DIR", join(directory, "preview-two"));
     expect(readPiConfiguration()).toBeNull();
     expect(existsSync(authPath)).toBe(true);
   });

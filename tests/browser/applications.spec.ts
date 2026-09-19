@@ -22,7 +22,7 @@ async function view(page: Page) {
   return (await page.request.get(`/api${new URL(page.url()).pathname}`)).json();
 }
 async function send(page: Page, message: string) {
-  await page.getByRole("textbox", { name: "Message Haldur" }).fill(message);
+  await page.getByRole("textbox", { name: "Message Hallvi" }).fill(message);
   const applicationUrl = new URL(page.url());
   // First-use dev compilation belongs to HTTP acceptance, not the reply budget.
   const [accepted] = await Promise.all([
@@ -83,24 +83,24 @@ test(
     ).toBeVisible();
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
+      page.locator(".hv-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
 
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("Cancel **me** [slow-cancel]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
     await openConversation(page);
-    await expect(page.locator(".hd-did").last()).toContainText(
+    await expect(page.locator(".hv-did").last()).toContainText(
       "[QA fixture reply]",
     );
     // The HTTP acceptance has finished, but the saved run is still active.
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeEnabled();
-    await expect(page.locator(".hd-busy-bar")).toBeVisible();
+    await expect(page.locator(".hv-still-working")).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("durable-reply-in-progress.png"),
       fullPage: true,
@@ -113,13 +113,11 @@ test(
     await page.getByRole("button", { name: "Stop" }).click();
     expect((await (await cancellation).json()).status).toBe("cancelled");
     await page.reload();
-    await expect(
-      page.getByRole("button", { name: "Retry reply" }),
-    ).toBeVisible();
-    await expect(page.locator(".hd-busy-bar")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(page.locator(".hv-still-working")).toHaveCount(0);
     await page.getByText("Show unfinished draft", { exact: true }).click();
     await openConversation(page);
-    await expect(page.locator(".hd-run-progress details")).toContainText(
+    await expect(page.locator(".hv-run-progress details")).toContainText(
       "[QA fixture reply]",
     );
     await page.getByText("Show unfinished draft", { exact: true }).click();
@@ -127,22 +125,23 @@ test(
       path: testInfo.outputPath("durable-cancelled-reply.png"),
       fullPage: true,
     });
-    await page.getByRole("button", { name: "Retry reply" }).click();
+    await page.getByRole("button", { name: "Try again" }).click();
     await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Cancel me [slow-cancel]", {
         exact: true,
       }),
-    ).toBeVisible();
+      // The synthetic reply alone takes six seconds.
+    ).toBeVisible({ timeout: 20_000 });
     await openConversation(page);
     await expect(
       page
-        .locator(".hd-messages")
+        .locator(".hv-messages")
         .getByText("Cancel me [slow-cancel]", { exact: true }),
     ).toHaveCount(1);
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages strong:visible").filter({ hasText: /^me$/ }),
+      page.locator(".hv-messages strong:visible").filter({ hasText: /^me$/ }),
     ).toHaveCount(2); // Original user message and successful assistant answer.
     const saved = await (await page.request.get(endpoint)).json();
     expect(saved.runs.map((run: { status: string }) => run.status)).toEqual([
@@ -168,7 +167,9 @@ test(
     // unchanged 10s reply assertion, plus the final reload and state check.
     test.setTimeout(120_000);
     await page.goto("/");
-    await expect(page).toHaveURL(/\/applications$/);
+    // The fixture is worker-scoped: another smoke journey may already have
+    // created an application, but the root must always enter applications.
+    await expect(page).toHaveURL(/\/applications(?:\/new)?$/);
     await addApplication(page, "smoke-app");
     await openConversation(page);
     const message = "What should we check before deploying?";
@@ -228,7 +229,7 @@ test(
     await expect(disconnect).toBeFocused();
     await page.getByLabel("Reasoning effort").selectOption("medium");
     await page.getByRole("button", { name: "View applications" }).click();
-    await expect(page).toHaveURL(/\/applications$/);
+    await expect(page).toHaveURL(/\/applications(?:\/new)?$/);
     await page.goto("/setup/pi");
     await expect(page.getByLabel("Reasoning effort")).toHaveValue("medium");
   },
@@ -241,29 +242,30 @@ test(
     await addApplication(page, "failure-app");
     const before = await view(page);
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("Hello [fail-once]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    // The pane shows one user-safe line for any failed attempt; the worker's
-    // exact error stays in the run record.
+    // The failed attempt offers another go; the worker's exact error stays in
+    // the run record.
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(page.getByText("QA simulated provider failure.")).toHaveCount(
+      0,
+    );
     await expect(
-      page.getByText("Something went wrong. Please retry.", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toHaveValue("");
     await openConversation(page);
     await expect(
       page
-        .locator(".hd-messages")
+        .locator(".hv-messages")
         .getByText("Hello [fail-once]", { exact: true }),
     ).toHaveCount(1);
     expect((await view(page)).messages).toHaveLength(
       before.messages.length + 2,
     );
     await page.reload();
-    await page.getByRole("button", { name: "Retry reply" }).click();
+    await page.getByRole("button", { name: "Try again" }).click();
     await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Hello [fail-once]", { exact: true }),
@@ -271,7 +273,7 @@ test(
     await openConversation(page);
     await expect(
       page
-        .locator(".hd-messages")
+        .locator(".hv-messages")
         .getByText("Hello [fail-once]", { exact: true }),
     ).toHaveCount(1);
     expect((await view(page)).messages).toHaveLength(
@@ -281,55 +283,27 @@ test(
 );
 
 test(
-  "P1-05 applications isolate Decisions and unsent drafts",
+  "P1-05 applications isolate messages and unsent drafts",
   journey("isolation"),
   async ({ page }) => {
     const first = await addApplication(page, "isolation-first");
     await openConversation(page);
-    await send(page, "priority: First app only");
+    await send(page, "First app only");
     await page
-      .getByRole("textbox", { name: "Message Haldur" })
+      .getByRole("textbox", { name: "Message Hallvi" })
       .fill("Unsent draft");
     await addApplication(page, "isolation-second");
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toHaveValue("");
-    expect((await view(page)).decisions).toEqual([]);
+    expect((await view(page)).messages).not.toContainEqual(
+      expect.objectContaining({ body: "First app only" }),
+    );
     await page.goto(first);
-    expect((await view(page)).decisions[0].value).toBe("First app only");
-  },
-);
-
-test(
-  "P1-06/07 revision uses lookup; fabricated replacement returns a recoverable tool error",
-  journey("revision"),
-  async ({ page }) => {
-    await addApplication(page, "revision-app");
-    await openConversation(page);
-    await send(page, "priority: Lowest cost");
-    const oldId = (await view(page)).decisions[0].id;
-    await openConversation(page);
-    await send(page, "replace-priority: Fast recovery");
-    const revised = await view(page);
-    expect(revised.decisions).toHaveLength(1);
-    expect(revised.decisions[0].id).not.toBe(oldId);
-    expect(revised.decisions[0].value).toBe("Fast recovery");
-    await page
-      .getByRole("textbox", { name: "Message Haldur" })
-      .fill("invalid-replacement: reject this");
-    await openConversation(page);
-    await page.getByRole("button", { name: "Send", exact: true }).click();
     await openConversation(page);
     await expect(
-      page.getByText(
-        "[QA fixture reply] Replacement rejected; no Decision was staged.",
-        { exact: true },
-      ),
+      page.getByText("[QA fixture reply] First app only", { exact: true }),
     ).toBeVisible();
-    expect((await view(page)).messages).toHaveLength(
-      revised.messages.length + 2,
-    );
-    expect((await view(page)).decisions).toEqual(revised.decisions);
   },
 );
 
@@ -339,7 +313,7 @@ test(
   async ({ page }) => {
     const oldPath = await addApplication(page, "removal-app");
     await openConversation(page);
-    await send(page, "priority: Disposable decision");
+    await send(page, "Disposable message");
     await page
       .getByRole("button", { name: "Switch application: removal-app" })
       .click();
@@ -356,7 +330,9 @@ test(
     await expect(page).toHaveURL(/\/applications\/new$/);
     const freshPath = await addApplication(page, "removal-app");
     expect(freshPath).not.toBe(oldPath);
-    expect((await view(page)).decisions).toEqual([]);
+    expect((await view(page)).messages).not.toContainEqual(
+      expect.objectContaining({ body: "Disposable message" }),
+    );
     expect((await page.request.get(`/api${oldPath}`)).status()).toBe(404);
   },
 );
@@ -382,8 +358,12 @@ test(
       page.getByRole("button", { name: "View applications" }),
     ).toBeDisabled();
     await page.goto(path);
+    // A draft can still be written; it cannot be sent until ChatGPT is back.
+    await page
+      .getByRole("textbox", { name: "Message Hallvi" })
+      .fill("Hello after disconnect");
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("button", { name: "Send", exact: true }),
     ).toBeDisabled();
     expect((await view(page)).messages).toEqual(before.messages);
   },
@@ -395,7 +375,7 @@ test(
   async ({ page }, testInfo) => {
     await addApplication(page, "slow-send-app");
     const before = await view(page);
-    const composer = page.getByRole("textbox", { name: "Message Haldur" });
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     let release!: () => void;
     let requests = 0;
     const held = new Promise<void>((resolve) => {
@@ -418,11 +398,11 @@ test(
       await composer.press("Enter");
       await openConversation(page);
       await expect(
-        page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
+        page.locator(".hv-messages").getByText("Hello [slow]", { exact: true }),
       ).toBeVisible();
       await openConversation(page);
       await expect(
-        page.locator(".hd-messages").getByText("Pending", { exact: true }),
+        page.locator(".hv-messages").getByText("Pending", { exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole("status").filter({ hasText: "Saving message" }),
@@ -450,11 +430,11 @@ test(
     ).toBeVisible();
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages").getByText("Hello [slow]", { exact: true }),
+      page.locator(".hv-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
     await openConversation(page);
     await expect(
-      page.locator(".hd-messages").getByText("Pending", { exact: true }),
+      page.locator(".hv-messages").getByText("Pending", { exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("status").filter({ hasText: "Saving message" }),
@@ -465,5 +445,42 @@ test(
     expect((await view(page)).messages).toHaveLength(
       before.messages.length + 2,
     );
+  },
+);
+
+test(
+  "SSE acceptance removes the pending copy even before the send response arrives",
+  journey("slow-reply"),
+  async ({ page }) => {
+    await addApplication(page, "acceptance-race");
+    let release: () => void = () => {};
+    const delayed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/messages", async (route) => {
+      const response = await route.fetch();
+      await delayed;
+      await route.fulfill({ response });
+    });
+    try {
+      await openConversation(page);
+      await page
+        .getByRole("textbox", { name: "Message Hallvi" })
+        .fill("Acceptance race");
+      await openConversation(page);
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await openConversation(page);
+      await expect(
+        page.getByText("[QA fixture reply] Acceptance race", { exact: true }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByText("Acceptance race", { exact: true }),
+      ).toHaveCount(1);
+      await expect(
+        page.getByText("Saving message…", { exact: false }),
+      ).toHaveCount(0);
+    } finally {
+      release();
+    }
   },
 );

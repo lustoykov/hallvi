@@ -24,7 +24,7 @@ const rich = scenario === "rich";
 // The recommendation's configuration in the native shape the executor runs:
 // one web process, and for the rich application a managed PostgreSQL
 // database, a Valkey broker, a Celery worker and file storage.
-const project = "hd-capture";
+const project = "hv-capture";
 const image = "ghcr.io/paperless-ngx/paperless-ngx:2.13";
 const native = {
   format: 1,
@@ -51,7 +51,7 @@ const native = {
           ...(rich
             ? {
                 DATABASE_URL:
-                  "postgresql://haldur:${HALDUR_DATABASE_PASSWORD}@postgres:5432/application",
+                  "postgresql://hallvi:${HALLVI_DATABASE_PASSWORD}@postgres:5432/application",
               }
             : {}),
         },
@@ -283,14 +283,11 @@ await page
   .getByLabel("GitHub repository", { exact: true })
   .fill(`https://github.com/qa/${rich ? "document-archive" : "static-site"}`);
 await page
-  .getByLabel("Application name", { exact: true })
-  .fill(rich ? "Document archive" : "Static site");
-await page
   .getByRole("button", { name: "Add application", exact: true })
   .click();
 await page.waitForURL(/\/applications\/[\da-f-]{36}$/, { timeout: 30000 });
 const nav = page.getByRole("navigation", { name: "Application workspace" });
-const composer = page.getByRole("textbox", { name: "Message Haldur" });
+const composer = page.getByRole("textbox", { name: "Message Hallvi" });
 await composer.fill("Deploy this repository on a small server, please.");
 await page.getByRole("button", { name: "Send", exact: true }).click();
 await page.getByText("[QA fixture reply]").first().waitFor({ timeout: 30000 });

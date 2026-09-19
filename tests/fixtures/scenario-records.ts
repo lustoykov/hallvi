@@ -16,7 +16,7 @@ type Presentation = NonNullable<SavedInformation["presentation"]>;
  * Command output, which Logs is built from.
  *
  * Logs is the one destination that reads nothing from saved information: it
- * shows what Haldur's own commands printed. A scenario with no captured
+ * shows what Hallvi's own commands printed. A scenario with no captured
  * output leaves that page empty, which says "nothing has run" rather than
  * showing the page doing its job.
  */

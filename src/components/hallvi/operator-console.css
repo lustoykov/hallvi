@@ -1,0 +1,398 @@
+.hv-operator-console {
+  font-size: 13px;
+}
+.hv-operator-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border, #e6e6e6);
+}
+.hv-modes {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.hv-modes [role="radiogroup"] {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: #eceff5;
+  box-shadow: inset 0 1px 2px rgb(23 34 56 / 10%);
+}
+.hv-modes button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+  transition:
+    background-color var(--base) var(--ease-out),
+    color var(--base) var(--ease-out);
+}
+.hv-modes button:hover:not([aria-checked="true"]) {
+  color: var(--ink-2);
+}
+.hv-modes button[aria-checked="true"] {
+  background: #fff;
+  color: var(--ink);
+  box-shadow:
+    0 1px 1px rgb(23 34 56 / 10%),
+    inset 0 0 0 1px rgb(40 90 216 / 10%);
+}
+.hv-modes button[disabled] {
+  cursor: default;
+}
+.hv-execution {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: #fff;
+}
+.hv-execution header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 10px;
+}
+.hv-execution header strong {
+  font-size: 13px;
+  font-weight: 620;
+  color: var(--ink);
+}
+.hv-execution-where {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.hv-execution-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.hv-execution-state em {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-style: normal;
+}
+.hv-execution pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px;
+  background: var(--context);
+  border-radius: 5px;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.hv-execution.awaiting-approval {
+  border-color: var(--waiting-line);
+  background: var(--waiting-bg);
+}
+.hv-execution.failed,
+.hv-execution.interrupted {
+  border-color: var(--failed-line);
+}
+.hv-execution-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.hv-execution .hv-stream {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.hv-stream > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--link);
+  width: fit-content;
+}
+.hv-stream-terminal {
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--ink);
+  color: #f7f8fa;
+}
+.hv-stream pre {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  tab-size: 2;
+  scrollbar-color: #687183 #202838;
+  overscroll-behavior: contain;
+}
+/* What ran, as one line of caption above its output. Not a pane: no scroll,
+   no height of its own, nothing that competes with the output below it. */
+.hv-stream-ran {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 9px 14px;
+  border-bottom: 1px solid #475267;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.hv-stream-ran > code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #b8ceff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-stream-prompt {
+  flex: none;
+  color: #8792a6;
+}
+.hv-stream-more {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid #687183;
+  border-radius: 5px;
+  background: transparent;
+  color: #dfe5ef;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+.hv-stream-more:hover {
+  background: #39465d;
+}
+/* The whole script, only once it has been asked for. */
+.hv-stream .hv-stream-command {
+  max-height: 220px;
+  overflow: auto;
+  border-bottom: 1px solid #475267;
+  background: #171e2b;
+  color: #b8ceff;
+}
+.hv-stream .hv-stream-output {
+  min-height: 120px;
+  max-height: 320px;
+  overflow: auto;
+  overflow-anchor: none;
+}
+.hv-stream-empty {
+  color: #bec6d4;
+}
+.hv-stream-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 8px 14px;
+  border-top: 1px solid #475267;
+  font-size: 12px;
+}
+.hv-stream-controls button {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #687183;
+  border-radius: 5px;
+  background: transparent;
+  color: #f7f8fa;
+  cursor: pointer;
+  font: inherit;
+}
+.hv-stream-controls button:hover {
+  background: #39465d;
+}
+.hv-stream-controls button[aria-pressed="true"] {
+  color: #b8ceff;
+  border-color: #8aaaf0;
+}
+.hv-stream-controls span {
+  color: #bec6d4;
+}
+/* The clock sits away from the buttons: it is read, not pressed. */
+.hv-stream-pulse {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.hv-stream :focus-visible {
+  outline: 2px solid #8aaaf0;
+  outline-offset: -2px;
+}
+.hv-stream ::selection {
+  background: #b8ceff;
+  color: #202838;
+}
+@media (max-width: 600px) {
+  .hv-stream .hv-stream-output {
+    max-height: 180px;
+  }
+}
+
+/* What the current permission setting actually does.
+   Three words in a segmented pill said which mode was chosen and nothing
+   about what it meant, so "Bypass" — Pi executing without asking — looked
+   exactly like a view filter. Bypass is not an error and does not get the
+   failure colour; it is the one mode where nothing will stop to ask, and it
+   is marked so that reading the header tells you so. */
+.hv-modes-means {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.hv-modes-means[data-loud] {
+  color: var(--waiting-text, #9a4b10);
+  font-weight: 560;
+}
+.hv-modes-means svg {
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .hv-modes-means {
+    display: none;
+  }
+}
+
+/* Asking for a decision.
+   The approval used to be a dark terminal opened by default, with the request
+   itself never stated in words: the reader was shown a shell payload and two
+   buttons. What it wants to do goes first, the command's own first line goes
+   next so it can be read without opening anything, and the full payload waits
+   behind the disclosure. */
+.hv-ask {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0 10px;
+}
+.hv-ask-what {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.5;
+}
+.hv-ask-command {
+  display: block;
+  overflow-x: auto;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfcfe;
+  color: var(--ink);
+  font-family: var(
+    --font-geist-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace
+  );
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+.hv-ask-safe {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Permissions, where Claude and Codex keep theirs: a small control on the
+   composer, with each mode's consequence said in the menu. */
+.hv-operator-console:has(> .hv-mode) {
+  display: contents;
+}
+.hv-mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line, #e7e9ee);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink-2, #3e4a60);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.hv-mode-button:hover {
+  background: #f4f6fa;
+}
+.hv-mode-button svg {
+  width: 13px;
+  height: 13px;
+  color: var(--muted);
+}
+.hv-mode-button[data-loud] {
+  border-color: #ecd6b8;
+  background: #fff4e9;
+  color: #9a4b10;
+}
+.hv-mode-button[data-loud] svg {
+  color: #b25a16;
+}
+.hv-mode-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: 280px;
+  padding: 5px;
+  border: 1px solid var(--line, #e7e9ee);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgb(23 34 56 / 14%);
+}
+.hv-mode-menu button {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hv-mode-menu button:hover {
+  background: #f4f6fa;
+}
+.hv-mode-menu button[aria-checked="true"] {
+  background: var(--selected-bg, #e8edf7);
+}
+.hv-mode-menu strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.hv-mode-menu span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hv-mode-menu :focus-visible,
+.hv-mode-button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}

@@ -2,9 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import Home from "../../../src/app/page";
-import { ApplicationsScreen } from "../../../src/components/haldur/applications-screen";
-import { NewApplicationScreen } from "../../../src/components/haldur/new-application-screen";
-import type { ApplicationListItem } from "../../../src/components/haldur/applications-screen";
+import { ApplicationsScreen } from "../../../src/components/hallvi/applications-screen";
+import { NewApplicationScreen } from "../../../src/components/hallvi/new-application-screen";
+import type { ApplicationListItem } from "../../../src/components/hallvi/applications-screen";
 
 const mocks = vi.hoisted(() => ({ redirect: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -100,9 +100,9 @@ describe("application navigation", () => {
     expect(html.match(/<input[^>]*id="repository-url"[^>]*>/)?.[0]).toContain(
       "disabled",
     );
-    expect(html.match(/<input[^>]*id="application-name"[^>]*>/)?.[0]).toContain(
-      "disabled",
-    );
+    // The name comes from the repository and is changed afterwards, so the
+    // page asks for one thing.
+    expect(html).not.toContain('id="application-name"');
   });
 
   it("starts creation with an empty URL and no retired permission choice", () => {
@@ -111,7 +111,8 @@ describe("application navigation", () => {
     expect(html).toContain('value=""');
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Add application/);
     expect(html).not.toContain("todo-fastapi");
-    for (const retired of ["Always ask", "Let Haldur decide", "Full autonomy"])
+    expect(html).not.toContain('name="permissionMode"');
+    for (const retired of ["Let Hallvi decide", "Full autonomy"])
       expect(html).not.toContain(retired);
     expect(html).toContain('href="/applications"');
   });

@@ -67,7 +67,7 @@ test(
     await openConversation(page);
 
     const composer = page.getByRole("textbox", {
-      name: "Message Haldur",
+      name: "Message Hallvi",
       exact: true,
     });
     const send = page.getByRole("button", { name: "Send", exact: true });

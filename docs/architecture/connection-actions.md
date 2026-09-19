@@ -28,6 +28,13 @@ route; it needs no application, so it is offered here directly.
 
 A token is typed into a password field and posted in a same-origin JSON body.
 It is never put in a URL, a query string, a chat message or a log, and nothing
-about it is returned to the browser beyond whether the provider accepted it.
-Connecting an account authorises nothing further: every purchase or change is
-still approved in the conversation that proposes it.
+about it is returned to the browser beyond what the provider established. It
+is saved as a plaintext file, mode 0600, in the controller's config directory,
+and travels inside Hallvi's encrypted self-backup once backup storage is
+connected. Connecting an account changes nothing by itself; what happens next
+follows the application's [permission mode](../../PRODUCT.md#permission-modes),
+and only Always ask guarantees a prompt.
+
+When a conversation needs a server or a domain, the credential is taken there
+instead, by the [onboarding cards](../design/onboarding.md); this page remains
+the inventory for deliberate management.

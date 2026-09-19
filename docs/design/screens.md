@@ -1,6 +1,6 @@
 # UI reference
 
-The [component design reference](../../src/components/haldur/DESIGN.md) owns typography, color, spacing and interaction language. [Settings](settings.md) records the existing settings surface. This page explains how to inspect the UI without confusing a simulated flow with a deployed feature.
+The [component design reference](../../src/components/hallvi/DESIGN.md) owns typography, color, spacing and interaction language. [Settings](settings.md) records the existing settings surface. This page explains how to inspect the UI without confusing a simulated flow with a deployed feature.
 
 ## Redesign interaction principles
 

@@ -1,4 +1,4 @@
-// Runs an installed Haldur: the built interface and the bundled Pi worker,
+// Runs an installed Hallvi: the built interface and the bundled Pi worker,
 // as one foreground process an operating-system service can own.
 //
 // `scripts/dev.mjs` is the development counterpart and the differences are the
@@ -35,10 +35,10 @@ const program = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const checkingInstalled = process.argv.includes("--check-installed");
 let state;
 try {
-  // A managed installation always supplies HALDUR_DATA_DIR. A foreground
+  // A managed installation always supplies HALLVI_DATA_DIR. A foreground
   // `npm start` from a checkout stays with that checkout's development state
   // instead of silently opening the installed controller.
-  const chosen = process.env.HALDUR_DATA_DIR?.trim();
+  const chosen = process.env.HALLVI_DATA_DIR?.trim();
   state = chosen
     ? stateFiles(resolve(chosen))
     : checkingInstalled
@@ -59,15 +59,15 @@ if (existsSync(state.settings)) process.loadEnvFile(state.settings);
 // already connected ChatGPT does not connect again. An owner who moves the
 // configuration directory moves the account with it, as in development.
 const moved =
-  process.env.HALDUR_PI_CONFIG_DIR?.trim() || process.env.HALDUR_CONFIG_DIR;
+  process.env.HALLVI_PI_CONFIG_DIR?.trim() || process.env.HALLVI_CONFIG_DIR;
 const resolved = resolveEnvironment(
   {
-    HALDUR_DB_PATH: state.database,
-    HALDUR_CONFIG_DIR: join(data, "config"),
+    HALLVI_DB_PATH: state.database,
+    HALLVI_CONFIG_DIR: join(data, "config"),
     ...(moved
       ? {}
       : {
-          HALDUR_PI_CONFIG_DIR: piAccountLocation(homedir()),
+          HALLVI_PI_CONFIG_DIR: piAccountLocation(homedir()),
         }),
     ...process.env,
   },
@@ -107,7 +107,7 @@ function prepareDatabase({ initialize = true } = {}) {
     const current = database.pragma("user_version", { simple: true });
     if (current !== version)
       throw new SchemaMismatchError(
-        `${resolved.database} holds schema ${current} and this Haldur needs schema ${version}. Nothing was changed. Install the version that wrote it, or move the file aside to start fresh.`,
+        `${resolved.database} holds schema ${current} and this Hallvi needs schema ${version}. Nothing was changed. Install the version that wrote it, or move the file aside to start fresh.`,
       );
   } finally {
     database.close();
@@ -126,14 +126,14 @@ try {
   process.exit(
     error instanceof SchemaMismatchError &&
       !checkingInstalled &&
-      process.env.HALDUR_MANAGED_SERVICE === "1"
+      process.env.HALLVI_MANAGED_SERVICE === "1"
       ? 0
       : 1,
   );
 }
 
 if (checkingInstalled) {
-  console.log("Haldur can open this controller database.");
+  console.log("Hallvi can open this controller database.");
   process.exit(0);
 }
 
@@ -148,8 +148,8 @@ function start(args) {
       ...process.env,
       ...environmentVariables(resolved),
       NODE_ENV: "production",
-      HALDUR_TERMINAL_PORT: String(ports.terminal),
-      HALDUR_PRIVATE_PORTS: `${ports.privateFirst}-${ports.privateLast}`,
+      HALLVI_TERMINAL_PORT: String(ports.terminal),
+      HALLVI_PRIVATE_PORTS: `${ports.privateFirst}-${ports.privateLast}`,
     },
   });
   children.add(child);
@@ -172,7 +172,7 @@ process.on("exit", () => {
 });
 
 console.log(
-  `Haldur on http://127.0.0.1:${ports.web}, keeping its state in ${data}`,
+  `Hallvi on http://127.0.0.1:${ports.web}, keeping its state in ${data}`,
 );
 
 const web = start([

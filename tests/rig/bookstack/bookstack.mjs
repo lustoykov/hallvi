@@ -259,8 +259,8 @@ if (mode === "setup") {
   const book = await call("books", {
     method: "POST",
     body: JSON.stringify({
-      name: "Haldur Audit Handbook",
-      description: "Created by the Haldur BookStack + MariaDB audit.",
+      name: "Hallvi Audit Handbook",
+      description: "Created by the Hallvi BookStack + MariaDB audit.",
     }),
     headers: { "Content-Type": "application/json" },
   });

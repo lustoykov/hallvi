@@ -8,8 +8,7 @@ coverage
 next-env.d.ts
 
 # Local state and generated results
-.haldur
-.server-guy
+.hallvi
 .claude
 data
 tests/results

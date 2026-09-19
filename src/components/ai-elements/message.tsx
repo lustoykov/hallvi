@@ -9,7 +9,7 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 export function Message({ className = "", from, ...props }: MessageProps) {
   return (
     <article
-      className={`hd-message hd-message-${from} ${className}`.trim()}
+      className={`hv-message hv-message-${from} ${className}`.trim()}
       {...props}
     />
   );
@@ -20,7 +20,7 @@ export function MessageContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`hd-message-content ${className}`.trim()} {...props} />
+    <div className={`hv-message-content ${className}`.trim()} {...props} />
   );
 }
 
@@ -29,6 +29,6 @@ export function MessageResponse({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`hd-message-response ${className}`.trim()} {...props} />
+    <div className={`hv-message-response ${className}`.trim()} {...props} />
   );
 }

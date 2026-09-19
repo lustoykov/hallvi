@@ -36,7 +36,7 @@ beforeEach(async () => {
   // A token may now be saved on the controller instead of set in the
   // environment. Point that directory at an empty one, so these cases cannot
   // read a developer's real connection and report it as the fixture's.
-  process.env.HALDUR_CONFIG_DIR = mkdtempSync(
+  process.env.HALLVI_CONFIG_DIR = mkdtempSync(
     join(tmpdir(), "cloudflare-test-"),
   );
   cloudflare = await import("@/server/cloudflare");
@@ -121,13 +121,13 @@ describe("R2", () => {
     stub({
       success: true,
       result: {
-        buckets: [{ name: "haldur-backups", creation_date: "2026-01-01" }],
+        buckets: [{ name: "hallvi-backups", creation_date: "2026-01-01" }],
       },
     });
     const buckets = await cloudflare.cloudflareBuckets();
     expect(fetched[0]).toContain(`/accounts/${ACCOUNT}/r2/buckets`);
     expect(buckets).toEqual([
-      { name: "haldur-backups", createdAt: "2026-01-01" },
+      { name: "hallvi-backups", createdAt: "2026-01-01" },
     ]);
   });
 

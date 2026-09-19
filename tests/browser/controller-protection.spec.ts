@@ -6,12 +6,12 @@ import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
 
 /**
- * The owner's glance at Backups has to answer whether Haldur itself would
+ * The owner's glance at Backups has to answer whether Hallvi itself would
  * survive losing this machine. Three states, in the order they actually
  * happen: nothing connected, the first copy taken, and the kit saved.
  */
 test(
-  "Backups states Haldur's own protection in every state",
+  "Backups states Hallvi's own protection in every state",
   journey("controller-protection"),
   async ({ page, fixture }) => {
     test.setTimeout(180_000);
@@ -19,9 +19,6 @@ test(
     await page
       .getByLabel("GitHub repository", { exact: true })
       .fill("https://github.com/qa/controller-protection");
-    await page
-      .getByLabel("Application name", { exact: true })
-      .fill("Controller protection");
     await page
       .getByRole("button", { name: "Add application", exact: true })
       .click();
@@ -36,9 +33,9 @@ test(
         await button.click();
     };
     await openBackups();
-    const panel = page.getByRole("region", { name: "Haldur itself" });
+    const panel = page.getByRole("region", { name: "Hallvi itself" });
 
-    // 1. No destination: Haldur is stated as unprotected beside the data,
+    // 1. No destination: Hallvi is stated as unprotected beside the data,
     //    and the single action that fixes both is on the page.
     await expect(panel).toBeVisible({ timeout: 30_000 });
     await expect(panel.getByText("Not copied", { exact: true })).toBeVisible();
@@ -46,7 +43,7 @@ test(
       page.getByRole("form", { name: "Connect backup storage" }),
     ).toBeVisible();
     await expect(panel).toContainText(
-      "Connecting off-host storage protects your application\u2019s data and Haldur together",
+      "Connecting off-host storage protects your application\u2019s data and Hallvi together",
     );
 
     // 2. A copy has reached storage, but the owner has not saved the kit.
@@ -58,7 +55,7 @@ test(
       JSON.stringify({
         provider: "r2",
         endpoint,
-        bucket: "haldur-copies",
+        bucket: "hallvi-copies",
         region: "auto",
         credentialFile: "default-credentials.json",
       }),
@@ -86,7 +83,7 @@ test(
         version: 1,
         kit: {
           createdAt: at,
-          bucket: "haldur-copies",
+          bucket: "hallvi-copies",
           endpoint,
           prefix: "controller/",
           confirmedAt: null,
@@ -123,7 +120,7 @@ test(
       passphrase,
       { timeout: 15_000 },
     );
-    await expect(kit).toContainText("haldur-copies");
+    await expect(kit).toContainText("hallvi-copies");
     await expect(panel).toContainText("Save your recovery kit");
 
     // 3. The owner says they saved it. One button, no form, and the page
@@ -141,7 +138,7 @@ test(
     // Settings shows it again only when the owner deliberately asks.
     await page.goto("/setup/connections");
     const settings = page.getByRole("region", {
-      name: "Haldur recovery kit",
+      name: "Hallvi recovery kit",
     });
     await expect(settings).toContainText("saved outside this machine");
     await expect(settings.locator("[data-recovery-passphrase]")).toHaveCount(0);

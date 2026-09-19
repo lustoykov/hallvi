@@ -80,10 +80,10 @@ let directory: string;
 let now: number;
 
 beforeEach(() => {
-  directory = mkdtempSync(join(tmpdir(), "haldur-github-"));
-  vi.stubEnv("HALDUR_CONFIG_DIR", directory);
-  vi.stubEnv("HALDUR_GITHUB_CLIENT_ID", "Iv1.test");
-  vi.stubEnv("HALDUR_GITHUB_APP_SLUG", "haldur-test");
+  directory = mkdtempSync(join(tmpdir(), "hallvi-github-"));
+  vi.stubEnv("HALLVI_CONFIG_DIR", directory);
+  vi.stubEnv("HALLVI_GITHUB_CLIENT_ID", "Iv1.test");
+  vi.stubEnv("HALLVI_GITHUB_APP_SLUG", "hallvi-test");
   now = Date.parse("2026-09-04T00:00:00Z");
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(now);
@@ -96,7 +96,7 @@ beforeEach(() => {
           installations: [
             {
               id: 7,
-              app_slug: "haldur-test",
+              app_slug: "hallvi-test",
               account: { id: 1, login: "test-owner" },
               permissions: { metadata: "read", contents: "read" },
               repository_selection: "selected",
@@ -130,8 +130,8 @@ beforeEach(() => {
     );
 });
 afterEach(() => {
-  globalThis.__haldurGithubSetups?.delete(githubConnectionPath());
-  globalThis.__haldurGithubRefreshes?.delete(githubConnectionPath());
+  globalThis.__hallviGithubSetups?.delete(githubConnectionPath());
+  globalThis.__hallviGithubRefreshes?.delete(githubConnectionPath());
   vi.useRealTimers();
   vi.unstubAllEnvs();
   rmSync(directory, { recursive: true, force: true });
@@ -145,7 +145,7 @@ async function reuse() {
     account,
     connectedAt: new Date().toISOString(),
     clientId: "Iv1.test",
-    slug: "haldur-test",
+    slug: "hallvi-test",
     token: tokenResponse.access_token,
     expiresAt: null,
   });
@@ -193,7 +193,7 @@ describe("explicit GitHub consent and storage", () => {
     );
     expect(cli).not.toHaveBeenCalled();
   });
-  it("disconnects only Haldur and removes its separate token", async () => {
+  it("disconnects only Hallvi and removes its separate token", async () => {
     await appLogin();
     disconnectGithub();
     expect(readGithubConnection()).toBeNull();
@@ -202,7 +202,7 @@ describe("explicit GitHub consent and storage", () => {
     await expect(connectedGithubCredential()).rejects.toThrow("Connect GitHub");
   });
   it("requires App registration for the supported connection path", async () => {
-    vi.stubEnv("HALDUR_GITHUB_CLIENT_ID", "");
+    vi.stubEnv("HALLVI_GITHUB_CLIENT_ID", "");
     await expect(startGithubLogin()).rejects.toThrow("client ID");
     expect(device).not.toHaveBeenCalled();
     await expect(
@@ -415,7 +415,7 @@ describe("GitHub access renewal", () => {
     expect(results[0]).toEqual(results[1]);
     expect(results[0].token).toBe(renewedResponse.access_token);
     expect(
-      globalThis.__haldurGithubRefreshes?.has(githubConnectionPath()),
+      globalThis.__hallviGithubRefreshes?.has(githubConnectionPath()),
     ).toBe(false);
   });
 
@@ -573,7 +573,7 @@ describe("GitHub access renewal", () => {
     );
     expect(readGithubConnection()).toEqual(previous);
     expect(
-      globalThis.__haldurGithubRefreshes?.has(githubConnectionPath()),
+      globalThis.__hallviGithubRefreshes?.has(githubConnectionPath()),
     ).toBe(false);
   });
 
@@ -682,7 +682,7 @@ describe("exact repository access", () => {
       raw: {
         repositoryId: 99,
         connectionId: connection.id,
-        credentialSource: "Haldur GitHub App",
+        credentialSource: "Hallvi GitHub App",
         accountId: 42,
         scopes: ["repo"],
         accountRepositoryPermissions: { pull: true },
@@ -693,7 +693,7 @@ describe("exact repository access", () => {
     expect(JSON.stringify(result)).not.toContain(token);
   });
   it("reads a public repository without a login, and never borrows one", async () => {
-    // Haldur exists to deploy software its user did not write, and a
+    // Hallvi exists to deploy software its user did not write, and a
     // public repository is public. What must not happen is reaching for a
     // credential the owner did not choose: the host's gh login stays untouched
     // and the read carries no token.

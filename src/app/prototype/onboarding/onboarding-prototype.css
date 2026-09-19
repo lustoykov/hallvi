@@ -1,0 +1,386 @@
+/* PROTOTYPE chrome only: a stand-in conversation column and the controls bar.
+ * The cards bring their own styles from components/hallvi/onboarding. */
+
+.hvp {
+  --ink: #202838;
+  --muted: #687183;
+  --line: #e7e9ee;
+  --blue: #285ad8;
+  min-height: 100vh;
+  padding-bottom: 80px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.hvp-top {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+.hvp-mark,
+.hvp-avatar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #2f3a4d;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.hvp-avatar[data-from="you"] {
+  background: #e8edf7;
+  color: #244d98;
+  font-size: 8.5px;
+}
+.hvp-crumb {
+  color: var(--muted);
+  font-size: 13px;
+}
+.hvp-simulated {
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid #f0dcc4;
+  border-radius: 8px;
+  background: #fff8f0;
+  color: #9a4b10;
+  font-size: 11px;
+}
+.hvp-chat {
+  display: grid;
+  gap: 6px;
+  width: min(780px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 28px 0 40px;
+}
+.hvp-msg {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+.hvp-msg[data-from="you"] {
+  justify-items: end;
+}
+.hvp-msg-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.hvp-msg[data-from="you"] .hvp-msg-who {
+  flex-direction: row-reverse;
+}
+.hvp-msg-body {
+  max-width: 68ch;
+  margin-left: 30px;
+}
+.hvp-msg[data-from="you"] .hvp-msg-body {
+  margin: 0 30px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f4f6fa;
+}
+.hvp-msg-body p {
+  margin: 10px 0 0;
+}
+.hvp-msg-body code,
+.hvp-approval code,
+.hvp-bypass code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+}
+.hvp-spin {
+  margin-right: 8px;
+  vertical-align: -2px;
+  color: #2852a6;
+  animation: hv-ob-spin 0.9s linear infinite;
+}
+.hvp-note {
+  margin: 2px 0 2px 30px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.hvp-note::before {
+  content: "↳ ";
+}
+.hvp-steps {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.hvp-steps li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+}
+.hvp-steps li[data-state="done"] {
+  color: var(--ink);
+}
+.hvp-steps li[data-state="done"] svg {
+  color: #14945f;
+}
+.hvp-steps li[data-state="active"] {
+  color: #2852a6;
+  font-weight: 600;
+}
+.hvp-steps .hvp-spin {
+  margin: 0;
+}
+.hvp-steps i {
+  width: 6px;
+  height: 6px;
+  margin: 0 4px;
+  border: 1px solid #b6bfce;
+  border-radius: 999px;
+}
+.hvp-approval {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed #ccd5e3;
+  border-radius: 10px;
+  background: #fbfcfe;
+  font-size: 13px;
+}
+.hvp-approval strong {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9a4b10;
+}
+.hvp-approval code {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #eef1f6;
+  overflow-x: auto;
+}
+.hvp-approval div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hvp-approval button,
+.hvp-intake button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--blue);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hvp-approval button[data-quiet] {
+  border: 1px solid #ccd5e3;
+  background: #fff;
+  color: var(--ink);
+}
+.hvp-approval small {
+  color: var(--muted);
+}
+.hvp-approved,
+.hvp-bypass {
+  margin-top: 10px !important;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.hvp-approved svg {
+  color: #14945f;
+  vertical-align: -2px;
+}
+.hvp-bypass {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff4e9;
+  color: #9a4b10;
+}
+
+/* ---------- Intake ---------- */
+
+.hvp-intake {
+  display: grid;
+  gap: 14px;
+  width: min(620px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 12vh 0 40px;
+}
+.hvp-intake h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.hvp-intake p {
+  margin: 0;
+  max-width: 60ch;
+  color: #3e4a60;
+}
+.hvp-intake form {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.hvp-intake input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #ccd5e3;
+  border-radius: 8px;
+  font: inherit;
+}
+.hvp-intake input:focus-visible,
+.hvp-intake button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.hvp-intake button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hvp-intake-name,
+.hvp-intake-fine {
+  font-size: 12.5px;
+  color: var(--muted) !important;
+}
+.hvp-intake-private {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 14px;
+  border: 1px solid #ecd6b8;
+  border-radius: 10px;
+  background: #fffdfa;
+  font-size: 13px;
+}
+.hvp-intake-private button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* ---------- Controls ---------- */
+
+.hvp-bar {
+  --ob-field: #3a4456;
+  --ob-ink-2: #e6eaf2;
+  --ob-mono: var(--font-geist-mono), ui-monospace, monospace;
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+  width: min(360px, calc(100vw - 32px));
+  max-height: 78vh;
+  overflow: auto;
+  border-radius: 12px;
+  background: #1f2633;
+  color: #e6eaf2;
+  font-size: 12px;
+  box-shadow: 0 12px 40px rgb(15 20 30 / 30%);
+}
+.hvp-bar-toggle {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: #1f2633;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.hvp-bar-body {
+  display: grid;
+  gap: 14px;
+  padding: 2px 14px 14px;
+}
+.hvp-bar section {
+  display: grid;
+  gap: 6px;
+}
+.hvp-bar h2 {
+  margin: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a0b4;
+}
+.hvp-bar section > button {
+  padding: 6px 9px;
+  border: 1px solid #3a4456;
+  border-radius: 7px;
+  background: #2a3342;
+  color: #e6eaf2;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hvp-bar section > button:hover {
+  border-color: #6f86c6;
+}
+.hvp-bar label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.hvp-bar .hvp-tick {
+  justify-content: flex-start;
+}
+.hvp-bar select {
+  max-width: 190px;
+  padding: 4px 6px;
+  border: 1px solid #3a4456;
+  border-radius: 6px;
+  background: #2a3342;
+  color: #e6eaf2;
+  font: inherit;
+}
+.hvp-bar .hv-ob-copy {
+  display: flex;
+  background: #161b25;
+}
+.hvp-bar .hv-ob-copy code {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #b9c3d6;
+  font-size: 11px;
+}
+.hvp-bar .hv-ob-copy button {
+  background: #2a3342;
+  color: #e6eaf2;
+}
+
+/* Beside the controls, not under them. */
+@media (min-width: 1240px) {
+  .hvp-chat {
+    margin-left: max(24px, calc((100vw - 392px - 780px) / 2));
+  }
+}
+
+/* In the product the rail is the pane's top row; here it sticks under the
+ * prototype's own bar. */
+.hvp .hv-rail {
+  position: sticky;
+  top: 52px;
+  z-index: 2;
+}

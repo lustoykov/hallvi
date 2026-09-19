@@ -5,25 +5,32 @@ import { journey } from "./journeys";
 // disposable app rather than one that earlier journeys have populated.
 test.use({ isolatedApp: true });
 
-// The page is the caretakers over their applications: one card each, with
+// The page pairs caretakers with their applications: one card each, with
 // the drawn screen, one word of state and what runs. What has to keep
 // working: the reader recognises an application and opens it from its name,
-// its screen or More; search, once there is enough to search, never leaves
+// its screen or Open app; search, once there is enough to search, never leaves
 // them on a card that opens something else; and the empty page offers the
-// one thing to do. There is no offer at the top of the page any more; talking
-// to Haldur starts inside the application.
+// one thing to do. The welcome offers another application; continuing work
+// starts inside an existing application.
 test(
   "home lists applications, follows the selected one, and search preserves navigation",
   journey("application-shell"),
   async ({ page }) => {
     test.setTimeout(180_000);
     await page.goto("/applications");
+    await expect(page).toHaveURL(/\/applications\/new$/);
     await expect(
-      page.getByRole("heading", { name: "Add your first application" }),
+      page.getByRole("heading", { name: "Hi, I’m Hallvi." }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Add application", exact: true }),
-    ).toHaveAttribute("href", "/applications/new");
+      page.getByRole("list", { name: "How Hallvi works" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "What do you want to run?" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Add application", exact: true }),
+    ).toBeDisabled();
 
     const ids: string[] = [];
     const names = [
@@ -44,7 +51,7 @@ test(
       expect(response.status()).toBe(201);
       ids.push((await response.json()).application.id);
     }
-    await page.reload();
+    await page.goto("/applications");
 
     const list = page.getByRole("list", { name: "Applications" });
     await expect(list.getByRole("listitem")).toHaveCount(names.length);
@@ -55,15 +62,28 @@ test(
     await expect(
       alpha.getByRole("link", { name: "Open Home alpha" }),
     ).toHaveAttribute("href", `/applications/${ids[0]}`);
-    await expect(alpha.getByRole("link", { name: "More" })).toHaveAttribute(
+    await expect(alpha.getByRole("link", { name: "Open app" })).toHaveAttribute(
       "href",
       `/applications/${ids[0]}`,
     );
     // A freshly added application says so in one word, and its caretaker
-    // carries the box; nothing on the card warns about protection.
+    // stands ready; nothing on the card warns about protection.
     await expect(alpha.getByText("New", { exact: true })).toBeVisible();
     await expect(alpha.getByText(/backed up|backup/i)).toHaveCount(0);
 
+    // Saying hello is keyboard-accessible and never replaces the real status
+    // or takes the reader away from the application they meant to open.
+    await alpha
+      .getByRole("button", { name: "Say hello to Home alpha's caretaker" })
+      .press("Enter");
+    await expect(alpha.getByRole("status")).toContainText(
+      "Ready to make this one yours?",
+    );
+    await expect(alpha.getByText("No deployment recorded yet.")).toBeVisible();
+    await expect(page).toHaveURL(/\/applications$/);
+
+    // The collection and search remain usable on a narrow screen.
+    await page.setViewportSize({ width: 390, height: 844 });
     const search = page.getByRole("textbox", { name: "Find an application" });
     await search.fill("home beta");
     await expect(list.getByRole("listitem")).toHaveCount(1);
@@ -75,10 +95,17 @@ test(
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(list.getByRole("listitem")).toHaveCount(names.length);
 
-    await alpha.getByRole("link", { name: "More" }).click();
+    await alpha.getByRole("link", { name: "Open app" }).click();
     await expect(page).toHaveURL(new RegExp(`/applications/${ids[0]}$`));
     await expect(
-      page.getByRole("textbox", { name: "Message Haldur" }),
+      page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeVisible();
+    await page.goto("/applications/new");
+    await expect(
+      page.getByLabel("GitHub repository", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "How Hallvi works" }),
+    ).toHaveCount(0);
   },
 );

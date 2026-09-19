@@ -47,12 +47,12 @@ function entries(archive: Buffer) {
 }
 
 beforeAll(async () => {
-  root = mkdtempSync(join(tmpdir(), "hd-controller-protection-"));
-  vi.stubEnv("HALDUR_DB_PATH", join(root, "state", "haldur.db"));
-  vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "state"));
-  vi.stubEnv("HALDUR_PI_CONFIG_DIR", join(root, "state"));
+  root = mkdtempSync(join(tmpdir(), "hv-controller-protection-"));
+  vi.stubEnv("HALLVI_DB_PATH", join(root, "state", "hallvi.db"));
+  vi.stubEnv("HALLVI_CONFIG_DIR", join(root, "state"));
+  vi.stubEnv("HALLVI_PI_CONFIG_DIR", join(root, "state"));
   mkdirSync(join(root, "state"), { recursive: true });
-  pushTestDatabase(join(root, "state", "haldur.db"));
+  pushTestDatabase(join(root, "state", "hallvi.db"));
   // A stand-in for the owner's bucket: it records what was signed and keeps
   // the bytes, so a copy can be opened again the way recovery would.
   storage = createServer((request, response) => {
@@ -123,7 +123,7 @@ it("copies the controller while it runs, including committed WAL data", async ()
   );
   const { entries: files, capturedAt } = await captureControllerPayload();
   const names = files.map((file) => file.path);
-  expect(names).toContain("payload/database/haldur.db");
+  expect(names).toContain("payload/database/hallvi.db");
   expect(names).toContain("payload/database/RECOVERY_QUARANTINE");
   expect(names).toContain("payload/config/RECOVERY_QUARANTINE");
   expect(names).toContain("payload/config/backup-destinations/default.json");
@@ -136,7 +136,7 @@ it("copies the controller while it runs, including committed WAL data", async ()
   const copy = join(root, "captured.db");
   writeFileSync(
     copy,
-    files.find((file) => file.path === "payload/database/haldur.db")!.content,
+    files.find((file) => file.path === "payload/database/hallvi.db")!.content,
   );
   const captured = new Database(copy, { readonly: true });
   expect(captured.prepare("SELECT count(*) AS c FROM messages").get()).toEqual({
@@ -176,7 +176,7 @@ it("uploads a copy the owner can open, and offers the kit once", async () => {
   expect(stored.length).toBe(copy!.bytes);
   const kit = recoveryKit()!;
   const opened = entries(decryptArchive(stored, kit.passphrase));
-  expect(opened.has("payload/database/haldur.db")).toBe(true);
+  expect(opened.has("payload/database/hallvi.db")).toBe(true);
   const manifest = JSON.parse(
     opened.get("payload/manifest.json")!.toString("utf8"),
   );
@@ -294,7 +294,7 @@ it("opens a copy again through the recovery command, and refuses a damaged one",
     true,
   );
   // The restored database is the controller's own, openable and complete.
-  const restored = new Database(join(target, "payload/database/haldur.db"), {
+  const restored = new Database(join(target, "payload/database/hallvi.db"), {
     readonly: true,
   });
   expect(restored.prepare("PRAGMA integrity_check").get()).toEqual({
@@ -376,7 +376,7 @@ it("carries the application secret store, and the values resolve after restore",
   // A controller reading only the restored directory resolves both values.
   // Compared, never printed: the assertion is that they match, and a failure
   // message must not become the place a password appears.
-  vi.stubEnv("HALDUR_CONFIG_DIR", restoredConfig);
+  vi.stubEnv("HALLVI_CONFIG_DIR", restoredConfig);
   try {
     const environment = secrets.secretEnvironment(app.id, [
       generatedName,
@@ -402,7 +402,7 @@ it("carries the application secret store, and the values resolve after restore",
       ),
     ).toBe(true);
   } finally {
-    vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "state"));
+    vi.stubEnv("HALLVI_CONFIG_DIR", join(root, "state"));
   }
 
   // The passphrase stays outside the thing it opens.

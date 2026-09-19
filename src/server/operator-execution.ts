@@ -17,6 +17,7 @@ import { getPiRun } from "./pi-runs";
 import { piConfigDir } from "./pi-configuration";
 import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
+import { managedSshOptions } from "./managed-ssh";
 import type { PiRun } from "./types";
 
 import { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
@@ -173,7 +174,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
     work: (output: (text: string) => void) => Promise<T>,
     ask = false,
     /** Pi's tool-call id, so the activity and this record are one thing. */
-    toolCallId?: string,
+    toolCallId: string,
   ): Promise<T | { declined: true }> {
     signal?.throwIfAborted();
     if (!isMainChat(run.applicationId, run.chatId))
@@ -233,8 +234,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       type: "execution",
       id: record.id,
     });
-    if (toolCallId)
-      linkActivityExecution(run.applicationId, toolCallId, record.id);
+    linkActivityExecution(run.applicationId, toolCallId, record.id);
     const conversationStatus = (status: "working" | "awaiting-approval") =>
       db()
         .update(chats)
@@ -257,8 +257,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
           record.status = "declined";
           // The runtime is handed an ordinary result, not an error, so the
           // activity record would otherwise keep claiming this succeeded.
-          if (toolCallId)
-            settleActivity(run.applicationId, toolCallId, "declined");
+          settleActivity(run.applicationId, toolCallId, "declined");
           return { declined: true };
         }
         record.approvalId = record.id;
@@ -324,21 +323,8 @@ export function runHostCommand(
       const child = spawn(
         "ssh",
         [
-          "-F",
-          "/dev/null",
+          ...managedSshOptions(host),
           "-T",
-          "-i",
-          host.privateKeyPath,
-          "-p",
-          String(host.port),
-          "-o",
-          `UserKnownHostsFile=${host.knownHostsPath}`,
-          "-o",
-          "StrictHostKeyChecking=yes",
-          "-o",
-          "BatchMode=yes",
-          "-o",
-          "IdentitiesOnly=yes",
           "-o",
           "ConnectTimeout=10",
           "-o",

@@ -11,6 +11,7 @@ import {
   listApplicationChats,
   listApplications,
   withTransaction,
+  renameApplicationRow,
 } from "./db";
 import {
   ANONYMOUS_CREDENTIAL,
@@ -76,8 +77,8 @@ export async function createApplication(input: CreateApplicationInput) {
     insertMessage(
       chat.id,
       "assistant",
-      `I created ${name}. I’m checking access to the repository so we can work out what it needs.`,
-      "haldur",
+      `I’ve added ${name}. Next, I can read its repository and explain what it needs to run.`,
+      "hallvi",
     );
     return application;
   });
@@ -252,6 +253,16 @@ export async function withGithubConnectionTransition<T>(
   return operation();
 }
 
+/** The name is the owner's label and nothing else: no record is keyed on it. */
+export function renameApplication(applicationId: string, name: string) {
+  loadApplication(applicationId);
+  const next = name.trim();
+  if (!next || next.length > 120)
+    throw new Error("Give the application a name of up to 120 characters.");
+  renameApplicationRow(applicationId, next);
+  return loadApplication(applicationId);
+}
+
 export function removeApplication(applicationId: string, repository: string) {
   const application = loadApplication(applicationId);
   if (
@@ -281,7 +292,7 @@ export function createChat(applicationId: string, title?: string) {
     chat.id,
     "assistant",
     `This is a read-only side chat for ${application.name}. I can explain the application and its execution history. Send commands and changes to the main conversation.`,
-    "haldur",
+    "hallvi",
   );
   // Chat administration is visible in the chat list; it is not an application
   // event.

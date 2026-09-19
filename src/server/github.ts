@@ -62,7 +62,7 @@ export function parseGithubRepository(value: string): RepositoryIdentity {
     throw new Error("Enter a GitHub HTTPS or SSH repository URL.");
   }
   if (url.hostname.toLowerCase() !== "github.com") {
-    throw new Error("Haldur currently accepts GitHub repositories only.");
+    throw new Error("Hallvi currently accepts GitHub repositories only.");
   }
   const parts = url.pathname.split("/").filter(Boolean);
   if (parts.length !== 2) {
@@ -153,7 +153,7 @@ async function verifyInstallation(
         !["read", "write"].includes(installation.permissions.contents)
       )
         throw new GithubAccessError(
-          "Grant Haldur read access to repository contents on GitHub, then run the check again.",
+          "Grant Hallvi read access to repository contents on GitHub, then run the check again.",
           "access",
         );
       for (let repoPage = 1; repoPage <= 20; repoPage++) {
@@ -183,7 +183,7 @@ async function verifyInstallation(
     if (installations.length < 100) break;
   }
   throw new GithubAccessError(
-    "Allow this exact repository in Haldur’s GitHub App installation, then run the check again.",
+    "Allow this exact repository in Hallvi’s GitHub App installation, then run the check again.",
     "access",
   );
 }
@@ -294,7 +294,7 @@ async function inspectGithubRepositoryAttempt(
         repositoryId: repo.id,
         ...(connection ? { connectionId: connection.id } : {}),
         credentialSource: connection
-          ? "Haldur GitHub App"
+          ? "Hallvi GitHub App"
           : ANONYMOUS_CREDENTIAL,
         ...(account
           ? { accountId: account.id, authenticatedAs: account.login }
@@ -351,7 +351,7 @@ async function inspectGithubRepositoryAttempt(
         repository: fullName,
         connectionId: connection?.id,
         credentialSource: connection
-          ? "Haldur GitHub App"
+          ? "Hallvi GitHub App"
           : ANONYMOUS_CREDENTIAL,
         checkedAt,
         error: failure.reason,

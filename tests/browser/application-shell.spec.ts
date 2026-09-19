@@ -13,16 +13,13 @@ test(
       .getByLabel("GitHub repository", { exact: true })
       .fill("https://github.com/qa/application-shell");
     await page
-      .getByLabel("Application name", { exact: true })
-      .fill("Application shell acceptance");
-    await page
       .getByRole("button", { name: "Add application", exact: true })
       .click();
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {
       timeout: 30000,
     });
     const nav = page.getByRole("navigation", { name: "Application workspace" });
-    const composer = page.getByRole("textbox", { name: "Message Haldur" });
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     await expect(
       page.getByRole("button", { name: "Overview", exact: true }),
     ).toHaveCount(1);
@@ -103,7 +100,7 @@ test(
     // Before a deployment records the stack, only the application and care
     // destinations exist; Processes, Database and the rest appear as recorded.
     // A quiet row reveals what the application could run, with the reason
-    // each is hidden, and the empty view says what Haldur would do there.
+    // each is hidden, and the empty view says what Hallvi would do there.
     await expect(
       nav.getByRole("button", { name: "Database", exact: true }),
     ).toHaveCount(0);
@@ -191,11 +188,16 @@ test(
       page.getByRole("heading", { name: "Environment Variables", exact: true }),
     ).toBeVisible();
     await nav.getByRole("button", { name: "Backups", exact: true }).click();
-    // Backups is a designed destination now, and its own empty state says the
-    // same thing in its own words: nobody has looked, which is never the same
-    // as there being nothing to find.
+    // Unknown inventory and missing protection are stated separately: neither
+    // is presented as proof that there is nothing to back up.
     await expect(
-      page.getByText(/Nothing here has been looked at yet/),
+      page.getByText(
+        "Hallvi has not established what this application keeps on disk.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByText("No plan has been established", { exact: true }),
     ).toBeVisible();
     await page.goBack();
     await expect(
@@ -235,7 +237,6 @@ test(
       await page
         .getByLabel("GitHub repository", { exact: true })
         .fill("https://github.com/qa/same-source");
-      await page.getByLabel("Application name", { exact: true }).fill(name);
       await page
         .getByRole("button", { name: "Add application", exact: true })
         .click();
@@ -243,6 +244,16 @@ test(
         timeout: 30000,
       });
       ids.push(new URL(page.url()).pathname);
+      // The name comes from the repository; the owner's own name for it is
+      // given afterwards, from the application's menu.
+      await page
+        .getByRole("button", { name: "Switch application: same-source" })
+        .click();
+      await page
+        .getByRole("button", { name: "Rename application…", exact: true })
+        .click();
+      await page.getByLabel("Application name", { exact: true }).fill(name);
+      await page.getByRole("button", { name: "Rename", exact: true }).click();
       // The application's name lives in the top-bar picker; the conversation
       // has no permanent panel repeating it.
       await expect(

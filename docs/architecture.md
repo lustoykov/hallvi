@@ -66,7 +66,7 @@ output is large and append-only. And local diagnostics, under `diagnostics/`.
 
 ## What Pi can do
 
-Twenty tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
+Twenty-two tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
 engine behind them: Pi reads the repository, decides what to do and does it,
 and the tools are the only things that can reach outside.
 
@@ -76,6 +76,11 @@ and the tools are the only things that can reach outside.
 - **Provisioning.** `hetzner_request` is the provider's own REST API;
   `server_public_key` supplies this application's key; `connect_server`
   verifies SSH and saves the connection.
+- **Asking for a connection.** `request_connection` asks where the application
+  should run and `request_domain_access` asks how to reach a domain's DNS. Each
+  puts a guided card in the conversation and ends the turn; the controller
+  does the checking, and a message tells Pi what was connected.
+  [Onboarding](design/onboarding.md) owns the design.
 - **Publishing.** `set_domain_record` writes one DNS record; `check_domain`
   and `check_public_access` ask the internet what it can see.
 - **Records.** `save_information` writes what Pi established;
@@ -97,11 +102,18 @@ and the tools are the only things that can reach outside.
 [operator-execution.ts](../src/server/operator-execution.ts) owns it. Every
 call that reaches a server or a provider passes through it and is recorded
 with its mode, its input and its outcome, whatever the answer.
+Executor-backed calls require the runtime tool-call ID, linking the activity
+and execution records without an optional identity argument.
 
 The three modes are defined in
 [Product](../PRODUCT.md#permission-modes). A call awaiting
 approval is a durable record: the page reads pending calls, the owner decides,
 and the tool continues or declines. A worker restart does not replay a call.
+
+Command execution, the owner's terminal, private tunnels and backup transfers
+share [managedSshOptions](../src/server/managed-ssh.ts) for the saved SSH key,
+port and pinned-host verification policy. Each caller retains its own timeout,
+keepalive, terminal, forwarding and output handling.
 
 ## From a record to a page
 
@@ -125,9 +137,34 @@ answers into what its page needs, and a `*-page.tsx` that draws it. The
 conversation shows the same records as cards; the page is not a list of the
 cards, it is composed from the same records.
 
+## Repository workspace architecture
+
+The repository workspace runs natively on the local Docker Engine's Linux
+architecture: amd64 or arm64. The controller reads the daemon's architecture,
+selects the matching immutable Node image, and includes that architecture in
+the workspace image cache key. PowerShell and Compose are pinned downloads
+with separate checksums for each architecture. This avoids requiring x86
+emulation on Apple-silicon Macs.
+
+```mermaid
+flowchart LR
+  Engine[Local Docker Engine architecture] --> Select{amd64 or arm64}
+  Select --> Base[Matching pinned Node image]
+  Base --> Tools[Matching PowerShell and Compose binaries]
+  Tools --> Workspace[Isolated repository workspace]
+  Source[Repository snapshot] --> Workspace
+  Workspace --> Findings[Inspection results for Pi]
+```
+
+Only the workspace architecture follows the controller's engine. Deployment
+image resolution retains its existing Linux amd64 default. The workspace's
+non-root user, absent network, read-only container filesystem, temporary
+repository volume and lack of controller credentials or Docker socket remain
+unchanged.
+
 ## Publishing at a domain
 
-Merged in [PR #76](https://github.com/lustoykov/haldur/pull/76) on 15 September 2026, this lets the main operator make a privately
+Merged in [PR #76](https://github.com/lustoykov/hallvi/pull/76) on 15 September 2026, this lets the main operator make a privately
 deployed application answer at a hostname the owner supplies, over HTTPS, from
 the internet. It adds two tools and no workflow, table or approval type. The
 public request path is browser → DNS → a reverse proxy on the deployment server
@@ -178,11 +215,11 @@ claims to have observed a renewal.
 
 ## Provisioning
 
-Merged in [PR #56](https://github.com/lustoykov/haldur/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
+Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation; since 18 September the [host request card](design/onboarding.md) gathers both with one command the owner pastes on the machine, and `connection-checks.ts` also requires passwordless administrator rights and a 64-bit Linux before the host is saved. The same card proves a Hetzner token can write by registering the application's public SSH key. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
 
 ## Protecting the controller
 
-When a backup destination is connected, the worker copies Haldur's own
+When a backup destination is connected, the worker copies Hallvi's own
 records and keys after each piece of work and once a day, encrypted, under the
 bucket's `controller/` prefix, keeping the last fourteen.
 [controller-protection.ts](../src/server/controller-protection.ts) owns it, and
@@ -203,7 +240,7 @@ controller stays manual; see
 - One DNS provider and one host provider are implemented. An IPv6 publishing
   path is not proved.
 - Nothing retrieves an application's own logs; the Logs destination holds what
-  Haldur's own commands printed, and says so.
+  Hallvi's own commands printed, and says so.
 - The worker runs one turn at a time for the whole controller. Native queueing
   and parallel read-only side work are deferred.
 

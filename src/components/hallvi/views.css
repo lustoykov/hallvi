@@ -1,0 +1,1933 @@
+/* Refinements to the stable views: rhythm, grouping and the small visual
+   vocabulary in views/visuals.tsx. Loaded after application-shell.css, so
+   the rules here are the later word on the same selectors. */
+
+.hv-adaptive-shell {
+  --ok: #0f7a4e;
+  --ok-bg: #eaf8f1;
+  --warn: #b25a16;
+  --warn-bg: #fff4e9;
+  --bad: #a6312b;
+  --bad-bg: #fdf1f0;
+  --working: #2852a6;
+  --working-bg: #edf3ff;
+  --quiet: #f7f8fa;
+  --hairline: #eef0f4;
+  --view-title: 24px;
+  --view-body: 14px;
+  --view-meta: 13px;
+}
+
+/* A view is a sequence of bands, not a stack of cards. One measure for
+   prose, a wider one for evidence, and a single vertical rhythm. */
+.hv-section-content {
+  padding: 26px 36px 64px;
+  max-width: 1120px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.hv-section-content > * {
+  margin: 0;
+}
+.hv-section-header {
+  padding: 24px 36px 20px;
+  align-items: baseline;
+}
+.hv-section-header h1 {
+  margin: 0 0 6px;
+  font-size: var(--view-title);
+}
+.hv-section-header p {
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+/* A titled band. The rule above the title is the only separator needed;
+   surfaces are reserved for things that need attention. */
+.hv-band {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hv-band > h2,
+.hv-subheading {
+  margin: 0;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hv-band-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.hv-band-head > h2 {
+  margin: 0;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hv-band-head .hv-op-links {
+  margin: 0;
+}
+.hv-section-content .hv-section-note {
+  font-size: var(--view-meta);
+  line-height: 1.65;
+  color: var(--muted);
+  max-width: 74ch;
+}
+
+/* Two columns on a wide screen: a fact and its value stay close together
+   instead of stretching a label across a metre of empty page. */
+.hv-section-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0 40px;
+  border-top: 1px solid var(--hairline);
+  font-size: var(--view-body);
+}
+.hv-section-facts > div {
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+  align-items: baseline;
+}
+.hv-section-facts dt {
+  color: var(--muted);
+  font-size: var(--view-meta);
+}
+.hv-section-facts dd {
+  line-height: 1.6;
+  /* A fact that is a sentence should not end on a line holding one word. */
+  text-wrap: pretty;
+}
+.hv-section-facts dd small,
+.hv-fact-note {
+  display: block;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  margin-top: 2px;
+}
+/* A fact whose value is a paragraph gets the full width instead of a
+   narrow column it would wrap to pieces in. */
+.hv-facts-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+.hv-facts-wide > div {
+  grid-template-columns: 180px minmax(0, 1fr);
+}
+/* One reading measure, so a fact that is a sentence reads like a sentence
+   and not like a spreadsheet row stretched across the page. */
+.hv-facts-wide dd {
+  max-width: 72ch;
+}
+/* A checksum is longer than a phone is wide. */
+.hv-section-facts dd code {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Condition ---------- */
+
+.hv-condition {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+.hv-condition-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #8b95a5;
+}
+.hv-condition h2 {
+  font-size: 15.5px;
+  margin: 0 0 3px;
+  letter-spacing: -0.01em;
+}
+.hv-condition p {
+  margin: 0;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  color: #606d80;
+  max-width: 78ch;
+}
+.hv-condition-ok {
+  background: #f6fcf9;
+  border-color: #d6ecdf;
+}
+.hv-condition-warn {
+  background: var(--warn-bg);
+  border-color: #ecd6b8;
+}
+.hv-condition-bad {
+  background: var(--bad-bg);
+  border-color: #f2d3d0;
+}
+.hv-condition-working {
+  background: var(--working-bg);
+  border-color: #c7d6f5;
+}
+/* The aside is a div, and `.hv-condition > div` claims flex: 1; this has to
+   out-specify it or the action grows to half the band. */
+.hv-condition > .hv-condition-aside {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.hv-condition-aside .hv-op-links {
+  margin: 0;
+}
+
+/* Some work is outstanding without changing the verdict above it: failed
+   cleanup is not a failed restore. Such a band keeps its own border and
+   tint so it cannot be skimmed past, and never lifts off the page. */
+.hv-band.hv-attention {
+  gap: 10px;
+  padding: 15px 16px;
+  border: 1px solid #f2d3d0;
+  border-radius: 10px;
+  background: #fffbfb;
+}
+.hv-attention > .hv-subheading {
+  color: var(--bad);
+}
+.hv-attention > p {
+  margin: 0;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  color: #606d80;
+  max-width: 74ch;
+}
+.hv-attention > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hv-attention .hv-section-facts,
+.hv-attention .hv-section-facts > div {
+  border-color: #f2d3d0;
+}
+/* Inside a card the last rule would float above the padding edge. */
+.hv-attention .hv-section-facts > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* ---------- Headline statistics ---------- */
+
+.hv-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.hv-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 128px;
+  flex: 1 1 128px;
+  padding: 11px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: #fff;
+  text-align: left;
+}
+.hv-stat strong {
+  font-size: 20px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.hv-stat > span {
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.hv-stat small {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  margin-top: 2px;
+}
+.hv-stat-button {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.hv-stat-button:hover {
+  border-color: #ccd5e3;
+  background: #fbfcfe;
+}
+.hv-stat-ok {
+  color: var(--ok);
+}
+.hv-stat-warn {
+  color: var(--warn);
+}
+.hv-stat-bad {
+  color: var(--bad);
+}
+.hv-stat-working {
+  color: var(--working);
+}
+
+/* ---------- Fills shared by every visual ---------- */
+
+.hv-fill-ok {
+  background: #2f9e6c;
+}
+.hv-fill-warn {
+  background: #d68a2e;
+}
+.hv-fill-bad {
+  background: #c1524a;
+}
+.hv-fill-working {
+  background: #4a7ad8;
+}
+.hv-fill-muted {
+  background: #c3cad6;
+}
+.hv-shade-0 {
+  background: #4a7ad8;
+}
+.hv-shade-1 {
+  background: #7aa0e4;
+}
+.hv-shade-2 {
+  background: #a9c1ee;
+}
+.hv-shade-3 {
+  background: #cbd9f4;
+}
+.hv-shade-4 {
+  background: #5d93c4;
+}
+.hv-shade-5 {
+  background: #9dbcd8;
+}
+.hv-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.hv-section-content .hv-visual-caption,
+.hv-visual-caption {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.6;
+  max-width: 82ch;
+}
+
+/* ---------- Tally ---------- */
+
+.hv-tally {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.hv-tally-bar {
+  display: flex;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  gap: 2px;
+  background: #eef0f4;
+}
+.hv-tally-bar > span {
+  border-radius: 999px;
+  min-width: 4px;
+}
+.hv-tally-keys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.hv-tally-keys li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.hv-tally-keys strong {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+/* ---------- Composition ---------- */
+
+.hv-composition {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hv-composition-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #eef0f4;
+  border: 1px solid var(--hairline);
+}
+.hv-composition-bar > span {
+  min-width: 2px;
+}
+.hv-composition-free {
+  background: repeating-linear-gradient(
+    135deg,
+    #f2f4f8,
+    #f2f4f8 4px,
+    #e9ecf2 4px,
+    #e9ecf2 8px
+  );
+}
+.hv-composition-bar.warn {
+  border-color: #ecd6b8;
+}
+.hv-composition-bar.bad {
+  border-color: #f2d3d0;
+}
+.hv-composition-keys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.hv-composition-keys li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.hv-composition-keys strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.hv-composition-remainder {
+  color: var(--muted);
+}
+
+/* ---------- Gauge ---------- */
+
+.hv-gauges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px 28px;
+}
+.hv-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.hv-gauge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: var(--view-meta);
+}
+.hv-gauge-head strong {
+  font-weight: 600;
+}
+.hv-gauge-head span {
+  color: var(--muted);
+  font-size: var(--view-meta);
+}
+.hv-gauge-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+.hv-gauge-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #4a7ad8;
+}
+.hv-gauge-fill.warn {
+  background: #d68a2e;
+}
+.hv-gauge-fill.bad {
+  background: #c1524a;
+}
+.hv-gauge-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgb(255 255 255 / 75%);
+}
+.hv-gauge-note {
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+
+/* ---------- Flow ---------- */
+
+.hv-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hv-flow-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.hv-flow-stage {
+  position: relative;
+  flex: 1 1 150px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px 12px 15px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: #fff;
+}
+/* The chevron between stages: the path is read left to right. */
+.hv-flow-stage + .hv-flow-stage::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-top: 1.5px solid #ccd5e3;
+  border-right: 1.5px solid #ccd5e3;
+  transform: translateY(-50%) rotate(45deg);
+}
+.hv-flow-mark {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #c3cad6;
+}
+.hv-flow-label {
+  font-size: var(--view-meta);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.hv-flow-value {
+  font-size: var(--view-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hv-flow-detail {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.hv-flow-ok .hv-flow-mark {
+  background: #2f9e6c;
+}
+.hv-flow-pending {
+  background: #fffdfa;
+  border-color: #ecd6b8;
+}
+.hv-flow-pending .hv-flow-mark {
+  background: #d68a2e;
+}
+.hv-flow-failed {
+  background: var(--bad-bg);
+  border-color: #f2d3d0;
+}
+.hv-flow-failed .hv-flow-mark {
+  background: #c1524a;
+}
+.hv-flow-absent {
+  background: #fbfcfd;
+  border-style: dashed;
+}
+.hv-flow-absent .hv-flow-value,
+.hv-flow-skipped .hv-flow-value {
+  color: var(--muted);
+  font-weight: 500;
+}
+.hv-flow-skipped {
+  background: #fbfcfd;
+}
+.hv-flow-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.hv-flow-notes li {
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: #fbfcfe;
+  border: 1px solid var(--hairline);
+  line-height: 1.6;
+}
+.hv-flow-notes li.hv-flow-pending {
+  background: var(--warn-bg);
+  border-color: #ecd6b8;
+}
+.hv-flow-notes li.hv-flow-failed {
+  background: var(--bad-bg);
+  border-color: #f2d3d0;
+}
+.hv-flow-notes strong {
+  display: block;
+  color: var(--ink);
+  font-size: var(--view-meta);
+  margin-bottom: 2px;
+}
+
+/* ---------- Timeline ---------- */
+
+.hv-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.hv-timeline-track {
+  position: relative;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(#fafbfd, #f4f6f9);
+  border: 1px solid var(--hairline);
+}
+.hv-timeline-point {
+  position: absolute;
+  top: 6px;
+  width: 4px;
+  height: 12px;
+  border-radius: 2px;
+  transform: translateX(-2px);
+}
+.hv-timeline-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+
+/* ---------- Outcome strip ---------- */
+
+.hv-outcome-strip {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  vertical-align: middle;
+}
+.hv-outcome-strip i {
+  width: 5px;
+  height: 13px;
+  border-radius: 1.5px;
+  display: block;
+}
+
+/* ---------- Bars ---------- */
+
+.hv-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: var(--view-meta);
+}
+.hv-bars li {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.1fr) minmax(80px, 2fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+.hv-bars-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-bars-track {
+  height: 7px;
+  border-radius: 999px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+.hv-bars-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.hv-bars-value {
+  color: #606d80;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Loading ---------- */
+
+.hv-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hv-loading-row {
+  height: 15px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f1f3f7 25%, #e8ebf1 50%, #f1f3f7 75%);
+  background-size: 320px 100%;
+  animation: hv-shimmer 1.4s linear infinite;
+}
+.hv-loading-row:nth-child(2n) {
+  width: 78%;
+}
+.hv-loading-row:nth-child(3n) {
+  width: 56%;
+}
+@keyframes hv-shimmer {
+  to {
+    background-position: 320px 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hv-loading-row {
+    animation: none;
+  }
+}
+
+/* Every recorded list shares one table: a quiet header, tight rows, and
+   a tinted row only when something is wrong. */
+.hv-rows {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--view-meta);
+  border-top: 1px solid var(--hairline);
+}
+.hv-row {
+  display: grid;
+  gap: 16px;
+  align-items: baseline;
+  padding: 11px 10px 11px 12px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  margin-left: -12px;
+}
+.hv-row.hv-table-head {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #99a2b0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-weight: 600;
+}
+.hv-row-bad {
+  background: #fffafa;
+  border-left-color: #d9847e;
+}
+.hv-row-warn {
+  background: #fffdfa;
+  border-left-color: #e0ab6b;
+}
+.hv-row strong {
+  font-weight: 600;
+}
+.hv-row small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.hv-row code {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--view-meta);
+}
+.hv-row-end {
+  text-align: right;
+}
+
+/* The existing lists adopt the same rhythm. */
+.hv-volume-row,
+.hv-variable-row,
+.hv-check-row,
+.hv-route-row,
+.hv-job-row,
+.hv-coverage-row {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--view-meta);
+}
+.hv-volume-list .hv-table-head,
+.hv-variable-list .hv-table-head,
+.hv-checks .hv-table-head,
+.hv-routes .hv-table-head,
+.hv-job-list .hv-table-head {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #99a2b0;
+  font-weight: 600;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* The disclosure under a verified restore holds several groups of evidence;
+   they need air between them and a heading needs more above than below. */
+.hv-evidence-more > summary ~ * {
+  margin-top: 22px;
+}
+.hv-evidence-more > .hv-subheading + * {
+  margin-top: 8px;
+}
+
+/* Plugins group by what their check established, so the state is said once
+   per group instead of once per plugin. A group whose members all recorded
+   the same result states it in the head and lists only names. */
+.hv-plugin-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 6px;
+}
+.hv-plugin-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 2px;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  color: var(--muted);
+}
+.hv-plugin-group-head > span:last-child {
+  max-width: 72ch;
+  text-wrap: pretty;
+}
+.hv-plugin-count {
+  color: var(--ink);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.hv-plugin-list,
+.hv-plugin-names {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+}
+/* The same label column as the facts above them, so one disclosure has one
+   left edge for its values instead of two. */
+.hv-plugin-list > li {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-top: 1px solid var(--hairline);
+}
+.hv-plugin-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding-top: 7px;
+  border-top: 1px solid var(--hairline);
+}
+.hv-plugin-list strong,
+.hv-plugin-names strong {
+  font-weight: 600;
+}
+
+/* An attempt is state, one clause and its time at the right edge. */
+.hv-attempts {
+  margin: 2px 0 0;
+}
+.hv-attempts > li {
+  align-items: baseline;
+  padding: 9px 0;
+}
+.hv-attempts > li > .hv-op-rel {
+  font-size: var(--view-meta);
+  white-space: nowrap;
+}
+
+/* A process, a database or a service: a titled group, not a card. */
+.hv-stack-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--hairline);
+  border-radius: 11px;
+  background: #fff;
+}
+.hv-stack-item + .hv-stack-item {
+  border-top: 1px solid var(--hairline);
+  margin-top: 0;
+  padding-top: 16px;
+}
+.hv-stack-item h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.hv-stack-item h2 code {
+  font-size: 14px;
+}
+.hv-stack-item .hv-section-facts {
+  border-top: 0;
+}
+.hv-stack-item .hv-section-facts > div:first-child,
+.hv-stack-item .hv-section-facts > div:nth-child(2) {
+  padding-top: 0;
+}
+.hv-stack-item-bad {
+  border-color: #f2d3d0;
+  background: #fffbfb;
+}
+.hv-role {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ---------- Empty and unavailable ---------- */
+
+.hv-section-empty,
+.hv-possible {
+  padding: 22px 20px;
+  border: 1px dashed #d9dfe8;
+  border-radius: 11px;
+  background: #fbfcfd;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hv-section-empty h2,
+.hv-possible h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.hv-section-empty p,
+.hv-possible p {
+  margin: 0;
+  font-size: var(--view-meta);
+  line-height: 1.7;
+  max-width: 72ch;
+}
+.hv-possible .hv-op-links {
+  margin-top: 4px;
+}
+.hv-planned-section {
+  padding: 16px 0 0;
+  margin: 0;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.hv-planned-section h2 {
+  margin: 0;
+  font-size: var(--view-body);
+  font-weight: 600;
+}
+.hv-planned-section p {
+  margin: 0;
+  font-size: var(--view-meta);
+  max-width: 74ch;
+}
+.hv-planned-section .hv-availability {
+  align-self: flex-start;
+}
+
+/* ---------- Overview ---------- */
+
+.hv-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* The one thing to read first: state, in a sentence, at a size that wins. */
+.hv-hero {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px 22px;
+  border: 1px solid var(--hairline);
+  border-left: 3px solid #c3cad6;
+  border-radius: 12px;
+  background: #fcfdfe;
+}
+.hv-hero-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: #8b95a5;
+  flex-shrink: 0;
+}
+.hv-hero-text {
+  min-width: 0;
+}
+.hv-hero h2 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.hv-section-content .hv-hero p {
+  margin: 0;
+  font-size: var(--view-body);
+  line-height: 1.6;
+  color: #606d80;
+  max-width: 84ch;
+}
+.hv-hero-action {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.hv-hero-ok {
+  border-left-color: #2f9e6c;
+}
+.hv-hero-ok .hv-hero-dot {
+  background: #2f9e6c;
+}
+.hv-hero-warn {
+  border-left-color: #d68a2e;
+  background: #fffdfa;
+}
+.hv-hero-warn .hv-hero-dot {
+  background: #d68a2e;
+}
+.hv-hero-bad {
+  border-left-color: #c1524a;
+  background: #fffbfb;
+}
+.hv-hero-bad .hv-hero-dot {
+  background: #c1524a;
+}
+.hv-hero-working {
+  border-left-color: #4a7ad8;
+  background: #fbfcff;
+}
+.hv-hero-working .hv-hero-dot {
+  background: #4a7ad8;
+}
+
+/* Separators live on the cells, so a row that does not fill the grid
+   leaves white space rather than a block of background. */
+.hv-runlist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.hv-run {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 15px;
+  background: #fff;
+  border: 0;
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+}
+.hv-run-open {
+  cursor: pointer;
+}
+.hv-run-open:hover {
+  background: #fafbfd;
+}
+.hv-run-label {
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+.hv-run-value {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-run-value code {
+  font-size: var(--view-body);
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.hv-run-note {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  line-height: 1.5;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.hv-run-note .hv-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  align-self: center;
+}
+.hv-run-warn {
+  color: var(--warn);
+}
+.hv-run-bad {
+  color: var(--bad);
+}
+
+/* Evidence: one line each, two columns, the dot carries the freshness. */
+.hv-fresh-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0 36px;
+}
+.hv-fresh-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--view-meta);
+}
+.hv-fresh-list .hv-dot {
+  border-radius: 50%;
+  align-self: center;
+}
+.hv-fresh-list li > span {
+  margin-left: auto;
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: var(--view-meta);
+}
+.hv-fresh-list li.never > span {
+  color: #a4acb9;
+}
+
+.hv-overview-empty {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  padding: 14px 16px;
+  border: 1px dashed #e2e6ec;
+  border-radius: 9px;
+  background: #fcfdfe;
+  margin: 0;
+}
+.hv-changes li {
+  border-bottom: 1px solid var(--hairline);
+  padding: 10px 0;
+  font-size: var(--view-meta);
+}
+.hv-change-meta {
+  font-size: var(--view-meta);
+}
+
+/* ---------- Application identity ---------- */
+
+.hv-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  min-width: 0;
+}
+.hv-identity:hover {
+  background: #edeff3;
+}
+.hv-identity-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #243149;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  flex-shrink: 0;
+}
+.hv-identity-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.hv-identity-text strong {
+  font-size: 13.5px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-identity-text small {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-identity svg {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #99a2b0;
+  width: 13px;
+  height: 13px;
+}
+.hv-identity[disabled] {
+  cursor: default;
+  opacity: 0.7;
+}
+/* In the column the application is the first lifted thing. */
+.hv-identity-navigation .hv-identity {
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #fff, #fbfcfe);
+  box-shadow: var(--raise);
+}
+.hv-identity-navigation .hv-identity:hover {
+  background: #fff;
+}
+.hv-identity-navigation .hv-identity-mark {
+  background: linear-gradient(160deg, #35466a, #172238);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 22%),
+    0 1px 2px rgb(var(--shade) / 35%);
+}
+.hv-navigation-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 18px;
+}
+.hv-navigation-home {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 5px;
+  font-size: var(--view-meta);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+}
+.hv-navigation-home:hover {
+  color: var(--ink);
+}
+.hv-navigation-home svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* The top bar now carries where you are and what is running. */
+.hv-adaptive-shell .hv-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+}
+.hv-topbar-where {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+.hv-topbar-where strong {
+  font-size: 13.5px;
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-topbar-where span {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hv-adaptive-shell .hv-workstrip {
+  margin-left: auto;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 1180px) {
+  .hv-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .hv-section-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .hv-section-content {
+    padding: 20px 16px 56px;
+    gap: 22px;
+  }
+  .hv-section-header {
+    padding: 18px 16px 16px;
+  }
+  .hv-section-facts > div,
+  .hv-facts-wide > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+    padding: 10px 0;
+  }
+  .hv-overview-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .hv-stat {
+    flex-basis: 44%;
+    min-width: 0;
+    padding: 10px 12px;
+  }
+  .hv-stat strong {
+    font-size: 17px;
+  }
+  .hv-flow-stage {
+    flex-basis: 100%;
+  }
+  .hv-flow-stage + .hv-flow-stage::before {
+    left: 50%;
+    top: -8px;
+    transform: translateX(-50%) rotate(135deg);
+  }
+  .hv-bars li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+  }
+  .hv-bars-track {
+    grid-column: 1 / -1;
+  }
+  .hv-condition {
+    flex-wrap: wrap;
+    padding: 13px 14px;
+  }
+  .hv-condition > .hv-condition-aside {
+    margin: 4px 0 0 21px;
+    flex: 0 0 100%;
+  }
+  .hv-band.hv-attention {
+    padding: 13px 14px;
+  }
+  /* A plugin's own limitation belongs under its name, not beside it. */
+  .hv-plugin-list > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  /* The time moves under the clause rather than squeezing it to nothing. */
+  .hv-attempts > li {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 12px;
+  }
+  .hv-attempts > li > .hv-op-rel {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+  .hv-stack-item {
+    padding: 14px;
+  }
+  .hv-navigation-head {
+    padding-bottom: 10px;
+  }
+  .hv-topbar-where span {
+    display: none;
+  }
+  .hv-fresh table,
+  .hv-fresh thead,
+  .hv-fresh tbody,
+  .hv-fresh th,
+  .hv-fresh td,
+  .hv-fresh tr {
+    display: block;
+  }
+  .hv-fresh thead {
+    display: none;
+  }
+  .hv-fresh tr {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .hv-fresh td {
+    border: 0;
+    padding: 1px 0;
+  }
+}
+
+/* Identity placements the prototype compares. */
+.hv-identity-topbar .hv-identity {
+  width: auto;
+  max-width: 320px;
+  padding: 5px 8px;
+}
+.hv-identity-topbar .hv-identity:hover {
+  background: #f2f4f8;
+}
+.hv-identity-breadcrumb {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--view-body);
+}
+.hv-identity-breadcrumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.hv-identity-breadcrumb a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.hv-identity-breadcrumb > span {
+  color: #c3cad6;
+}
+.hv-identity-breadcrumb strong {
+  font-weight: 620;
+}
+.hv-identity-breadcrumb small {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* With identity in the top bar the sidebar keeps the product mark. */
+.hv-identity-topbar + .hv-topbar-where,
+.hv-identity-breadcrumb + .hv-topbar-where {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+
+/* A link-shaped control inside a column stack must not stretch. */
+.hv-overview-block > .hv-op-link,
+.hv-band > .hv-op-link,
+.hv-section-content > .hv-op-link,
+.hv-section-content > .hv-op-links {
+  align-self: flex-start;
+}
+.hv-overview-block .hv-band-head h3 {
+  margin: 0;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hv-overview-block .hv-band-head .hv-op-link {
+  align-self: baseline;
+}
+
+/* A state word sits at its own width, not the column's. */
+.hv-coverage-row > .hv-pill,
+.hv-check-row .hv-pill,
+.hv-job-row .hv-pill {
+  justify-self: start;
+}
+.hv-coverage-row,
+.hv-check-row,
+.hv-route-row {
+  padding: 11px 10px 11px 12px;
+  margin-left: -12px;
+  border-left: 2px solid transparent;
+  font-size: var(--view-meta);
+}
+.hv-coverage-row small,
+.hv-check-row small,
+.hv-job-row small,
+.hv-volume-row small,
+.hv-variable-row small {
+  color: var(--muted);
+  font-size: var(--view-meta);
+}
+.hv-volume-row,
+.hv-variable-row,
+.hv-job-row {
+  padding-left: 12px;
+  margin-left: -12px;
+  border-left: 2px solid transparent;
+}
+
+/* Logs */
+.hv-stream-bar {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: #eef0f4;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.hv-stream-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.hv-logs-output {
+  line-height: 1.75;
+  font-size: var(--view-meta);
+  background: #fcfdfe;
+}
+.hv-log-severe {
+  display: block;
+  color: #96302a;
+  background: #fdf1f0;
+}
+.hv-log-warn {
+  display: block;
+  color: #8a4712;
+}
+.hv-log-empty {
+  color: var(--muted);
+}
+.hv-logs-collecting {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  border: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  background: #fcfdfe;
+}
+
+/* History */
+.hv-history-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hv-filter-count {
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  margin-left: 3px;
+}
+.hv-history-filters button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hv-band > h2 + .hv-operation-history {
+  margin: 0;
+}
+
+/* The switcher menu is a nav inside the sidebar; the mobile rule that lays
+   the workspace nav out as a row must not un-hide a closed popover. */
+.hv-application-navigation .hv-application-menu {
+  display: none;
+}
+.hv-application-navigation .hv-application-menu:popover-open {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  /* The destinations already scroll sideways; keep the scrollbar quiet. */
+  .hv-destinations {
+    scrollbar-width: none;
+  }
+  .hv-destinations::-webkit-scrollbar {
+    display: none;
+  }
+  .hv-navigation-head {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+  .hv-navigation-home {
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .hv-navigation-head .hv-app-identity {
+    min-width: 0;
+    flex: 1;
+  }
+  .hv-identity {
+    padding: 4px 6px;
+  }
+  .hv-identity-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+  /* The section heading is directly below; the bar keeps only live work. */
+  .hv-adaptive-shell .hv-topbar {
+    min-height: 0;
+    padding: 0 12px;
+    border-bottom: 0;
+  }
+  .hv-topbar-where {
+    display: none;
+  }
+  .hv-adaptive-shell .hv-workstrip {
+    margin: 8px 0;
+  }
+}
+
+/* Architecture: the detail strip carries the way into the destination. */
+.hv-canvas-detail {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.hv-canvas-detail > div {
+  min-width: 0;
+}
+.hv-canvas-legend {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+.hv-canvas-legend li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.hv-canvas-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Activity marks: one thing moves at a time. A change that touches five
+   destinations sets five marks, but only the destination it is mainly
+   about animates; the rest are quiet, smaller and static. */
+.hv-nav-indicator.working,
+.hv-nav-indicator.needs-you,
+.hv-nav-indicator.failed {
+  animation: none;
+}
+.hv-nav-indicator:not(.primary) {
+  width: 5px;
+  height: 5px;
+  opacity: 0.5;
+}
+.hv-nav-indicator.working.primary {
+  animation: hv-mark-pulse 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hv-nav-indicator.working.primary {
+    animation: none;
+  }
+}
+
+/* Grouped variables drop the source column: the group heading says it. */
+.hv-variable-list-grouped .hv-variable-row {
+  grid-template-columns: minmax(0, 1.6fr) 150px minmax(0, 1.2fr);
+}
+.hv-pending-inputs ul {
+  margin: 0;
+}
+
+/* Inbound rules: the port, what it serves, and who can reach it. */
+.hv-rules {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hairline);
+}
+.hv-rule-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1.2fr) minmax(0, 1.4fr) 120px;
+  gap: 20px;
+  align-items: baseline;
+  padding: 11px 10px 11px 12px;
+  margin-left: -12px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  font-size: var(--view-meta);
+}
+.hv-rule-row.hv-table-head {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #99a2b0;
+  font-weight: 600;
+  border-top: 0;
+}
+.hv-rule-row code {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--view-meta);
+}
+.hv-rule-row code + code {
+  margin-left: 6px;
+}
+.hv-rule-row .hv-pill {
+  justify-self: start;
+}
+@media (max-width: 640px) {
+  .hv-rule-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .hv-rule-row.hv-table-head {
+    display: none;
+  }
+  .hv-rule-row span[data-label]::before {
+    content: attr(data-label) ": ";
+    color: #99a2b0;
+  }
+}
+
+/* Reading and keyboard affordances shared by the live operation views. */
+.hv-section-content {
+  font-size: var(--view-body);
+}
+.hv-history-open {
+  color: var(--ink);
+  border-radius: 6px;
+}
+.hv-history-open strong {
+  font-size: var(--view-body);
+}
+.hv-history-open small,
+.hv-history-open .hv-op-rel {
+  font-size: var(--view-meta);
+}
+.hv-history-open:hover strong {
+  color: var(--blue-text);
+}
+.hv-history-open:focus-visible,
+.hv-run-open:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+.hv-history-details {
+  margin-top: 10px;
+  font-size: var(--view-meta);
+}
+.hv-history-details summary {
+  cursor: pointer;
+  color: var(--blue-text);
+  padding: 4px 0;
+}
+.hv-history-details p {
+  margin: 8px 0;
+  line-height: 1.65;
+  max-width: 75ch;
+}
+.hv-history-resolved {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  margin: 8px 0 0;
+  color: var(--ok);
+  font-size: var(--view-meta);
+}
+.hv-op-more {
+  font-size: var(--view-meta);
+}
+.hv-op-more summary {
+  cursor: pointer;
+  color: var(--blue-text);
+  padding: 4px 0;
+}
+.hv-op-more .hv-op-links {
+  margin-top: 6px;
+}
+
+.hv-deployment-summary > p {
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+
+.hv-open-application {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-end;
+  max-width: 240px;
+}
+.hv-open-application small {
+  color: var(--muted);
+  font-size: var(--view-meta);
+  text-align: right;
+}
+.hv-fresh-list li {
+  flex-wrap: wrap;
+}
+.hv-evidence-detail {
+  flex-basis: 100%;
+  margin-left: 16px;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  line-height: 1.5;
+}
+.hv-fresh-list li.never > span {
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .hv-open-application {
+    align-items: flex-start;
+    max-width: none;
+  }
+  .hv-open-application small {
+    text-align: left;
+  }
+}
+
+.hv-history-reason {
+  color: var(--ink);
+  font-size: var(--view-meta);
+  margin: 10px 0 0;
+}
+.hv-variable-names {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.hv-variable-names li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--view-body);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .hv-view-back {
+    display: none;
+  }
+  .hv-view-bar:not(:has(.hv-suggest)) {
+    display: none;
+  }
+  .hv-destinations {
+    padding-right: 24px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+  }
+}
+
+.hv-variable-names code {
+  font-family:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* One captured run: where it ran, what was asked, when the output was taken. */
+.hv-captured {
+  margin: 0 0 18px;
+}
+.hv-captured header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 6px;
+}
+.hv-captured header strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.hv-captured header code {
+  min-width: 0;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.hv-captured header span {
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.hv-captured header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hv-captured header button:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Deployment before any release is on record. */
+.hv-deploy-none {
+  max-width: 62ch;
+  padding: 8px 0 0;
+}
+.hv-deploy-none h2 {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.hv-deploy-none p {
+  margin: 0 0 12px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+.hv-deploy-none button {
+  margin-top: 4px;
+}

@@ -9,7 +9,7 @@
 // asks it. So this runs PostgreSQL, changes its password for real, breaks the
 // step after it, and then asks.
 //
-// Opt in with HALDUR_DOCKER_TESTS=1 on a host with a reachable Docker
+// Opt in with HALLVI_DOCKER_TESTS=1 on a host with a reachable Docker
 // Engine. It creates one throwaway container, uses synthetic values only, and
 // removes it afterwards. Nothing outside that container is touched.
 import { execFileSync } from "node:child_process";
@@ -65,13 +65,13 @@ function accepts(password: string) {
   }
 }
 
-describe.skipIf(process.env.HALDUR_DOCKER_TESTS !== "1")(
+describe.skipIf(process.env.HALLVI_DOCKER_TESTS !== "1")(
   "a credential change against a real PostgreSQL",
   () => {
     beforeAll(() => {
-      directory = mkdtempSync(join(tmpdir(), "hd-credential-change-"));
-      saved = process.env.HALDUR_CONFIG_DIR;
-      process.env.HALDUR_CONFIG_DIR = directory;
+      directory = mkdtempSync(join(tmpdir(), "hv-credential-change-"));
+      saved = process.env.HALLVI_CONFIG_DIR;
+      process.env.HALLVI_CONFIG_DIR = directory;
       container = execFileSync(
         "docker",
         [
@@ -113,8 +113,8 @@ describe.skipIf(process.env.HALDUR_DOCKER_TESTS !== "1")(
         } catch {
           // Already gone.
         }
-      if (saved === undefined) delete process.env.HALDUR_CONFIG_DIR;
-      else process.env.HALDUR_CONFIG_DIR = saved;
+      if (saved === undefined) delete process.env.HALLVI_CONFIG_DIR;
+      else process.env.HALLVI_CONFIG_DIR = saved;
       if (directory) rmSync(directory, { recursive: true, force: true });
     });
 

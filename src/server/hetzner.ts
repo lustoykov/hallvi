@@ -12,7 +12,7 @@ function connection(): { token: string; id: string } {
     return JSON.parse(readFileSync(connectionPath(), "utf8"));
   } catch {
     throw new Error(
-      "Connect Hetzner Cloud in Settings › Connections to inspect and manage servers.",
+      "Hetzner Cloud is not connected yet. It is connected in the conversation when a server is needed (request_connection), or in Settings › Connections.",
     );
   }
 }

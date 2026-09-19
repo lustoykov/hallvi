@@ -123,7 +123,7 @@ export function canRefreshGithubConnection(connection: GithubConnection) {
 export function githubConnectionPath() {
   return join(
     resolve(
-      /* turbopackIgnore: true */ process.env.HALDUR_CONFIG_DIR ??
+      /* turbopackIgnore: true */ process.env.HALLVI_CONFIG_DIR ??
         stateLocation(process.cwd(), { hidden: true }).directory,
     ),
     "github-connection.json",
@@ -142,7 +142,7 @@ export function readGithubConnection(): GithubConnection | null {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw new GithubAccessError(
-      "Haldur’s GitHub settings could not be read. Connect again to replace them.",
+      "Hallvi’s GitHub settings could not be read. Connect again to replace them.",
       "auth",
     );
   }
@@ -172,7 +172,7 @@ export function githubConnectionIssue(
   connection: GithubConnection,
 ): string | null {
   if (connection.mode === "cli")
-    return "CLI connections are no longer supported. Connect through Haldur's GitHub App in Settings → GitHub.";
+    return "CLI connections are no longer supported. Connect through Hallvi's GitHub App in Settings → GitHub.";
   if (connection.invalidReason) return connection.invalidReason;
   if (
     connection.mode === "app" &&
@@ -199,8 +199,8 @@ export function currentGithubConnectionId(): string | null {
 }
 
 export function githubAppRegistration() {
-  const clientId = process.env.HALDUR_GITHUB_CLIENT_ID?.trim();
-  const slug = process.env.HALDUR_GITHUB_APP_SLUG?.trim();
+  const clientId = process.env.HALLVI_GITHUB_CLIENT_ID?.trim();
+  const slug = process.env.HALLVI_GITHUB_APP_SLUG?.trim();
   return clientId &&
     /^[A-Za-z0-9_.-]+$/.test(clientId) &&
     slug &&
@@ -266,7 +266,7 @@ export function invalidateGithubConnection(
 // local Node process. The file remains authoritative; no background timer is
 // needed.
 declare global {
-  var __haldurGithubRefreshes:
+  var __hallviGithubRefreshes:
     | Map<
         string,
         { token: string; id: string; promise: Promise<AppConnection> }
@@ -277,7 +277,7 @@ async function refreshGithubConnection(
   connection: AppConnection,
 ): Promise<AppConnection> {
   const path = githubConnectionPath();
-  const all = (globalThis.__haldurGithubRefreshes ??= new Map());
+  const all = (globalThis.__hallviGithubRefreshes ??= new Map());
   const pending = all.get(path);
   if (pending?.id === connection.id && pending.token === connection.token)
     return pending.promise;
@@ -377,7 +377,7 @@ export async function connectedGithubCredential() {
   }
   // Older saved CLI selections remain readable only to explain reconnection.
   // Never inspect or borrow the host user's shell credentials.
-  throw new GithubAccessError("Connect through Haldur's GitHub App.", "auth");
+  throw new GithubAccessError("Connect through Hallvi's GitHub App.", "auth");
 }
 
 /**

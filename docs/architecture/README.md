@@ -16,6 +16,7 @@ Each of these is linked from the document that owns its decision.
 
 | Diagram | Owned by |
 | --- | --- |
+| [Native repository workspace](../architecture.md#repository-workspace-architecture) | [Architecture](../architecture.md) |
 | [Development cleanup decision flow](development-cleanup-decision.html) | [Development resources](../development-resources.md) |
 | [Cleanup scope](cleanup-scope.md) | [Development resources](../development-resources.md#discarding-development-data) |
 | [Where a check belongs, and where it does not](where-coverage-lives.md) | [Testing](../../tests/README.md#the-8020-bar) |

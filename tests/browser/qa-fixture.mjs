@@ -1,6 +1,6 @@
 // Isolated browser QA: real app/routes/domain/SQLite, deterministic external
 // adapters.
-// Never copies .haldur, .env files, or credentials from the source
+// Never copies .hallvi, .env files, or credentials from the source
 // checkout.
 import {
   cpSync,
@@ -29,7 +29,7 @@ if (!["ready", "fresh"].includes(initialSetup))
   throw new Error("Choose ready or fresh for initial QA setup.");
 if (!Number.isInteger(port) || port < 3100 || port > 3999)
   throw new Error("Use a QA port from 3100 to 3999.");
-const root = createTemporaryRoot("/tmp/haldur-e2e-");
+const root = createTemporaryRoot("/tmp/hallvi-e2e-");
 // Everything under root is disposable. It is deleted whenever this process
 // ends: after Next stops on
 // SIGTERM/SIGINT from Playwright or the dashboard, after the orphan watch, or
@@ -70,7 +70,7 @@ for (const name of [
 // Keep synthetic repository labels, but exercise deployment UI in this isolated
 // copy. Deployment browser tests intercept its endpoint; no provider credential
 // files are copied and the unconnected state performs no external operation.
-const shellPath = join(app, "src/components/haldur/operator-shell.tsx");
+const shellPath = join(app, "src/components/hallvi/operator-shell.tsx");
 writeFileSync(
   shellPath,
   readFileSync(shellPath, "utf8")
@@ -132,7 +132,7 @@ if (initialSetup === "ready") {
       id: "00000000-0000-4000-8000-000000000001",
       mode: "app",
       clientId: "Iv1.qa-fixture",
-      slug: "qa-haldur-app",
+      slug: "qa-hallvi-app",
       token: "ghu_QA-SYNTHETIC",
       expiresAt: null,
       account: { id: 42, login: "qa-fixture-user" },
@@ -166,17 +166,17 @@ if (initialSetup === "ready") {
 
 const env = {
   ...process.env,
-  HALDUR_DB_PATH: join(state, "qa.db"),
-  HALDUR_LOG_DIR: join(state, "diagnostics"),
-  HALDUR_CONFIG_DIR: state,
-  HALDUR_PI_CONFIG_DIR: state,
+  HALLVI_DB_PATH: join(state, "qa.db"),
+  HALLVI_LOG_DIR: join(state, "diagnostics"),
+  HALLVI_CONFIG_DIR: state,
+  HALLVI_PI_CONFIG_DIR: state,
   PI_CODING_AGENT_DIR: pi,
-  HALDUR_QA_ROOT: root,
-  HALDUR_QA_LOGIN_MODE: loginMode,
-  HALDUR_GITHUB_CLIENT_ID: "Iv1.qa",
-  HALDUR_GITHUB_APP_SLUG: "qa-haldur-app",
+  HALLVI_QA_ROOT: root,
+  HALLVI_QA_LOGIN_MODE: loginMode,
+  HALLVI_GITHUB_CLIENT_ID: "Iv1.qa",
+  HALLVI_GITHUB_APP_SLUG: "qa-hallvi-app",
   NEXT_TELEMETRY_DISABLED: "1",
-  HALDUR_TRACING: "0",
+  HALLVI_TRACING: "0",
 };
 for (const key of Object.keys(env)) {
   if (
@@ -199,7 +199,7 @@ const manifest = {
   port,
   source,
   initialSetup,
-  database: env.HALDUR_DB_PATH,
+  database: env.HALLVI_DB_PATH,
   externalAdapters:
     "Production Pi adapter, native SDK sessions and tools; only model responses and GitHub API/credentials (fixture repository trees and contents at synthetic commits) are synthetic. ChatGPT OAuth " +
     loginMode +

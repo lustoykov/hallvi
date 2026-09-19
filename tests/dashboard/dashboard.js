@@ -186,7 +186,7 @@ async function api(path, body) {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
     headers: {
-      "X-Haldur-Testing-Token": token,
+      "X-Hallvi-Testing-Token": token,
       "Content-Type": "application/json",
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -1054,7 +1054,7 @@ function renderPage() {
     if (id === link) $(id).setAttribute("aria-current", "page");
     else $(id).removeAttribute("aria-current");
   }
-  document.title = `${title} · Haldur Testing`;
+  document.title = `${title} · Hallvi Testing`;
 }
 document.addEventListener("click", (event) => {
   const link = event.target.closest("a[data-route]");

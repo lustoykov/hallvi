@@ -1,80 +1,181 @@
-# Installing Haldur
+# Installing Hallvi
 
-Haldur installs as a background service for one user on macOS or Linux.
-It keeps running without a terminal, restarts after a crash, and starts again
-with the machine. The same package runs on your own computer and on a virtual
-machine you provide; the [always-on concept](design/always-on-concept.md)
-explains when each makes sense.
+Install Hallvi on the Mac or Linux machine where you want it to run. It starts
+as a background service, so you can close the terminal and use it in your
+browser. On macOS it starts when you log in and pauses during sleep; on Linux
+it can start at boot without a login.
 
-Development is separate: `npm run dev` in a checkout, described in
-[Development resources](development-resources.md). An installation and a
-checkout do not share a database.
+You do not need to clone the repository or install Node.js. The installer
+supplies its own Node.js runtime. The current package does need compiler tools
+and internet access to download Node.js and install dependencies.
 
-## What you need
+[macOS](#macos) · [Linux](#linux) · [First deployment](#your-first-deployment) ·
+[Troubleshooting](#troubleshooting) · [Remote access](#on-another-machine) ·
+[Upgrade](#upgrade) · [Uninstall](#uninstall)
 
-- macOS (Apple silicon or Intel) or a glibc Linux with systemd (x64 or
-  arm64). Alpine and other musl systems are not supported.
-- A C/C++ compiler, `make` and `python3`, because two dependencies compile on
-  installation. On macOS: `xcode-select --install`. On Debian or Ubuntu:
-  `sudo apt-get install -y build-essential python3 curl openssh-client`.
-- `ssh`, which Haldur uses to reach application servers.
-- Docker, only for Pi's repository workspace: reading and building a
-  repository. Conversations, server work and every page work without it, and
-  Pi says so when the workspace is unavailable.
+## Get the package
 
-Node.js is not needed. The installer downloads Node.js 24 from nodejs.org,
-checks it against the published checksum and keeps it inside the program
-directory, so the service does not depend on a shell's version manager.
+Hallvi is in private beta. There is no public download yet; obtain
+`hallvi-0.1.0.tgz` and its matching `hallvi-0.1.0.tgz.sha256` from the maintainer.
+Keep both files in the same directory. The instructions below use version
+`0.1.0`; substitute the supplied version if it differs.
 
-## Build the package
+Contributors creating a package should use [Build a release archive](#build-a-release-archive).
+Installing a supplied archive does not require a source checkout.
 
-The repository is private, so there is no download link yet. From a checkout:
+## Supported machines
 
-```bash
-npm ci
-npm run package
-```
+| Platform | Current evidence |
+| --- | --- |
+| macOS, Apple silicon | Service installation exercised |
+| Ubuntu 24.04, x64 | Installation, restart and upgrade rehearsal exercised |
+| macOS, Intel | Installer target; beta acceptance not completed |
+| glibc Linux with systemd, arm64 / other distributions | Installer targets; beta acceptance not completed |
 
-This writes `dist/haldur-<version>.tgz`: the built interface, the Pi worker
-as plain JavaScript, the database schema, the lockfile and `install.sh`. The
-archive is the same for every platform; dependencies are installed on the
-machine that runs them.
+Alpine/musl Linux and Windows are not supported by this installer. The
+[installation evidence](testing/2026-09-17-installation.md) and
+[beta rehearsal](testing/2026-09-18-beta-rehearsal.md) identify the tested
+revisions; they do not certify a newer archive.
 
-## Install
+## macOS
 
-```bash
-tar -xzf haldur-0.1.0.tgz
-./haldur-0.1.0/install.sh
-```
+1. Install Apple's command line tools if they are not already installed:
 
-Nothing needs root. A new installation starts the service and prints its
-status. Open <http://127.0.0.1:4747>.
+   ```bash
+   xcode-select --install
+   ```
+
+   Finish the installation dialog before continuing. If macOS says the tools
+   are already installed, continue.
+
+2. In Terminal, go to the directory containing the archive and checksum. For
+   example, if you saved them in Downloads:
+
+   ```bash
+   cd ~/Downloads
+   shasum -a 256 -c hallvi-0.1.0.tgz.sha256 &&
+     tar -xzf hallvi-0.1.0.tgz &&
+     ./hallvi-0.1.0/install.sh
+   ```
+
+   Verification must report `OK`. The chained commands stop if verification
+   fails. Run the installer as your normal logged-in user, without `sudo`.
+
+3. Check the result and open Hallvi:
+
+   ```bash
+   ~/.local/bin/hallvi status
+   open http://127.0.0.1:4747
+   ```
+
+The installer downloads Node.js and compiles native dependencies; let it finish.
+Hallvi starts automatically on a new installation. It runs as your login's
+background service, not before login or while the Mac is asleep.
+
+## Linux
+
+These commands are for Ubuntu or Debian with systemd. Use an ordinary user
+account; `sudo` is only for installing system prerequisites.
+
+1. Install the prerequisites:
+
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y build-essential python3 curl openssh-client
+   ```
+
+   Other glibc distributions need equivalent compiler, `make`, Python 3,
+   `curl`, `tar` and SSH tools, plus a working systemd user session.
+
+2. From the directory containing the archive and checksum, run:
+
+   ```bash
+   sha256sum -c hallvi-0.1.0.tgz.sha256 &&
+     tar -xzf hallvi-0.1.0.tgz &&
+     ./hallvi-0.1.0/install.sh
+   ```
+
+   Verification must report `OK`. The chained commands stop if verification
+   fails. Do not run `install.sh` with `sudo`.
+
+3. Check the service:
+
+   ```bash
+   ~/.local/bin/hallvi status
+   ```
+
+   Open <http://127.0.0.1:4747> in a browser on that machine. If you installed
+   over SSH, follow [remote access](#on-another-machine) to use your laptop's
+   browser. If status says boot without login needs an extra command, run the
+   `sudo loginctl enable-linger ...` command it prints.
+
+## Your first deployment
+
+1. Start your local Docker Engine before choosing **Read repository**. The
+   current repository inspection and packaging tools still require it.
+   Running the workspace directly on your machine, with Docker optional, is
+   [decided but not implemented](design/always-on-concept.md#packaging).
+2. Open Hallvi and add the public GitHub repository you want to deploy.
+3. Connect ChatGPT when prompted, then choose **Read repository**. A public
+   repository does not need GitHub login. Private repositories require the
+   separate [GitHub App configuration](integrations/github.md).
+4. Let Hallvi explain the application requirements, then connect Hetzner or
+   an existing supported Linux application server through the interface.
+   Read the [beta precautions](../README.md#beta-safety) before connecting it.
+5. Ask Hallvi to deploy the app and open the application link it provides.
+
+Installing Hallvi on your Mac does not make that Mac the Linux deployment
+server. Likewise, the local Docker workspace and Docker/Compose on the
+application server serve different purposes.
+
+## Troubleshooting
+
+| What happened | What to do |
+| --- | --- |
+| Checksum fails or the checksum file is missing | Stop and obtain the matching archive and checksum together. Do not skip verification. |
+| Installer reports missing compiler tools | Finish the macOS command line tools installation, or install the Linux prerequisites above, then rerun `install.sh`. |
+| `hallvi: command not found` | Use `~/.local/bin/hallvi` instead. Optionally add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file. |
+| Browser cannot open Hallvi | Run `~/.local/bin/hallvi status`, then `~/.local/bin/hallvi logs`. If it is stopped, run `~/.local/bin/hallvi start`. Use the address status prints. |
+| Installed on another computer, but the laptop cannot connect | `127.0.0.1` refers to the computer running your browser. Follow [remote access](#on-another-machine). |
+| Repository inspection says Docker is unavailable | Start the local Docker Engine and retry. Direct execution is not available in the current package. |
+| Linux service does not survive logout or start at boot | Check `~/.local/bin/hallvi status` and follow its lingering instruction. |
+| Linux reports that it cannot connect to the user service manager | Run from a normal login session for the installing user on a systemd machine, rather than through `sudo`. |
+| Upgrade reports a schema mismatch | Keep the installed version and follow [Upgrade](#upgrade). Do not delete the database to bypass the check. |
+
+When reporting a problem, include the installed revision from
+`~/.local/bin/hallvi status`, your OS and the relevant error. Remove credentials
+and private data from any logs you share.
+
+## Files and configuration
 
 | What | Where | On upgrade or uninstall |
 | --- | --- | --- |
-| Program, its Node.js and dependencies | `~/.local/lib/haldur` | Replaced / removed |
-| The `haldur` command | `~/.local/bin/haldur` | Replaced / removed |
-| Database, credentials, SSH keys, conversations, logs | `~/.local/share/haldur` | Kept |
-| Model account (ChatGPT connection) | `~/.config/haldur/pi` | Kept |
-| Service definition | `~/Library/LaunchAgents/com.haldur.plist` or `~/.config/systemd/user/haldur.service` | Rewritten by `start` |
+| Program, its Node.js and dependencies | `~/.local/lib/hallvi` | Replaced / removed |
+| The `hallvi` command | `~/.local/bin/hallvi` | Replaced / removed |
+| Database, credentials, SSH keys, conversations, logs | `~/.local/share/hallvi` | Kept |
+| Model account (ChatGPT connection) | `~/.config/hallvi/pi` | Kept |
+| Service definition | `~/Library/LaunchAgents/com.hallvi.plist` or `~/.config/systemd/user/hallvi.service` | Rewritten by `start` |
 
-Optional settings go in `~/.local/share/haldur/haldur.env`, one
-`NAME=value` per line, read at every start: `HALDUR_PORT` to move the
+Optional settings go in `~/.local/share/hallvi/hallvi.env`, one
+`NAME=value` per line, read at every start: `HALLVI_PORT` to move the
 interface, and the GitHub App values from [GitHub setup](integrations/github.md)
 for private repositories. Public repositories need no login.
 
 ## The service
 
+The examples below use `hallvi`. If it is not on your PATH, use
+`~/.local/bin/hallvi` instead.
+
 ```bash
-haldur start      # run now, and whenever this machine starts
-haldur stop       # stop, and stay stopped until the next start
-haldur restart
-haldur status     # service, interface and Pi worker
-haldur logs -f
+hallvi start      # run now; macOS login / Linux boot with lingering
+hallvi stop       # stop, and stay stopped until the next start
+hallvi restart
+hallvi status     # service, interface and Pi worker
+hallvi logs -f
 ```
 
-`start` and `stop` are the only two states. There is no state in which Server
-Guy is stopped now and comes back by itself later.
+`start` and `stop` are the only two states. There is no state in which Hallvi
+is stopped now and comes back by itself later.
 
 - **macOS** runs it as a launchd agent. It starts when you log in, which on a
   personal Mac is when the machine is usable at all. It pauses while the Mac
@@ -85,19 +186,31 @@ Guy is stopped now and comes back by itself later.
   status of a running service says so and prints the one command that needs
   `sudo`.
 
-If the interface or the worker stops unexpectedly, the service exits and the
-service manager starts both again within a few seconds. A conversation that was
+If the interface or the worker stops unexpectedly, the service shuts down the
+other process and the service manager starts both again. Active browser
+connections can delay the interface's shutdown, so recovery may take tens of
+seconds. A conversation that was
 being answered at that moment shows as interrupted and can be retried.
 
-## On a virtual machine
+## On another machine
 
-Install exactly as above, as an ordinary user on the machine. Haldur still
-listens on the machine's loopback only. It has no login, so it must never be
-bound to a public address; an SSH connection you open is the only way in.
+<a id="on-a-virtual-machine"></a>
+
+For a Mac mini, install while logged in to its desktop using the macOS steps.
+You can use Hallvi directly in that Mac's browser. To use your laptop's browser,
+follow the forwarding instructions below; the Mac must remain awake and allow
+SSH connections.
+
+For a Linux virtual machine, use the Linux steps over SSH. In the instructions
+below, replace `you@vm.example.com` with your username and the address of the
+machine running Hallvi.
+
+Hallvi listens on the machine's loopback only. It has no login, so it must never be
+bound to a public address; use SSH forwarding for remote browser access.
 
 Forwarding the interface alone is not enough. Pages also name two other kinds
 of loopback port: the browser terminal's, and the port of every private
-application link (`http://127.0.0.1:<port>`), which end on the virtual machine.
+application link (`http://127.0.0.1:<port>`), which end on the machine running Hallvi.
 An installation therefore fixes all of them, and you forward them together, each
 to the same number:
 
@@ -107,31 +220,31 @@ to the same number:
 | 4748 | Browser terminal |
 | 4757–4766 | Private application links, one per open link |
 
-On the virtual machine, print the configuration for your laptop:
+On the machine running Hallvi, print the configuration for your laptop:
 
 ```bash
-haldur remote you@vm.example.com
+~/.local/bin/hallvi remote you@vm.example.com
 ```
 
-Paste the `Host haldur` block it prints into `~/.ssh/config` on the laptop,
-then. Every local forward explicitly binds the laptop's `127.0.0.1`, even when
+Paste the `Host hallvi` block it prints into `~/.ssh/config` on the laptop,
+then run the command below. Every local forward explicitly binds the laptop's `127.0.0.1`, even when
 the laptop's SSH defaults allow forwarded ports on other interfaces:
 
 ```bash
-ssh -N haldur
+ssh -N hallvi
 ```
 
-Keep that running while you use Haldur, and open
+Keep that running while you use Hallvi, and open
 <http://127.0.0.1:4747> on the laptop. A private application link Pi opens, for
 example `http://127.0.0.1:4757`, now works in the laptop's browser as it is
 written. Connecting ChatGPT and GitHub uses device codes, so both work through
 the same connection with nothing further to forward.
 
 If one of those ports is already used on the laptop, `ssh` refuses to start and
-names it. Free the port, or move the whole installation with `HALDUR_PORT`
-on the virtual machine: every other port is derived from it.
+names it. Free the port, or move the whole installation with `HALLVI_PORT`
+on the machine running Hallvi: every other port is derived from it.
 
-Keeping the virtual machine updated, and its SSH access protected, is yours to
+Keeping that machine updated, and its SSH access protected, is yours to
 do. Prefer a machine other than the one your applications run on; the concept
 note explains why.
 
@@ -151,56 +264,54 @@ reporting the mismatch instead of restarting indefinitely. Until schema
 migrations exist, the choices are to keep or reinstall the version that wrote
 the database, or to move the database aside and start fresh.
 
-## Moving from Server Guy
-
-Haldur was called Server Guy until 17 September 2026. Haldur does not read
-state left under that name, and it does not start over it either: the
-installer, the service and development commands stop and name what to move.
-Move it once, with nothing running:
-
-```sh
-# 1. Stop the service. A Server Guy installation: server-guy stop, then remove
-#    ~/.local/bin/server-guy and ~/.local/lib/server-guy (program only).
-haldur stop
-# 2. Move state and the model account, from an unpacked Haldur archive or a checkout.
-node scripts/move-from-server-guy.mjs installation
-node scripts/move-from-server-guy.mjs account
-# 3. Install or start Haldur.
-haldur start
-```
-
-A development checkout moves its own state with
-`node scripts/move-from-server-guy.mjs checkout <checkout>` while its
-development servers and worker are stopped.
-
-The script renames `~/.local/share/server-guy` to `~/.local/share/haldur`,
-`~/.config/server-guy` to `~/.config/haldur` and a checkout's `.server-guy` to
-`.haldur`, renames `server-guy.db`, `server-guy.env` and their companions to
-`haldur.*`, and rewrites the paths Haldur stored inside them: SSH key paths in
-the database and the model credential path in `pi-settings.json`. It refuses
-to move over an existing Haldur directory or a database another process has
-open, and `--dry-run` lists what it would change. Records of work that already
-ran keep the paths they ran with, and `SERVER_GUY_*` settings are not read:
-rename them to `HALDUR_*`.
-
-Controller copies made before the rename hold `payload/database/server-guy.db`
-and `server-guy.env.disabled`; when restoring one, rename those files as above.
-
 ## Uninstall
 
 ```bash
-haldur uninstall
+hallvi uninstall
 ```
 
 This stops the service and removes the program, the command and the service
-definition. It keeps `~/.local/share/haldur` and `~/.config/haldur`
+definition. It keeps `~/.local/share/hallvi` and `~/.config/hallvi`
 and prints both paths. Installing again picks everything up where it was. To
 discard the state as well, delete those two directories yourself.
+
+## Build a release archive
+
+This section is for contributors preparing an archive for someone else. From
+an authorized source checkout using Node.js 22 and locked dependencies:
+
+```bash
+npm ci
+npm run package
+cd dist
+shasum -a 256 hallvi-0.1.0.tgz > hallvi-0.1.0.tgz.sha256
+```
+
+On Linux, use `sha256sum` instead of `shasum -a 256`. Substitute the package
+version if it differs. Distribute the archive and checksum together, with the
+source revision and the verification performed on that candidate. The
+[beta walkthrough](beta-walkthrough.md) defines the fresh-user acceptance check.
+
+The archive contains the built interface, Pi worker, schema, lockfile and
+installer. The same archive targets every supported platform; dependencies
+are installed on the recipient's machine. The installer downloads Node.js 24
+from nodejs.org, verifies its published checksum and keeps it inside the
+program directory. Users still need the compiler prerequisites above, but not Node.js 22 or
+a source checkout.
+
+Development remains separate: `npm run dev` in a checkout, described in the
+[README](../README.md#development). An installation and a development checkout
+do not share a database by default.
 
 ## Limits today
 
 - No download link or signed release; the package is built from a checkout.
-- Two dependencies compile during installation, so a compiler is required.
+- The service has been exercised on Apple-silicon macOS and Ubuntu 24.04 x64.
+  macOS Intel, Linux arm64 and other Linux distributions are installation
+  targets, not completed beta acceptance checks. See the
+  [dated installation evidence](testing/2026-09-17-installation.md) and the
+  [current rehearsal](testing/2026-09-18-beta-rehearsal.md).
+- Native dependencies can compile during installation, so a compiler is required.
 - No schema migrations between versions (see Upgrade).
 - Pi's repository workspace still needs Docker. Running it directly on the
   machine is decided in the concept note and is a separate change.
@@ -208,6 +319,6 @@ discard the state as well, delete those two directories yourself.
   reboots. The Overview shows the link as closed; ask Pi to open it again.
 - One installation per user account.
 - A laptop that runs its own installation and also forwards one from a virtual
-  machine needs them on different ports: set `HALDUR_PORT` on one of them.
-- macOS keeps one service log, `~/.local/share/haldur/logs/service.log`,
-  rotated only when it passes 10 MB at a `haldur start`.
+  machine needs them on different ports: set `HALLVI_PORT` on one of them.
+- macOS keeps one service log, `~/.local/share/hallvi/logs/service.log`,
+  rotated only when it passes 10 MB at a `hallvi start`.

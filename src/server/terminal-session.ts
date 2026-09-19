@@ -12,6 +12,7 @@ import { spawn, type IPty } from "node-pty";
 
 import { operatorSettings } from "./operator-execution";
 import type { OperatorSettings } from "./operator-data";
+import { managedSshOptions } from "./managed-ssh";
 
 type Host = NonNullable<OperatorSettings["host"]>;
 
@@ -40,7 +41,7 @@ const failures: { failure: TerminalFailure; detail: string; test: RegExp }[] = [
   {
     failure: "host-key",
     detail:
-      "The server presented a different host key than the one on record. Haldur will not connect past that; ask in the conversation to review the connection.",
+      "The server presented a different host key than the one on record. Hallvi will not connect past that; ask in the conversation to review the connection.",
     test: /host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|key_from_blob|no matching host key/i,
   },
   {
@@ -74,21 +75,8 @@ function classify(text: string): { failure: TerminalFailure; detail: string } {
  */
 function sshArguments(host: Host) {
   return [
-    "-F",
-    "/dev/null",
+    ...managedSshOptions(host),
     "-tt",
-    "-i",
-    host.privateKeyPath,
-    "-p",
-    String(host.port),
-    "-o",
-    `UserKnownHostsFile=${host.knownHostsPath}`,
-    "-o",
-    "StrictHostKeyChecking=yes",
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "IdentitiesOnly=yes",
     "-o",
     "ConnectTimeout=10",
     "-o",

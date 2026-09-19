@@ -11,8 +11,6 @@ export const stepLabels = {
   context: "Load request context",
   session: "Prepare conversation",
   model: "Generate response",
-  search_decisions: "Look up saved requirements",
-  propose_decision: "Prepare requirement",
   get_application_status: "Look up application status",
   tool: "Execute tool",
   compaction: "Summarize earlier conversation",
@@ -20,14 +18,9 @@ export const stepLabels = {
   save: "Validate and save reply and requirements",
 } as const;
 export type StepKind = keyof typeof stepLabels;
-// The scoped tools Pi may call. A status read is diagnostic detail like a
-// requirement lookup: it changes nothing, so it is never an Activity Event.
-// Any other tool name is recorded generically.
-const TOOL_STEP_KINDS: readonly StepKind[] = [
-  "search_decisions",
-  "propose_decision",
-  "get_application_status",
-];
+// A status read is diagnostic detail: it changes nothing. Any other tool name
+// is recorded generically.
+const TOOL_STEP_KINDS: readonly StepKind[] = ["get_application_status"];
 export function isToolStep(kind: StepKind) {
   return TOOL_STEP_KINDS.includes(kind);
 }
@@ -163,13 +156,13 @@ export function diagnosticLogPath(
   filename: "replies.ndjson" | "spans.ndjson" = "replies.ndjson",
 ) {
   const dbPath =
-    process.env.HALDUR_DB_PATH ??
+    process.env.HALLVI_DB_PATH ??
     stateLocation(/* turbopackIgnore: true */ process.cwd(), { hidden: true })
       .database;
   // Runtime output files must not be included in the application build.
   return join(
     /* turbopackIgnore: true */
-    (process.env.HALDUR_LOG_DIR?.trim() || undefined) ??
+    (process.env.HALLVI_LOG_DIR?.trim() || undefined) ??
       join(dirname(dbPath), "diagnostics"),
     filename,
   );

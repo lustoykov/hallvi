@@ -10,6 +10,7 @@ import {
   runHostCommand,
   saveOperatorSettings,
 } from "./operator-execution";
+import type { OperatorSettings } from "./operator-data";
 import { piConfigDir } from "./pi-configuration";
 
 const exec = promisify(execFile);
@@ -40,7 +41,7 @@ export async function serverPublicKey(
         "-N",
         "",
         "-C",
-        `haldur-${applicationId}`,
+        `hallvi-${applicationId}`,
         "-f",
         key,
       ],
@@ -140,6 +141,12 @@ export async function connectServer(
   applicationId: string,
   input: unknown,
   signal?: AbortSignal,
+  options: {
+    /** How long to wait for SSH. A machine that is already up needs little. */
+    waitMs?: number;
+    /** Further checks on the verified host; a throw leaves nothing saved. */
+    require?: (host: NonNullable<OperatorSettings["host"]>) => Promise<void>;
+  } = {},
 ) {
   const params = connectServerSchema.parse(input);
   const { root, key } = accessPaths(applicationId);
@@ -170,7 +177,10 @@ export async function connectServer(
   let hostKeys = existsSync(knownHostsPath)
     ? readFileSync(knownHostsPath, "utf8")
     : "";
-  if (!hostKeys) hostKeys = await scanHostKey(address, params.port, signal);
+  if (!hostKeys)
+    hostKeys = await scanHostKey(address, params.port, signal, {
+      waitMs: options.waitMs,
+    });
   const keyLines = hostKeys
     .trim()
     .split("\n")
@@ -214,15 +224,16 @@ export async function connectServer(
   };
   const result = await runHostCommand(
     host,
-    "printf 'haldur-ssh-ready\\n'; uname -s",
+    "printf 'hallvi-ssh-ready\\n'; uname -s",
     signal,
     undefined,
     20,
   );
-  if (result.exitCode !== 0 || !result.output.includes("haldur-ssh-ready"))
+  if (result.exitCode !== 0 || !result.output.includes("hallvi-ssh-ready"))
     throw new Error(
       `SSH access was not verified; the application connection was not changed. ${result.output}`,
     );
+  await options.require?.(host);
   signal?.throwIfAborted();
   saveOperatorSettings(applicationId, {
     ...operatorSettings(applicationId),

@@ -65,7 +65,7 @@ export const updatePiPreferencesSchema = z.strictObject({
 export function piConfigDir() {
   // Runtime-owned local state, never an input to the deployed code bundle.
   return resolve(
-    /* turbopackIgnore: true */ process.env.HALDUR_CONFIG_DIR ??
+    /* turbopackIgnore: true */ process.env.HALLVI_CONFIG_DIR ??
       stateLocation(process.cwd(), { hidden: true }).directory,
   );
 }
@@ -76,8 +76,8 @@ export function piConfigDir() {
  */
 export function piAccountDir() {
   return resolve(
-    /* turbopackIgnore: true */ process.env.HALDUR_PI_CONFIG_DIR?.trim() ||
-      process.env.HALDUR_CONFIG_DIR ||
+    /* turbopackIgnore: true */ process.env.HALLVI_PI_CONFIG_DIR?.trim() ||
+      process.env.HALLVI_CONFIG_DIR ||
       piAccountLocation(homedir()),
   );
 }
@@ -100,7 +100,7 @@ export function readPiConfiguration(): PiConfiguration | null {
   const result = configurationSchema.safeParse(value);
   if (!result.success)
     throw new Error(
-      "Haldur’s saved Pi configuration is invalid. Choose a setup again.",
+      "Hallvi’s saved Pi configuration is invalid. Choose a setup again.",
     );
   return result.data;
 }
@@ -116,7 +116,7 @@ export function savePiConfiguration(configuration: PiConfiguration) {
 }
 
 /**
- * Forget Haldur's consent/selection, never delete a shared or separate
+ * Forget Hallvi's consent/selection, never delete a shared or separate
  * credential file.
  */
 export function forgetPiConfiguration() {

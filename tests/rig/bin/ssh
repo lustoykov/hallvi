@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Rig stand-in for SSH to the provider-created "server" (127.0.0.1). Rig A
 // runs each host command with this machine's shell and Docker engine, with
-// host paths under /opt/haldur and /run/lock mapped to SG_RIG_HOST_ROOT.
+// host paths under /opt/hallvi and /run/lock mapped to SG_RIG_HOST_ROOT.
 // Rig B (SG_RIG_HOST_CONTAINER) runs it unchanged as root inside that Linux
 // host container (tests/rig/host), whose real paths, systemd and dockerd
 // the product uses. Every invocation is logged (command prefix, duration,
@@ -66,17 +66,17 @@ if (sshPort) {
 
 const original = process.argv.at(-1) ?? "";
 // Only the host's per-deployment paths: a path inside a container, such as
-// /opt/haldur/check.php in a check command, must pass through unchanged.
+// /opt/hallvi/check.php in a check command, must pass through unchanged.
 let command = container
   ? original
   : original
       .replace(
-        /\/opt\/haldur\/(?=[0-9a-f]{8}-[0-9a-f]{4}-)/g,
-        `${root}/opt/haldur/`,
+        /\/opt\/hallvi\/(?=[0-9a-f]{8}-[0-9a-f]{4}-)/g,
+        `${root}/opt/hallvi/`,
       )
       .replaceAll("/run/lock/", `${root}/run/lock/`);
 let note = container ? `host container ${container}` : "";
-if (command.includes("haldur-metadata-guard")) {
+if (command.includes("hallvi-metadata-guard")) {
   // Cloud metadata firewalling has no equivalent on this machine.
   command = "true";
   note = "metadata guard skipped";
