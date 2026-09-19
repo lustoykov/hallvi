@@ -414,6 +414,7 @@
 }
 
 .bs-primary {
+  box-shadow: var(--button-shadow);
   border-color: var(--ax-blue);
   background: var(--ax-blue);
   color: white;
