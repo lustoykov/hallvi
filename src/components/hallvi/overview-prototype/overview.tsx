@@ -6,10 +6,7 @@
 // miniature, recent work, and one quiet line of ideas.
 
 import { ArrowRight, CaretDown, Lightbulb } from "@phosphor-icons/react";
-import { useCallback, useMemo, useState } from "react";
-
-import type { ApplicationOperation } from "@/server/operation-record";
-import type { ChatSummary } from "@/server/types";
+import { useCallback, useState } from "react";
 
 import type { ApplicationSection } from "../application-sections";
 import type { PageContext } from "../deployment-prototype/page-head";
@@ -18,10 +15,9 @@ import type {
   ArchitectureModel,
   LiveRecord,
 } from "../architecture-prototype/model";
-import type { Recheck } from "../architecture-prototype/use-recheck";
 import { AccessLink } from "../deployment-prototype/page-head";
 import { MiniMap } from "./mini-map";
-import { buildOverview, type Overview } from "./overview-model";
+import type { Overview } from "./overview-model";
 import { IdeaCard, OpChip } from "./shared";
 import { TimelineHero } from "./timeline";
 import type { Timeline } from "./timeline-model";
@@ -32,12 +28,8 @@ const counts = ["No", "One", "Two", "Three", "Four"];
 export function OverviewDirection({
   model,
   record,
-  recheck,
   page,
-  operations,
-  chats,
   reduced,
-  onOpenConversation,
   onOpenDestination,
   onAsk,
   built,
@@ -45,26 +37,15 @@ export function OverviewDirection({
 }: {
   model: ArchitectureModel;
   record: LiveRecord;
-  /**
-   * Built from records by the caller. The prototype route still builds its
-   * own from the old facts model; the live page hands one in.
-   */
-  built?: Overview;
-  timeline?: Timeline;
-  recheck: Recheck;
+  /** Built from records by the caller. */
+  built: Overview;
+  timeline: Timeline;
   page: PageContext;
-  operations: ApplicationOperation[];
-  chats: ChatSummary[];
   reduced: boolean;
-  onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
 }) {
-  const fallback = useMemo(
-    () => buildOverview({ model, operations, chats, onOpenConversation }),
-    [model, operations, chats, onOpenConversation],
-  );
-  const overview = built ?? fallback;
+  const overview = built;
   const [pointed, setPointed] = useState<string | null>(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
   const planned = model.status !== "live";
@@ -105,7 +86,6 @@ export function OverviewDirection({
         model={model}
         record={record}
         overview={overview}
-        recheck={recheck}
         page={page}
         offset={offset}
         pointed={pointed}

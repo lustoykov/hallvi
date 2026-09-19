@@ -865,7 +865,7 @@
   }
 }
 
-/* Navigation marks: a 7px dot with its reason in a title and hidden text. */
+/* Text for screen readers only. */
 .hv-visually-hidden {
   position: absolute;
   width: 1px;
@@ -873,32 +873,6 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-}
-.hv-nav-indicator {
-  margin-left: auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  position: relative;
-}
-.hv-nav-indicator.working {
-  background: var(--blue);
-  animation: hv-mark-pulse 1.6s ease-in-out infinite;
-}
-.hv-nav-indicator.needs-you {
-  background: var(--amber);
-}
-.hv-nav-indicator.failed {
-  background: var(--red);
-}
-.hv-nav-indicator.updated {
-  background: var(--green);
-}
-@keyframes hv-mark-pulse {
-  50% {
-    opacity: 0.3;
-  }
 }
 
 /* The way back from a full-width destination. */
@@ -927,18 +901,6 @@
   width: 14px;
   height: 14px;
 }
-.hv-suggest {
-  border: 1px solid #c7d6f5;
-  background: var(--blue-soft);
-  color: var(--blue-text);
-  border-radius: 999px;
-  padding: 3px 10px;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
 
 /* The active-work strip in the top bar while a destination is open. */
 .hv-adaptive-shell .hv-topbar {
@@ -963,260 +925,6 @@
 }
 .hv-topbar-debug a:hover {
   color: var(--ink);
-}
-.hv-workstrip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-}
-.hv-workstrip > span:not(.hv-op-state) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* State chip: one icon, one word, optionally one detail. */
-.hv-op-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  line-height: 1.6;
-}
-.hv-op-state svg {
-  width: 12px;
-  height: 12px;
-}
-.hv-op-state em {
-  font-style: normal;
-  font-weight: 500;
-}
-.hv-op-state-working {
-  background: var(--blue-soft);
-  color: var(--blue-text);
-}
-.hv-op-state-proposed {
-  background: var(--amber-soft);
-  color: var(--amber-text);
-}
-.hv-op-state-inspected {
-  background: #eef1f6;
-  color: var(--muted);
-}
-.hv-op-state-verified {
-  background: var(--green-soft);
-  color: var(--green-text);
-}
-.hv-op-state-failed {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
-/* Receipt: under the reply that started the work. */
-.hv-op-receipt {
-  margin-top: 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: #fff;
-  font-size: 14px;
-  display: grid;
-  gap: 8px;
-  color: var(--ink);
-  max-width: 100%;
-}
-.hv-message-receipts {
-  max-width: 92%;
-}
-.hv-message-receipts .hv-op-receipt {
-  margin-top: 0;
-}
-.hv-op-receipt-proposed {
-  border-color: #ecd6b8;
-  background: #fffdfa;
-}
-.hv-op-receipt-working {
-  border-color: #c7d6f5;
-}
-.hv-op-receipt-failed {
-  border-color: #f2d3d0;
-  background: #fffbfb;
-}
-.hv-op-receipt-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.hv-op-receipt-head strong {
-  font-weight: 600;
-}
-.hv-op-rel {
-  color: var(--muted);
-  margin-left: auto;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-.hv-op-summary,
-.hv-op-evidence,
-.hv-op-next {
-  margin: 0;
-  color: #4b5568;
-  line-height: 1.6;
-}
-.hv-op-evidence {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  color: var(--green-text);
-}
-.hv-op-evidence svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.hv-op-next {
-  color: var(--amber-text);
-}
-.hv-op-muted {
-  color: var(--muted);
-}
-
-/* Step list. */
-.hv-op-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 5px;
-}
-.hv-op-steps li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-}
-.hv-op-steps li.done {
-  color: var(--ink);
-}
-.hv-op-steps li.active {
-  color: var(--blue-text);
-  font-weight: 600;
-}
-.hv-op-steps li.failed {
-  color: var(--red);
-  font-weight: 600;
-}
-.hv-op-step-mark {
-  width: 16px;
-  height: 16px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.hv-op-step-mark svg {
-  width: 13px;
-  height: 13px;
-}
-.hv-op-step-mark i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  border: 1px solid #b7c1d1;
-}
-
-/* Destination links, reference chips and text links. */
-.hv-op-links {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.hv-op-links:empty {
-  display: none;
-}
-.hv-op-links-label {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.hv-op-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 999px;
-  padding: 3px 10px;
-  font: inherit;
-  font-size: 11.5px;
-  color: var(--blue-text);
-  cursor: pointer;
-}
-.hv-op-link:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.hv-op-link:hover:not(:disabled) {
-  border-color: #c7d6f5;
-  background: var(--blue-soft);
-}
-.hv-op-link svg {
-  width: 12px;
-  height: 12px;
-}
-.hv-op-refs {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.hv-op-ref {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 999px;
-  padding: 2px 10px 2px 4px;
-  font: inherit;
-  font-size: 11.5px;
-  color: var(--ink);
-  cursor: pointer;
-}
-.hv-op-ref:hover {
-  border-color: #c7d6f5;
-}
-.hv-op-ref em {
-  font-style: normal;
-  color: var(--muted);
-}
-.hv-op-text-link {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: #315bc6;
-  font: inherit;
-  cursor: pointer;
-  text-decoration: none;
-}
-.hv-op-text-link:hover {
-  text-decoration: underline;
 }
 
 /* Approval and recovery: the one dashed border in the system. */
@@ -1276,14 +984,7 @@
 .hv-op-approval .hv-host-recommendation {
   font-size: 12px;
 }
-.hv-op-approval-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  color: var(--muted);
-  font-size: 11.5px;
-}
+
 .hv-op-approval .hv-primary-button,
 .hv-op-approval .hv-secondary-button {
   padding: 8px 12px;
@@ -1340,10 +1041,7 @@
   line-height: 2;
   color: var(--muted);
 }
-.hv-origin .hv-op-state {
-  margin-right: 6px;
-  vertical-align: middle;
-}
+
 .hv-operation-history {
   font-size: 12px;
   color: var(--muted);
@@ -1471,9 +1169,7 @@ dd.hv-protection-warn {
   border-bottom: 1px solid var(--line);
   font-size: 13px;
 }
-.hv-changes .hv-op-links {
-  grid-column: 2;
-}
+
 .hv-changes strong {
   display: block;
   font-weight: 600;
@@ -1535,7 +1231,6 @@ dd.hv-protection-warn {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hv-nav-indicator.working,
   .hv-message-highlight {
     animation: none;
   }
@@ -1547,17 +1242,9 @@ dd.hv-protection-warn {
   .hv-changes li {
     grid-template-columns: minmax(0, 1fr);
   }
-  .hv-changes .hv-op-links {
-    grid-column: 1;
-  }
-  .hv-workstrip {
-    display: none;
-  }
+
   .hv-section-activity {
     padding: 20px 24px 0;
-  }
-  .hv-message-receipts {
-    max-width: 100%;
   }
 }
 
@@ -1704,9 +1391,7 @@ dd.hv-protection-warn {
 .hv-possible p {
   max-width: 70ch;
 }
-.hv-possible .hv-op-links {
-  margin-top: 4px;
-}
+
 @media (max-width: 640px) {
   .hv-application-navigation .hv-nav-unused small {
     display: none;
@@ -1800,9 +1485,7 @@ dd.hv-protection-warn {
   font-size: 12px;
   margin-top: 4px;
 }
-.hv-fact-note .hv-op-muted {
-  color: var(--muted);
-}
+
 .hv-protection-ok {
   color: var(--green-text);
 }
@@ -2029,9 +1712,7 @@ dd.hv-protection-warn {
   display: grid;
   gap: 6px;
 }
-.hv-pending-inputs .hv-op-link {
-  margin-left: 8px;
-}
+
 .hv-variable-list-wide .hv-variable-row {
   grid-template-columns: minmax(0, 1.3fr) 130px 170px minmax(0, 1.2fr);
 }
@@ -2104,21 +1785,7 @@ dd.hv-protection-warn {
 .hv-candidate > div:first-child {
   min-width: 0;
 }
-.hv-candidate > .hv-op-muted,
-.hv-candidate > .hv-op-links {
-  grid-column: 1 / -1;
-}
-.hv-op-cost {
-  display: grid;
-  gap: 2px;
-}
-.hv-op-cost span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+
 @media (max-width: 640px) {
   .hv-coverage-row,
   .hv-check-row,
@@ -2181,15 +1848,7 @@ dd.hv-protection-warn {
   color: var(--hv-muted, #63728c);
   margin-top: 7px;
 }
-.hv-op-state-queued {
-  color: #476fbe;
-  background: #f0f4fc;
-}
-.hv-op-state-cancelled {
-  color: #6f7b8e;
-  background: #f2f4f7;
-}
-.hv-op-receipt-queued,
+
 .hv-activity-queued {
   border-color: #cfdbef;
 }
@@ -2198,13 +1857,6 @@ dd.hv-protection-warn {
     flex-wrap: wrap;
     gap: 10px;
   }
-  .hv-history-open > .hv-op-rel {
-    flex-basis: 100%;
-  }
-}
-
-.hv-op-receipt > .hv-op-ref {
-  justify-self: start;
 }
 
 /* Architecture, before anybody has mapped the application. The designed

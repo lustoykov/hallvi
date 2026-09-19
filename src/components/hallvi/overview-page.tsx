@@ -16,7 +16,6 @@ import type { ApplicationRecord, ChatSummary } from "@/server/types";
 import { architectureFromRecords } from "./architecture-records";
 import type { PageChrome } from "./deployment-prototype/page-head";
 import type { LiveRecord } from "./architecture-prototype/model";
-import type { Recheck } from "./architecture-prototype/use-recheck";
 import type { ApplicationSection } from "./application-sections";
 import type { Reachability } from "./deployment-prototype/page-head";
 import {
@@ -31,14 +30,6 @@ import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag } from "./presentation";
 import "./overview-prototype/overview.css";
 import "./overview-plain.css";
-
-const idle: Recheck = {
-  phase: "idle",
-  marks: {},
-  active: null,
-  run: () => undefined,
-  reset: () => undefined,
-};
 
 const tone = {
   verified: "verified",
@@ -256,11 +247,7 @@ export function OverviewPage({
           record={live}
           built={built}
           timeline={timeline}
-          recheck={idle}
-          operations={[]}
-          chats={chats}
           reduced={reduced}
-          onOpenConversation={onOpenConversation}
           onOpenDestination={onOpenDestination}
           onAsk={onAsk}
           page={{

@@ -14,7 +14,7 @@ Views load saved information without a model call on every visit. Preserve draft
 
 ## Existing UI and prototypes
 
-The existing implementation uses operation receipts under originating replies, references across conversations and facts-derived views. Its workflow approvals and data contracts are descriptions of current behavior, not redesign requirements. Seen state is currently browser-local. The prototype documentation records selected visual directions, not a commitment to implement all depicted care capabilities before deployment works.
+The existing implementation places Pi's records and execution evidence under the replies that produced them, and builds History from the same records. Its workflow approvals and data contracts are descriptions of current behavior, not redesign requirements. The prototype documentation records selected visual directions, not a commitment to implement all depicted care capabilities before deployment works.
 
 Reuse useful components and omit irrelevant controls. A prototype action completing does not establish executor support. [Current architecture](../architecture.md), [requirements](../requirements.md) and [Roadmap](../../ROADMAP.md) distinguish current behavior, intended outcomes and delivery order.
 

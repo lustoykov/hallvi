@@ -1,4 +1,3 @@
-// PROTOTYPE · claude/architecture-directions · throwaway.
 // What the top of Overview, the Timeline, receives from the page around it
 // (header, the map in miniature, recent work, ideas).
 
@@ -8,14 +7,12 @@ import type {
   ArchitectureModel,
   LiveRecord,
 } from "../architecture-prototype/model";
-import type { Recheck } from "../architecture-prototype/use-recheck";
 import type { Overview } from "./overview-model";
 
 export interface HeroProps {
   model: ArchitectureModel;
   record: LiveRecord;
   overview: Overview;
-  recheck: Recheck;
   page: PageContext;
   /** The model's clock minus the browser's, for countdowns. */
   offset: number;

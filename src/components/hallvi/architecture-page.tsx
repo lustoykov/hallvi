@@ -18,22 +18,8 @@ import type { SavedInformation } from "@/server/operator-data";
 import { architectureFromRecords } from "./architecture-records";
 import { JourneyDirection } from "./architecture-prototype/journey-v2";
 import type { PageChrome } from "./deployment-prototype/page-head";
-import type { Recheck } from "./architecture-prototype/use-recheck";
 import type { ApplicationSection } from "./application-sections";
 import "./architecture-prototype/prototype.css";
-
-/**
- * The design animates a re-check while one is running. Nothing re-checks on
- * its own here: a reader asks, in the conversation, and the next records are
- * what changes the page.
- */
-const idle: Recheck = {
-  phase: "idle",
-  marks: {},
-  active: null,
-  run: () => undefined,
-  reset: () => undefined,
-};
 
 export function ArchitecturePage({
   records,
@@ -96,7 +82,6 @@ export function ArchitecturePage({
     <div className="ax-root hv-section-page hv-section-architecture">
       <JourneyDirection
         model={model}
-        recheck={idle}
         onOpenDestination={onOpenDestination}
         onAsk={onAsk}
         page={{

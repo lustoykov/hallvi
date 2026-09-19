@@ -1,6 +1,6 @@
 ---
 name: Hallvi conversation-first workspace
-description: The quiet application workspace plus one application-level action record that renders as receipts in chat, activity cards in views, marks in navigation and blocks on Overview.
+description: The quiet application workspace. Pi's records render in the conversation and in full-page destinations; History and Overview read the same records.
 colors:
   ink: "#202838"
   muted: "#687183"
@@ -193,7 +193,7 @@ components:
 
 [Application operator design](../../../docs/operator-design.md) and the [UI reference](../../../docs/design/screens.md) govern the redesign. Keep this visual language and the sidebar's guiding purpose as starting points; view interiors and interactions can change to serve the deployment journey.
 
-Pi chooses what to surface through shared knowledge records with optional presentation. One main conversation owns changes; side conversations are read-only, with native queue/steer for active work. The operation receipts, fixed states, approval placement and facts contracts described below document the existing UI. They do not require the redesign to preserve that record model or workflow machinery. Exact new presentation roles are not settled. Review each view's capabilities after the deployment path works.
+Pi chooses what to surface through shared knowledge records with optional presentation. One main conversation owns changes; side conversations are read-only, with native queue/steer for active work. The chat receipts, navigation marks, work strip and suggestion chip described below were retired on 20 September 2026 with the empty operation channel that fed them; their sections stay as design history. The state chips, step lists and tints still render in History and Overview. They do not require the redesign to preserve that record model or workflow machinery. Exact new presentation roles are not settled. Review each view's capabilities after the deployment path works.
 
 ## The presentation protocol
 
@@ -386,7 +386,7 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 The workspace shell: a 240px navigation column, a 56px top bar, and a workspace that fills the rest. Beside the column the top bar and workspace form one sheet, its top-left corner rounded 14px and set 8px down, casting a soft shadow onto the column; on a phone the navigation is a strip above it and there is no sheet edge. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
 
-A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”, and, when work elsewhere is live, a suggestion chip. While a destination is open and an action is working or waiting, the top bar shows a **work strip** on the right: state chip, action title, nothing else. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit control is the Stop icon until something is typed, then “Send next” with a quiet “Steer” beside it. A waiting message says when Pi will read it — after its current work, or for a steer after its current step, never interrupting a running command or a pending approval — and is cancelled the way Pi cancels: Stop, which also settles every waiting message as not started, with its text kept. A message that was never run offers Send again. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.
+A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit control is the Stop icon until something is typed, then “Send next” with a quiet “Steer” beside it. A waiting message says when Pi will read it — after its current work, or for a steer after its current step, never interrupting a running command or a pending approval — and is cancelled the way Pi cancels: Stop, which also settles every waiting message as not started, with its text kept. A message that was never run offers Send again. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.
 
 Receipts sit under the message that started the work, inside the message column, and stretch to the message width. Activity cards and origin lines sit at the top of a destination’s content, above the first heading, so the first thing a view says is what is happening to it right now.
 
@@ -419,7 +419,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 - **Variants:** Working (spinner, working tints), Waiting for you (hourglass, waiting tints), Inspected (magnifier, inspected grey), Verified (check, verified tints), Failed (warning, failed tints).
 - **Detail:** “· step 2 of 5” after Working. Nothing else is allowed inside a chip.
 
-### Receipt
+### Receipt (retired)
 
 - **Character:** the durable trace of one action, placed under the message that started it, updating in place as the action changes state.
 - **Anatomy, top to bottom:** head (state chip, action title in 600, relative time at the right edge), one-line summary, then exactly one of: step list while Working or Failed, evidence line in verified green after Verified or Inspected, “Next:” line in waiting amber after Failed; then the approval card while Waiting for you; then destination links with a “Read” or “Changed” prefix once settled.
@@ -448,7 +448,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 - **Activity card:** at the top of a destination while an action touching it is Waiting, Working or Failed. Head with state chip and a plain-language title (“Proposed change · not applied”, “Hallvi is applying a change”, “This needs you”), one sentence, step list or next step, then one link: “Review and approve in the conversation” or “Open in [conversation]”. 10px radius, 14px by 16px padding, `card-surface`, border tinted by state.
 - **Origin line:** once settled, one line of meta text with the last action’s chip, its title, “from [conversation]” as a text link, and the relative time. It is a sentence, not a row.
 
-### Navigation mark
+### Navigation mark (retired)
 
 - **Style:** a 7px dot at the right edge of a navigation row, with the reason in a title and as the row's accessible description, so the row keeps its plain name.
 - **Tones:** Working (working blue, pulsing at 1.6s, still under reduced motion), Waiting for you (amber), Failed (red), Updated since you looked (verified green).
@@ -485,15 +485,15 @@ One primary button everywhere (19 September): 34px tall (`--button-height`), 0 b
 
 - **Do** render every action from the record. If a surface wants to say something about work, it reads the action and uses these components; it does not keep its own copy of the state.
 - **Do** keep confirmed facts below and live activity above in every destination, with the origin line as the settled form.
-- **Do** link both ways: a receipt links to the destinations it touched, a view links to the conversation at the message that started the work.
-- **Do** mark, never move. Marks and receipts tell the reader where to look; the reader navigates.
+- **Do** link both ways: a record links to the destinations it touched, a view links to the conversation at the message that started the work.
+- **Do** point, never move. Links tell the reader where to look; the reader navigates.
 - **Do** keep the conversation mounted while a destination is open so scroll position and draft survive.
 - **Do** lead with the chip, keep relative time at the right edge, and use one state tint per record.
 - **Do** label anything simulated with the banner or tag, and keep the exploration bar out of product screenshots.
 
 ### Don't:
 
-- **Don't** add a permanent side panel. Receipts, marks and full-width destinations carry everything the old right panel repeated.
+- **Don't** add a permanent side panel. Records in the transcript and full-width destinations carry everything the old right panel repeated.
 - **Don't** show verified green, a “Protected” line or a configured destination before the evidence exists.
 - **Don't** put the same approval card in two places at once in this option; the decision lives in the receipt.
 - **For existing receipts**, use their established states and tints consistently. New shared-record presentation is designed around the deployment journey rather than forced into this operation state model.

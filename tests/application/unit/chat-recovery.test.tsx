@@ -35,7 +35,6 @@ const run = { assistantMessageId: "assistant-message" };
 function render({
   error = historyError,
   archived = false,
-  activity = [],
   piActivity,
   status = "failed",
   body = "",
@@ -43,7 +42,6 @@ function render({
 }: {
   error?: string;
   archived?: boolean;
-  activity?: OperatorView["activity"];
   piActivity?: OperatorView["piActivity"];
   status?: "waiting" | "running" | "failed" | "cancelled" | "completed";
   body?: string;
@@ -77,8 +75,6 @@ function render({
         revision: 2,
       },
     ],
-    decisions: [],
-    activity,
     piActivity,
   };
   return renderToStaticMarkup(

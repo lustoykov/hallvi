@@ -17,47 +17,6 @@ import {
 import type { ChatSummary } from "@/server/types";
 
 /**
- * A quiet mark beside a destination: work in progress there, something
- * waiting for the user, a failure, or a confirmed change not looked at yet.
- */
-export interface NavigationIndicator {
-  tone: "working" | "needs-you" | "failed" | "updated";
-  label: string;
-  /**
-   * The destination this operation is mainly about. One change often
-   * touches five destinations; only the primary one animates, so a busy
-   * application does not flash five marks at once.
-   */
-  primary?: boolean;
-}
-
-/**
- * The mark itself is decorative; its reason is the row's accessible
- * description, so the row keeps its plain name and a screen reader hears
- * the reason after it.
- */
-function Mark({
-  id,
-  indicator,
-}: {
-  id: string;
-  indicator: NavigationIndicator;
-}) {
-  return (
-    <>
-      <i
-        className={`hv-nav-indicator ${indicator.tone}${indicator.primary ? " primary" : ""}`}
-        title={indicator.label}
-        aria-hidden="true"
-      />
-      <span id={id} className="hv-visually-hidden" aria-hidden="true">
-        {indicator.label}
-      </span>
-    </>
-  );
-}
-
-/**
  * What else this application could run, one click away at the bottom of the
  * destinations: the hidden stack destinations as muted rows, each saying why
  * it is hidden. Hiding keeps a simple application clean; revealing shows
@@ -127,12 +86,10 @@ function Reveal({
 function Activity({
   sections,
   section,
-  indicators,
   onSection,
 }: {
   sections: readonly ApplicationSectionDefinition[];
   section: ApplicationSection | null;
-  indicators?: Partial<Record<ApplicationSection, NavigationIndicator>>;
   onSection: (section: ApplicationSection) => void;
 }) {
   const inside = sections.some((item) => item.id === section);
@@ -165,23 +122,17 @@ function Activity({
         <span>Activity</span>
       </button>
       {open &&
-        sections.map((item) => {
-          const indicator = indicators?.[item.id];
-          const markId = `hv-mark-${item.id}`;
-          return (
-            <button
-              key={item.id}
-              className={`hv-nav-inside ${section === item.id ? "selected" : ""}`}
-              aria-current={section === item.id ? "page" : undefined}
-              aria-describedby={indicator ? markId : undefined}
-              onClick={() => onSection(item.id)}
-            >
-              <item.icon aria-hidden="true" />
-              <span>{item.label}</span>
-              {indicator && <Mark id={markId} indicator={indicator} />}
-            </button>
-          );
-        })}
+        sections.map((item) => (
+          <button
+            key={item.id}
+            className={`hv-nav-inside ${section === item.id ? "selected" : ""}`}
+            aria-current={section === item.id ? "page" : undefined}
+            onClick={() => onSection(item.id)}
+          >
+            <item.icon aria-hidden="true" />
+            <span>{item.label}</span>
+          </button>
+        ))}
     </>
   );
 }
@@ -195,8 +146,6 @@ export function ApplicationNavigation({
   onSection,
   onChat,
   onCreate,
-  indicators,
-  chatMarks,
   sections = applicationSections,
   hidden = [],
   revealed = false,
@@ -222,8 +171,6 @@ export function ApplicationNavigation({
   onSection: (section: ApplicationSection) => void;
   onChat: (id: string) => void;
   onCreate: () => void;
-  indicators?: Partial<Record<ApplicationSection, NavigationIndicator>>;
-  chatMarks?: Record<string, NavigationIndicator>;
 }) {
   const primary = sections.filter((item) => item.group !== "activity");
   const activity = sections.filter((item) => item.group === "activity");
@@ -247,8 +194,6 @@ export function ApplicationNavigation({
       <nav aria-label="Application workspace">
         <div className="hv-destinations">
           {primary.map((item, index) => {
-            const indicator = indicators?.[item.id];
-            const markId = `hv-mark-${item.id}`;
             const groupStart =
               index > 0 && item.group !== primary[index - 1].group;
             const row = (
@@ -256,12 +201,10 @@ export function ApplicationNavigation({
                 key={item.id}
                 className={`${section === item.id ? "selected" : ""} ${groupStart ? "hv-nav-group-start" : ""}`}
                 aria-current={section === item.id ? "page" : undefined}
-                aria-describedby={indicator ? markId : undefined}
                 onClick={() => onSection(item.id)}
               >
                 <item.icon aria-hidden="true" />
                 <span>{item.label}</span>
-                {indicator && <Mark id={markId} indicator={indicator} />}
               </button>
             );
             return row;
@@ -278,7 +221,6 @@ export function ApplicationNavigation({
           <Activity
             sections={activity}
             section={section}
-            indicators={indicators}
             onSection={onSection}
           />
         </div>
@@ -300,9 +242,6 @@ export function ApplicationNavigation({
             aria-current={
               !section && chat.id === selectedChatId ? "page" : undefined
             }
-            aria-describedby={
-              chatMarks?.[chat.id] ? `hv-mark-chat-${chat.id}` : undefined
-            }
             onClick={() => onChat(chat.id)}
           >
             <ChatCircle />
@@ -310,12 +249,6 @@ export function ApplicationNavigation({
               {chat.title}
               {chat.archivedAt && <small>Archived</small>}
             </span>
-            {chatMarks?.[chat.id] && (
-              <Mark
-                id={`hv-mark-chat-${chat.id}`}
-                indicator={chatMarks[chat.id]}
-              />
-            )}
           </button>
         ))}
       </nav>

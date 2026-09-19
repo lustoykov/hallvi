@@ -36,9 +36,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Conversation (Chat in existing code)**: An application-owned transcript and native model session. Conversations have separate drafts/history and share the application's operational state. In the redesign, only the main conversation owns changes; side conversations are read-only.
 
-**Application view**: An inspectable projection of recorded application facts and work, such as deployment, data or health. Chat receipts and views refer to the same records.
-
-**Operation receipt**: The interactive presentation of an operation's origin, progress, required decision, evidence and outcome, drawn by `operation-receipt.tsx`. A receipt is not a second copy of execution state.
+**Application view**: An inspectable projection of recorded application facts and work, such as deployment, data or health. Record cards in chat and views refer to the same records.
 
 **Reply** (`pi-transcript.ts`): What Pi said and did between two of the owner's messages, as one item in the conversation. It is projected from Pi's history on every read and stored nowhere else; it is named after the message it answers. Evidence is placed under it by the id Pi gave each tool call. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
 

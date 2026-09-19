@@ -51,17 +51,14 @@ export async function getOperatorView(
     },
     executions: conversation?.executions ?? listExecutions(applicationId),
     piActivity: conversation?.piActivity ?? listActivity(applicationId),
-    operations: [],
     worker: conversation?.worker,
     chats,
     selectedChatId: selected?.id ?? null,
     messages: conversation?.messages ?? [],
-    decisions: [],
     information: listInformation(application.id, "", true).filter(
       (r) => r.presentation,
     ),
     secrets: listSecrets(application.id),
-    activity: [],
     // Hallvi's own protection is the same fact for every application:
     // read from the controller's records, not from this application's.
     facts: { controllerProtection: controllerProtectionFacts() },

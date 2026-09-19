@@ -14,12 +14,6 @@
     border-color var(--ax-base),
     box-shadow var(--ax-base);
 }
-.axt.is-live {
-  border-color: var(--ax-working-line);
-  box-shadow:
-    0 0 0 4px rgb(40 90 216 / 6%),
-    0 30px 60px -44px rgb(23 34 56 / 34%);
-}
 
 /* ---------- What it says ---------- */
 
@@ -337,13 +331,7 @@
   transform: rotate(45deg) scale(0.45);
   transition-duration: 200ms;
 }
-/* Held still, the working star is drawn whole. */
-.axt-sign[data-state="running"] .axt-spark-a {
-  transform: scale(0.9);
-}
-.axt-sign[data-state="running"] .axt-spark-b {
-  transform: rotate(45deg) scale(0.8);
-}
+
 .axt-shine {
   --axt-shine-base: var(--ax-ink-2);
   --axt-shine-1: #0b7fa6;
@@ -351,32 +339,19 @@
   --axt-shine-3: #6a4fd8;
   color: var(--axt-shine-base);
 }
-/* While a check runs the light is the full cool spectrum over working blue. */
-.axt-sign[data-state="running"] .axt-shine {
-  --axt-shine-base: var(--ax-working-text);
-}
+
 .axt-log-meta {
   /* Pulled in, so the dot sits centred between the words and the fact. */
   margin-left: -3px;
   color: var(--ax-muted);
   font-weight: 500;
 }
-.axt-sign[data-state="running"] .axt-log-meta {
-  /* Monospace spaces are wide enough on their own. */
-  margin-left: 0;
-  font: 500 11.5px var(--ax-mono);
-  font-variant-numeric: tabular-nums;
-}
+
 .axt-sign[data-state="new"] .axt-log-meta {
   color: var(--ax-working-text);
   font-weight: 620;
 }
-.axt-sign[data-state="passed"] .axt-log-meta {
-  color: var(--ax-verified-text);
-}
-.axt-sign[data-state="failed"] .axt-log-meta {
-  color: var(--ax-failed);
-}
+
 .axt-tag {
   padding: 0 5px;
   border-radius: 4px;
@@ -399,9 +374,6 @@
 }
 /* Light only where motion is welcome; clipped text would vanish in forced colours. */
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-  :root:not([data-ax-motion="reduced"])
-    .axt-sign[data-state="running"]
-    .axt-shine,
   :root:not([data-ax-motion="reduced"]) .axt-shine[data-shine] {
     background: linear-gradient(
         100deg,
@@ -415,21 +387,6 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-  }
-  :root:not([data-ax-motion="reduced"])
-    .axt-sign[data-state="running"]
-    .axt-shine {
-    animation: axt-shine 1600ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  }
-  :root:not([data-ax-motion="reduced"])
-    .axt-sign[data-state="running"]
-    .axt-spark-a {
-    animation: axt-step-a 1600ms steps(1, end) infinite;
-  }
-  :root:not([data-ax-motion="reduced"])
-    .axt-sign[data-state="running"]
-    .axt-spark-b {
-    animation: axt-step-b 1600ms steps(1, end) infinite;
   }
 }
 /* The light crosses the words in the first 1120 ms, then waits off-text. */
@@ -445,55 +402,6 @@
 /* Eight 200 ms frames: a dot, a small four-point star, a hint of
    diagonals, six rays, all eight, and back. Claude Code's spinner, drawn
    with the burst's own star. */
-@keyframes axt-step-a {
-  0% {
-    transform: scale(0.35);
-  }
-  12.5% {
-    transform: scale(0.7);
-  }
-  25% {
-    transform: scale(0.9);
-  }
-  37.5%,
-  62.5% {
-    transform: scale(1);
-  }
-  75% {
-    transform: scale(0.9);
-  }
-  87.5% {
-    transform: scale(0.7);
-  }
-  100% {
-    transform: scale(0.35);
-  }
-}
-@keyframes axt-step-b {
-  0%,
-  12.5% {
-    transform: rotate(45deg) scale(0);
-  }
-  25% {
-    transform: rotate(45deg) scale(0.35);
-  }
-  37.5% {
-    transform: rotate(45deg) scale(0.65);
-  }
-  50% {
-    transform: rotate(45deg) scale(0.9);
-  }
-  62.5% {
-    transform: rotate(45deg) scale(0.65);
-  }
-  75% {
-    transform: rotate(45deg) scale(0.35);
-  }
-  87.5%,
-  100% {
-    transform: rotate(45deg) scale(0);
-  }
-}
 .axt-log {
   display: grid;
   grid-template-rows: 0fr;
@@ -599,16 +507,7 @@
   color: #f4c98f;
   background: rgb(244 201 143 / 12%);
 }
-.axt-caret {
-  display: inline-block;
-  width: 7px;
-  height: 14px;
-  margin-left: 6px;
-  vertical-align: -2px;
-  background: #9fb4f5;
-  /* Steady: the label above carries the rhythm while a check runs. */
-  animation: none;
-}
+
 /* A line pointed at in the log lights its moment on the lanes. */
 .axt-ev.is-lit {
   transform: translate(-50%, -50%) scale(1.3);

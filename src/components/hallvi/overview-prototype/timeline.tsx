@@ -41,7 +41,6 @@ import {
   whenWords,
 } from "./shared";
 import {
-  buildTimeline,
   laneOf,
   type Lane,
   type TimeEvent,
@@ -289,22 +288,16 @@ export function TimelineHero({
   model,
   record,
   overview,
-  recheck,
   offset,
   pointed,
   onPoint,
   onShow,
   onAsk,
   onOpenDestination,
-  timeline: given,
-}: HeroProps & { timeline?: Timeline }) {
-  const [guy, mascot] = useHallvi(model, recheck, { narrate: true });
+  timeline,
+}: HeroProps & { timeline: Timeline }) {
+  const [guy, mascot] = useHallvi(model);
   const appId = record.application.id;
-  const fallback = useMemo(
-    () => buildTimeline({ model, live: guy.live, marks: recheck.marks }),
-    [model, guy.live, recheck.marks],
-  );
-  const timeline = given ?? fallback;
   // This visit, read once from what the browser remembers of the last: how
   // the log was left, and when you last looked, so what landed since stays
   // new all visit. The hero only renders on the client, once the model
@@ -327,8 +320,6 @@ export function TimelineHero({
   // Open from the start unless you folded it, so the log reads as the
   // timeline's terminal.
   const [logOpen, setLogOpen] = useState(visit.memory?.open ?? true);
-  // How long the running check has taken, in whole seconds.
-  const [seconds, setSeconds] = useState(0);
   // The moment being pointed at, on the lanes or in the log.
   const [lit, setLit] = useState<string | null>(null);
   const log = useRef<HTMLDivElement>(null);
@@ -365,8 +356,8 @@ export function TimelineHero({
   const showLog = !planned && logOpen;
   const lines = guy.lines.slice(-6);
   const newest = lines.at(-1);
-  // Only recorded work is news: invented and simulated lines never are, and
-  // a first visit has none.
+  // Only recorded work is news: invented lines never are, and a first visit
+  // has none.
   const recorded = model.log.filter((line) => !line.invented);
   const newestRecorded = recorded.at(-1)?.at;
   const seenAt = visit.seenAt;
@@ -378,62 +369,18 @@ export function TimelineHero({
   const firstFresh = lines.find((line) => freshIds.has(line.id))?.id;
 
   // One state for the label, the most pressing first.
-  const state = planned
-    ? "planned"
-    : guy.running
-      ? "running"
-      : recheck.phase === "passed"
-        ? "passed"
-        : recheck.phase === "failed"
-          ? "failed"
-          : fresh.length > 0
-            ? "new"
-            : "rest";
+  const state = planned ? "planned" : fresh.length > 0 ? "new" : "rest";
   const sparkTone =
     state === "planned"
       ? "ghost"
-      : state === "failed" ||
-          (state === "rest" && newest?.tone === "fail") ||
+      : (state === "rest" && newest?.tone === "fail") ||
           (state === "new" && fresh.some((line) => line.tone === "fail"))
         ? "fail"
         : "star";
-  const failedId = Object.keys(recheck.marks).find(
-    (id) => recheck.marks[id] === "failed",
-  );
-  const failedName = model.byId[failedId ?? ""]?.name ?? "A part";
-  // The news is the count; the divider and bubble say "while you were away".
-  const words = state === "running" ? "What I'm doing" : "What I did last";
   // At rest the label keeps quiet about time: the log has its own clock, and
   // the lanes may have seen the server more recently than the log records.
-  const meta =
-    state === "running"
-      ? `${seconds} s`
-      : state === "new"
-        ? `${fresh.length} new`
-        : state === "passed"
-          ? `all answered in ${seconds} s`
-          : state === "failed"
-            ? `${failedName} isn't answering`
-            : null;
-  // The check itself is labelled beside its button and on every line; the
-  // label tags the results it claims.
-  const tag =
-    state === "passed" || state === "failed"
-      ? "simulated"
-      : state === "rest" && newest?.invented
-        ? newest.id.startsWith("live:")
-          ? "simulated"
-          : "invented"
-        : null;
-  // Said as a check starts and as it ends; the streamed lines stay quiet.
-  const said =
-    state === "running"
-      ? "Checking, simulated."
-      : state === "passed"
-        ? `Checked for ${seconds} seconds. Everything answered. Simulated.`
-        : state === "failed"
-          ? `Stopped. ${failedName} isn't answering. Simulated.`
-          : "";
+  const meta = state === "new" ? `${fresh.length} new` : null;
+  const tag = state === "rest" && newest?.invented ? "invented" : null;
 
   // The label answers: its star flares and one light crosses the words.
   // With the log open, the lines that landed while you were away warm once.
@@ -443,8 +390,7 @@ export function TimelineHero({
     if (
       reducedMotion() ||
       !button ||
-      button.querySelector(".axt-spark.is-fail") ||
-      button.closest('[data-state="running"]')
+      button.querySelector(".axt-spark.is-fail")
     )
       return;
     const flare = { duration: 900, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
@@ -516,28 +462,10 @@ export function TimelineHero({
       remember(appId, { seen: newestRecorded });
   }, [appId, newestRecorded, visit.review]);
 
-  useEffect(() => {
-    if (!guy.running) return;
-    const began = Date.now();
-    const tick = window.setInterval(
-      () => setSeconds(Math.floor((Date.now() - began) / 1000)),
-      250,
-    );
-    return () => window.clearInterval(tick);
-  }, [guy.running]);
-
-  // A passing check lands on the label with his celebration burst.
-  useEffect(() => {
-    if (recheck.phase !== "passed") return;
-    const timer = window.setTimeout(() => answer(false), 120);
-    return () => window.clearTimeout(timer);
-  }, [recheck.phase, answer]);
-
   // What the arrival reads when it decides, kept current.
   const facts = {
     planned,
     needs: overview.needs.length,
-    phase: recheck.phase,
     fresh,
     hasRecorded: recorded.length > 0,
     copy: newsLine(fresh),
@@ -573,7 +501,7 @@ export function TimelineHero({
         (entries) => {
           if (!entries.some((entry) => entry.intersectionRatio >= 0.99)) return;
           observer?.disconnect();
-          if (latest.current.phase === "idle") answer(true);
+          answer(true);
         },
         { threshold: 1 },
       );
@@ -595,7 +523,6 @@ export function TimelineHero({
         !facts.planned &&
         facts.hasRecorded &&
         facts.needs === 0 &&
-        facts.phase === "idle" &&
         !document.hidden &&
         !touched &&
         (intro || news) &&
@@ -608,13 +535,8 @@ export function TimelineHero({
       if (settled && drawing) {
         point(intro ? INTRO : facts.copy);
         if (!visit.review) remember(appId, { pointed: Date.now() });
-        // The label answers as his tap lands; no separate arrival. A check
-        // started in the meantime has the stage.
-        timers.push(
-          window.setTimeout(() => {
-            if (latest.current.phase === "idle") answer(true);
-          }, 820),
-        );
+        // The label answers as his tap lands; no separate arrival.
+        timers.push(window.setTimeout(() => answer(true), 820));
         return;
       }
       // His scene may still be loading: look again, for a few seconds.
@@ -622,7 +544,7 @@ export function TimelineHero({
         timers.push(window.setTimeout(decide, 300));
         return;
       }
-      if (news && facts.phase === "idle") arrive();
+      if (news) arrive();
     };
     timers.push(window.setTimeout(decide, 1800));
 
@@ -651,7 +573,7 @@ export function TimelineHero({
 
   return (
     <section
-      className={`axt${planned ? " is-planned" : ""}${guy.simulating ? " is-live" : ""}`}
+      className={`axt${planned ? " is-planned" : ""}`}
       aria-label="How it is doing"
     >
       <div className="axt-top">
@@ -769,23 +691,13 @@ export function TimelineHero({
           >
             <Spark tone={sparkTone} />
             <span className="axt-shine" ref={shine}>
-              {words}
+              What I did last
             </span>
-            {meta && (
-              <span
-                className="axt-log-meta"
-                aria-hidden={state === "running" || undefined}
-              >
-                · {meta}
-              </span>
-            )}
+            {meta && <span className="axt-log-meta">· {meta}</span>}
             {tag && <em className="axt-tag">{tag}</em>}
             <CaretDown weight="bold" className="axt-log-caret" />
           </button>
         )}
-        <span className="ax-visually-hidden" role="status">
-          {said}
-        </span>
       </div>
       {!planned && (
         <div
@@ -835,16 +747,7 @@ export function TimelineHero({
                       <b aria-hidden="true">{glyph[line.tone]}</b>
                       <span>
                         {line.text}
-                        {line.invented && (
-                          <em>
-                            {line.id.startsWith("live:")
-                              ? "simulated"
-                              : "invented"}
-                          </em>
-                        )}
-                        {last && guy.running && (
-                          <i className="axt-caret" aria-hidden="true" />
-                        )}
+                        {line.invented && <em>invented</em>}
                       </span>
                     </div>
                   </Fragment>
