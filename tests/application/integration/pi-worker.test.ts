@@ -40,6 +40,14 @@ vi.mock("../../../src/server/pi-configuration", async (original) => ({
 vi.mock("../../../src/server/pi-workspace", async (original) => ({
   ...(await original<object>()),
   PiWorkspace: class {
+    // As when the owner chose Docker isolation and Docker cannot be used: the
+    // workspace tools are withdrawn, and everything else is the product's.
+    async unavailable() {
+      return "The repository workspace is not part of this test.";
+    }
+    prompt(reason: string) {
+      return reason;
+    }
     async dispose() {}
   },
 }));
