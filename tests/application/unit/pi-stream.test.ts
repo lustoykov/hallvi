@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ snapshot: vi.fn() }));
-vi.mock("../../../src/server/pi-runs", () => ({
-  chatRunSnapshot: mocks.snapshot,
+vi.mock("../../../src/server/pi-conversation", () => ({
+  chatSnapshot: mocks.snapshot,
 }));
 import { GET } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/events/route";
 

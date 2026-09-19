@@ -85,7 +85,7 @@ it("runs Pi's tools in a scratch folder without Hallvi's credentials and keeps f
   writeFileSync(configuration, `CLOUDFLARE_API_TOKEN=${secret}\n`);
   const workspace = new PiWorkspace({
     applicationId: "app-direct",
-    runId: "run-direct",
+    chatId: "run-direct",
     source: async () => ({
       description: "qa/example@abc123",
       files: [
@@ -147,7 +147,7 @@ it("runs Pi's tools in a scratch folder without Hallvi's credentials and keeps f
 it("cancelling a command kills its process tree and ends the workspace without replay", async () => {
   const workspace = new PiWorkspace({
     applicationId: "app-direct",
-    runId: "run-cancel",
+    chatId: "run-cancel",
   });
   const run = tools(workspace);
   const cancel = new AbortController();
@@ -181,7 +181,7 @@ it("with Docker chosen and unavailable, withdraws the workspace with a reason an
   process.env.DOCKER_HOST = `unix://${join(root, "no-docker.sock")}`;
   const workspace = new PiWorkspace({
     applicationId: "app-direct",
-    runId: "run-docker",
+    chatId: "run-docker",
   });
   const reason = await workspace.unavailable();
   expect(reason).toMatch(/Docker isolation is selected[\s\S]*Start Docker/);
@@ -196,7 +196,7 @@ it("with Docker chosen and unavailable, withdraws the workspace with a reason an
   writeFileSync(join(root, "workspace.json"), "{");
   const unreadable = new PiWorkspace({
     applicationId: "app-direct",
-    runId: "run-unreadable",
+    chatId: "run-unreadable",
   });
   expect(await unreadable.unavailable()).toMatch(/Settings → Workspace/);
   expect(await tools(unreadable)("ls", {})).toMatch(/^Error: /);

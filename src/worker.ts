@@ -1,6 +1,5 @@
 import {
   PiWorkerBusyError,
-  PiWorkerDrainError,
   runPiWorker,
   WORKER_BUSY_EXIT,
 } from "./server/pi-worker";
@@ -8,14 +7,18 @@ import { shutdownTracing } from "./server/tracing";
 
 const controller = new AbortController();
 for (const signal of ["SIGINT", "SIGTERM"] as const)
-  process.on(signal, () => controller.abort());
+  process.on(signal, () => {
+    controller.abort();
+    // Pi keeps whatever was running as it stands. A tool that will not let go
+    // must not keep a stopped worker alive.
+    setTimeout(() => process.exit(0), 5_000).unref();
+  });
 runPiWorker(controller.signal)
   .catch((error) => {
     controller.abort();
     console.error(
       error instanceof Error ? error.message : "The Pi worker could not start.",
     );
-    if (error instanceof PiWorkerDrainError) process.exit(1);
     // A worker that stepped aside for a live one is not a failure to restart
     // into; its own exit code says which case this was.
     process.exitCode =

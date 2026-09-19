@@ -1,5 +1,4 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import type { PiRun } from "../../../src/server/types";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   open: vi.fn(),
@@ -34,15 +33,11 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
       await original<typeof import("@earendil-works/pi-coding-agent")>(),
     ).filter(([name]) => /^create\w+ToolDefinition$/.test(name)),
   ),
-  createAgentSession: mocks.create,
   defineTool: <T>(tool: T) => tool,
-  DefaultResourceLoader: class {
-    constructor(private options: { appendSystemPromptOverride: () => void }) {}
-    async reload() {
-      this.options.appendSystemPromptOverride();
-    }
-  },
-  SettingsManager: { inMemory: () => ({}) },
+}));
+vi.mock("@earendil-works/pi-agent-core", () => ({
+  AgentHarness: { create: mocks.create },
+  BACKGROUND_CONTEXT: {},
 }));
 vi.mock("../../../src/server/pi-configuration", () => ({
   configuredPiRuntime: mocks.configure,
@@ -70,53 +65,48 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
     prompt = mocks.workspacePrompt;
   },
 }));
-import { askPi, describePiFailure } from "../../../src/server/pi";
-const run = { id: "run-a", applicationId: "app-a", chatId: "chat-a" } as PiRun;
-const input = { run, userMessage: "Inspect the server", runContext: "{}" };
+import { openPiSession, describePiFailure } from "../../../src/server/pi";
+const scope = {
+  applicationId: "app-a",
+  chatId: "chat-a",
+  reply: () => "reply-a",
+};
 type RegisteredTool = {
   name: string;
-  execute: (id: string, args: unknown) => Promise<unknown>;
+  execute: (
+    id: string,
+    args: unknown,
+    onUpdate: () => void,
+    toolContext: undefined,
+    invocation: object,
+    context: { abortSignal: AbortSignal | undefined },
+  ) => Promise<unknown>;
 };
-let session: {
-  prompt: ReturnType<typeof vi.fn>;
-  waitForIdle: ReturnType<typeof vi.fn>;
-  dispose: ReturnType<typeof vi.fn>;
-};
+let harness: { close: ReturnType<typeof vi.fn> };
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.main.mockReturnValue(true);
   mocks.configure.mockResolvedValue({
     configuration: { reasoningEffort: "high" },
-    model: {},
-    modelRuntime: {},
+    model: { provider: "openai-codex", id: "gpt" },
+    modelRuntime: { runtime: true },
   });
-  mocks.open.mockResolvedValue({
-    sessionManager: { getSessionFile: () => "/tmp/test-session.jsonl" },
-    release: mocks.release,
-  });
-  let listener: (event: unknown) => void;
-  session = {
-    prompt: vi.fn(async () =>
-      listener({
-        type: "message_end",
-        message: {
-          role: "assistant",
-          content: [{ type: "text", text: "Checked." }],
-          stopReason: "stop",
-        },
+  mocks.open.mockResolvedValue({ session: {}, release: mocks.release });
+  harness = { close: vi.fn(async () => {}) };
+  mocks.create.mockResolvedValue({
+    harness: {
+      ...harness,
+      lane: async () => ({
+        getModel: vi.fn(async () => undefined),
+        setModel: vi.fn(),
+        getThinkingLevel: vi.fn(async () => undefined),
+        setThinkingLevel: vi.fn(),
+        getActiveTools: vi.fn(async () => []),
+        setActiveTools: vi.fn(),
       }),
-    ),
-    waitForIdle: vi.fn(async () => {}),
-    dispose: vi.fn(),
-    ...{
-      subscribe: (callback: typeof listener) => {
-        listener = callback;
-        return () => {};
-      },
-      sendCustomMessage: vi.fn(async () => {}),
     },
-  };
-  mocks.create.mockResolvedValue({ session });
+    open: [],
+  });
   mocks.unavailable.mockResolvedValue(null);
   mocks.workspace.mockResolvedValue({
     content: [{ type: "text", text: "file" }],
@@ -127,16 +117,26 @@ beforeEach(() => {
   );
   mocks.host.mockResolvedValue({ output: "Linux", exitCode: 0 });
 });
+/** A tool as the harness calls it. */
+const call = (name: string, id: string, args: unknown) =>
+  tool(name).execute(
+    id,
+    args,
+    () => {},
+    undefined,
+    {},
+    {
+      abortSignal: undefined,
+    },
+  );
 function tool(name: string) {
-  return (mocks.create.mock.calls[0][0].customTools as RegisteredTool[]).find(
+  return (mocks.create.mock.calls[0][0].tools as RegisteredTool[]).find(
     (item) => item.name === name,
   )!;
 }
 it("executes host and workspace mutations through the permission boundary in the main native session", async () => {
-  expect(await askPi(input)).toMatchObject({
-    message: "Checked.",
-  });
-  await tool("server_bash").execute("call", { command: "uname -s" });
+  const { close } = await openPiSession(scope);
+  await call("server_bash", "call", { command: "uname -s" });
   expect(mocks.host).toHaveBeenCalledWith(
     { address: "test-host" },
     "uname -s",
@@ -144,25 +144,36 @@ it("executes host and workspace mutations through the permission boundary in the
     expect.any(Function),
     undefined,
   );
-  await tool("write").execute("write", { path: "file", content: "hello" });
+  await call("write", "write", { path: "file", content: "hello" });
   expect(mocks.execute.mock.calls.map((call) => call[0])).toEqual([
     "server_bash",
     "write",
   ]);
-  const names = mocks.create.mock.calls[0][0].tools;
-  expect(names).not.toContain("prepare_deployment");
-  expect(names).not.toContain("prepare_release");
-  expect(session.prompt).toHaveBeenCalledWith(
-    input.userMessage,
-    expect.anything(),
-  );
-  expect(session.waitForIdle).toHaveBeenCalled();
+  const composed = mocks.create.mock.calls[0][0];
+  // Pi's own runtime is what the harness authenticates and compacts with, and
+  // mutating calls are never concurrent.
+  expect(composed.models).toEqual({ runtime: true });
+  expect(composed).toMatchObject({
+    toolExecution: "sequential",
+    followUpMode: "one-at-a-time",
+    steeringMode: "one-at-a-time",
+  });
+  // Pi's own argument shim for its edit tool passes through.
+  expect(typeof tool("edit")).toBe("object");
+  expect(
+    (tool("edit") as unknown as { prepareArguments?: unknown })
+      .prepareArguments,
+  ).toBeTypeOf("function");
+  // Opening starts nothing, and the history is held until Pi has closed.
+  expect(mocks.release).not.toHaveBeenCalled();
+  await close();
+  expect(harness.close).toHaveBeenCalledOnce();
   expect(mocks.release).toHaveBeenCalledOnce();
 });
 it("side chats have no shell, approval or mutation tools", async () => {
   mocks.main.mockReturnValue(false);
-  await askPi(input);
-  expect(mocks.create.mock.calls[0][0].tools).toEqual([
+  await openPiSession(scope);
+  expect(mocks.create.mock.calls[0][0].activeToolNames).toEqual([
     "read",
     "grep",
     "find",
@@ -170,15 +181,15 @@ it("side chats have no shell, approval or mutation tools", async () => {
     "search_information",
     "get_application_status",
   ]);
-  await tool("read").execute("read", { path: "README.md" });
+  await call("read", "read", { path: "README.md" });
   expect(mocks.workspace).toHaveBeenCalled();
   expect(mocks.execute).not.toHaveBeenCalled();
 });
 it("withdraws every workspace tool with its reason when the chosen Docker isolation is unavailable", async () => {
   const reason = "Docker isolation is selected, and Docker cannot be used.";
   mocks.unavailable.mockResolvedValue(reason);
-  await askPi(input);
-  const names = mocks.create.mock.calls[0][0].tools as string[];
+  await openPiSession(scope);
+  const names = mocks.create.mock.calls[0][0].activeToolNames as string[];
   for (const name of ["read", "write", "edit", "bash", "grep", "find", "ls"])
     expect(names).not.toContain(name);
   expect(names).toContain("server_bash");
@@ -187,16 +198,15 @@ it("withdraws every workspace tool with its reason when the chosen Docker isolat
 });
 it("a declined file mutation never reaches the workspace", async () => {
   mocks.execute.mockResolvedValue({ declined: true });
-  await askPi(input);
+  await openPiSession(scope);
   expect(
-    await tool("write").execute("call", { path: "file", content: "hello" }),
+    await call("write", "call", { path: "file", content: "hello" }),
   ).toMatchObject({ content: [{ text: '{"declined":true}' }] });
   expect(mocks.workspace).not.toHaveBeenCalled();
 });
-it("does not treat an incomplete model turn as success and releases the session", async () => {
-  session.prompt.mockResolvedValue(undefined);
-  await expect(askPi(input)).rejects.toThrow("could not reach");
-  expect(session.dispose).toHaveBeenCalledOnce();
+it("releases the history when the session cannot be opened, without leaking why", async () => {
+  mocks.create.mockRejectedValue(new Error("Secret bearer token"));
+  await expect(openPiSession(scope)).rejects.toThrow("could not reach");
   expect(mocks.release).toHaveBeenCalledOnce();
   expect(describePiFailure(new Error("Secret bearer token"))).not.toContain(
     "token",
@@ -207,14 +217,14 @@ it("provider and connection tools use the same permission boundary, including de
   mocks.provider.mockResolvedValue({ server: { id: 123 } });
   mocks.publicKey.mockResolvedValue({ publicKey: "ssh-ed25519 public" });
   mocks.connect.mockResolvedValue({ sshVerified: true });
-  await askPi(input);
-  await tool("hetzner_request").execute("api", {
+  await openPiSession(scope);
+  await call("hetzner_request", "api", {
     method: "POST",
     path: "/servers",
     body: { name: "example", ssh_keys: [1] },
   });
-  await tool("server_public_key").execute("key", {});
-  await tool("connect_server").execute("connect", { serverId: 123 });
+  await call("server_public_key", "key", {});
+  await call("connect_server", "connect", { serverId: 123 });
   expect(mocks.execute.mock.calls.map((call) => call[0])).toEqual([
     "hetzner_request",
     "server_public_key",
@@ -224,12 +234,12 @@ it("provider and connection tools use the same permission boundary, including de
   expect(mocks.publicKey).toHaveBeenCalledOnce();
   expect(mocks.connect).toHaveBeenCalledOnce();
   mocks.execute.mockResolvedValue({ declined: true });
-  await tool("hetzner_request").execute("api", {
+  await call("hetzner_request", "api", {
     method: "POST",
     path: "/servers",
     body: {},
   });
-  await tool("connect_server").execute("connect", { serverId: 456 });
+  await call("connect_server", "connect", { serverId: 456 });
   expect(mocks.provider).toHaveBeenCalledOnce();
   expect(mocks.connect).toHaveBeenCalledOnce();
 });
@@ -239,8 +249,8 @@ it("opens private access through the permission boundary and honors decline", as
     url: "http://127.0.0.1:8080",
     httpStatus: 200,
   });
-  await askPi(input);
-  await tool("open_server_port").execute("tunnel", { remotePort: 80 });
+  await openPiSession(scope);
+  await call("open_server_port", "tunnel", { remotePort: 80 });
   expect(mocks.execute.mock.calls[0][0]).toBe("open_server_port");
   expect(mocks.tunnel).toHaveBeenCalledWith(
     "app-a",
@@ -248,6 +258,6 @@ it("opens private access through the permission boundary and honors decline", as
     undefined,
   );
   mocks.execute.mockResolvedValue({ declined: true });
-  await tool("open_server_port").execute("tunnel", { remotePort: 80 });
+  await call("open_server_port", "tunnel", { remotePort: 80 });
   expect(mocks.tunnel).toHaveBeenCalledOnce();
 });

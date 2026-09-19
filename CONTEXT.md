@@ -40,7 +40,11 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Operation receipt**: The interactive presentation of an operation's origin, progress, required decision, evidence and outcome, drawn by `operation-receipt.tsx`. A receipt is not a second copy of execution state.
 
-**Pi Run** (*projection*, `pi-runs.ts`): One durable attempt to answer an accepted conversation message using the embedded Pi runtime. It is read off the message row; there is no runs table. Retry creates a linked attempt; a successful reply does not prove an external effect.
+**Reply** (`pi-transcript.ts`): What Pi said and did between two of the owner's messages, as one item in the conversation. It is projected from Pi's history on every read and stored nowhere else; it is named after the message it answers. Evidence is placed under it by the id Pi gave each tool call. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
+
+**Waiting message**: A message Pi has durably taken and not read yet: an entry in Pi's queue, under the id its sender gave it. Pi orders it, reads it, or drops it on Stop. After a worker goes away it keeps waiting until the owner continues or stops the conversation.
+
+**Session owner** (`pi-owner.ts`, `worker-link.ts`): The worker, as the only process that opens a Pi session: the one holding the owner's lock, which the operating system releases when it ends. The app asks it over `worker.sock` to read, send, continue, stop or forget; a send is answered once Pi has durably taken the message. **Interrupted** means Pi holds an open operation or a queue that this worker is not running: nothing runs until the owner chooses Continue or Stop.
 
 ## Execution and evidence
 

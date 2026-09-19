@@ -15,12 +15,20 @@ export const test = base.extend<
     isolatedApp: boolean;
     /** Start with ChatGPT not yet connected, the way a first run is. */
     freshSetup: boolean;
+    /**
+     * The journey stands in for the worker (see scripted-worker.ts), so its app
+     * is shared only with journeys that do the same: none of them needs the
+     * real worker the first one stopped.
+     */
+    scriptedWorker: boolean;
   }
 >({
   isolatedApp: [false, { scope: "worker", option: true }],
   freshSetup: [false, { scope: "worker", option: true }],
+  scriptedWorker: [false, { scope: "worker", option: true }],
   fixture: [
-    async ({ freshSetup }, provide, workerInfo) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async ({ freshSetup, scriptedWorker }, provide, workerInfo) => {
       // 3180 by default. Another checkout of this repository may already be
       // running its own fixtures there, so a run can be moved out of the way
       // with HALLVI_E2E_PORT rather than waiting for the port back.

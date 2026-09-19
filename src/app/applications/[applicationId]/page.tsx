@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { OperatorShell } from "@/components/hallvi/operator-shell";
 import { NotFoundError } from "@/server/applications";
-import { listApplications, getMessage } from "@/server/db";
+import { listApplications } from "@/server/db";
 import { getOperatorView } from "@/server/operator-view";
 import { getPiSetupStatus } from "@/server/pi-setup";
 
@@ -18,19 +18,15 @@ export default async function ApplicationPage({
     message?: string | string[];
   }>;
 }) {
-  const [{ applicationId }, { chat, message }] = await Promise.all([
+  const [{ applicationId }, { chat }] = await Promise.all([
     params,
     searchParams,
   ]);
   let view;
   try {
-    view = getOperatorView(
+    view = await getOperatorView(
       applicationId,
-      typeof chat === "string"
-        ? chat
-        : typeof message === "string"
-          ? getMessage(message)?.chatId
-          : undefined,
+      typeof chat === "string" ? chat : undefined,
     );
   } catch (error) {
     if (error instanceof NotFoundError) notFound();

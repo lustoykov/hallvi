@@ -18,11 +18,13 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { connect } from "node:net";
 import { homedir, hostname, userInfo } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedPorts, installedPorts } from "./installed-ports.mjs";
+import { workerSocketPath } from "./worker-socket.mjs";
 import {
   piAccountLocation,
   stateFiles,
@@ -224,20 +226,18 @@ async function answers(url) {
   return false;
 }
 
-/** The worker's own beat, read the way the interface reads it. */
+/** The worker answers on its socket beside the database, or it is not there. */
 function workerAlive() {
-  try {
-    const beat = JSON.parse(
-      readFileSync(
-        `${process.env.HALLVI_DB_PATH ?? state.database}.worker-status`,
-        "utf8",
+  return new Promise((done) => {
+    const probe = connect(
+      join(
+        dirname(process.env.HALLVI_DB_PATH ?? state.database),
+        "worker.sock",
       ),
     );
-    process.kill(beat.pid, 0);
-    return Date.now() - Date.parse(beat.heartbeatAt) < 20_000;
-  } catch {
-    return false;
-  }
+    probe.once("connect", () => done(true) ?? probe.destroy());
+    probe.once("error", () => done(false));
+  });
 }
 
 async function status() {
@@ -255,7 +255,7 @@ async function status() {
   }
   const up = await answers(`${url}/applications`);
   // The worker writes its first beat a moment after the interface answers.
-  for (let wait = 0; up && !workerAlive() && wait < 20; wait++)
+  for (let wait = 0; up && !(await workerAlive()) && wait < 20; wait++)
     await new Promise((done) => setTimeout(done, 500));
   console.log(
     mac
@@ -265,7 +265,9 @@ async function status() {
   console.log(
     `  interface  ${up ? url : "not answering, or answering with errors"}`,
   );
-  console.log(`  Pi worker  ${workerAlive() ? "running" : "not running yet"}`);
+  console.log(
+    `  Pi worker  ${(await workerAlive()) ? "running" : "not running yet"}`,
+  );
   console.log(`  state      ${data}`);
   console.log(`  logs       hallvi logs`);
   if (!up) console.log("Look at `hallvi logs` for the reason.");
@@ -273,7 +275,7 @@ async function status() {
     console.log("Open the interface address in a browser on this machine.");
     console.log("From a laptop, run: hallvi remote user@server-address");
   }
-  return up && workerAlive() ? 0 : 1;
+  return up && (await workerAlive()) ? 0 : 1;
 }
 
 function logs() {

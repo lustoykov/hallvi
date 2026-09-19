@@ -26,9 +26,7 @@ import {
   listInformation,
   saveInformation,
   retireInformation,
-  attachMessageBlock,
 } from "./saved-information";
-import { getPiRun } from "./pi-runs";
 import { Type } from "typebox";
 import { PiWorkspace, piWorkspaceTools } from "./pi-workspace";
 import { applicationWorkspaceSource } from "./pi-workspace-source";
@@ -40,11 +38,9 @@ import {
   listExecutions,
 } from "./operator-execution";
 import { loadApplication, repositoryAccess } from "./applications";
-import { dirname } from "node:path";
 
 import { configuredPiRuntime } from "./pi-configuration";
 import { openNativeChatSession } from "./pi-sessions";
-import type { PiRun, PiTurnResult } from "./types";
 import {
   diagnosticFailure,
   toolStepKind,
@@ -169,65 +165,104 @@ export type PiToolEvent =
   /** What Pi said at this point, between its calls. */
   | { type: "message"; sequence: number; text: string };
 
-export interface PiExecutionOptions {
-  signal?: AbortSignal;
+export interface PiSessionEvents {
   onText?: (text: string) => void;
   /** Every tool call, in order, with what went in and what came back. */
   onTool?: (event: PiToolEvent) => void;
-  onModelCall?: () => void;
   onActivity?: (event: ExecutionSignal) => void;
 }
 
-export async function askPi(
-  input: {
-    run: PiRun;
-    userMessage: string;
-    runContext: string;
-  },
-  options: PiExecutionOptions = {},
-): Promise<PiTurnResult> {
+/** One conversation's tools. Their evidence is kept under Pi's call ids. */
+export interface PiSessionScope {
+  applicationId: string;
+  chatId: string;
+}
+
+type PiHarness = import("@earendil-works/pi-agent-core").AgentHarness;
+
+/** A tool as Hallvi and Pi's coding agent define one. */
+interface DefinedTool {
+  name: string;
+  label: string;
+  description: string;
+  parameters: import("typebox").TSchema;
+  prepareArguments?: (args: unknown) => never;
+  constrainedSampling?: unknown;
+  execute(
+    id: string,
+    params: never,
+    signal?: AbortSignal,
+    onUpdate?: (partial: never) => void,
+  ): Promise<unknown>;
+}
+
+/**
+ * The same definition under the harness's call shape. The schema, argument
+ * preparation and sampling constraint are Pi's fields and pass through; only
+ * the order of `execute`'s arguments differs, and cancellation arrives on the
+ * context instead of as a bare signal.
+ */
+function forHarness(tool: DefinedTool) {
+  return {
+    name: tool.name,
+    label: tool.label,
+    description: tool.description,
+    parameters: tool.parameters,
+    prepareArguments: tool.prepareArguments,
+    constrainedSampling: tool.constrainedSampling,
+    execute: (
+      id: string,
+      params: unknown,
+      onUpdate: (partial: never) => void,
+      _toolContext: unknown,
+      _invocation: unknown,
+      context: { abortSignal: AbortSignal | undefined },
+    ) => tool.execute(id, params as never, context.abortSignal, onUpdate),
+  } as import("@earendil-works/pi-agent-core").AgentHarnessTool<undefined>;
+}
+
+/**
+ * Open this conversation's native session with its tools. Pi owns everything
+ * that happens in it; `close` waits for Pi to settle and releases the history.
+ */
+export async function openPiSession(
+  scope: PiSessionScope,
+  options: { signal?: AbortSignal } = {},
+) {
   options.signal?.throwIfAborted();
-  options.onActivity?.({ type: "start", key: "session", kind: "session" });
   const sdk = await import("@earendil-works/pi-coding-agent");
-  const {
-    createAgentSession,
-    defineTool,
-    DefaultResourceLoader,
-    SettingsManager,
-  } = sdk;
+  const { AgentHarness, BACKGROUND_CONTEXT } =
+    await import("@earendil-works/pi-agent-core");
+  const { defineTool } = sdk;
   // Open and validate history before provider/auth work. A missing established
   // history is a recovery error, not permission to silently start a new Chat.
-  const native = await openNativeChatSession(
-    input.run.applicationId,
-    input.run.chatId,
-  );
-  let session:
-    Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined;
-  let unsubscribe: (() => void) | undefined;
-  let aborting: Promise<void> | undefined;
+  const native = await openNativeChatSession(scope.applicationId, scope.chatId);
+  let harness: PiHarness | undefined;
   const builtinWorkspace = new PiWorkspace({
-    applicationId: input.run.applicationId,
-    runId: input.run.id,
+    applicationId: scope.applicationId,
+    chatId: scope.chatId,
     signal: options.signal,
     source: () =>
-      applicationWorkspaceSource(input.run.applicationId, options.signal),
+      applicationWorkspaceSource(scope.applicationId, options.signal),
   });
-  const abort = () => {
-    if (!session) return;
-    session.abortCompaction();
-    // An earlier abort can settle during pre-prompt compaction, before the SDK
-    // starts its agent loop. Reapply cancellation to each newly started phase.
-    aborting = session.abort();
-    void aborting.catch(() => undefined);
+  const close = async () => {
+    try {
+      await harness?.close(BACKGROUND_CONTEXT);
+    } finally {
+      try {
+        await builtinWorkspace.dispose();
+      } finally {
+        await native.release();
+      }
+    }
   };
-  options.signal?.addEventListener("abort", abort, { once: true });
   try {
     options.signal?.throwIfAborted();
     const { configuration, modelRuntime, model } =
       await configuredPiRuntime(sdk);
     options.signal?.throwIfAborted();
-    const main = isMainChat(input.run.applicationId, input.run.chatId);
-    const execution = executionContext(input.run, options.signal);
+    const main = isMainChat(scope.applicationId, scope.chatId);
+    const execution = executionContext(scope, options.signal);
     const json = (value: unknown) => ({
       content: [{ type: "text" as const, text: JSON.stringify(value) }],
       details: {},
@@ -245,7 +280,7 @@ export async function askPi(
         async execute(_id, params) {
           return json(
             listInformation(
-              input.run.applicationId,
+              scope.applicationId,
               params.query,
               params.includeRetired,
             ),
@@ -259,7 +294,7 @@ export async function askPi(
               label: "Save application information",
               executionMode: "sequential",
               description:
-                "Save/update a record, or retire one by ID. record: {title, body, evidence:[{type:'message'|'execution',id} or {type:'url',url}], establishedAt:ISO timestamp|null, presentation:null or {about?:[{kind,id}],states?:{ref:{kind,id},presence:'present'|'absent'},views:string[],role:'recommendation'|'status'|'outcome',status:'info'|'verified'|'failed'|'warning',checks:[{key,label,status:'passed'|'failed'|'info',claim,basis,about?:{kind,id},detail?,freshFor?}],facts:[{key,label,value,claim,basis,mono?,freshFor?}],nextStep?:string,url?:http URL,content?:{kind:'deployment',repositoryUrl,revision,server,changes:string[],image?,services?:[{process,image,digest?}]}|{kind:'application-access',mode:'private'|'public',server,localPort?:number,remotePort?:number}|{kind:'topology',from:'observed'|'plan',parts:[{id,kind,name,role,plain,owner?}],edges:[{from,to,network,label?}]}|{kind:'access-log',proxy,format:'caddy-json',source:{type:'container',name}|{type:'file',path}}}}. Private access requires a 127.0.0.1 URL matching localPort and a remotePort. Omit presentation for knowledge kept for future work. showInChat renders a surfaced record in this response. Never store secrets.",
+                "Save/update a record, or retire one by ID. record: {title, body, evidence:[{type:'execution',id} or {type:'url',url}], establishedAt:ISO timestamp|null, presentation:null or {about?:[{kind,id}],states?:{ref:{kind,id},presence:'present'|'absent'},views:string[],role:'recommendation'|'status'|'outcome',status:'info'|'verified'|'failed'|'warning',checks:[{key,label,status:'passed'|'failed'|'info',claim,basis,about?:{kind,id},detail?,freshFor?}],facts:[{key,label,value,claim,basis,mono?,freshFor?}],nextStep?:string,url?:http URL,content?:{kind:'deployment',repositoryUrl,revision,server,changes:string[],image?,services?:[{process,image,digest?}]}|{kind:'application-access',mode:'private'|'public',server,localPort?:number,remotePort?:number}|{kind:'topology',from:'observed'|'plan',parts:[{id,kind,name,role,plain,owner?}],edges:[{from,to,network,label?}]}|{kind:'access-log',proxy,format:'caddy-json',source:{type:'container',name}|{type:'file',path}}}}. Private access requires a 127.0.0.1 URL matching localPort and a remotePort. Omit presentation for knowledge kept for future work. showInChat renders a surfaced record in this response. Never store secrets.",
               parameters: Type.Object({
                 action: Type.Union([
                   Type.Literal("save"),
@@ -270,24 +305,17 @@ export async function askPi(
                 showInChat: Type.Optional(Type.Boolean()),
               }),
               async execute(_id, params) {
-                if (getPiRun(input.run.id)?.status !== "running")
-                  throw new Error("This turn is no longer running.");
                 if (params.action === "retire") {
                   if (!params.id) throw new Error("A record ID is required.");
                   return json(
-                    retireInformation(input.run.applicationId, params.id),
+                    retireInformation(scope.applicationId, params.id),
                   );
                 }
                 const record = saveInformation(
-                  input.run.applicationId,
+                  scope.applicationId,
                   params.record,
                   params.id,
                 );
-                if (params.showInChat && record.presentation)
-                  attachMessageBlock(input.run.applicationId, input.run.id, {
-                    type: "saved-information",
-                    id: record.id,
-                  });
                 return json(record);
               },
             }),
@@ -300,8 +328,8 @@ export async function askPi(
           "Read application identity, host address, permission mode and recent execution evidence. Does not check live health.",
         parameters: Type.Object({}, { additionalProperties: false }),
         async execute() {
-          const settings = operatorSettings(input.run.applicationId);
-          const application = loadApplication(input.run.applicationId);
+          const settings = operatorSettings(scope.applicationId);
+          const application = loadApplication(scope.applicationId);
           const access = repositoryAccess(application);
           return json({
             application: {
@@ -330,7 +358,7 @@ export async function askPi(
                   serverId: settings.host.serverId,
                 }
               : null,
-            executions: listExecutions(input.run.applicationId).slice(-20),
+            executions: listExecutions(scope.applicationId).slice(-20),
           });
         },
       }),
@@ -357,12 +385,13 @@ export async function askPi(
                   params,
                   () =>
                     openServerPort(
-                      input.run.applicationId,
+                      scope.applicationId,
                       params,
                       signal ?? options.signal,
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -399,6 +428,7 @@ export async function askPi(
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -418,11 +448,12 @@ export async function askPi(
                   {},
                   () =>
                     serverPublicKey(
-                      input.run.applicationId,
+                      scope.applicationId,
                       signal ?? options.signal,
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -448,12 +479,13 @@ export async function askPi(
                   params,
                   () =>
                     connectServer(
-                      input.run.applicationId,
+                      scope.applicationId,
                       params,
                       signal ?? options.signal,
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -480,7 +512,7 @@ export async function askPi(
               // not data. Refuse it here, before the record is written, with
               // a message saying what to do instead.
               refuseSecretHandles(params.command);
-              const host = operatorSettings(input.run.applicationId).host;
+              const host = operatorSettings(scope.applicationId).host;
               if (!host)
                 throw new Error(
                   "No server is connected. Inspect the repository, prepare a suitable Hetzner server or obtain existing-machine access, then use connect_server and continue with the deployment.",
@@ -498,7 +530,7 @@ export async function askPi(
                       // command Pi wrote and the names it asked for, so what
                       // is stored, shown and logged holds no value.
                       secretEnvironment(
-                        input.run.applicationId,
+                        scope.applicationId,
                         params.secrets ?? [],
                       ) + params.command,
                       signal ?? options.signal,
@@ -507,6 +539,7 @@ export async function askPi(
                     ),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -526,13 +559,13 @@ export async function askPi(
               ]),
             }),
             async execute(_id, params) {
-              const host = operatorSettings(input.run.applicationId).host;
+              const host = operatorSettings(scope.applicationId).host;
               if (host)
                 return json({
                   attached: true,
                   note: `A host is already attached at ${host.address}. Nothing was asked.`,
                 });
-              requestHost(input.run.applicationId, params);
+              requestHost(scope.applicationId, params);
               return json({
                 attached: false,
                 hetznerConnected: Boolean(hetznerConnectionId()),
@@ -550,7 +583,7 @@ export async function askPi(
             parameters: Type.Object({ name: Type.String() }),
             async execute(_id, params) {
               requestDomain(
-                input.run.applicationId,
+                scope.applicationId,
                 params.name.trim().toLowerCase().slice(0, 253),
               );
               return json({
@@ -571,7 +604,7 @@ export async function askPi(
               process: Type.Optional(Type.String()),
             }),
             async execute(_id, params) {
-              const asked = requestSecret(input.run.applicationId, params);
+              const asked = requestSecret(scope.applicationId, params);
               return json({
                 ...asked,
                 waiting: asked.established
@@ -592,7 +625,7 @@ export async function askPi(
               process: Type.Optional(Type.String()),
             }),
             async execute(_id, params) {
-              const made = generateSecret(input.run.applicationId, params);
+              const made = generateSecret(scope.applicationId, params);
               return json({
                 ...made,
                 note: made.reused
@@ -617,7 +650,7 @@ export async function askPi(
             // alongside the first one.
             parameters: Type.Object({ name: Type.String() }),
             async execute(_id, params) {
-              const started = beginChange(input.run.applicationId, params.name);
+              const started = beginChange(scope.applicationId, params.name);
               return json({
                 name: started.name,
                 changing: true,
@@ -643,7 +676,7 @@ export async function askPi(
             }),
             async execute(_id, params) {
               const settled = settleChange(
-                input.run.applicationId,
+                scope.applicationId,
                 params.name,
                 params.outcome,
                 params.why,
@@ -670,9 +703,7 @@ export async function askPi(
               covers: Type.String(),
             }),
             async execute(_id, params) {
-              return json(
-                await fetchBackupCopy(input.run.applicationId, params),
-              );
+              return json(await fetchBackupCopy(scope.applicationId, params));
             },
           }),
           defineTool({
@@ -684,7 +715,7 @@ export async function askPi(
             parameters: Type.Object({}),
             async execute() {
               return json({
-                copies: listBackupCopies(input.run.applicationId),
+                copies: listBackupCopies(scope.applicationId),
               });
             },
           }),
@@ -696,9 +727,7 @@ export async function askPi(
               "Delete the oldest copies held on this computer beyond the number to keep, and report exactly which were removed. Retention is the part of a backup plan that quietly stops working, so it runs where the files are rather than as a line in a host crontab nobody reads. Keep at least one.",
             parameters: Type.Object({ keep: Type.Number() }),
             async execute(_id, params) {
-              return json(
-                pruneBackupCopies(input.run.applicationId, params.keep),
-              );
+              return json(pruneBackupCopies(scope.applicationId, params.keep));
             },
           }),
           defineTool({
@@ -709,7 +738,7 @@ export async function askPi(
               "The secrets this application has asked for: each name, why it was asked for, and whether the owner has supplied a value. Never values — nothing returns those.",
             parameters: Type.Object({}),
             async execute() {
-              return json({ secrets: listSecrets(input.run.applicationId) });
+              return json({ secrets: listSecrets(scope.applicationId) });
             },
           }),
           defineTool({
@@ -772,7 +801,7 @@ export async function askPi(
               ttl: Type.Optional(Type.Number({ minimum: 1, maximum: 86400 })),
               replace: Type.Optional(Type.Boolean()),
             }),
-            async execute(id, params) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "set_domain_record",
@@ -783,10 +812,11 @@ export async function askPi(
                       ? removeDomainRecord(params)
                       : writeDomainRecord({
                           ...params,
-                          owner: input.run.applicationId,
+                          owner: scope.applicationId,
                         }),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -815,6 +845,7 @@ export async function askPi(
                   () => checkPublicAccess(params, signal ?? options.signal),
                   false,
                   id,
+                  signal,
                 ),
               );
             },
@@ -826,7 +857,7 @@ export async function askPi(
             description:
               "In Pi decides mode, ask the user to approve the proposed action before proceeding. Describe the concrete action and its effects. Bypass returns immediately. Always ask already prompts at execution; do not request duplicate approval there.",
             parameters: Type.Object({ action: Type.String() }),
-            async execute(id, params) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "request_approval",
@@ -835,6 +866,7 @@ export async function askPi(
                   async () => ({ approved: true }),
                   true,
                   id,
+                  signal,
                 ),
               );
             },
@@ -869,224 +901,189 @@ export async function askPi(
                     ),
                   false,
                   id,
+                  signal,
                 );
                 return "declined" in result ? json(result) : result;
               },
             }
           : tool,
       );
-    const cwd = process.cwd();
-    const agentDir = dirname(native.sessionManager.getSessionFile()!);
-    const settingsManager = SettingsManager.inMemory();
-    const loader = new DefaultResourceLoader({
-      cwd,
-      agentDir,
-      settingsManager,
-      systemPromptOverride: () => SYSTEM_PROMPT,
-      appendSystemPromptOverride: () => [
-        builtinWorkspace.prompt(workspaceUnavailable),
-        main
-          ? "You are the main operator. You may execute work for this application."
-          : "You are a read-only side chat. Explain the application and its execution evidence. You cannot run commands or change files, records or the server. Tell the user to send operational work to the main conversation.",
-      ],
-      skillsOverride: () => ({ skills: [], diagnostics: [] }),
-      agentsFilesOverride: () => ({ agentsFiles: [] }),
-      promptsOverride: () => ({ prompts: [], diagnostics: [] }),
-      noContextFiles: true,
-      noExtensions: true,
-      noPromptTemplates: true,
-      noSkills: true,
-      noThemes: true,
-    });
-    await loader.reload();
     options.signal?.throwIfAborted();
-    ({ session } = await createAgentSession({
-      cwd,
-      agentDir,
-      model,
-      modelRuntime,
-      thinkingLevel: configuration.reasoningEffort,
-      settingsManager,
-      tools: [...workspaceTools, ...recordTools, ...operatorTools].map(
-        (tool) => tool.name,
-      ),
-      customTools: [...workspaceTools, ...recordTools, ...operatorTools],
-      resourceLoader: loader,
-      sessionManager: native.sessionManager,
-    }));
-    options.onActivity?.({ type: "end", key: "session" });
-    let response = "";
-    // Native overflow recovery can remove the current failed assistant from
-    // session.messages. Only this Run's completion events establish its result.
-    let outcome = { text: "", error: true };
-    let generation = 0;
-    let compaction = 0;
-    let retry = 0;
-    let toolSequence = 0;
-    const toolKeys = new Map<string, string>();
-    unsubscribe = session.subscribe((event) => {
-      if (event.type === "tool_execution_start") {
-        const key = `tool:${++toolSequence}`;
-        toolKeys.set(event.toolCallId, key);
-        options.onActivity?.({
-          type: "start",
-          key,
-          kind: toolStepKind(event.toolName),
-        });
-        options.onTool?.({
-          type: "start",
-          id: event.toolCallId,
-          sequence: toolSequence,
-          tool: event.toolName,
-          args: event.args,
-        });
-      }
-      if (event.type === "tool_execution_update")
-        options.onTool?.({
-          type: "update",
-          id: event.toolCallId,
-          partial: event.partialResult,
-        });
-      if (event.type === "tool_execution_end") {
-        const key = toolKeys.get(event.toolCallId);
-        if (key)
-          options.onActivity?.({ type: "end", key, failed: event.isError });
-        toolKeys.delete(event.toolCallId);
-        options.onTool?.({
-          type: "end",
-          id: event.toolCallId,
-          result: event.result,
-          isError: event.isError,
-        });
-      }
-      if (event.type === "compaction_start")
-        options.onActivity?.({
-          type: "start",
-          key: `compaction:${++compaction}`,
-          kind: "compaction",
-        });
-      if (event.type === "compaction_end")
-        options.onActivity?.({
-          type: "end",
-          key: `compaction:${compaction}`,
-          failed: event.aborted || !!event.errorMessage,
-        });
-      if (event.type === "auto_retry_start") {
-        const key = `retry:${++retry}`;
-        options.onActivity?.({ type: "start", key, kind: "retry" });
-        options.onActivity?.({
-          type: "end",
-          key,
-          metadata: { attempt: event.attempt },
-        });
-      }
-      if (event.type === "turn_start" || event.type === "compaction_start") {
-        options.onModelCall?.();
-        // compaction_start precedes creation of the SDK's abort controller.
-        // Recheck after it exists, also covering a later normal turn after an
-        // aborted pre-prompt compaction. The prompt still must fully settle.
-        queueMicrotask(() => {
-          if (options.signal?.aborted) abort();
-        });
-      }
-      if (
-        event.type === "message_start" &&
-        event.message.role === "assistant"
-      ) {
-        response = "";
-        options.onActivity?.({
-          type: "start",
-          key: `model:${++generation}`,
-          kind: "model",
-        });
-        outcome = { text: "", error: true };
-      }
-      if (event.type === "message_end" && event.message.role === "assistant") {
-        options.onActivity?.({
-          type: "end",
-          key: `model:${generation}`,
-          failed:
-            event.message.stopReason === "error" ||
-            event.message.stopReason === "aborted",
-          metadata: {
-            model: event.message.model,
-            provider: event.message.provider,
-            inputTokens: event.message.usage?.input,
-            outputTokens: event.message.usage?.output,
-            cacheReadTokens: event.message.usage?.cacheRead,
-            cacheWriteTokens: event.message.usage?.cacheWrite,
-          },
-        });
-        const said = event.message.content
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("");
-        if (said.trim())
-          options.onTool?.({
-            type: "message",
-            sequence: ++toolSequence,
-            text: said,
-          });
-        outcome = {
-          text: said,
-          error: event.message.stopReason !== "stop",
-        };
-      }
-      if (
-        event.type === "message_update" &&
-        event.assistantMessageEvent.type === "text_delta"
-      ) {
-        response += event.assistantMessageEvent.delta;
-        options.onText?.(response);
-      }
-    });
-    options.signal?.throwIfAborted();
-    await session.sendCustomMessage(
+    const tools = [...workspaceTools, ...recordTools, ...operatorTools];
+    const created = await AgentHarness.create(
       {
-        customType: "hallvi-run",
-        content: input.runContext,
-        display: false,
-        details: { runId: input.run.id },
+        session: native.session,
+        // Pi's own runtime: credentials, refresh and model access stay its.
+        models: modelRuntime,
+        model,
+        thinkingLevel: configuration.reasoningEffort,
+        systemPrompt: [
+          SYSTEM_PROMPT,
+          builtinWorkspace.prompt(workspaceUnavailable),
+          main
+            ? "You are the main operator. You may execute work for this application."
+            : "You are a read-only side chat. Explain the application and its execution evidence. You cannot run commands or change files, records or the server. Tell the user to send operational work to the main conversation.",
+        ].join("\n\n"),
+        tools: tools.map((tool) => forHarness(tool as DefinedTool)),
+        activeToolNames: tools.map((tool) => tool.name),
+        // The harness has one setting for a whole turn's tool calls and does
+        // not read a tool's own executionMode. Every call that changes a
+        // server, a file or a record was sequential; one at a time for all of
+        // them keeps that, at the cost of reads no longer overlapping.
+        toolExecution: "sequential",
+        // One message per turn, as the conversation shows them.
+        steeringMode: "one-at-a-time",
+        followUpMode: "one-at-a-time",
       },
-      { triggerTurn: false },
+      BACKGROUND_CONTEXT,
     );
-    options.signal?.throwIfAborted();
-    await session.prompt(input.userMessage, {
-      expandPromptTemplates: false,
-      source: "rpc",
-    });
-    await session.waitForIdle();
-    options.signal?.throwIfAborted();
-    if (outcome.error)
-      throw new Error("The model did not finish the response.");
-    return {
-      message: normalizePiAssistantMessage(outcome.text),
-    };
+    harness = created.harness;
+    const lane = await harness.lane("main", BACKGROUND_CONTEXT);
+    // Hallvi's setup chooses the model, not what an earlier history recorded.
+    // Pi writes each change to the history, so only a change is set: opening
+    // a conversation to read it writes nothing.
+    const current = await lane.getModel(BACKGROUND_CONTEXT);
+    if (current?.provider !== model.provider || current.id !== model.id)
+      await lane.setModel(
+        { provider: model.provider, modelId: model.id },
+        BACKGROUND_CONTEXT,
+      );
+    if (
+      (await lane.getThinkingLevel(BACKGROUND_CONTEXT)) !==
+      configuration.reasoningEffort
+    )
+      await lane.setThinkingLevel(
+        configuration.reasoningEffort,
+        BACKGROUND_CONTEXT,
+      );
+    const names = tools.map((tool) => tool.name);
+    if ((await lane.getActiveTools(BACKGROUND_CONTEXT)).join() !== names.join())
+      await lane.setActiveTools(names, BACKGROUND_CONTEXT);
+    return { harness, lane, close };
   } catch (error) {
+    await close();
     if (options.signal?.aborted) throw error;
     throw new PiUnavailableError(
       describePiFailure(error),
       diagnosticFailure(error),
     );
-  } finally {
-    if (options.signal?.aborted) abort();
-    // Never release the native-file lock on a timer. The worker terminates if
-    // the SDK cannot settle within its bounded drain deadline.
-    try {
-      try {
-        if (aborting) await aborting;
-      } finally {
-        await session?.waitForIdle();
-      }
-    } finally {
-      options.signal?.removeEventListener("abort", abort);
-      unsubscribe?.();
-      session?.dispose();
-      try {
-        await builtinWorkspace.dispose();
-      } finally {
-        native.release();
-      }
-    }
   }
+}
+
+/** Pi's events as Hallvi records them. `reply()` restarts per-reply keys. */
+export function watchPiSession(harness: PiHarness, options: PiSessionEvents) {
+  let response = "";
+  let generation = 0;
+  let compaction = 0;
+  let retry = 0;
+  let toolSequence = 0;
+  const toolKeys = new Map<string, string>();
+  const off = [
+    harness.events.on("tool_start", (event) => {
+      const key = `tool:${++toolSequence}`;
+      toolKeys.set(event.toolCallId, key);
+      options.onActivity?.({
+        type: "start",
+        key,
+        kind: toolStepKind(event.toolName),
+      });
+      options.onTool?.({
+        type: "start",
+        id: event.toolCallId,
+        sequence: toolSequence,
+        tool: event.toolName,
+        args: event.args,
+      });
+    }),
+    harness.events.on("tool_update", (event) =>
+      options.onTool?.({
+        type: "update",
+        id: event.toolCallId,
+        partial: event.partialResult,
+      }),
+    ),
+    harness.events.on("tool_end", (event) => {
+      const key = toolKeys.get(event.toolCallId);
+      if (key)
+        options.onActivity?.({ type: "end", key, failed: event.isError });
+      toolKeys.delete(event.toolCallId);
+      options.onTool?.({
+        type: "end",
+        id: event.toolCallId,
+        result: event.result,
+        isError: event.isError,
+      });
+    }),
+    harness.events.on("compaction_start", () =>
+      options.onActivity?.({
+        type: "start",
+        key: `compaction:${++compaction}`,
+        kind: "compaction",
+      }),
+    ),
+    harness.events.on("compaction_end", (event) =>
+      options.onActivity?.({
+        type: "end",
+        key: `compaction:${compaction}`,
+        failed: event.status === "failed" || event.status === "aborted",
+      }),
+    ),
+    harness.events.on("retry_start", (event) => {
+      const key = `retry:${++retry}`;
+      options.onActivity?.({ type: "start", key, kind: "retry" });
+      options.onActivity?.({
+        type: "end",
+        key,
+        metadata: { attempt: event.attempt },
+      });
+    }),
+    harness.events.on("message_start", (event) => {
+      if (event.message.role !== "assistant") return;
+      response = "";
+      options.onActivity?.({
+        type: "start",
+        key: `model:${++generation}`,
+        kind: "model",
+      });
+    }),
+    harness.events.on("message_update", (event) => {
+      if (event.event.type !== "text_delta") return;
+      response += event.event.delta;
+      options.onText?.(response);
+    }),
+    harness.events.on("message_end", ({ message }) => {
+      if (message.role !== "assistant") return;
+      options.onActivity?.({
+        type: "end",
+        key: `model:${generation}`,
+        failed:
+          message.stopReason === "error" || message.stopReason === "aborted",
+        metadata: {
+          model: message.model,
+          provider: message.provider,
+          inputTokens: message.usage?.input,
+          outputTokens: message.usage?.output,
+          cacheReadTokens: message.usage?.cacheRead,
+          cacheWriteTokens: message.usage?.cacheWrite,
+        },
+      });
+      const said = message.content
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("");
+      if (said.trim())
+        options.onTool?.({
+          type: "message",
+          sequence: ++toolSequence,
+          text: said,
+        });
+    }),
+  ];
+  return {
+    unsubscribe: () => off.forEach((stop) => stop()),
+    reply() {
+      response = "";
+      generation = compaction = retry = toolSequence = 0;
+    },
+  };
 }

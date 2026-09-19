@@ -273,7 +273,7 @@ it("starts one isolated container on first use and keeps a Run's sequential call
   }));
   const tools = piWorkspaceTools(
     sdk,
-    new PiWorkspace({ applicationId: "app-a", runId: "run-a", source }),
+    new PiWorkspace({ applicationId: "app-a", chatId: "run-a", source }),
   );
   const call = (name: string, id: string, args: object) =>
     tools.find((tool) => tool.name === name)!.execute(id, args);
@@ -392,7 +392,10 @@ it("cancels during shared runtime preparation without creating a late workspace"
     preparation = response;
   };
   const call = new AbortController();
-  const workspace = new PiWorkspace({ applicationId: "app-a", runId: "run-a" });
+  const workspace = new PiWorkspace({
+    applicationId: "app-a",
+    chatId: "run-a",
+  });
   const result = workspace.execute("ls", "first", {}, call.signal);
   const rejected = expect(result).rejects.toThrow();
   await vi.waitFor(() => expect(preparation).toBeDefined());
@@ -409,7 +412,7 @@ it("reports a missing Docker Engine as tool feedback and never runs the built-in
   const target = join(root, "controller.txt");
   const tools = piWorkspaceTools(
     sdk,
-    new PiWorkspace({ applicationId: "app-a", runId: "run-a" }),
+    new PiWorkspace({ applicationId: "app-a", chatId: "run-a" }),
   );
   for (const [name, args] of [
     ["write", { path: target, content: "from Pi" }],
@@ -446,7 +449,7 @@ it.each(interruptions)(
     engine.answer = interrupt(call);
     const workspace = new PiWorkspace({
       applicationId: "app-a",
-      runId: "run-a",
+      chatId: "run-a",
     });
     await expect(
       workspace.execute("bash", "long", { command: "sleep 600" }, call.signal),
@@ -467,7 +470,7 @@ it.each(interruptions)(
 it("streams split Docker frames and UTF-8 before the final result arrives", async () => {
   const workspace = new PiWorkspace({
     applicationId: "app-stream",
-    runId: "run-stream",
+    chatId: "run-stream",
   });
   const updates: unknown[] = [];
   let finish: () => void = () => {};

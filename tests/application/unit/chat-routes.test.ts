@@ -14,7 +14,7 @@ vi.mock("../../../src/server/applications", () => ({
 vi.mock("../../../src/server/operator-view", () => ({
   getOperatorView: () => ({ selectedChatId: "chat-id" }),
 }));
-vi.mock("../../../src/server/pi-runs", () => ({
+vi.mock("../../../src/server/pi-conversation", () => ({
   sendChatMessage: mocks.sendChatMessage,
 }));
 
@@ -109,6 +109,8 @@ describe("Chat request validation", () => {
       "chat-id",
       "Recovery matters.",
       "00000000-0000-4000-8000-000000000001",
+      // Left to the domain, which sends it after Pi's current work.
+      undefined,
     );
   });
 

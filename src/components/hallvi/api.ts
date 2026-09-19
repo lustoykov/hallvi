@@ -1,8 +1,4 @@
-import type {
-  AcceptedPiRun,
-  ChatRunSnapshot,
-  OperatorView,
-} from "@/server/types";
+import type { ChatMessage, ChatSnapshot, OperatorView } from "@/server/types";
 
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -41,7 +37,7 @@ function post(url: string, body: unknown) {
  */
 export const api = {
   runSnapshot(applicationId: string, chatId: string) {
-    return jsonRequest<ChatRunSnapshot>(
+    return jsonRequest<ChatSnapshot>(
       `/api/applications/${applicationId}/chats/${chatId}/messages`,
     );
   },
@@ -89,23 +85,27 @@ export const api = {
     chatId: string,
     message: string,
     requestKey: string,
+    delivery: "next" | "steer" = "next",
   ) {
-    return jsonRequest<AcceptedPiRun>(
+    return jsonRequest<ChatSnapshot>(
       `/api/applications/${applicationId}/chats/${chatId}/messages`,
       {
         method: "POST",
-        body: JSON.stringify({ message, requestKey }),
+        body: JSON.stringify({ message, requestKey, delivery }),
       },
     );
   },
-  runAction(
-    applicationId: string,
-    chatId: string,
-    runId: string,
-    action: "cancel" | "retry",
-  ) {
+  /** Pi carries on with what an interruption left unfinished. */
+  continueConversation(applicationId: string, chatId: string) {
     return jsonRequest(
-      `/api/applications/${applicationId}/chats/${chatId}/runs/${runId}/${action}`,
+      `/api/applications/${applicationId}/chats/${chatId}/continue`,
+      { method: "POST" },
+    );
+  },
+  /** Pi ends what it is doing here and drops what it had queued. */
+  stopConversation(applicationId: string, chatId: string) {
+    return jsonRequest(
+      `/api/applications/${applicationId}/chats/${chatId}/stop`,
       { method: "POST" },
     );
   },

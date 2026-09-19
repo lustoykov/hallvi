@@ -12,9 +12,8 @@ import type { ApplicationFacts } from "@/server/application-facts";
 import type { PiSetupStatus } from "@/server/pi-setup";
 import type {
   ApplicationRecord,
-  ChatRunSnapshot,
+  ChatSnapshot,
   OperatorView,
-  PiRun,
   ChatMessage,
 } from "@/server/types";
 
@@ -63,19 +62,9 @@ import {
   type ConversationContext,
 } from "./conversation-continuity";
 
-function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
-  const byId = new Map(current.map((message) => [message.id, message]));
-  const received = new Set(incoming.map((message) => message.id));
-  return [
-    ...incoming.map((message) => {
-      const previous = byId.get(message.id);
-      return previous && previous.revision > message.revision
-        ? previous
-        : message;
-    }),
-    ...current.filter((message) => !received.has(message.id)),
-  ];
-}
+/** Pi's transcript is the conversation: what arrives replaces what was. */
+const mergeMessages = (_current: ChatMessage[], incoming: ChatMessage[]) =>
+  incoming;
 
 /**
  * When each destination was last looked at, per browser. A confirmed change
@@ -261,7 +250,6 @@ export function OperatorShell({
     return () => window.clearTimeout(timer);
   }, [chatIds, initialView.application?.id]);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
-  const [runs, setRuns] = useState<PiRun[]>([]);
   const [terminal, setTerminal] = useState({
     open: false,
     expanded: false,
@@ -303,7 +291,7 @@ export function OperatorShell({
   // for as long as the tab stayed open.
   const working =
     view.messages.some(
-      (message) => message.status === "queued" || message.status === "running",
+      (message) => message.status === "waiting" || message.status === "running",
     ) ||
     (view.executions ?? []).some(
       (execution) =>
@@ -445,8 +433,7 @@ export function OperatorShell({
     stream.onerror = () => setReconnecting(true);
     stream.onmessage = (event) => {
       if (!active) return;
-      const snapshot = JSON.parse(event.data) as ChatRunSnapshot;
-      setRuns(snapshot.runs);
+      const snapshot = JSON.parse(event.data) as ChatSnapshot;
       setView((current) =>
         current.selectedChatId === selectedChatId
           ? {
@@ -463,7 +450,7 @@ export function OperatorShell({
       );
       const pending = readPendingSubmission(applicationId, selectedChatId);
       if (pending) {
-        if (snapshot.runs.some((run) => run.requestKey === pending.key)) {
+        if (snapshot.messages.some((sent) => sent.requestKey === pending.key)) {
           // SSE can confirm acceptance before the POST response arrives.
           // Retire the optimistic copy as soon as durable intent is visible.
           setPendingMessage(null);
@@ -493,9 +480,9 @@ export function OperatorShell({
           });
         }
       }
-      const nextVersion = snapshot.runs
-        .filter((run) => run.finishedAt)
-        .map((run) => `${run.id}:${run.revision}`)
+      const nextVersion = snapshot.messages
+        .filter((settled) => settled.finishedAt)
+        .map((settled) => `${settled.id}:${settled.revision}`)
         .join(";");
       if (nextVersion !== outcomeVersion) {
         outcomeVersion = nextVersion;
@@ -731,7 +718,7 @@ export function OperatorShell({
   }
 
   /** `told` is a message a card sends for the owner; the draft is kept. */
-  function sendMessage(told?: string) {
+  function sendMessage(told?: string, delivery: "next" | "steer" = "next") {
     const message = (told ?? composer).trim();
     if (!message) return;
     if (busy || !piReady || !application || !activeChat) {
@@ -771,7 +758,13 @@ export function OperatorShell({
           message,
           key,
         });
-        await api.sendMessage(application.id, activeChat.id, message, key);
+        await api.sendMessage(
+          application.id,
+          activeChat.id,
+          message,
+          key,
+          delivery,
+        );
         accepted = true;
         setPendingMessage(null);
         clearPendingSubmission(application.id, activeChat.id);
@@ -794,7 +787,7 @@ export function OperatorShell({
           .runSnapshot(application.id, activeChat.id)
           .catch(() => null);
         accepted ||= Boolean(
-          snapshot?.runs.some((run) => run.requestKey === key),
+          snapshot?.messages.some((sent) => sent.requestKey === key),
         );
         if (accepted) {
           clearPendingSubmission(application.id, activeChat.id);
@@ -837,10 +830,18 @@ export function OperatorShell({
     );
   }
 
-  function runAction(runId: string, action: "cancel" | "retry") {
+  function stopConversation() {
     if (!application || !activeChat) return;
-    void run(action, async () => {
-      await api.runAction(application.id, activeChat.id, runId, action);
+    void run("stop", async () => {
+      await api.stopConversation(application.id, activeChat.id);
+      return api.view(application.id, activeChat.id);
+    });
+  }
+
+  function continueConversation() {
+    if (!application || !activeChat) return;
+    void run("continue", async () => {
+      await api.continueConversation(application.id, activeChat.id);
       return api.view(application.id, activeChat.id);
     });
   }
@@ -1081,12 +1082,12 @@ export function OperatorShell({
                     ?.focus({ preventScroll: true }),
                 );
               }}
-              onSend={() => sendMessage()}
-              onTell={sendMessage}
-              runs={runs.filter((run) => run.chatId === activeChat?.id)}
+              onSend={(delivery) => sendMessage(undefined, delivery)}
+              onTell={(told) => sendMessage(told)}
               reconnecting={reconnecting}
               workerAlive={view.worker?.alive}
-              onRunAction={runAction}
+              onStop={stopConversation}
+              onContinue={continueConversation}
               onNewChat={createChat}
               onReveal={() => selectSection("history")}
               references={references}
@@ -1136,8 +1137,8 @@ export function OperatorShell({
             open={terminal.open}
             expanded={terminal.expanded}
             minimized={terminal.minimized}
-            piBusy={runs.some((item) =>
-              ["queued", "running"].includes(item.status),
+            piBusy={view.messages.some((item) =>
+              ["waiting", "running"].includes(item.status),
             )}
             onClose={() =>
               setTerminal({ open: false, expanded: false, minimized: false })

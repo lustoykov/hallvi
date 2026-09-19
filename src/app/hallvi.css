@@ -929,6 +929,27 @@
     background-color var(--fast) var(--ease),
     transform var(--fast) var(--ease);
 }
+/* Quiet beside Send next: the same action, at an earlier point. */
+.hv-steer {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hv-steer:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-2);
+}
+.hv-steer:disabled {
+  color: #7d889d;
+  cursor: not-allowed;
+}
 .hv-send svg {
   width: 14px;
   height: 14px;

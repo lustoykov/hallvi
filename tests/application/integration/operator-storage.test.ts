@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,20 +8,11 @@ import {
   removeApplication,
 } from "../../../src/server/applications";
 import { getOperatorView } from "../../../src/server/operator-view";
-import {
-  sendChatMessage,
-  claimNextPiRun,
-  persistPiDraft,
-  completePiRun,
-  cancelPiRun,
-  interruptRunningPiRuns,
-  chatRunSnapshot,
-} from "../../../src/server/pi-runs";
+import { ownSessions } from "../../../src/server/pi-owner";
 import {
   saveInformation,
   listInformation,
   retireInformation,
-  attachMessageBlock,
 } from "../../../src/server/saved-information";
 import {
   saveOperatorSettings,
@@ -63,110 +53,15 @@ afterAll(() => {
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
-it("loads creation, settings and the partial response after reopening the database", () => {
+it("loads creation and settings after reopening the database", () => {
   expect(store.getApplication(app)?.repositoryId).toBe(123);
   expect(store.getChat(chat)?.kind).toBe("main");
   expect(operatorSettings(app).permissionMode).toBe("pi-decides");
   saveOperatorSettings(app, { permissionMode: "always-ask", host: null });
-  const request = randomUUID();
-  const accepted = sendChatMessage(
-    app,
-    chat,
-    "Inspect this repository",
-    request,
-  );
-  expect(
-    sendChatMessage(app, chat, "Inspect this repository", request).run.id,
-  ).toBe(accepted.run.id);
-  const turn = claimNextPiRun()!;
-  expect(claimNextPiRun()).toBeNull();
-  persistPiDraft(turn.id, "I’m inspecting the source.");
   reopen();
   expect(operatorSettings(app).permissionMode).toBe("always-ask");
-  expect(store.getChat(chat)).toMatchObject({
-    status: "working",
-    currentResponseId: turn.id,
-  });
-  expect(chatRunSnapshot(app, chat).messages.at(-1)).toMatchObject({
-    body: "I’m inspecting the source.",
-    status: "running",
-  });
-  expect(completePiRun(turn.id, { message: "Inspection finished." })).toBe(
-    true,
-  );
-  reopen();
-  expect(store.getChat(chat)).toMatchObject({
-    status: "idle",
-    currentResponseId: null,
-  });
-  expect(store.getMessage(turn.id)?.status).toBe("completed");
 });
-it("queues explicit follow-ups FIFO without replaying interrupted work", () => {
-  const first = sendChatMessage(app, chat, "First task", randomUUID()).run;
-  const running = claimNextPiRun()!;
-  expect(running.id).toBe(first.id);
-
-  const secondKey = randomUUID();
-  const second = sendChatMessage(app, chat, "Second task", secondKey).run;
-  const third = sendChatMessage(app, chat, "Third task", randomUUID()).run;
-  expect(sendChatMessage(app, chat, "Second task", secondKey).run.id).toBe(
-    second.id,
-  );
-  expect(claimNextPiRun()).toBeNull();
-  expect(store.getChat(chat)?.currentResponseId).toBe(running.id);
-
-  interruptRunningPiRuns();
-  expect(store.getMessage(running.id)?.status).toBe("interrupted");
-  expect(store.getMessage(second.id)?.status).toBe("queued");
-  expect(store.getMessage(third.id)?.status).toBe("queued");
-
-  const resumed = claimNextPiRun()!;
-  expect(resumed.id).toBe(second.id);
-  expect(store.getChat(chat)?.currentResponseId).toBe(second.id);
-  expect(claimNextPiRun()).toBeNull();
-  completePiRun(resumed.id, { message: "Second finished." });
-  expect(claimNextPiRun()?.id).toBe(third.id);
-});
-
-it("stopping active work cancels queued follow-ups before they start", () => {
-  const active = sendChatMessage(app, chat, "Active task", randomUUID()).run;
-  claimNextPiRun();
-  const followUp = sendChatMessage(
-    app,
-    chat,
-    "Use that result next",
-    randomUUID(),
-  ).run;
-
-  cancelPiRun(app, chat, active.id);
-
-  expect(store.getMessage(active.id)?.status).toBe("cancelled");
-  expect(store.getMessage(followUp.id)).toMatchObject({
-    status: "cancelled",
-    error: "Not started because the active reply was stopped.",
-  });
-  expect(store.getChat(chat)).toMatchObject({
-    status: "idle",
-    currentResponseId: null,
-  });
-  expect(claimNextPiRun()).toBeNull();
-});
-it("cancels one queued follow-up without discarding later work", () => {
-  const first = sendChatMessage(app, chat, "First", randomUUID()).run;
-  const second = sendChatMessage(app, chat, "Second", randomUUID()).run;
-
-  cancelPiRun(app, chat, first.id);
-
-  expect(store.getMessage(first.id)?.status).toBe("cancelled");
-  expect(store.getMessage(second.id)?.status).toBe("queued");
-  expect(claimNextPiRun()?.id).toBe(second.id);
-  // A late duplicate request to stop the old row is inert.
-  cancelPiRun(app, chat, first.id);
-  expect(store.getMessage(second.id)?.status).toBe("running");
-});
-it("shares one outcome between chat and two views while keeping working knowledge unsurfaced", () => {
-  sendChatMessage(app, chat, "Inspect", randomUUID());
-  const turn = claimNextPiRun()!;
+it("shares one outcome between views while keeping working knowledge unsurfaced", async () => {
   const hidden = saveInformation(app, {
     title: "Build note",
     body: "Use the repository lockfile.",
@@ -174,7 +69,7 @@ it("shares one outcome between chat and two views while keeping working knowledg
   const record = saveInformation(app, {
     title: "Application verified",
     body: "HTTP check passed.",
-    evidence: [{ type: "message", id: turn.userMessageId }],
+    evidence: [{ type: "url", url: "https://example.com" }],
     establishedAt: "2026-09-12T12:00:00.000Z",
     presentation: {
       views: ["overview", "deployment"],
@@ -193,17 +88,9 @@ it("shares one outcome between chat and two views while keeping working knowledg
       ],
     },
   });
-  attachMessageBlock(app, turn.id, {
-    type: "saved-information",
-    id: record.id,
-  });
-  completePiRun(turn.id, { message: "Here is the result." });
   reopen();
-  const view = getOperatorView(app, chat);
+  const view = await getOperatorView(app, chat);
   expect(view.information?.map((r) => r.id)).toEqual([record.id]);
-  expect(view.messages.at(-1)?.blocks).toEqual([
-    { type: "saved-information", id: record.id },
-  ]);
   expect(listInformation(app, "lockfile").map((r) => r.id)).toEqual([
     hidden.id,
   ]);
@@ -211,28 +98,24 @@ it("shares one outcome between chat and two views while keeping working knowledg
   expect(listInformation(app, "npm ci")).toHaveLength(1);
   retireInformation(app, record.id);
   expect(listInformation(app).map((r) => r.id)).toEqual([hidden.id]);
-  expect(getOperatorView(app, chat).information?.[0].retiredAt).toBeTruthy();
+  expect(
+    (await getOperatorView(app, chat)).information?.[0].retiredAt,
+  ).toBeTruthy();
 });
-it("marks unfinished work interrupted on worker restart and cascades only application data on removal", () => {
-  sendChatMessage(app, chat, "Inspect", randomUUID());
-  const turn = claimNextPiRun()!;
-  persistPiDraft(turn.id, "Started");
-  reopen();
-  interruptRunningPiRuns();
-  expect(store.getChat(chat)?.status).toBe("interrupted");
-  expect(store.getMessage(turn.id)).toMatchObject({
-    status: "interrupted",
-    body: "Started",
-  });
-  expect(claimNextPiRun()).toBeNull();
+it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
   saveInformation(app, { title: "Note", body: "Saved" });
-  removeApplication(app, "example/app");
-  for (const table of [
-    "applications",
-    "conversations",
-    "messages",
-    "saved_information",
-  ])
+  // Without the owner nothing is removed: a history must not be orphaned.
+  await expect(removeApplication(app, "example/app")).rejects.toThrow(
+    /worker is not running/,
+  );
+  expect(store.getApplication(app)).toBeTruthy();
+  const worker = (await ownSessions())!;
+  try {
+    await removeApplication(app, "example/app");
+  } finally {
+    await worker.close();
+  }
+  for (const table of ["applications", "conversations", "saved_information"])
     expect(
       store.db().$client.prepare(`SELECT count(*) AS n FROM ${table}`).get(),
     ).toEqual({ n: 0 });

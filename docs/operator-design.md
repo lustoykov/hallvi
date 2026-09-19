@@ -87,7 +87,7 @@ The architectural direction is sufficiently clear to begin bounded implementatio
 4. **Complete the lightweight deployment UI/UX checkpoint — current focus.** Deployment has been demonstrated. Implement the data-to-view mapping and polish the complete journey against the reference designs. Prove it with fresh Pi output and obtain owner acceptance before expanding complexity.
 5. **Prove generalization progressively.** Review the lightweight journey before moving to the medium example, then the more complicated example. Add capabilities those deployments actually need. These remain separate reviewable increments.
 
-**Send next is the first conversation-control slice.** Explicit follow-ups use the existing durable message rows and run one at a time after the active turn. Native steering, contextual side-chat opening and concurrent side explanations remain deferred. Existing read-only tool restrictions remain in effect.
+**The conversation is Pi's.** Send next and Steer are Pi's own durable follow-up and steering queues on an `AgentLane`; a send is answered once Pi has taken the message, and Hallvi keeps only the evidence of what Pi's tools did. Applications work concurrently, and so do read-only side conversations. Contextual side-chat opening and concurrent side explanations remain deferred. Existing read-only tool restrictions remain in effect.
 
 After those checkpoints establish the deployment journey, begin the view-by-view design work described above. Detailed care features and broad hardening remain deferred. Exact application repositories, final record fields and visual details can be settled at the relevant checkpoint; they do not require another comprehensive architecture exercise.
 
@@ -98,7 +98,7 @@ This walkthrough is a proposal to refine with the user, not a fixed workflow or 
 | “Deploy this repository” | Inspect available source, existing connections and saved preferences. | Enter or select the repository and a request; enter the main conversation without an infrastructure questionnaire. |
 | Understand what is needed | Determine how the application runs, its dependencies, configuration and persistent data. | A concise explanation of the intended setup; ask only for access, private inputs or consequential choices that are actually missing. |
 | Establish the target | Recommend an appropriate server using available context, explain any new cost, and obtain authority when needed under the permission mode. | A concrete recommendation or decision in the conversation, not a mandatory release-proposal workflow. |
-| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress and expandable execution logs. Send next retains an explicit follow-up; Stop also cancels waiting follow-ups in that conversation. Steering and contextual side chats remain deferred. |
+| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress and expandable execution logs. Send next keeps a follow-up for when Pi is done and Steer reaches Pi at its next step; Stop also settles what was waiting as not started. Contextual side chats remain deferred. |
 | Verify useful behavior | Choose and execute checks appropriate to the actual application, including reachability and meaningful behavior. | Explain what was actually verified and any remaining limitation. |
 | Hand over a working application | Preserve useful configuration and consequential knowledge and publish the relevant outcome. | An application link where applicable, an understandable deployment result and evidence available in the relevant existing views. |
 
@@ -116,24 +116,52 @@ Background work and, eventually, requests from other agents must coordinate with
 
 ### Interaction while Pi is busy
 
-The composer remains editable during work. **Send next** explicitly saves a follow-up in Hallvi's existing message queue; it does not interrupt the current command or deliver text to the active model turn. The worker claims requests in order, one at a time, and each gets its own reply in the same native conversation. A waiting follow-up never replaces the active reply's approval or activity pointer.
+**Pi keeps the conversation.** Its persisted history, its queues and its operation state are the record of what was said, what waits, what is running and what an interruption left behind (published `pi-agent-core` 0.85.1, `AgentHarness`/`AgentLane`). Hallvi stores no messages, no replies, no conversation status and no record of what it has handed over. The page is projected on every read from Pi's lane — its whole branch for the history, its snapshot for the queue, the open operation and the text being streamed — and Hallvi's execution evidence is placed into it by the id Pi gave each tool call. The database keeps the conversation's title, which application it belongs to, and the id of the Pi session that holds it.
 
-**Stop** cancels the active reply and the waiting follow-ups in that conversation. Their text remains in the transcript, with an explicit never-started explanation. Stopping a reply does not prove that a command already issued to the server stopped. Restart marks an unfinished active reply interrupted rather than replaying it; explicitly queued, not-yet-started requests remain available to the worker.
+**The worker owns Pi's sessions.** It is the only process that opens one. The app asks it over a Unix socket beside the database (`worker.sock`, readable only by its user): for the transcript, to send, to continue, to stop, and to remove an application's histories. One process at a time may serve that socket. Which one is decided before the socket is touched, by an exclusive lock on a small file beside the database that the operating system holds for the process and releases when it ends, however it ends; there is no lease, heartbeat or stale-owner check. A socket path cannot decide it by itself: a path left by a dead worker has to be removed, and two starters that both find it unanswered would each remove the other's. With the lock held, whatever is at the path is stale and is replaced. Ownership lasts through shutdown: a stopping worker stops answering first, lets go of every session, which waits for whatever Pi is still writing, and only then gives up the lock, or the process ends and the operating system does. A cleanup failure is reported only after every session’s cleanup attempt has settled; it cannot release ownership while another cleanup is pending. A worker that does not get the lock leaves, having touched nothing: evidence left unsettled by a crash is settled only by the process that became the owner. There is no per-application lock and no heartbeat file.
+
+**Sending.** The composer stays editable during work. **Send**, **Send next** and **Steer** are answered only once Pi has durably taken the message: an idle lane accepts it as a prompt, which Pi writes to its history before anything runs; a busy lane takes it as a follow-up or a steer into Pi's queue. If the worker cannot be reached, or Pi cannot be opened, the send fails, says why, and the composer keeps the text. The sender's request key is the message's id for good: it is carried on the message into Pi, it is the operation id of a prompt, and a send repeated after a lost answer is recognised in Pi's queue or history and accepted again without being taken twice. The same key with different text is refused.
+
+Pi decides when a message runs: a follow-up when its current work is done, a steer after the tool calls of its current step and before its next model call, one message per turn. A steer does not interrupt a running command or a pending approval, and the interface says so. A message queued in the instant Pi finished stays in Pi's queue under its own entry id, and the worker has Pi read it from there with an empty prompt; nothing is cancelled and sent again.
+
+Hallvi schedules nothing. Conversations of different applications run at the same time, including two applications on one server, and a read-only side conversation answers while its application's main conversation is busy. Within a conversation Pi sequences its own work. What protects a target is what always did: the application's permission mode and approvals, tool calls one at a time within a turn, side conversations having no tools that change anything, and each application's own host, secrets and records. No operation is known to need more than that; one that does would be fenced where it happens, not by holding conversations back.
+
+**Stop** is Pi's `abort`: it ends the operation and empties Pi's queues. Queued messages are no longer Pi's after that and leave the transcript, which is what the control says it does (“Stop + cancel 2 waiting”). With no operation open, Stop cancels what is queued by its id. There is no taking back a single waiting message.
+
+**A worker going away** — killed or shut down — aborts nothing in Pi, and a worker coming back opens nothing. Nothing runs because a worker restarted. When the conversation is next read, Pi restores what it had, and unfinished work that nobody is running is shown as interrupted: the history and evidence as they were, the reply saying that whether the last command finished is not known, anything queued still waiting, and two controls, always both:
+
+- **Continue.** Pi resumes its operation. An interrupted tool call is not made again: Pi gives the model an error result saying the outcome is unknown, and the model investigates. What Pi held queued then runs in its order. With only a queue left, Pi reads it as above.
+- **Stop.** As above, whether or not anything is queued.
+
+A new message is refused until one of them is chosen, so an ordinary question cannot quietly resume old operational work ahead of itself. Evidence that still said “running” when the worker started, or when a stretch of work ended, is settled as interrupted.
+
+**Tools, authentication, compaction and retry are Pi's.** Hallvi hands the harness coding-agent's own `ModelRuntime` for credentials, refresh and model access; the same tool definitions as before, with `execute` delegated to Hallvi's workspace and permission wrapper; and nothing at all for compaction and retry, which the harness does by itself. A definition's `prepareArguments` and `constrainedSampling` pass through unchanged. `executionMode` does not: the harness has one setting for a whole turn's tool calls, so it is set to run them one at a time, and nothing that mutates can run concurrently within a conversation. A tool is stopped through the signal Pi gives that call.
+
+**What Hallvi still keeps, and why.** Permissions and approvals, because they are the product's decision and not the model's. Execution evidence (activity and execution records, saved information), because it outlives what a model context retains and carries redaction; each record keeps Pi's tool-call id, and its place in the conversation is read from Pi. Whether this worker is driving a lane right now, in memory, because that is the one fact Pi's records cannot hold; it is what distinguishes working from interrupted.
+
+**What depends on undocumented Pi behaviour.** A caller's own field on a message (`hallviMessageId`) survives Pi's queue, a restart and its history. `accept` with an empty prompt followed by `drive` reads an idle lane's queue. A lane snapshot's transcript stops at the last compaction, so the page reads the branch with `findEntries`. Each is exercised by `tests/application/integration/pi-owner.test.ts`.
 
 ```mermaid
 flowchart TD
-  View[Application destination] -->|Ask| Draft[Editable draft with removable origin chip]
-  Draft -->|Explicit Send or Send next| Saved[Durable user message and queued reply]
-  Saved -->|Current turn finishes| Run[Single worker claims next reply]
-  Run --> Result[Recorded reply and outcomes]
-  Result -->|Return to destination| View
-  Stop[Stop active reply] --> Cancel[Cancel active and waiting replies in this conversation]
-  Cancel --> History[Keep transcript and command history]
+  Page[Page] -->|send, continue, stop, read| App[App]
+  App -->|worker.sock| Worker[Worker: sole owner of Pi sessions]
+  Worker -->|accept / followUp / steer, tagged with the sender's id| Lane[Pi AgentLane]
+  Lane -->|durably taken| Worker -->|answered| App
+  Lane --> Pi[Pi: history, queue, order, abort, retry, compaction, restore]
+  Pi -->|tool calls, each with Pi's id| Tools[Hallvi tools: permission, approval, execution]
+  Tools --> Evidence[(Evidence, kept under Pi's tool-call id)]
+  Lane -->|branch + snapshot| Projection[Transcript projected on read]
+  Evidence --> Projection --> Page
+  Gone[Worker goes away] --> Held[Pi keeps operation and queue; nothing runs]
+  Held -->|Continue| Lane
+  Held -->|Stop| Abort[Pi abort / cancel queued]
 ```
+
+**Upgrading an existing installation.** `npm run db:upgrade` takes a schema-15 database to the current one and keeps the original beside it as `<database>.before-v18`. Nothing in the database is rewritten: the earlier `messages` table and the two conversation columns that tracked a reply are simply no longer read, and stay where they are. A conversation's earlier history (`pi-sessions/<application>/<chat>.jsonl`) is opened through Pi's public `JsonlSessionRepo`, which reads that format: on first use it is copied into the conversation's own directory (`pi-sessions/<application>/<chat>/`), where Pi rewrites the copy in its current format. The original file is never modified. Earlier conversations are shown from those histories; evidence recorded earlier is placed by the same tool-call ids. What only the earlier `messages` table held — a failure Hallvi reported without Pi having written anything — is not shown. Rollback is: stop the app and worker, put the database copy back, run the earlier version; it reads the original histories where they always were. Messages sent after the upgrade exist only in the new copies.
 
 A destination's question keeps its origin in a removable chip and offers a return action after submission. It never replaces an existing draft. Drafts are kept in browser storage scoped to the controller origin, application and conversation, survive tab closure, and are cleared after acceptance. Storage being unavailable must not block ordinary messaging. Credential-entry fields do not use draft persistence.
 
-Mid-command steering and contextual read-only side chats remain future work. Pi's native `AgentSession.followUp()`, `AgentSession.steer()` and session branching primitives are available building blocks; they are not used to create a second queue in this slice. Steering would require a separately reviewed delivery boundary and must not imply cancellation of an already-running server command.
+Contextual read-only side chats remain future work; Pi's session branching primitives are available building blocks.
 
 ### General tools and independent permissions
 
@@ -290,7 +318,7 @@ The user chose simplicity: use the Codex-style pending-call approval interaction
 
 [Codex's documented approval interaction](https://learn.chatgpt.com/docs/app-server#approvals) is a pending command/file-change item, an approval request, a client decision and continuation or decline. We are following that interaction, not claiming that Codex guarantees restoration of pending approvals across process restarts.
 
-The installed Pi 0.84.4 has native queue/steer and a tool-call blocking hook. Its `terminate` flag is only a batch-level hint, not a requirement to build turn suspension. The first execution checkpoint retains a native session per conversation, opened/disposed around each request. Tool wrappers await UI approval inside the live turn; there is no default conversation timeout while a person decides. Native queue/steer and concurrent side conversations still need lifecycle integration.
+Conversations run on published Pi 0.85.1: `pi-agent-core`'s `AgentHarness`/`AgentLane` for the conversation lifecycle, composed with `pi-coding-agent`'s `ModelRuntime` and tool definitions, as described under Interaction while Pi is busy. Upstream's own coding-agent composition of the harness is unpublished (`experimental/` on main) and is not depended on. Tool wrappers await UI approval inside the live turn; there is no default conversation timeout while a person decides. The worker is the one owner of every history, so side conversations need no lock of their own.
 
 Use explicit host execution and controller-held credentials, with named private inputs and known-value redaction. Keep the minimum repository access needed before a host exists. Details of the saved-record index, revision history and output storage can follow the working slice rather than become prerequisites. Side chats can follow useful execution records. No dedicated recovery subsystem is planned.
 
@@ -313,7 +341,7 @@ The four-table checkpoint below is approved for implementation. Keep this docume
 
 ## First implementation checkpoint — 12 September 2026
 
-The first conversation is the main operator and cannot be archived. Other conversations receive only repository read/search and stored application/execution evidence tools. Only the main operator gets workspace mutations, server Bash and approval requests. The current worker still processes turns serially; concurrent side explanations and native queue/steer are deferred until the core deployment experience is established.
+The first conversation is the main operator and cannot be archived. Other conversations receive only repository read/search and stored application/execution evidence tools. Only the main operator gets workspace mutations, server Bash and approval requests. The worker runs one live stretch per application; concurrent side explanations are deferred until the core deployment experience is established.
 
 An existing server connection contains address, SSH user/port and controller-side paths to a key and verified known-hosts file. Pi sees the target and command, not those credential paths. Provider provisioning and named private-input injection are not implemented in this checkpoint.
 
@@ -344,7 +372,7 @@ A database needed by the deployed application is a separate concern. Pi determin
 Implement and review storage before Hetzner provisioning, then review provisioning before the first lightweight deployment. Queue/steer and further side-chat interactions stay deferred. Old development application data is disposable; account credentials and `.env.local` are separate and must remain.
 
 - **Applications:** repository identity and latest access check, permission mode (Pi decides by default), optional host connection with controller credential references and optional provider/server identity, timestamps.
-- **Conversations:** application/title, one main conversation and read-only sides, native session reference, current status and response pointer, timestamps. The worker enforces one active turn; the main label alone is not a lock.
+- **Conversations:** application/title, one main conversation and read-only sides, native session reference, current status, timestamps. The worker enforces one live conversation per application; the main label alone is not a lock.
 - **Messages:** user-facing text and structured references to saved information or executions, source, completion state and timestamps. Response delivery metadata belongs here; there is no separate runs table. An in-memory response projection may serve the worker/API without duplicating database records.
 - **Saved information:** application, title/body, evidence references, establishment time, optional presentation (views, role, outcome, checks, next step and URL), creation/update/retirement times. Pi searches, saves, updates and retires it. Presentation is optional: private working knowledge and surfaced information use the same record. Saved preferences cannot override permission settings.
 

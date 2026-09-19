@@ -1,5 +1,4 @@
 import { linkActivityExecution, settleActivity } from "./pi-activity";
-import { attachMessageBlock } from "./saved-information";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
@@ -13,23 +12,24 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { loadApplication, loadChat } from "./applications";
-import { getPiRun } from "./pi-runs";
 import { piConfigDir } from "./pi-configuration";
 import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
 import { managedSshOptions } from "./managed-ssh";
-import type { PiRun } from "./types";
 
 import { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
 export { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
 import { db } from "./db";
-import { applications, chats } from "./db-schema";
-import { and, eq } from "drizzle-orm";
+import { applications } from "./db-schema";
+import { eq } from "drizzle-orm";
 export interface ExecutionRecord {
   id: string;
   applicationId: string;
   chatId: string;
+  /** Where the conversation shows it: set on read, from Pi's transcript. */
   runId: string;
+  /** Pi's id for the tool call that made this record. */
+  toolCallId?: string;
   tool: string;
   target: string;
   input: string;
@@ -110,18 +110,6 @@ export function listExecutions(applicationId: string): ExecutionRecord[] {
       const record = read<ExecutionRecord>(
         join(executionDirectory(applicationId), name),
       )!;
-      // A stopped turn is never resumed or replayed by this execution log.
-      if (
-        ["running", "awaiting-approval"].includes(record.status) &&
-        getPiRun(record.runId)?.status !== "running"
-      )
-        return {
-          ...record,
-          status: "interrupted" as const,
-          output:
-            record.output ||
-            "The turn stopped. Any remote effect must be checked by Pi.",
-        };
       return record;
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -133,11 +121,7 @@ export function decideExecution(
 ) {
   loadApplication(applicationId);
   const record = read<ExecutionRecord>(recordPath(applicationId, id));
-  if (
-    !record ||
-    record.status !== "awaiting-approval" ||
-    getPiRun(record.runId)?.status !== "running"
-  )
+  if (!record || record.status !== "awaiting-approval")
     throw new Error("This request is no longer waiting for approval.");
   writeFileSync(
     `${recordPath(applicationId, id)}.decision`,
@@ -165,7 +149,38 @@ function cleanResult<T>(value: T, clean: (text: string) => string): T {
   return value;
 }
 
-export function executionContext(run: PiRun, signal?: AbortSignal) {
+/**
+ * What a worker that went away, or a stretch that ended, left unsettled. The
+ * record says so; nothing is resumed or replayed from this log.
+ */
+export function settleRunningExecutions(
+  applicationId: string,
+  chatId: string | null,
+) {
+  for (const record of listExecutions(applicationId))
+    if (
+      ["running", "awaiting-approval"].includes(record.status) &&
+      (chatId === null || record.chatId === chatId)
+    )
+      write(recordPath(applicationId, record.id), {
+        ...record,
+        status: "interrupted",
+        output:
+          record.output ||
+          "The turn stopped. Any remote effect must be checked by Pi.",
+        finishedAt: new Date().toISOString(),
+      });
+}
+
+/**
+ * Permissions and evidence for one conversation's tools. Each record keeps
+ * the id Pi gave the tool call, which is what places it in the conversation.
+ * Pi's own signal for the call says when it was stopped.
+ */
+export function executionContext(
+  run: { applicationId: string; chatId: string },
+  closing?: AbortSignal,
+) {
   let lastApproval: string | undefined;
   async function execute<T>(
     tool: string,
@@ -175,14 +190,16 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
     ask = false,
     /** Pi's tool-call id, so the activity and this record are one thing. */
     toolCallId: string,
+    stopped?: AbortSignal,
   ): Promise<T | { declined: true }> {
-    signal?.throwIfAborted();
+    const signal = AbortSignal.any(
+      [closing, stopped].filter((each): each is AbortSignal => Boolean(each)),
+    );
+    signal.throwIfAborted();
     if (!isMainChat(run.applicationId, run.chatId))
       throw new Error(
         "Side chats are read-only. Send this work to the main operator.",
       );
-    if (getPiRun(run.id)?.status !== "running")
-      throw new Error("This turn is no longer running.");
     const mode = operatorSettings(run.applicationId).permissionMode;
     const needsApproval =
       mode === "always-ask" || (mode === "pi-decides" && ask);
@@ -190,7 +207,8 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       id: randomUUID(),
       applicationId: run.applicationId,
       chatId: run.chatId,
-      runId: run.id,
+      runId: run.chatId,
+      toolCallId,
       tool,
       target,
       // What Pi wrote, which carries {{secret:NAME}} handles and not values.
@@ -230,29 +248,12 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       save();
     };
     save();
-    attachMessageBlock(run.applicationId, run.id, {
-      type: "execution",
-      id: record.id,
-    });
     linkActivityExecution(run.applicationId, toolCallId, record.id);
-    const conversationStatus = (status: "working" | "awaiting-approval") =>
-      db()
-        .update(chats)
-        .set({ status, updatedAt: new Date().toISOString() })
-        .where(
-          and(eq(chats.id, run.chatId), eq(chats.currentResponseId, run.id)),
-        )
-        .run();
     try {
       if (needsApproval) {
-        conversationStatus("awaiting-approval");
         let decision;
-        while (!(decision = read<{ approved: boolean }>(`${path}.decision`))) {
+        while (!(decision = read<{ approved: boolean }>(`${path}.decision`)))
           await delay(150, undefined, { signal });
-          if (getPiRun(run.id)?.status !== "running")
-            throw new Error("This turn stopped while waiting for approval.");
-        }
-        signal?.throwIfAborted();
         if (!decision.approved) {
           record.status = "declined";
           // The runtime is handed an ordinary result, not an error, so the
@@ -263,10 +264,8 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         record.approvalId = record.id;
         if (ask) lastApproval = record.id;
       }
-      if (getPiRun(run.id)?.status !== "running")
-        throw new Error("This turn is no longer running.");
+      signal.throwIfAborted();
       record.status = "running";
-      conversationStatus("working");
       save();
       // Redacted before anything else touches it. The stored record was
       // already clean; this is the copy the model receives, and a command
@@ -292,17 +291,13 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         exitCode === undefined || exitCode === 0 ? "succeeded" : "failed";
       return result;
     } catch (error) {
-      record.status =
-        signal?.aborted || getPiRun(run.id)?.status !== "running"
-          ? "interrupted"
-          : "failed";
+      record.status = signal.aborted ? "interrupted" : "failed";
       const said = error instanceof Error ? error.message : "Execution failed.";
       output(record.output + "\n" + said);
       // A failure can carry the value too — a connection string in a driver
       // error, a command echoed back by the shell.
       throw new Error(clean(said));
     } finally {
-      if (getPiRun(run.id)?.status === "running") conversationStatus("working");
       record.finishedAt = new Date().toISOString();
       save();
     }

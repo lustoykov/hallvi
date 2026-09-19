@@ -9,6 +9,7 @@ const effects = vi.hoisted(() => ({
   })),
   createChat: vi.fn(() => ({ id: "chat" })),
   sendChatMessage: vi.fn(() => ({})),
+  stopConversation: vi.fn(() => ({})),
   archiveChat: vi.fn(() => ({})),
   observeRepository: vi.fn(() => ({})),
   removeApplication: vi.fn(() => ({})),
@@ -35,14 +36,16 @@ vi.mock("../../../src/server/pi-setup", () => ({
   getPiSetupStatus: () => ({}),
   piLoginCoordinator: effects,
 }));
-vi.mock("../../../src/server/pi-runs", () => ({
+vi.mock("../../../src/server/pi-conversation", () => ({
   sendChatMessage: effects.sendChatMessage,
+  stopConversation: effects.stopConversation,
 }));
 
 import { POST as application } from "../../../src/app/api/applications/route";
 import { DELETE as remove } from "../../../src/app/api/applications/[applicationId]/route";
 import { POST as chat } from "../../../src/app/api/applications/[applicationId]/chats/route";
 import { POST as message } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/messages/route";
+import { POST as stop } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/stop/route";
 import { POST as archive } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/archive/route";
 import { POST as repositoryCheck } from "../../../src/app/api/applications/[applicationId]/repository-check/route";
 import {
@@ -81,6 +84,7 @@ const routes = [
       requestKey: "00000000-0000-4000-8000-000000000001",
     },
   },
+  { name: "stop", method: "POST", handler: stop },
   { name: "archive", method: "POST", handler: archive },
   { name: "repository check", method: "POST", handler: repositoryCheck },
   { name: "setup", method: "POST", handler: setup, body: { mode: "separate" } },

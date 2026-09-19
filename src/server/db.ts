@@ -7,11 +7,11 @@ import { dirname } from "node:path";
 
 import { stateLocation } from "../../scripts/state-location.mjs";
 
-import { applications, chats, messages, savedInformation } from "./db-schema";
+import { applications, chats, savedInformation } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import type { ApplicationRecord, ChatMessage, Observation } from "./types";
 
-const schema = { applications, chats, messages, savedInformation };
+const schema = { applications, chats, savedInformation };
 type HallviDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
@@ -63,7 +63,7 @@ function assertCurrentSchema(
   }
   if (version !== schemaVersion.version) {
     throw new Error(
-      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker, then run npm run db:push. Other prototype versions require an explicit fresh database.`,
+      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker. Schema 15 is upgraded in place, keeping the original, by npm run db:upgrade; an empty database is created by npm run db:push.`,
     );
   }
 }
@@ -119,7 +119,7 @@ export function insertApplication(
   return application;
 }
 
-// Chats and messages
+// Chats
 
 export function insertChat(applicationId: string, title: string) {
   const chat = {
@@ -150,18 +150,17 @@ export function listApplicationChats(applicationId: string) {
     .all();
 }
 
-// The chat list shows when each chat was last active: its newest message, or
-// its creation when nothing has been sent yet.
+// The chat list shows when each chat was last written in by its owner, or its
+// creation when nothing has been sent yet.
 export function listApplicationChatSummaries(applicationId: string) {
   return listApplicationChats(applicationId).map((chat) => ({
     ...chat,
-    lastActivityAt:
-      db()
-        .select({ at: sql<string | null>`max(${messages.createdAt})` })
-        .from(messages)
-        .where(eq(messages.chatId, chat.id))
-        .get()?.at ?? chat.createdAt,
+    lastActivityAt: chat.updatedAt,
   }));
+}
+
+export function touchChat(id: string) {
+  db().update(chats).set({ updatedAt: now() }).where(eq(chats.id, id)).run();
 }
 
 export function archiveChat(id: string) {
@@ -170,42 +169,6 @@ export function archiveChat(id: string) {
     .set({ archivedAt: now() })
     .where(and(eq(chats.id, id), isNull(chats.archivedAt)))
     .run();
-}
-
-export function insertMessage(
-  chatId: string,
-  role: ChatMessage["role"],
-  body: string,
-  source: ChatMessage["source"],
-  status: ChatMessage["status"] = "completed",
-) {
-  const message = {
-    id: randomUUID(),
-    chatId,
-    role,
-    body,
-    blocks: [],
-    source,
-    createdAt: now(),
-    updatedAt: now(),
-    status,
-    revision: 0,
-  };
-  db().insert(messages).values(message).run();
-  return message;
-}
-
-export function getMessage(id: string) {
-  return db().select().from(messages).where(eq(messages.id, id)).get() ?? null;
-}
-
-export function listMessages(chatId: string) {
-  return db()
-    .select()
-    .from(messages)
-    .where(eq(messages.chatId, chatId))
-    .orderBy(asc(messages.createdAt), asc(rowId))
-    .all();
 }
 
 // The latest repository access check is application configuration.

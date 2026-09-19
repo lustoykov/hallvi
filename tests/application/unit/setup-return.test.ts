@@ -12,7 +12,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const records = vi.hoisted(() => ({
   getApplication: vi.fn(),
   getChat: vi.fn(),
-  listMessages: vi.fn(),
 }));
 vi.mock("../../../src/server/db", () => records);
 
@@ -24,7 +23,6 @@ const CHAT = "22222222-2222-4222-8222-222222222222";
 beforeEach(() => {
   records.getApplication.mockReset();
   records.getChat.mockReset();
-  records.listMessages.mockReset();
   records.getApplication.mockReturnValue({ id: APPLICATION, name: "My app" });
   records.getChat.mockReturnValue({
     id: CHAT,
@@ -32,7 +30,6 @@ beforeEach(() => {
     kind: "main",
     archivedAt: null,
   });
-  records.listMessages.mockReturnValue([{ role: "assistant" }]);
 });
 
 describe("first-run continuation", () => {
@@ -79,10 +76,14 @@ describe("first-run continuation", () => {
   });
 
   it("drops the first-run action once the owner has sent a message", () => {
-    records.listMessages.mockReturnValue([
-      { role: "assistant" },
-      { role: "user", body: "Read the repository." },
-    ]);
+    // Pi holds a session for it: somebody has written in it.
+    records.getChat.mockReturnValue({
+      id: CHAT,
+      applicationId: APPLICATION,
+      kind: "main",
+      archivedAt: null,
+      nativeSessionId: "pi-session",
+    });
     const destination = setupReturnDestination(onboarding);
     expect(destination?.firstRun).toBeUndefined();
     expect(destination?.query).not.toContain("onboarding");

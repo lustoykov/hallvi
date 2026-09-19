@@ -22,7 +22,7 @@ try {
     .get();
   if (populated && current !== version)
     throw new Error(
-      `Schema ${current} is retired. Stop the app and worker and initialize a fresh development database. No compatibility migration is provided.`,
+      `Schema ${current} is not ${version}. db:push never alters existing data. Stop the app and worker; schema 15 is upgraded in place, keeping the original, by npm run db:upgrade.`,
     );
 } finally {
   database.close();

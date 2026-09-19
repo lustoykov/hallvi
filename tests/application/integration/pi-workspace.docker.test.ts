@@ -69,7 +69,7 @@ describe.skipIf(process.env.HALLVI_DOCKER_TESTS !== "1")(
         });
         const workspace = new PiWorkspace({
           applicationId: "app-docker-proof",
-          runId: "run-docker-proof",
+          chatId: "run-docker-proof",
           source: async () => ({
             description: "qa/example@abc123",
             files: [

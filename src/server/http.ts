@@ -5,11 +5,14 @@ import {
   NotFoundError,
 } from "./applications";
 import { PiUnavailableError } from "./pi";
+import { WorkerRefusal, WorkerUnavailableError } from "./worker-link";
 
 function statusFor(error: unknown) {
   if (error instanceof ExistingApplicationConflictError) return 409;
   if (error instanceof NotFoundError) return 404;
   if (error instanceof PiUnavailableError) return 503;
+  if (error instanceof WorkerUnavailableError) return 503;
+  if (error instanceof WorkerRefusal && error.code !== "failed") return 409;
   return 400;
 }
 

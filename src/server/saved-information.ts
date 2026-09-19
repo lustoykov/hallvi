@@ -1,9 +1,9 @@
 import { listExecutions } from "./operator-execution";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, getApplication, getMessage } from "./db";
-import { savedInformation, messages, chats } from "./db-schema";
-import { informationInputSchema, type MessageBlock } from "./operator-data";
+import { db, getApplication } from "./db";
+import { savedInformation } from "./db-schema";
+import { informationInputSchema } from "./operator-data";
 import { requireReadableRecord } from "./record-contract";
 
 export function listInformation(
@@ -39,14 +39,10 @@ export function saveInformation(
   // in the same turn rather than the page rendering a lie later.
   requireReadableRecord(value);
   for (const evidence of value.evidence) {
-    if (evidence.type === "message") {
-      const message = getMessage(evidence.id);
-      const conversation =
-        message &&
-        db().select().from(chats).where(eq(chats.id, message.chatId)).get();
-      if (conversation?.applicationId !== applicationId)
-        throw new Error("Evidence message not found in this application.");
-    }
+    // Earlier records may cite a message. Pi keeps the conversation now, and
+    // what it did is cited by execution or URL.
+    if (evidence.type === "message")
+      throw new Error("Cite an execution or a URL as evidence, not a message.");
     if (
       evidence.type === "execution" &&
       !listExecutions(applicationId).some((e) => e.id === evidence.id)
@@ -107,45 +103,4 @@ export function retireInformation(applicationId: string, id: string) {
     .get();
   if (!record) throw new Error("Saved information not found.");
   return record;
-}
-export function attachMessageBlock(
-  applicationId: string,
-  responseId: string,
-  block: MessageBlock,
-) {
-  const response = getMessage(responseId);
-  const owner =
-    response &&
-    db().select().from(chats).where(eq(chats.id, response.chatId)).get();
-  if (
-    !response ||
-    owner?.applicationId !== applicationId ||
-    response.status !== "running"
-  )
-    throw new Error("This response is no longer running.");
-  if (
-    block.type === "saved-information" &&
-    !db()
-      .select()
-      .from(savedInformation)
-      .where(
-        and(
-          eq(savedInformation.id, block.id),
-          eq(savedInformation.applicationId, applicationId),
-        ),
-      )
-      .get()
-  )
-    throw new Error("Saved information not found.");
-  if (response.blocks.some((b) => JSON.stringify(b) === JSON.stringify(block)))
-    return;
-  db()
-    .update(messages)
-    .set({
-      blocks: [...response.blocks, block],
-      updatedAt: new Date().toISOString(),
-      revision: response.revision + 1,
-    })
-    .where(eq(messages.id, responseId))
-    .run();
 }

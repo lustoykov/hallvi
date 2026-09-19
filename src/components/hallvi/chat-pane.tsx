@@ -33,7 +33,7 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import type { ApplicationOperation } from "@/server/operation-record";
-import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
+import type { Chat, ChatMessage, OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
 import type { ConversationContext } from "./conversation-continuity";
@@ -72,16 +72,15 @@ export interface MessageHighlight {
 
 const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   completed: "Saved",
-  queued: "Queued",
+  delivered: "Saved",
+  waiting: "Waiting",
   running: "Draft",
-  succeeded: "Saved",
   failed: "Failed",
-  // Both of these mean the reader stopped it. The status line beneath says
-  // "Stopped", and a tag reading "Cancelled" beside it made one action look
-  // like two different outcomes.
+  // The reader stopped it. The status line beneath says "Stopped", and a tag
+  // reading "Cancelled" beside it made one action look like two outcomes.
   cancelled: "Stopped",
-  "timed-out": "Timed out",
-  interrupted: "Stopped",
+  // Nobody stopped it: the worker went away, and how far it got is not known.
+  interrupted: "Interrupted",
 };
 
 function CopyReply({ body }: { body: string }) {
@@ -221,9 +220,9 @@ export function ChatPane({
   onReturnToContext,
   onSend,
   onArchive,
-  runs,
   reconnecting,
-  onRunAction,
+  onStop,
+  onContinue,
   onTell,
   onNewChat,
   references,
@@ -248,11 +247,13 @@ export function ChatPane({
   onComposerChange: (value: string) => void;
   onDismissContext?: () => void;
   onReturnToContext?: (section: ApplicationSection) => void;
-  onSend: () => void;
+  /** "steer" hands it to Pi at its next step instead of after its work. */
+  onSend: (delivery?: "next" | "steer") => void;
   onArchive: () => void;
-  runs: PiRun[];
   reconnecting: boolean;
-  onRunAction: (id: string, action: "cancel" | "retry") => void;
+  /** Stop what Pi is doing here; what was waiting is never started. */
+  onStop: () => void;
+  onContinue: () => void;
   /**
    * Sends Hallvi a message the owner did not have to type: a connection card
    * settled, or a rung of the access ladder was chosen. Absent, it is drafted
@@ -418,7 +419,7 @@ export function ChatPane({
    */
   const canWrite = Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || readOnly;
-  const sendDisabled = composerDisabled || !piReady;
+  const sendUnavailable = composerDisabled || !piReady;
   /**
    * The turn this conversation is still finishing, if there is one.
    *
@@ -426,26 +427,25 @@ export function ChatPane({
    * this is the same condition it enforces, read from the same records.
    */
   const inFlight = (view.messages ?? []).find(
-    (message) =>
-      message.role === "assistant" &&
-      (message.status === "queued" || message.status === "running"),
+    (message) => message.role === "assistant" && message.status === "running",
   );
-  const inFlightRun = runs.find(
-    (run) => run.assistantMessageId === inFlight?.id,
+  const waiting = (view.messages ?? []).filter(
+    (message) => message.status === "waiting",
   );
-  const queuedFollowUps = inFlight
-    ? view.messages.filter(
-        (message) =>
-          message.role === "assistant" &&
-          message.status === "queued" &&
-          message.id !== inFlight.id,
-      ).length
-    : 0;
+  /**
+   * Pi holds unfinished work that nobody is running: a worker went away while
+   * it was busy. Nothing runs again until the owner says which way it goes.
+   */
+  const interrupted =
+    !inFlight &&
+    (waiting.length > 0 ||
+      view.messages.some((message) => message.status === "interrupted"));
+  const sendDisabled = sendUnavailable || interrupted;
   const inFlightActivity = runActivity({
     runId: inFlight?.id,
-    status: inFlight?.status ?? "",
+    status: inFlight ? "running" : "",
     workerAlive,
-    startedAt: inFlightRun?.startedAt,
+    startedAt: inFlight?.startedAt,
     hasDraft: Boolean(inFlight?.body?.trim()),
     executions: view.executions ?? [],
     activity: view.piActivity ?? [],
@@ -453,10 +453,10 @@ export function ChatPane({
   });
   /** Whether the transcript shortcut is useful beside the persistent status. */
   const requestPending = view.messages.some(
-    (message) => message.status === "queued" || message.status === "running",
+    (message) => message.status === "waiting" || message.status === "running",
   );
   const contextualUserMessageId = context?.requestKey
-    ? runs.find((run) => run.requestKey === context.requestKey)?.userMessageId
+    ? view.messages.find((sent) => sent.requestKey === context.requestKey)?.id
     : null;
 
   // What Pi has asked the owner for. Read while a turn is running, because
@@ -544,11 +544,7 @@ export function ChatPane({
     firstConversation && !requestPending && pendingMessage === null;
 
   const stopLabel =
-    inFlight?.status === "queued"
-      ? "Cancel queued message"
-      : queuedFollowUps > 0
-        ? `Stop + cancel ${queuedFollowUps} queued`
-        : "Stop";
+    waiting.length > 0 ? `Stop + cancel ${waiting.length} waiting` : "Stop";
   return (
     <section className="hv-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -600,25 +596,26 @@ export function ChatPane({
             </p>
           )}
           {view.messages.map((message) => {
-            const run = runs.find(
-              (run) => run.assistantMessageId === message.id,
+            // The owner's message is settled once Pi has read it. Until
+            // then it waits, and it can end without ever being read.
+            const unread =
+              message.role === "user" &&
+              !["completed", "delivered"].includes(message.status);
+            const provisional =
+              message.role === "assistant" && message.status !== "completed";
+            const inProgress = message.status === "running";
+            const asked = view.messages.find(
+              (sent) => sent.id === message.responseTo,
             );
-            const provisional = message.status !== "completed";
-            const inProgress =
-              message.status === "queued" || message.status === "running";
-            const queuedFollowUp =
-              message.status === "queued" && message.id !== inFlight?.id;
-            const retried =
-              run !== undefined &&
-              runs.some((attempt) => attempt.retryOfId === run.id);
+            const last = view.messages.at(-1)?.id === message.id;
             const failure = runFailure({
               runId: message.id,
-              error: run?.error,
+              error: message.error,
               executions: view.executions ?? [],
             });
             const historyUnavailable =
-              run?.status === "failed" &&
-              run.error?.startsWith("Conversation history unavailable.");
+              message.status === "failed" &&
+              message.error?.startsWith("Conversation history unavailable.");
             // A request Hallvi started itself is never shown as the
             // engineer's words.
             const engineer =
@@ -627,13 +624,17 @@ export function ChatPane({
               <Fragment key={message.id}>
                 <Message
                   className={
-                    provisional
-                      ? inProgress
-                        ? "hv-message-live"
+                    unread
+                      ? message.status === "waiting"
+                        ? ""
                         : "hv-message-failed"
-                      : message.role === "user" && !engineer
-                        ? "hv-message-request"
-                        : ""
+                      : provisional
+                        ? inProgress
+                          ? "hv-message-live"
+                          : "hv-message-failed"
+                        : message.role === "user" && !engineer
+                          ? "hv-message-request"
+                          : ""
                   }
                   from={engineer ? "user" : "assistant"}
                   id={`hv-message-${message.id}`}
@@ -654,13 +655,20 @@ export function ChatPane({
                           : "Recorded event"}
                       </span>
                     )}
-                    {provisional && message.status !== "running" && (
-                      <span
-                        className={`hv-source-tag ${inProgress ? "live" : "failed"}`}
-                      >
-                        {ATTEMPT_LABELS[message.status]}
-                      </span>
-                    )}
+                    {(provisional || unread) &&
+                      message.status !== "running" && (
+                        <span
+                          className={`hv-source-tag ${message.status === "waiting" ? "live" : "failed"}`}
+                        >
+                          {unread && message.status === "waiting"
+                            ? message.delivery === "steer"
+                              ? "Steering"
+                              : "Waiting"
+                            : unread
+                              ? "Not run"
+                              : ATTEMPT_LABELS[message.status]}
+                        </span>
+                      )}
                     <LocalTime value={message.createdAt} variant="compact" />
                   </div>
                   <MessageContent>
@@ -678,18 +686,16 @@ export function ChatPane({
                         )}
                         {!inProgress && (
                           <p className="hv-run-status" role="status">
-                            {run?.error?.startsWith(
-                              "Conversation history unavailable.",
-                            )
-                              ? run.error
-                              : message.status === "cancelled" ||
-                                  message.status === "interrupted"
-                                ? message.status === "cancelled" &&
-                                  !run?.startedAt &&
-                                  run?.error
-                                  ? run.error
-                                  : stopOutcome(view.executions, message.id)
-                                : failure.says}
+                            {historyUnavailable
+                              ? message.error
+                              : message.status === "cancelled"
+                                ? stopOutcome(view.executions, message.id)
+                                : message.status === "interrupted"
+                                  ? // Not the reader's Stop, and never "nothing
+                                    // had run": the reply says what is unknown.
+                                    (message.error ??
+                                    stopOutcome(view.executions, message.id))
+                                  : failure.says}
                           </p>
                         )}
                         {message.body && !inProgress && (
@@ -700,42 +706,32 @@ export function ChatPane({
                             </MessageResponse>
                           </details>
                         )}
-                        {run &&
-                          !readOnly &&
-                          !retried &&
-                          (!inProgress || queuedFollowUp) && (
+                        {!readOnly &&
+                          !inProgress &&
+                          last &&
+                          message.status !== "interrupted" && (
                             <button
-                              className={
-                                queuedFollowUp
-                                  ? "hv-run-stop"
-                                  : "hv-run-action hv-primary-button"
-                              }
+                              className="hv-run-action hv-primary-button"
                               disabled={busy !== null}
                               onClick={() => {
-                                if (queuedFollowUp)
-                                  onRunAction(run.id, "cancel");
-                                else if (historyUnavailable) onNewChat();
+                                if (historyUnavailable) onNewChat();
                                 else if (failure.action.kind === "ask")
                                   continueAfterSecrets(failure.action.draft!);
-                                else onRunAction(run.id, "retry");
+                                else if (asked) onTell?.(asked.body);
                               }}
                               type="button"
                             >
-                              {!inProgress && (
-                                <ArrowClockwise
-                                  aria-hidden="true"
-                                  weight="bold"
-                                />
-                              )}
-                              {queuedFollowUp
-                                ? "Cancel queued message"
-                                : historyUnavailable
-                                  ? "Start a new chat"
-                                  : // A command that exited non-zero will exit
-                                    // non-zero again, so retrying it is a way
-                                    // of not reading the error. The control
-                                    // follows what actually failed.
-                                    failure.action.label}
+                              <ArrowClockwise
+                                aria-hidden="true"
+                                weight="bold"
+                              />
+                              {historyUnavailable
+                                ? "Start a new chat"
+                                : // A command that exited non-zero will exit
+                                  // non-zero again, so retrying it is a way
+                                  // of not reading the error. The control
+                                  // follows what actually failed.
+                                  failure.action.label}
                             </button>
                           )}
                       </div>
@@ -746,6 +742,30 @@ export function ChatPane({
                       <MessageResponse>
                         <Markdown source={message.body} />
                       </MessageResponse>
+                    )}
+                    {unread && (
+                      <div className="hv-run-progress">
+                        <p className="hv-run-status" role="status">
+                          {message.status === "waiting"
+                            ? message.delivery === "steer" && inFlight
+                              ? "Pi reads this after its current step, before it carries on. It does not interrupt a running command or a pending approval."
+                              : inFlight
+                                ? "Pi reads this when its current work is done."
+                                : "Pi holds this and has not read it. Continue has Pi read it; Stop cancels it."
+                            : message.error}
+                        </p>
+                        {!readOnly && message.status !== "waiting" && last && (
+                          <button
+                            className="hv-run-action hv-primary-button"
+                            disabled={busy !== null}
+                            onClick={() => onTell?.(message.body)}
+                            type="button"
+                          >
+                            <ArrowClockwise aria-hidden="true" weight="bold" />
+                            Send again
+                          </button>
+                        )}
+                      </div>
                     )}
                   </MessageContent>
                   {message.role === "assistant" && view.piActivity && (
@@ -976,19 +996,50 @@ export function ChatPane({
             a new one.
           </p>
         )}
-        {/* Sending puts a message in a queue. If nothing is reading that
-            queue, the message sits there looking exactly like a reply being
-            written, and the only clue is a console the owner is not reading.
-            It is said here, where they are about to type. */}
+        {interrupted && !readOnly && workerAlive !== false && (
+          <div className="hv-pi-required" role="status">
+            <WarningCircle weight="bold" />
+            <div>
+              <strong>This conversation was interrupted</strong>
+              <p>
+                Hallvi stopped while Pi had work in hand. Nothing has run since,
+                and nothing will until you choose. Continue has Pi carry on from
+                where it was, without repeating a command it had started. Stop
+                ends that work and drops anything still waiting.
+              </p>
+              <p>
+                <button
+                  className="hv-run-action hv-primary-button"
+                  disabled={busy !== null}
+                  onClick={onContinue}
+                  type="button"
+                >
+                  Continue
+                </button>{" "}
+                <button
+                  className="hv-run-action"
+                  disabled={busy !== null}
+                  onClick={onStop}
+                  type="button"
+                >
+                  Stop
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
+        {/* Only the worker can hand a message to Pi. Without one nothing is
+            accepted, and that is said here, where the owner is about to
+            type, rather than after they have sent it. */}
         {application && piReady && workerAlive === false && (
           <div className="hv-pi-required">
             <WarningCircle weight="bold" />
             <div>
               <strong>No worker is running</strong>
               <p>
-                Messages are saved and stay queued. Restart Hallvi with{" "}
-                <code>hallvi restart</code>, then check it with{" "}
-                <code>hallvi status</code>.
+                Nothing can be sent or shown until it runs again; what you have
+                typed is kept. Restart Hallvi with <code>hallvi restart</code>,
+                then check it with <code>hallvi status</code>.
                 {process.env.NODE_ENV === "development" && (
                   <>
                     {" "}
@@ -1097,14 +1148,25 @@ export function ChatPane({
             </span>
             {/* While a turn runs and nothing is typed, Send's place is Stop.
                 Typing brings Send next back, so a follow-up can be queued. */}
-            {inFlightRun && !readOnly && !composer.trim() ? (
+            {inFlight && !readOnly && composer.trim() && (
+              <button
+                className="hv-steer"
+                disabled={sendDisabled || busy !== null}
+                type="button"
+                title="Pi reads this after its current step, before it carries on. It does not interrupt a running command or a pending approval."
+                onClick={() => onSend("steer")}
+              >
+                Steer
+              </button>
+            )}
+            {requestPending && !readOnly && !composer.trim() ? (
               <button
                 className="hv-stop"
                 disabled={busy !== null}
                 type="button"
                 aria-label={stopLabel}
                 title={stopLabel}
-                onClick={() => onRunAction(inFlightRun.id, "cancel")}
+                onClick={onStop}
               >
                 <i aria-hidden="true" />
               </button>
