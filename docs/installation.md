@@ -341,9 +341,10 @@ do not share a database by default.
   access remains an owner decision. Shipped JavaScript can be inspected even
   when the source repository is private.
 - The [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md)
-  was installed on Apple-silicon macOS and Ubuntu 24.04 x64. Real repository
-  inspection and deployment from that installed candidate still need fresh
-  account authorization. Each later archive needs its own trial.
+  was installed on Apple-silicon macOS and Ubuntu 24.04 x64. A fresh ChatGPT
+  connection on the installed Ubuntu controller drove real public-repository
+  inspection and private deployment to a separate test host. External-user
+  acceptance remains open; each later archive needs its own trial.
 - macOS Intel, Linux arm64 and other Linux distributions have no prebuilt
   release target yet.
 - No schema migrations between versions (see Upgrade).

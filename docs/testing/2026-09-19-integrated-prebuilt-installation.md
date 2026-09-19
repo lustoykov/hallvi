@@ -29,16 +29,46 @@ The Ubuntu reinstall checked native-module/database preflight and program
 replacement on the combined archive while retaining the saved application and
 port setting. This was a same-schema reinstall, not a schema migration.
 
-## Remaining acceptance work
+## Real installed-service journey
 
-The next product screen asks for a fresh ChatGPT device authorization before
-**Read repository**. The owner has not yet completed that authorization for
-this candidate. Consequently this installed-service run has **not** established
-real repository inspection, Pi's direct workspace operation, deployment to the
-task-owned application host, use of the running app, or app-data persistence
-after restart. [Earlier optional-Docker evidence](2026-09-19-optional-local-docker.md)
-established those behaviors from a development controller, not from this
-installed archive. Neither proof substitutes for the other.
+The owner completed a fresh ChatGPT device authorization in the installed
+Ubuntu controller; the UI showed **Login saved**. Through the normal browser
+flow, real Pi read and searched the public `docker/getting-started-app`
+repository in the default direct workspace, explained the to-do app and its
+SQLite/Node requirements, and asked where to run it. The browser's
+existing-machine card generated an application-specific SSH key and verified
+the separately created, task-owned Ubuntu 24.04 application host's identity,
+SSH access, administrator access, OS and resources.
+
+Pi installed Ubuntu's Docker and Compose packages on that host, checked its
+existing listeners and disk, and built repository revision
+`6b025fc53bc7b9bef435d6b09bcd1da5a871c9cc`. The resulting container was
+healthy, ran without root with a read-only root filesystem, and published only
+`127.0.0.1:3000` on the host. SQLite lived in the labeled named volume
+`getting-started-app-sqlite`. Pi wrote an item, replaced the container,
+confirmed the item survived, then removed that temporary item. An external
+connection to port 3000 was refused; Hallvi's private SSH link at
+`http://127.0.0.1:5757` returned HTTP 200 through the controller and laptop
+forwards.
+
+The MacBook browser used that private link to add a separate to-do item and
+found it again after page reload. After `hallvi restart` on the controller,
+the conversation and deployment records remained, Overview showed the tunnel
+as closed, and the private link no longer answered. **Open the connection
+again** restored the link through Pi; Overview showed access verified and the
+same to-do item was still present in the app. This verifies installed-service
+inspection, deployment, application use and data persistence across a
+controller restart on this candidate.
+
+Two recoverable frictions appeared in Pi's visible transcript: a `git status`
+command failed because the direct workspace's repository copy has no `.git`
+directory, and eight initial `save_information` calls failed with **Saved
+information not found** because Pi supplied new IDs while creating records.
+Pi continued and saved eight records without those IDs; the deployment and
+access views displayed them. These failed attempts are part of the evidence,
+not successful checks.
+
+## Remaining acceptance work
 
 An external account's private-repository journey remains blocked because the
 archive's `github-app.json` has no client ID or slug. The private App in the
@@ -46,7 +76,9 @@ owner's development setup is not a distributable identity; App visibility was
 not changed. Public repository intake works without that connection. There is
 still no signed or publicly published download. A person outside the
 development setup must run the [beta walkthrough](../beta-walkthrough.md) on
-the final distributed candidate.
+the final distributed candidate using their own accounts. This engineering
+run used the owner's fresh ChatGPT connection and task-owned hosts, so it does
+not complete that external-user gate.
 
 ## Artifact and resource disposition
 
@@ -56,10 +88,14 @@ retains the macOS three-file bundle in its matching Downloads directory. Its
 temporary test service and state were removed. The previous `db009f61`
 bundles remain as clearly marked superseded evidence.
 
-At this check's handoff, two labeled task-owned Hetzner VPSs remain within a
-72-hour cleanup lease: the installed controller and the intended application
-host (also used to build the Linux archive). Their exact IDs, attached IPs,
-SSH key, owner UUID and expiry are in the owner-only development resource
-inventory outside the worktree. They are retained only for resuming the fresh
-authorization and real deployment check, then must be retired by exact ID.
+The two labeled task-owned Hetzner VPSs (`166540390`, `166540392`) were
+deleted by exact ID after the run. Their deletion actions succeeded; provider
+reads returned 404 for both servers and all four attached, auto-deleted primary
+IPs. The task SSH key (`130216464`) was deleted and verified absent. These
+resources were used only for this engineering run; the owner-only development
+resource inventory outside the worktree records their labels, dependencies and
+cleanup. The application host's labeled SQLite volume held only task-created
+test items and was on its deleted server disk. The installed controller's
+temporary ChatGPT credential files and database were on its deleted server
+disk.
 The owner's existing MacBook Hallvi service and data were not changed.

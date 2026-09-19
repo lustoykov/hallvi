@@ -22,9 +22,11 @@ need to clone this repository or install Node.js, npm, Python or a compiler.
 | Another machine, including a Mac mini or Linux VM | [Remote browser access](docs/installation.md#on-another-machine) after installing there |
 
 The [integrated prebuilt candidate](docs/testing/2026-09-19-integrated-prebuilt-installation.md)
-was installed on Apple-silicon macOS and Ubuntu 24.04 x64. Real repository
-inspection and deployment from that installed candidate still need fresh
-account authorization. See [supported machines](docs/installation.md#supported-machines).
+was installed on Apple-silicon macOS and Ubuntu 24.04 x64. On the installed
+Ubuntu controller, real Pi inspected a public repository, deployed it to a
+separate test host, and reopened private access after a restart with app data
+intact. External-user acceptance remains open. See
+[supported machines](docs/installation.md#supported-machines).
 Pi reads repositories on this computer by default; local Docker is optional.
 Choose **In Docker** in **Settings → Workspace** if you want an isolated
 workspace. See [Pi’s workspace](docs/installation.md#pis-workspace).
