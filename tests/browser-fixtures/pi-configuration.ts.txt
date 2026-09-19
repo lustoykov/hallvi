@@ -92,8 +92,15 @@ function streamSynthetic(
         delta: prefix,
         partial: message,
       });
+      // Held the first time only: what Pi resumes after a restart answers.
+      const heldMarker = join(
+        root,
+        `pi-held-${createHash("sha256").update(userMessage).digest("hex")}`,
+      );
+      const hold = userMessage.includes("[hold]") && !existsSync(heldMarker);
+      if (hold) writeFileSync(heldMarker, "held", { mode: 0o600 });
       await pause(
-        userMessage.includes("[hold]")
+        hold
           ? 60_000
           : userMessage.includes("[slow-cancel]")
           ? 6_000

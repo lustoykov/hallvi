@@ -1,4 +1,4 @@
-import { getApplication, getChat, listMessages } from "./db";
+import { getApplication, getChat } from "./db";
 
 /**
  * Where setup sends the reader back to.
@@ -36,7 +36,8 @@ export function setupReturnDestination(params: {
     params.onboarding === "1" &&
     chat.kind === "main" &&
     !chat.archivedAt &&
-    !listMessages(chat.id).some((message) => message.role === "user");
+    // Pi holds nothing for it yet: nobody has written in it.
+    !chat.nativeSessionId;
   return {
     ...(firstRun
       ? {

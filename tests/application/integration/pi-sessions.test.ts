@@ -15,17 +15,14 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { spawn } from "node:child_process";
-import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
 import { chats } from "../../../src/server/db-schema";
 import {
-  NativeSessionError,
   openNativeChatSession,
-  removeNativeApplicationSessions,
+  removeNativeSessions,
 } from "../../../src/server/pi-sessions";
 import { pushTestDatabase } from "../../test-database";
 
@@ -219,24 +216,12 @@ it("refuses a damaged earlier history rather than half-reading it", async () => 
   expect(historyFiles()).toEqual([]);
 });
 
-it("blocks a second writer and removal until release, and retains lock files after removal", async () => {
-  const first = await openNativeChatSession(applicationId, chatId);
-  await expect(
-    openNativeChatSession(applicationId, otherChatId),
-  ).rejects.toMatchObject({ code: "busy" });
-  const remove = vi.fn(() => store.deleteApplication(applicationId));
-  expect(() => removeNativeApplicationSessions(applicationId, remove)).toThrow(
-    NativeSessionError,
-  );
-  expect(remove).not.toHaveBeenCalled();
-  await first.release();
-  removeNativeApplicationSessions(applicationId, remove);
-  expect(remove).toHaveBeenCalledOnce();
-  expect(store.getApplication(applicationId)).toBeNull();
-  expect(existsSync(dirname(pathFor()))).toBe(false);
-  expect(
-    existsSync(join(root, "pi-sessions", ".locks", `${applicationId}.sqlite`)),
-  ).toBe(true);
+it("removes every history an application has", async () => {
+  const opened = await openNativeChatSession(applicationId, chatId);
+  await opened.release();
+  expect(existsSync(join(root, "pi-sessions", applicationId))).toBe(true);
+  removeNativeSessions(applicationId);
+  expect(existsSync(join(root, "pi-sessions", applicationId))).toBe(false);
 });
 
 it("rejects cross-application identity and path traversal before creating session storage", async () => {
@@ -247,39 +232,4 @@ it("rejects cross-application identity and path traversal before creating sessio
     openNativeChatSession(applicationId, "../escape"),
   ).rejects.toMatchObject({ code: "not-found" });
   expect(existsSync(dirname(pathFor()))).toBe(false);
-});
-
-it("the OS releases an abandoned application lock when its worker exits", async () => {
-  const initial = await openNativeChatSession(applicationId, chatId);
-  await initial.release();
-  const lockPath = join(
-    root,
-    "pi-sessions",
-    ".locks",
-    `${applicationId}.sqlite`,
-  );
-  const child = spawn(
-    process.execPath,
-    [
-      "--input-type=module",
-      "-e",
-      `import Database from 'better-sqlite3'; const lock = new Database(process.argv[1],{timeout:0}); lock.exec('BEGIN EXCLUSIVE'); process.stdout.write('locked'); setInterval(() => lock.inTransaction, 1000);`,
-      lockPath,
-    ],
-    { cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] },
-  );
-  try {
-    const [ready] = await once(child.stdout, "data");
-    expect(String(ready)).toBe("locked");
-    await expect(
-      openNativeChatSession(applicationId, chatId),
-    ).rejects.toMatchObject({ code: "busy" });
-    const exited = once(child, "exit");
-    child.kill("SIGKILL");
-    await exited;
-    const resumed = await openNativeChatSession(applicationId, chatId);
-    await resumed.release();
-  } finally {
-    child.kill("SIGKILL");
-  }
 });

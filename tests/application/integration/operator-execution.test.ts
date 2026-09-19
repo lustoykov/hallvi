@@ -1,19 +1,14 @@
-import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
 import {
-  messageSeen,
-  sendChatMessage,
-  stopConversation,
-} from "../../../src/server/pi-conversation";
-import {
   decideExecution,
   executionContext,
   listExecutions,
   saveOperatorSettings,
+  settleRunningExecutions,
 } from "../../../src/server/operator-execution";
 import { pushTestDatabase } from "../../test-database";
 import {
@@ -22,12 +17,11 @@ import {
   listActivity,
 } from "../../../src/server/pi-activity";
 let root: string;
-/** The reply Pi is writing, and the scope its tools are bound to. */
-let run: { id: string; applicationId: string; chatId: string };
+/** The conversation whose tools are being called. */
+let run: { applicationId: string; chatId: string };
 const scope = (chatId = run.chatId) => ({
   applicationId: run.applicationId,
   chatId,
-  reply: () => run.id,
 });
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hv-operator-"));
@@ -44,9 +38,7 @@ beforeEach(() => {
     repositoryName: "app",
   });
   const chat = store.insertChat(app.id, "Main operator");
-  run = messageSeen(
-    sendChatMessage(app.id, chat.id, "Inspect this server", randomUUID()).id,
-  )!;
+  run = { applicationId: app.id, chatId: chat.id };
 });
 afterAll(() => {
   globalThis.__hallviDb?.$client.close();
@@ -70,7 +62,8 @@ it("pauses the actual call until approved, then records its output and failure c
   const [receipt] = listExecutions(run.applicationId);
   expect(receipt.status).toBe("awaiting-approval");
   expect(work).not.toHaveBeenCalled();
-  expect(store.getChat(run.chatId)?.status).toBe("awaiting-approval");
+  // The record keeps the id Pi gave the call; that is what places it.
+  expect(receipt.toolCallId).toBe("host-call");
   store.db().$client.close();
   delete globalThis.__hallviDb;
   expect(listExecutions(run.applicationId)[0].id).toBe(receipt.id);
@@ -89,7 +82,7 @@ it("declining or cancelling an approval never starts the command", async () => {
   const work = vi.fn(async () => "should not run");
   startActivity({
     applicationId: run.applicationId,
-    runId: run.id,
+    runId: run.chatId,
     sequence: 1,
     id: "declined-call",
     tool: "bash",
@@ -122,13 +115,15 @@ it("declining or cancelling an approval never starts the command", async () => {
     status: "declined",
   });
   const controller = new AbortController();
-  const cancelled = executionContext(scope(), controller.signal).execute(
+  // Pi's own signal for the call: what its abort reaches a tool through.
+  const cancelled = executionContext(scope()).execute(
     "bash",
     "workspace",
     "example",
     work,
     false,
     "cancelled-call",
+    controller.signal,
   );
   controller.abort();
   await expect(cancelled).rejects.toThrow();
@@ -190,7 +185,7 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
     ),
   ).toBe(false);
 });
-it("side chats cannot execute and a stopped turn's pending command cannot be approved or replayed", async () => {
+it("side chats cannot execute and a stretch that ended leaves its pending command unapprovable", async () => {
   const side = store.insertChat(run.applicationId, "Explain");
   await expect(
     executionContext(scope(side.id)).execute(
@@ -203,6 +198,7 @@ it("side chats cannot execute and a stopped turn's pending command cannot be app
     ),
   ).rejects.toThrow("read-only");
   settings("always-ask");
+  const stopped = new AbortController();
   const work = vi.fn(async () => "bad");
   const pending = executionContext(scope()).execute(
     "bash",
@@ -211,13 +207,16 @@ it("side chats cannot execute and a stopped turn's pending command cannot be app
     work,
     false,
     "stopped-call",
+    stopped.signal,
   );
   const receipt = listExecutions(run.applicationId)[0];
-  stopConversation(run.applicationId, run.chatId);
+  // What the owner of the session does when a stretch ends or a worker starts.
+  settleRunningExecutions(run.applicationId, run.chatId);
+  stopped.abort();
   expect(listExecutions(run.applicationId)[0].status).toBe("interrupted");
   expect(() => decideExecution(run.applicationId, receipt.id, true)).toThrow(
     "no longer",
   );
-  await expect(pending).rejects.toThrow("stopped");
+  await expect(pending).rejects.toThrow();
   expect(work).not.toHaveBeenCalled();
 });

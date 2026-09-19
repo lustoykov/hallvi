@@ -61,27 +61,22 @@ function render({
     },
     chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
-    messages:
-      messages ??
-      // Accepted and not yet read, there is no reply at all.
-      (status === "waiting"
-        ? [{ ...asked, status }]
-        : [
-            asked,
-            {
-              id: run.assistantMessageId,
-              chatId: chat.id,
-              role: "assistant",
-              source: "pi",
-              body,
-              createdAt: failedAt,
-              startedAt: failedAt,
-              responseTo: asked.id,
-              error: status === "failed" ? error : null,
-              status,
-              revision: 2,
-            },
-          ]),
+    messages: messages ?? [
+      asked,
+      {
+        id: run.assistantMessageId,
+        chatId: chat.id,
+        role: "assistant",
+        source: "pi",
+        body,
+        createdAt: failedAt,
+        startedAt: failedAt,
+        responseTo: asked.id,
+        error: status === "failed" ? error : null,
+        status,
+        revision: 2,
+      },
+    ],
     decisions: [],
     activity,
     piActivity,
@@ -100,6 +95,7 @@ function render({
       onArchive={vi.fn()}
       reconnecting={false}
       onStop={vi.fn()}
+      onContinue={vi.fn()}
       onTell={vi.fn()}
       onNewChat={vi.fn()}
     />,
@@ -112,7 +108,6 @@ describe("conversation recovery and assistant branding", () => {
     // that say so. With no execution and no tool call in flight, a running
     // turn is inside a model call, and "Working" was the same word it used
     // for a command building an image and for a decision nobody had noticed.
-    ["waiting", "Waiting to start"],
     ["running", "Waiting for the model"],
     // No command failed, so there is nothing to read — the run's own error is
     // runtime text and stays internal, which the assertions below guard.
@@ -211,7 +206,7 @@ describe("conversation recovery and assistant branding", () => {
     expect(html.match(/Waiting for the model/g)).toHaveLength(1);
   });
 
-  it("after a worker went away, shows what Pi still holds without pretending it is about to run", () => {
+  it("after a worker went away, offers Continue and Stop and sends nothing new until one is chosen", () => {
     const html = render({
       messages: [
         asked,
@@ -234,16 +229,18 @@ describe("conversation recovery and assistant branding", () => {
           id: "held",
           body: "Then publish it",
           status: "waiting",
-          admittedAt: failedAt,
         },
       ],
     });
     expect(html).toContain("Then publish it");
     expect(html).toContain(
-      "Pi holds this and has not read it. It runs when you continue the conversation; Stop cancels it.",
+      "Pi holds this and has not read it. Continue has Pi read it; Stop cancels it.",
     );
-    expect(html).not.toContain("Waiting to start");
-    expect(html).toContain("Stop + cancel 1 waiting");
+    expect(html).toContain("This conversation was interrupted");
+    expect(html).toMatch(/<button[^>]*>Continue<\/button>/);
+    expect(html).toMatch(/<button[^>]*>Stop<\/button>/);
+    // The interrupted reply offers no "try again" that would send something.
+    expect(html).not.toContain("Try again");
     // Nobody stopped it, and nothing claims that nothing had run.
     expect(html).toContain("Interrupted");
     expect(html).toContain("Whether the last command finished is not known");

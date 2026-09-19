@@ -526,26 +526,6 @@ async function signedRequest(
 
 // The job
 
-function changeRunning() {
-  // A response still being written is a change in flight. Read the database
-  // directly: this must not depend on the schema assertion or the app's
-  // connection, and it must stay true while the worker is between runs.
-  const path = databasePath();
-  if (!existsSync(path)) return false;
-  const reader = new Database(path, { readonly: true });
-  try {
-    return Boolean(
-      reader
-        .prepare("SELECT 1 FROM messages WHERE status = 'running' LIMIT 1")
-        .get(),
-    );
-  } catch {
-    return false;
-  } finally {
-    reader.close();
-  }
-}
-
 function record(state: ControllerProtectionState, copy: ControllerCopy) {
   const copies = [copy, ...state.copies].slice(0, 30);
   saveState({ ...state, copies });
@@ -580,7 +560,11 @@ async function applyRetention(
 
 export async function protectController(
   trigger: ControllerCopy["trigger"],
-  options: { access?: DestinationAccess } = {},
+  options: {
+    access?: DestinationAccess;
+    /** Pi is working in some conversation. The worker owns them, and says. */
+    changeRunning?: boolean;
+  } = {},
 ): Promise<ControllerCopy | null> {
   const access = options.access ?? backupDestinationAccess();
   // Nothing is connected: the view already says Hallvi is not protected,
@@ -601,7 +585,7 @@ export async function protectController(
     expiredAt: null,
     retention: { deleted: 0, failed: false },
   } satisfies Omit<ControllerCopy, "outcome">;
-  if (changeRunning())
+  if (options.changeRunning)
     return record(state, {
       ...base,
       outcome: "skipped",

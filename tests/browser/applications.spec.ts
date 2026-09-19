@@ -57,11 +57,14 @@ test(
     const endpoint = `/api/applications/${before.application.id}/chats/${before.selectedChatId}/messages`;
     const data = { message: "Hello [slow]", requestKey: crypto.randomUUID() };
     const response = await page.request.post(endpoint, { data });
+    // Answered once Pi has durably taken the message.
     expect(response.status()).toBe(202);
-    const accepted = await response.json();
-    expect(accepted.status).toBe("waiting");
+    const sent = (snapshot: { messages: { requestKey?: string }[] }) =>
+      snapshot.messages.filter((m) => m.requestKey === data.requestKey);
+    expect(sent(await response.json())).toHaveLength(1);
+    // The same send again, as after a lost answer, is still one message.
     const duplicate = await page.request.post(endpoint, { data });
-    expect((await duplicate.json()).id).toBe(accepted.id);
+    expect(sent(await duplicate.json())).toHaveLength(1);
     expect(
       (
         await page.request.post(endpoint, {

@@ -43,3 +43,7 @@ coding-agent 0.85.1's `AgentSession` does not use the harness. Hallvi depends
 only on published exports: `AgentHarness`, `JsonlSessionRepo`,
 `NodeExecutionEnv`, `createCustomMessage` and the context helpers from
 agent-core, and `ModelRuntime` and the tool definitions from coding-agent.
+
+## Addendum: what Pi already owns
+
+`pi-agent-harness-fit/ownership.mjs` shows, against published 0.85.1, the facts the revision of PR #156 rests on: a prompt is durable at `accept`, before anything runs, and is in the lane's transcript at once; a restart restores the operation open and runs nothing; `accept` with an empty prompt followed by `drive` reads an idle lane's queue under the original entry ids; `abort` on an idle lane has nothing to abort, so a queue alone is cancelled by id; and every operation's result (`completed`, `aborted`, `failed`, with the entry it ended at) is kept and readable with `getResult`. One more was found in integration rather than by the probe: a lane snapshot's transcript stops at the last compaction, so a whole conversation is read with `findEntries`.

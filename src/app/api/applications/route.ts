@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       ...(body.name ? { name: body.name } : {}),
       repositoryUrl: body.repositoryUrl,
     });
-    return NextResponse.json(getOperatorView(application.id), {
+    return NextResponse.json(await getOperatorView(application.id), {
       status: created ? 201 : 200,
     });
   });

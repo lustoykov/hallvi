@@ -1,4 +1,3 @@
-import Database from "better-sqlite3";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -10,7 +9,7 @@ import { expect, test } from "./fixtures";
 // It gets an app of its own, because no other journey should lose its worker.
 test.use({ isolatedApp: true });
 
-test("a killed worker runs nothing when it comes back, and the owner's next message resumes what Pi held", async ({
+test("without a worker nothing is accepted; after a restart nothing runs until the owner continues", async ({
   page,
   fixture,
 }, testInfo) => {
@@ -25,38 +24,45 @@ test("a killed worker runs nothing when it comes back, and the owner's next mess
     },
   });
   const view = await created.json();
-  const chatId = view.selectedChatId;
-  const db = new Database(join(fixture.state, "qa.db"));
-  const rows = () =>
-    db
-      .prepare(
-        "SELECT role, status, body, native_entry_id AS entry FROM messages WHERE conversation_id = ? AND source != 'hallvi' ORDER BY status = 'waiting', coalesce(started_at, finished_at, created_at), rowid",
-      )
-      .all(chatId) as Array<{
-      role: string;
-      status: string;
-      body: string;
-      entry: string | null;
-    }>;
+  const messages = async () =>
+    (
+      (await (
+        await page.request.get(
+          `/api/applications/${view.application.id}/chats/${view.selectedChatId}/messages`,
+        )
+      ).json()) as {
+        messages: { role: string; status: string; body: string }[];
+      }
+    ).messages
+      .slice(1)
+      .map((m) => `${m.role} ${m.status}`);
   let next: ChildProcess | undefined;
   try {
     await page.goto(`/applications/${view.application.id}`);
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     await composer.fill("Inspect the application [hold]");
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(page.locator(".hv-still-working")).toBeVisible();
+    await expect(page.locator(".hv-still-working")).toBeVisible({
+      timeout: 30_000,
+    });
     await composer.fill("Then explain the result.");
     await page.getByRole("button", { name: "Send next", exact: true }).click();
-    // Pi has taken the follow-up and named it.
-    await expect
-      .poll(() => rows().find((row) => row.status === "waiting")?.entry)
-      .toBeTruthy();
-    const heldAs = rows().find((row) => row.status === "waiting")!.entry;
+    await expect(
+      page.getByText("Pi reads this when its current work is done."),
+    ).toBeVisible();
 
     process.kill(hand.pid, "SIGKILL");
+    await expect(page.getByText("No worker is running")).toBeVisible({
+      timeout: 30_000,
+    });
+    // Nothing is accepted without the worker, and what was typed is kept.
+    await composer.fill("Is anybody there?");
+    await page.getByRole("button", { name: /^Send/ }).click();
     await expect(
-      page.getByText("The worker stopped", { exact: false }).first(),
-    ).toBeVisible({ timeout: 30_000 });
+      page.getByText("worker is not running", { exact: false }).first(),
+    ).toBeVisible();
+    await expect(composer).toHaveValue("Is anybody there?");
+    await composer.fill("");
 
     next = spawn(process.execPath, ["--import", "tsx", "src/worker.ts"], {
       cwd: hand.app,
@@ -64,49 +70,54 @@ test("a killed worker runs nothing when it comes back, and the owner's next mess
       stdio: "ignore",
     });
     await expect(
-      page.getByText("Whether the last command finished is not known", {
-        exact: false,
-      }),
+      page.getByText("This conversation was interrupted"),
     ).toBeVisible({ timeout: 60_000 });
-    // The worker is back and nothing runs: the reply stays interrupted with
-    // its draft, and the follow-up is still Pi's, under the same id, unread.
+    // The worker is back and nothing runs: history is there, the reply says
+    // what is not known, and the follow-up is still Pi's, unread.
     await page.waitForTimeout(4_000);
-    expect(rows().map((row) => `${row.role} ${row.status}`)).toEqual([
+    expect(await messages()).toEqual([
       "user delivered",
       "assistant interrupted",
       "user waiting",
     ]);
-    expect(rows()[2].entry).toBe(heldAs);
-    expect(rows()[1].body).toContain("[QA fixture reply]");
+    expect(
+      (await messages()).filter((each) => each.includes("Is anybody")),
+    ).toEqual([]);
+    await expect(
+      page.getByText("Whether the last command finished is not known", {
+        exact: false,
+      }),
+    ).toBeVisible();
     await expect(
       page.getByText("Pi holds this and has not read it.", { exact: false }),
     ).toBeVisible();
     await page.reload();
     await expect(
-      page.getByText("Pi holds this and has not read it.", { exact: false }),
+      page.getByRole("button", { name: "Continue", exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Stop", exact: true }),
+    ).toBeVisible();
+    // A new question cannot slip in ahead of that choice.
+    await composer.fill("What time is it?");
+    await expect(page.getByRole("button", { name: /^Send/ })).toBeDisabled();
+    await composer.fill("");
     await page.screenshot({
       path: testInfo.outputPath("after-worker-restart.png"),
       fullPage: true,
     });
 
-    // The owner continues. What Pi held runs first, once, then this message.
-    await composer.fill("Carry on.");
-    await page.getByRole("button", { name: /^Send/ }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(
-      page.getByText("[QA fixture reply] Carry on.", { exact: true }),
+      page.getByText("[QA fixture reply] Then explain the result.", {
+        exact: true,
+      }),
     ).toBeVisible({ timeout: 120_000 });
-    const after = rows();
-    expect(
-      after.filter((row) => row.body === "Then explain the result."),
-    ).toHaveLength(1);
-    expect(after.map((row) => row.status)).not.toContain("waiting");
-    expect(
-      after.filter((row) => row.role === "user").map((row) => row.body),
-    ).toEqual([
-      "Inspect the application [hold]",
-      "Then explain the result.",
-      "Carry on.",
+    expect(await messages()).toEqual([
+      "user delivered",
+      "assistant completed",
+      "user delivered",
+      "assistant completed",
     ]);
     await page.screenshot({
       path: testInfo.outputPath("after-continue.png"),
@@ -114,6 +125,5 @@ test("a killed worker runs nothing when it comes back, and the owner's next mess
     });
   } finally {
     next?.kill("SIGTERM");
-    db.close();
   }
 });

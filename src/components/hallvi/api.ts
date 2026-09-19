@@ -87,7 +87,7 @@ export const api = {
     requestKey: string,
     delivery: "next" | "steer" = "next",
   ) {
-    return jsonRequest<ChatMessage>(
+    return jsonRequest<ChatSnapshot>(
       `/api/applications/${applicationId}/chats/${chatId}/messages`,
       {
         method: "POST",
@@ -95,7 +95,14 @@ export const api = {
       },
     );
   },
-  /** Stop what Pi is doing here. What was waiting is settled as not started. */
+  /** Pi carries on with what an interruption left unfinished. */
+  continueConversation(applicationId: string, chatId: string) {
+    return jsonRequest(
+      `/api/applications/${applicationId}/chats/${chatId}/continue`,
+      { method: "POST" },
+    );
+  },
+  /** Pi ends what it is doing here and drops what it had queued. */
   stopConversation(applicationId: string, chatId: string) {
     return jsonRequest(
       `/api/applications/${applicationId}/chats/${chatId}/stop`,

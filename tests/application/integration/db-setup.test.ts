@@ -24,12 +24,7 @@ function tables(db: Database.Database) {
     .all()
     .map((row) => (row as { name: string }).name);
 }
-const CURRENT_TABLES = [
-  "applications",
-  "conversations",
-  "messages",
-  "saved_information",
-];
+const CURRENT_TABLES = ["applications", "conversations", "saved_information"];
 
 it("initializes a fresh database and can push its current schema again", () => {
   const { path } = temporary("test.db");

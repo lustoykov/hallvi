@@ -7,11 +7,11 @@ import { dirname } from "node:path";
 
 import { stateLocation } from "../../scripts/state-location.mjs";
 
-import { applications, chats, messages, savedInformation } from "./db-schema";
+import { applications, chats, savedInformation } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import type { ApplicationRecord, ChatMessage, Observation } from "./types";
 
-const schema = { applications, chats, messages, savedInformation };
+const schema = { applications, chats, savedInformation };
 type HallviDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
@@ -119,7 +119,7 @@ export function insertApplication(
   return application;
 }
 
-// Chats and messages
+// Chats
 
 export function insertChat(applicationId: string, title: string) {
   const chat = {
@@ -150,18 +150,17 @@ export function listApplicationChats(applicationId: string) {
     .all();
 }
 
-// The chat list shows when each chat was last active: its newest message, or
-// its creation when nothing has been sent yet.
+// The chat list shows when each chat was last written in by its owner, or its
+// creation when nothing has been sent yet.
 export function listApplicationChatSummaries(applicationId: string) {
   return listApplicationChats(applicationId).map((chat) => ({
     ...chat,
-    lastActivityAt:
-      db()
-        .select({ at: sql<string | null>`max(${messages.createdAt})` })
-        .from(messages)
-        .where(eq(messages.chatId, chat.id))
-        .get()?.at ?? chat.createdAt,
+    lastActivityAt: chat.updatedAt,
   }));
+}
+
+export function touchChat(id: string) {
+  db().update(chats).set({ updatedAt: now() }).where(eq(chats.id, id)).run();
 }
 
 export function archiveChat(id: string) {
@@ -170,50 +169,6 @@ export function archiveChat(id: string) {
     .set({ archivedAt: now() })
     .where(and(eq(chats.id, id), isNull(chats.archivedAt)))
     .run();
-}
-
-export function insertMessage(
-  chatId: string,
-  role: ChatMessage["role"],
-  body: string,
-  source: ChatMessage["source"],
-  status: ChatMessage["status"] = "completed",
-) {
-  const message = {
-    id: randomUUID(),
-    chatId,
-    role,
-    body,
-    blocks: [],
-    source,
-    createdAt: now(),
-    updatedAt: now(),
-    status,
-    revision: 0,
-  };
-  db().insert(messages).values(message).run();
-  return message;
-}
-
-export function getMessage(id: string) {
-  return db().select().from(messages).where(eq(messages.id, id)).get() ?? null;
-}
-
-export function listMessages(chatId: string) {
-  return (
-    db()
-      .select()
-      .from(messages)
-      .where(eq(messages.chatId, chatId))
-      // Transcript order: a message sits where Pi read it, or where it was
-      // settled without being read; whatever still waits comes last.
-      .orderBy(
-        sql`${messages.status} = 'waiting'`,
-        sql`coalesce(${messages.startedAt}, ${messages.finishedAt}, ${messages.createdAt})`,
-        asc(rowId),
-      )
-      .all()
-  );
 }
 
 // The latest repository access check is application configuration.

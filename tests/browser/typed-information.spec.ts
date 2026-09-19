@@ -2,6 +2,9 @@ import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
+import { exchange, scriptWorker } from "./scripted-worker";
+
+test.use({ scriptedWorker: true });
 
 test("records render in chat and their views, survive refresh, and update by record ID @journey-shared-information @smoke", async ({
   page,
@@ -23,6 +26,7 @@ test("records render in chat and their views, survive refresh, and update by rec
     )
     .get(appId) as { id: string };
   const now = new Date().toISOString();
+  let closeWorker: (() => Promise<unknown>) | undefined;
   const deployment = randomUUID(),
     access = randomUUID(),
     failed = randomUUID();
@@ -110,21 +114,24 @@ test("records render in chat and their views, survive refresh, and update by rec
           now,
           now,
         );
-    database
-      .prepare(
-        "INSERT INTO messages (id,conversation_id,role,body,source,blocks,created_at,updated_at) VALUES (?,?,'assistant','Your application is ready.','pi',?,?,?)",
-      )
-      .run(
-        randomUUID(),
-        chatId,
-        JSON.stringify([
-          { type: "saved-information", id: deployment },
-          { type: "saved-information", id: access },
-          { type: "saved-information", id: failed },
-        ]),
-        now,
-        now,
-      );
+    // Pi's side: one finished reply whose three saves asked to be shown.
+    closeWorker = await scriptWorker(fixture, () => {
+      const { replyId, messages } = exchange(chatId, "Is it ready?", {
+        body: "Your application is ready.",
+        status: "completed",
+      });
+      return {
+        status: "idle",
+        messages,
+        calls: Object.fromEntries(
+          [deployment, access, failed].map((informationId, index) => [
+            `save-${index}`,
+            { replyId, sequence: index + 1, informationId },
+          ]),
+        ),
+        said: [],
+      };
+    });
     await page.goto(`/applications/${appId}`);
     const chat = page.locator(".hv-chat-pane");
     const cards = (scope: typeof chat) =>
@@ -267,6 +274,7 @@ test("records render in chat and their views, survive refresh, and update by rec
       ),
     ).toBe(false);
   } finally {
+    await closeWorker?.();
     database.close();
   }
 });

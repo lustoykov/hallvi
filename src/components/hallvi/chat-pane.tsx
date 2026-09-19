@@ -222,6 +222,7 @@ export function ChatPane({
   onArchive,
   reconnecting,
   onStop,
+  onContinue,
   onTell,
   onNewChat,
   references,
@@ -252,6 +253,7 @@ export function ChatPane({
   reconnecting: boolean;
   /** Stop what Pi is doing here; what was waiting is never started. */
   onStop: () => void;
+  onContinue: () => void;
   /**
    * Sends Hallvi a message the owner did not have to type: a connection card
    * settled, or a rung of the access ladder was chosen. Absent, it is drafted
@@ -417,7 +419,7 @@ export function ChatPane({
    */
   const canWrite = Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || readOnly;
-  const sendDisabled = composerDisabled || !piReady;
+  const sendUnavailable = composerDisabled || !piReady;
   /**
    * The turn this conversation is still finishing, if there is one.
    *
@@ -431,14 +433,17 @@ export function ChatPane({
     (message) => message.status === "waiting",
   );
   /**
-   * Accepted, and a worker has yet to hand it to Pi. What Pi already holds
-   * after a worker went away is not about to start: it waits for the owner.
+   * Pi holds unfinished work that nobody is running: a worker went away while
+   * it was busy. Nothing runs again until the owner says which way it goes.
    */
-  const notStarted =
-    !inFlight && waiting.some((message) => !message.admittedAt);
+  const interrupted =
+    !inFlight &&
+    (waiting.length > 0 ||
+      view.messages.some((message) => message.status === "interrupted"));
+  const sendDisabled = sendUnavailable || interrupted;
   const inFlightActivity = runActivity({
     runId: inFlight?.id,
-    status: inFlight ? "running" : notStarted ? "queued" : "",
+    status: inFlight ? "running" : "",
     workerAlive,
     startedAt: inFlight?.startedAt,
     hasDraft: Boolean(inFlight?.body?.trim()),
@@ -538,11 +543,8 @@ export function ChatPane({
   const showFirstWelcome =
     firstConversation && !requestPending && pendingMessage === null;
 
-  const stopLabel = notStarted
-    ? "Cancel waiting message"
-    : waiting.length > 0
-      ? `Stop + cancel ${waiting.length} waiting`
-      : "Stop";
+  const stopLabel =
+    waiting.length > 0 ? `Stop + cancel ${waiting.length} waiting` : "Stop";
   return (
     <section className="hv-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -704,28 +706,34 @@ export function ChatPane({
                             </MessageResponse>
                           </details>
                         )}
-                        {!readOnly && !inProgress && last && (
-                          <button
-                            className="hv-run-action hv-primary-button"
-                            disabled={busy !== null}
-                            onClick={() => {
-                              if (historyUnavailable) onNewChat();
-                              else if (failure.action.kind === "ask")
-                                continueAfterSecrets(failure.action.draft!);
-                              else if (asked) onTell?.(asked.body);
-                            }}
-                            type="button"
-                          >
-                            <ArrowClockwise aria-hidden="true" weight="bold" />
-                            {historyUnavailable
-                              ? "Start a new chat"
-                              : // A command that exited non-zero will exit
-                                // non-zero again, so retrying it is a way
-                                // of not reading the error. The control
-                                // follows what actually failed.
-                                failure.action.label}
-                          </button>
-                        )}
+                        {!readOnly &&
+                          !inProgress &&
+                          last &&
+                          message.status !== "interrupted" && (
+                            <button
+                              className="hv-run-action hv-primary-button"
+                              disabled={busy !== null}
+                              onClick={() => {
+                                if (historyUnavailable) onNewChat();
+                                else if (failure.action.kind === "ask")
+                                  continueAfterSecrets(failure.action.draft!);
+                                else if (asked) onTell?.(asked.body);
+                              }}
+                              type="button"
+                            >
+                              <ArrowClockwise
+                                aria-hidden="true"
+                                weight="bold"
+                              />
+                              {historyUnavailable
+                                ? "Start a new chat"
+                                : // A command that exited non-zero will exit
+                                  // non-zero again, so retrying it is a way
+                                  // of not reading the error. The control
+                                  // follows what actually failed.
+                                  failure.action.label}
+                            </button>
+                          )}
                       </div>
                     ) : view.piActivity &&
                       hasActivity(view.piActivity, message.id) ? null : (
@@ -743,9 +751,7 @@ export function ChatPane({
                               ? "Pi reads this after its current step, before it carries on. It does not interrupt a running command or a pending approval."
                               : inFlight
                                 ? "Pi reads this when its current work is done."
-                                : message.admittedAt
-                                  ? "Pi holds this and has not read it. It runs when you continue the conversation; Stop cancels it."
-                                  : "Waiting for Pi to start."
+                                : "Pi holds this and has not read it. Continue has Pi read it; Stop cancels it."
                             : message.error}
                         </p>
                         {!readOnly && message.status !== "waiting" && last && (
@@ -913,18 +919,6 @@ export function ChatPane({
             />
           )}
 
-          {/* Accepted and not yet begun: the same live line a reply carries,
-              here because there is no reply to carry it yet. */}
-          {notStarted && (
-            <div className="hv-still-working">
-              {workerAlive !== false && (
-                <SpinnerGap className="spin" aria-hidden="true" />
-              )}
-              <span className="hv-still-what" role="status">
-                <Doing activity={inFlightActivity} />
-              </span>
-            </div>
-          )}
           {pendingMessage !== null && (
             <>
               <Message from="user">
@@ -1002,19 +996,50 @@ export function ChatPane({
             a new one.
           </p>
         )}
-        {/* Sending puts a message in a queue. If nothing is reading that
-            queue, the message sits there looking exactly like a reply being
-            written, and the only clue is a console the owner is not reading.
-            It is said here, where they are about to type. */}
+        {interrupted && !readOnly && workerAlive !== false && (
+          <div className="hv-pi-required" role="status">
+            <WarningCircle weight="bold" />
+            <div>
+              <strong>This conversation was interrupted</strong>
+              <p>
+                Hallvi stopped while Pi had work in hand. Nothing has run since,
+                and nothing will until you choose. Continue has Pi carry on from
+                where it was, without repeating a command it had started. Stop
+                ends that work and drops anything still waiting.
+              </p>
+              <p>
+                <button
+                  className="hv-run-action hv-primary-button"
+                  disabled={busy !== null}
+                  onClick={onContinue}
+                  type="button"
+                >
+                  Continue
+                </button>{" "}
+                <button
+                  className="hv-run-action"
+                  disabled={busy !== null}
+                  onClick={onStop}
+                  type="button"
+                >
+                  Stop
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
+        {/* Only the worker can hand a message to Pi. Without one nothing is
+            accepted, and that is said here, where the owner is about to
+            type, rather than after they have sent it. */}
         {application && piReady && workerAlive === false && (
           <div className="hv-pi-required">
             <WarningCircle weight="bold" />
             <div>
               <strong>No worker is running</strong>
               <p>
-                Messages are saved and stay queued. Restart Hallvi with{" "}
-                <code>hallvi restart</code>, then check it with{" "}
-                <code>hallvi status</code>.
+                Nothing can be sent or shown until it runs again; what you have
+                typed is kept. Restart Hallvi with <code>hallvi restart</code>,
+                then check it with <code>hallvi status</code>.
                 {process.env.NODE_ENV === "development" && (
                   <>
                     {" "}
