@@ -1,4 +1,3 @@
-import { linkActivityExecution, settleActivity } from "./pi-activity";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
@@ -248,17 +247,16 @@ export function executionContext(
       save();
     };
     save();
-    linkActivityExecution(run.applicationId, toolCallId, record.id);
     try {
       if (needsApproval) {
         let decision;
         while (!(decision = read<{ approved: boolean }>(`${path}.decision`)))
           await delay(150, undefined, { signal });
         if (!decision.approved) {
+          // The runtime is handed an ordinary result, not an error, so what
+          // a reader is told about this call is this record's status, not the
+          // tool result Pi kept.
           record.status = "declined";
-          // The runtime is handed an ordinary result, not an error, so the
-          // activity record would otherwise keep claiming this succeeded.
-          settleActivity(run.applicationId, toolCallId, "declined");
           return { declined: true };
         }
         record.approvalId = record.id;

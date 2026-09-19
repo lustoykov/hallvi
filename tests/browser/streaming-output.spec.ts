@@ -3,7 +3,7 @@ import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExecutionRecord } from "../../src/server/operator-execution";
 import { test, expect } from "./fixtures";
-import { exchange, scriptWorker, seedToolCall } from "./scripted-worker";
+import { exchange, scriptWorker } from "./scripted-worker";
 
 test.use({ scriptedWorker: true });
 
@@ -33,18 +33,19 @@ test("server output streams inline, preserves reading position and stays readabl
     return {
       status: "working",
       messages,
-      calls: { "call-1": { replyId, sequence: 1 } },
+      calls: {
+        "call-1": {
+          replyId,
+          sequence: 1,
+          tool: "server_bash",
+          args: {},
+          at: new Date().toISOString(),
+        },
+      },
       said: [],
     };
   });
   const runId = chat.id;
-  seedToolCall(fixture, {
-    applicationId: appId,
-    chatId: chat.id,
-    toolCallId: "call-1",
-    tool: "server_bash",
-    executionId,
-  });
   const directory = join(fixture.state, "operator", appId, "executions");
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `${executionId}.json`);

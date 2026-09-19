@@ -1,7 +1,13 @@
 import {
   BACKGROUND_CONTEXT,
   JsonlSessionRepo,
+  laneState,
+  operationMeta,
+  operationResult,
+  pendingEntry,
+  type Entry,
   type JsonlSessionMetadata,
+  type LaneQueuedItem,
   type Session,
 } from "@earendil-works/pi-agent-core";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
@@ -117,6 +123,9 @@ function inspectEarlierHistory(path: string, expectedId: string | null) {
   return true;
 }
 
+/** The lane every Hallvi conversation runs in; Pi keeps its state under it. */
+const LANE = "main";
+
 export type NativeSession = Session<JsonlSessionMetadata>;
 
 /**
@@ -187,4 +196,77 @@ export async function openNativeChatSession(
 /** Remove every history an application has. */
 export function removeNativeSessions(applicationId: string) {
   rmSync(applicationDirectory(applicationId), { recursive: true, force: true });
+}
+
+/**
+ * A conversation nobody is running, read from Pi's stored session alone.
+ *
+ * Opening a conversation to answer it needs Pi's model runtime: credentials,
+ * a workspace, the tool list. Reading one needs none of that, and asking for
+ * it meant an expired ChatGPT login hid the history it had nothing to do with.
+ * This reads what Pi durably wrote — the branch, the lane's own state, and how
+ * its operations ended — through Pi's own API and no runtime at all. It starts
+ * nothing, changes no setting, and writes nothing except the session id the
+ * first open records.
+ */
+export async function readNativeConversation(
+  applicationId: string,
+  chatId: string,
+): Promise<{
+  entries: Entry[];
+  abortedAt: Set<string>;
+  lane: {
+    operation: { id: string; startedAt: number } | null;
+    queues: LaneQueuedItem[];
+  };
+}> {
+  const native = await openNativeChatSession(applicationId, chatId);
+  const ctx = BACKGROUND_CONTEXT;
+  try {
+    const { session } = native;
+    const branch = await session.branch(LANE, ctx);
+    const entries = branch
+      ? await branch.findEntries({ order: "oldestFirst" }, ctx)
+      : [];
+    const state = (await session.getValue(laneState(LANE), ctx))?.value;
+    // What Pi is holding for this conversation, in the order it will read it.
+    const queues: LaneQueuedItem[] = [];
+    for (const item of state?.inbox ?? []) {
+      const held = (await session.getValue(pendingEntry(item.entryId), ctx))
+        ?.value;
+      if (held?.type === "message")
+        queues.push({
+          entryId: item.entryId,
+          kind: item.kind,
+          type: "message",
+          message: held.payload,
+        });
+    }
+    // An operation still open when the worker went away: Pi's record of it is
+    // what says the conversation was interrupted rather than finished.
+    const open = state?.currentOperationId ?? null;
+    const meta = open
+      ? (await session.getValue(operationMeta(open), ctx))?.value
+      : undefined;
+    const abortedAt = new Set<string>();
+    for (const id of [state?.currentOperationId, state?.lastOperationId]) {
+      const result = id
+        ? (await session.getValue(operationResult(id), ctx))?.value
+        : undefined;
+      if (result?.status === "aborted" && result.tipId)
+        abortedAt.add(result.tipId);
+    }
+    return {
+      entries,
+      abortedAt,
+      lane: {
+        operation: open
+          ? { id: open, startedAt: meta?.startedAt ?? Date.now() }
+          : null,
+        queues,
+      },
+    };
+  } finally {
+    await native.release();
+  }
 }

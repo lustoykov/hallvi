@@ -1,5 +1,4 @@
 import { controllerProtectionFacts } from "./controller-protection";
-import { listActivity } from "./pi-activity";
 import { chatSnapshot } from "./pi-conversation";
 import { listExecutions } from "./operator-execution";
 import { listSecrets } from "./application-secrets";
@@ -50,7 +49,7 @@ export async function getOperatorView(
       connected: access.connected,
     },
     executions: conversation?.executions ?? listExecutions(applicationId),
-    piActivity: conversation?.piActivity ?? listActivity(applicationId),
+    piActivity: conversation?.piActivity ?? [],
     worker: conversation?.worker,
     chats,
     selectedChatId: selected?.id ?? null,

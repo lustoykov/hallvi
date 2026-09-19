@@ -166,7 +166,6 @@ export type PiToolEvent =
   | { type: "message"; sequence: number; text: string };
 
 export interface PiSessionEvents {
-  onText?: (text: string) => void;
   /** Every tool call, in order, with what went in and what came back. */
   onTool?: (event: PiToolEvent) => void;
   onActivity?: (event: ExecutionSignal) => void;
@@ -292,7 +291,6 @@ export async function openPiSession(
             defineTool({
               name: "save_information",
               label: "Save application information",
-              executionMode: "sequential",
               description:
                 "Save/update a record, or retire one by ID. record: {title, body, evidence:[{type:'execution',id} or {type:'url',url}], establishedAt:ISO timestamp|null, presentation:null or {about?:[{kind,id}],states?:{ref:{kind,id},presence:'present'|'absent'},views:string[],role:'recommendation'|'status'|'outcome',status:'info'|'verified'|'failed'|'warning',checks:[{key,label,status:'passed'|'failed'|'info',claim,basis,about?:{kind,id},detail?,freshFor?}],facts:[{key,label,value,claim,basis,mono?,freshFor?}],nextStep?:string,url?:http URL,content?:{kind:'deployment',repositoryUrl,revision,server,changes:string[],image?,services?:[{process,image,digest?}]}|{kind:'application-access',mode:'private'|'public',server,localPort?:number,remotePort?:number}|{kind:'topology',from:'observed'|'plan',parts:[{id,kind,name,role,plain,owner?}],edges:[{from,to,network,label?}]}|{kind:'access-log',proxy,format:'caddy-json',source:{type:'container',name}|{type:'file',path}}}}. Private access requires a 127.0.0.1 URL matching localPort and a remotePort. Omit presentation for knowledge kept for future work. showInChat renders a surfaced record in this response. Never store secrets.",
               parameters: Type.Object({
@@ -368,7 +366,6 @@ export async function openPiSession(
           defineTool({
             name: "open_server_port",
             label: "Open private application access",
-            executionMode: "sequential",
             description:
               "Open or reuse an SSH tunnel from this controller PC's 127.0.0.1 to a loopback port on the connected server. Returns a local HTTP URL; verify the app separately. Omit localPort unless you need a particular one: an installation keeps private links on ports its owner forwards to their browser, picks a free one for you, and refuses ports outside them. Does not change the server's listeners/firewall. If the local port on this PC is occupied, choose another and carry on: picking a free port is bookkeeping, not a decision, and it needs no approval and no mention beyond the address you end up giving. A port in use on this PC says only that this PC is using it — it is not evidence about the server, and it never means another application has taken the deployment host. A port already in use on the *server* is a different matter: find out what is listening before you take it or move around it, and if the answer is that something else is deployed there, that is a question about which machine this application should be on and it goes to the owner. The URL works on this PC while the tunnel is alive, and in the owner's browser on another machine only when the result's access says this installation's ports are forwarded to it; give the URL as returned either way. No credentials or arbitrary bind addresses are accepted.",
             parameters: Type.Object({
@@ -399,7 +396,6 @@ export async function openPiSession(
           defineTool({
             name: "hetzner_request",
             label: "Hetzner Cloud request",
-            executionMode: "sequential",
             description:
               "Call the connected Hetzner Cloud REST API. Supply method, relative path including query parameters, and optional JSON body. No token/header arguments. Inspect live catalogs/pricing and resources, then choose API calls yourself. Provider requests use the application's normal permission mode and execution log. No automatic retries. Never supply secrets in the body; register server_public_key and supply that SSH key ID when creating servers. If Hetzner is not connected, call request_connection rather than naming Settings.",
             parameters: Type.Object({
@@ -436,7 +432,6 @@ export async function openPiSession(
           defineTool({
             name: "server_public_key",
             label: "Prepare server access key",
-            executionMode: "sequential",
             description:
               "Get or generate this application's controller-managed SSH key. Returns only the public key for provider registration or installation by the owner. Private key stays on the controller.",
             parameters: Type.Object({}, { additionalProperties: false }),
@@ -461,7 +456,6 @@ export async function openPiSession(
           defineTool({
             name: "connect_server",
             label: "Verify and connect server",
-            executionMode: "sequential",
             description:
               "Verify SSH with this application's managed key, then save its server connection. For Hetzner supply serverId; address is fetched from the provider and its SSH host key is pinned on first use. For an existing machine supply address and a SHA256 ED25519 hostKeyFingerprint from the owner's trusted terminal. The public key must already be installed. Optional user (root by default), port (22), fingerprint. Does not install software or deploy the application.",
             parameters: Type.Object({
@@ -492,7 +486,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "server_bash",
-            executionMode: "sequential",
             label: "Run on server",
             description:
               'Run a Bash script on the connected application server. Use ordinary shell tools to inspect, deploy, configure or repair it. Returns output and exit code. The timeout closes SSH; a remote process may continue, so inspect when completion is uncertain. To use a secret the owner supplied, list its name in secrets and refer to it in the command as an ordinary variable — secrets:["POSTGRES_PASSWORD"] with the command using "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs. Never write a value or a {{secret:NAME}} handle into the command itself: a value spliced into a command is shell syntax rather than data, and the command is refused.',
@@ -546,7 +539,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "request_connection",
-            executionMode: "parallel",
             label: "Ask where it should run",
             description:
               "Ask the owner for a place to run this application, when none is attached yet. It puts one guided card in the conversation with both ways in: rent a Hetzner server (the card walks them through making the project API token, checks it can read and write, and saves it on the controller) or use a machine they already have (one command on the machine, then the controller pins its host key, verifies SSH, administrator rights, system and Docker, and attaches it). Call this instead of sending the owner to Settings, asking for a token, or walking them through SSH yourself. `needs` is one plain sentence on what the application requires of a server; `estimate` is the monthly cost you read from Hetzner's live prices, or 'a few euros a month' if Hetzner is not connected yet; `recommended` is your recommendation, which the owner can override. Then end your turn: a message arrives when a place is connected, saying which. After 'hetzner' use hetzner_request as usual; this application's SSH key may already be registered in the project under the name hallvi-<application id> (the card's write check does that), so look it up with GET /ssh_keys first and register it only when it is missing. After 'machine' the host is already attached and verified: go straight to server_bash.",
@@ -576,7 +568,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "request_domain_access",
-            executionMode: "parallel",
             label: "Ask how to reach the domain's DNS",
             description:
               "When the owner wants the application at a name and you cannot write its DNS record (check_domain or set_domain_record says Cloudflare is not connected, or the zone is not visible), call this with the exact hostname instead of asking for a token or sending them to Settings. It puts one card in the conversation that looks up who runs the domain's DNS and then either guides a Cloudflare token limited to that zone, or shows the single record to add by hand at any other provider and watches public DNS for it. Then end your turn: a message arrives saying which happened. After 'cloudflare', write the record with set_domain_record; that write is also the first proof the token can edit DNS. After 'manual', the record already resolves to the server: do not call set_domain_record, carry on with the certificate and verification.",
@@ -594,7 +585,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "request_secret",
-            executionMode: "parallel",
             label: "Ask for a secret",
             description:
               'Ask the owner for a value you must never see: a password, an API key, a token the application needs. Name it after the environment variable the application reads, in capitals with underscores, at least eight characters long, and say plainly in `why` what it is for so the owner can judge it. To use it afterwards, list the name in server_bash\'s secrets argument and refer to it in your script as "$NAME": the privileged layer exports it before the script runs, so the value never appears in the command, the record, the activity or the log. There is no tool that reads a value back. If no value has been supplied yet the command fails rather than running with a blank — say what you are waiting for and stop.',
@@ -615,7 +605,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "generate_secret",
-            executionMode: "parallel",
             label: "Generate a credential",
             description:
               "Have the controller generate a credential the application needs and nobody has to type: a database role password, an internal service token. Use this rather than inventing a value yourself — a password you write is in your context, your transcript and every artifact made from either, and it is not random. The controller generates 192 bits from the system random source, seals it, and returns only the name and its length. Name it after the environment variable the application reads, in capitals with underscores, and say in `why` which service uses it. Use it exactly as a supplied secret: list the name in server_bash's secrets argument and refer to it as \"$NAME\". Calling this again for a name that already has a value returns that value's reference and tells you it was reused — it does not make a second password, so a retry cannot leave the running service on a value the controller has replaced. There is no tool that reads it back; the owner can reveal it in the application's own pages. To replace an established credential, do not call this: changing one is an operational change that has to reach the service too.",
@@ -636,7 +625,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "begin_credential_change",
-            executionMode: "sequential",
             label: "Begin a credential change",
             description:
               'Start replacing an established credential. The controller generates the replacement and keeps the outgoing value, so during the change server_bash gives you both: "$NAME" is what the credential is becoming, and "$NAME_PREVIOUS" is the one the service accepted before you started. Nothing is current yet. Changing a password is an operational change and not an edit to a stored value: update the account on the service itself, update whatever configuration the application reads, restart or reconnect what holds a connection, then prove the new credential works by doing something real with the application — not by a command exiting zero. Then call settle_credential_change. Until you do, the page says a change is part-way through and claims nothing. Both values stay sealed until you settle, and settling with outcome "unresolved" keeps them both, so there is no step of this where the only working password can be lost. You cannot pass a value, and neither can the owner through you: replacements are generated by the controller. If the owner wants to choose one, say that this version does not support it rather than inventing a way. Only one change per credential at a time, and beginning again is refused while one is unsettled — that refusal is what keeps the working password from being thrown away by a second attempt.',
@@ -661,7 +649,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "settle_credential_change",
-            executionMode: "sequential",
             label: "Settle a credential change",
             description:
               'Finish a change you began, or say that you could not. Each outcome discards a value or keeps both, so choose by what you have actually proved. "established" keeps the new credential and forgets the old one: say it only when the new value worked against the service and the application behaved. "reverted" keeps the old credential and forgets the new one: say it only when you have proved the service still accepts the old value — asked it and been let in — because if the service already took the new password, discarding it deletes the only one that works and locks the application out. "unresolved" is the answer whenever you cannot tell which password the service now has, including when a command failed part-way through: it keeps both values sealed and both exported to server_bash, and it changes nothing except that the page stops implying the question is settled. Prefer it to guessing. Then go and find out — authenticate with $NAME, and if that is refused authenticate with $NAME_PREVIOUS — and settle again with what you learned. "The command exited zero" is not proof; "the application answered and its data is there" is.',
@@ -694,7 +681,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "fetch_backup_copy",
-            executionMode: "sequential",
             label: "Copy a backup off the server",
             description:
               'Pull one file from the application server onto the computer running Hallvi, which is a destination that survives losing the application\'s server. Give an absolute remotePath on the server and say in covers what the copy is of. The controller asks the server for the file\'s size and digest, copies it over the connection it already owns, and checks the digest on arrival: a copy that does not match is deleted rather than kept, so there is never a half-file to mistake for a backup. It returns the size, the digest and the words to use for the destination — record a backup-copy with destination-kind "controller" and those facts. This is not object storage and the record must not imply it is: it depends on this computer existing and being reachable. Say that in the body. Do not use this for a copy that belongs beside the application; that is an ordinary server_bash write with destination-kind "same-server".',
@@ -708,7 +694,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "list_backup_copies",
-            executionMode: "parallel",
             label: "List copies held here",
             description:
               "The backup copies held on the computer running Hallvi for this application, newest first, with their sizes and times. Read this before taking another one, so a plan that says it keeps seven copies can be checked against what is actually here rather than what a schedule intended.",
@@ -721,7 +706,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "prune_backup_copies",
-            executionMode: "sequential",
             label: "Apply retention here",
             description:
               "Delete the oldest copies held on this computer beyond the number to keep, and report exactly which were removed. Retention is the part of a backup plan that quietly stops working, so it runs where the files are rather than as a line in a host crontab nobody reads. Keep at least one.",
@@ -732,7 +716,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "list_secrets",
-            executionMode: "parallel",
             label: "List secrets",
             description:
               "The secrets this application has asked for: each name, why it was asked for, and whether the owner has supplied a value. Never values — nothing returns those.",
@@ -743,7 +726,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "check_domain",
-            executionMode: "parallel",
             label: "Read a DNS record",
             description:
               "Read back what the DNS provider holds for one name: whether a record exists, its type, what it points at, and whether the provider proxies the name rather than handing out the origin address. This is a configuration reading and nothing else — it never tells you that anything answers. A proxied name resolves, serves a valid certificate and returns an error page while the origin behind it is dead, so prove reachability separately by asking for the name over HTTP and record that as its own check.",
@@ -784,7 +766,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "set_domain_record",
-            executionMode: "sequential",
             label: "Point a name at this server",
             description:
               "Create, change or remove one DNS record at the provider: one exact name and one exact type per call, so nothing else in the zone can be touched. action 'set' needs content — the IPv4 for an A, the IPv6 for an AAAA, the target for a CNAME — and refuses to take over a name that already points somewhere else unless you pass replace, which is a decision to put to the owner rather than make. action 'remove' needs the content you expect to find and refuses when it does not match, so withdrawing this application never deletes somebody else's record. Leave proxied off while a certificate is being issued and while you are verifying: a proxied name serves the provider's certificate from the provider's addresses, so nothing you check afterwards is the origin's. The result says what stood there before and what other address records the name still has — read that, because a leftover AAAA is preferred by browsers and breaks the name for everyone who has IPv6. Writing a record is configuration, never evidence: verify with check_public_access.",
@@ -823,7 +804,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "check_public_access",
-            executionMode: "sequential",
             label: "Check from outside",
             description:
               "Ask the internet what it can see, from this controller PC rather than from the server. Give url to check a public name end to end: what public DNS hands out for both address families, what certificate each of those addresses serves and whether it is trusted and covers the name, what an ordinary HTTPS request gets back, and what plain HTTP does. Give expectAddress — the server's own public address — so an edge in front of the origin can be told from the origin itself; without it a proxied name that is serving the provider's error page reads exactly like a working site. Give ports to try TCP ports that must stay private, such as a database or a broker: refused or dropped from out here is the only evidence that they are shut, since a port bound to the host's loopback refuses on the server no matter how open it is to the world. This is the external check the server cannot perform on itself, and it establishes a moment rather than a state.",
@@ -852,7 +832,6 @@ export async function openPiSession(
           }),
           defineTool({
             name: "request_approval",
-            executionMode: "sequential",
             label: "Ask for approval",
             description:
               "In Pi decides mode, ask the user to approve the proposed action before proceeding. Describe the concrete action and its effects. Bypass returns immediately. Always ask already prompts at execution; do not request duplicate approval there.",
@@ -887,7 +866,6 @@ export async function openPiSession(
         ["bash", "powershell", "write", "edit"].includes(tool.name)
           ? {
               ...tool,
-              executionMode: "sequential" as const,
               async execute(id: string, args: unknown, signal?: AbortSignal) {
                 const result = await execution.execute(
                   tool.name,
@@ -926,10 +904,11 @@ export async function openPiSession(
         ].join("\n\n"),
         tools: tools.map((tool) => forHarness(tool as DefinedTool)),
         activeToolNames: tools.map((tool) => tool.name),
-        // The harness has one setting for a whole turn's tool calls and does
-        // not read a tool's own executionMode. Every call that changes a
-        // server, a file or a record was sequential; one at a time for all of
-        // them keeps that, at the cost of reads no longer overlapping.
+        // One setting for a whole turn's tool calls; the harness has no
+        // per-tool one, so Hallvi's tools declare none. Every call that
+        // changes a server, a file or a record has to be sequential, and one
+        // at a time for all of them keeps that, at the cost of reads no
+        // longer overlapping.
         toolExecution: "sequential",
         // One message per turn, as the conversation shows them.
         steeringMode: "one-at-a-time",
@@ -972,7 +951,6 @@ export async function openPiSession(
 
 /** Pi's events as Hallvi records them. `reply()` restarts per-reply keys. */
 export function watchPiSession(harness: PiHarness, options: PiSessionEvents) {
-  let response = "";
   let generation = 0;
   let compaction = 0;
   let retry = 0;
@@ -1039,17 +1017,11 @@ export function watchPiSession(harness: PiHarness, options: PiSessionEvents) {
     }),
     harness.events.on("message_start", (event) => {
       if (event.message.role !== "assistant") return;
-      response = "";
       options.onActivity?.({
         type: "start",
         key: `model:${++generation}`,
         kind: "model",
       });
-    }),
-    harness.events.on("message_update", (event) => {
-      if (event.event.type !== "text_delta") return;
-      response += event.event.delta;
-      options.onText?.(response);
     }),
     harness.events.on("message_end", ({ message }) => {
       if (message.role !== "assistant") return;
@@ -1082,7 +1054,6 @@ export function watchPiSession(harness: PiHarness, options: PiSessionEvents) {
   return {
     unsubscribe: () => off.forEach((stop) => stop()),
     reply() {
-      response = "";
       generation = compaction = retry = toolSequence = 0;
     },
   };
