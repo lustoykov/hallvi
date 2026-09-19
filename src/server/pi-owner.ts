@@ -36,7 +36,7 @@ import {
 import { settleRunningExecutions } from "./operator-execution";
 import { beginRunDiagnostics } from "./tracing";
 import type { PiReply } from "./types";
-import { WorkerRefusal } from "./worker-link";
+import { serveWorker, WorkerRefusal } from "./worker-link";
 
 export interface Scope {
   applicationId: string;
@@ -77,6 +77,9 @@ const toPi = (message: SentMessage): AgentMessage =>
     [MESSAGE_TAG]: message.id,
   }) as AgentMessage;
 
+/** The operation in which Pi reads its queue, named after its first entry. */
+const queueOperation = (entryId: string) => `queue:${entryId}`;
+
 const NOTHING: Transcript = {
   status: "idle",
   messages: [],
@@ -87,13 +90,6 @@ const NOTHING: Transcript = {
 export function sessionOwner(
   options: { signal?: AbortSignal; stopTimeoutMs?: number } = {},
 ) {
-  // A crash never reaches a worker's own cleanup, so evidence still marked
-  // running belongs to work that no longer exists. Pi's sessions are left as
-  // they are: nothing is opened, and nothing runs, until somebody asks.
-  for (const applicationId of applicationsWithActivity())
-    settleRunningActivity(applicationId, null);
-  for (const { id } of listApplications()) settleRunningExecutions(id, null);
-
   /** The worker is going away: Pi keeps what it has, and nothing goes on. */
   let closing = false;
   const opened = new Map<string, Opened>();
@@ -126,14 +122,19 @@ export function sessionOwner(
           { order: "oldestFirst" },
           ctx,
         );
-        // A prompt's operation is named after its message. Pi keeps how each
-        // one ended, and the entry it ended at.
+        // Pi keeps how each operation ended, and the entry it ended at. An
+        // operation begins at one of the owner's messages and is named after
+        // it: a prompt's after the message's own id, a queue read's after the
+        // entry id of the first message Pi read from the queue.
         const abortedAt = new Set<string>();
         for (const entry of entries) {
-          const id = entry.type === "message" && tagOf(entry.message);
-          const result = id && (await session.lane.getResult(id, ctx));
-          if (result && result.status === "aborted" && result.tipId)
-            abortedAt.add(result.tipId);
+          if (entry.type !== "message" || entry.message.role !== "user")
+            continue;
+          for (const id of [tagOf(entry.message), queueOperation(entry.id)]) {
+            const result = id && (await session.lane.getResult(id, ctx));
+            if (result && result.status === "aborted" && result.tipId)
+              abortedAt.add(result.tipId);
+          }
         }
         read = { tipId, entries, abortedAt };
       }
@@ -235,7 +236,7 @@ export function sessionOwner(
         const next = await inLine(conversation.chatId, async () => {
           const { queues, operation } = await conversation.fresh();
           if (settled && queues.length && !operation)
-            return `queue:${queues[0].entryId}`;
+            return queueOperation(queues[0].entryId);
           // Whatever a call never reported ending did not survive the stretch.
           settleRunningActivity(
             conversation.applicationId,
@@ -390,7 +391,7 @@ export function sessionOwner(
             if (!resumed.ok) throw new Error(resumed.error.message);
           });
         else {
-          const operationId = `queue:${snapshot.queues[0].entryId}`;
+          const operationId = queueOperation(snapshot.queues[0].entryId);
           try {
             await accept(live, operationId, []);
           } catch (error) {
@@ -449,6 +450,19 @@ export function sessionOwner(
   };
 
   return {
+    /**
+     * A crash never reaches a worker's own cleanup, so evidence still marked
+     * running belongs to work that no longer exists. Only the owner may say
+     * so: a process that has yet to find out whether another worker is serving
+     * would be settling that worker's live approvals. Pi's sessions are left
+     * as they are: nothing is opened, and nothing runs, until somebody asks.
+     */
+    recover() {
+      for (const applicationId of applicationsWithActivity())
+        settleRunningActivity(applicationId, null);
+      for (const { id } of listApplications())
+        settleRunningExecutions(id, null);
+    },
     handle(action: string, body: unknown) {
       const act = actions[action as keyof typeof actions] as
         ((...input: unknown[]) => Promise<unknown>) | undefined;
@@ -466,4 +480,13 @@ export function sessionOwner(
       await Promise.all([...opened.values()].map((open) => open.close()));
     },
   };
+}
+
+/** Become the owner of Pi's sessions for this database, unless there is one. */
+export async function ownSessions(
+  options: Parameters<typeof sessionOwner>[0] = {},
+) {
+  const owner = sessionOwner(options);
+  const server = await serveWorker(owner.handle, owner.recover);
+  return server ? { owner, server } : null;
 }

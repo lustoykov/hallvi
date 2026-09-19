@@ -1,8 +1,7 @@
 import { cleanupPiWorkspaces } from "./pi-workspace";
 import { copyDue, protectController } from "./controller-protection";
 import { setTimeout as delay } from "node:timers/promises";
-import { sessionOwner } from "./pi-owner";
-import { serveWorker } from "./worker-link";
+import { ownSessions } from "./pi-owner";
 
 /**
  * Another worker already serves this database. Not a failure: it answers the
@@ -31,12 +30,12 @@ async function keepControllerCopy(
 }
 
 export async function runPiWorker(signal: AbortSignal) {
-  const owner = sessionOwner({ signal });
-  const server = await serveWorker(owner.handle);
-  if (!server)
+  const owned = await ownSessions({ signal });
+  if (!owned)
     throw new PiWorkerBusyError(
       "A Pi worker is already running for this database.",
     );
+  const { owner, server } = owned;
   try {
     // A send is answered once Pi has the message, so the first one should
     // not also wait for the SDK to load.

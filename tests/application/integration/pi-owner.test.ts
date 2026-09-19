@@ -9,9 +9,10 @@ import {
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
-import type { Server } from "node:http";
+import { once } from "node:events";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -66,20 +67,21 @@ import {
   saveOperatorSettings,
 } from "../../../src/server/operator-execution";
 import { openPiSession } from "../../../src/server/pi";
-import { sessionOwner } from "../../../src/server/pi-owner";
+import { ownSessions } from "../../../src/server/pi-owner";
 import { MESSAGE_TAG } from "../../../src/server/pi-transcript";
 import {
-  serveWorker,
+  askWorker,
   WorkerRefusal,
   WorkerUnavailableError,
 } from "../../../src/server/worker-link";
+import { workerSocketPath } from "../../../scripts/worker-socket.mjs";
 import { pushTestDatabase } from "../../test-database";
 
 let root: string;
 /** What each model request ended with, in order: the scripted model's view. */
 let requests: string[];
 let contextUsed = 10;
-let worker: { server: Server; owner: ReturnType<typeof sessionOwner> } | null;
+let worker: NonNullable<Awaited<ReturnType<typeof ownSessions>>> | null;
 
 function assistant(
   model: Model<Api>,
@@ -223,17 +225,18 @@ beforeAll(async () => {
 });
 
 async function startWorker() {
-  const owner = sessionOwner({ stopTimeoutMs: 2_000 });
-  const server = await serveWorker(owner.handle);
-  if (!server) throw new Error("A worker already answers.");
-  worker = { server, owner };
+  worker = await ownSessions({ stopTimeoutMs: 2_000 });
+  if (!worker) throw new Error("A worker already answers.");
 }
 /** As a worker that dies: Pi is told nothing, and keeps what it had. */
 async function loseWorker() {
   if (!worker) return;
+  const closed = once(worker.server, "close");
   worker.server.close();
   worker.server.closeAllConnections();
   await worker.owner.close();
+  // Ownership goes with the server: the next worker can only start after it.
+  await closed;
   worker = null;
 }
 
@@ -600,6 +603,106 @@ it("leaves retrying, compaction and failure to Pi, and gives the page advice ins
   expect(JSON.stringify(await a.snapshot())).not.toContain("invalid_grant");
 });
 
-it("a second worker steps aside", async () => {
-  expect(await serveWorker(async () => ({}))).toBeNull();
+it("Stop after continuing an idle lane's queue says stopped, from the result of the operation Pi read the queue in", async () => {
+  const a = application("shop");
+  await a.send("hello");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  await loseWorker();
+  const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
+  await direct.lane.followUp(
+    {
+      role: "user",
+      content: [{ type: "text", text: "[approve] restart it" }],
+      timestamp: Date.now(),
+      [MESSAGE_TAG]: "late-approval",
+    } as never,
+    undefined,
+    ctx,
+  );
+  await direct.close();
+  await startWorker();
+
+  await a.continue();
+  await until(() => expect(approval(a.id)).toBeTruthy());
+  await a.stop();
+  expect(await a.status()).toBe("idle");
+  expect((await a.transcript()).slice(-2)).toEqual([
+    "you [delivered] [approve] restart it",
+    "pi [cancelled] I will ask first.",
+  ]);
+  expect(listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
 });
+
+it("a second worker steps aside without touching what the first is doing", async () => {
+  const a = application("shop");
+  await a.send("[approve] restart it");
+  await until(() => expect(approval(a.id)).toBeTruthy());
+  const waiting = approval(a.id)!.id;
+
+  // Everything a starting worker does, while another one owns the sessions.
+  expect(await ownSessions()).toBeNull();
+  expect(approval(a.id)?.id).toBe(waiting);
+  expect((await a.snapshot()).worker).toEqual({ alive: true });
+
+  decideExecution(a.id, waiting, true);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect((await a.transcript()).at(-1)).toBe("pi [completed] finished");
+});
+
+it("of workers starting in the same instant over a dead worker's socket, exactly one becomes the owner", async () => {
+  await loseWorker();
+  // A worker that was killed leaves its socket path behind, unanswered.
+  const path = workerSocketPath(process.env.HALLVI_DB_PATH!);
+  const dead = spawn(process.execPath, [
+    "-e",
+    "require('net').createServer().listen(process.argv[1], () => process.stdout.write('up'))",
+    path,
+  ]);
+  await once(dead.stdout, "data");
+  dead.kill("SIGKILL");
+  await once(dead, "exit");
+  expect(existsSync(path)).toBe(true);
+
+  // Separate processes, as workers are: each tries to become the owner, says
+  // whether it did, and an owner keeps serving until it is stopped, so a slow
+  // starter cannot become a second owner honestly, after the first has gone.
+  const starters = Array.from({ length: 6 }, () =>
+    spawn(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "-e",
+        `import("./src/server/worker-link.ts").then(async ({ serveWorker }) => {
+          const server = await serveWorker(async () => ({ pid: process.pid }));
+          process.stdout.write(server ? "owner" : "busy");
+        })`,
+      ],
+      { env: process.env, stdio: ["ignore", "pipe", "inherit"] },
+    ),
+  );
+  const said = await Promise.all(
+    starters.map(
+      (starter) =>
+        new Promise<string>((resolve, reject) => {
+          starter.stdout.once("data", (data) => resolve(String(data)));
+          starter.once("exit", (code) =>
+            reject(new Error(`A starter exited (${code}) without saying.`)),
+          );
+        }),
+    ),
+  );
+  expect(said.filter((each) => each === "owner")).toHaveLength(1);
+  expect(said.filter((each) => each === "busy")).toHaveLength(5);
+  // The owner is the one that answers at the path.
+  const owner = starters[said.indexOf("owner")];
+  expect(await askWorker<{ pid: number }>("anything", {})).toEqual({
+    pid: owner.pid,
+  });
+  owner.kill("SIGTERM");
+  await Promise.all(
+    starters.map(
+      (starter) => starter.exitCode !== null || once(starter, "exit"),
+    ),
+  );
+}, 120_000);

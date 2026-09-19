@@ -44,7 +44,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Waiting message**: A message Pi has durably taken and not read yet: an entry in Pi's queue, under the id its sender gave it. Pi orders it, reads it, or drops it on Stop. After a worker goes away it keeps waiting until the owner continues or stops the conversation.
 
-**Session owner** (`pi-owner.ts`, `worker-link.ts`): The worker, as the only process that opens a Pi session. The app asks it over `worker.sock` to read, send, continue, stop or forget; a send is answered once Pi has durably taken the message. **Interrupted** means Pi holds an open operation or a queue that this worker is not running: nothing runs until the owner chooses Continue or Stop.
+**Session owner** (`pi-owner.ts`, `worker-link.ts`): The worker, as the only process that opens a Pi session: the one holding the owner's lock, which the operating system releases when it ends. The app asks it over `worker.sock` to read, send, continue, stop or forget; a send is answered once Pi has durably taken the message. **Interrupted** means Pi holds an open operation or a queue that this worker is not running: nothing runs until the owner chooses Continue or Stop.
 
 ## Execution and evidence
 

@@ -133,3 +133,34 @@ as 404, and a label query for the owner across servers, firewalls, keys,
 primary and floating IPs, volumes and snapshots returns nothing. The
 controller, its worker and the product's SSH tunnel are stopped. The earlier
 run's disposable state is kept under `.hallvi/previous-run-schema17`.
+
+## After review of `769983bb`
+
+Three defects found by review, each reproduced here first and now covered in
+`pi-owner.test.ts`:
+
+- **A starting worker settled a running worker's evidence.** Recovery ran
+  before the process knew whether it was the owner, so a live approval became
+  `interrupted` even though the second worker then left. Recovery now runs
+  only once ownership is held. Covered: everything a starting worker does,
+  during a live approval wait, changes nothing, and the approval then
+  completes.
+- **The socket did not guarantee one owner.** Two starters that both found a
+  dead worker's path unanswered could each remove the other's socket, and both
+  would serve. Ownership is now an exclusive lock the operating system holds
+  for the process, taken before the socket path is touched. Covered with
+  separate processes: six started at once over a killed process's socket
+  path, exactly one becomes the owner and it is the one that answers. This
+  brings back one small lock file; nothing else of the earlier locks, and no
+  application or server gate.
+- **Stop showed `completed` for work Pi read from an idle lane's queue.** Such
+  an operation is named `queue:<entry id>`, and results were looked up only
+  under message ids. They are now looked up under both. Covered: restore an
+  idle queue, Continue, approval wait, Stop: the reply reads as stopped. The
+  test fails without the fix.
+
+Scripted model only; the real-provider run above was not repeated for these.
+Afterwards: application suite 942 passed, 3 skipped; typecheck, eslint (no
+errors) and prettier clean; the 14 browser journeys that use the real worker
+process (applications, experience continuity, worker restart, transcript)
+pass.

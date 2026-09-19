@@ -49,7 +49,8 @@ flowchart LR
 
 A send is answered once Pi has durably taken the message, and fails visibly
 otherwise. There is no intake queue, no reply row, no stored status, no
-reconciliation and no lock: one process owns the sessions because only it is
-asked, and what the page shows is read from Pi each time. Hallvi keeps what
+reconciliation, no per-application lock and no start gate: one process owns
+the sessions, by a lock the operating system holds for it, and only it is
+asked; what the page shows is read from Pi each time. Hallvi keeps what
 is the product's own: permissions, approvals and execution evidence, each
 record under the id Pi gave the tool call.

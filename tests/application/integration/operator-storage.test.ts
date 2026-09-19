@@ -8,8 +8,7 @@ import {
   removeApplication,
 } from "../../../src/server/applications";
 import { getOperatorView } from "../../../src/server/operator-view";
-import { sessionOwner } from "../../../src/server/pi-owner";
-import { serveWorker } from "../../../src/server/worker-link";
+import { ownSessions } from "../../../src/server/pi-owner";
 import {
   saveInformation,
   listInformation,
@@ -110,11 +109,11 @@ it("removal goes through the worker that owns the histories, and cascades only a
     /worker is not running/,
   );
   expect(store.getApplication(app)).toBeTruthy();
-  const server = (await serveWorker(sessionOwner().handle))!;
+  const { server } = (await ownSessions())!;
   try {
     await removeApplication(app, "example/app");
   } finally {
-    server.close();
+    await new Promise((closed) => server.close(closed));
   }
   for (const table of ["applications", "conversations", "saved_information"])
     expect(

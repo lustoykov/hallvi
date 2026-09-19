@@ -13,10 +13,8 @@
 // of the database, and run the earlier version. Conversation histories need
 // nothing: the originals are never modified (see docs/operator-design.md).
 import Database from "better-sqlite3";
-import { existsSync, readFileSync } from "node:fs";
-import { connect } from "node:net";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { stateLocation } from "./state-location.mjs";
-import { workerSocketPath } from "./worker-socket.mjs";
 
 const FROM = 15;
 const { version: TO } = JSON.parse(
@@ -30,14 +28,14 @@ const path =
   stateLocation(process.cwd(), { hidden: true }).database;
 if (!existsSync(path)) throw new Error(`No database at ${path}.`);
 
-// A running worker answers on its socket; upgrading under it would race it.
-const running = await new Promise((resolve) => {
-  const probe = connect(workerSocketPath(path));
-  probe.once("connect", () => resolve(true) ?? probe.destroy());
-  probe.once("error", () => resolve(false));
-});
-if (running)
+// A running worker holds this lock; upgrading under it would race its writes.
+const lock = new Database(`${realpathSync(path)}.worker-lock`, { timeout: 0 });
+try {
+  lock.exec("BEGIN EXCLUSIVE");
+} catch {
+  lock.close();
   throw new Error("A Pi worker is running on this database. Stop it first.");
+}
 
 const database = new Database(path);
 try {
@@ -70,4 +68,5 @@ try {
   }
 } finally {
   database.close();
+  lock.close();
 }

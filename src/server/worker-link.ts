@@ -1,13 +1,12 @@
 // The one line between the app and the worker: a Unix socket, beside the
 // database where its path fits, carrying small JSON requests.
 //
-// The worker owns every Pi session. The app never opens one; it asks. The
-// socket is also what makes the worker the only owner: requests reach whoever
-// holds this path, sessions are opened only on request, and a second worker
-// that finds the path answered leaves.
-import { rmSync } from "node:fs";
+// The worker owns every Pi session. The app never opens one; it asks. One
+// process at a time may serve this socket, which is what makes the worker the
+// only owner: sessions are opened only on request, and requests arrive here.
+import Database from "better-sqlite3";
+import { realpathSync, rmSync } from "node:fs";
 import { request, createServer, type Server } from "node:http";
-import { connect } from "node:net";
 import { workerSocketPath } from "../../scripts/worker-socket.mjs";
 import { databasePath } from "./db";
 
@@ -74,26 +73,31 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
   });
 }
 
-function answered(path: string) {
-  return new Promise<boolean>((resolve) => {
-    const probe = connect(path);
-    probe.once("connect", () => {
-      probe.destroy();
-      resolve(true);
-    });
-    probe.once("error", () => resolve(false));
-  });
-}
-
 /**
  * Become the worker for this database, or learn that there already is one.
- * A path nobody answers was left by a worker that died, and is replaced.
+ *
+ * Who owns the socket is decided before the socket is touched, by an
+ * exclusive lock the operating system holds for this process and releases
+ * when it ends, however it ends. A socket path cannot decide it: a path left
+ * by a dead worker has to be removed, and two starters that both find it
+ * unanswered would each remove the other's. With the lock held, whatever is
+ * at the path is stale, and replacing it is safe. `owned` runs once this
+ * process is the owner and before it answers anything.
  */
 export async function serveWorker(
   handle: (action: string, body: unknown) => Promise<unknown>,
+  owned?: () => void,
 ): Promise<Server | null> {
+  const lock = new Database(`${realpathSync(databasePath())}.worker-lock`, {
+    timeout: 0,
+  });
+  try {
+    lock.exec("BEGIN EXCLUSIVE");
+  } catch {
+    lock.close();
+    return null;
+  }
   const path = socketPath();
-  if (await answered(path)) return null;
   rmSync(path, { force: true });
   const server = createServer((incoming, outgoing) => {
     let text = "";
@@ -115,12 +119,19 @@ export async function serveWorker(
       );
     });
   });
+  // Held for as long as this process serves, and referenced from here so it
+  // is not collected while it does.
+  server.once("close", () => lock.close());
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
+    server.once("error", (error) => {
+      lock.close();
+      reject(error);
+    });
     // Only this user may reach it: the requests carry instructions for Pi.
     const mask = process.umask(0o177);
     server.listen(path, () => {
       process.umask(mask);
+      owned?.();
       resolve();
     });
   });
