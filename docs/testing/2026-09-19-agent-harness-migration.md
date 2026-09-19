@@ -9,6 +9,13 @@ install (`npm ci`), `@earendil-works/pi-agent-core`, `pi-ai` and
 Scripted-model results and real-provider results are kept apart below. A
 scripted result is never offered as evidence about the real provider or a host.
 
+Code under test: `beae2f10`. The application suite, typecheck, lint, format and
+the browser journeys below were run on exactly that commit, which includes
+`main` as of `df44e2a9`. The real-provider run was made on this branch just
+before `main` was merged in; the merge changed the workspace prompt the harness
+is given (main's optional Docker isolation) and nothing in the conversation
+lifecycle. Later commits change only this document.
+
 ## Real provider, real workspace, real host
 
 One run, from this checkout: `scripts/dev.mjs` on `127.0.0.1:3290`. Before it
@@ -47,7 +54,7 @@ not touched.
 
 ## Scripted model, real everything else
 
-`npm test`: 91 files, 936 tests passed, 3 skipped. `npx tsc --noEmit` and
+`npm test`: 95 files, 954 tests passed, 3 skipped. `npx tsc --noEmit` and
 eslint clean; `npm run format` applied.
 
 - `integration/pi-worker.test.ts` — Hallvi's worker, tools, permissions and
@@ -80,7 +87,10 @@ copies this checkout and starts its real worker. Ports were checked first:
 started here (3431, working directory verified) and the acceptance-only URL at
 an unused port.
 
-- All conversation journeys pass, including the new
+- All 22 conversation-facing journeys pass on `beae2f10` (application shell,
+  applications, experience continuity, transcript, still-working, streaming
+  output, typed information, workspace navigation, worker restart), including
+  the new
   `tests/browser/worker-restart.spec.ts`, which kills the fixture's real worker
   with SIGKILL mid-answer with a follow-up Pi already holds, starts another,
   checks nothing runs and the same entry id still waits, then continues.
