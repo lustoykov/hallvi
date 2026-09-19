@@ -7,8 +7,17 @@ account and the existing Hetzner connection. The model was the configured Pi,
 the provider was real Hetzner, and nothing was seeded: every record below was
 written by Pi in the main conversation.
 
-**Revision tested: `afd9ecb5`.** The commit after it changes one label ("The
-way in is open", see below) and adds this document.
+**Real-server revision tested: `afd9ecb5`.** The later label correction says
+"The way in is open". Review fixes after that run reconnect the stream when
+its source or host changes, stop it when the source is retired, check file
+readability before announcing live, restore the pending approval action,
+and label traffic as an observed sample of requests and addresses.
+
+Those review fixes passed focused Node.js 22 route, parser, Overview render
+and record tests plus TypeScript. The route tests cover record creation,
+replacement, retirement, host removal and page closure. The file-readability
+check runs the actual shell command against a nonexistent file. These are
+local regression checks; the real-server screenshots below predate them.
 
 ## What was asked, as an owner would ask it
 
@@ -98,6 +107,10 @@ on.
 - On reconnect, a request made in the last four seconds may be drawn twice.
   Counts are not affected.
 - Only Caddy's JSON format is read. One SSH session per open page.
+- Traffic is a bounded sample: a file starts with its last 400 lines, bursts
+  retain at most 400 lines per 400 ms, and the browser ages out lines after
+  five minutes.
+  Addresses can be shared or belong to bots; they are not unique people.
 - The "last day" and "speed" tiles need a `usage` record, which nothing in this
   run asked Pi to write; they correctly said nothing had been read.
 - My network-drop test also closed the application's tunnel, and the product

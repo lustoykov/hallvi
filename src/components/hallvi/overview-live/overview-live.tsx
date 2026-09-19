@@ -212,7 +212,7 @@ export function OverviewLive({
           label={
             traffic.state === "live" && traffic.requests > 0 ? (
               <>
-                Right now · {plural(traffic.visitors, "visitor")} and{" "}
+                Observed · {plural(traffic.visitors, "address")} and{" "}
                 {plural(traffic.requests, "request")} in the last{" "}
                 {WINDOW_MINUTES} minutes
               </>
@@ -221,6 +221,10 @@ export function OverviewLive({
             )
           }
         >
+          <p className="ovl-foot">
+            A recent sample from the access log. Addresses can include bots and
+            shared connections; they are not a count of people.
+          </p>
           <div className="ovl-now-flow" data-live={traffic.state === "live"}>
             {/* Nothing is drawn that is not there: no log, no picture. */}
             {(traffic.state === "live" || traffic.requests > 0) && (
@@ -320,11 +324,13 @@ export function OverviewLive({
                 <li key={need.id} data-tone={need.tone}>
                   <b>{need.title}</b>
                   <span>{need.detail}</span>
-                  {need.primary.draft && (
+                  {(need.primary.open || need.primary.draft) && (
                     <button
                       type="button"
                       className="ovl-ask"
-                      onClick={() => onAsk(need.primary.draft!)}
+                      onClick={
+                        need.primary.open ?? (() => onAsk(need.primary.draft!))
+                      }
                     >
                       {need.primary.label} →
                     </button>

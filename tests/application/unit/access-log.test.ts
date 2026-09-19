@@ -2,6 +2,7 @@
 // its own and cannot be steered by a record, and what reaches the browser
 // carries no address and no query string.
 
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import { followCommand, parseCaddyLine } from "@/server/access-log";
@@ -85,11 +86,28 @@ describe("the access log", () => {
       );
   });
 
+  it("does not announce live for an unreadable file", () => {
+    const result = spawnSync(
+      "/bin/sh",
+      [
+        "-c",
+        followCommand({
+          type: "file",
+          path: "/hallvi-review-nonexistent/access.log",
+        }),
+      ],
+      { encoding: "utf8", timeout: 2000 },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("The access log is not readable.");
+    expect(result.stdout).not.toContain("hallvi-following");
+  });
+
   it("only ever reads", () => {
     expect(
       followCommand({ type: "file", path: "/var/log/caddy/access.log" }),
     ).toBe(
-      "echo hallvi-following; exec tail -n 400 -F '/var/log/caddy/access.log'",
+      "test -r '/var/log/caddy/access.log' || { echo 'The access log is not readable.'; exit 1; }; echo hallvi-following; exec tail -n 400 -F '/var/log/caddy/access.log'",
     );
     expect(
       followCommand({ type: "container", name: "shop-caddy-1" }),

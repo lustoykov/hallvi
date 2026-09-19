@@ -28,7 +28,7 @@ export interface Traffic {
   detail: string | null;
   /** Newest first, for the tape. */
   recent: SeenLine[];
-  /** Distinct visitors in the window. */
+  /** Distinct source addresses in the observed window, not people. */
   visitors: number;
   requests: number;
   failed: number;
@@ -104,7 +104,14 @@ export function useTraffic(applicationId: string): Traffic {
         setState(event.state);
         setDetail(event.state === "lost" ? event.detail : null);
         // A new session resends its backlog, so the old one is dropped.
-        if (event.state === "connecting") lines.current = [];
+        if (
+          event.state === "connecting" ||
+          event.state === "no-log" ||
+          event.state === "no-server"
+        ) {
+          lines.current = [];
+          setSummary(summarise([], Date.now()));
+        }
         return;
       }
       const now = Date.now();

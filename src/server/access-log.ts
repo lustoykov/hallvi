@@ -58,7 +58,11 @@ const READY = "hallvi-following";
 
 /** A few minutes of backlog so the page opens on something, then follow. */
 export function followCommand(source: AccessLogSource) {
-  return `echo ${READY}; ${followOnly(source)}`;
+  const readable =
+    source.type === "file"
+      ? `test -r '${source.path}' || { echo 'The access log is not readable.'; exit 1; }; `
+      : "";
+  return `${readable}echo ${READY}; ${followOnly(source)}`;
 }
 function followOnly(source: AccessLogSource) {
   if (source.type === "file") return `exec tail -n 400 -F '${source.path}'`;

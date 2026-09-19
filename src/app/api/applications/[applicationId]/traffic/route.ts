@@ -19,17 +19,23 @@ export async function GET(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId } = await context.params;
-    const host = operatorSettings(applicationId).host;
-    const source = host ? accessLogSource(applicationId) : null;
+    const configuration = () => {
+      const host = operatorSettings(applicationId).host;
+      return { host, source: host ? accessLogSource(applicationId) : null };
+    };
+    const initial = configuration();
+    const { host, source } = initial;
 
     const encoder = new TextEncoder();
     const session = new AbortController();
     let flush: ReturnType<typeof setInterval> | undefined;
+    let watch: ReturnType<typeof setInterval> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     const end = () => {
       session.abort();
       clearInterval(flush);
       clearInterval(heartbeat);
+      clearInterval(watch);
     };
 
     const stream = new ReadableStream<Uint8Array>({
@@ -46,6 +52,22 @@ export async function GET(
           controller.close();
         };
         request.signal.addEventListener("abort", close, { once: true });
+        if (request.signal.aborted) {
+          close();
+          return;
+        }
+        // A held-open page must discover a newly recorded source and stop
+        // following one that was retired or moved, without a page reload.
+        watch = setInterval(() => {
+          try {
+            if (JSON.stringify(configuration()) === JSON.stringify(initial))
+              return;
+          } catch {
+            // Deleting the application also ends its observation.
+          }
+          controller.enqueue(encoder.encode("retry: 1000\n\n"));
+          close();
+        }, 1000);
         // A server that will not answer is asked again four times a minute,
         // not twenty.
         controller.enqueue(encoder.encode("retry: 15000\n\n"));
@@ -68,7 +90,7 @@ export async function GET(
           if (!pending.length) return;
           // A burst is summarised by its newest lines; the page is a picture
           // of traffic, not a copy of the log.
-          send({ type: "lines", lines: pending.slice(-400) });
+          send({ type: "lines", lines: pending });
           pending = [];
         }, 400);
         heartbeat = setInterval(
@@ -79,7 +101,10 @@ export async function GET(
         followAccessLog(
           host,
           source,
-          (line) => pending.push(line),
+          (line) => {
+            pending.push(line);
+            if (pending.length > 400) pending.shift();
+          },
           session.signal,
           () => {
             answered = true;
