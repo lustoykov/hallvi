@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { handle } from "@/server/http";
-import { chatRunSnapshot, sendChatMessage } from "@/server/pi-runs";
+import { chatSnapshot, sendChatMessage } from "@/server/pi-conversation";
 import {
   parseJsonRequest,
   sendChatMessageRequestSchema,
@@ -18,7 +18,13 @@ export async function POST(
     const { applicationId, chatId } = await context.params;
     const body = await parseJsonRequest(request, sendChatMessageRequestSchema);
     return Response.json(
-      sendChatMessage(applicationId, chatId, body.message, body.requestKey),
+      sendChatMessage(
+        applicationId,
+        chatId,
+        body.message,
+        body.requestKey,
+        body.delivery,
+      ),
       { status: 202 },
     );
   });
@@ -31,7 +37,7 @@ export async function GET(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
-    return Response.json(chatRunSnapshot(applicationId, chatId), {
+    return Response.json(chatSnapshot(applicationId, chatId), {
       headers: { "Cache-Control": "no-store" },
     });
   });

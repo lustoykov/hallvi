@@ -93,7 +93,9 @@ function streamSynthetic(
         partial: message,
       });
       await pause(
-        userMessage.includes("[slow-cancel]")
+        userMessage.includes("[hold]")
+          ? 60_000
+          : userMessage.includes("[slow-cancel]")
           ? 6_000
           : userMessage.includes("[slow]")
             ? 1_500

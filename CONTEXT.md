@@ -40,7 +40,9 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Operation receipt**: The interactive presentation of an operation's origin, progress, required decision, evidence and outcome, drawn by `operation-receipt.tsx`. A receipt is not a second copy of execution state.
 
-**Pi Run** (*projection*, `pi-runs.ts`): One durable attempt to answer an accepted conversation message using the embedded Pi runtime. It is read off the message row; there is no runs table. Retry creates a linked attempt; a successful reply does not prove an external effect.
+**Reply** (`pi-conversation.ts`): What Pi said and did between two of the owner's messages, as one transcript row. Its evidence and approvals attach to it. It is not a unit of scheduling: Pi's native session decides what runs and when, and Hallvi records what happened. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
+
+**Waiting message**: An accepted message Pi has not read yet. It becomes *delivered* when Pi reads it, *cancelled* when the conversation is stopped first or Pi could not be started, or *interrupted* when Hallvi stopped as Pi read it and Pi kept no record. Only a waiting message is ever handed to Pi.
 
 ## Execution and evidence
 

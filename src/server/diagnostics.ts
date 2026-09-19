@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { stateLocation } from "../../scripts/state-location.mjs";
-import type { PiRun } from "./types";
+import type { PiReply } from "./types";
 
 export const MAX_DIAGNOSTIC_STEPS = 128;
 export const LOG_MAX_BYTES = 1024 * 1024;
@@ -169,20 +169,15 @@ export function diagnosticLogPath(
 }
 
 type LogEvent =
-  | "reply.accepted"
-  | "reply.retry"
-  | "reply.claimed"
-  | "reply.succeeded"
+  | "reply.completed"
   | "reply.failed"
-  | "reply.cancelled"
-  | "reply.timed-out"
   | "reply.interrupted"
   | "execution.started"
   | "execution.omitted"
   | "step.started"
   | "step.finished";
 interface LogDetails {
-  outcome?: PiRun["status"] | "completed" | "incomplete";
+  outcome?: PiReply["status"] | "incomplete";
   durationMs?: number;
   step?: StepKind;
   stepId?: string;
@@ -195,7 +190,7 @@ interface LogDetails {
 
 export function logDiagnostic(
   event: LogEvent,
-  run: PiRun,
+  run: PiReply,
   details: LogDetails = {},
 ) {
   try {
@@ -206,7 +201,6 @@ export function logDiagnostic(
       chatId: run.chatId,
       applicationId: run.applicationId,
     };
-    if (run.retryOfId) record.retryOfId = run.retryOfId;
     if (details.outcome) record.outcome = details.outcome;
     if (details.step && details.step in stepLabels) record.step = details.step;
     if (

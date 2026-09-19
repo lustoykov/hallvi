@@ -2,7 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ChatPane } from "../../../src/components/hallvi/chat-pane";
-import type { Chat, OperatorView, PiRun } from "../../../src/server/types";
+import type {
+  Chat,
+  ChatMessage,
+  OperatorView,
+} from "../../../src/server/types";
 
 const failedAt = "2026-09-05T10:00:00.000Z";
 const historyError =
@@ -14,22 +18,19 @@ const chat: Chat = {
   createdAt: failedAt,
   archivedAt: null,
 };
-const run: PiRun = {
-  id: "failed-run",
-  applicationId: "app-one",
+/** The owner's message Pi read, and the reply Pi wrote under it. */
+const asked: ChatMessage = {
+  id: "user-message",
   chatId: chat.id,
-  userMessageId: "user-message",
-  assistantMessageId: "assistant-message",
-  requestKey: "key",
-  retryOfId: null,
-  status: "failed",
-  revision: 2,
-  error: historyError,
-  piCalls: 0,
+  role: "user",
+  source: "user",
+  body: "Deploy it",
   createdAt: failedAt,
-  startedAt: failedAt,
-  finishedAt: failedAt,
+  status: "delivered",
+  requestKey: "key",
+  revision: 1,
 };
+const run = { assistantMessageId: "assistant-message" };
 
 function render({
   error = historyError,
@@ -39,16 +40,14 @@ function render({
   status = "failed",
   body = "",
   messages,
-  suppliedRuns,
 }: {
   error?: string;
   archived?: boolean;
   activity?: OperatorView["activity"];
   piActivity?: OperatorView["piActivity"];
-  status?: "queued" | "running" | "failed" | "cancelled" | "completed";
+  status?: "waiting" | "running" | "failed" | "cancelled" | "completed";
   body?: string;
   messages?: OperatorView["messages"];
-  suppliedRuns?: PiRun[];
 } = {}) {
   const view: OperatorView = {
     application: {
@@ -62,18 +61,27 @@ function render({
     },
     chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
-    messages: messages ?? [
-      {
-        id: run.assistantMessageId,
-        chatId: chat.id,
-        role: "assistant",
-        source: "pi",
-        body,
-        createdAt: failedAt,
-        status,
-        revision: 2,
-      },
-    ],
+    messages:
+      messages ??
+      // Accepted and not yet read, there is no reply at all.
+      (status === "waiting"
+        ? [{ ...asked, status }]
+        : [
+            asked,
+            {
+              id: run.assistantMessageId,
+              chatId: chat.id,
+              role: "assistant",
+              source: "pi",
+              body,
+              createdAt: failedAt,
+              startedAt: failedAt,
+              responseTo: asked.id,
+              error: status === "failed" ? error : null,
+              status,
+              revision: 2,
+            },
+          ]),
     decisions: [],
     activity,
     piActivity,
@@ -90,17 +98,9 @@ function render({
       onComposerChange={vi.fn()}
       onSend={vi.fn()}
       onArchive={vi.fn()}
-      runs={
-        suppliedRuns ?? [
-          {
-            ...run,
-            error,
-            status: status === "completed" ? "succeeded" : status,
-          },
-        ]
-      }
       reconnecting={false}
-      onRunAction={vi.fn()}
+      onStop={vi.fn()}
+      onTell={vi.fn()}
       onNewChat={vi.fn()}
     />,
   );
@@ -112,7 +112,7 @@ describe("conversation recovery and assistant branding", () => {
     // that say so. With no execution and no tool call in flight, a running
     // turn is inside a model call, and "Working" was the same word it used
     // for a command building an image and for a decision nobody had noticed.
-    ["queued", "Waiting to start"],
+    ["waiting", "Waiting to start"],
     ["running", "Waiting for the model"],
     // No command failed, so there is nothing to read — the run's own error is
     // runtime text and stays internal, which the assertions below guard.
@@ -174,45 +174,58 @@ describe("conversation recovery and assistant branding", () => {
     expect(html).not.toContain("Ask what went wrong</button>");
   });
 
-  it("lets a queued follow-up be withdrawn without stopping the active turn", () => {
-    const active = { ...run, id: "active", status: "running" as const };
-    const queued = {
-      ...run,
-      id: "follow-up",
-      assistantMessageId: "queued-message",
-      requestKey: "queued-key",
-      status: "queued" as const,
-      startedAt: null,
-    };
+  it("says when Pi will read each waiting message, and cancels them only through Stop", () => {
     const html = render({
       messages: [
+        asked,
         {
-          id: active.assistantMessageId,
+          id: run.assistantMessageId,
           chatId: chat.id,
           role: "assistant",
           source: "pi",
           body: "",
           createdAt: failedAt,
+          startedAt: failedAt,
+          responseTo: asked.id,
           status: "running",
           revision: 2,
         },
+        { ...asked, id: "next", body: "Then publish it", status: "waiting" },
         {
-          id: queued.assistantMessageId,
-          chatId: chat.id,
-          role: "assistant",
-          source: "pi",
-          body: "",
-          createdAt: failedAt,
-          status: "queued",
-          revision: 2,
+          ...asked,
+          id: "steer",
+          body: "Use port 8080",
+          status: "waiting",
+          delivery: "steer",
         },
       ],
-      suppliedRuns: [active, queued],
     });
 
-    expect(html).toContain("Stop + cancel 1 queued");
-    expect(html).toContain("Cancel queued message");
+    expect(html).toContain("Stop + cancel 2 waiting");
+    expect(html).not.toContain("Withdraw");
+    expect(html).toContain("Pi reads this when its current work is done.");
+    // Steering says where it lands, and what it does not do.
+    expect(html).toContain(
+      "It does not interrupt a running command or a pending approval.",
+    );
     expect(html.match(/Waiting for the model/g)).toHaveLength(1);
+  });
+
+  it("keeps an instruction Pi never recorded, and says it did not run", () => {
+    const html = render({
+      messages: [
+        {
+          ...asked,
+          status: "interrupted",
+          error:
+            "Hallvi stopped as this reached Pi. Pi has no record of it and did not act on it. It was not sent again; send it again when ready.",
+        },
+      ],
+    });
+    expect(html).toContain("Deploy it");
+    expect(html).toContain("Not run");
+    expect(html).toContain("Pi has no record of it");
+    expect(html).toContain("Send again</button>");
   });
 
   it("uses one assistant name and a matching composer accessible label", () => {

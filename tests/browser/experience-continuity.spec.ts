@@ -123,10 +123,10 @@ test("contextual questions preserve a draft across tab closure and return to the
   }
 });
 
-test("Send next waits behind active work and Stop cancels its waiting follow-up", async ({
+test("Send next and Steer wait on active work, and Stop settles them as not started", async ({
   page,
   fixture,
-}) => {
+}, testInfo) => {
   test.setTimeout(180_000);
   const response = await page.request.post("/api/applications", {
     data: {
@@ -139,57 +139,74 @@ test("Send next waits behind active work and Stop cancels its waiting follow-up"
   const appId = view.application.id;
   const chatId = view.selectedChatId;
   const db = new Database(join(fixture.state, "qa.db"));
-  const userId = randomUUID();
-  const runId = randomUUID();
-  const now = new Date().toISOString();
+  const active = () =>
+    (
+      db
+        .prepare(
+          "SELECT count(*) AS count FROM messages WHERE conversation_id = ? AND status IN ('waiting', 'running')",
+        )
+        .get(chatId) as { count: number }
+    ).count;
   try {
-    // Hold an active turn without running a model or any external command.
-    // The real worker will not claim the follow-up until this turn settles.
-    db.prepare(
-      "INSERT INTO messages (id, conversation_id, role, body, source, status, created_at, updated_at) VALUES (?, ?, 'user', 'Inspect the application', 'user', 'completed', ?, ?)",
-    ).run(userId, chatId, now, now);
-    db.prepare(
-      "INSERT INTO messages (id, conversation_id, role, body, source, status, response_to, request_key, created_at, updated_at) VALUES (?, ?, 'assistant', 'Inspecting the application.', 'pi', 'running', ?, ?, ?, ?)",
-    ).run(runId, chatId, userId, randomUUID(), now, now);
-    db.prepare(
-      "UPDATE conversations SET status = 'working', current_response_id = ? WHERE id = ?",
-    ).run(runId, chatId);
     await page.goto(`/applications/${appId}`);
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    // The fixture model holds this answer open, as a long command would.
+    await composer.fill("Inspect the application [hold]");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.locator(".hv-still-working")).toBeVisible();
+
     await composer.fill("Explain the result afterwards.");
     await page.getByRole("button", { name: "Send next", exact: true }).click();
-    const cancel = page.getByRole("button", {
-      name: "Cancel queued message",
-      exact: true,
-    });
-    await expect(cancel).toBeVisible();
+    await composer.fill("Look at the logs first.");
+    await page.getByRole("button", { name: "Steer", exact: true }).click();
+    // Both wait, each saying when Pi will read it. Neither has its own
+    // cancel: Pi's queues are emptied by Stop.
+    const waiting = page.locator(".hv-source-tag.live");
+    await expect(waiting).toHaveText(["Waiting", "Steering"]);
+    await expect(
+      page.getByRole("button", { name: "Withdraw", exact: true }),
+    ).toHaveCount(0);
     await expect(composer).toHaveValue("");
-    const state = db
-      .prepare(
-        "SELECT current_response_id AS active FROM conversations WHERE id = ?",
-      )
-      .get(chatId) as { active: string };
-    expect(state.active).toBe(runId);
+    // Steering says where it lands and what it does not do.
+    await expect(
+      page.getByText("It does not interrupt a running command", {
+        exact: false,
+      }),
+    ).toBeVisible();
     await page.reload();
-    await expect(cancel).toBeVisible();
+    await expect(waiting).toHaveText(["Waiting", "Steering"]);
+    await page.screenshot({
+      path: testInfo.outputPath("waiting-and-steering.png"),
+      fullPage: true,
+    });
+
     // Stop sits where Send does; its name says what else it cancels.
     await page
-      .getByRole("button", { name: "Stop + cancel 1 queued", exact: true })
+      .getByRole("button", { name: "Stop + cancel 2 waiting", exact: true })
       .click();
-    await expect(cancel).toHaveCount(0);
-    await expect
-      .poll(() => {
-        const row = db
-          .prepare(
-            "SELECT count(*) AS count FROM messages WHERE conversation_id = ? AND status IN ('queued', 'running')",
-          )
-          .get(chatId) as { count: number };
-        return row.count;
-      })
-      .toBe(0);
+    await expect(waiting).toHaveCount(0);
+    await expect.poll(active).toBe(0);
+    // Both instructions stay in the transcript, and neither ever runs.
     await expect(
       page.getByText("Explain the result afterwards.", { exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByText("Not started because the conversation was stopped.", {
+        exact: true,
+      }),
+    ).toHaveCount(2);
+    await page.waitForTimeout(2_000);
+    await page.screenshot({
+      path: testInfo.outputPath("stopped-with-waiting-messages.png"),
+      fullPage: true,
+    });
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS count FROM messages WHERE conversation_id = ? AND role = 'assistant' AND source = 'pi'",
+        )
+        .get(chatId),
+    ).toEqual({ count: 1 });
   } finally {
     db.close();
   }

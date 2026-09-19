@@ -1,5 +1,5 @@
 import { handle } from "@/server/http";
-import { chatRunSnapshot } from "@/server/pi-runs";
+import { chatSnapshot } from "@/server/pi-conversation";
 import { assertSameOrigin } from "@/server/schemas";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ export async function GET(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
-    let latest = JSON.stringify(chatRunSnapshot(applicationId, chatId));
+    let latest = JSON.stringify(chatSnapshot(applicationId, chatId));
     let timer: ReturnType<typeof setInterval> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let closed = false;
@@ -42,7 +42,7 @@ export async function GET(
         controller.enqueue(encoder.encode(`data: ${latest}\n\n`));
         timer = setInterval(() => {
           try {
-            const next = JSON.stringify(chatRunSnapshot(applicationId, chatId));
+            const next = JSON.stringify(chatSnapshot(applicationId, chatId));
             if (next !== latest) {
               latest = next;
               controller.enqueue(encoder.encode(`data: ${next}\n\n`));

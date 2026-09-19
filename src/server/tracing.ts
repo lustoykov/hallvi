@@ -25,7 +25,7 @@ import {
   type StepKind,
 } from "./diagnostics";
 import { traceExportConfiguration } from "./tracing-config";
-import type { PiRun } from "./types";
+import type { PiReply } from "./types";
 
 let provider: NodeTracerProvider | undefined;
 
@@ -91,7 +91,7 @@ function optionalTelemetry<T>(work: () => T): T | undefined {
   }
 }
 
-export function beginRunDiagnostics(run: PiRun) {
+export function beginRunDiagnostics(run: PiReply) {
   const root = optionalTelemetry(() =>
     tracer().startSpan(
       "Assistant reply",
@@ -101,7 +101,6 @@ export function beginRunDiagnostics(run: PiRun) {
           "hallvi.run.id": run.id,
           "hallvi.application.id": run.applicationId,
           "langfuse.session.id": run.chatId,
-          "hallvi.retry_of": run.retryOfId ?? "",
           "langfuse.trace.name": "Hallvi reply",
           "hallvi.payload_policy": "Content omitted; metadata only",
           "hallvi.cost_basis":
@@ -227,7 +226,7 @@ export function beginRunDiagnostics(run: PiRun) {
           );
       });
     },
-    finish(status: PiRun["status"]) {
+    finish(status: PiReply["status"]) {
       if (finished) return;
       finished = true;
       for (const key of active.keys())
@@ -240,7 +239,7 @@ export function beginRunDiagnostics(run: PiRun) {
         root?.setAttribute("hallvi.outcome", status);
         root?.setStatus({
           code:
-            status === "succeeded" ? SpanStatusCode.OK : SpanStatusCode.ERROR,
+            status === "completed" ? SpanStatusCode.OK : SpanStatusCode.ERROR,
         });
         root?.end();
       });

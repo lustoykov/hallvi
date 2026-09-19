@@ -76,10 +76,8 @@ test(
         new Date(Date.now() - 200_000).toISOString(),
       );
     database
-      .prepare(
-        "UPDATE conversations SET current_response_id = ?, status = 'working' WHERE id = ?",
-      )
-      .run(runId, chat.id);
+      .prepare("UPDATE conversations SET status = 'working' WHERE id = ?")
+      .run(chat.id);
 
     const directory = join(fixture.state, "operator", appId, "executions");
     mkdirSync(directory, { recursive: true });

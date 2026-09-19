@@ -45,7 +45,6 @@ export const chats = sqliteTable(
       .$type<ConversationStatus>()
       .notNull()
       .default("idle"),
-    currentResponseId: text("current_response_id"),
     nativeSessionId: text("native_session_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -78,9 +77,11 @@ export const messages = sqliteTable(
     revision: integer("revision").notNull().default(0),
     responseTo: text("response_to"),
     requestKey: text("request_key"),
-    retryOfId: text("retry_of_id").unique(),
+    /** How the owner sent it: after Pi's current work, or into it. */
+    delivery: text("delivery").$type<ChatMessage["delivery"]>(),
+    /** The entry Pi wrote this message into its own history as. */
+    nativeEntryId: text("native_entry_id"),
     error: text("error"),
-    piCalls: integer("pi_calls").notNull().default(0),
     startedAt: text("started_at"),
     finishedAt: text("finished_at"),
     createdAt: text("created_at").notNull(),

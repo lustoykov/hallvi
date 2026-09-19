@@ -3,12 +3,12 @@ import { copyDue, protectController } from "./controller-protection";
 import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import { databasePath, listMessages } from "./db";
+import { databasePath, getMessage } from "./db";
 import { announceWorker } from "./worker-presence";
 import { beginRunDiagnostics } from "./tracing";
-import { buildPiRunContext } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
-import { askPi, normalizePiAssistantMessage, PiUnavailableError } from "./pi";
+import { openPiSession, PiUnavailableError, watchPiSession } from "./pi";
+import { liveOperator, type AcceptedMessage } from "./pi-operator";
 import {
   applicationsWithActivity,
   endActivity,
@@ -17,17 +17,18 @@ import {
   startActivity,
   updateActivity,
 } from "./pi-activity";
-import { assertChatWritable, loadChat } from "./applications";
+import { assertChatWritable, loadApplication, loadChat } from "./applications";
 import {
-  claimNextPiRun,
-  completePiRun,
-  finishPiRun,
-  getPiRun,
-  interruptRunningPiRuns,
-  persistPiDraft,
-  recordPiCall,
-} from "./pi-runs";
-import type { PiRun } from "./types";
+  conversationContext,
+  failToStart,
+  interruptConversations,
+  messagePersisted,
+  messageSeen,
+  settleConversation,
+  waitingMessages,
+  writeReply,
+} from "./pi-conversation";
+import type { PiReply } from "./types";
 import { diagnosticFailure, type DiagnosticFailure } from "./diagnostics";
 
 // The process must exit instead of releasing its writer locks while SDK work
@@ -64,205 +65,198 @@ export function acquireWorkerLock() {
   };
 }
 
-/**
- * A reply can read and search the repository in its workspace and prepare
- * operations; the budget covers that work without holding the single worker
- * indefinitely.
- */
+function advice(error: unknown) {
+  let failure: DiagnosticFailure =
+    error instanceof PiUnavailableError
+      ? (error.diagnostic ?? diagnosticFailure(error))
+      : diagnosticFailure(error);
+  if (error instanceof NativeSessionError)
+    failure = {
+      category: error.code === "busy" ? "busy" : "history-unavailable",
+    };
+  const said =
+    error instanceof NativeSessionError
+      ? error.message
+      : `${
+          failure.category === "authentication"
+            ? "The model connection was rejected. Open Settings and reconnect."
+            : failure.category === "rate-limit"
+              ? "The model reports a usage or rate limit. Check the account allowance, then retry."
+              : failure.category === "network" ||
+                  failure.category === "provider-unavailable"
+                ? "The model service could not be reached. Check your connection and retry."
+                : "Hallvi could not finish this attempt. Check Settings or retry."
+        } Your message is saved. Check execution history for any effects.`;
+  return { said, failure };
+}
 
-export async function executePiRun(
-  run: PiRun,
-  options: {
-    signal?: AbortSignal;
-    timeoutMs?: number;
-    drainTimeoutMs?: number;
-  } = {},
+/**
+ * One live stretch of one conversation: its native session, Pi's events
+ * written down as they happen, and the messages handed to Pi so far. Pi decides
+ * what runs and when; this records it and answers Stop.
+ */
+export function converse(
+  scope: { applicationId: string; chatId: string },
+  first: AcceptedMessage,
+  options: { signal?: AbortSignal; drainTimeoutMs?: number } = {},
 ) {
-  const controller = new AbortController();
-  const diagnostics = beginRunDiagnostics(run);
-  const stop = () => {
-    finishPiRun(
-      run.id,
-      "interrupted",
-      "The worker stopped before this attempt finished. Retry when ready.",
-    );
-    controller.abort();
-  };
-  options.signal?.addEventListener("abort", stop, { once: true });
-  if (options.signal?.aborted) stop();
+  const given = new Set([first.id]);
+  const early: AcceptedMessage[] = [];
+  let operator: ReturnType<typeof liveOperator> | undefined;
+  let reply: PiReply | undefined;
+  let diagnostics: ReturnType<typeof beginRunDiagnostics> | undefined;
+  let replyError: string | null = null;
   let draft = "";
   let savedDraft = "";
-  const poll = setInterval(() => {
-    if (getPiRun(run.id)?.status !== "running") controller.abort();
-    else if (draft !== savedDraft) {
-      persistPiDraft(run.id, draft);
-      savedDraft = draft;
-    }
-  }, 250);
-  // Individual commands have timeouts. A conversation can wait for its user.
-  const timeout =
-    options.timeoutMs === undefined
-      ? undefined
-      : setTimeout(() => {
-          finishPiRun(
-            run.id,
-            "timed-out",
-            "The turn exceeded its execution time limit. Check its command history before continuing.",
-          );
-          controller.abort();
-        }, options.timeoutMs);
-  let drainTimer: ReturnType<typeof setTimeout> | undefined;
-  let abortListener: (() => void) | undefined;
-  const stage: { value: "context" | "model" | "save" } = { value: "context" };
-  try {
-    const work = async () => {
-      controller.signal.throwIfAborted();
-      diagnostics.signal({ type: "start", key: "context", kind: "context" });
-      assertChatWritable(loadChat(run.applicationId, run.chatId).chat);
-      // No application summary is injected: Pi reads current state through
-      // get_application_status when an answer depends on it.
-      const runContext = buildPiRunContext(run);
-      const user = listMessages(run.chatId).find(
-        (message) => message.id === run.userMessageId,
+  let stopping: Promise<unknown> | undefined;
+  let poison!: (error: PiWorkerDrainError) => void;
+  const poisoned = new Promise<never>((_, reject) => (poison = reject));
+
+  const stop = () =>
+    (stopping ??= (async () => {
+      // The conversation is settled at once; the native history stays locked
+      // until the SDK has really stopped, or the worker ends instead.
+      const timer = setTimeout(
+        () =>
+          poison(
+            new PiWorkerDrainError(
+              "The model did not stop within the shutdown deadline. Restart the worker before retrying.",
+            ),
+          ),
+        options.drainTimeoutMs ?? 5_000,
       );
-      if (!user) throw new Error("The accepted user message is missing.");
-      diagnostics.signal({ type: "end", key: "context" });
-      stage.value = "model";
-      const reply = await askPi(
-        { run, userMessage: user.body, runContext },
-        {
-          signal: controller.signal,
-          onActivity: diagnostics.signal,
-          onTool(event) {
-            // Evidence of what Pi did, written as it happens so the
-            // conversation can show it before the answer arrives.
-            if (event.type === "start")
-              startActivity({
-                applicationId: run.applicationId,
-                runId: run.id,
-                sequence: event.sequence,
-                id: event.id,
-                tool: event.tool,
-                args: event.args,
-              });
-            else if (event.type === "message")
-              recordMessage({
-                applicationId: run.applicationId,
-                runId: run.id,
-                sequence: event.sequence,
-                text: event.text,
-              });
-            else if (event.type === "update")
-              updateActivity(
-                run.applicationId,
-                event.id,
-                event.partial,
-                // The runtime sends a result-so-far, never an increment.
-                "snapshot",
-              );
-            else
-              endActivity({
-                applicationId: run.applicationId,
-                id: event.id,
-                result: event.result,
-                isError: event.isError,
-              });
-          },
-          onModelCall() {
-            if (getPiRun(run.id)?.status === "running") recordPiCall(run.id);
-            else controller.abort();
-          },
-          onText(text) {
-            if (text.length <= 10_000) draft = text;
-          },
-        },
-      );
-      controller.signal.throwIfAborted();
-      stage.value = "save";
-      diagnostics.signal({ type: "start", key: "save", kind: "save" });
       try {
-        const saved = completePiRun(run.id, {
-          ...reply,
-          message: normalizePiAssistantMessage(reply.message),
-        });
-        // completePiRun has committed before either the log or span can claim
-        // success. A cancelled/stale result leaves this step incomplete.
-        if (saved)
-          diagnostics.signal({
-            type: "end",
-            key: "save",
-          });
-      } catch (error) {
-        diagnostics.signal({ type: "end", key: "save", failed: true });
-        throw error;
+        await (operator?.stop() ?? done);
+      } finally {
+        clearTimeout(timer);
       }
-    };
-    await Promise.race([
-      work(),
-      new Promise<never>((_, reject) => {
-        abortListener = () => {
-          // Cancellation is recorded immediately, but the single writer is
-          // retained until the adapter has aborted compaction and settled.
-          drainTimer = setTimeout(
-            () =>
-              reject(
-                new PiWorkerDrainError(
-                  "The model did not stop within the shutdown deadline. Restart the worker before retrying.",
-                ),
-              ),
-            options.drainTimeoutMs ?? 5_000,
-          );
-        };
-        controller.signal.addEventListener("abort", abortListener, {
-          once: true,
-        });
-        if (controller.signal.aborted) abortListener();
-      }),
-    ]);
-  } catch (error) {
-    if (error instanceof PiWorkerDrainError) throw error;
-    let failure: DiagnosticFailure =
-      error instanceof PiUnavailableError
-        ? (error.diagnostic ?? diagnosticFailure(error))
-        : diagnosticFailure(error);
-    if (error instanceof NativeSessionError)
-      failure = {
-        category: error.code === "busy" ? "busy" : "history-unavailable",
-      };
-    else if (failure.category === "unknown" && stage.value === "save")
-      failure = { category: "validation" };
-    const advice =
-      failure.category === "authentication"
-        ? "The model connection was rejected. Open Settings and reconnect."
-        : failure.category === "rate-limit"
-          ? "The model reports a usage or rate limit. Check the account allowance, then retry."
-          : failure.category === "network" ||
-              failure.category === "provider-unavailable"
-            ? "The model service could not be reached. Check your connection and retry."
-            : failure.category === "storage"
-              ? "The reply could not be saved. Check local storage, then retry."
-              : "Hallvi could not finish this attempt. Check Settings or retry.";
-    finishPiRun(
-      run.id,
-      "failed",
-      error instanceof NativeSessionError
-        ? error.message
-        : `${advice} Your message is saved. Check execution history for any effects.`,
-      failure,
-    );
-  } finally {
-    // A run that stopped mid-call leaves a record claiming to still be
-    // running. Say it stopped rather than leave a spinner in the transcript.
-    settleRunningActivity(run.applicationId, run.id);
-    diagnostics.finish(getPiRun(run.id)?.status ?? "interrupted");
-    clearInterval(poll);
-    clearTimeout(timeout);
-    clearTimeout(drainTimer);
-    options.signal?.removeEventListener("abort", stop);
-    if (abortListener)
-      controller.signal.removeEventListener("abort", abortListener);
-  }
-  return getPiRun(run.id);
+    })());
+
+  const endReply = (status: "completed" | "failed" | "interrupted") => {
+    if (!reply) return;
+    // A call that never reported its end must not keep a spinner.
+    settleRunningActivity(scope.applicationId, reply.id);
+    diagnostics?.finish(status);
+    diagnostics = undefined;
+  };
+
+  const done = (async () => {
+    let close: (() => Promise<void>) | undefined;
+    try {
+      assertChatWritable(loadChat(scope.applicationId, scope.chatId).chat);
+      const opened = await openPiSession(
+        { ...scope, reply: () => reply?.id ?? "" },
+        options,
+      );
+      close = opened.close;
+      const watch = watchPiSession(opened.session, {
+        onActivity: (event) => diagnostics?.signal(event),
+        onPhase: () => void (stopping && operator?.stop()),
+        onText(text) {
+          if (text.length <= 10_000) draft = text;
+        },
+        onTool(event) {
+          // Evidence of what Pi did, written as it happens so the conversation
+          // can show it before the answer arrives.
+          if (!reply) return;
+          const at = { applicationId: scope.applicationId, runId: reply.id };
+          if (event.type === "start")
+            startActivity({ ...at, ...event, id: event.id });
+          else if (event.type === "message") recordMessage({ ...at, ...event });
+          else if (event.type === "update")
+            // The runtime sends a result-so-far, never an increment.
+            updateActivity(
+              scope.applicationId,
+              event.id,
+              event.partial,
+              "snapshot",
+            );
+          else endActivity({ applicationId: scope.applicationId, ...event });
+        },
+      });
+      // Pi reads current state through its tools. This says only what its own
+      // history cannot: how Hallvi saw the previous reply end.
+      await opened.session.sendCustomMessage(
+        {
+          customType: "hallvi-conversation",
+          content: conversationContext(scope.applicationId, scope.chatId),
+          display: false,
+        },
+        { triggerTurn: false },
+      );
+      operator = liveOperator(opened.session, first, {
+        seen(id) {
+          endReply(replyError ? "failed" : "completed");
+          const next = messageSeen(id, {
+            status: replyError ? "failed" : "completed",
+            error: replyError,
+          });
+          replyError = null;
+          draft = savedDraft = "";
+          // Stopped before Pi read it: it must not run.
+          if (!next) return void stop();
+          reply = next;
+          diagnostics = beginRunDiagnostics(next);
+          watch.reply();
+        },
+        persisted: messagePersisted,
+        said(text) {
+          if (reply)
+            writeReply(reply.id, (draft = savedDraft = text.slice(0, 10_000)));
+        },
+        errored(error) {
+          replyError = advice(error).said;
+        },
+      });
+      for (const message of early.splice(0)) operator.deliver(message);
+      if (stopping) void operator.stop();
+      const outcome = await Promise.race([operator.done, poisoned]);
+      watch.unsubscribe();
+      const failed = outcome.status === "failed" ? advice(outcome.error) : null;
+      if (failed && !reply) failToStart(first.id, failed.said, failed.failure);
+      const status = options.signal?.aborted
+        ? "interrupted"
+        : failed
+          ? "failed"
+          : "completed";
+      endReply(status);
+      settleConversation(
+        scope.chatId,
+        status,
+        status === "interrupted"
+          ? "The worker stopped before this finished. Read execution evidence before continuing; commands are not replayed."
+          : (failed?.said ?? null),
+        failed?.failure,
+      );
+    } catch (error) {
+      if (error instanceof PiWorkerDrainError) throw error;
+      const { said, failure } = advice(error);
+      endReply("failed");
+      if (reply) settleConversation(scope.chatId, "failed", said, failure);
+      else failToStart(first.id, said, failure);
+    } finally {
+      await Promise.race([close?.(), poisoned]);
+    }
+  })();
+
+  return {
+    ...scope,
+    done,
+    given,
+    /** The reply being written, so the worker can tell it was stopped. */
+    reply: () => reply,
+    deliver(message: AcceptedMessage) {
+      given.add(message.id);
+      if (operator) operator.deliver(message);
+      else early.push(message);
+    },
+    stop,
+    /** Streamed text reaches the page between Pi's own message boundaries. */
+    flush() {
+      if (reply && draft !== savedDraft)
+        writeReply(reply.id, (savedDraft = draft));
+    },
+  };
 }
 
 /**
@@ -280,44 +274,101 @@ async function keepControllerCopy(trigger: "after-change" | "daily") {
   }
 }
 
+/**
+ * Hand what the owner has sent to the conversations it belongs to. The only
+ * decision made here is whether a conversation may start: never two for one
+ * application, and never two on one server.
+ */
+export function route(
+  live: Map<string, ReturnType<typeof converse>>,
+  options: { signal?: AbortSignal; drainTimeoutMs?: number } = {},
+) {
+  const waiting = waitingMessages();
+  for (const conversation of live.values()) {
+    const reply = conversation.reply();
+    if (reply && getMessage(reply.id)?.status !== "running")
+      void conversation.stop().catch(() => undefined);
+    conversation.flush();
+  }
+  const host = (applicationId: string) =>
+    loadApplication(applicationId).host?.address.toLowerCase();
+  for (const { message, applicationId } of waiting) {
+    const accepted = {
+      id: message.id,
+      body: message.body,
+      delivery: message.delivery ?? "next",
+    };
+    const conversation = live.get(message.chatId);
+    if (conversation) {
+      if (!conversation.given.has(message.id)) conversation.deliver(accepted);
+      continue;
+    }
+    const busy = [...live.values()].some(
+      (other) =>
+        other.applicationId === applicationId ||
+        (host(applicationId) &&
+          host(other.applicationId) === host(applicationId)),
+    );
+    if (busy) continue;
+    const started = converse(
+      { applicationId, chatId: message.chatId },
+      accepted,
+      options,
+    );
+    live.set(message.chatId, started);
+    void started.done
+      .catch(() => undefined)
+      .finally(() => live.delete(message.chatId));
+  }
+}
+
 export async function runPiWorker(signal: AbortSignal) {
   const release = acquireWorkerLock();
   // Only after the lock: a process that never became the worker must not
   // claim to be one.
   const stopAnnouncing = announceWorker();
   let unsettled = false;
+  const live = new Map<string, ReturnType<typeof converse>>();
   try {
-    interruptRunningPiRuns();
-    // A crash never reaches this worker's own cleanup, so any call still
-    // marked running belongs to a run that no longer exists. Startup is the
+    // A crash never reaches this worker's own cleanup, so anything still
+    // marked running belongs to work that no longer exists. Startup is the
     // only place to say so.
+    interruptConversations();
     for (const applicationId of applicationsWithActivity())
       settleRunningActivity(applicationId, null);
     await cleanupPiWorkspaces().catch(() => undefined);
-    console.info("Pi worker ready. Watching saved requests, one at a time.");
+    console.info("Pi worker ready. Watching saved messages.");
     let nextProtectionCheck = 0;
-    while (!signal.aborted) {
-      const run = claimNextPiRun();
-      if (run) {
-        await executePiRun(run, { signal });
+    let worked = false;
+    let poisoned: unknown;
+    while (!signal.aborted && !poisoned) {
+      route(live, { signal });
+      for (const conversation of live.values())
+        conversation.done.catch((error) => (poisoned ??= error));
+      if (live.size) worked = true;
+      else if (worked) {
+        worked = false;
         await keepControllerCopy("after-change");
-      } else {
-        // Between runs, and rarely: the check reads one small file, and the
-        // copy itself decides whether anything is owed.
-        if (Date.now() >= nextProtectionCheck) {
-          nextProtectionCheck = Date.now() + 60_000;
-          await keepControllerCopy("daily");
-        }
-        await delay(250, undefined, { signal }).catch(() => undefined);
+      } else if (Date.now() >= nextProtectionCheck) {
+        // Rarely: the check reads one small file, and the copy itself decides
+        // whether anything is owed.
+        nextProtectionCheck = Date.now() + 60_000;
+        await keepControllerCopy("daily");
       }
+      await delay(250, undefined, { signal }).catch(() => undefined);
     }
+    if (poisoned) throw poisoned;
+    // Shutdown interrupts every conversation and waits for each to settle.
+    await Promise.all(
+      [...live.values()].map((c) => c.stop().then(() => c.done)),
+    );
   } catch (error) {
     unsettled = error instanceof PiWorkerDrainError;
     throw error;
   } finally {
     // A poisoned worker keeps the OS lock until process exit, not merely until
     // this function rejects. No next writer may overlap an unresponsive SDK.
-    // Its beat stops either way: it is not reading the queue any more, and
+    // Its beat stops either way: it is not reading messages any more, and
     // the conversation must say so rather than wait on it.
     stopAnnouncing();
     if (unsettled) unsettledWorkerLocks.add(release);

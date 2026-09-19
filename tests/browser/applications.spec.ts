@@ -48,7 +48,7 @@ async function send(page: Page, message: string) {
 }
 
 test(
-  "P1-20 durable acceptance, reconnect, cancellation and linked retry",
+  "P1-20 durable acceptance, reconnect, Stop and sending again",
   journey("durable-requests"),
   async ({ page }, testInfo) => {
     await addApplication(page, "durable-app");
@@ -59,9 +59,9 @@ test(
     const response = await page.request.post(endpoint, { data });
     expect(response.status()).toBe(202);
     const accepted = await response.json();
-    expect(accepted.run.status).toBe("queued");
+    expect(accepted.status).toBe("waiting");
     const duplicate = await page.request.post(endpoint, { data });
-    expect((await duplicate.json()).run.id).toBe(accepted.run.id);
+    expect((await duplicate.json()).id).toBe(accepted.id);
     expect(
       (
         await page.request.post(endpoint, {
@@ -73,9 +73,9 @@ test(
     await expect
       .poll(async () => {
         const snapshot = await (await page.request.get(endpoint)).json();
-        return snapshot.runs[0].status;
+        return snapshot.messages.at(-1).status;
       })
-      .toBe("succeeded");
+      .toBe("completed");
     await page.goto(route);
     await openConversation(page);
     await expect(
@@ -96,7 +96,7 @@ test(
     await expect(page.locator(".hv-did").last()).toContainText(
       "[QA fixture reply]",
     );
-    // The HTTP acceptance has finished, but the saved run is still active.
+    // The HTTP acceptance has finished, but Pi is still writing its reply.
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeEnabled();
@@ -107,11 +107,11 @@ test(
     });
     const cancellation = page.waitForResponse(
       (response) =>
-        response.url().endsWith("/cancel") &&
+        response.url().endsWith("/stop") &&
         response.request().method() === "POST",
     );
     await page.getByRole("button", { name: "Stop" }).click();
-    expect((await (await cancellation).json()).status).toBe("cancelled");
+    expect((await (await cancellation).json()).status).toBe("idle");
     await page.reload();
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
     await expect(page.locator(".hv-still-working")).toHaveCount(0);
@@ -134,22 +134,24 @@ test(
       // The synthetic reply alone takes six seconds.
     ).toBeVisible({ timeout: 20_000 });
     await openConversation(page);
+    // Trying again sends the instruction again, as Pi's own history has it.
     await expect(
       page
         .locator(".hv-messages")
         .getByText("Cancel me [slow-cancel]", { exact: true }),
-    ).toHaveCount(1);
-    await openConversation(page);
-    await expect(
-      page.locator(".hv-messages strong:visible").filter({ hasText: /^me$/ }),
-    ).toHaveCount(2); // Original user message and successful assistant answer.
+    ).toHaveCount(2);
     const saved = await (await page.request.get(endpoint)).json();
-    expect(saved.runs.map((run: { status: string }) => run.status)).toEqual([
-      "succeeded",
+    const statuses = (role: string) =>
+      saved.messages
+        .filter((m: { role: string; source: string }) => m.role === role)
+        .slice(-3)
+        .map((m: { status: string }) => m.status);
+    expect(statuses("user")).toEqual(["delivered", "delivered", "delivered"]);
+    expect(statuses("assistant")).toEqual([
+      "completed",
       "cancelled",
-      "succeeded",
+      "completed",
     ]);
-    expect(saved.runs[2].retryOfId).toBe(saved.runs[1].id);
     await page.screenshot({
       path: testInfo.outputPath("durable-retried-reply.png"),
       fullPage: true,
@@ -236,7 +238,7 @@ test(
 );
 
 test(
-  "P1-07 provider failure preserves accepted intent and linked retry works",
+  "P1-07 provider failure preserves accepted intent and trying again works",
   journey("provider-failure"),
   async ({ page }) => {
     await addApplication(page, "failure-app");
@@ -246,8 +248,8 @@ test(
       .fill("Hello [fail-once]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    // The failed attempt offers another go; the worker's exact error stays in
-    // the run record.
+    // The failed reply offers another go; the provider's words stay out of
+    // the conversation.
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
     await expect(page.getByText("QA simulated provider failure.")).toHaveCount(
       0,
@@ -275,9 +277,9 @@ test(
       page
         .locator(".hv-messages")
         .getByText("Hello [fail-once]", { exact: true }),
-    ).toHaveCount(1);
+    ).toHaveCount(2);
     expect((await view(page)).messages).toHaveLength(
-      before.messages.length + 3,
+      before.messages.length + 4,
     );
   },
 );

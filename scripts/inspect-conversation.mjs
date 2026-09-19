@@ -94,15 +94,15 @@ function version(path) {
 }
 function snapshot(view) {
   const conversation = database
-    .prepare(
-      "SELECT status, current_response_id FROM conversations WHERE id = ?",
-    )
+    .prepare("SELECT status FROM conversations WHERE id = ?")
     .get(view.chat.id);
-  const response = conversation?.current_response_id
-    ? database
-        .prepare("SELECT id, body, status FROM messages WHERE id = ?")
-        .get(conversation.current_response_id)
-    : null;
+  // The reply Pi is writing now, if it is writing one.
+  const response =
+    database
+      .prepare(
+        "SELECT id, body, status FROM messages WHERE conversation_id = ? AND status = 'running'",
+      )
+      .get(view.chat.id) ?? null;
   let executions = [];
   if (response?.status === "running") {
     try {

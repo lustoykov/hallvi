@@ -1,5 +1,4 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import type { PiRun } from "../../../src/server/types";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   open: vi.fn(),
@@ -62,9 +61,12 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
     dispose = mocks.dispose;
   },
 }));
-import { askPi, describePiFailure } from "../../../src/server/pi";
-const run = { id: "run-a", applicationId: "app-a", chatId: "chat-a" } as PiRun;
-const input = { run, userMessage: "Inspect the server", runContext: "{}" };
+import { openPiSession, describePiFailure } from "../../../src/server/pi";
+const scope = {
+  applicationId: "app-a",
+  chatId: "chat-a",
+  reply: () => "reply-a",
+};
 type RegisteredTool = {
   name: string;
   execute: (id: string, args: unknown) => Promise<unknown>;
@@ -124,9 +126,7 @@ function tool(name: string) {
   )!;
 }
 it("executes host and workspace mutations through the permission boundary in the main native session", async () => {
-  expect(await askPi(input)).toMatchObject({
-    message: "Checked.",
-  });
+  const { close } = await openPiSession(scope);
   await tool("server_bash").execute("call", { command: "uname -s" });
   expect(mocks.host).toHaveBeenCalledWith(
     { address: "test-host" },
@@ -143,16 +143,18 @@ it("executes host and workspace mutations through the permission boundary in the
   const names = mocks.create.mock.calls[0][0].tools;
   expect(names).not.toContain("prepare_deployment");
   expect(names).not.toContain("prepare_release");
-  expect(session.prompt).toHaveBeenCalledWith(
-    input.userMessage,
-    expect.anything(),
-  );
+  // Opening a session starts nothing: Pi is prompted by whoever delivers the
+  // owner's messages, and the history is held until Pi has settled.
+  expect(session.prompt).not.toHaveBeenCalled();
+  expect(mocks.release).not.toHaveBeenCalled();
+  await close();
   expect(session.waitForIdle).toHaveBeenCalled();
+  expect(session.dispose).toHaveBeenCalledOnce();
   expect(mocks.release).toHaveBeenCalledOnce();
 });
 it("side chats have no shell, approval or mutation tools", async () => {
   mocks.main.mockReturnValue(false);
-  await askPi(input);
+  await openPiSession(scope);
   expect(mocks.create.mock.calls[0][0].tools).toEqual([
     "read",
     "grep",
@@ -167,16 +169,15 @@ it("side chats have no shell, approval or mutation tools", async () => {
 });
 it("a declined file mutation never reaches the workspace", async () => {
   mocks.execute.mockResolvedValue({ declined: true });
-  await askPi(input);
+  await openPiSession(scope);
   expect(
     await tool("write").execute("call", { path: "file", content: "hello" }),
   ).toMatchObject({ content: [{ text: '{"declined":true}' }] });
   expect(mocks.workspace).not.toHaveBeenCalled();
 });
-it("does not treat an incomplete model turn as success and releases the session", async () => {
-  session.prompt.mockResolvedValue(undefined);
-  await expect(askPi(input)).rejects.toThrow("could not reach");
-  expect(session.dispose).toHaveBeenCalledOnce();
+it("releases the history when the session cannot be opened, without leaking why", async () => {
+  mocks.create.mockRejectedValue(new Error("Secret bearer token"));
+  await expect(openPiSession(scope)).rejects.toThrow("could not reach");
   expect(mocks.release).toHaveBeenCalledOnce();
   expect(describePiFailure(new Error("Secret bearer token"))).not.toContain(
     "token",
@@ -187,7 +188,7 @@ it("provider and connection tools use the same permission boundary, including de
   mocks.provider.mockResolvedValue({ server: { id: 123 } });
   mocks.publicKey.mockResolvedValue({ publicKey: "ssh-ed25519 public" });
   mocks.connect.mockResolvedValue({ sshVerified: true });
-  await askPi(input);
+  await openPiSession(scope);
   await tool("hetzner_request").execute("api", {
     method: "POST",
     path: "/servers",
@@ -219,7 +220,7 @@ it("opens private access through the permission boundary and honors decline", as
     url: "http://127.0.0.1:8080",
     httpStatus: 200,
   });
-  await askPi(input);
+  await openPiSession(scope);
   await tool("open_server_port").execute("tunnel", { remotePort: 80 });
   expect(mocks.execute.mock.calls[0][0]).toBe("open_server_port");
   expect(mocks.tunnel).toHaveBeenCalledWith(

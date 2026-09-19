@@ -48,10 +48,8 @@ test("server output streams inline, preserves reading position and stays readabl
       now,
     );
   database
-    .prepare(
-      "UPDATE conversations SET current_response_id = ?, status = 'working' WHERE id = ?",
-    )
-    .run(runId, chat.id);
+    .prepare("UPDATE conversations SET status = 'working' WHERE id = ?")
+    .run(chat.id);
   const directory = join(fixture.state, "operator", appId, "executions");
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `${executionId}.json`);

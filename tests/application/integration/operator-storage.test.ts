@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
@@ -11,13 +11,15 @@ import {
 import { getOperatorView } from "../../../src/server/operator-view";
 import {
   sendChatMessage,
-  claimNextPiRun,
-  persistPiDraft,
-  completePiRun,
-  cancelPiRun,
-  interruptRunningPiRuns,
-  chatRunSnapshot,
-} from "../../../src/server/pi-runs";
+  messageSeen,
+  messagePersisted,
+  writeReply,
+  settleConversation,
+  stopConversation,
+  waitingMessages,
+  interruptConversations,
+  chatSnapshot,
+} from "../../../src/server/pi-conversation";
 import {
   saveInformation,
   listInformation,
@@ -63,110 +65,158 @@ afterAll(() => {
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
-it("loads creation, settings and the partial response after reopening the database", () => {
+/** What the worker records when Pi reads a message: a reply opens under it. */
+function read(id: string) {
+  return messageSeen(id)!;
+}
+const waitingIds = () => waitingMessages().map(({ message }) => message.id);
+
+it("loads creation, settings and the partial reply after reopening the database", () => {
   expect(store.getApplication(app)?.repositoryId).toBe(123);
   expect(store.getChat(chat)?.kind).toBe("main");
   expect(operatorSettings(app).permissionMode).toBe("pi-decides");
   saveOperatorSettings(app, { permissionMode: "always-ask", host: null });
   const request = randomUUID();
-  const accepted = sendChatMessage(
-    app,
-    chat,
-    "Inspect this repository",
-    request,
-  );
+  const sent = sendChatMessage(app, chat, "Inspect this repository", request);
   expect(
-    sendChatMessage(app, chat, "Inspect this repository", request).run.id,
-  ).toBe(accepted.run.id);
-  const turn = claimNextPiRun()!;
-  expect(claimNextPiRun()).toBeNull();
-  persistPiDraft(turn.id, "I’m inspecting the source.");
+    sendChatMessage(app, chat, "Inspect this repository", request).id,
+  ).toBe(sent.id);
+  expect(sent.status).toBe("waiting");
+  expect(store.getChat(chat)?.status).toBe("working");
+  const reply = read(sent.id);
+  writeReply(reply.id, "I’m inspecting the source.");
   reopen();
   expect(operatorSettings(app).permissionMode).toBe("always-ask");
-  expect(store.getChat(chat)).toMatchObject({
-    status: "working",
-    currentResponseId: turn.id,
-  });
-  expect(chatRunSnapshot(app, chat).messages.at(-1)).toMatchObject({
+  expect(store.getChat(chat)?.status).toBe("working");
+  expect(
+    chatSnapshot(app, chat)
+      .messages.slice(-2)
+      .map((m) => m.status),
+  ).toEqual(["delivered", "running"]);
+  expect(chatSnapshot(app, chat).messages.at(-1)).toMatchObject({
     body: "I’m inspecting the source.",
-    status: "running",
+    responseTo: sent.id,
   });
-  expect(completePiRun(turn.id, { message: "Inspection finished." })).toBe(
-    true,
-  );
+  writeReply(reply.id, "Inspection finished.");
+  settleConversation(chat, "completed");
   reopen();
-  expect(store.getChat(chat)).toMatchObject({
-    status: "idle",
-    currentResponseId: null,
+  expect(store.getChat(chat)?.status).toBe("idle");
+  expect(store.getMessage(reply.id)).toMatchObject({
+    status: "completed",
+    body: "Inspection finished.",
   });
-  expect(store.getMessage(turn.id)?.status).toBe("completed");
 });
-it("queues explicit follow-ups FIFO without replaying interrupted work", () => {
-  const first = sendChatMessage(app, chat, "First task", randomUUID()).run;
-  const running = claimNextPiRun()!;
-  expect(running.id).toBe(first.id);
+it("keeps what waits across an interruption without replaying interrupted work", () => {
+  // The transcript is ordered by when things happened, so time has to pass.
+  vi.useFakeTimers({ toFake: ["Date"], now: Date.now() });
+  const messageSeen = (...args: Parameters<typeof read>) => {
+    vi.advanceTimersByTime(1_000);
+    return read(...args);
+  };
+  const first = sendChatMessage(app, chat, "First task", randomUUID());
+  const running = messageSeen(first.id);
+  const second = sendChatMessage(app, chat, "Second task", randomUUID());
+  const third = sendChatMessage(app, chat, "Third task", randomUUID(), "steer");
+  expect(waitingIds()).toEqual([second.id, third.id]);
 
-  const secondKey = randomUUID();
-  const second = sendChatMessage(app, chat, "Second task", secondKey).run;
-  const third = sendChatMessage(app, chat, "Third task", randomUUID()).run;
-  expect(sendChatMessage(app, chat, "Second task", secondKey).run.id).toBe(
-    second.id,
-  );
-  expect(claimNextPiRun()).toBeNull();
-  expect(store.getChat(chat)?.currentResponseId).toBe(running.id);
-
-  interruptRunningPiRuns();
+  interruptConversations();
   expect(store.getMessage(running.id)?.status).toBe("interrupted");
-  expect(store.getMessage(second.id)?.status).toBe("queued");
-  expect(store.getMessage(third.id)?.status).toBe("queued");
+  expect(store.getChat(chat)?.status).toBe("interrupted");
+  // Pi never read these. They still wait, in order, as the owner sent them.
+  expect(waitingIds()).toEqual([second.id, third.id]);
+  expect(store.getMessage(third.id)?.delivery).toBe("steer");
 
-  const resumed = claimNextPiRun()!;
-  expect(resumed.id).toBe(second.id);
-  expect(store.getChat(chat)?.currentResponseId).toBe(second.id);
-  expect(claimNextPiRun()).toBeNull();
-  completePiRun(resumed.id, { message: "Second finished." });
-  expect(claimNextPiRun()?.id).toBe(third.id);
+  // Read in turn, each closes what Pi wrote before it and opens its own.
+  const resumed = messageSeen(second.id);
+  expect(store.getChat(chat)?.status).toBe("working");
+  const last = messageSeen(third.id);
+  expect(store.getMessage(resumed.id)?.status).toBe("completed");
+  expect(
+    chatSnapshot(app, chat)
+      .messages.slice(-6)
+      .map((m) => m.id),
+  ).toEqual([first.id, running.id, second.id, resumed.id, third.id, last.id]);
 });
 
-it("stopping active work cancels queued follow-ups before they start", () => {
-  const active = sendChatMessage(app, chat, "Active task", randomUUID()).run;
-  claimNextPiRun();
+it("Stop settles what waits as never started, and nothing delivers it later", () => {
+  const active = sendChatMessage(app, chat, "Active task", randomUUID());
+  const reply = read(active.id);
   const followUp = sendChatMessage(
     app,
     chat,
     "Use that result next",
     randomUUID(),
-  ).run;
+  );
 
-  cancelPiRun(app, chat, active.id);
+  stopConversation(app, chat);
 
-  expect(store.getMessage(active.id)?.status).toBe("cancelled");
+  expect(store.getMessage(reply.id)?.status).toBe("cancelled");
   expect(store.getMessage(followUp.id)).toMatchObject({
     status: "cancelled",
-    error: "Not started because the active reply was stopped.",
+    body: "Use that result next",
+    error: "Not started because the conversation was stopped.",
   });
-  expect(store.getChat(chat)).toMatchObject({
-    status: "idle",
-    currentResponseId: null,
-  });
-  expect(claimNextPiRun()).toBeNull();
+  expect(store.getChat(chat)?.status).toBe("idle");
+  expect(waitingIds()).toEqual([]);
+  // Pi was already reading it as Stop landed: it is refused, not run.
+  expect(messageSeen(followUp.id)).toBeNull();
+  expect(store.getMessage(followUp.id)?.status).toBe("cancelled");
+  // Nor does a restart find anything to pick up.
+  interruptConversations();
+  expect(waitingIds()).toEqual([]);
+  expect(store.getChat(chat)?.status).toBe("idle");
 });
-it("cancels one queued follow-up without discarding later work", () => {
-  const first = sendChatMessage(app, chat, "First", randomUUID()).run;
-  const second = sendChatMessage(app, chat, "Second", randomUUID()).run;
+it("after an interruption, keeps an instruction Pi's history does not hold and says what is not known", () => {
+  // Pi's own history, as the crash left it: one entry.
+  const sessions = join(root, "pi-sessions", app);
+  mkdirSync(sessions, { recursive: true });
+  writeFileSync(
+    join(sessions, `${chat}.jsonl`),
+    [
+      {
+        type: "session",
+        id: "s",
+        version: 3,
+        timestamp: "2026-01-01",
+        cwd: "/",
+      },
+      { type: "message", id: "entry-kept", message: { role: "user" } },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join("\n") + '\n{"type":"message","id":"entry-to',
+  );
+  const interruptedAfter = (persistedAs?: string) => {
+    const sent = sendChatMessage(app, chat, "Publish it", randomUUID());
+    const reply = read(sent.id);
+    if (persistedAs) messagePersisted(sent.id, persistedAs);
+    interruptConversations();
+    expect(store.getMessage(reply.id)?.status).toBe("interrupted");
+    expect(store.getChat(chat)?.status).toBe("interrupted");
+    return store.getMessage(sent.id)!;
+  };
 
-  cancelPiRun(app, chat, first.id);
-
-  expect(store.getMessage(first.id)?.status).toBe("cancelled");
-  expect(store.getMessage(second.id)?.status).toBe("queued");
-  expect(claimNextPiRun()?.id).toBe(second.id);
-  // A late duplicate request to stop the old row is inert.
-  cancelPiRun(app, chat, first.id);
-  expect(store.getMessage(second.id)?.status).toBe("running");
+  // Pi kept it: delivered stands, and only the reply is interrupted.
+  expect(interruptedAfter("entry-kept")).toMatchObject({
+    status: "delivered",
+    error: null,
+  });
+  // Pi named an entry that never reached its file, whole or torn, or Hallvi
+  // stopped before Pi named one. Either way the instruction is kept, nothing
+  // claims the model did or did not begin, and it is not sent again.
+  for (const persistedAs of ["entry-never-flushed", "entry-torn", undefined]) {
+    expect(interruptedAfter(persistedAs)).toMatchObject({
+      status: "interrupted",
+      body: "Publish it",
+      error: expect.stringMatching(
+        /not in Pi's history.*Whether the model had begun to answer is not known.*not sent again/,
+      ),
+    });
+    expect(waitingIds()).toEqual([]);
+  }
 });
 it("shares one outcome between chat and two views while keeping working knowledge unsurfaced", () => {
-  sendChatMessage(app, chat, "Inspect", randomUUID());
-  const turn = claimNextPiRun()!;
+  const asked = sendChatMessage(app, chat, "Inspect", randomUUID());
+  const turn = read(asked.id);
   const hidden = saveInformation(app, {
     title: "Build note",
     body: "Use the repository lockfile.",
@@ -174,7 +224,7 @@ it("shares one outcome between chat and two views while keeping working knowledg
   const record = saveInformation(app, {
     title: "Application verified",
     body: "HTTP check passed.",
-    evidence: [{ type: "message", id: turn.userMessageId }],
+    evidence: [{ type: "message", id: asked.id }],
     establishedAt: "2026-09-12T12:00:00.000Z",
     presentation: {
       views: ["overview", "deployment"],
@@ -197,7 +247,8 @@ it("shares one outcome between chat and two views while keeping working knowledg
     type: "saved-information",
     id: record.id,
   });
-  completePiRun(turn.id, { message: "Here is the result." });
+  writeReply(turn.id, "Here is the result.");
+  settleConversation(chat, "completed");
   reopen();
   const view = getOperatorView(app, chat);
   expect(view.information?.map((r) => r.id)).toEqual([record.id]);
@@ -214,17 +265,16 @@ it("shares one outcome between chat and two views while keeping working knowledg
   expect(getOperatorView(app, chat).information?.[0].retiredAt).toBeTruthy();
 });
 it("marks unfinished work interrupted on worker restart and cascades only application data on removal", () => {
-  sendChatMessage(app, chat, "Inspect", randomUUID());
-  const turn = claimNextPiRun()!;
-  persistPiDraft(turn.id, "Started");
+  const turn = read(sendChatMessage(app, chat, "Inspect", randomUUID()).id);
+  writeReply(turn.id, "Started");
   reopen();
-  interruptRunningPiRuns();
+  interruptConversations();
   expect(store.getChat(chat)?.status).toBe("interrupted");
   expect(store.getMessage(turn.id)).toMatchObject({
     status: "interrupted",
     body: "Started",
   });
-  expect(claimNextPiRun()).toBeNull();
+  expect(waitingIds()).toEqual([]);
   saveInformation(app, { title: "Note", body: "Saved" });
   removeApplication(app, "example/app");
   for (const table of [

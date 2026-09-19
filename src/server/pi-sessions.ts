@@ -201,8 +201,27 @@ export async function openNativeChatSession(
   }
 }
 
-// The caller cancels and settles active Runs first. Keep record removal and
-// session cleanup inside the same lock so a worker cannot reopen between them.
+/**
+ * The ids of the entries in Pi's own history on disk. Read at worker start,
+ * before any session is open, to tell a message Pi kept from one it did not.
+ */
+export function nativeEntryIds(applicationId: string, chatId: string) {
+  const kept = new Set<string>();
+  const path = sessionPath(applicationId, chatId);
+  if (!existsSync(path)) return kept;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    try {
+      kept.add(JSON.parse(line).id);
+    } catch {
+      // A torn trailing line is exactly the entry that was not kept.
+    }
+  }
+  return kept;
+}
+
+// The caller stops and settles active conversations first. Keep record
+// removal and session cleanup inside the same lock so a worker cannot reopen
+// between them.
 export function removeNativeApplicationSessions(
   applicationId: string,
   removeApplicationRecords: () => void,

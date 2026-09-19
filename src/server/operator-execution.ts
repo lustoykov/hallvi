@@ -13,18 +13,16 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { loadApplication, loadChat } from "./applications";
-import { getPiRun } from "./pi-runs";
 import { piConfigDir } from "./pi-configuration";
 import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
 import { managedSshOptions } from "./managed-ssh";
-import type { PiRun } from "./types";
 
 import { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
 export { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
-import { db } from "./db";
+import { db, getMessage } from "./db";
 import { applications, chats } from "./db-schema";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 export interface ExecutionRecord {
   id: string;
   applicationId: string;
@@ -113,7 +111,7 @@ export function listExecutions(applicationId: string): ExecutionRecord[] {
       // A stopped turn is never resumed or replayed by this execution log.
       if (
         ["running", "awaiting-approval"].includes(record.status) &&
-        getPiRun(record.runId)?.status !== "running"
+        getMessage(record.runId)?.status !== "running"
       )
         return {
           ...record,
@@ -136,7 +134,7 @@ export function decideExecution(
   if (
     !record ||
     record.status !== "awaiting-approval" ||
-    getPiRun(record.runId)?.status !== "running"
+    getMessage(record.runId)?.status !== "running"
   )
     throw new Error("This request is no longer waiting for approval.");
   writeFileSync(
@@ -165,7 +163,15 @@ function cleanResult<T>(value: T, clean: (text: string) => string): T {
   return value;
 }
 
-export function executionContext(run: PiRun, signal?: AbortSignal) {
+/**
+ * Permissions and evidence for one conversation's tools. `reply` names the
+ * reply Pi is writing at the moment of each call: evidence attaches there, and
+ * a call made for a reply that has ended is refused.
+ */
+export function executionContext(
+  scope: { applicationId: string; chatId: string; reply: () => string },
+  signal?: AbortSignal,
+) {
   let lastApproval: string | undefined;
   async function execute<T>(
     tool: string,
@@ -177,12 +183,13 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
     toolCallId: string,
   ): Promise<T | { declined: true }> {
     signal?.throwIfAborted();
+    const run = { ...scope, id: scope.reply() };
+    const writing = () => getMessage(run.id)?.status === "running";
     if (!isMainChat(run.applicationId, run.chatId))
       throw new Error(
         "Side chats are read-only. Send this work to the main operator.",
       );
-    if (getPiRun(run.id)?.status !== "running")
-      throw new Error("This turn is no longer running.");
+    if (!writing()) throw new Error("This turn is no longer running.");
     const mode = operatorSettings(run.applicationId).permissionMode;
     const needsApproval =
       mode === "always-ask" || (mode === "pi-decides" && ask);
@@ -239,9 +246,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       db()
         .update(chats)
         .set({ status, updatedAt: new Date().toISOString() })
-        .where(
-          and(eq(chats.id, run.chatId), eq(chats.currentResponseId, run.id)),
-        )
+        .where(eq(chats.id, run.chatId))
         .run();
     try {
       if (needsApproval) {
@@ -249,7 +254,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         let decision;
         while (!(decision = read<{ approved: boolean }>(`${path}.decision`))) {
           await delay(150, undefined, { signal });
-          if (getPiRun(run.id)?.status !== "running")
+          if (!writing())
             throw new Error("This turn stopped while waiting for approval.");
         }
         signal?.throwIfAborted();
@@ -263,8 +268,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         record.approvalId = record.id;
         if (ask) lastApproval = record.id;
       }
-      if (getPiRun(run.id)?.status !== "running")
-        throw new Error("This turn is no longer running.");
+      if (!writing()) throw new Error("This turn is no longer running.");
       record.status = "running";
       conversationStatus("working");
       save();
@@ -292,17 +296,14 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         exitCode === undefined || exitCode === 0 ? "succeeded" : "failed";
       return result;
     } catch (error) {
-      record.status =
-        signal?.aborted || getPiRun(run.id)?.status !== "running"
-          ? "interrupted"
-          : "failed";
+      record.status = signal?.aborted || !writing() ? "interrupted" : "failed";
       const said = error instanceof Error ? error.message : "Execution failed.";
       output(record.output + "\n" + said);
       // A failure can carry the value too — a connection string in a driver
       // error, a command echoed back by the shell.
       throw new Error(clean(said));
     } finally {
-      if (getPiRun(run.id)?.status === "running") conversationStatus("working");
+      if (writing()) conversationStatus("working");
       record.finishedAt = new Date().toISOString();
       save();
     }

@@ -87,7 +87,7 @@ The architectural direction is sufficiently clear to begin bounded implementatio
 4. **Complete the lightweight deployment UI/UX checkpoint — current focus.** Deployment has been demonstrated. Implement the data-to-view mapping and polish the complete journey against the reference designs. Prove it with fresh Pi output and obtain owner acceptance before expanding complexity.
 5. **Prove generalization progressively.** Review the lightweight journey before moving to the medium example, then the more complicated example. Add capabilities those deployments actually need. These remain separate reviewable increments.
 
-**Send next is the first conversation-control slice.** Explicit follow-ups use the existing durable message rows and run one at a time after the active turn. Native steering, contextual side-chat opening and concurrent side explanations remain deferred. Existing read-only tool restrictions remain in effect.
+**Conversation control uses Pi's native session.** Send next and Steer are Pi's own follow-up and steering queues; Hallvi keeps the durable accepted message and records what Pi did. Applications work concurrently. Contextual side-chat opening and concurrent side explanations remain deferred. Existing read-only tool restrictions remain in effect.
 
 After those checkpoints establish the deployment journey, begin the view-by-view design work described above. Detailed care features and broad hardening remain deferred. Exact application repositories, final record fields and visual details can be settled at the relevant checkpoint; they do not require another comprehensive architecture exercise.
 
@@ -98,7 +98,7 @@ This walkthrough is a proposal to refine with the user, not a fixed workflow or 
 | “Deploy this repository” | Inspect available source, existing connections and saved preferences. | Enter or select the repository and a request; enter the main conversation without an infrastructure questionnaire. |
 | Understand what is needed | Determine how the application runs, its dependencies, configuration and persistent data. | A concise explanation of the intended setup; ask only for access, private inputs or consequential choices that are actually missing. |
 | Establish the target | Recommend an appropriate server using available context, explain any new cost, and obtain authority when needed under the permission mode. | A concrete recommendation or decision in the conversation, not a mandatory release-proposal workflow. |
-| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress and expandable execution logs. Send next retains an explicit follow-up; Stop also cancels waiting follow-ups in that conversation. Steering and contextual side chats remain deferred. |
+| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress and expandable execution logs. Send next keeps a follow-up for when Pi is done and Steer reaches Pi at its next step; Stop also settles what was waiting as not started. Contextual side chats remain deferred. |
 | Verify useful behavior | Choose and execute checks appropriate to the actual application, including reachability and meaningful behavior. | Explain what was actually verified and any remaining limitation. |
 | Hand over a working application | Preserve useful configuration and consequential knowledge and publish the relevant outcome. | An application link where applicable, an understandable deployment result and evidence available in the relevant existing views. |
 
@@ -116,24 +116,29 @@ Background work and, eventually, requests from other agents must coordinate with
 
 ### Interaction while Pi is busy
 
-The composer remains editable during work. **Send next** explicitly saves a follow-up in Hallvi's existing message queue; it does not interrupt the current command or deliver text to the active model turn. The worker claims requests in order, one at a time, and each gets its own reply in the same native conversation. A waiting follow-up never replaces the active reply's approval or activity pointer.
+The composer remains editable during work. **Send next** and **Steer** each save a durable message and hand it to the conversation's live Pi session. Pi decides when it runs: a follow-up when its current work is done, a steer after the tool calls of its current step and before its next model call. A steer does not interrupt a running command or a pending approval, and the interface says so. A message shows as waiting until Pi reads it, at which point it takes its place in the transcript and a new reply opens under it; what Pi did before a steer stays under the reply it happened in.
 
-**Stop** cancels the active reply and the waiting follow-ups in that conversation. Their text remains in the transcript, with an explicit never-started explanation. Stopping a reply does not prove that a command already issued to the server stopped. Restart marks an unfinished active reply interrupted rather than replaying it; explicitly queued, not-yet-started requests remain available to the worker.
+One conversation is one live stretch of a native session: a prompt and whatever Pi's queues deliver after it, ending when Pi settles. Hallvi schedules nothing inside it. The worker only decides whether a stretch may start: never two for one application, and never two on one server address (see Shared servers below).
+
+**Stop** is recorded at once, by the API: the reply being written is settled as stopped and every waiting message as not started, with its text kept. The worker then empties Pi's queues before aborting, because Pi's abort otherwise continues into them. Only a message still marked waiting is ever handed to Pi, or allowed to run if Pi was already reading it, so nothing Stop settled is delivered later, including after a restart. There is no taking back a single waiting message: Pi can only empty its queues, and rebuilding them around one removal would be Hallvi reconstructing Pi's queue. Stop is the cancellation control, and a message that was not started offers Send again.
+
+**Interruption.** A worker that stops marks its replies interrupted and replays nothing; messages Pi never read still wait for the next worker. A message is marked delivered before Pi persists it, so an interruption between the two cannot deliver it twice. At start the worker checks each interrupted conversation's last delivered message against Pi's own history, by the timestamp Pi stamped on it and its text. If Pi kept no record, the message says so, keeps the instruction, and is not sent again by itself.
+
+**Shared servers.** The product topology is one stack on one instance, but nothing establishes that an instance belongs to one application, and two applications can be attached to the same address. Their operators would otherwise work on one machine at once, so a stretch does not start while another application on the same address has one live; the message waits. Prohibiting a shared server outright would remove this one remaining gate and is a product decision, not taken here.
 
 ```mermaid
 flowchart TD
-  View[Application destination] -->|Ask| Draft[Editable draft with removable origin chip]
-  Draft -->|Explicit Send or Send next| Saved[Durable user message and queued reply]
-  Saved -->|Current turn finishes| Run[Single worker claims next reply]
-  Run --> Result[Recorded reply and outcomes]
-  Result -->|Return to destination| View
-  Stop[Stop active reply] --> Cancel[Cancel active and waiting replies in this conversation]
-  Cancel --> History[Keep transcript and command history]
+  Send[Send, Send next or Steer] --> Saved[Durable waiting message]
+  Saved -->|Worker hands it over| Pi[Live Pi session: prompt, follow-up or steer]
+  Pi -->|Pi reads it| Delivered[Delivered; a reply opens under it]
+  Delivered --> Evidence[Activity, executions and approvals attach to that reply]
+  Stop[Stop] -->|Recorded first| Cancelled[Not started; text kept]
+  Cancelled -.->|never handed to Pi| Pi
 ```
 
 A destination's question keeps its origin in a removable chip and offers a return action after submission. It never replaces an existing draft. Drafts are kept in browser storage scoped to the controller origin, application and conversation, survive tab closure, and are cleared after acceptance. Storage being unavailable must not block ordinary messaging. Credential-entry fields do not use draft persistence.
 
-Mid-command steering and contextual read-only side chats remain future work. Pi's native `AgentSession.followUp()`, `AgentSession.steer()` and session branching primitives are available building blocks; they are not used to create a second queue in this slice. Steering would require a separately reviewed delivery boundary and must not imply cancellation of an already-running server command.
+Contextual read-only side chats remain future work; Pi's session branching primitives are available building blocks.
 
 ### General tools and independent permissions
 
@@ -288,7 +293,7 @@ The user chose simplicity: use the Codex-style pending-call approval interaction
 
 [Codex's documented approval interaction](https://learn.chatgpt.com/docs/app-server#approvals) is a pending command/file-change item, an approval request, a client decision and continuation or decline. We are following that interaction, not claiming that Codex guarantees restoration of pending approvals across process restarts.
 
-The installed Pi 0.84.4 has native queue/steer and a tool-call blocking hook. Its `terminate` flag is only a batch-level hint, not a requirement to build turn suspension. The first execution checkpoint retains a native session per conversation, opened/disposed around each request. Tool wrappers await UI approval inside the live turn; there is no default conversation timeout while a person decides. Native queue/steer and concurrent side conversations still need lifecycle integration.
+The installed Pi 0.84.4 has native queue/steer and a tool-call blocking hook. Its `terminate` flag is only a batch-level hint, not a requirement to build turn suspension. The first execution checkpoint retains a native session per conversation, opened/disposed around each request. Tool wrappers await UI approval inside the live turn; there is no default conversation timeout while a person decides. Native queue/steer are integrated as described under Interaction while Pi is busy; concurrent side conversations still need a per-conversation history lock.
 
 Use explicit host execution and controller-held credentials, with named private inputs and known-value redaction. Keep the minimum repository access needed before a host exists. Details of the saved-record index, revision history and output storage can follow the working slice rather than become prerequisites. Side chats can follow useful execution records. No dedicated recovery subsystem is planned.
 
@@ -311,7 +316,7 @@ The four-table checkpoint below is approved for implementation. Keep this docume
 
 ## First implementation checkpoint — 12 September 2026
 
-The first conversation is the main operator and cannot be archived. Other conversations receive only repository read/search and stored application/execution evidence tools. Only the main operator gets workspace mutations, server Bash and approval requests. The current worker still processes turns serially; concurrent side explanations and native queue/steer are deferred until the core deployment experience is established.
+The first conversation is the main operator and cannot be archived. Other conversations receive only repository read/search and stored application/execution evidence tools. Only the main operator gets workspace mutations, server Bash and approval requests. The worker runs one live stretch per application; concurrent side explanations are deferred until the core deployment experience is established.
 
 An existing server connection contains address, SSH user/port and controller-side paths to a key and verified known-hosts file. Pi sees the target and command, not those credential paths. Provider provisioning and named private-input injection are not implemented in this checkpoint.
 

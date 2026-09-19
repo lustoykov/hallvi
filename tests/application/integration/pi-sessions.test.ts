@@ -100,20 +100,8 @@ it("starts with empty native context instead of importing disposable SQLite chat
   expect(store.listMessages(chatId)).toHaveLength(2);
 });
 
-it("does not duplicate the accepted user message from the first queued Run", async () => {
-  const user = store.insertMessage(
-    chatId,
-    "user",
-    "New accepted input",
-    "user",
-  );
-  const answer = store.insertMessage(chatId, "assistant", "", "pi", "queued");
-  store
-    .db()
-    .$client.prepare(
-      "UPDATE messages SET response_to = ?, request_key = ? WHERE id = ?",
-    )
-    .run(user.id, "key", answer.id);
+it("does not copy a waiting message into the native history before Pi reads it", async () => {
+  store.insertMessage(chatId, "user", "New accepted input", "user", "waiting");
   const opened = await openNativeChatSession(applicationId, chatId);
   expect(opened.sessionManager.buildSessionContext().messages).toEqual([]);
   opened.release();

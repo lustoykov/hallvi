@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
 import {
-  claimNextPiRun,
+  messageSeen,
   sendChatMessage,
-  finishPiRun,
-} from "../../../src/server/pi-runs";
+  stopConversation,
+} from "../../../src/server/pi-conversation";
 import {
   decideExecution,
   executionContext,
@@ -16,14 +16,19 @@ import {
   saveOperatorSettings,
 } from "../../../src/server/operator-execution";
 import { pushTestDatabase } from "../../test-database";
-import type { PiRun } from "../../../src/server/types";
 import {
   startActivity,
   endActivity,
   listActivity,
 } from "../../../src/server/pi-activity";
 let root: string;
-let run: PiRun;
+/** The reply Pi is writing, and the scope its tools are bound to. */
+let run: { id: string; applicationId: string; chatId: string };
+const scope = (chatId = run.chatId) => ({
+  applicationId: run.applicationId,
+  chatId,
+  reply: () => run.id,
+});
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hv-operator-"));
   vi.stubEnv("HALLVI_DB_PATH", join(root, "test.db"));
@@ -39,8 +44,9 @@ beforeEach(() => {
     repositoryName: "app",
   });
   const chat = store.insertChat(app.id, "Main operator");
-  sendChatMessage(app.id, chat.id, "Inspect this server", randomUUID());
-  run = claimNextPiRun()!;
+  run = messageSeen(
+    sendChatMessage(app.id, chat.id, "Inspect this server", randomUUID()).id,
+  )!;
 });
 afterAll(() => {
   globalThis.__hallviDb?.$client.close();
@@ -53,7 +59,7 @@ const settings = (permissionMode: "always-ask" | "pi-decides" | "bypass") =>
 it("pauses the actual call until approved, then records its output and failure code", async () => {
   settings("always-ask");
   const work = vi.fn(async () => ({ output: "missing service", exitCode: 3 }));
-  const pending = executionContext(run).execute(
+  const pending = executionContext(scope()).execute(
     "server_bash",
     "test host",
     "systemctl status app",
@@ -89,7 +95,7 @@ it("declining or cancelling an approval never starts the command", async () => {
     tool: "bash",
     args: { command: "example" },
   });
-  const declined = executionContext(run).execute(
+  const declined = executionContext(scope()).execute(
     "bash",
     "workspace",
     "example",
@@ -116,7 +122,7 @@ it("declining or cancelling an approval never starts the command", async () => {
     status: "declined",
   });
   const controller = new AbortController();
-  const cancelled = executionContext(run, controller.signal).execute(
+  const cancelled = executionContext(scope(), controller.signal).execute(
     "bash",
     "workspace",
     "example",
@@ -134,7 +140,7 @@ it("declining or cancelling an approval never starts the command", async () => {
 });
 it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even when Pi asks", async () => {
   settings("pi-decides");
-  const context = executionContext(run);
+  const context = executionContext(scope());
   expect(
     await context.execute(
       "bash",
@@ -187,7 +193,7 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
 it("side chats cannot execute and a stopped turn's pending command cannot be approved or replayed", async () => {
   const side = store.insertChat(run.applicationId, "Explain");
   await expect(
-    executionContext({ ...run, chatId: side.id }).execute(
+    executionContext(scope(side.id)).execute(
       "bash",
       "workspace",
       "anything",
@@ -198,7 +204,7 @@ it("side chats cannot execute and a stopped turn's pending command cannot be app
   ).rejects.toThrow("read-only");
   settings("always-ask");
   const work = vi.fn(async () => "bad");
-  const pending = executionContext(run).execute(
+  const pending = executionContext(scope()).execute(
     "bash",
     "workspace",
     "example",
@@ -207,7 +213,7 @@ it("side chats cannot execute and a stopped turn's pending command cannot be app
     "stopped-call",
   );
   const receipt = listExecutions(run.applicationId)[0];
-  finishPiRun(run.id, "interrupted", "Stopped");
+  stopConversation(run.applicationId, run.chatId);
   expect(listExecutions(run.applicationId)[0].status).toBe("interrupted");
   expect(() => decideExecution(run.applicationId, receipt.id, true)).toThrow(
     "no longer",

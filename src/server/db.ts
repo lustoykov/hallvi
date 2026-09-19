@@ -200,12 +200,20 @@ export function getMessage(id: string) {
 }
 
 export function listMessages(chatId: string) {
-  return db()
-    .select()
-    .from(messages)
-    .where(eq(messages.chatId, chatId))
-    .orderBy(asc(messages.createdAt), asc(rowId))
-    .all();
+  return (
+    db()
+      .select()
+      .from(messages)
+      .where(eq(messages.chatId, chatId))
+      // Transcript order: a message sits where Pi read it, or where it was
+      // settled without being read; whatever still waits comes last.
+      .orderBy(
+        sql`${messages.status} = 'waiting'`,
+        sql`coalesce(${messages.startedAt}, ${messages.finishedAt}, ${messages.createdAt})`,
+        asc(rowId),
+      )
+      .all()
+  );
 }
 
 // The latest repository access check is application configuration.

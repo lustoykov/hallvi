@@ -10,7 +10,7 @@ import {
   LOG_ARCHIVES,
   LOG_MAX_BYTES,
 } from "../../../src/server/diagnostics";
-import type { PiRun } from "../../../src/server/types";
+import type { PiReply } from "../../../src/server/types";
 
 const mocks = vi.hoisted(() => ({ failWrites: false, failRotation: false }));
 vi.mock("node:fs", async (original) => {
@@ -34,8 +34,7 @@ const run = {
   id: "run",
   chatId: "chat",
   applicationId: "app",
-  retryOfId: "prior",
-} as PiRun;
+} as PiReply;
 beforeEach(() => {
   mocks.failWrites = false;
   mocks.failRotation = false;
@@ -75,7 +74,6 @@ it("uses a blank override as the default and writes selected NDJSON fields with 
   expect(JSON.parse(text)).toMatchObject({
     event: "step.finished",
     runId: "run",
-    retryOfId: "prior",
     stepId: "model:1",
     metadata: { inputTokens: 2, outputTokens: 3, model: "fixture" },
     errorCategory: "rate-limit",
@@ -94,7 +92,7 @@ it("bounds file retention to the active file and three rotated archives", () => 
       JSON.stringify({ synthetic: i, padding: "x".repeat(LOG_MAX_BYTES) }) +
         "\n",
     );
-    logDiagnostic("reply.accepted", run);
+    logDiagnostic("reply.completed", run);
   }
   expect(fs.readdirSync(join(root, "diagnostics")).sort()).toEqual([
     "replies.ndjson",
@@ -107,14 +105,14 @@ it("bounds file retention to the active file and three rotated archives", () => 
     JSON.parse(fs.readFileSync(`${path}.${LOG_ARCHIVES}`, "utf8")).synthetic,
   ).toBe(3);
   expect(JSON.parse(fs.readFileSync(path, "utf8")).event).toBe(
-    "reply.accepted",
+    "reply.completed",
   );
 });
 
 it("swallows read-only filesystem and serialization failures without stdout fallback", () => {
   const stdout = vi.spyOn(console, "info").mockImplementation(() => {});
   mocks.failWrites = true;
-  expect(() => logDiagnostic("reply.accepted", run)).not.toThrow();
+  expect(() => logDiagnostic("reply.completed", run)).not.toThrow();
   expect(() =>
     logDiagnostic("step.finished", run, {
       metadata: {
@@ -174,6 +172,6 @@ it("retains the existing file if rotation fails and does not fail the caller", (
   const existing = "x".repeat(LOG_MAX_BYTES);
   fs.writeFileSync(diagnosticLogPath(), existing);
   mocks.failRotation = true;
-  expect(() => logDiagnostic("reply.accepted", run)).not.toThrow();
+  expect(() => logDiagnostic("reply.completed", run)).not.toThrow();
   expect(fs.readFileSync(diagnosticLogPath(), "utf8")).toBe(existing);
 });

@@ -23,7 +23,6 @@ export interface Chat {
   archivedAt: string | null;
   kind?: "main" | "side";
   status?: import("./operator-data").ConversationStatus;
-  currentResponseId?: string | null;
 }
 
 /** A chat as the list shows it: with the time of its newest message. */
@@ -45,40 +44,40 @@ export interface ChatMessage {
    */
   source: "user" | "pi" | "hallvi";
   createdAt: string;
-  status: "completed" | PiRunStatus;
+  /**
+   * The owner's message waits until Pi reads it (`delivered`), unless it is
+   * taken back or the conversation is stopped first (`cancelled`), or Hallvi
+   * stopped as Pi read it and Pi kept no record (`interrupted`). A reply is
+   * `running` while Pi writes it and then says how that ended.
+   */
+  status:
+    | "waiting"
+    | "delivered"
+    | "running"
+    | "completed"
+    | "failed"
+    | "cancelled"
+    | "interrupted";
+  /** How the owner sent it: after Pi's current work, or into it. */
+  delivery?: "next" | "steer" | null;
+  /** The sender's idempotency key: the same send twice is one message. */
+  requestKey?: string | null;
+  /** The owner's message this reply was written under. */
+  responseTo?: string | null;
+  error?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
   revision: number;
 }
 
-export type PiRunStatus =
-  | "queued"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled"
-  | "timed-out"
-  | "interrupted";
-
-export interface PiRun {
+/** The reply Pi is writing now: where its evidence and approvals attach. */
+export interface PiReply {
   id: string;
   applicationId: string;
   chatId: string;
-  userMessageId: string;
-  assistantMessageId: string;
-  requestKey: string;
-  retryOfId: string | null;
-  status: PiRunStatus;
-  revision: number;
-  error: string | null;
-  piCalls: number;
+  status: ChatMessage["status"];
   createdAt: string;
   startedAt: string | null;
-  finishedAt: string | null;
-}
-
-export interface AcceptedPiRun {
-  run: PiRun;
-  userMessageId: string;
-  assistantMessageId: string;
 }
 
 export interface Decision {
@@ -119,19 +118,19 @@ export interface ActivityEvent {
 }
 
 /**
- * The authoritative Chat state delivered over SSE and on demand: messages,
- * their Pi Runs, the application's operations and Activity.
+ * The authoritative Chat state delivered over SSE and on demand: its status,
+ * its messages, the application's operations and Activity.
  */
-export interface ChatRunSnapshot {
+export interface ChatSnapshot {
+  status: import("./operator-data").ConversationStatus;
   executions?: import("./operator-execution").ExecutionRecord[];
   /** Whether a Pi worker is alive to read this queue. */
   worker?: import("./worker-presence").WorkerPresence;
   information?: import("./operator-data").SavedInformation[];
   operations?: import("./operation-record").ApplicationOperation[];
-  /** What Pi ran during these runs, in order. */
+  /** What Pi ran, in order. */
   piActivity?: import("./pi-activity").ActivityRecord[];
   messages: ChatMessage[];
-  runs: PiRun[];
   activity: ActivityEvent[];
 }
 
