@@ -291,7 +291,10 @@ export function sessionOwner(
   const actions = {
     async transcript(scope: Scope): Promise<Transcript> {
       const open = opened.get(scope.chatId);
-      if (open) return project(open);
+      // Read without waiting in line. One that is being closed as it is read
+      // is read again below, from a newly opened one.
+      const read = open && (await project(open).catch(() => undefined));
+      if (read) return read;
       if (!hasHistory(scope)) return NOTHING;
       return inLine(scope.chatId, async () =>
         project(await ensure(scope)),
