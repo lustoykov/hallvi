@@ -17,9 +17,13 @@ export const WORKER_BUSY_EXIT = 3;
  * Pi and not by the owner remembering to. A copy that cannot be taken is
  * recorded where the Backups view reads it; it never stops the worker.
  */
-async function keepControllerCopy(trigger: "after-change" | "daily") {
+async function keepControllerCopy(
+  trigger: "after-change" | "daily",
+  changeRunning: boolean,
+) {
   try {
-    if (copyDue(trigger)) await protectController(trigger);
+    if (copyDue(trigger))
+      await protectController(trigger, { changeRunning });
   } catch (error) {
     console.warn(
       `Hallvi could not copy its own records: ${error instanceof Error ? error.message : "unknown reason"}`,
@@ -43,12 +47,12 @@ export async function runPiWorker(signal: AbortSignal) {
       if (owner.live()) worked = true;
       else if (worked) {
         worked = false;
-        await keepControllerCopy("after-change");
+        await keepControllerCopy("after-change", owner.live() > 0);
       } else if (Date.now() >= nextProtectionCheck) {
         // Rarely: the check reads one small file, and the copy itself decides
         // whether anything is owed.
         nextProtectionCheck = Date.now() + 60_000;
-        await keepControllerCopy("daily");
+        await keepControllerCopy("daily", owner.live() > 0);
       }
       await delay(250, undefined, { signal }).catch(() => undefined);
     }

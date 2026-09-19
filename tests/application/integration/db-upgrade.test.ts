@@ -36,7 +36,7 @@ const shape = (path: string) => {
   }
 };
 
-it("upgrades a schema-15 database to the current one, keeps every message, and leaves the original for rollback", () => {
+it("upgrades a schema-15 database without rewriting anything in it, and leaves the original for rollback", () => {
   const path = join(root, "hallvi.db");
   const old = new Database(path);
   old.exec(readFileSync("tests/fixtures/schema-15.sql", "utf8"));
@@ -61,13 +61,16 @@ it("upgrades a schema-15 database to the current one, keeps every message, and l
       env: { ...process.env, HALLVI_DB_PATH: path },
       encoding: "utf8",
     });
-  expect(run()).toContain("from schema 15 to 17");
+  expect(run()).toContain("from schema 15 to 18");
   expect(run()).toContain("Nothing to do");
 
-  // The same schema a new installation gets.
+  // Everything a new installation has is there. What conversations used to
+  // keep in the database stays too, unread: Pi holds them now.
   const fresh = join(root, "fresh.db");
   pushTestDatabase(fresh);
-  expect(shape(path)).toEqual(shape(fresh));
+  const have = shape(path).map((each) => JSON.stringify(each));
+  for (const needed of shape(fresh))
+    expect(have).toContain(JSON.stringify(needed));
 
   const upgraded = new Database(path, { readonly: true });
   expect(
@@ -78,20 +81,17 @@ it("upgrades a schema-15 database to the current one, keeps every message, and l
     { id: "u1", status: "completed", body: "Deploy it" },
     { id: "a1", status: "completed", body: "Deployed." },
     { id: "u2", status: "completed", body: "Check it" },
-    // Whatever was running when the earlier worker stopped did not finish.
-    { id: "a2", status: "interrupted", body: "Checking" },
-    // Accepted and never started: it waits to be handed to Pi, as it was.
-    { id: "u3", status: "waiting", body: "Then publish it" },
+    { id: "a2", status: "running", body: "Checking" },
+    { id: "u3", status: "completed", body: "Then publish it" },
+    { id: "a3", status: "queued", body: "" },
   ]);
   expect(
-    upgraded
-      .prepare("SELECT status, native_session_id FROM conversations")
-      .get(),
-  ).toEqual({ status: "working", native_session_id: "native-1" });
+    upgraded.prepare("SELECT native_session_id FROM conversations").get(),
+  ).toEqual({ native_session_id: "native-1" });
   upgraded.close();
 
   // Rollback is putting this file back: it is the database as it was.
-  const original = new Database(`${path}.before-v17`, { readonly: true });
+  const original = new Database(`${path}.before-v18`, { readonly: true });
   expect(original.pragma("user_version", { simple: true })).toBe(15);
   expect(original.prepare("SELECT count(*) AS n FROM messages").get()).toEqual({
     n: 6,

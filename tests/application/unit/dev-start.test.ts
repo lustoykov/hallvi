@@ -24,7 +24,6 @@ import {
   piConfigDir,
 } from "../../../src/server/pi-configuration";
 import { WORKER_BUSY_EXIT as workerBusyExit } from "../../../src/server/pi-worker";
-import { workerPresence } from "../../../src/server/worker-presence";
 
 const keys = [
   "HALLVI_DB_PATH",
@@ -98,43 +97,3 @@ it("says which exit code means another worker already holds the database", () =>
 // A lock file exists after any worker has ever run. Reading it as a live
 // worker is exactly the mistake that leaves a queued message looking like a
 // reply being written.
-it("believes a live worker only on evidence a worker is alive", () => {
-  const database = join(root, "presence.db");
-  process.env.HALLVI_DB_PATH = database;
-  const beat = (value: Record<string, unknown>) =>
-    writeFileSync(`${database}.worker-status`, JSON.stringify(value));
-
-  expect(workerPresence().alive).toBe(false);
-
-  beat({
-    pid: process.pid,
-    host: hostname(),
-    startedAt: new Date().toISOString(),
-    heartbeatAt: new Date().toISOString(),
-  });
-  expect(workerPresence().alive).toBe(true);
-
-  // Stopped beating: a crashed worker whose pid has been reused would
-  // otherwise report itself alive forever.
-  const old = new Date(Date.now() - 60_000).toISOString();
-  beat({
-    pid: process.pid,
-    host: hostname(),
-    startedAt: old,
-    heartbeatAt: old,
-  });
-  expect(workerPresence().alive).toBe(false);
-
-  // A process id that is no longer running, and one belonging to another
-  // machine that reached the same database over a share.
-  const now = new Date().toISOString();
-  beat({ pid: 2 ** 30, host: hostname(), startedAt: now, heartbeatAt: now });
-  expect(workerPresence().alive).toBe(false);
-  beat({
-    pid: process.pid,
-    host: "another-machine",
-    startedAt: now,
-    heartbeatAt: now,
-  });
-  expect(workerPresence().alive).toBe(false);
-});

@@ -103,7 +103,7 @@ describe("Chat request validation", () => {
       chatContext,
     );
 
-    expect(response.status).toBe(202);
+    expect(response.status).toBe(201);
     expect(mocks.sendChatMessage).toHaveBeenCalledWith(
       "application-id",
       "chat-id",

@@ -93,18 +93,15 @@ afterAll(() => {
 beforeEach(() => {
   objects.clear();
   requests.length = 0;
-  // A case that leaves a response mid-flight must not make every later copy
-  // a skip.
-  store.db().$client.exec("UPDATE messages SET status = 'completed'");
   rmSync(join(root, "state", "controller-protection"), {
     recursive: true,
     force: true,
   });
 });
 
-function application() {
+function application(name = "Notes") {
   const app = store.insertApplication({
-    name: "Notes",
+    name,
     repositoryUrl: "https://github.com/owner/notes",
     repositoryOwner: "owner",
     repositoryName: "notes",
@@ -114,8 +111,7 @@ function application() {
 }
 
 it("copies the controller while it runs, including committed WAL data", async () => {
-  const { chat } = application();
-  store.insertMessage(chat.id, "user", "Deploy it", "user");
+  application();
   mkdirSync(join(root, "state", "backup-destinations"), { recursive: true });
   writeFileSync(
     join(root, "state", "backup-destinations", "default.json"),
@@ -131,17 +127,17 @@ it("copies the controller while it runs, including committed WAL data", async ()
   // One file, once: the account directory is usually the config directory.
   expect(new Set(names).size).toBe(names.length);
   expect(Date.parse(capturedAt)).toBeGreaterThan(0);
-  // The message was committed through WAL and never checkpointed; the online
-  // backup has to carry it, or the copy is a copy of yesterday.
+  // The application was committed through WAL and never checkpointed; the
+  // online backup has to carry it, or the copy is a copy of yesterday.
   const copy = join(root, "captured.db");
   writeFileSync(
     copy,
     files.find((file) => file.path === "payload/database/hallvi.db")!.content,
   );
   const captured = new Database(copy, { readonly: true });
-  expect(captured.prepare("SELECT count(*) AS c FROM messages").get()).toEqual({
-    c: 1,
-  });
+  expect(
+    captured.prepare("SELECT count(*) AS c FROM applications").get(),
+  ).toEqual({ c: 1 });
   captured.close();
 });
 
@@ -196,28 +192,19 @@ it("uploads a copy the owner can open, and offers the kit once", async () => {
 });
 
 it("skips a copy while a change is running and says so", async () => {
-  const { chat } = application();
-  const message = store.insertMessage(
-    chat.id,
-    "assistant",
-    "Working",
-    "pi",
-    "running",
-  );
-  const skipped = await protectController("after-change", { access });
+  application();
+  const skipped = await protectController("after-change", {
+    access,
+    changeRunning: true,
+  });
   expect(skipped?.outcome).toBe("skipped");
   expect(skipped?.reason).toMatch(/change was running/i);
   expect(requests).toEqual([]);
-  // A stale running row must not make the worker record a skip every minute
-  // until the copies the record should hold are pushed out of it.
+  // Long work must not make the worker record a skip every minute until the
+  // copies the record should hold are pushed out of it.
   const at = Date.parse(skipped!.finishedAt!);
   expect(copyDue("after-change", at + 60_000)).toBe(false);
   expect(copyDue("after-change", at + 3_600_000)).toBe(true);
-  store
-    .db()
-    .$client.exec(
-      `UPDATE messages SET status = 'completed' WHERE id = '${message.id}'`,
-    );
   const taken = await protectController("after-change", { access });
   expect(taken?.outcome).toBe("succeeded");
   expect(objects.size).toBe(1);
@@ -264,8 +251,7 @@ it("records a failure without claiming protection", async () => {
 });
 
 it("opens a copy again through the recovery command, and refuses a damaged one", async () => {
-  const { chat } = application();
-  store.insertMessage(chat.id, "user", "Something worth keeping", "user");
+  application("Something worth keeping");
   const copy = await protectController("daily", { access });
   expect(copy?.outcome).toBe("succeeded");
   const stored = objects.get(`/controller-copies/${copy!.objectKey}`)!;
@@ -302,7 +288,7 @@ it("opens a copy again through the recovery command, and refuses a damaged one",
   });
   expect(
     restored
-      .prepare("SELECT count(*) AS c FROM messages WHERE body = ?")
+      .prepare("SELECT count(*) AS c FROM applications WHERE name = ?")
       .get("Something worth keeping"),
   ).toEqual({ c: 1 });
   restored.close();

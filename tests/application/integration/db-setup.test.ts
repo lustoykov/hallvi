@@ -27,7 +27,6 @@ function tables(db: Database.Database) {
 const CURRENT_TABLES = [
   "applications",
   "conversations",
-  "messages",
   "saved_information",
 ];
 
