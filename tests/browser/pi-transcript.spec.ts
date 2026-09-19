@@ -1,8 +1,10 @@
-import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
+import { exchange, scriptWorker } from "./scripted-worker";
+
+test.use({ isolatedApp: true });
 
 test("Pi text stays once in order through completion and reload @journey-streaming-output", async ({
   page,
@@ -17,18 +19,25 @@ test("Pi text stays once in order through completion and reload @journey-streami
   expect(response.ok()).toBe(true);
   const created = await response.json();
   const appId = created.application?.id ?? created.id;
-  const db = new Database(join(fixture.state, "qa.db"));
-  const { id: chatId } = db
-    .prepare(
-      "SELECT id FROM conversations WHERE application_id = ? AND kind = 'main'",
-    )
-    .get(appId) as { id: string };
-  const runId = randomUUID();
+  const chatId = created.selectedChatId as string;
   const now = new Date().toISOString();
   const body = "Now checking persistence.";
-  db.prepare(
-    "INSERT INTO messages (id, conversation_id, role, body, source, status, created_at, updated_at) VALUES (?, ?, 'assistant', ?, 'pi', 'running', ?, ?)",
-  ).run(runId, chatId, body, now, now);
+  // Pi's side of the conversation, as the worker would report it.
+  let status: "running" | "completed" = "running";
+  let said = false;
+  const closeWorker = await scriptWorker(fixture, () => {
+    const { replyId, messages } = exchange(chatId, "Check persistence.", {
+      body,
+      status,
+    });
+    return {
+      status: status === "running" ? "working" : "idle",
+      messages,
+      calls: { "read-package": { replyId, sequence: 1 } },
+      said: said ? [{ replyId, sequence: 2, text: body, at: now }] : [],
+    };
+  });
+  const runId = "reply:asked";
   const dir = join(fixture.state, "operator", appId, "activity");
   mkdirSync(dir, { recursive: true });
   const save = (id: string, value: object) => {
@@ -40,7 +49,8 @@ test("Pi text stays once in order through completion and reload @journey-streami
     kind: "tool",
     id: "read-package",
     applicationId: appId,
-    runId,
+    // Kept under the conversation; Pi's transcript says which reply.
+    runId: chatId,
     sequence: 1,
     tool: "read",
     args: JSON.stringify({ path: "package.json" }),
@@ -54,7 +64,7 @@ test("Pi text stays once in order through completion and reload @journey-streami
   save(record.id, record);
   try {
     await page.goto(`/applications/${appId}`);
-    const message = page.locator(`#hv-message-${runId}`);
+    const message = page.locator(`[id="hv-message-${runId}"]`);
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
     // What the group line actually says. It counts and pluralises — "1 file
     // read" — and this asked for "File reads", so the one spec guarding the
@@ -67,17 +77,9 @@ test("Pi text stays once in order through completion and reload @journey-streami
     ).toBeVisible();
     const text = await message.innerText();
     expect(text.indexOf("package.json")).toBeLessThan(text.indexOf(body));
-    save("said", {
-      ...record,
-      kind: "message",
-      id: "said",
-      sequence: 2,
-      text: body,
-    });
+    said = true;
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
-    db.prepare(
-      "UPDATE messages SET status = 'completed', revision = revision + 1 WHERE id = ?",
-    ).run(runId);
+    status = "completed";
     await page.reload();
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
     await expect(group).toBeVisible();
@@ -100,6 +102,6 @@ test("Pi text stays once in order through completion and reload @journey-streami
       page.getByRole("region", { name: "Application server terminal" }),
     ).toHaveCount(0);
   } finally {
-    db.close();
+    await closeWorker();
   }
 });

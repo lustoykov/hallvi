@@ -38,6 +38,9 @@ export async function runPiWorker(signal: AbortSignal) {
       "A Pi worker is already running for this database.",
     );
   try {
+    // A send is answered once Pi has the message, so the first one should
+    // not also wait for the SDK to load.
+    void import("@earendil-works/pi-coding-agent").catch(() => undefined);
     await cleanupPiWorkspaces().catch(() => undefined);
     console.info("Pi worker ready.");
     let nextProtectionCheck = 0;
