@@ -80,8 +80,10 @@ database. Only the model is scripted, and the Docker workspace is left out.
   from the branch, not from the lane snapshot.
 - A second worker steps aside.
 
-Whole application suite on the tree above: 940 passed, 3 skipped (96 files);
-`tsc --noEmit` clean; eslint without errors; prettier clean.
+Whole application suite, on the tag and again on the branch head: 940 passed,
+3 skipped (96 files); `tsc --noEmit` clean; prettier clean. eslint found one
+over-long comment line in a test helper on the tag; it is the one-line change
+named above, and the head has no errors.
 
 ## Browser
 
