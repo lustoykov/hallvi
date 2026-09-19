@@ -15,8 +15,8 @@
 import Database from "better-sqlite3";
 import { existsSync, readFileSync } from "node:fs";
 import { connect } from "node:net";
-import { dirname, join } from "node:path";
 import { stateLocation } from "./state-location.mjs";
+import { workerSocketPath } from "./worker-socket.mjs";
 
 const FROM = 15;
 const { version: TO } = JSON.parse(
@@ -32,7 +32,7 @@ if (!existsSync(path)) throw new Error(`No database at ${path}.`);
 
 // A running worker answers on its socket; upgrading under it would race it.
 const running = await new Promise((resolve) => {
-  const probe = connect(join(dirname(path), "worker.sock"));
+  const probe = connect(workerSocketPath(path));
   probe.once("connect", () => resolve(true) ?? probe.destroy());
   probe.once("error", () => resolve(false));
 });

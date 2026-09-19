@@ -8,6 +8,7 @@ import {
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 
+import { workerSocketPath } from "../../scripts/worker-socket.mjs";
 import type { Transcript } from "../../src/server/pi-transcript";
 
 /**
@@ -28,7 +29,7 @@ export async function scriptWorker(
   } catch {
     // Already gone: an earlier journey in this worker scripted it too.
   }
-  const path = join(fixture.state, "worker.sock");
+  const path = workerSocketPath(join(fixture.state, "qa.db"));
   const server = createServer((incoming, outgoing) => {
     incoming.resume();
     incoming.on("end", () => {

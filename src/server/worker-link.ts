@@ -1,5 +1,5 @@
-// The one line between the app and the worker: a Unix socket beside the
-// database, carrying small JSON requests.
+// The one line between the app and the worker: a Unix socket, beside the
+// database where its path fits, carrying small JSON requests.
 //
 // The worker owns every Pi session. The app never opens one; it asks. The
 // socket is also what makes the worker the only owner: requests reach whoever
@@ -8,17 +8,10 @@
 import { rmSync } from "node:fs";
 import { request, createServer, type Server } from "node:http";
 import { connect } from "node:net";
-import { dirname, join } from "node:path";
-
+import { workerSocketPath } from "../../scripts/worker-socket.mjs";
 import { databasePath } from "./db";
 
-export function workerSocketPath() {
-  const path = join(dirname(databasePath()), "worker.sock");
-  // The platform's limit for a socket path; past it, listen fails obscurely.
-  if (Buffer.byteLength(path) > 100)
-    throw new Error(`The worker socket path is too long: ${path}`);
-  return path;
-}
+const socketPath = () => workerSocketPath(databasePath());
 
 /** The worker could not be asked. Nothing was accepted. */
 export class WorkerUnavailableError extends Error {
@@ -44,7 +37,7 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const asked = request(
       {
-        socketPath: workerSocketPath(),
+        socketPath: socketPath(),
         // One connection per question: a kept one may belong to a worker that
         // has since gone.
         agent: false,
@@ -99,7 +92,7 @@ function answered(path: string) {
 export async function serveWorker(
   handle: (action: string, body: unknown) => Promise<unknown>,
 ): Promise<Server | null> {
-  const path = workerSocketPath();
+  const path = socketPath();
   if (await answered(path)) return null;
   rmSync(path, { force: true });
   const server = createServer((incoming, outgoing) => {

@@ -24,6 +24,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedPorts, installedPorts } from "./installed-ports.mjs";
+import { workerSocketPath } from "./worker-socket.mjs";
 import {
   piAccountLocation,
   stateFiles,
