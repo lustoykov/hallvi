@@ -11,11 +11,7 @@ import {
   settleRunningExecutions,
 } from "../../../src/server/operator-execution";
 import { pushTestDatabase } from "../../test-database";
-import {
-  startActivity,
-  endActivity,
-  listActivity,
-} from "../../../src/server/pi-activity";
+import {} from "../../../src/server/pi-activity";
 let root: string;
 /** The conversation whose tools are being called. */
 let run: { applicationId: string; chatId: string };
@@ -80,14 +76,6 @@ it("pauses the actual call until approved, then records its output and failure c
 it("declining or cancelling an approval never starts the command", async () => {
   settings("always-ask");
   const work = vi.fn(async () => "should not run");
-  startActivity({
-    applicationId: run.applicationId,
-    runId: run.chatId,
-    sequence: 1,
-    id: "declined-call",
-    tool: "bash",
-    args: { command: "example" },
-  });
   const declined = executionContext(scope()).execute(
     "bash",
     "workspace",
@@ -102,16 +90,10 @@ it("declining or cancelling an approval never starts the command", async () => {
     false,
   );
   expect(await declined).toEqual({ declined: true });
-  // The SDK completes normally after a decline; the linked activity must
-  // still agree with the executor that no command ran.
-  endActivity({
-    applicationId: run.applicationId,
-    id: "declined-call",
-    result: { declined: true },
-    isError: false,
-  });
-  expect(listActivity(run.applicationId)[0]).toMatchObject({
-    executionId: listExecutions(run.applicationId)[0].id,
+  // The SDK completes normally after a decline, so Pi's history says the call
+  // came back. This record is what says nothing ran, under Pi's own call id.
+  expect(listExecutions(run.applicationId)[0]).toMatchObject({
+    toolCallId: "declined-call",
     status: "declined",
   });
   const controller = new AbortController();

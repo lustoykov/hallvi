@@ -4,7 +4,11 @@
 // what waits and what is running. Nothing here is stored: it is projected on
 // every read, and Hallvi's execution evidence is placed into it by the id Pi
 // gave each tool call.
-import type { Entry, LaneSnapshot } from "@earendil-works/pi-agent-core";
+import type {
+  Entry,
+  LaneQueuedItem,
+  LaneSnapshot,
+} from "@earendil-works/pi-agent-core";
 
 import type { ConversationStatus } from "./operator-data";
 import type { ChatMessage } from "./types";
@@ -15,14 +19,33 @@ export const tagOf = (message: unknown) =>
   (message as Record<string, unknown> | undefined)?.[MESSAGE_TAG] as
     string | undefined;
 
+/**
+ * One of Pi's tool calls, as Pi recorded it: where it sits, what it was, and
+ * what came back. Pi writes the call before the tool runs and the result when
+ * it returns, so a call with no result is one that never reported an end.
+ *
+ * Arguments and results are Pi's own, unredacted here. Redaction belongs to
+ * the reader that hands them out — `activityFromTranscript` — because Pi's
+ * history keeps what the model actually sent.
+ */
+export interface TranscriptCall {
+  replyId: string;
+  sequence: number;
+  tool: string;
+  args: unknown;
+  at: string;
+  /** Absent until Pi records the tool's own result. */
+  result?: { text: string; failed: boolean; at: string };
+  informationId?: string;
+  /** What has streamed back so far, from the worker running this call. */
+  preview?: string;
+}
+
 export interface Transcript {
   status: ConversationStatus;
   messages: ChatMessage[];
-  /** Where each of Pi's tool calls sits, by Pi's tool-call id. */
-  calls: Record<
-    string,
-    { replyId: string; sequence: number; informationId?: string }
-  >;
+  /** Each of Pi's tool calls, by Pi's tool-call id. */
+  calls: Record<string, TranscriptCall>;
   /** What Pi said between its calls, in the same sequence. */
   said: { replyId: string; sequence: number; text: string; at: string }[];
 }
@@ -33,6 +56,16 @@ type Part = {
   id?: string;
   name?: string;
   arguments?: Record<string, unknown>;
+};
+
+/** A tool result as Pi stores it: the tool's own words, and whether it failed. */
+type ToolResult = {
+  role: string;
+  toolCallId?: string;
+  toolName?: string;
+  content: unknown;
+  isError?: boolean;
+  timestamp?: number;
 };
 
 function textOf(content: unknown) {
@@ -65,9 +98,65 @@ function advice(errorMessage: string | undefined) {
 const at = (timestamp: number | undefined) =>
   new Date(timestamp ?? 0).toISOString();
 
+/**
+ * The part of Pi's lane a transcript reads: whether an operation is open, what
+ * it is streaming, and what is waiting in the queue.
+ *
+ * A narrow shape on purpose. A worker driving the conversation has the whole
+ * lane; a reader that only opens Pi's stored session has these three facts and
+ * no runtime at all, and both must produce the same transcript.
+ */
+export interface LaneView {
+  operation: {
+    id: string;
+    startedAt: number;
+    streamingMessage?: { content: unknown; timestamp?: number };
+  } | null;
+  queues: LaneQueuedItem[];
+}
+
+export const laneView = (snapshot: LaneSnapshot): LaneView => ({
+  operation: snapshot.operation,
+  queues: snapshot.queues,
+});
+
+/** The operation in which Pi reads its queue, named after its first entry. */
+export const queueOperation = (entryId: string) => `queue:${entryId}`;
+
+/**
+ * The entries at which Pi says an operation was aborted.
+ *
+ * An operation begins at one of the owner's messages and is named after it:
+ * a prompt's after the message's own id, a queue read's after the entry id of
+ * the first message Pi read from the queue. Both are asked for, over every
+ * message in the branch, because a reply stopped three turns ago is still
+ * stopped — a reader that only asks about the newest operation quietly
+ * promotes old cancelled work to completed.
+ *
+ * The caller says how a result is fetched: a driving worker asks its lane, a
+ * reader asks Pi's stored session. The derivation is the same either way.
+ */
+export async function abortedTips(
+  history: Entry[],
+  resultOf: (
+    operationId: string,
+  ) => Promise<{ status: string; tipId?: string | null } | undefined>,
+) {
+  const abortedAt = new Set<string>();
+  for (const entry of history) {
+    if (entry.type !== "message" || entry.message.role !== "user") continue;
+    for (const id of [tagOf(entry.message), queueOperation(entry.id)]) {
+      const result = id ? await resultOf(id) : undefined;
+      if (result?.status === "aborted" && result.tipId)
+        abortedAt.add(result.tipId);
+    }
+  }
+  return abortedAt;
+}
+
 /** True while anything of Pi's is unfinished: an operation, or a queue. */
-export function unfinished(snapshot: LaneSnapshot) {
-  return Boolean(snapshot.operation) || snapshot.queues.length > 0;
+export function unfinished(lane: LaneView) {
+  return Boolean(lane.operation) || lane.queues.length > 0;
 }
 
 /**
@@ -82,7 +171,7 @@ export function projectTranscript(
   history: Entry[],
   /** Entries at which Pi says an operation was aborted. */
   abortedAt: ReadonlySet<string>,
-  snapshot: LaneSnapshot,
+  lane: LaneView,
   driving: boolean,
 ): Transcript {
   const messages: ChatMessage[] = [];
@@ -135,7 +224,13 @@ export function projectTranscript(
           at: at(message.timestamp),
         });
       } else if (part.type === "toolCall" && part.id) {
-        calls[part.id] = { replyId: to.id, sequence: ++sequence };
+        calls[part.id] = {
+          replyId: to.id,
+          sequence: ++sequence,
+          tool: part.name ?? "",
+          args: part.arguments,
+          at: at(message.timestamp),
+        };
         if (part.name === "save_information" && part.arguments?.showInChat)
           shown.add(part.id);
       }
@@ -158,12 +253,7 @@ export function projectTranscript(
     const cut = () => {
       if (reply && abortedAt.has(entry.id)) reply.status = "cancelled";
     };
-    const message = entry.message as {
-      role: string;
-      content: unknown;
-      timestamp?: number;
-      toolCallId?: string;
-    };
+    const message = entry.message as ToolResult;
     if (message.role === "user") {
       reply = undefined;
       messages.push({
@@ -180,7 +270,16 @@ export function projectTranscript(
     } else if (message.role === "assistant") {
       assistant(entry.id, message);
       cut();
-    } else if (message.role === "toolResult") cut();
+    } else if (message.role === "toolResult") {
+      cut();
+      const call = message.toolCallId && calls[message.toolCallId];
+      if (call)
+        call.result = {
+          text: textOf(message.content),
+          failed: Boolean(message.isError),
+          at: at(message.timestamp ?? entry.timestamp),
+        };
+    }
     if (
       message.role === "toolResult" &&
       message.toolCallId &&
@@ -196,21 +295,22 @@ export function projectTranscript(
     }
   }
 
-  const streaming = snapshot.operation?.streamingMessage;
+  const streaming = lane.operation?.streamingMessage;
   if (streaming)
-    replyFor(`${snapshot.operation!.id}:streaming`, streaming.timestamp).body =
-      textOf(streaming.content);
+    replyFor(
+      `${lane.operation!.id}:streaming`,
+      streaming.timestamp ?? lane.operation!.startedAt,
+    ).body = textOf(streaming.content);
 
   const status: ConversationStatus = driving
     ? "working"
-    : unfinished(snapshot)
+    : unfinished(lane)
       ? "interrupted"
       : "idle";
-  if (snapshot.operation) {
+  if (lane.operation) {
     // The operation is Pi's; whether anyone is driving it is the worker's.
     const open =
-      reply ??
-      replyFor(`${snapshot.operation.id}:open`, snapshot.operation.startedAt);
+      reply ?? replyFor(`${lane.operation.id}:open`, lane.operation.startedAt);
     open.status = driving ? "running" : "interrupted";
     open.finishedAt = null;
     open.error = driving
@@ -218,7 +318,7 @@ export function projectTranscript(
       : "The worker stopped while Pi was working. Whether the last command finished is not known: read execution evidence before continuing. Nothing runs again until you continue.";
   }
 
-  for (const item of snapshot.queues) {
+  for (const item of lane.queues) {
     if (item.type !== "message") continue;
     messages.push({
       id: tagOf(item.message) ?? item.entryId,
@@ -237,9 +337,9 @@ export function projectTranscript(
 }
 
 /** The text of the message Pi holds under this id, read or still queued. */
-export function holds(history: Entry[], snapshot: LaneSnapshot, id: string) {
+export function holds(history: Entry[], lane: LaneView, id: string) {
   const held =
-    snapshot.queues.find(
+    lane.queues.find(
       (item) => item.type === "message" && tagOf(item.message) === id,
     ) ??
     history.find(

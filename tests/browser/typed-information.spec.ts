@@ -126,7 +126,14 @@ test("records render in chat and their views, survive refresh, and update by rec
         calls: Object.fromEntries(
           [deployment, access, failed].map((informationId, index) => [
             `save-${index}`,
-            { replyId, sequence: index + 1, informationId },
+            {
+              replyId,
+              sequence: index + 1,
+              tool: "save_information",
+              args: {},
+              at: now,
+              informationId,
+            },
           ]),
         ),
         said: [],

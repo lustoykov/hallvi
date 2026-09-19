@@ -64,7 +64,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Authority**: The permitted target, effects and limits for an action, including required user approval. A model recommendation or available credential does not widen it.
 
-**Activity event**: A meaningful application change or consequential operational result. It is not every message or internal tool call.
+**Pi activity** (`pi-activity.ts`): What Pi called and what came back, read from Pi's own history on every read and stored nowhere else. Order, arguments and results are Pi's; the outcome of a call the executor owns is its [execution record](#) by Pi's tool-call id; what a call in flight has streamed so far is the worker's, held in memory while the call lasts. Arguments and results are redacted on the way out, because Pi's history keeps what the model sent.
 
 **Evidence packet**: A bounded, redacted bundle of application/revision identity, observations, impact and a verification target that an owner or coding agent can use.
 

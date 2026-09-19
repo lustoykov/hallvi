@@ -1,316 +1,232 @@
-// The activity store keeps evidence of what Pi ran. These assert the parts a
-// reader depends on: order, honest status, redaction, and that a stopped run
-// never leaves a row claiming to still be running.
+// What a reader is told Pi did, derived from Pi's own history. These assert
+// the parts a reader depends on: order, honest status, redaction on the way
+// out, and that a run nobody is driving never leaves a row claiming to still
+// be running.
 
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { expect, it } from "vitest";
+
+import { activityFromTranscript } from "@/server/pi-activity";
+import type { ExecutionRecord } from "@/server/operator-execution";
+import type { Transcript, TranscriptCall } from "@/server/pi-transcript";
+import type { ChatMessage } from "@/server/types";
 
 const APPLICATION = "11111111-2222-4333-8444-555555555555";
-const RUN = "run-1";
-let store: typeof import("@/server/pi-activity");
-let directory: string;
+const REPLY = "reply:asked";
+const AT = "2026-09-20T08:00:00.000Z";
 
-beforeAll(async () => {
-  directory = mkdtempSync(join(tmpdir(), "hv-activity-"));
-  process.env.HALLVI_CONFIG_DIR = directory;
-  store = await import("@/server/pi-activity");
+const reply = (
+  id = REPLY,
+  status: ChatMessage["status"] = "completed",
+): ChatMessage => ({
+  id,
+  chatId: "chat",
+  role: "assistant",
+  body: "",
+  source: "pi",
+  status,
+  createdAt: AT,
+  revision: 0,
 });
 
-afterAll(() => {
-  delete process.env.HALLVI_CONFIG_DIR;
-  rmSync(directory, { recursive: true, force: true });
-});
+/** The conversation as it reads while Pi is writing this reply. */
+const working = {
+  status: "working" as const,
+  messages: [reply(REPLY, "running")],
+};
+
+function transcript(
+  calls: Record<string, Partial<TranscriptCall>>,
+  extra: Partial<Transcript> = {},
+): Transcript {
+  return {
+    status: "idle",
+    messages: [reply()],
+    said: [],
+    ...extra,
+    calls: Object.fromEntries(
+      Object.entries(calls).map(([id, call], index) => [
+        id,
+        {
+          replyId: REPLY,
+          sequence: index + 1,
+          tool: "server_bash",
+          args: {},
+          at: AT,
+          ...call,
+        } satisfies TranscriptCall,
+      ]),
+    ),
+  };
+}
+
+const read = (value: Transcript, executions: Partial<ExecutionRecord>[] = []) =>
+  activityFromTranscript({
+    applicationId: APPLICATION,
+    transcript: value,
+    executions: executions as ExecutionRecord[],
+  });
 
 it("keeps a call in order, with what went in and what came back", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: RUN,
-    sequence: 1,
-    id: "call-a",
-    tool: "read_file",
-    args: { path: "/workspace/package.json" },
-  });
-  store.endActivity({
-    applicationId: APPLICATION,
-    id: "call-a",
-    result: { content: "ok" },
-    isError: false,
-  });
-  const [record] = store.listActivity(APPLICATION);
-  expect(record.tool).toBe("read_file");
-  expect(record.status).toBe("succeeded");
-  expect(record.args).toContain("/workspace/package.json");
-  expect(record.result).toContain("ok");
-  expect(record.finishedAt).toBeTruthy();
-});
-
-it("says a call failed when the runtime says it failed", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: RUN,
-    sequence: 2,
-    id: "call-b",
-    tool: "list_directory",
-    args: { path: "/nowhere" },
-  });
-  store.endActivity({
-    applicationId: APPLICATION,
-    id: "call-b",
-    result: "No such directory",
-    isError: true,
-  });
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-b");
-  expect(record?.status).toBe("failed");
-});
-
-it("treats a cumulative partial as the whole, not as more to append", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: RUN,
-    sequence: 3,
-    id: "call-c",
-    tool: "workspace_bash",
-    args: { command: "npm test" },
-  });
-  store.updateActivity(APPLICATION, "call-c", "line one\n", "snapshot");
-  store.updateActivity(
-    APPLICATION,
-    "call-c",
-    "line one\nline two\n",
-    "snapshot",
+  const rows = read(
+    transcript(
+      {
+        first: { args: { command: "uptime" }, sequence: 1 },
+        second: {
+          sequence: 3,
+          tool: "read",
+          result: { text: "the file", failed: false, at: AT },
+        },
+      },
+      { said: [{ replyId: REPLY, sequence: 2, text: "Looking.", at: AT }] },
+    ),
   );
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-c");
-  expect(record?.preview).toBe("line one\nline two\n");
-  expect(record?.status).toBe("running");
-});
-
-it("appends a delta, and keeps two identical chunks as two", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: RUN,
-    sequence: 4,
-    id: "call-d",
-    tool: "workspace_bash",
-    args: { command: "npm test" },
-  });
-  // The defect this replaces: guessing by prefix collapsed the second
-  // "tick\n" into the first, because a snapshot looks like a longer delta.
-  store.updateActivity(APPLICATION, "call-d", "tick\n", "delta");
-  store.updateActivity(APPLICATION, "call-d", "tick\n", "delta");
-  store.updateActivity(APPLICATION, "call-d", "tock\n", "delta");
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-d");
-  expect(record?.preview).toBe("tick\ntick\ntock\n");
-});
-
-it("replaces on a repeated snapshot rather than doubling it", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: RUN,
-    sequence: 6,
-    id: "call-g",
-    tool: "workspace_bash",
-    args: { command: "npm test" },
-  });
-  store.updateActivity(APPLICATION, "call-g", "tick\ntick\n", "snapshot");
-  store.updateActivity(APPLICATION, "call-g", "tick\ntick\n", "snapshot");
   expect(
-    store.listActivity(APPLICATION).find((item) => item.id === "call-g")
-      ?.preview,
-  ).toBe("tick\ntick\n");
+    rows.map((row) => [row.sequence, row.kind, row.text ?? row.tool]),
+  ).toEqual([
+    [1, "tool", "server_bash"],
+    [2, "message", "Looking."],
+    [3, "tool", "read"],
+  ]);
+  expect(rows[0]).toMatchObject({
+    args: '{\n  "command": "uptime"\n}',
+    status: "interrupted",
+  });
+  expect(rows[2]).toMatchObject({ result: "the file", status: "succeeded" });
+});
+
+it("says a call failed when Pi's own result says it failed", () => {
+  const [row] = read(
+    transcript({
+      call: { result: { text: "no such host", failed: true, at: AT } },
+    }),
+  );
+  expect(row).toMatchObject({ status: "failed", result: "no such host" });
+});
+
+it("reads a call with no result as running while its reply is being written", () => {
+  const [row] = read(transcript({ call: {} }, working));
+  expect(row.status).toBe("running");
+});
+
+it("reads a call with no result as interrupted once nobody is driving", () => {
+  // The worker went away mid-call: Pi wrote the call and never a result.
+  const [row] = read(transcript({ call: {} }, { status: "interrupted" }));
+  expect(row).toMatchObject({ status: "interrupted", finishedAt: undefined });
+});
+
+it("takes the outcome from the execution record when there is one", () => {
+  // A declined command returns an ordinary result to the runtime, so Pi's
+  // history says it came back. Only the executor knows nothing ran.
+  const rows = read(
+    transcript({
+      call: { result: { text: '{"declined":true}', failed: false, at: AT } },
+    }),
+    [{ id: "exec-1", toolCallId: "call", status: "declined" }],
+  );
+  expect(rows[0]).toMatchObject({ status: "declined", executionId: "exec-1" });
+});
+
+it("reads an approval still waiting as work in progress", () => {
+  const rows = read(transcript({ call: {} }), [
+    { id: "exec-1", toolCallId: "call", status: "awaiting-approval" },
+  ]);
+  expect(rows[0]).toMatchObject({ status: "running", executionId: "exec-1" });
+});
+
+it("never hands out a secret Pi kept, and says when it cut", () => {
+  const rows = read(
+    transcript({
+      call: {
+        args: { token: "ghp_livesecrettoken0123456789abcdefghij" },
+        result: { text: "x".repeat(20_001), failed: false, at: AT },
+      },
+    }),
+  );
+  expect(rows[0].args).not.toContain("ghp_live");
+  expect(rows[0].args).toContain("[REDACTED]");
+  expect(rows[0].result).toHaveLength(20_000);
+  expect(rows[0].truncated).toBe(true);
 });
 
 it("reads the text out of a runtime result object", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: RUN,
-    sequence: 7,
-    id: "call-h",
-    tool: "workspace_bash",
-    args: { command: "ls" },
-  });
-  // What the SDK actually hands over, rather than a bare string.
-  store.updateActivity(
-    APPLICATION,
-    "call-h",
-    { content: [{ type: "text", text: "one\n" }] },
-    "snapshot",
+  const [row] = read(
+    transcript({
+      call: {
+        result: {
+          text: JSON.stringify({ content: [{ type: "text", text: "said" }] }),
+          failed: false,
+          at: AT,
+        },
+      },
+    }),
   );
-  store.updateActivity(
-    APPLICATION,
-    "call-h",
-    { content: [{ type: "text", text: "one\ntwo\n" }] },
-    "snapshot",
-  );
-  store.endActivity({
-    applicationId: APPLICATION,
-    id: "call-h",
-    result: { content: [{ type: "text", text: "one\ntwo\nthree\n" }] },
-    isError: false,
-  });
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-h");
-  expect(record?.preview).toBe("one\ntwo\n");
-  // No JSON scaffolding, and no doubling of the repeated lines.
-  expect(record?.result).toBe("one\ntwo\nthree\n");
+  // The result arrives as Pi's own text; scaffolding it still carries is read
+  // through rather than printed at the reader.
+  expect(row.result).toContain("said");
 });
 
-it("stops storing output once a call has ended", () => {
-  store.endActivity({
-    applicationId: APPLICATION,
-    id: "call-d",
-    result: "done",
-    isError: false,
-  });
-  store.updateActivity(APPLICATION, "call-d", "late output", "snapshot");
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-d");
-  expect(record?.preview).toBe("tick\ntick\ntock\n");
-  expect(record?.result).toBe("done");
+it("carries what a call in flight has streamed back", () => {
+  const [row] = read(transcript({ call: { preview: "line one\n" } }, working));
+  expect(row).toMatchObject({ preview: "line one\n", status: "running" });
 });
 
-it("never stores a secret it was handed, and says when it cut", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: RUN,
-    sequence: 5,
-    id: "call-e",
-    tool: "workspace_bash",
-    args: { command: "echo secret" },
+it("orders replies as the transcript does, whatever the clock did", () => {
+  const rows = read({
+    status: "idle",
+    messages: [reply("reply:first"), reply("reply:second")],
+    said: [],
+    calls: {
+      later: {
+        replyId: "reply:first",
+        sequence: 1,
+        tool: "read",
+        args: {},
+        at: "2026-09-20T09:00:00.000Z",
+      },
+      earlier: {
+        replyId: "reply:second",
+        sequence: 1,
+        tool: "read",
+        args: {},
+        at: "2026-09-20T08:00:00.000Z",
+      },
+    },
   });
-  store.endActivity({
-    applicationId: APPLICATION,
-    id: "call-e",
-    result: "x".repeat(50_000),
-    isError: false,
-  });
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-e");
-  expect(record?.truncated).toBe(true);
-  expect(record!.result.length).toBeLessThan(50_000);
+  expect(rows.map((row) => row.id)).toEqual(["later", "earlier"]);
 });
 
-it("settles a call the run never finished, so no row spins forever", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: "run-2",
-    sequence: 1,
-    id: "call-f",
-    tool: "read_file",
-    args: { path: "/workspace/x" },
-  });
-  expect(
-    store.listActivity(APPLICATION).find((item) => item.id === "call-f")
-      ?.status,
-  ).toBe("running");
-  store.settleRunningActivity(APPLICATION, "run-2");
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-f");
-  expect(record?.status).toBe("interrupted");
-  expect(record?.finishedAt).toBeTruthy();
-  // Another run's calls are untouched.
-  expect(
-    store.listActivity(APPLICATION).find((item) => item.id === "call-c")
-      ?.status,
-  ).toBe("running");
+it("has nothing to say about a conversation with no calls", () => {
+  expect(read(transcript({}))).toEqual([]);
 });
 
-it("reads back in sequence within a run, whatever the clock did", () => {
-  expect(
-    store
-      .listActivity(APPLICATION)
-      .filter((item) => item.runId === RUN)
-      .map((item) => item.sequence),
-  ).toEqual([1, 2, 3, 4, 5, 6, 7]);
-});
-
-it("settles every open call at startup, as a crash restart must", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: "run-3",
-    sequence: 1,
-    id: "call-i",
-    tool: "read_file",
-    args: { path: "/workspace/y" },
+it("leaves an older unfinished call alone while a newer reply runs", () => {
+  // The old reply was stopped with a call still open; the new one is being
+  // written now. Reading the conversation's status made both read "running".
+  const stopped = reply("reply:old", "cancelled");
+  const current = reply("reply:new", "running");
+  const rows = read({
+    status: "working",
+    messages: [stopped, current],
+    said: [],
+    calls: {
+      old: {
+        replyId: stopped.id,
+        sequence: 1,
+        tool: "server_bash",
+        args: {},
+        at: AT,
+      },
+      fresh: {
+        replyId: current.id,
+        sequence: 1,
+        tool: "server_bash",
+        args: {},
+        at: AT,
+      },
+    },
   });
-  // A crash never reaches the worker's own cleanup, so the restart settles
-  // everything still open rather than one known run.
-  store.settleRunningActivity(APPLICATION, null);
-  expect(
-    store.listActivity(APPLICATION).filter((item) => item.status === "running"),
-  ).toEqual([]);
-  expect(
-    store.listActivity(APPLICATION).find((item) => item.id === "call-i")
-      ?.status,
-  ).toBe("interrupted");
-  // Calls that had already finished keep the outcome they reported.
-  expect(
-    store.listActivity(APPLICATION).find((item) => item.id === "call-a")
-      ?.status,
-  ).toBe("succeeded");
-});
-
-it("records a decline as not run, whatever the runtime returned", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: "run-4",
-    sequence: 1,
-    id: "call-j",
-    tool: "bash",
-    args: { command: "echo no" },
-  });
-  // The executor records the decision before returning to the runtime.
-  store.settleActivity(APPLICATION, "call-j", "declined");
-  store.endActivity({
-    applicationId: APPLICATION,
-    id: "call-j",
-    result: { declined: true },
-    isError: false,
-  });
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-j");
-  expect(record?.status).toBe("declined");
-});
-
-it("keeps a settled outcome when the end event arrives after it", () => {
-  store.startActivity({
-    applicationId: APPLICATION,
-    runId: "run-5",
-    sequence: 1,
-    id: "call-k",
-    tool: "bash",
-    args: { command: "echo no" },
-  });
-  // The executor refuses first; the runtime's end event follows and reports
-  // an ordinary result, which must not overwrite what we already know.
-  store.settleActivity(APPLICATION, "call-k", "declined");
-  store.endActivity({
-    applicationId: APPLICATION,
-    id: "call-k",
-    result: { declined: true },
-    isError: false,
-  });
-  const record = store
-    .listActivity(APPLICATION)
-    .find((item) => item.id === "call-k");
-  expect(record?.status).toBe("declined");
-  expect(record?.result).toContain("declined");
-});
-
-it("has nothing to say about an application Pi never worked on", () => {
-  expect(store.listActivity("99999999-2222-4333-8444-555555555555")).toEqual(
-    [],
-  );
+  expect(rows.map((row) => [row.id, row.status])).toEqual([
+    ["old", "interrupted"],
+    ["fresh", "running"],
+  ]);
 });

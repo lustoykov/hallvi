@@ -2,7 +2,7 @@
 // sessions, and this asks the worker: for the transcript, to send, to
 // continue, to stop. Hallvi's execution evidence is placed into what comes
 // back by the id Pi gave each tool call.
-import { listActivity, type ActivityRecord } from "./pi-activity";
+import { activityFromTranscript } from "./pi-activity";
 import { listExecutions, type ExecutionRecord } from "./operator-execution";
 import { assertChatWritable, loadChat } from "./applications";
 import { touchChat } from "./db";
@@ -41,50 +41,24 @@ function greeting(
 }
 
 /**
- * Evidence where Pi's transcript puts it. Records keep Pi's tool-call id; the
- * reply and the position they are shown under are read from the transcript.
+ * Evidence where Pi's transcript puts it. Pi's calls are read from its own
+ * history; Hallvi's execution records join them by the tool-call id Pi gave.
  */
 function placeEvidence(
+  applicationId: string,
   transcript: Transcript,
-  activity: ActivityRecord[],
   executions: ExecutionRecord[],
 ) {
   const { calls } = transcript;
-  const tools = activity
-    // What Pi said is in its transcript now, not in a record of ours.
-    .filter((record) => record.kind === "tool")
-    .map((record) =>
-      calls[record.id]
-        ? {
-            ...record,
-            runId: calls[record.id].replyId,
-            sequence: calls[record.id].sequence,
-          }
-        : record,
-    );
-  const callOf = new Map(
-    tools.flatMap((record) =>
-      record.executionId ? [[record.executionId, record.id] as const] : [],
-    ),
-  );
-  const said = transcript.said.map((each): ActivityRecord => ({
-    kind: "message",
-    id: `${each.replyId}:said:${each.sequence}`,
-    applicationId: "",
-    runId: each.replyId,
-    sequence: each.sequence,
-    tool: "",
-    text: each.text,
-    args: "",
-    preview: "",
-    result: "",
-    status: "succeeded",
-    truncated: false,
-    startedAt: each.at,
-    finishedAt: each.at,
-  }));
+  const piActivity = activityFromTranscript({
+    applicationId,
+    transcript,
+    executions,
+  });
   const executionOf = new Map(
-    tools.map((record) => [record.id, record.executionId]),
+    piActivity.flatMap((record) =>
+      record.executionId ? [[record.id, record.executionId] as const] : [],
+    ),
   );
   const blocks = new Map<string, MessageBlock[]>();
   for (const [toolCallId, call] of Object.entries(calls).sort(
@@ -98,11 +72,9 @@ function placeEvidence(
     blocks.set(call.replyId, mine);
   }
   return {
-    piActivity: [...tools, ...said].sort(
-      (a, b) => a.runId.localeCompare(b.runId) || a.sequence - b.sequence,
-    ),
+    piActivity,
     executions: executions.map((record) => {
-      const call = calls[record.toolCallId ?? callOf.get(record.id) ?? ""];
+      const call = record.toolCallId ? calls[record.toolCallId] : undefined;
       return call ? { ...record, runId: call.replyId } : record;
     }),
     blocks,
@@ -123,8 +95,8 @@ export async function chatSnapshot(
     return NO_WORKER;
   });
   const placed = placeEvidence(
+    applicationId,
     transcript,
-    listActivity(applicationId),
     listExecutions(applicationId),
   );
   return {

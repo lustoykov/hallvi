@@ -17,12 +17,7 @@ import { join } from "node:path";
 import type { ExecutionRecord } from "../../src/server/operator-execution";
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
-import {
-  exchange,
-  scriptedAt,
-  scriptWorker,
-  seedToolCall,
-} from "./scripted-worker";
+import { exchange, scriptedAt, scriptWorker } from "./scripted-worker";
 
 // The page is what is under test; Pi's side of the conversation is scripted.
 test.use({ scriptedWorker: true });
@@ -68,18 +63,19 @@ test(
       return {
         status: finished ? "idle" : "working",
         messages: [...earlier(chat.id), ...messages],
-        calls: { "backup-call": { replyId, sequence: 1 } },
+        calls: {
+          "backup-call": {
+            replyId,
+            sequence: 1,
+            tool: "server_bash",
+            args: {},
+            at: startedAt,
+          },
+        },
         said: [],
       };
     });
     const runId = "reply:asked";
-    seedToolCall(fixture, {
-      applicationId: appId,
-      chatId: chat.id,
-      toolCallId: "backup-call",
-      tool: "server_bash",
-      executionId,
-    });
 
     const directory = join(fixture.state, "operator", appId, "executions");
     mkdirSync(directory, { recursive: true });

@@ -18,18 +18,17 @@ import { assertChatWritable, loadChat } from "./applications";
 import { openPiSession, watchPiSession } from "./pi";
 import { listApplications } from "./db";
 import {
-  applicationsWithActivity,
-  endActivity,
-  settleRunningActivity,
-  startActivity,
-  updateActivity,
-} from "./pi-activity";
-import { earlierHistoryPath, removeNativeSessions } from "./pi-sessions";
+  earlierHistoryPath,
+  readNativeConversation,
+  removeNativeSessions,
+} from "./pi-sessions";
 import {
+  abortedTips,
   holds,
+  laneView,
   MESSAGE_TAG,
   projectTranscript,
-  tagOf,
+  queueOperation,
   unfinished,
   type Transcript,
 } from "./pi-transcript";
@@ -67,6 +66,27 @@ interface Opened extends Scope {
   driving: boolean;
   /** Settles when this worker has let go of the lane. */
   done?: Promise<void>;
+  /** What each call in flight has streamed back, by Pi's tool-call id. */
+  previews: Map<string, string>;
+}
+
+/** A result-so-far as text, for the line under a call that is still running. */
+function partialText(partial: unknown): string {
+  if (typeof partial === "string") return partial;
+  if (partial && typeof partial === "object") {
+    const content = (partial as { content?: unknown }).content;
+    if (Array.isArray(content))
+      return content
+        .map((part) =>
+          part && typeof part === "object" && "text" in part
+            ? String((part as { text: unknown }).text)
+            : "",
+        )
+        .join("");
+    const output = (partial as { output?: unknown }).output;
+    if (typeof output === "string") return output;
+  }
+  return partial === undefined || partial === null ? "" : String(partial);
 }
 
 const toPi = (message: SentMessage): AgentMessage =>
@@ -76,9 +96,6 @@ const toPi = (message: SentMessage): AgentMessage =>
     timestamp: Date.now(),
     [MESSAGE_TAG]: message.id,
   }) as AgentMessage;
-
-/** The operation in which Pi reads its queue, named after its first entry. */
-const queueOperation = (entryId: string) => `queue:${entryId}`;
 
 const NOTHING: Transcript = {
   status: "idle",
@@ -122,47 +139,35 @@ export function sessionOwner(
           { order: "oldestFirst" },
           ctx,
         );
-        // Pi keeps how each operation ended, and the entry it ended at. An
-        // operation begins at one of the owner's messages and is named after
-        // it: a prompt's after the message's own id, a queue read's after the
-        // entry id of the first message Pi read from the queue.
-        const abortedAt = new Set<string>();
-        for (const entry of entries) {
-          if (entry.type !== "message" || entry.message.role !== "user")
-            continue;
-          for (const id of [tagOf(entry.message), queueOperation(entry.id)]) {
-            const result = id && (await session.lane.getResult(id, ctx));
-            if (result && result.status === "aborted" && result.tipId)
-              abortedAt.add(result.tipId);
-          }
-        }
+        // Pi keeps how each operation ended, and the entry it ended at.
+        const abortedAt = await abortedTips(entries, (id) =>
+          session.lane.getResult(id, ctx),
+        );
         read = { tipId, entries, abortedAt };
       }
       return read;
     };
-    // Evidence of what Pi's tools did, written as it happens and kept under
-    // the id Pi gave the call. Where it sits in the conversation is Pi's.
+    // What a call has streamed back so far. Pi writes the call and its
+    // result to its own history; only the in-between is nobody's record, and
+    // a short-lived read has no business on disk. It lives here while the
+    // call does, and a lost worker takes it with it — which is honest, since
+    // a call whose worker is gone is not producing anything either.
+    const previews = new Map<string, string>();
     const recording = watchPiSession(session.harness, {
       onActivity: (event) => diagnostics?.signal(event),
       onTool(event) {
-        if (event.type === "start")
-          startActivity({ ...scope, runId: scope.chatId, ...event });
+        if (event.type === "start") previews.delete(event.id);
+        // The runtime sends a result-so-far, never an increment.
         else if (event.type === "update")
-          // The runtime sends a result-so-far, never an increment.
-          updateActivity(
-            scope.applicationId,
-            event.id,
-            event.partial,
-            "snapshot",
-          );
-        else if (event.type === "end")
-          endActivity({ applicationId: scope.applicationId, ...event });
+          previews.set(event.id, partialText(event.partial));
+        else if (event.type === "end") previews.delete(event.id);
       },
     });
     let diagnostics: ReturnType<typeof beginRunDiagnostics> | undefined;
     const conversation = {
       ...scope,
       lane: session.lane,
+      previews,
       snapshot: () => snapshot,
       fresh,
       history,
@@ -237,11 +242,9 @@ export function sessionOwner(
           const { queues, operation } = await conversation.fresh();
           if (settled && queues.length && !operation)
             return queueOperation(queues[0].entryId);
-          // Whatever a call never reported ending did not survive the stretch.
-          settleRunningActivity(
-            conversation.applicationId,
-            conversation.chatId,
-          );
+          // Whatever a command never reported ending did not survive the
+          // stretch. Pi's own calls need no sweep: one with no result in Pi's
+          // history, with nobody driving, reads as interrupted.
           settleRunningExecutions(
             conversation.applicationId,
             conversation.chatId,
@@ -297,26 +300,51 @@ export function sessionOwner(
 
   const project = async (open: Opened) => {
     const { entries, abortedAt } = await open.history();
-    return projectTranscript(
-      open.chatId,
-      entries,
-      abortedAt,
-      open.snapshot(),
-      open.driving,
+    return withPreviews(
+      projectTranscript(
+        open.chatId,
+        entries,
+        abortedAt,
+        laneView(open.snapshot()),
+        open.driving,
+      ),
+      open.previews,
     );
   };
+
+  /** What the calls still in flight have streamed back, from this worker. */
+  function withPreviews(transcript: Transcript, previews: Map<string, string>) {
+    for (const [id, preview] of previews) {
+      const call = transcript.calls[id];
+      if (call) call.preview = preview;
+    }
+    return transcript;
+  }
 
   const actions = {
     async transcript(scope: Scope): Promise<Transcript> {
       const open = opened.get(scope.chatId);
       // Read without waiting in line. One that is being closed as it is read
-      // is read again below, from a newly opened one.
+      // is read again below, from Pi's stored session.
       const read = open && (await project(open).catch(() => undefined));
       if (read) return read;
       if (!hasHistory(scope)) return NOTHING;
-      return inLine(scope.chatId, async () =>
-        project(await ensure(scope)),
-      ).catch((error) => ({
+      // Nobody is running this conversation, so reading it needs nothing of
+      // Pi's runtime: not the model, not credentials, not a workspace. Pi
+      // wrote everything a reader needs, and this reads it and nothing else.
+      return inLine(scope.chatId, async () => {
+        const stored = await readNativeConversation(
+          scope.applicationId,
+          scope.chatId,
+        );
+        return projectTranscript(
+          scope.chatId,
+          stored.entries,
+          stored.abortedAt,
+          stored.lane,
+          false,
+        );
+      }).catch((error) => ({
         // A history that cannot be opened is said where it would have been.
         ...NOTHING,
         messages: [
@@ -458,8 +486,6 @@ export function sessionOwner(
      * as they are: nothing is opened, and nothing runs, until somebody asks.
      */
     recover() {
-      for (const applicationId of applicationsWithActivity())
-        settleRunningActivity(applicationId, null);
       for (const { id } of listApplications())
         settleRunningExecutions(id, null);
     },

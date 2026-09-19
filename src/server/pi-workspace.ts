@@ -1058,7 +1058,6 @@ export function piWorkspaceTools(sdk: PiSdk, workspace: PiWorkspace) {
     promptGuidelines: definition.promptGuidelines,
     prepareArguments: definition.prepareArguments,
     constrainedSampling: definition.constrainedSampling,
-    executionMode: definition.executionMode,
     // The update callback keeps the runtime's own type here, at the one
     // boundary where the two shapes meet, so nothing below has to know it.
     async execute(

@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync, renameSync } from "node:fs";
-import { join } from "node:path";
 import { test, expect } from "./fixtures";
 import { exchange, scriptWorker } from "./scripted-worker";
 
@@ -33,35 +31,21 @@ test("Pi text stays once in order through completion and reload @journey-streami
     return {
       status: status === "running" ? "working" : "idle",
       messages,
-      calls: { "read-package": { replyId, sequence: 1 } },
+      // Pi's own record of the call: what it was, and what came back.
+      calls: {
+        "read-package": {
+          replyId,
+          sequence: 1,
+          tool: "read",
+          args: { path: "package.json" },
+          at: now,
+          result: { text: "{}", failed: false, at: now },
+        },
+      },
       said: said ? [{ replyId, sequence: 2, text: body, at: now }] : [],
     };
   });
   const runId = "reply:asked";
-  const dir = join(fixture.state, "operator", appId, "activity");
-  mkdirSync(dir, { recursive: true });
-  const save = (id: string, value: object) => {
-    const path = join(dir, `${id}.json`);
-    writeFileSync(`${path}.tmp`, JSON.stringify(value));
-    renameSync(`${path}.tmp`, path);
-  };
-  const record = {
-    kind: "tool",
-    id: "read-package",
-    applicationId: appId,
-    // Kept under the conversation; Pi's transcript says which reply.
-    runId: chatId,
-    sequence: 1,
-    tool: "read",
-    args: JSON.stringify({ path: "package.json" }),
-    preview: "",
-    result: "{}",
-    status: "succeeded",
-    truncated: false,
-    startedAt: now,
-    finishedAt: now,
-  };
-  save(record.id, record);
   try {
     await page.goto(`/applications/${appId}`);
     const message = page.locator(`[id="hv-message-${runId}"]`);

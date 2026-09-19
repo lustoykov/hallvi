@@ -35,14 +35,23 @@ const synthetic = vi.hoisted(() => ({
   /** When set, letting go of a session waits for it, as a slow write would. */
   cleanup: undefined as Promise<void> | undefined,
   cleanupFailsFor: undefined as string | undefined,
+  /** The provider login has expired, as it does between visits. */
+  authFails: false,
+  /** Set while the next non-executor tool call should hang mid-flight. */
+  hanging: false,
+  release: undefined as (() => void) | undefined,
 }));
 vi.mock("../../../src/server/pi-configuration", async (original) => ({
   ...(await original<object>()),
-  configuredPiRuntime: async () => ({
-    configuration: { reasoningEffort: "off" },
-    modelRuntime: synthetic.runtime,
-    model: synthetic.model,
-  }),
+  configuredPiRuntime: async () => {
+    if (synthetic.authFails)
+      throw new Error("invalid_grant: the ChatGPT login has expired");
+    return {
+      configuration: { reasoningEffort: "off" },
+      modelRuntime: synthetic.runtime,
+      model: synthetic.model,
+    };
+  },
 }));
 vi.mock("../../../src/server/pi-workspace", async (original) => ({
   ...(await original<object>()),
@@ -59,6 +68,25 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
         throw new Error("Workspace cleanup failed.");
       await synthetic.cleanup;
     }
+  },
+}));
+
+// A tool Pi runs itself, with no execution record: `check_domain` awaits the
+// provider read, so a test can hold it open mid-call.
+vi.mock("../../../src/server/cloudflare", async (original) => ({
+  ...(await original<object>()),
+  cloudflareDomain: async () => {
+    const reading = {
+      name: "shop.test",
+      zone: "test",
+      record: null,
+      proxied: false,
+    };
+    if (!synthetic.hanging) return reading;
+    synthetic.hanging = false;
+    return new Promise((resolve) => {
+      synthetic.release = () => resolve(reading);
+    });
   },
 }));
 
@@ -179,30 +207,46 @@ beforeAll(async () => {
       }
       const message = text.includes("[fail]")
         ? assistant(model, [], "error", "invalid_grant: 401 unauthorized")
-        : text.includes("[approve]")
+        : text.includes("[domain]")
           ? assistant(
               model,
               [
-                { type: "text", text: "I will ask first." },
+                { type: "text", text: "Reading the name." },
                 {
                   type: "toolCall",
                   id: `call-${++calls}`,
-                  name: "request_approval",
-                  arguments: { action: "Restart the service" },
+                  name: "check_domain",
+                  // Secret-shaped, because Pi's history keeps what the model
+                  // sent and a reader must never be handed it.
+                  arguments: { name: "ghp_livesecrettoken0123456789abcdef" },
                 },
               ],
               "toolUse",
             )
-          : assistant(
-              model,
-              [
-                {
-                  type: "text",
-                  text: last.role === "user" ? `reply: ${text}` : "finished",
-                },
-              ],
-              "stop",
-            );
+          : text.includes("[approve]")
+            ? assistant(
+                model,
+                [
+                  { type: "text", text: "I will ask first." },
+                  {
+                    type: "toolCall",
+                    id: `call-${++calls}`,
+                    name: "request_approval",
+                    arguments: { action: "Restart the service" },
+                  },
+                ],
+                "toolUse",
+              )
+            : assistant(
+                model,
+                [
+                  {
+                    type: "text",
+                    text: last.role === "user" ? `reply: ${text}` : "finished",
+                  },
+                ],
+                "stop",
+              );
       stream.push({ type: "start", partial: message });
       stream.push(
         message.stopReason === "error"
@@ -246,9 +290,13 @@ beforeEach(async () => {
   store.db().$client.exec("DELETE FROM applications");
   requests = [];
   contextUsed = 10;
+  synthetic.authFails = false;
+  synthetic.hanging = false;
+  synthetic.release = undefined;
   await startWorker();
 });
 afterEach(async () => {
+  synthetic.release?.();
   for (const { id } of store.listApplications())
     for (const chat of store.listApplicationChats(id))
       await stopConversation(id, chat.id).catch(() => undefined);
@@ -633,6 +681,20 @@ it("Stop after continuing an idle lane's queue says stopped, from the result of 
     "pi [cancelled] I will ask first.",
   ]);
   expect(listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
+
+  // A later turn, and a worker that went away in between, do not rewrite how
+  // that stopped one ended: its operation is the one Pi read the queue in,
+  // and a reader that only asked about the newest operation called it
+  // completed.
+  await a.send("hello again");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  await loseWorker();
+  await startWorker();
+  expect((await a.transcript()).slice(-3)).toEqual([
+    "pi [cancelled] I will ask first.",
+    "you [delivered] hello again",
+    "pi [completed] reply: hello again",
+  ]);
 });
 
 it("a second worker steps aside without touching what the first is doing", async () => {
@@ -656,12 +718,12 @@ it.each([false, true])(
   async (failCleanup) => {
     const a = application("shop");
     const b = application("notes");
-    await a.send("hello");
-    await b.send("hello");
-    await until(async () => expect(await a.status()).toBe("idle"));
-    await until(async () => expect(await b.status()).toBe("idle"));
-    await a.snapshot(); // both conversations are open for reading
-    await b.snapshot();
+    // Both conversations are open because Pi is holding work in them:
+    // reading one opens nothing.
+    await a.send("[approve] restart it");
+    await b.send("[approve] restart it");
+    await until(() => expect(approval(a.id)).toBeTruthy());
+    await until(() => expect(approval(b.id)).toBeTruthy());
     let finish!: () => void;
     synthetic.cleanup = new Promise((resolve) => (finish = resolve));
     synthetic.cleanupFailsFor = failCleanup ? a.chat : undefined;
@@ -698,8 +760,14 @@ it.each([false, true])(
     }
     worker = await ownSessions({ stopTimeoutMs: 2_000 });
     expect(worker).not.toBeNull();
-    expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: hello");
-    expect((await b.transcript()).at(-1)).toBe("pi [completed] reply: hello");
+    // The new worker inherits the interrupted turns; what waited is still
+    // waiting for its owner, and nothing ran again.
+    expect((await a.transcript()).at(-1)).toBe(
+      "pi [interrupted] I will ask first.",
+    );
+    expect((await b.transcript()).at(-1)).toBe(
+      "pi [interrupted] I will ask first.",
+    );
   },
 );
 
@@ -760,3 +828,85 @@ it("of workers starting in the same instant over a dead worker's socket, exactly
     ),
   );
 }, 120_000);
+
+it("a call the worker never finished reads as interrupted, from Pi's own history", async () => {
+  const a = application("shop");
+  synthetic.hanging = true;
+  await a.send("[domain] check the name");
+  await until(() => expect(synthetic.release).toBeTruthy());
+  const working = (await a.snapshot()).piActivity!.at(-1)!;
+  expect(working).toMatchObject({ tool: "check_domain", status: "running" });
+  // Pi kept the arguments the model sent; a reader is never handed them.
+  expect(working.args).toContain("[REDACTED]");
+  expect(JSON.stringify(await a.snapshot())).not.toContain("ghp_live");
+
+  // The worker dies with the call still in flight. Pi is told nothing, and
+  // there is no record of Hallvi's to sweep.
+  await loseWorker();
+  await startWorker();
+  const after = await a.snapshot();
+  expect(after.status).toBe("interrupted");
+  expect(after.piActivity!.at(-1)).toMatchObject({
+    tool: "check_domain",
+    status: "interrupted",
+    result: "",
+  });
+  expect(after.messages.at(-1)).toMatchObject({ status: "interrupted" });
+});
+
+it("reads a conversation nobody is running without asking the model provider", async () => {
+  const a = application("shop");
+  await a.send("[domain] check the name");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  await loseWorker();
+  await startWorker();
+
+  // The login expired while the page was closed. Reading a history is not
+  // running anything, so it does not need one.
+  synthetic.authFails = true;
+  const snapshot = await a.snapshot();
+  expect(snapshot.status).toBe("idle");
+  expect(snapshot.messages.at(-1)).toMatchObject({ status: "completed" });
+  expect(
+    snapshot.piActivity!.map((record) => [record.tool, record.status]),
+  ).toEqual([
+    ["", "succeeded"],
+    ["check_domain", "succeeded"],
+    ["", "succeeded"],
+  ]);
+  // Sending still needs the provider, and says so.
+  await expect(a.send("and now?")).rejects.toThrow();
+});
+
+it("keeps an older stopped reply stopped, and its calls with it, after a later turn", async () => {
+  const a = application("shop");
+  await a.send("[approve] restart it");
+  await until(() => expect(approval(a.id)).toBeTruthy());
+  await a.stop();
+  const stopped = (await a.snapshot()).messages.at(-1)!;
+  expect(stopped.status).toBe("cancelled");
+
+  // A new turn runs to the end. The old reply is history and stays stopped,
+  // read from the same session both while a worker holds it and after one
+  // has been replaced.
+  await a.send("hello again");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  const later = await a.snapshot();
+  expect(later.messages.find((m) => m.id === stopped.id)?.status).toBe(
+    "cancelled",
+  );
+  expect(
+    later.piActivity!.filter((record) => record.runId === stopped.id),
+  ).toMatchObject([{ status: "succeeded" }, { status: "interrupted" }]);
+
+  await loseWorker();
+  await startWorker();
+  const afterRestart = await a.snapshot();
+  expect(afterRestart.messages.find((m) => m.id === stopped.id)?.status).toBe(
+    "cancelled",
+  );
+  expect(
+    afterRestart.piActivity!.find((record) => record.runId === stopped.id)
+      ?.status,
+  ).toBe("succeeded");
+});

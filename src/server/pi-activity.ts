@@ -1,28 +1,24 @@
-// What Pi actually did, in the order it did it.
+// What Pi actually did, in the order it did it — read from Pi's own history.
 //
-// Pi's runtime already emits a start, streaming updates and an end for every
-// tool call. Until now those were consumed as anonymous progress signals, so a
-// conversation could say Pi was working but never what it ran or what came
-// back. This projects them into ordered records the conversation can render.
+// Pi writes a tool call to its branch before the tool runs and the tool's
+// result when it returns, and keeps both through a compaction and across a
+// restart. So this is derived on every read rather than kept a second time:
+// there is no store here, nothing to sweep, and no way for two records of the
+// same call to disagree.
 //
-// Records live beside execution records on disk rather than in the message
-// row, for the same reason executions do: a streaming update rewrites one
-// small file instead of a JSON column and a revision bump per delta.
+// Two things Pi's history cannot answer, and where they come from instead:
 //
-// Nothing here re-runs anything. Reading a record is reading evidence.
+//   The outcome of a call the executor owns — waiting for the owner, declined,
+//   running, failed — is the execution record's, by Pi's own tool-call id.
+//
+//   What has streamed back from a call still in flight is the worker's, held
+//   in its memory for as long as the call lasts and never written down.
+//
+// Redaction happens here, on the way out. Pi's history keeps what the model
+// actually sent, secrets and all; nothing leaves this file unredacted.
 
-import {
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
-import { randomUUID } from "node:crypto";
-import { join } from "node:path";
-import { z } from "zod";
-
-import { piConfigDir } from "./pi-configuration";
+import type { ExecutionRecord } from "./operator-execution";
+import type { Transcript } from "./pi-transcript";
 import { redactSecrets } from "./secrets";
 
 /** How much of a tool's argument or result is worth keeping for a reader. */
@@ -74,45 +70,29 @@ export interface ActivityRecord {
   finishedAt?: string;
 }
 
-function directory(applicationId: string) {
-  return join(
-    piConfigDir(),
-    "operator",
-    z.uuid().parse(applicationId),
-    "activity",
-  );
-}
-
-function recordPath(applicationId: string, id: string) {
-  // A tool-call id comes from the runtime, so it is not trusted as a filename.
-  return join(directory(applicationId), `${encodeURIComponent(id)}.json`);
-}
-
-function write(path: string, value: ActivityRecord) {
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 });
-  renameSync(temporary, path);
-}
-
-function read(path: string): ActivityRecord | undefined {
-  try {
-    const record = JSON.parse(readFileSync(path, "utf8")) as ActivityRecord;
-    // Records written before messages joined the transcript carry no kind.
-    return record.kind ? record : { ...record, kind: "tool" };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
-  }
-}
+/**
+ * How an execution record's outcome reads as activity. The executor knows
+ * things Pi's history cannot: that the owner was asked and said no, that a
+ * command is still running under an approval, that it failed.
+ */
+const fromExecution: Record<ExecutionRecord["status"], ActivityStatus> = {
+  "awaiting-approval": "running",
+  running: "running",
+  succeeded: "succeeded",
+  failed: "failed",
+  declined: "declined",
+  interrupted: "interrupted",
+};
 
 /**
  * A tool result is usually `{content:[{type:"text",text}]}`. Reading the text
  * out of it keeps the record readable and, more importantly, stops the JSON
- * scaffolding being compared and re-appended as if it were output.
+ * scaffolding being shown as if it were output.
  */
 function words(value: unknown): string {
+  if (value === undefined || value === null) return "";
   if (typeof value === "string") return value;
-  if (value && typeof value === "object") {
+  if (typeof value === "object") {
     const content = (value as { content?: unknown }).content;
     if (Array.isArray(content)) {
       const parts = content
@@ -146,219 +126,98 @@ function safeStringify(value: unknown) {
   }
 }
 
-export function startActivity(input: {
-  applicationId: string;
-  runId: string;
-  sequence: number;
-  id: string;
-  tool: string;
-  args: unknown;
-}): ActivityRecord {
-  mkdirSync(directory(input.applicationId), { recursive: true, mode: 0o700 });
-  const args = keep(input.args, ARGUMENT_LIMIT);
-  const record: ActivityRecord = {
-    kind: "tool",
-    id: input.id,
-    applicationId: input.applicationId,
-    runId: input.runId,
-    sequence: input.sequence,
-    tool: input.tool,
-    args: args.text,
-    preview: "",
-    result: "",
-    status: "running",
-    truncated: args.truncated,
-    startedAt: new Date().toISOString(),
-  };
-  write(recordPath(input.applicationId, input.id), record);
-  return record;
-}
-
 /**
- * How to read what a caller handed us. Guessing between the two by comparing
- * prefixes loses data — two legitimate deltas of "tick\n" look like one
- * snapshot — so every caller states which it is sending.
+ * Pi's calls and its own words, in the order Pi recorded them.
  *
- * `snapshot` is everything produced so far and replaces what we hold; the
- * runtime's `partialResult` is a result-so-far, so it is always a snapshot.
- * `delta` is only the new bytes and is appended; a source that streams
- * increments says so.
+ * A call with no result is one that never reported an end: it is running while
+ * the reply it belongs to is being written, and interrupted otherwise — which
+ * is what a reader needs to know after a restart, and keeps a call from an
+ * older stopped reply from springing back to life when a new reply starts.
  */
-export type PartialMode = "snapshot" | "delta";
-
-export function updateActivity(
-  applicationId: string,
-  id: string,
-  partial: unknown,
-  mode: PartialMode,
-) {
-  const path = recordPath(applicationId, id);
-  const record = read(path);
-  if (!record || record.status !== "running") return;
-  const incoming = keep(partial, PREVIEW_LIMIT);
-  const preview =
-    mode === "snapshot" ? incoming.text : record.preview + incoming.text;
-  if (preview === record.preview) return;
-  const cut = preview.length > PREVIEW_LIMIT;
-  write(path, {
-    ...record,
-    preview: cut ? preview.slice(-PREVIEW_LIMIT) : preview,
-    truncated: record.truncated || incoming.truncated || cut,
-  });
-}
-
-/** Ties a call to the record it produced, by id rather than by tool name. */
-export function linkActivityExecution(
-  applicationId: string,
-  id: string,
-  executionId: string,
-) {
-  const path = recordPath(applicationId, id);
-  const record = read(path);
-  if (!record) return;
-  write(path, { ...record, executionId });
-}
-
-export function endActivity(input: {
+export function activityFromTranscript(input: {
   applicationId: string;
-  id: string;
-  result: unknown;
-  isError: boolean;
-}) {
-  const path = recordPath(input.applicationId, input.id);
-  const record = read(path);
-  if (!record) return;
-  const result = keep(input.result, RESULT_LIMIT);
-  write(path, {
-    ...record,
-    result: result.text,
-    // Executor decisions happen before the SDK completion event.
-    // Keep that outcome when the SDK returns an ordinary declined result.
-    status:
-      record.status === "running"
-        ? input.isError
-          ? "failed"
-          : "succeeded"
-        : record.status,
-    truncated: record.truncated || result.truncated,
-    finishedAt: record.finishedAt ?? new Date().toISOString(),
+  transcript: Transcript;
+  executions: ExecutionRecord[];
+}): ActivityRecord[] {
+  const { applicationId, transcript } = input;
+  const executionOf = new Map(
+    input.executions.flatMap((record) =>
+      record.toolCallId ? [[record.toolCallId, record] as const] : [],
+    ),
+  );
+  /**
+   * Whether the reply a call belongs to is the one being written now.
+   *
+   * Per reply, never per conversation. A call with no result under a reply
+   * that was stopped or interrupted turns is finished business, and reading
+   * the conversation's own status made every one of them spring back to
+   * "running" the moment a later reply started.
+   */
+  const live = new Map(
+    transcript.messages.map((message) => [
+      message.id,
+      message.status === "running",
+    ]),
+  );
+  const tools: ActivityRecord[] = Object.entries(transcript.calls).map(
+    ([id, call]) => {
+      const execution = executionOf.get(id);
+      const args = keep(call.args, ARGUMENT_LIMIT);
+      const result = keep(call.result?.text, RESULT_LIMIT);
+      const preview = keep(call.preview, PREVIEW_LIMIT);
+      return {
+        kind: "tool" as const,
+        id,
+        applicationId,
+        runId: call.replyId,
+        sequence: call.sequence,
+        tool: call.tool,
+        args: args.text,
+        preview: preview.text,
+        result: result.text,
+        status: execution
+          ? fromExecution[execution.status]
+          : call.result
+            ? call.result.failed
+              ? "failed"
+              : "succeeded"
+            : live.get(call.replyId)
+              ? "running"
+              : "interrupted",
+        executionId: execution?.id,
+        truncated: args.truncated || result.truncated || preview.truncated,
+        startedAt: call.at,
+        finishedAt: call.result?.at,
+      };
+    },
+  );
+  const said: ActivityRecord[] = transcript.said.map((each) => {
+    const text = keep(each.text, RESULT_LIMIT);
+    return {
+      kind: "message" as const,
+      id: `${each.replyId}:said:${each.sequence}`,
+      applicationId,
+      runId: each.replyId,
+      sequence: each.sequence,
+      tool: "",
+      text: text.text,
+      args: "",
+      preview: "",
+      result: "",
+      status: "succeeded" as const,
+      truncated: text.truncated,
+      startedAt: each.at,
+      finishedAt: each.at,
+    };
   });
-}
-
-/**
- * A run that stopped between a call's start and its end leaves a record
- * claiming to run forever. Pass a run to settle that run's calls; pass null to
- * settle every one of them, which is what a controller does at startup — a
- * crash never reaches the worker's own cleanup, so a restart is the only place
- * some of these can be put right.
- */
-export function settleRunningActivity(
-  applicationId: string,
-  runId: string | null,
-  status: Exclude<ActivityStatus, "running"> = "interrupted",
-) {
-  for (const record of listActivity(applicationId))
-    if (
-      (runId === null || record.runId === runId) &&
-      record.status === "running"
-    )
-      write(recordPath(applicationId, record.id), {
-        ...record,
-        status,
-        finishedAt: new Date().toISOString(),
-      });
-}
-
-/**
- * Settles one call to an outcome the runtime cannot report. A declined
- * command returns an ordinary result, so without this the record would keep
- * saying it succeeded even though nothing ran.
- */
-export function settleActivity(
-  applicationId: string,
-  id: string,
-  status: Exclude<ActivityStatus, "running">,
-) {
-  const path = recordPath(applicationId, id);
-  const record = read(path);
-  if (!record) return;
-  write(path, { ...record, status, finishedAt: new Date().toISOString() });
-}
-
-/** Every application that has any activity on record. */
-export function applicationsWithActivity(): string[] {
-  try {
-    return readdirSync(join(piConfigDir(), "operator"), {
-      withFileTypes: true,
-    })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
-}
-
-/**
- * What Pi said between its tool calls. Each assistant message is kept where it
- * happened, so a reader sees the reasoning that led to the next command rather
- * than only the last paragraph.
- */
-export function recordMessage(input: {
-  applicationId: string;
-  runId: string;
-  sequence: number;
-  text: string;
-}) {
-  const text = input.text.trim();
-  if (!text) return;
-  mkdirSync(directory(input.applicationId), { recursive: true, mode: 0o700 });
-  const id = `${input.runId}:said:${input.sequence}`;
-  const kept = keep(text, RESULT_LIMIT);
-  const now = new Date().toISOString();
-  write(recordPath(input.applicationId, id), {
-    kind: "message",
-    id,
-    applicationId: input.applicationId,
-    runId: input.runId,
-    sequence: input.sequence,
-    tool: "",
-    text: kept.text,
-    args: "",
-    preview: "",
-    result: "",
-    status: "succeeded",
-    truncated: kept.truncated,
-    startedAt: now,
-    finishedAt: now,
-  });
-}
-
-export function listActivity(applicationId: string): ActivityRecord[] {
-  let names: string[];
-  try {
-    names = readdirSync(directory(applicationId));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
-  const records = names
-    .filter((name) => name.endsWith(".json"))
-    .map((name) => read(join(directory(applicationId), name)))
-    .filter((record): record is ActivityRecord => Boolean(record));
-  // Sequence is the runtime's own counter and is the only authority on order
-  // within a run; wall-clock times tie at millisecond resolution and say
-  // nothing across runs. So: runs in the order they began, calls in sequence.
-  const began = new Map<string, string>();
-  for (const record of records) {
-    const first = began.get(record.runId);
-    if (!first || record.startedAt < first)
-      began.set(record.runId, record.startedAt);
-  }
-  return records.sort(
-    (a, b) =>
-      (began.get(a.runId) ?? "").localeCompare(began.get(b.runId) ?? "") ||
-      a.runId.localeCompare(b.runId) ||
-      a.sequence - b.sequence,
+  // Replies in the order Pi wrote them, and within a reply the sequence Pi
+  // gave each call and each thing it said.
+  const order = transcript.messages.map((message) => message.id);
+  const place = (runId: string) => {
+    const at = order.indexOf(runId);
+    return at < 0 ? order.length : at;
+  };
+  return [...tools, ...said].sort(
+    (a, b) => place(a.runId) - place(b.runId) || a.sequence - b.sequence,
   );
 }
