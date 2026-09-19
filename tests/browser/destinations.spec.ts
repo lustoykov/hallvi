@@ -106,6 +106,9 @@ async function clipped(page: Page) {
     [...document.querySelectorAll<HTMLElement>("main *")]
       .filter((element) => {
         if (element.children.length) return false;
+        // Text only a screen reader reads sits in a one-pixel box and
+        // overflows it by design. Reporting it hides the real findings.
+        if (element.clientWidth <= 1 || element.clientHeight <= 1) return false;
         const style = getComputedStyle(element);
         if (style.overflow !== "hidden" && style.overflowX !== "hidden")
           return false;
