@@ -21,10 +21,10 @@ need to clone this repository or install Node.js, npm, Python or a compiler.
 | Ubuntu 24.04 x64 with systemd | [Linux installation](docs/installation.md#linux) |
 | Another machine, including a Mac mini or Linux VM | [Remote browser access](docs/installation.md#on-another-machine) after installing there |
 
-Earlier source-plus-compile service builds were exercised on Apple-silicon
-macOS and Ubuntu 24.04 x64; each prebuilt candidate needs its own trial. See
-[supported machines](docs/installation.md#supported-machines). The current
-main revision still needs a local Docker Engine before **Read repository**.
+The [prebuilt installation candidate](docs/testing/2026-09-19-prebuilt-installation.md)
+was exercised on Apple-silicon macOS and Ubuntu 24.04 x64. Each later archive
+needs its own trial. See [supported machines](docs/installation.md#supported-machines).
+The current main revision still needs a local Docker Engine before **Read repository**.
 Direct repository execution with optional Docker is separate, unmerged work.
 
 After a local installation, open <http://127.0.0.1:4747>. For a headless VPS,
