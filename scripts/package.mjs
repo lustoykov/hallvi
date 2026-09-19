@@ -56,6 +56,27 @@ const curl = (url, output) =>
 const sha256 = (file) =>
   createHash("sha256").update(readFileSync(file)).digest("hex");
 
+// The revision describes the source this archive was built from, so read the
+// checkout before the build writes anything: a production build rewrites the
+// tracked `next-env.d.ts`, which would otherwise report every clean checkout
+// as uncommitted.
+let revision = process.env.HALLVI_SOURCE_REVISION ?? "unknown";
+if (revision !== "unknown" && !/^[0-9a-f]{40}$/.test(revision))
+  throw new Error("HALLVI_SOURCE_REVISION must be a full commit SHA.");
+if (revision === "unknown") {
+  try {
+    const dirty = execFileSync("git", ["status", "--porcelain"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    revision = dirty
+      ? "uncommitted"
+      : execFileSync("git", ["rev-parse", "HEAD"], {
+          encoding: "utf8",
+        }).trim();
+  } catch {}
+}
+
 // build.mjs replaces dist/, so finish it before preparing the archive there.
 execFileSync(process.execPath, ["scripts/build.mjs"], { stdio: "inherit" });
 rmSync(root, { recursive: true, force: true });
@@ -129,22 +150,6 @@ try {
     { cwd: target, stdio: "inherit" },
   );
 
-  let revision = process.env.HALLVI_SOURCE_REVISION ?? "unknown";
-  if (revision !== "unknown" && !/^[0-9a-f]{40}$/.test(revision))
-    throw new Error("HALLVI_SOURCE_REVISION must be a full commit SHA.");
-  if (revision === "unknown") {
-    try {
-      const dirty = execFileSync("git", ["status", "--porcelain"], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim();
-      revision = dirty
-        ? "uncommitted"
-        : execFileSync("git", ["rev-parse", "HEAD"], {
-            encoding: "utf8",
-          }).trim();
-    } catch {}
-  }
   writeFileSync(
     join(target, "dist", "release.json"),
     `${JSON.stringify({ version, revision, platform, nodeVersion: NODE_VERSION }, null, 2)}\n`,
