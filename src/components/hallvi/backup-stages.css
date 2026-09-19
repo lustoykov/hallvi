@@ -414,6 +414,10 @@
 }
 
 .bs-primary {
+  min-height: var(--button-height);
+  padding: 0 14px;
+  align-items: center;
+  box-shadow: var(--button-shadow);
   border-color: var(--ax-blue);
   background: var(--ax-blue);
   color: white;
@@ -429,15 +433,10 @@
   background: var(--ax-working-bg);
 }
 
-.bs-primary em,
 .bs-action em {
   font-size: 10.5px;
   font-style: normal;
   font-weight: 450;
-}
-
-.bs-primary em {
-  color: rgb(255 255 255 / 74%);
 }
 
 .bs-action em {

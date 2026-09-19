@@ -17,7 +17,7 @@ export function StandInNotice() {
   const container = process.env.SG_RIG_HOST_CONTAINER;
   const server = container
     ? `the server is the Docker container ${container}`
-    : "the server is this Mac's own shell and Docker";
+    : "the server is this PC's own shell and Docker";
   return (
     <div
       className={styles.notice}
