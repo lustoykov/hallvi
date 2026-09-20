@@ -1248,12 +1248,10 @@
 .hv-navigation-home {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   padding: 3px 10px 5px;
   font-size: var(--view-meta);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--muted);
   text-decoration: none;
 }

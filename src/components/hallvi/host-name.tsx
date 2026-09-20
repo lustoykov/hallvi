@@ -59,6 +59,19 @@ export function HostName({ className }: { className?: string }) {
 }
 
 /**
+ * ", on mac-mini", to finish a sentence that has already said "Hallvi".
+ *
+ * The alpha notice is the one place on every page that names the product, so
+ * the machine belongs in it rather than beside a second copy of the name. The
+ * comma goes with the name: until it is known there is nothing here at all.
+ */
+export function OnThisMachine() {
+  const name = useHostName();
+  if (!name) return null;
+  return <>, on {name}</>;
+}
+
+/**
  * Keeps the machine's name at the end of the tab title. Pages set their own
  * titles as they load, so this follows the title element rather than a route.
  */

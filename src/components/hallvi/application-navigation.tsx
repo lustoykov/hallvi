@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  ArrowLeft,
   CaretDown,
   CaretRight,
   ChatCircle,
@@ -17,7 +18,6 @@ import {
 } from "./application-sections";
 import type { ChatSummary } from "@/server/types";
 
-import { HostName } from "./host-name";
 import { ThisHallvi } from "./hallvi-version";
 
 /**
@@ -187,8 +187,10 @@ export function ApplicationNavigation({
     >
       {head ? (
         <div className="hv-navigation-head">
+          {/* The alpha notice above already names the product and the
+              machine. This is the way back to the list, so it says that. */}
           <Link href="/applications" className="hv-navigation-home">
-            Hallvi <HostName className="hv-navigation-host" />
+            <ArrowLeft aria-hidden="true" /> All applications
           </Link>
           {head}
         </div>

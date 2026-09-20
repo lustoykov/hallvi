@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { HostTitle } from "@/components/hallvi/host-name";
+import { HostTitle, OnThisMachine } from "@/components/hallvi/host-name";
 import { StandInNotice } from "@/components/hallvi/stand-in-notice";
 
 import "./globals.css";
@@ -33,7 +33,10 @@ export default function RootLayout({
         <aside className="hv-alpha-notice" aria-label="Hallvi alpha release">
           <span className="hv-alpha-label">Alpha</span>
           <div>
-            <strong>Hallvi is in alpha.</strong>
+            <strong>
+              Hallvi is in alpha
+              <OnThisMachine />.
+            </strong>
             <p>
               Expect frequent changes as we figure out the best user experience.
             </p>
