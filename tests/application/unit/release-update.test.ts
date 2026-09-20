@@ -583,7 +583,10 @@ it("waits out the hour after a look that failed, then looks again", async () => 
   );
   const data = join(root, "outage-data");
   mkdirSync(data, { recursive: true });
-  const unreachable = { HALLVI_RELEASE_SOURCE: "https://127.0.0.1:1/releases" };
+  const unreachable = {
+    ...process.env,
+    HALLVI_RELEASE_SOURCE: "https://127.0.0.1:1/releases",
+  };
   const failed = {
     candidate: { tag: "v0.1.0-alpha.1" },
     error: "The release source could not be reached.",
@@ -596,7 +599,12 @@ it("waits out the hour after a look that failed, then looks again", async () => 
     `${JSON.stringify({ ...failed, checkedAt: recent })}\n`,
   );
   expect(
-    await checkForReleaseIfDue({ program: installed, data, home, env: unreachable }),
+    await checkForReleaseIfDue({
+      program: installed,
+      data,
+      home,
+      env: unreachable,
+    }),
   ).toMatchObject({ checkedAt: recent, error: failed.error });
 
   // Ninety minutes in, it is due again, error or no error.
