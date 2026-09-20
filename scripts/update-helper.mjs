@@ -31,6 +31,7 @@ import { installedPorts } from "./installed-ports.mjs";
 import {
   currentPlatform,
   downloadPackage,
+  migrates,
   packageFor,
   programSchemaVersion,
   ReleaseRefusal,
@@ -147,16 +148,19 @@ async function main() {
       "The release changed between choosing it and installing it.",
     );
 
-  // A schema the installed database cannot be read by is refused here, before
-  // anything is downloaded. `install.sh` refuses it again from the unpacked
-  // archive, against the real database; this only saves the download and says
-  // so in words the owner can act on.
+  // A schema this release does not claim to migrate is refused here, before
+  // anything is downloaded. One it does claim is not a refusal: `install.sh`
+  // carries the migration out from the unpacked archive — which holds the
+  // list the claim was made from — after the service has stopped and with a
+  // backup taken first. The claim travels in the signed manifest because this
+  // program is the old one, and cannot know a migration written after it.
   const schema = programSchemaVersion(program);
-  if (schema !== null && manifest.schemaVersion !== schema) {
+  const migrating = schema !== null && manifest.schemaVersion !== schema;
+  if (migrating && !migrates(manifest, schema)) {
     recordPhase(
       data,
       "blocked",
-      `Hallvi ${manifest.version} keeps its records in schema ${manifest.schemaVersion} and this one uses schema ${schema}. There is no migration between them yet, so nothing was downloaded and nothing was changed.`,
+      `Hallvi ${manifest.version} keeps its records in schema ${manifest.schemaVersion} and this one uses schema ${schema}, and does not say it can migrate them. Nothing was downloaded and nothing was changed.`,
     );
     say("blocked: schema");
     return;
@@ -274,7 +278,9 @@ async function main() {
   recordPhase(
     data,
     "installing",
-    `Installing Hallvi ${manifest.version}. Hallvi stops for a moment and comes back on the same address.`,
+    migrating
+      ? `Installing Hallvi ${manifest.version}. Your records move from schema ${schema} to ${manifest.schemaVersion}; they are copied first, and the copy is kept. Hallvi stops for a moment and comes back on the same address.`
+      : `Installing Hallvi ${manifest.version}. Hallvi stops for a moment and comes back on the same address.`,
   );
   say(`installing ${folder}`);
   const installed = run("sh", [join(root, "install.sh")], {

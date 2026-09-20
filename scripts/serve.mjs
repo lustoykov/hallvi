@@ -24,6 +24,7 @@ import {
   resolveEnvironment,
   WORKER_BUSY_EXIT,
 } from "./dev-environment.mjs";
+import { supported } from "./migrations.mjs";
 import { installedPorts } from "./installed-ports.mjs";
 import {
   piAccountLocation,
@@ -97,7 +98,7 @@ const ports = installedPorts(process.env);
  */
 class SchemaMismatchError extends Error {}
 
-function prepareDatabase({ initialize = true } = {}) {
+function prepareDatabase({ initialize = true, migratable = false } = {}) {
   const { version } = JSON.parse(
     readFileSync(join(program, "dist", "schema-version.json"), "utf8"),
   );
@@ -120,10 +121,20 @@ function prepareDatabase({ initialize = true } = {}) {
       return;
     }
     const current = database.pragma("user_version", { simple: true });
-    if (current !== version)
-      throw new SchemaMismatchError(
-        `${resolved.database} holds schema ${current} and this Hallvi needs schema ${version}. Nothing was changed. Install the version that wrote it, or move the file aside to start fresh.`,
+    if (current === version) return;
+    // Asked whether this program could be installed over these records, a
+    // migration it can carry out is a yes with a sentence. Asked to start on
+    // them, it is still a no: starting is not the moment to rewrite anything,
+    // and `install.sh` runs the migration before it gets here.
+    if (migratable && supported(current, version)) {
+      console.log(
+        `${resolved.database} holds schema ${current}; this Hallvi needs ${version} and can migrate it during the upgrade.`,
       );
+      return;
+    }
+    throw new SchemaMismatchError(
+      `${resolved.database} holds schema ${current} and this Hallvi needs schema ${version}. Nothing was changed. Install the version that wrote it, or move the file aside to start fresh.`,
+    );
   } finally {
     database.close();
   }
@@ -132,6 +143,7 @@ function prepareDatabase({ initialize = true } = {}) {
 try {
   prepareDatabase({
     initialize: !checkingInstalled,
+    migratable: checkingInstalled,
   });
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

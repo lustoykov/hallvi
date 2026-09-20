@@ -138,6 +138,7 @@ One file, `hallvi-release.json`, signed byte for byte. Its signature is
   "version": "0.1.0-alpha.1",
   "revision": "<the 40-character commit the archives were built from>",
   "schemaVersion": 18,
+  "migratesFrom": [15],
   "releasedAt": "2026-09-20T09:00:00.000Z",
   "notes": "https://github.com/lustoykov/hallvi/releases/tag/v0.1.0-alpha.1",
   "packages": {
@@ -152,10 +153,31 @@ installation refer to the same immutable candidate. An installation keeps the
 manifest's own bytes while it updates and verifies them again in the program
 that does the installing, rather than trusting what the interface read.
 
-`schemaVersion` is the database schema that release needs. An installation
-whose records are in another schema says so and does not download. The
-installed self-update path does not apply schema migrations; the persistent
-development environment can use a separately verified database upgrade.
+`schemaVersion` is the database schema that release needs, and
+`migratesFrom` is every schema it can take records from. Both are signed with
+the rest of the manifest.
+
+`migratesFrom` has to travel with the release rather than be worked out by the
+installation reading it. The migration from one schema to the next is written
+in the version that introduces the new schema, so the installation deciding
+whether to download it — the older one — cannot have heard of it. Asking that
+older program would refuse every forward migration, which is the only
+direction there is. `sign-release.mjs` fills the field from
+[the list](../scripts/migrations.mjs) in the build being signed, and
+`install.sh` checks the claim again from the unpacked archive, against the
+real database, before anything is replaced.
+
+A release whose schema differs and whose `migratesFrom` does not name the
+installation's is refused before anything is downloaded, naming both schemas.
+A release from before this field existed names nothing, and so can take only
+records already in its own schema.
+
+There is one list of migrations and both ways of upgrading read it — `npm run
+db:upgrade` in a checkout and `install.sh` on an installation, which is what
+the updater runs. Each transition names both of its ends as literal numbers,
+so raising `schemaVersion` for a new release does not quietly extend an
+existing migration to reach it. [The upgrade](installation.md#update)
+describes what happens to the records.
 
 ## The channel
 

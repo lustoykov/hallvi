@@ -15,6 +15,7 @@ import {
   DEFAULT_CHANNEL,
   discover,
   installation,
+  migrates,
   packageFor,
   programSchemaVersion,
 } from "./release-source.mjs";
@@ -92,8 +93,17 @@ export async function checkForRelease(
 /** Why this candidate cannot be installed here, in one sentence, or nothing. */
 export function blockedReason(program, candidate) {
   const schema = programSchemaVersion(program);
-  if (schema !== null && candidate.manifest.schemaVersion !== schema)
-    return `Hallvi ${candidate.manifest.version} keeps its records in schema ${candidate.manifest.schemaVersion} and this one uses schema ${schema}. There is no migration between them yet, so this release cannot be installed over your records.`;
+  const wanted = candidate.manifest.schemaVersion;
+  // Whether the two can be joined is the *release's* answer, carried in its
+  // signed manifest. It cannot be this program's: the migration belongs to
+  // the version being installed, and an installation old enough to need one
+  // is by definition too old to know it exists.
+  if (
+    schema !== null &&
+    wanted !== schema &&
+    !migrates(candidate.manifest, schema)
+  )
+    return `Hallvi ${candidate.manifest.version} keeps its records in schema ${wanted} and this one uses schema ${schema}, and does not say it can migrate them. This release cannot be installed over your records.`;
   try {
     packageFor(candidate.manifest);
     return null;

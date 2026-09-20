@@ -14,6 +14,7 @@ set -eu
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 home="$HOME/.local/lib/hallvi"
 bin="$HOME/.local/bin"
+data="${HALLVI_DATA_DIR:-$HOME/.local/share/hallvi}"
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'install: %s\n' "$*" >&2; exit 1; }
@@ -82,12 +83,98 @@ upgrade=no
 mkdir -p "$HOME/.local/lib" "$bin"
 staging=$(mktemp -d "$HOME/.local/lib/hallvi.installing.XXXXXX")
 backup=""
+migrated=""
 committed=no
 stopped=no
+# Stops the service and does not return success until the service manager
+# agrees it is gone. A start that reported failure can still have left a
+# process serving, and both managers restart what they own; replacing a
+# database out from under one is the thing this exists to prevent.
+service_is_gone() {
+  if [ "$os" = darwin ]; then
+    ! launchctl print "gui/$(id -u)/com.hallvi" >/dev/null 2>&1
+  else
+    ! systemctl --user is-enabled hallvi.service >/dev/null 2>&1 &&
+      ! systemctl --user is-active --quiet hallvi.service
+  fi
+}
+
+ensure_stopped() {
+  service_is_gone && return 0
+  "$bin/hallvi" stop >/dev/null 2>&1 || :
+  if [ "$os" = darwin ]; then
+    launchctl bootout "gui/$(id -u)/com.hallvi" >/dev/null 2>&1 || :
+  else
+    systemctl --user disable --now hallvi.service >/dev/null 2>&1 || :
+  fi
+  attempt=0
+  while [ "$attempt" -lt 30 ]; do
+    service_is_gone && return 0
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+  return 1
+}
+
+restore_records() {
+  # Putting the old program back is not a rollback once its database has been
+  # migrated under it: it would refuse the schema it now finds, correctly.
+  # Copying the backup back is, and it needs no program to do it.
+  [ -n "$migrated" ] && [ -f "$migrated/hallvi.db" ] || return 0
+  if ! ensure_stopped; then
+    say "Hallvi is still running; the records were left alone. The copy taken before the upgrade is at $migrated" >&2
+    return 0
+  fi
+  # The migrator's own restore is the one that checks the copy against the
+  # schema it claims and stages it before replacing anything. Use it wherever
+  # a program that has it is still on disk — after the swap that is the new
+  # one, before the swap it is the unpacked archive.
+  for candidate in "$home" "$staging"; do
+    [ -n "$candidate" ] || continue
+    [ -x "$candidate/node/bin/node" ] || continue
+    [ -f "$candidate/app/scripts/migrate-state.mjs" ] || continue
+    if "$candidate/node/bin/node" \
+      "$candidate/app/scripts/migrate-state.mjs" --restore "$migrated"; then
+      migrated=""
+      return 0
+    fi
+    # It read the copy and refused it. This is the only thing here that checks a
+    # backup against the schema it claims, so putting the same file into place by
+    # hand would install exactly what it just rejected. Leave both untouched and
+    # say where the copy is.
+    say "The copy of your records was refused, so it was not put back. Your records are as the upgrade left them, and the copy is at $migrated" >&2
+    return 0
+  done
+  # Nothing on disk to run it with. There was a hand copy here once, for
+  # exactly this case; it is gone, because the only thing it could do is put a
+  # file nobody checked over the records — and it could only ever run when the
+  # installation was already in a state where that is the last thing to do.
+  say "No Hallvi on this machine can check the copy, so the records were left alone. The copy taken before the upgrade is at $migrated" >&2
+}
 cleanup() {
   result=$?
   trap - EXIT
-  if [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
+  # Nothing is replaced while anything might still be writing. This only
+  # applies when there is something to undo: a failure before anything was
+  # touched must leave a working service exactly as it found it.
+  recovery_stopped=yes
+  if [ "$committed" = no ] && { [ -n "$migrated" ] || [ -n "$backup" ]; }; then
+    ensure_stopped || recovery_stopped=no
+  fi
+  restore_records
+  if [ "$recovery_stopped" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
+    # Swapping the program directory while something may still be writing to it
+    # turns one failed upgrade into two broken installations. Keep both versions
+    # and let a person decide.
+    say "Hallvi could not be stopped, so the program was left as it is. This version is at $home and the previous one is at $backup" >&2
+  elif [ -n "$migrated" ] && [ -n "$backup" ] && [ -d "$backup" ]; then
+    # The records were migrated and could not be put back — restore_records
+    # clears $migrated when they were. Handing the old program an installation
+    # whose database has moved on gives it a schema it will refuse, correctly,
+    # which is an installation that cannot start rather than a rollback. Both
+    # versions stay, and so does the copy.
+    say "Your records are still at the schema the upgrade left them, so the program was not rolled back: the previous version cannot open them. This version is at $home, the previous one is at $backup, and the copy of your records is at $migrated" >&2
+  elif [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
     if [ -d "$home" ] && is_installation "$home"; then rm -rf "$home"; fi
     if [ ! -e "$home" ]; then
       mv "$backup" "$home"
@@ -147,6 +234,26 @@ if [ "$running" = yes ]; then
   fi
   stopped=yes
 fi
+# The records move to the schema this archive needs while nothing is running
+# and the old program is still in place, so a refusal here costs nothing. The
+# migration backs itself up first and prints where; if anything after this
+# fails, cleanup puts both the records and the program back.
+if [ "$upgrade" = yes ]; then
+  say "Checking the schema of the records"
+  # The output is read before the exit status is acted on: the copy is made,
+  # and its location printed, before anything is migrated, so a failure that
+  # happens afterwards must still leave cleanup knowing where to go back to.
+  migration_ok=yes
+  migration_output=$("$staging/node/bin/node" \
+    "$staging/app/scripts/migrate-state.mjs" --apply --data "$data" 2>&1) ||
+    migration_ok=no
+  printf '%s\n' "$migration_output"
+  migrated=$(printf '%s\n' "$migration_output" |
+    sed -n 's/^Backed up to //p' | tail -1)
+  [ "$migration_ok" = yes ] ||
+    fail "the records could not be migrated; nothing was replaced."
+fi
+
 if [ "$upgrade" = yes ]; then
   backup=$(mktemp -d "$HOME/.local/lib/hallvi.previous.XXXXXX")
   rmdir "$backup"
@@ -196,7 +303,7 @@ fi
 # refuses the whole connection when one forwarded port is taken. A remote
 # installation therefore starts on its own ports, which also makes its address
 # differ from a local one. An existing choice is never replaced.
-settings="$HOME/.local/share/hallvi/hallvi.env"
+settings="$data/hallvi.env"
 if [ "$upgrade" = no ] && [ "$use" = remote ] &&
   ! grep -q '^HALLVI_PORT=' "$settings" 2>/dev/null; then
   mkdir -p "$(dirname "$settings")"
@@ -213,6 +320,12 @@ else
   say "Installed. Hallvi was stopped before and stays stopped: hallvi start"
 fi
 committed=yes
+# Kept, not deleted: this is the only way back to the schema it came from, and
+# the old program archive alone cannot provide it.
+if [ -n "$migrated" ]; then
+  say "The records before this upgrade are kept at $migrated"
+  migrated=""
+fi
 if [ -n "$backup" ]; then rm -rf "$backup"; backup=""; fi
 
 if [ "$upgrade" = no ]; then

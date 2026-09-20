@@ -54,6 +54,17 @@ export function installedRelease(program) {
   }
 }
 
+/**
+ * Whether this release says it can take records in `schema`. The answer is
+ * the release's, not the reader's: a migration is written in the version that
+ * introduces the new schema, so an installation old enough to need one cannot
+ * have heard of it. `install.sh` checks the claim again from the unpacked
+ * archive, against the real database, before anything is replaced.
+ */
+export function migrates(manifest, schema) {
+  return (manifest.migratesFrom ?? []).includes(schema);
+}
+
 /** The schema version the program in `program` was built against. */
 export function programSchemaVersion(program) {
   try {

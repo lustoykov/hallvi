@@ -357,10 +357,11 @@ it("throws away a download whose bytes are not the ones the manifest named", asy
   expect(readFileSync(file)).toEqual(ARCHIVE);
 });
 
-it("blocks a release that needs another database schema, before anything is downloaded", () => {
+it("blocks a release whose schema nothing can reach, before anything is downloaded", () => {
   const program = programWith(join(root, "app"), "schema-version.json", {
     version: 15,
   });
+  // A release that does not say it can take schema 15 is a refusal.
   expect(
     blockedReason(program, {
       manifest: verified(manifestFor({ schemaVersion: 16 })),
@@ -370,7 +371,16 @@ it("blocks a release that needs another database schema, before anything is down
     blockedReason(program, {
       manifest: verified(manifestFor({ schemaVersion: 16 })),
     }),
-  ).toMatch(/no migration between them yet/);
+  ).toMatch(/does not say it can migrate them/);
+  // A release that says it takes schema 15 is not refused for its schema,
+  // whatever this older program's own list happens to contain.
+  const carried = blockedReason(program, {
+    manifest: verified(manifestFor({ schemaVersion: 18, migratesFrom: [15] })),
+  });
+  // Whatever it says, it is no longer about the schema: on this machine
+  // nothing is in the way, and on another only the missing package is.
+  expect(carried ?? "").not.toMatch(/schema/);
+
   // The same schema on the machine the package is built for: nothing in the
   // way. A Linux machine is told about the package, not about the schema.
   const reason = blockedReason(program, { manifest: verified(manifestFor()) });
@@ -379,6 +389,52 @@ it("blocks a release that needs another database schema, before anything is down
       ? null
       : "Release 0.1.0-alpha.2 has no package for linux-x64.",
   );
+});
+
+it("takes the release's word for what it can migrate, not its own list", () => {
+  // The scenario this exists for. The installed program is schema 18 and its
+  // own list knows only 15 to 18, because the 18-to-19 migration is written
+  // in the release that introduces 19. If eligibility came from the reader,
+  // every forward migration would be refused by the only program in a
+  // position to ask for it.
+  const program = programWith(join(root, "at18"), "schema-version.json", {
+    version: 18,
+  });
+  const offered = blockedReason(program, {
+    manifest: verified(
+      manifestFor({ schemaVersion: 19, migratesFrom: [18], version: "0.2.0" }),
+    ),
+  });
+  expect(offered ?? "").not.toMatch(/schema/);
+
+  // The same release saying nothing about schema 18 is refused.
+  expect(
+    blockedReason(program, {
+      manifest: verified(
+        manifestFor({
+          schemaVersion: 19,
+          migratesFrom: [15],
+          version: "0.2.0",
+        }),
+      ),
+    }),
+  ).toMatch(/does not say it can migrate them/);
+
+  // And a release from before the field existed can take only its own.
+  expect(
+    blockedReason(program, {
+      manifest: verified(manifestFor({ schemaVersion: 19, version: "0.2.0" })),
+    }),
+  ).toMatch(/does not say it can migrate them/);
+});
+
+it("refuses a release claiming to migrate from a schema newer than its own", () => {
+  expect(() =>
+    verified(manifestFor({ schemaVersion: 18, migratesFrom: [19] })),
+  ).toThrow(/lists schemas it cannot have migrated from/);
+  expect(() =>
+    verified(manifestFor({ schemaVersion: 18, migratesFrom: ["15"] })),
+  ).toThrow(/lists schemas it cannot have migrated from/);
 });
 
 it("says what a development checkout is, and never offers to replace it", () => {

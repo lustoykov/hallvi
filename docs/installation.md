@@ -130,7 +130,7 @@ server when needed.
 | Repository inspection says Docker is unavailable | Start the local Docker Engine and retry, or choose **On this computer** in **Settings → Workspace**. Hallvi never switches modes automatically. |
 | Linux service does not survive logout or start at boot | Check `~/.local/bin/hallvi status` and follow its lingering instruction. |
 | Linux reports that it cannot connect to the user service manager | Run from a normal login session for the installing user on a systemd machine, rather than through `sudo`. |
-| An update reports a schema mismatch | Keep the installed version and read [Update](#update). Do not delete the database to bypass the check. |
+| An update reports a schema mismatch | No migration joins those two versions. Keep the installed version and read [Update](#update). Do not delete the database to bypass the check. |
 | An update says the release is not signed by the key this Hallvi trusts | Stop. Nothing was downloaded. Check you are looking at [the real releases page](https://github.com/lustoykov/hallvi/releases), and tell the maintainer. |
 | An update says Pi is working | Let the conversation finish, then start the update again. The package it downloaded has already been checked. |
 | An update stopped without finishing | Hallvi is on the version it had. Read `~/.local/share/hallvi/logs/update.log`, then try again. |
@@ -355,13 +355,48 @@ between, so opening a page never waits on the network.
 **A development checkout** says what it is and offers nothing. `git` is how it
 changes.
 
-A new version that needs a different database schema is refused before anything
-is downloaded, naming both schemas. It is refused a second time by the
-installer, against the real database, before the program is replaced. If a
-running service meets an incompatible database later, it stops after reporting
-the mismatch instead of restarting for ever. Until migrations exist, the
-choices are to keep or reinstall the version that wrote the database, or to
-move the database aside and start fresh. Nothing deletes or rewrites it.
+**A new version that keeps its records in another schema** is either migrated
+or refused, and never guessed at. The release says which schemas it can take
+records from, in its signed manifest; the installation reading it is the older
+one and could not know about a migration written after it shipped.
+
+If it does not name yours, the release is refused before it is downloaded,
+naming both schemas, and the claim is checked again by the installer against
+the real database from
+[the list in the archive](../scripts/migrations.mjs). Keep or
+reinstall the version that wrote the database, or move the database aside and
+start fresh. Nothing deletes or rewrites it.
+
+If it does, the upgrade carries it out, in this order and no other:
+
+1. Pi stops taking new work, and says how much is still going on. Work in
+   progress stops the update rather than being interrupted.
+2. The package is downloaded and checked against the signed release.
+3. The service stops, so nothing is writing.
+4. Exactly the records the migration rewrites are copied and the copy is
+   reopened and verified. It is kept afterwards, and the installer says where.
+5. The migration runs, while the old program is still in place.
+6. The new program replaces the old one and starts, and the update is only
+   finished once the interface reports the installed revision and the worker
+   answers.
+
+**If step 5 or 6 fails**, the installer first stops the service and waits for
+the service manager to agree it is gone — a start that reported failure can
+leave a service loaded and being retried, and nothing is replaced while
+anything might still be writing. Then it puts the records back from the copy
+it made, the old program back from the one it kept, and starts it again.
+Putting the program back is not on its own a rollback: the old version would
+meet a database in a schema it does not know and refuse it, which is the
+correct refusal and not a recovery. If you ever need to do this by hand, the
+copy is under `migrations/` in the state directory and its `manifest.json`
+carries the exact command:
+
+```bash
+node ~/.local/lib/hallvi/app/scripts/migrate-state.mjs --restore <that directory>
+```
+
+If a running service meets a database it cannot open later, it stops after
+reporting the mismatch instead of restarting for ever.
 
 You can still install an archive by hand with `install-hallvi.sh`, which does
 the same thing without the release manifest.
@@ -429,9 +464,11 @@ do not share a database by default.
   acceptance remains open; each later archive needs its own trial.
 - macOS Intel, Linux arm64 and other Linux distributions have no prebuilt
   release target yet.
-- Installed self-update does not apply schema migrations (see [Update](#update)). An update to a
-  release needing another schema is refused; nothing migrates and nothing is
-  deleted.
+- Only the schema transitions in
+  [the list](../scripts/migrations.mjs) can be installed over existing records;
+  today that is 15 to 18. Any other difference is refused, and nothing is
+  migrated or deleted. A migration is carried forward only: going back is
+  restoring the copy the upgrade kept.
 - Updates are only ever started by the owner. There is no automatic
   installation, no scheduled one, and no way to ask for one.
 - One update at a time, and only the last attempt is remembered.
