@@ -167,6 +167,13 @@ cleanup() {
     # turns one failed upgrade into two broken installations. Keep both versions
     # and let a person decide.
     say "Hallvi could not be stopped, so the program was left as it is. This version is at $home and the previous one is at $backup" >&2
+  elif [ -n "$migrated" ] && [ -n "$backup" ] && [ -d "$backup" ]; then
+    # The records were migrated and could not be put back — restore_records
+    # clears $migrated when they were. Handing the old program an installation
+    # whose database has moved on gives it a schema it will refuse, correctly,
+    # which is an installation that cannot start rather than a rollback. Both
+    # versions stay, and so does the copy.
+    say "Your records are still at the schema the upgrade left them, so the program was not rolled back: the previous version cannot open them. This version is at $home, the previous one is at $backup, and the copy of your records is at $migrated" >&2
   elif [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
     if [ -d "$home" ] && is_installation "$home"; then rm -rf "$home"; fi
     if [ ! -e "$home" ]; then
