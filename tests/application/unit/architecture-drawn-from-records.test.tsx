@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { architectureFromRecords } from "@/components/hallvi/architecture-records";
 import {
+  BOX,
   JourneyDirection,
   layoutFor,
 } from "@/components/hallvi/architecture-prototype/journey-v2";
@@ -120,6 +121,18 @@ const startOf = (d: string) => {
   return { x: Number(x), y: Number(y) };
 };
 
+const door = (id: string, port: string, sources: string, open: boolean) =>
+  states(
+    { kind: "door", id },
+    {
+      title: open
+        ? `Port ${port} is open to everyone`
+        : `Port ${port} refuses from outside`,
+      facts: [fact("port", port), fact("sources", sources)] as never[],
+      checks: [check(open ? "open" : "refused", "passed")] as never[],
+    },
+  );
+
 const web = part("shop-web", "web", "Shop");
 const volume = part("shop-data", "volume", "Shop data");
 const service = part("shop-db", "private", "PostgreSQL");
@@ -220,6 +233,298 @@ describe("whether anything is watching", () => {
     const html = draw([topology([web] as never[])]);
     expect(html).toContain("Nothing is watching this");
     expect(html).toContain("Not assessed");
+  });
+});
+
+describe("the doors in the firewall", () => {
+  it("draws every way in on record, not only the first", () => {
+    // The map had two slots and put every non-SSH door in the first of them,
+    // so a second one kept its own id, got no place, and was never drawn.
+    const html = draw([
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      door("alt", "8443", "the office", true),
+    ]);
+    expect(html).toContain("443");
+    expect(html).toContain("8443");
+    expect(html).toContain("anywhere");
+    expect(html).toContain("the office");
+  });
+
+  it("draws a port that refuses, and says so in as many words", () => {
+    // This page is the overview. Leaving the port off had the firewall's own
+    // count referring to something nobody could see — and the fault was never
+    // that it was drawn, but that it was drawn as a peer of a port that
+    // answers, with only a missing gap in a dashed line telling them apart.
+    const html = draw([
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      door("postgres", "5432", "the container network", false),
+    ]);
+    expect(html).toContain("443");
+    expect(html).toContain("5432");
+    expect(html).toContain("1 open, 1 refused");
+    // It says "refused" rather than where it would admit from, which is what
+    // an open port says and is how the two came to read alike.
+    expect(html).toContain("refused");
+    expect(html).not.toContain("the container network");
+  });
+
+  it("says so when every port on record refuses", () => {
+    const html = draw([
+      topology([web] as never[]),
+      door("postgres", "5432", "the container network", false),
+    ]);
+    expect(html).toContain("5432");
+    // A finding, not the same as "rules not drawn", which reads as nobody
+    // having looked.
+    expect(html).toContain("1 refused");
+  });
+
+  it("does not count an unsuccessful check as an open or refused port", () => {
+    const records = [
+      topology([web] as never[]),
+      states(
+        { kind: "door", id: "unknown" },
+        {
+          title: "The port was checked without an answer",
+          facts: [fact("port", "8080")] as never[],
+          checks: [check("open", "failed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.find((part) => part.kind === "gate")?.admits,
+    ).toBe("unknown");
+    expect(draw(records)).toContain("1 unconfirmed");
+  });
+
+  it("uses the latest connection result when a door changes state", () => {
+    const records = [
+      topology([web] as never[]),
+      states(
+        { kind: "door", id: "site" },
+        {
+          at: EARLIER,
+          title: "The port refused",
+          checks: [check("refused", "passed")] as never[],
+        },
+      ),
+      states(
+        { kind: "door", id: "site" },
+        {
+          title: "The port answered",
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.find((part) => part.kind === "gate")?.admits,
+    ).toBe("open");
+  });
+
+  it("counts a port it had no room to draw rather than dropping it", () => {
+    // Eight doors is more than the wall's band can hold. A port the map
+    // cannot show is a port the reader cannot know about, so the count says
+    // how many are missing.
+    const many = Array.from({ length: 8 }, (_, index) =>
+      door(`d${index}`, `${9000 + index}`, "anywhere", true),
+    );
+    const model = modelOf([topology([web] as never[]), ...many]);
+    const layout = layoutFor(model);
+    expect(layout.undrawnGates).toBeGreaterThan(0);
+    const drawn = model.parts.filter(
+      (part) => part.kind === "gate" && layout.rects[part.id],
+    ).length;
+    expect(drawn + layout.undrawnGates).toBe(8);
+    expect(draw([topology([web] as never[]), ...many])).toContain(
+      `${layout.undrawnGates} more on record`,
+    );
+  });
+
+  it("counts a port that refuses as refused, not as a door that is open", () => {
+    const html = draw([
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      door("postgres", "5432", "the container network", false),
+    ]);
+    expect(html).toContain("1 open, 1 refused");
+  });
+
+  it("cuts the wall open for a door that admits and not for one that refuses", () => {
+    const shut = layoutFor(
+      modelOf([
+        topology([web] as never[]),
+        door("https", "443", "anywhere", true),
+        door("postgres", "5432", "the container network", false),
+      ]),
+    ).wall;
+    const openToo = layoutFor(
+      modelOf([
+        topology([web] as never[]),
+        door("https", "443", "anywhere", true),
+        door("alt", "8443", "anywhere", true),
+      ]),
+    ).wall;
+    // The two doorways the journeys cross are drawn either way; an extra
+    // door earns a third gap only by being open.
+    expect(shut.wall.split("M").length - 1).toBe(3);
+    expect(openToo.wall.split("M").length - 1).toBe(4);
+  });
+
+  it("reads a way in Pi called access, when that is what it wrote", () => {
+    const html = draw([
+      topology([web] as never[]),
+      states(
+        { kind: "access", id: "tunnel" },
+        {
+          title: "Reachable through the tunnel only",
+          facts: [fact("port", "8080"), fact("sources", "Hallvi")] as never[],
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ]);
+    expect(html).toContain("8080");
+  });
+
+  it("keeps a distinct access beside a door", () => {
+    const records = [
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      states(
+        { kind: "access", id: "tunnel" },
+        {
+          title: "The private way in",
+          facts: [fact("port", "8080")] as never[],
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.filter((part) => part.kind === "gate"),
+    ).toHaveLength(2);
+    expect(draw(records)).toContain("8080");
+  });
+
+  it("reads sources by their key when Pi gives the fact a human label", () => {
+    const records = [
+      topology([web] as never[]),
+      states(
+        { kind: "door", id: "private" },
+        {
+          title: "Private port",
+          facts: [
+            fact("port", "5432"),
+            {
+              key: "sources",
+              label: "Allowed from",
+              value: "the office network",
+              claim: "configuration",
+              basis: "observed",
+            } as never,
+          ] as never[],
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.find((part) => part.kind === "gate")?.sources,
+    ).toBe("the office network");
+    expect(draw(records)).toContain("the office network");
+  });
+
+  it("keeps a port that refuses off the path a visit travels", () => {
+    const layout = layoutFor(
+      modelOf([
+        topology([web] as never[]),
+        door("https", "443", "anywhere", true),
+        door("postgres", "5432", "the container network", false),
+      ]),
+    );
+    expect(layout.stops.visit).toContain("gate:http");
+    expect(layout.stops.visit).not.toContain("postgres");
+  });
+
+  it("says the rules are not drawn rather than counting zero", () => {
+    const html = draw([topology([web] as never[])]);
+    expect(html).toContain("rules not drawn");
+  });
+});
+
+describe("what a port leads to", () => {
+  const gate = (id: string, name: string) =>
+    ({ id, kind: "gate", name, role: "a way in", plain: "a way in" }) as never;
+  const service = part("db", "private", "PostgreSQL");
+
+  it("draws a wire to what a record says is behind the port", () => {
+    const layout = layoutFor(
+      modelOf([
+        topology(
+          [
+            web,
+            service,
+            gate("front", "Port 443"),
+            gate("dbp", "Port 5432"),
+          ] as never[],
+          [{ from: "dbp", to: "db", network: "private" }],
+        ),
+        door("front", "443", "anywhere", true),
+        door("dbp", "5432", "the office network", true),
+      ]),
+    );
+    const wire = layout.legs.visit
+      .flat()
+      .find((d) => d.startsWith(`M${BOX.http.x + BOX.http.w} `));
+    expect(wire, "a wire leaves the port that has an edge").toBeTruthy();
+  });
+
+  it("never infers it from the port's name", () => {
+    // A door Pi called `postgres` is not evidence that PostgreSQL is behind
+    // it. Only an edge says so.
+    const model = modelOf([
+      topology([web, service, gate("postgres", "Port 5432")] as never[], []),
+      door("postgres", "5432", "the office network", true),
+    ]);
+    const port = model.parts.find((one) => one.kind === "gate")!;
+    expect(port.serves).toBeUndefined();
+    expect(layoutFor(model).legs.visit.flat()).toHaveLength(1);
+  });
+
+  it("draws no wire out of a port that refuses", () => {
+    // What it would have reached is in its inspector. A line from it would
+    // draw a route nothing has travelled.
+    const model = modelOf([
+      topology(
+        [
+          web,
+          service,
+          gate("front", "Port 443"),
+          gate("dbp", "Port 5432"),
+        ] as never[],
+        [{ from: "dbp", to: "db", network: "private" }],
+      ),
+      door("front", "443", "anywhere", true),
+      door("dbp", "5432", "the office network", false),
+    ]);
+    const port = model.parts.find((one) => one.id === "dbp")!;
+    expect(port.serves).toBe("db");
+    expect(
+      layoutFor(model)
+        .legs.visit.flat()
+        .some((d) => d.startsWith(`M${BOX.http.x + BOX.http.w} `)),
+    ).toBe(false);
+  });
+
+  it("still draws a door on record that the map did not name", () => {
+    // Deriving doors used to stop entirely the moment the topology declared
+    // one gate, which silently dropped every other door on record.
+    const html = draw([
+      topology([web, gate("front", "Port 443")] as never[]),
+      door("front", "443", "anywhere", true),
+      door("stray", "9090", "anywhere", true),
+    ]);
+    expect(html).toContain("443");
+    expect(html).toContain("9090");
   });
 });
 

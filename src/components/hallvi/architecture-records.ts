@@ -314,6 +314,33 @@ function list(names: string[]) {
 type MapPart = Topology["parts"][number];
 
 /**
+ * Whether a way in is open, or a port that refuses.
+ *
+ * The check Pi wrote answers this and nothing else does: the application's own
+ * reach is a different question, and reading one as the other is how a
+ * database port that refuses from outside would have been counted among the
+ * doors that are open.
+ */
+function admitsOf(
+  records: SavedInformation[],
+  part: { id: string; kind: Part["kind"] },
+): NonNullable<Part["admits"]> {
+  const ref = refFor(records, part);
+  if (!ref) return "unknown";
+  // The newest connection observation decides. A failed `open` check does
+  // not establish an open port, and an older refusal cannot overrule a newer
+  // successful connection (or vice versa).
+  const observation = [...currentChecks(records, ref).entries()].find(
+    ([key]) => key === "open" || key === "refused",
+  );
+  return observation?.[1].value.status === "passed"
+    ? observation[0] === "open"
+      ? "open"
+      : "refused"
+    : "unknown";
+}
+
+/**
  * What the records know that this application's map does not name.
  *
  * A topology is composition: Pi writes what the application is made of. The
@@ -332,6 +359,8 @@ type MapPart = Topology["parts"][number];
 function fromRecords(
   records: SavedInformation[],
   declared: Set<string>,
+  /** Part ids the topology already names, so a door is not drawn twice. */
+  named: Set<string>,
   now: number,
 ): MapPart[] {
   const found: MapPart[] = [];
@@ -353,6 +382,47 @@ function fromRecords(
         role: "the machine this runs on",
         plain: "the server everything here runs on",
       });
+  }
+
+  {
+    // Every door, not the first one, and not all-or-nothing either.
+    //
+    // A map that drew one and said nothing about the other is the map
+    // claiming a shape the records contradict — and the one it dropped was
+    // the database port, which is the one a reader most wants the state of.
+    // Skipping every door the moment the topology declared one had the same
+    // effect by a different route: Pi naming one gate silently dropped every
+    // other door on record.
+    //
+    // A way in is a door; Pi may reasonably speak of the tunnel through it as
+    // access instead, and the two are the same thing on the map. So whichever
+    // Pi chose is read, and not both — the alternative is one way in drawn
+    // twice under two names.
+    const doors = subjectsOfKind(records, "door");
+    const doorIds = new Set(doors.map((ref) => ref.id));
+    // A door and an access record with the same id describe one way in;
+    // distinct access records still describe distinct ways in.
+    const waysIn = [
+      ...doors,
+      ...subjectsOfKind(records, "access").filter(
+        (ref) => !doorIds.has(ref.id),
+      ),
+    ];
+    for (const ref of waysIn) {
+      if (named.has(ref.id)) continue;
+      const presence = presenceOf(records, ref);
+      if (!presence.known || presence.presence !== "present") continue;
+      const port = currentFacts(records, ref).get("port")?.value.value;
+      found.push({
+        id: ref.id,
+        kind: "gate",
+        name: port ? `Port ${port}` : ref.id,
+        // Pi's own sentence about this port, which is what the card's
+        // second line and the inspector both read.
+        role: presence.record.title,
+        plain: presence.record.title,
+      });
+    }
   }
 
   if (!declared.has("monitor")) {
@@ -470,6 +540,7 @@ export function architectureFromRecords({
     ...fromRecords(
       records,
       new Set(map.value.parts.map((part) => part.kind)),
+      new Set(map.value.parts.map((part) => part.id)),
       now,
     ),
   ];
@@ -525,6 +596,19 @@ export function architectureFromRecords({
       // described the thing that is gone; it is in the series, not here.
       facts: evidence.certainty === "absent" ? [] : facts,
       evidence,
+      admits: part.kind === "gate" ? admitsOf(records, part) : undefined,
+      sources:
+        part.kind === "gate"
+          ? (factOf(records, part, "sources") ?? undefined)
+          : undefined,
+      // What a port leads to, from the edge leaving it — the same move the
+      // disk edge makes for a volume's owner. Never from the port number or
+      // the subject's name: a door Pi called `postgres` is not evidence that
+      // PostgreSQL is behind it.
+      serves:
+        part.kind === "gate"
+          ? edges.find((edge) => edge.from === slots.get(part.id))?.to
+          : undefined,
       destination: destinations[part.kind as Part["kind"]],
       // Hallvi and the repository have no state of their own to tag.
       quiet: part.kind === "controller",
