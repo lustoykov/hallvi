@@ -10,6 +10,7 @@
 // account id, because pointing a name at a server needs none of them.
 
 import { useEffect, useRef, useState } from "react";
+import { SpinnerGap } from "@phosphor-icons/react";
 
 import {
   Away,
@@ -113,6 +114,36 @@ export interface DomainProgress {
   guideAt: number;
 }
 
+function LookupStatus({ stage }: { stage: "dns" | "cloudflare" }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="hv-ob-lookup-status">
+      <SpinnerGap className="spin" aria-hidden="true" />
+      <div role="status">
+        <strong>
+          {stage === "dns"
+            ? "Finding your domain’s DNS provider…"
+            : "Checking your saved Cloudflare connection…"}
+        </strong>
+        <p>
+          {elapsed >= 10
+            ? "This is taking longer than usual. You can leave this for later; your current address keeps working."
+            : "This only checks access. It does not change your domain."}
+        </p>
+      </div>
+      <span aria-hidden="true">{elapsed}s</span>
+    </div>
+  );
+}
+
 export function DomainConnect({
   application,
   serverAddress,
@@ -137,7 +168,10 @@ export function DomainConnect({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState(progress.name);
-  const [looking, setLooking] = useState(false);
+  const [lookupStage, setLookupStage] = useState<"dns" | "cloudflare" | null>(
+    null,
+  );
+  const looking = lookupStage !== null;
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<CloudflareOutcome | null>(null);
   // A Cloudflare connection made earlier that already covers this zone.
@@ -178,14 +212,15 @@ export function DomainConnect({
       .replace(/^https?:\/\//, "")
       .replace(/\/.*$/, "");
     if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(wanted)) return;
-    setLooking(true);
+    setLookupStage("dns");
     const found = await transport.whoHostsDns(wanted);
+    if (found.kind === "cloudflare") setLookupStage("cloudflare");
     const held =
       found.kind === "cloudflare"
         ? await transport.existingCloudflare(found.zone)
         : null;
     setExisting(held?.kind === "connected" ? held.edit : null);
-    setLooking(false);
+    setLookupStage(null);
     onProgress({
       name: wanted,
       host: found,
@@ -247,20 +282,22 @@ export function DomainConnect({
           Not now
         </button>
       </form>
+      {lookupStage && <LookupStatus stage={lookupStage} />}
       <p className="hv-ob-fine">
         No domain yet? Buy one from any registrar first; this can wait, and the
         current address keeps working.
       </p>
 
-      {host?.kind === "unreachable" && (
-        <Problem title="Public DNS could not be asked from this computer">
+      {!looking && host?.kind === "unreachable" && (
+        <Problem title="The DNS lookup didn’t finish">
           <p>
-            That says nothing about {name}. Check the internet connection and
-            look it up again.
+            Hallvi couldn’t get a DNS answer for {name}. The network or DNS
+            service may be unavailable. Your domain hasn’t changed; try again in
+            a moment.
           </p>
         </Problem>
       )}
-      {host?.kind === "unregistered" && (
+      {!looking && host?.kind === "unregistered" && (
         <Problem title={`Nobody answers for ${zone}`}>
           <p>
             Public DNS has no name servers for it, which usually means a typo or
