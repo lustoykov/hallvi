@@ -299,8 +299,9 @@ note explains why.
 
 <a id="upgrade"></a>
 
-Hallvi updates itself. Open **Settings**, find **This Hallvi**, and press
-**Check for updates**, then **Update to …**. Or, in a terminal:
+Hallvi updates itself. Its version sits at the bottom of the sidebar, under
+**Settings**; when a release is waiting it says **Update available** under it.
+Click that line and press **Update**. Or, in a terminal:
 
 ```bash
 hallvi update            # look, then ask before installing
@@ -309,8 +310,8 @@ hallvi update --yes      # install without the question
 hallvi update --status   # what the last attempt did
 ```
 
-They are the same update. Settings and the command find the release the same
-way, check it the same way, and hand the work to the same installer; the
+They are the same update. The sidebar and the command find the release the
+same way, check it the same way, and hand the work to the same installer; the
 command adds only a question with a yes and a line per step.
 
 **What happens.** Hallvi looks for the newest release on the `alpha` channel
@@ -329,8 +330,8 @@ update returns the service to the state it found: running if it was running,
 stopped if you had stopped it. Unsent text in a conversation is kept too.
 
 **Where it is installed.** The machine running Hallvi. Reached through an SSH
-connection from a laptop, Settings updates the machine at the other end, keeps
-its ports, and the page comes back on the same address when it restarts.
+connection from a laptop, it updates the machine at the other end, keeps its
+ports, and the page comes back on the same address when it restarts.
 
 **While Pi is working.** Downloading happens alongside whatever Pi is doing.
 Installing does not: before the service stops, Hallvi asks the worker to take
@@ -342,8 +343,8 @@ finish and start the update again.
 **When it fails.** Anything that can be checked is checked while the old
 version is still serving, so a refusal changes nothing. If the new version is
 installed but does not start, the installer puts the previous program back and
-starts it, and Settings and `hallvi update --status` say which version you are
-on. The helper's own account is in `~/.local/share/hallvi/logs/update.log`.
+starts it, and both the sidebar and `hallvi update --status` say which version
+you are on. The helper's own account is in `~/.local/share/hallvi/logs/update.log`.
 
 Only one update runs at a time; a second is told what the first is doing.
 Installing is always something you press: Hallvi never replaces itself on its

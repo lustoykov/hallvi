@@ -15,7 +15,8 @@ Download the archive for your machine from
 [Releases](https://github.com/lustoykov/hallvi/releases), with its `.sha256`
 and `install-hallvi.sh`, and run the installer. You do not need to clone this
 repository or install Node.js, npm, Python or a compiler. Once it is installed,
-**Settings → This Hallvi** or `hallvi update` installs the next release.
+the version at the bottom of the sidebar, or `hallvi update`, installs the
+next release.
 
 **Alpha:** the first release has not been published yet, so that page is empty
 and the maintainer still supplies the three files by hand. Publishing one is

@@ -32,6 +32,8 @@ Archives, both built on the platform they run on:
 | `0.2.0-alpha.2` | `a5ebcef4` | Ubuntu 24.04 x64, and Apple silicon |
 | `0.2.0-alpha.3` | `a5ebcef4` | Ubuntu 24.04 x64 |
 | `0.2.0-alpha.4`, `0.2.0-alpha.5` | `146a7819` | Ubuntu 24.04 x64 |
+| `0.3.0-alpha.1`, `0.3.0-alpha.2` | `8bd12548` | Ubuntu 24.04 x64 |
+| `0.3.0-alpha.3`, `0.3.0-alpha.4` | `b2a7ccad` | Ubuntu 24.04 x64 |
 
 Each Linux archive is 278 MB and carries Node.js 22.23.2, the built interface,
 the Pi worker and production dependencies with both native modules.
@@ -92,9 +94,10 @@ laptop already had another Hallvi forwarding 5747, so this installation was
 moved with `hallvi port 6747` first — the collision the guide describes, and
 its answer.
 
-Settings → **This Hallvi** showed the version, revision and machine, then
-**Check for updates** offered `0.2.0-alpha.3` with its size and release notes.
-**Update to 0.2.0-alpha.3** ran it in the card: *Verifying* → *Installing* →
+The control was a card in Settings at the time of this run; it has since moved
+to the sidebar, and the later runs below used it there. Either way it showed
+the version, revision and machine, offered `0.2.0-alpha.3` with its size and
+release notes, and ran the update in place: *Verifying* → *Installing* →
 *Updated · Hallvi 0.2.0-alpha.3 is running on http://127.0.0.1:6747.* The same
 tab, the same address; the remote machine was updated, not the laptop, and
 `HALLVI_PORT=6747` survived.
@@ -123,12 +126,28 @@ from the finished branch: `0.2.0-alpha.4` (`146a7819`) installed over
 from the same commit and published so the running product could be seen with a
 release waiting.
 
-In the running product, on that build: the **Update available** link sits on
-its own line under the machine name and is no longer a link inside the brand
-link — which is not markup a browser keeps; and typing into an unconnected
-first conversation no longer summons a strip repeating what the welcome and
-the composer's placeholder already say. The same unsent draft was still in the
-composer, four updates after it was typed.
+In the running product, on that build: the **Update available** link was no
+longer a link inside the brand link — which is not markup a browser keeps; and
+typing into an unconnected first conversation no longer summons a strip
+repeating what the welcome and the composer's placeholder already say. The
+same unsent draft was still in the composer, four updates after it was typed.
+
+### Where the version ended up
+
+On review, the card in Settings read like a sixth provider account, which is
+not what Hallvi's own version is. It moved to the chrome: one dim line under
+**Settings** at the bottom of the sidebar, **Update available** under it only
+while a release is waiting, the phase on that line while an update runs, and a
+small panel — revision, machine, channel, last looked, the offer, **Update**
+and **Check for updates** — when the line is clicked. Settings went back to
+the six accounts.
+
+That move was installed and read in the running product too, over four more
+updates (`0.3.0-alpha.1` through `0.3.0-alpha.4`, all from `b2a7ccad` and
+`8bd12548`). It found one layout defect on the way: `.hv-application-navigation
+button` gives every button in that sidebar a row's height and type size, which
+outranked these rules and cut the version to an ellipsis the moment the second
+line appeared. Scoped past it and stacked.
 
 ### Releases that must not be installed
 

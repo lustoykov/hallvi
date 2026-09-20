@@ -59,7 +59,7 @@ export function runningRelease() {
   return installedRelease(program());
 }
 
-/** Everything the Settings card shows. `check` is the owner asking. */
+/** Everything the version line shows. `check` is the owner asking. */
 export function releaseState({ check = false } = {}): Promise<ReleaseState> {
   return releaseView({
     program: program(),

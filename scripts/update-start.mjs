@@ -1,11 +1,11 @@
 // Deciding whether to update, and handing the work over.
 //
-// `hallvi update` and the Settings card are the same thing said twice, so the
-// deciding happens once, here: which release is available, whether it can be
-// installed on this machine at all, and what the owner is agreeing to. Both
-// callers then start the same helper, which runs the same installer. A command
-// that took a different path would be a second update mechanism with its own
-// bugs, and only one of the two would be the one that was tested.
+// `hallvi update` and the version line in the sidebar are the same thing said
+// twice, so the deciding happens once, here: which release is available,
+// whether it can be installed on this machine at all, and what the owner is
+// agreeing to. Both callers then start the same helper, which runs the same
+// installer. A command that took a different path would be a second update
+// mechanism with its own bugs, and only one of the two would be tested.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
@@ -112,7 +112,7 @@ function sizeOf(candidate) {
   }
 }
 
-/** Everything the Settings card and `hallvi update` both read. */
+/** Everything the version line and `hallvi update` both read. */
 export async function releaseView({
   program,
   data,

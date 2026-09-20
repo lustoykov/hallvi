@@ -397,7 +397,7 @@ From another computer, run both commands from: hallvi remote`,
 }
 
 /**
- * The same update the Settings card starts, said in a terminal.
+ * The same update the interface starts, said in a terminal.
  *
  * It is deliberately the same code: `releaseView` and `startUpdate` are what
  * the interface calls, the helper it starts is the same helper, and the
@@ -569,7 +569,7 @@ if (Object.hasOwn(commands, command)) {
   port [number]
              show the interface port, or move every port to a new number
   update [--check | --status | --yes]
-             install the newest release, the way Settings does
+             install the newest release, as the interface does
   uninstall  remove the program and the service; keep all state`);
   process.exitCode = command ? 1 : 0;
 }
