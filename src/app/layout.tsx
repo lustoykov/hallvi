@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { HostTitle } from "@/components/hallvi/host-name";
 import { StandInNotice } from "@/components/hallvi/stand-in-notice";
 
 import "./globals.css";
@@ -41,6 +42,7 @@ export default function RootLayout({
         </aside>
         <div className="hv-app-content">{children}</div>
         <StandInNotice />
+        <HostTitle />
       </body>
     </html>
   );

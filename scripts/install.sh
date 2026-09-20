@@ -4,7 +4,8 @@
 #
 #   program   ~/.local/lib/hallvi     replaced on every install
 #   command   ~/.local/bin/hallvi
-#   state     ~/.local/share/hallvi   never touched by install or uninstall
+#   state     ~/.local/share/hallvi   never touched by install or uninstall,
+#                                       except a first remote port (below)
 #   model     ~/.config/hallvi/pi     never touched by install or uninstall
 #
 # Node.js and native dependencies are already inside this platform archive.
@@ -160,6 +161,50 @@ exec "$home/node/bin/node" "$home/app/scripts/cli.mjs" "\$@"
 EOF
 chmod +x "$bin/hallvi"
 
+# Where Hallvi will be used decides which address to hand over, and nothing
+# here can know it: a Mac mini has a desktop and is still used from a laptop.
+# So a new installation asks once. Being signed in over SSH, or having no
+# display, only chooses which answer Enter gives. HALLVI_USE=here|remote
+# answers for a scripted installation.
+use=${HALLVI_USE:-}
+if [ "$upgrade" = no ] && [ -z "$use" ]; then
+  if [ -n "${SSH_CONNECTION:-}" ] ||
+    { [ "$os" = linux ] && [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; }; then
+    use=remote
+  else
+    use=here
+  fi
+  if ( : <>/dev/tty ) 2>/dev/null; then
+    {
+      say ""
+      say "Where will you use Hallvi?"
+      say "  It only listens on this computer, so another computer reaches it"
+      say "  through a private SSH connection."
+      say "  1) On this computer"
+      say "  2) From another computer"
+      printf 'Choose 1 or 2 [%s]: ' "$([ "$use" = remote ] && echo 2 || echo 1)"
+    } >/dev/tty
+    read -r answer </dev/tty || answer=""
+    case "$answer" in
+      1) use=here ;;
+      2) use=remote ;;
+    esac
+  fi
+fi
+
+# A computer that uses Hallvi remotely often runs one of its own, and ssh
+# refuses the whole connection when one forwarded port is taken. A remote
+# installation therefore starts on its own ports, which also makes its address
+# differ from a local one. An existing choice is never replaced.
+settings="$HOME/.local/share/hallvi/hallvi.env"
+if [ "$upgrade" = no ] && [ "$use" = remote ] &&
+  ! grep -q '^HALLVI_PORT=' "$settings" 2>/dev/null; then
+  mkdir -p "$(dirname "$settings")"
+  chmod 700 "$(dirname "$settings")"
+  printf 'HALLVI_PORT=5747\n' >>"$settings"
+  chmod 600 "$settings"
+fi
+
 # A new installation starts. An upgrade returns to the state it found.
 if [ "$upgrade" = no ] || [ "$was_running" = yes ]; then
   "$bin/hallvi" start ||
@@ -172,16 +217,18 @@ if [ -n "$backup" ]; then rm -rf "$backup"; backup=""; fi
 
 if [ "$upgrade" = no ]; then
   browser_url=$("$bin/hallvi" url)
-  if [ -n "${SSH_CONNECTION:-}" ] ||
-    { [ "$os" = linux ] && [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; }; then
-    say "Hallvi is ready on this machine. To continue in your laptop browser:"
-    say "  $bin/hallvi remote $(id -un)@server-address"
-    say "Follow its SSH instructions, then open $browser_url on the laptop."
+  if [ "$use" = remote ]; then
+    say ""
+    "$bin/hallvi" remote
+    say ""
+    say "See this again any time: $bin/hallvi remote"
   elif [ "$os" = darwin ]; then
     open "$browser_url" || say "Open $browser_url in your browser."
   elif command -v xdg-open >/dev/null 2>&1; then
     xdg-open "$browser_url" >/dev/null 2>&1 ||
       say "Open $browser_url in your browser."
+  else
+    say "Open $browser_url in your browser."
   fi
 fi
 

@@ -23,7 +23,11 @@ import { homedir, hostname, userInfo } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedPorts, installedPorts } from "./installed-ports.mjs";
+import {
+  installedPorts,
+  remoteAccess,
+  saveInstalledPort,
+} from "./installed-ports.mjs";
 import { foreignService } from "./service-owner.mjs";
 import { workerSocketPath } from "./worker-socket.mjs";
 import {
@@ -323,35 +327,66 @@ function logs() {
 }
 
 /**
- * What to put on the machine with the browser when Hallvi is on another.
+ * What to run on the computer with the browser when Hallvi is on another.
  * Every port is forwarded to the same number because pages name them: the
  * terminal connects to 127.0.0.1 on its port, and a private application link
- * is http://127.0.0.1 on the port it was opened on.
+ * is http://127.0.0.1 on the port it was opened on. Only an SSH connection
+ * reaches them; nothing here listens beyond this machine's loopback.
  */
 function remote() {
-  const target = process.argv[3] ?? `${userInfo().username}@${hostname()}`;
+  const options = process.argv.slice(3);
+  // Signed in over SSH, the address the owner reached is one that works.
+  const reached = process.env.SSH_CONNECTION?.split(" ")[2];
+  const target =
+    options.find((option) => !option.startsWith("--")) ??
+    `${userInfo().username}@${reached ?? hostname()}`;
   const [user, address] = target.includes("@")
     ? target.split("@")
     : [userInfo().username, target];
   const ports = installedPorts();
-  console.log(`# Add to ~/.ssh/config on the machine with your browser:
+  const access = remoteAccess({ user, address, name: hostname(), ports });
+  if (options.includes("--config")) return console.log(access.config);
+  console.log(`Hallvi runs on ${hostname()} and listens only on this machine.
+On the computer with your browser, run this once:
 
-Host hallvi
-  HostName ${address}
-  User ${user}
-  ExitOnForwardFailure yes
-  ServerAliveInterval 30
-${forwardedPorts(ports)
-  .map((port) => `  LocalForward 127.0.0.1:${port} 127.0.0.1:${port}`)
-  .join("\n")}
+  ${access.setup}
 
-# Then keep this running while you use Hallvi:
-#   ssh -N hallvi
-# and open http://127.0.0.1:${ports.web}
-#
-# ${ports.web} is the interface, ${ports.terminal} the browser terminal, and ${ports.privateFirst}-${ports.privateLast} are
-# where private application links open. Hallvi listens on this machine's
-# loopback only; this SSH connection is the only way in.`);
+Then, now and whenever the connection drops:
+
+  ${access.connect}
+
+and open ${access.url}
+
+It stays open and says nothing while it is connected. It carries the interface
+(${ports.web}), the browser terminal (${ports.terminal}) and private application links
+(${ports.privateFirst}-${ports.privateLast}) together, to the same numbers on your computer.
+
+If ssh says an address is already in use, something on that computer has one
+of those ports — often another Hallvi. Leave it running and move this one:
+  hallvi port ${ports.web + 1000}
+then run both commands above again.`);
+}
+
+/**
+ * Moves every port at once. They travel together because pages name them, so
+ * changing the interface's alone would leave the terminal and private links
+ * pointing at ports nobody forwards.
+ */
+function port() {
+  const next = process.argv[3];
+  if (!next) return console.log(installedPorts().web);
+  ownService();
+  const ports = saveInstalledPort(state.settings, next);
+  process.env.HALLVI_PORT = String(ports.web);
+  const running = loaded();
+  if (running) {
+    stop();
+    start();
+  }
+  console.log(
+    `Hallvi uses ${ports.web}, ${ports.terminal} and ${ports.privateFirst}-${ports.privateLast}${running ? " and has restarted" : ""}. Applications and history are unchanged.
+From another computer, run both commands from: hallvi remote`,
+  );
 }
 
 function uninstall() {
@@ -385,6 +420,7 @@ const commands = {
   url: () => console.log(`http://127.0.0.1:${installedPorts().web}`),
   logs,
   remote,
+  port,
   uninstall,
 };
 const command = process.argv[2];
@@ -405,7 +441,9 @@ if (Object.hasOwn(commands, command)) {
   url        browser address on the machine using Hallvi
   logs [-f]  what the service has printed
   remote [user@host]
-             SSH settings for using this installation from another machine
+             the two commands for using this installation from another computer
+  port [number]
+             show the interface port, or move every port to a new number
   uninstall  remove the program and the service; keep all state`);
   process.exitCode = command ? 1 : 0;
 }
