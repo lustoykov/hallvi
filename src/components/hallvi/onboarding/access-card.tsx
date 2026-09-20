@@ -124,7 +124,7 @@ export function ReachLadder({
         <Rung
           icon={<Laptop />}
           title="Only this computer"
-          where="A private link. It works in a browser on the computer running Hallvi, while Hallvi is running. Nothing on the server is open to anyone else."
+          where="A private link. It works in a browser on the computer running Hallvi, for as long as the SSH tunnel stays open — which outlasts Hallvi itself, so quitting does not close it. Nothing on the server is open to anyone else."
           url={privateUrl}
           current={reach === "private"}
         />
