@@ -113,8 +113,14 @@ copy.
 
 ## Seeding
 
-There is no seed command for this environment, deliberately. The retained data
-is the starting point, and a command that wrote sample rows into four live
+**A fresh checkout** — one without those four lines — starts empty and stays
+explicit: `npm run db:push` creates the tables and stamps the schema. It
+refuses a database that already holds tables at another schema rather than
+rewriting it, so running it twice is safe and running it over somebody's
+records is not possible.
+
+**This environment has no seed command**, deliberately. The retained data is
+the starting point, and a command that wrote sample rows into four live
 applications would be manufacturing history.
 
 `npm run scenarios` remains what it was: it builds its **own** database from
