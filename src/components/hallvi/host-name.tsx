@@ -3,9 +3,10 @@
 // Which Hallvi this is.
 //
 // A controller is opened at a loopback address, on the machine itself or
-// through an SSH connection from another one, and nothing on the page said
-// which. With two installations that is two identical tabs. The machine's name
-// goes in the tab title and beside the product name, quietly, everywhere.
+// through an SSH connection from another one, and nothing said which. With two
+// installations that is two identical tabs, so the machine's name goes in the
+// tab title, where two tabs are told apart. The version at the foot of the
+// sidebar names it too, for anyone who asks the page itself.
 
 import { useEffect, useState } from "react";
 
@@ -45,30 +46,6 @@ function useThisHallvi() {
 
 export function useHostName() {
   return useThisHallvi().name;
-}
-
-/** "on mac-mini", for beside the product name. Nothing until it is known. */
-export function HostName({ className }: { className?: string }) {
-  const name = useHostName();
-  if (!name) return null;
-  return (
-    <span className={className} title={`This Hallvi runs on ${name}`}>
-      on {name}
-    </span>
-  );
-}
-
-/**
- * ", on mac-mini", to finish a sentence that has already said "Hallvi".
- *
- * The alpha notice is the one place on every page that names the product, so
- * the machine belongs in it rather than beside a second copy of the name. The
- * comma goes with the name: until it is known there is nothing here at all.
- */
-export function OnThisMachine() {
-  const name = useHostName();
-  if (!name) return null;
-  return <>, on {name}</>;
 }
 
 /**

@@ -270,8 +270,9 @@ ssh -F ~/.ssh/hallvi-mac-mini -N mac-mini
 The second command stays open and says nothing while it is connected. Every
 forward explicitly binds the laptop's `127.0.0.1`, even when its SSH defaults
 allow forwarded ports on other interfaces. Open the address the installer
-printed, for example <http://127.0.0.1:5747>. The tab title and the line beside
-the product name say which machine you have reached. A private application
+printed, for example <http://127.0.0.1:5747>. The tab title says which machine
+you have reached, and so does the version at the foot of the sidebar when you
+click it. A private application
 link Pi opens, for example `http://127.0.0.1:5757`, works in the laptop's
 browser as it is written. Connecting ChatGPT and GitHub uses device codes, so
 both work through the same connection with nothing further to forward. If the
