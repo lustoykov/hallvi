@@ -39,7 +39,10 @@ export function ChatgptConnect({
   settingsHref,
   onConnected,
   onClose,
+  plain = false,
 }: {
+  /** Outside a conversation, where nobody asked: no "Hallvi asks" line. */
+  plain?: boolean;
   /** Settings, carrying the conversation to come back to. */
   settingsHref: string;
   /** A login is saved: the composer can send. */
@@ -112,7 +115,10 @@ export function ChatgptConnect({
 
   if (status?.ready)
     return (
-      <Receipt title="ChatGPT login saved · checked with your first message">
+      <Receipt
+        plain={plain}
+        title="ChatGPT login saved · checked with your first message"
+      >
         <p>
           Nothing has been sent. If ChatGPT refuses the login, the conversation
           says so and keeps your message.{" "}
@@ -124,6 +130,7 @@ export function ChatgptConnect({
   if (!status)
     return (
       <RequestCard
+        plain={plain}
         asks="needs a model to think with"
         state="waiting"
         label="Connect ChatGPT"
@@ -164,6 +171,7 @@ export function ChatgptConnect({
 
   return (
     <RequestCard
+      plain={plain}
       asks="needs a model to think with"
       state={pending(attempt) ? "working" : failed ? "failed" : "waiting"}
       label="Connect ChatGPT"

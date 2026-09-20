@@ -18,6 +18,11 @@ const GAPS = ["An R2 Access Key ID", "Its Secret Access Key"];
 
 function facts(overrides: Partial<ConnectionFacts> = {}): ConnectionFacts {
   return {
+    own: {
+      model: { saved: false, issue: null },
+      github: { account: null, issue: null, signIn: true },
+      workspace: { isolation: "direct", problem: null },
+    },
     hetznerConnected: false,
     cloudflare: {
       connected: false,
@@ -42,13 +47,23 @@ describe("what a connection row offers", () => {
     expect(
       rows.map((item) => [item.id, item.action.kind, item.action.label]),
     ).toEqual([
+      ["chatgpt", "form", "Connect ChatGPT"],
+      ["github", "form", "Connect GitHub"],
+      ["workspace", "link", "Change"],
       ["hetzner", "form", "Connect"],
       ["cloudflare", "form", "Connect"],
       ["r2-uploads", "form", "Connect"],
     ]);
     expect(
       rows.map((item) => (item.action.kind === "form" ? item.action.form : "")),
-    ).toEqual(["hetzner", "cloudflare", "backup-storage"]);
+    ).toEqual([
+      "chatgpt",
+      "github",
+      "",
+      "hetzner",
+      "cloudflare",
+      "backup-storage",
+    ]);
   });
 
   it("keeps the management token and the backup key apart", () => {
@@ -156,5 +171,49 @@ describe("a row that needs an application never chooses one", () => {
     for (const item of connectionRows(several))
       if (item.action.kind === "link")
         expect(item.action.href).not.toMatch(/\/applications\/[^n]/);
+  });
+});
+
+// Hallvi's own two accounts are rows like any other, and they must not claim
+// more than is established: a saved model login has not been used yet, and a
+// release without the GitHub App cannot offer a sign-in that does not exist.
+describe("Hallvi's own accounts", () => {
+  const own = (overrides: Partial<ConnectionFacts["own"]>) =>
+    facts({
+      own: {
+        model: { saved: true, issue: null },
+        github: { account: "owner", issue: null, signIn: true },
+        workspace: { isolation: "direct", problem: null },
+        ...overrides,
+      },
+    });
+
+  it("says a saved model login is checked on send, not that it works", () => {
+    const saved = row(own({}), "chatgpt");
+    expect(saved.state).toBe("connected");
+    expect(saved.detail).toContain("checks it when you send");
+    expect(saved.detail).not.toMatch(/working|verified/i);
+    expect(
+      row(own({ model: { saved: false, issue: null } }), "chatgpt"),
+    ).toMatchObject({
+      state: "not-connected",
+      action: { kind: "form", form: "chatgpt", label: "Connect ChatGPT" },
+    });
+  });
+
+  it("separates a missing GitHub sign-in from a release that has none", () => {
+    const absent = (signIn: boolean) =>
+      row(own({ github: { account: null, issue: null, signIn } }), "github");
+    expect(absent(true).action).toMatchObject({ label: "Connect GitHub" });
+    expect(absent(false).detail).toContain("release can’t sign in");
+    expect(absent(false).detail).toContain("Public repositories still work");
+    // Never an action that this release cannot carry out.
+    expect(absent(false).action).not.toMatchObject({ label: "Connect GitHub" });
+  });
+
+  it("keeps the account separate from one repository's access", () => {
+    const connected = row(own({}), "github");
+    expect(connected.detail).toContain("Signed in as owner");
+    expect(connected.note).toContain("its own conversation");
   });
 });

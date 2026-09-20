@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ChatgptConnect } from "./onboarding/chatgpt-connect";
+import { GithubConnect } from "./onboarding/github-connect";
 import { ProviderTokenForm } from "./provider-token-form";
 import type { SetupReturn } from "@/server/setup-return";
 import { SettingsNav } from "./settings-nav";
@@ -13,7 +15,13 @@ import { BackupStorageForm } from "./backup-storage-form";
 import s from "./pi-setup-screen.module.css";
 
 /** A credential this page can take, on this page, in a field. */
-export type ConnectionForm = "hetzner" | "cloudflare" | "backup-storage";
+export type ConnectionForm =
+  | "hetzner"
+  | "cloudflare"
+  | "backup-storage"
+  /** The two accounts Hallvi itself signs in to, as their own cards. */
+  | "chatgpt"
+  | "github";
 
 /**
  * The one thing a row offers: a form here, or a place that does the work.
@@ -145,6 +153,14 @@ export function ConnectionsScreen({
   const needing = connections.filter(
     (item) => item.state === "expired" || item.state === "failed",
   );
+  /**
+   * One dominant action. Five rows that all need connecting used to draw five
+   * blue buttons, which says everything is equally urgent and therefore
+   * nothing is. The first row that wants the owner keeps the blue; the rest
+   * stay available and quiet.
+   */
+  const leading = connections.find((item) => item.state !== "connected")?.id;
+
   const connected = () => {
     setOpen(null);
     router.refresh();
@@ -169,8 +185,8 @@ export function ConnectionsScreen({
         <header className={s.heading}>
           <h1>Settings</h1>
           <p>
-            Connections: the accounts Hallvi acts through, and what each one is
-            allowed to do.
+            Every account Hallvi acts through, what it is allowed to do, and
+            what is missing.
           </p>
         </header>
         {prototype && (
@@ -233,7 +249,7 @@ export function ConnectionsScreen({
                 {item.action.kind === "link" ? (
                   <Link
                     className={`${
-                      item.state === "connected" ? s.textButton : s.primary
+                      item.id === leading ? s.primary : s.textButton
                     } ${s.connectionAction}`}
                     href={item.action.href}
                   >
@@ -243,7 +259,7 @@ export function ConnectionsScreen({
                   <button
                     type="button"
                     className={`${
-                      item.state === "connected" ? s.textButton : s.primary
+                      item.id === leading ? s.primary : s.textButton
                     } ${s.connectionAction}`}
                     aria-expanded={open === item.action.form}
                     onClick={() =>
@@ -257,7 +273,7 @@ export function ConnectionsScreen({
                       )
                     }
                   >
-                    {item.action.label}
+                    {open === item.action.form ? "Close" : item.action.label}
                   </button>
                 )}
               </div>
@@ -268,6 +284,16 @@ export function ConnectionsScreen({
                     className={s.connectForm}
                     onConnected={async () => connected()}
                   />
+                ) : item.action.form === "chatgpt" ? (
+                  // The same card the conversation draws, so there is one
+                  // account sign-in in the product rather than two.
+                  <ChatgptConnect
+                    plain
+                    settingsHref={`/setup/pi${returnTo?.query ?? ""}`}
+                    onConnected={connected}
+                  />
+                ) : item.action.form === "github" ? (
+                  <GithubConnect plain />
                 ) : (
                   <ProviderTokenForm
                     provider={item.action.form}

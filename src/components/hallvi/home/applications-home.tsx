@@ -130,7 +130,7 @@ export function ApplicationsHome({
           </span>
           Hallvi
         </Link>
-        <Link className={s.settings} href="/setup/pi">
+        <Link className={s.settings} href="/setup/connections">
           <GearSix aria-hidden="true" />
           <span>{piReady ? "Settings" : "Settings · Connect ChatGPT"}</span>
         </Link>

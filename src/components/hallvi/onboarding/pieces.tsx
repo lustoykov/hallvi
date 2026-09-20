@@ -26,21 +26,36 @@ export function RequestCard({
   asks,
   state,
   label,
+  plain = false,
   children,
 }: {
   /** Completes "Hallvi …": "needs a place to run it". */
   asks: string;
   state: "waiting" | "working" | "done" | "failed";
   label: string;
+  /**
+   * Drops the "Hallvi asks" line. In a conversation the frame says who is
+   * asking and why it appeared; in Settings the owner opened it themselves,
+   * and a card that claims to be asking would be putting words in Hallvi's
+   * mouth.
+   */
+  plain?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className="hv-ob" data-state={state} aria-label={label}>
-      <div className="hv-ob-who">
-        <HallviMark />
-        <strong>Hallvi</strong>
-        <span>{asks}</span>
-      </div>
+    <section
+      className="hv-ob"
+      data-state={state}
+      data-plain={plain ? "" : undefined}
+      aria-label={label}
+    >
+      {!plain && (
+        <div className="hv-ob-who">
+          <HallviMark />
+          <strong>Hallvi</strong>
+          <span>{asks}</span>
+        </div>
+      )}
       <div className="hv-ob-body">{children}</div>
     </section>
   );
@@ -351,13 +366,16 @@ export function Problem({
 
 export function Receipt({
   title,
+  plain = false,
   children,
 }: {
   title: string;
+  /** Sits flush where it is not a turn in a conversation. */
+  plain?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <details className="hv-ob-receipt">
+    <details className="hv-ob-receipt" data-plain={plain ? "" : undefined}>
       <summary>
         <CheckIcon weight="bold" aria-hidden="true" />
         {title}

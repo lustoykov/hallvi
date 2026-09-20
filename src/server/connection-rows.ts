@@ -10,7 +10,22 @@ export interface ConnectionApplication {
   name: string;
 }
 
+/** What Hallvi itself is signed in to, as its own settings report it. */
+export interface OwnAccounts {
+  /** A ChatGPT login is saved. It has not necessarily been used. */
+  model: { saved: boolean; issue: string | null };
+  github: {
+    account: string | null;
+    issue: string | null;
+    /** This release carries the GitHub App it would sign in through. */
+    signIn: boolean;
+  };
+  /** Where Pi's workspace runs, and whether that choice can be met. */
+  workspace: { isolation: "direct" | "docker" | null; problem: string | null };
+}
+
 export interface ConnectionFacts {
+  own: OwnAccounts;
   hetznerConnected: boolean;
   cloudflare: CloudflareConnection;
   /** R2 buckets the management token can see, or null when it could not ask. */
@@ -88,6 +103,83 @@ export function connectionRows(facts: ConnectionFacts): ConnectionItem[] {
     "#backups",
   );
   return [
+    // Hallvi's own two accounts come first: nothing else can happen without a
+    // model, and the rest of this page is about the owner's providers.
+    {
+      id: "chatgpt",
+      name: "ChatGPT",
+      purpose: "The model Hallvi thinks and replies with.",
+      state: facts.own.model.issue
+        ? "failed"
+        : facts.own.model.saved
+          ? "connected"
+          : "not-connected",
+      // Saved is not proven: nothing is asked of ChatGPT until a message is
+      // sent, so this never claims the login works.
+      detail: facts.own.model.issue
+        ? facts.own.model.issue
+        : facts.own.model.saved
+          ? "Login saved. ChatGPT checks it when you send a message."
+          : "Not connected. Hallvi cannot read, plan or reply without it.",
+      credential: facts.own.model.saved
+        ? "Login held by this controller"
+        : null,
+      action: {
+        kind: "form",
+        form: "chatgpt",
+        label: facts.own.model.saved ? "Change" : "Connect ChatGPT",
+      },
+    },
+    {
+      id: "github",
+      name: "GitHub",
+      purpose: "Reading the code of private repositories you choose.",
+      state: facts.own.github.issue
+        ? "failed"
+        : facts.own.github.account
+          ? "connected"
+          : "not-connected",
+      detail: facts.own.github.issue
+        ? facts.own.github.issue
+        : facts.own.github.account
+          ? `Signed in as ${facts.own.github.account}. Read-only, for the repositories you picked on GitHub.`
+          : facts.own.github.signIn
+            ? "Not connected. Public repositories are read without an account."
+            : "This release can’t sign in to GitHub. Public repositories still work.",
+      credential: facts.own.github.account
+        ? "Login held by this controller · renews by itself"
+        : null,
+      note: facts.own.github.account
+        ? "Whether one application’s repository can be read is checked in its own conversation."
+        : undefined,
+      action: {
+        kind: "form",
+        form: "github",
+        label: facts.own.github.account
+          ? "Repositories"
+          : facts.own.github.signIn
+            ? "Connect GitHub"
+            : "Why",
+      },
+    },
+    {
+      id: "workspace",
+      name: "Pi’s workspace",
+      purpose: "Where Hallvi runs the commands it composes about your code.",
+      state: facts.own.workspace.problem
+        ? "failed"
+        : facts.own.workspace.isolation
+          ? "connected"
+          : "not-connected",
+      detail: facts.own.workspace.problem
+        ? facts.own.workspace.problem
+        : facts.own.workspace.isolation === "docker"
+          ? "In Docker, away from the rest of this machine."
+          : facts.own.workspace.isolation === "direct"
+            ? "On this computer, with the same reach as the user running Hallvi."
+            : "Not chosen yet.",
+      action: { kind: "link", href: "/setup/workspace", label: "Change" },
+    },
     {
       id: "hetzner",
       name: "Hetzner Cloud",
