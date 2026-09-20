@@ -106,10 +106,16 @@ async function clipped(page: Page) {
     [...document.querySelectorAll<HTMLElement>("main *")]
       .filter((element) => {
         if (element.children.length) return false;
-        // Text only a screen reader reads sits in a one-pixel box and
-        // overflows it by design. Reporting it hides the real findings.
-        if (element.clientWidth <= 1 || element.clientHeight <= 1) return false;
         const style = getComputedStyle(element);
+        // Text only a screen reader reads: a box of a pixel each way, or one
+        // a clip leaves nothing of. Both overflow by design, and reporting
+        // them hides the real findings. A full-width line squashed to one
+        // pixel high is a real finding, so both dimensions have to be tiny.
+        const tiny = element.clientWidth <= 1 && element.clientHeight <= 1;
+        const hiddenByClip =
+          style.clipPath === "inset(50%)" ||
+          /^rect\(0px,? 0px,? 0px,? 0px\)$/.test(style.clip);
+        if (tiny || hiddenByClip) return false;
         if (style.overflow !== "hidden" && style.overflowX !== "hidden")
           return false;
         if (style.textOverflow === "ellipsis") return false;
