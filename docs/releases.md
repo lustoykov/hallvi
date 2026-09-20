@@ -152,10 +152,18 @@ installation refer to the same immutable candidate. An installation keeps the
 manifest's own bytes while it updates and verifies them again in the program
 that does the installing, rather than trusting what the interface read.
 
-`schemaVersion` is the database schema that release needs. An installation
-whose records are in another schema says so and does not download. The
-installed self-update path does not apply schema migrations; the persistent
-development environment can use a separately verified database upgrade.
+`schemaVersion` is the database schema that release needs. When it differs
+from the installation's, the answer comes from
+[the list of supported migrations](../scripts/migrations.mjs): a transition
+that exists is carried out during the upgrade, and one that does not is
+refused before anything is downloaded, naming both schemas.
+
+There is one such list, and both ways of upgrading read it — `npm run
+db:upgrade` in a checkout and `install.sh` on an installation, which is what
+the updater runs. Each transition names both of its ends as literal numbers,
+so raising `schemaVersion` for a new release does not quietly extend an
+existing migration to reach it. [The upgrade](installation.md#update)
+describes what happens to the records.
 
 ## The channel
 

@@ -124,6 +124,11 @@ try {
     "scripts/installed-ports.mjs",
     "scripts/service-owner.mjs",
     "scripts/worker-socket.mjs",
+    // Moving records from one schema to another: the list of what can be
+    // migrated, and the thing that carries one out. `install.sh` runs these
+    // from the new archive, before the program it belongs to is in place.
+    "scripts/migrations.mjs",
+    "scripts/migrate-state.mjs",
     // Updating itself: the trusted key, the release source, and the helper
     // that outlives the service while it is replaced.
     "scripts/release-trust.mjs",

@@ -165,17 +165,31 @@ Two things make this safe rather than hopeful:
   is newer, going back to the baseline needs the backup as well; the code alone
   leaves a file the baseline refuses to open, which is the correct refusal.
 
-When a candidate does need a schema change, it is upgraded in place with the
-original kept beside it:
+When a candidate does need a schema change, it runs the same migration an
+installation would — the same list, the same code, the same verified copy
+taken first. There is no separate development path:
 
 ```sh
 cd ~/.local/share/hallvi-dev/program
-HALLVI_DB_PATH=~/.local/share/hallvi-dev/state/hallvi.db npm run db:upgrade
+node scripts/migrate-state.mjs --plan  --data ~/.local/share/hallvi-dev/state
+node scripts/migrate-state.mjs --apply --data ~/.local/share/hallvi-dev/state
 ```
 
+`--plan` changes nothing and says which stores the transition rewrites.
+`--apply` prints where it put the copy, and that copy is how you go back:
+
+```sh
+node scripts/migrate-state.mjs --restore <that directory>
+```
+
+A transition that is not in
+[the list](../scripts/migrations.mjs) is refused, and the records are left
+exactly as they were.
+
 **If you change how Hallvi stores anything, this environment is your
-acceptance test.** Supply the migration, run it here, and check that the four
-applications still open, still show their history, and still hold their data.
+acceptance test.** Add the transition to that list, run it here, and check
+that the four applications still open, still show their history, and still
+hold their data.
 
 ## Backups
 
