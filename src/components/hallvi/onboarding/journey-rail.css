@@ -184,6 +184,73 @@
   margin: 12px 0 0;
   color: var(--muted);
 }
+/* While a request is open below, the welcome is one line. */
+.hv-first-app[data-compact] {
+  gap: 14px;
+  padding: 10px 36px;
+}
+.hv-first-app[data-compact] .hv-first-app-mascot {
+  width: 56px;
+  height: 60px;
+}
+.hv-first-app[data-compact] h2 {
+  font-size: 17px;
+  margin-bottom: 2px;
+}
+.hv-first-app[data-compact] p {
+  margin: 0;
+  font-size: 12.5px;
+}
+.hv-first-app .hv-first-app-quiet {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #ccd5e3;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.hv-first-app .hv-first-app-quiet:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Two different things are missing: one line each, the first one blue. */
+.hv-first-app-needs {
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.hv-first-app-needs li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+}
+.hv-first-app-needs li + li {
+  border-top: 1px solid var(--line);
+}
+.hv-first-app-needs li > span {
+  flex: 1;
+  display: grid;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.hv-first-app-needs strong {
+  font-size: 13px;
+  color: var(--ink);
+}
+.hv-first-app .hv-first-app-needs .hv-rail-start {
+  min-height: 32px;
+  padding: 5px 11px;
+  font-size: 12.5px;
+}
 @media (max-width: 600px) {
   .hv-first-app {
     gap: 12px;

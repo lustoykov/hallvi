@@ -896,34 +896,9 @@ export function OperatorShell({
             className={`hv-chat-column${recordVisible ? " hv-chat-parked" : ""}`}
             inert={recordVisible || undefined}
           >
-            {application &&
-              view.repository &&
-              view.repository.status !== "passed" && (
-                <div className="hv-repository-notice" role="status">
-                  <p>
-                    <strong>Repository access:</strong> {view.repository.result}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={checkRepository}
-                  >
-                    {busy === "repository" ? "Checking…" : "Check again"}
-                  </button>
-                  {!view.repository.connected && (
-                    <Link
-                      href={
-                        view.selectedChatId
-                          ? `/setup/github?application=${application.id}&chat=${view.selectedChatId}`
-                          : "/setup/github"
-                      }
-                    >
-                      Connect GitHub
-                    </Link>
-                  )}
-                </div>
-              )}
             <ChatPane
+              checkingRepository={busy === "repository"}
+              onCheckRepository={checkRepository}
               activeChat={activeChat}
               reachable={reachable}
               busy={busy}
