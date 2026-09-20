@@ -188,6 +188,7 @@
    saying nothing until it has something to say — so this is one line, and a
    second word only while a release is waiting or an update is running. */
 .hv-this-hallvi {
+  position: relative;
   margin-top: 6px;
 }
 /* Scoped past `.hv-application-navigation button`, which gives every button
@@ -234,12 +235,20 @@
 .hv-this-hallvi-phase.hv-update-blocked {
   color: var(--amber, #b25a16);
 }
+/* Beside the line, not under it. In the flow it grew the footer by a hundred
+   and fifty pixels and pushed Settings and the conversations about; as a
+   layer it costs the sidebar nothing and goes away when it is dismissed. */
 .hv-this-hallvi-panel {
-  margin: 4px 6px 0;
-  padding: 10px;
-  border: 1px solid var(--nav-groove);
-  border-radius: 8px;
-  background: rgb(255 255 255 / 70%);
+  position: absolute;
+  bottom: 0;
+  left: calc(100% - 4px);
+  z-index: 30;
+  width: 268px;
+  padding: 12px;
+  border: 1px solid var(--line, #e7e9ee);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 10px 30px rgb(28 52 110 / 14%);
   font-size: 11px;
   line-height: 1.6;
 }

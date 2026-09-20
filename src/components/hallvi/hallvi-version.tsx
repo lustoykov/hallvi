@@ -12,7 +12,7 @@
 // so while one runs its phase is on that line whether the panel is open or
 // not — and "done" is not the moment the files were swapped, it is the moment
 // the new interface answers with the revision that was installed.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ExternalLink } from "./external-link";
 import { LocalTime } from "./local-time";
@@ -103,6 +103,24 @@ export function ThisHallvi({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"check" | "install" | null>(null);
   const [error, setError] = useState("");
+  const here = useRef<HTMLDivElement>(null);
+
+  /** A layer over the page closes the way one is expected to. */
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (!here.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
 
   useEffect(() => {
     let alive = true;
@@ -170,7 +188,10 @@ export function ThisHallvi({ className }: { className?: string }) {
   const offering = Boolean(available && !available.blocked && !running);
 
   return (
-    <div className={`hv-this-hallvi${className ? ` ${className}` : ""}`}>
+    <div
+      className={`hv-this-hallvi${className ? ` ${className}` : ""}`}
+      ref={here}
+    >
       <button
         type="button"
         className="hv-this-hallvi-line"
