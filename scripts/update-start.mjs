@@ -65,10 +65,12 @@ export async function checkForRelease(
   { force = false, env = process.env } = {},
 ) {
   const cached = readCheck(data);
+  // One rule about how often to look, here and in checkForReleaseIfDue: a look
+  // that failed is still a look, and an unreachable source must not turn into a
+  // request per attempt. `force` is somebody pressing the button.
   if (
     !force &&
     cached &&
-    !cached.error &&
     Date.now() - Date.parse(cached.checkedAt) < CHECK_INTERVAL_MS
   )
     return cached;
