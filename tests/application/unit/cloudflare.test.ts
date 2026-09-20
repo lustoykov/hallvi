@@ -309,6 +309,32 @@ describe("pointing a name at a server", () => {
     });
   });
 
+  it("leaves the root and its neighbours alone when it writes a subdomain", async () => {
+    // Setup finds the zone by walking up from a subdomain, so the zone a
+    // token is scoped to is routinely a name the owner is already using.
+    // The record that goes out must still be the subdomain's alone.
+    zone([
+      held({ id: "root", name: "example.com", content: "198.51.100.5" }),
+      held({ id: "other", name: "www.example.com", content: "198.51.100.6" }),
+    ]);
+    const outcome = await cloudflare.writeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+    });
+    expect(outcome).toMatchObject({
+      action: "created",
+      name: "app.example.com",
+      zone: "example.com",
+      previous: null,
+    });
+    expect(wrote()).toHaveLength(1);
+    expect(wrote()[0].method).toBe("POST");
+    expect(wrote()[0].body).toMatchObject({ name: "app.example.com" });
+    // Nothing addressed either of the records that were already there.
+    expect(sent.some((call) => /rec-1|root|other/.test(call.url))).toBe(false);
+  });
+
   it("refuses to take a name away from whatever already has it", async () => {
     zone([held({ content: "198.51.100.5" })]);
     await expect(
