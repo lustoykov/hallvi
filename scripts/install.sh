@@ -119,7 +119,7 @@ ensure_stopped() {
 restore_records() {
   # Putting the old program back is not a rollback once its database has been
   # migrated under it: it would refuse the schema it now finds, correctly.
-  # Copying the backup back is, and it needs no program to do it.
+  # The migrator checks the backup before putting it back.
   [ -n "$migrated" ] && [ -f "$migrated/hallvi.db" ] || return 0
   if ! ensure_stopped; then
     say "Hallvi is still running; the records were left alone. The copy taken before the upgrade is at $migrated" >&2

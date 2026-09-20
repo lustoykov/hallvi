@@ -20,7 +20,7 @@ import {
 import { browserJourneys } from "../browser/journeys.ts";
 import { suiteGuides } from "./suite-guides.ts";
 import { guidePage, renderMarkdown } from "./markdown.ts";
-import { developmentState, releasesState } from "./development.ts";
+import { checkout, developmentState, releasesState } from "./development.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
@@ -58,7 +58,29 @@ function gh(args: string[]) {
  * signs in as nobody: `gh` uses the login already on this machine, and no
  * token is entered, stored or displayed here.
  */
-function dispatchRelease(version: string, revision: string) {
+export function dispatchRelease(
+  root: string,
+  version: string,
+  revision: string,
+) {
+  const here = checkout(root);
+  if (here.revision !== revision || here.branch === "HEAD" || !here.branch)
+    return {
+      started: false,
+      error:
+        "The checkout changed or has no branch. Reload and select a committed branch to release.",
+    };
+  const currentVersion = JSON.parse(
+    readFileSync(join(root, "package.json"), "utf8"),
+  ).version;
+  if (currentVersion !== version)
+    return {
+      started: false,
+      error: "The version changed. Reload before building a release.",
+    };
+  // workflow_dispatch takes a branch or tag, not an arbitrary commit SHA.
+  // The workflow checks the expected commit before building, so a branch
+  // moving between this click and dispatch cannot release different code.
   const started = gh([
     "workflow",
     "run",
@@ -66,33 +88,18 @@ function dispatchRelease(version: string, revision: string) {
     "--repo",
     REPOSITORY,
     "--ref",
-    revision,
+    here.branch,
     "-f",
     `version=${version}`,
     "-f",
     "channel=alpha",
+    "-f",
+    `expected_revision=${revision}`,
   ]);
   if (!started.ok) return { started: false, error: started.error };
-  // The run id is not returned by `workflow run`; the list is how the panel
-  // finds the run it just asked for.
-  const listed = gh([
-    "run",
-    "list",
-    "--repo",
-    REPOSITORY,
-    "--workflow",
-    "release.yml",
-    "--limit",
-    "1",
-    "--json",
-    "databaseId,url,status,headSha",
-  ]);
-  return {
-    started: true,
-    version,
-    revision,
-    run: listed.ok ? JSON.parse(listed.output)[0] : null,
-  };
+  // Listing the latest run here can return somebody else's previous build.
+  // The panel lists runs separately, with the actual revision of each run.
+  return { started: true, version, revision };
 }
 
 /** Promotes a draft this repository already has. Nothing is rebuilt. */
@@ -509,7 +516,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
             revision: z.string().regex(/^[0-9a-f]{40}$/),
           })
           .parse(body);
-        json(dispatchRelease(input.version, input.revision));
+        json(dispatchRelease(root, input.version, input.revision));
         return;
       }
       if (url.pathname === "/api/releases/publish") {

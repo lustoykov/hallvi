@@ -1291,7 +1291,7 @@ function renderReleases(state) {
     : `<p class="footnote">No workflow runs yet.</p>`;
 
   const actions = state.signedIn
-    ? `<div class="actions"><button id="build-release" class="primary" type="button">Build draft release</button></div>
+    ? `<div class="actions"><button id="build-release" class="primary" type="button" data-version="${escape(state.version ?? "")}" data-revision="${escape(here.revision ?? "")}">Build draft release</button></div>
        <p class="footnote">Dispatches the existing workflow for version ${escape(state.version ?? "")} at <code>${escape((here.revision ?? "").slice(0, 9))}</code>. Signing stays in the workflow. Publishing promotes the reviewed draft without rebuilding it.</p>`
     : `<p class="warn">Not signed in to GitHub. Run <code>gh auth login</code>; no token is entered here.</p>`;
 
@@ -1321,9 +1321,6 @@ document.addEventListener("click", async (event) => {
   const build = event.target.closest("#build-release");
   if (build) {
     build.disabled = true;
-    const current = await fetch("/api/releases", {
-      headers: { "X-Hallvi-Testing-Token": token },
-    }).then((response) => response.json());
     const answer = await fetch("/api/releases/build", {
       method: "POST",
       headers: {
@@ -1331,8 +1328,8 @@ document.addEventListener("click", async (event) => {
         "X-Hallvi-Testing-Token": token,
       },
       body: JSON.stringify({
-        version: current.version,
-        revision: current.checkout.revision,
+        version: build.dataset.version,
+        revision: build.dataset.revision,
       }),
     }).then((response) => response.json());
     if (!answer.started)

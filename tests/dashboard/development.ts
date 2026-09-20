@@ -20,13 +20,19 @@ export const DEVELOPMENT_ROOT = join(
 );
 
 /** A command that cannot become a shell string, and never throws. */
-function run(command: string, args: string[], cwd?: string) {
+function run(
+  command: string,
+  args: string[],
+  cwd?: string,
+  maxBuffer?: number,
+) {
   try {
     return execFileSync(command, args, {
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 15_000,
+      maxBuffer,
     }).trim();
   } catch {
     return null;
@@ -211,8 +217,10 @@ function plannedContents(root: string) {
 }
 
 /** What a built archive actually holds, from the archive itself. */
-function actualContents(archive: string) {
-  const listing = run("tar", ["-tzf", archive]);
+export function actualContents(archive: string) {
+  // A release includes tens of thousands of dependency paths. Node's default
+  // 1 MiB output limit truncates that listing before we can inspect it.
+  const listing = run("tar", ["-tzf", archive], undefined, 32 * 1024 * 1024);
   if (!listing) return null;
   return listing.split("\n").filter(Boolean);
 }
