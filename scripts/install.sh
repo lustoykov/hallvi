@@ -14,6 +14,7 @@ set -eu
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 home="$HOME/.local/lib/hallvi"
 bin="$HOME/.local/bin"
+data="${HALLVI_DATA_DIR:-$HOME/.local/share/hallvi}"
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'install: %s\n' "$*" >&2; exit 1; }
@@ -82,11 +83,26 @@ upgrade=no
 mkdir -p "$HOME/.local/lib" "$bin"
 staging=$(mktemp -d "$HOME/.local/lib/hallvi.installing.XXXXXX")
 backup=""
+migrated=""
 committed=no
 stopped=no
+restore_records() {
+  # Putting the old program back is not a rollback once its database has been
+  # migrated under it: it would refuse the schema it now finds, correctly.
+  # Copying the backup back is, and it needs no program to do it.
+  [ -n "$migrated" ] && [ -f "$migrated/hallvi.db" ] || return 0
+  rm -f "$data/hallvi.db-wal" "$data/hallvi.db-shm"
+  if cp "$migrated/hallvi.db" "$data/hallvi.db"; then
+    say "The records were put back as they were, from $migrated"
+    migrated=""
+  else
+    say "Could not put the records back; the backup is at $migrated" >&2
+  fi
+}
 cleanup() {
   result=$?
   trap - EXIT
+  restore_records
   if [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
     if [ -d "$home" ] && is_installation "$home"; then rm -rf "$home"; fi
     if [ ! -e "$home" ]; then
@@ -147,6 +163,22 @@ if [ "$running" = yes ]; then
   fi
   stopped=yes
 fi
+# The records move to the schema this archive needs while nothing is running
+# and the old program is still in place, so a refusal here costs nothing. The
+# migration backs itself up first and prints where; if anything after this
+# fails, cleanup puts both the records and the program back.
+if [ "$upgrade" = yes ]; then
+  say "Checking the schema of the records"
+  migration_output=$("$staging/node/bin/node" \
+    "$staging/app/scripts/migrate-state.mjs" --apply --data "$data" 2>&1) || {
+    printf '%s\n' "$migration_output" >&2
+    fail "the records could not be migrated; nothing was replaced."
+  }
+  printf '%s\n' "$migration_output"
+  migrated=$(printf '%s\n' "$migration_output" |
+    sed -n 's/^Backed up to //p' | tail -1)
+fi
+
 if [ "$upgrade" = yes ]; then
   backup=$(mktemp -d "$HOME/.local/lib/hallvi.previous.XXXXXX")
   rmdir "$backup"
@@ -196,7 +228,7 @@ fi
 # refuses the whole connection when one forwarded port is taken. A remote
 # installation therefore starts on its own ports, which also makes its address
 # differ from a local one. An existing choice is never replaced.
-settings="$HOME/.local/share/hallvi/hallvi.env"
+settings="$data/hallvi.env"
 if [ "$upgrade" = no ] && [ "$use" = remote ] &&
   ! grep -q '^HALLVI_PORT=' "$settings" 2>/dev/null; then
   mkdir -p "$(dirname "$settings")"
@@ -213,6 +245,12 @@ else
   say "Installed. Hallvi was stopped before and stays stopped: hallvi start"
 fi
 committed=yes
+# Kept, not deleted: this is the only way back to the schema it came from, and
+# the old program archive alone cannot provide it.
+if [ -n "$migrated" ]; then
+  say "The records before this upgrade are kept at $migrated"
+  migrated=""
+fi
 if [ -n "$backup" ]; then rm -rf "$backup"; backup=""; fi
 
 if [ "$upgrade" = no ]; then

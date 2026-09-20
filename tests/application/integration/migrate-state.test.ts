@@ -1,14 +1,17 @@
 import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { pushTestDatabase } from "../../test-database";
 
-// An existing installation's database is upgraded in place with the original
-// kept beside it. `schema-15.sql` is the schema main had before conversations
-// moved onto Pi's AgentHarness, taken from a real database, without its data.
+// An existing controller's records are migrated in place, with a verified copy
+// of exactly what the migration rewrites kept first. This is the one
+// implementation: `npm run db:upgrade` runs it in development and `install.sh`
+// runs it during an upgrade, which is the path the in-app updater takes.
+// `schema-15.sql` is the schema main had before conversations moved onto Pi's
+// AgentHarness, taken from a real database, without its data.
 
 let root: string;
 beforeAll(() => {
@@ -56,13 +59,21 @@ it("upgrades a schema-15 database without rewriting anything in it, and leaves t
   old.pragma("user_version = 15");
   old.close();
 
-  const run = () =>
-    execFileSync(process.execPath, ["scripts/upgrade-db.mjs"], {
-      env: { ...process.env, HALLVI_DB_PATH: path },
-      encoding: "utf8",
-    });
-  expect(run()).toContain("from schema 15 to 18");
-  expect(run()).toContain("Nothing to do");
+  const run = (...args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ["scripts/migrate-state.mjs", ...args, "--data", root],
+      { encoding: "utf8" },
+    );
+  expect(run("--plan")).toContain("Schema 15 to 18");
+  // A plan changes nothing, however often it is asked.
+  expect(
+    new Database(path, { readonly: true }).pragma("user_version", {
+      simple: true,
+    }),
+  ).toBe(15);
+  expect(run("--apply")).toContain("from schema 15 to 18");
+  expect(run("--apply")).toContain("Nothing to do");
 
   // Everything a new installation has is there. What conversations used to
   // keep in the database stays too, unread: Pi holds them now.
@@ -90,16 +101,62 @@ it("upgrades a schema-15 database without rewriting anything in it, and leaves t
   ).toEqual({ native_session_id: "native-1" });
   upgraded.close();
 
-  // Rollback is putting this file back: it is the database as it was.
-  const original = new Database(`${path}.before-v18`, { readonly: true });
+  // The copy taken first is the way back, and it holds only what the
+  // migration said it would rewrite.
+  const backups = readdirSync(join(root, "migrations"));
+  expect(backups).toHaveLength(1);
+  const kept = join(root, "migrations", backups[0]);
+  expect(backups[0]).toContain("15-to-18");
+  const manifest = JSON.parse(
+    readFileSync(join(kept, "manifest.json"), "utf8"),
+  );
+  expect(manifest).toMatchObject({
+    from: 15,
+    to: 18,
+    changes: ["the controller database"],
+    copied: ["hallvi.db"],
+  });
+  expect(readdirSync(kept).sort()).toEqual(["hallvi.db", "manifest.json"]);
+
+  const original = new Database(join(kept, "hallvi.db"), { readonly: true });
   expect(original.pragma("user_version", { simple: true })).toBe(15);
+  expect(original.pragma("integrity_check", { simple: true })).toBe("ok");
   expect(original.prepare("SELECT count(*) AS n FROM messages").get()).toEqual({
     n: 6,
   });
   original.close();
-  // And a second upgrade never overwrites it.
-  const again = new Database(path);
-  again.pragma("user_version = 15");
-  again.close();
-  expect(run).toThrow(/rollback copy and is never overwritten/);
+
+  // Restoring is how you go back, because putting the old program back is not
+  // a rollback once its database has been migrated under it.
+  expect(run("--restore", kept)).toContain("to schema 15");
+  const back = new Database(path, { readonly: true });
+  expect(back.pragma("user_version", { simple: true })).toBe(15);
+  expect(back.prepare("SELECT count(*) AS n FROM messages").get()).toEqual({
+    n: 6,
+  });
+  back.close();
+});
+
+it("refuses a schema it has no migration for, and leaves it alone", () => {
+  const data = mkdtempSync(join(tmpdir(), "hv-unknown-"));
+  const made = new Database(join(data, "hallvi.db"));
+  made.exec(readFileSync("tests/fixtures/schema-15.sql", "utf8"));
+  made.pragma("user_version = 14");
+  made.close();
+
+  expect(() =>
+    execFileSync(
+      process.execPath,
+      ["scripts/migrate-state.mjs", "--apply", "--data", data],
+      { encoding: "utf8", stdio: "pipe" },
+    ),
+  ).toThrow(/no supported migration from schema 14/);
+
+  // Untouched, and no half-made backup left looking like somewhere to go back
+  // to.
+  const after = new Database(join(data, "hallvi.db"), { readonly: true });
+  expect(after.pragma("user_version", { simple: true })).toBe(14);
+  after.close();
+  expect(readdirSync(data).sort()).toEqual(["hallvi.db"]);
+  rmSync(data, { recursive: true, force: true });
 });

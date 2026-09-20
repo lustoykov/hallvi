@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "db:upgrade": "node scripts/upgrade-db.mjs",
+    "db:upgrade": "node scripts/migrate-state.mjs --apply",
     "db:push": "node scripts/prepare-db.mjs && drizzle-kit push --force && node scripts/stamp-db.mjs",
     "dev": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/dev.mjs",
     "worker": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx src/worker.ts",

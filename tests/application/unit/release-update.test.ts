@@ -357,10 +357,11 @@ it("throws away a download whose bytes are not the ones the manifest named", asy
   expect(readFileSync(file)).toEqual(ARCHIVE);
 });
 
-it("blocks a release that needs another database schema, before anything is downloaded", () => {
+it("blocks a release whose schema nothing can reach, before anything is downloaded", () => {
   const program = programWith(join(root, "app"), "schema-version.json", {
     version: 15,
   });
+  // 15 to 16 is not a transition anyone wrote, so it is a refusal.
   expect(
     blockedReason(program, {
       manifest: verified(manifestFor({ schemaVersion: 16 })),
@@ -370,7 +371,16 @@ it("blocks a release that needs another database schema, before anything is down
     blockedReason(program, {
       manifest: verified(manifestFor({ schemaVersion: 16 })),
     }),
-  ).toMatch(/no migration between them yet/);
+  ).toMatch(/no supported migration between them/);
+  // 15 to 18 is a transition that exists, so a different schema is not by
+  // itself a refusal: the upgrade carries it out, having copied it first.
+  const carried = blockedReason(program, {
+    manifest: verified(manifestFor({ schemaVersion: 18 })),
+  });
+  // Whatever it says, it is no longer about the schema: on this machine
+  // nothing is in the way, and on another only the missing package is.
+  expect(carried ?? "").not.toMatch(/schema/);
+
   // The same schema on the machine the package is built for: nothing in the
   // way. A Linux machine is told about the package, not about the schema.
   const reason = blockedReason(program, { manifest: verified(manifestFor()) });

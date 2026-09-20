@@ -10,6 +10,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 
+import { supported } from "./migrations.mjs";
 import {
   compareVersions,
   DEFAULT_CHANNEL,
@@ -92,8 +93,11 @@ export async function checkForRelease(
 /** Why this candidate cannot be installed here, in one sentence, or nothing. */
 export function blockedReason(program, candidate) {
   const schema = programSchemaVersion(program);
-  if (schema !== null && candidate.manifest.schemaVersion !== schema)
-    return `Hallvi ${candidate.manifest.version} keeps its records in schema ${candidate.manifest.schemaVersion} and this one uses schema ${schema}. There is no migration between them yet, so this release cannot be installed over your records.`;
+  const wanted = candidate.manifest.schemaVersion;
+  // A different schema is only a refusal when nothing can join the two. When
+  // something can, the upgrade carries it out, having backed it up first.
+  if (schema !== null && wanted !== schema && !supported(schema, wanted))
+    return `Hallvi ${candidate.manifest.version} keeps its records in schema ${wanted} and this one uses schema ${schema}. There is no supported migration between them, so this release cannot be installed over your records.`;
   try {
     packageFor(candidate.manifest);
     return null;

@@ -41,6 +41,7 @@ const HELPER_FILES = [
   "release-source.mjs",
   "release-trust.mjs",
   "installed-ports.mjs",
+  "migrations.mjs",
   "state-location.mjs",
   "worker-socket.mjs",
 ];

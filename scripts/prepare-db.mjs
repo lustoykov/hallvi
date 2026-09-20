@@ -22,7 +22,7 @@ try {
     .get();
   if (populated && current !== version)
     throw new Error(
-      `Schema ${current} is not ${version}. db:push never alters existing data. Stop the app and worker; schema 15 is upgraded in place, keeping the original, by npm run db:upgrade.`,
+      `Schema ${current} is not ${version}. db:push never alters existing data. Stop the app and worker; a supported schema is migrated in place, with a verified copy kept first, by npm run db:upgrade.`,
     );
 } finally {
   database.close();
