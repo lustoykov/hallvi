@@ -5,7 +5,7 @@ import { journey } from "./journeys";
 test(
   "chat drafts stay separate, selection survives refresh, and archived chats explain their state",
   journey("chat-navigation"),
-  async ({ page }) => {
+  async ({ page }, testInfo) => {
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })
@@ -40,7 +40,9 @@ test(
     await page.getByRole("button", { name: "Main operator" }).click();
     await openConversation(page);
     await expect(composer).toHaveValue("Main chat draft");
-    await page.getByRole("button", { name: "Conversation 2" }).click();
+    await page
+      .getByRole("button", { name: "Conversation 2", exact: true })
+      .click();
     await openConversation(page);
     await expect(composer).toHaveValue("Separate chat draft");
     await openConversation(page);
@@ -54,18 +56,76 @@ test(
     await expect(
       page.getByText("[QA fixture reply] Separate chat draft", { exact: true }),
     ).toBeVisible();
-    await openConversation(page);
-    await expect(
-      page.getByRole("button", { name: "Archive chat", exact: true }),
-    ).toBeEnabled();
-    await openConversation(page);
-    await expect(
-      page.getByRole("button", { name: "Archive chat", exact: true }),
-    ).toBeEnabled();
-    await openConversation(page);
+    // Archive a different side chat without navigating or losing the draft.
     await page
-      .getByRole("button", { name: "Archive chat", exact: true })
+      .getByRole("button", { name: "New conversation", exact: true })
       .click();
+    await page
+      .getByRole("button", { name: "Conversation 2", exact: true })
+      .click();
+    await expect(page).toHaveURL(secondChatUrl);
+    await expect(
+      page.getByRole("button", { name: "Conversation 2", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(composer).toBeEnabled();
+    await composer.fill("Keep this draft while archiving another chat");
+    const selectedUrl = page.url();
+    const third = page.getByRole("button", {
+      name: "Conversation 3",
+      exact: true,
+    });
+    const archiveThird = page.getByRole("button", {
+      name: "Archive Conversation 3",
+      exact: true,
+    });
+    await page
+      .getByRole("button", { name: "Main operator", exact: true })
+      .hover();
+    await expect(archiveThird).toHaveCSS("opacity", "0");
+    await expect(
+      page.getByRole("button", { name: "Archive Main operator", exact: true }),
+    ).toHaveCount(0);
+    await third.hover();
+    await expect(archiveThird).toHaveCSS("opacity", "1");
+    await page.screenshot({
+      path: testInfo.outputPath("sidebar-desktop.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: testInfo.outputPath("sidebar-mobile.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await third.hover();
+    await archiveThird.click();
+    await expect(
+      page.getByRole("button", {
+        name: "Conversation 3 Archived",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(selectedUrl);
+    await expect(composer).toHaveValue(
+      "Keep this draft while archiving another chat",
+    );
+    await expect(archiveThird).toHaveCount(0);
+
+    // Keyboard focus exposes the same direct action for the selected chat.
+    await page
+      .getByRole("button", { name: "Main operator", exact: true })
+      .hover();
+    await page
+      .getByRole("button", { name: "Conversation 2", exact: true })
+      .focus();
+    await page.keyboard.press("Tab");
+    const archiveSecond = page.getByRole("button", {
+      name: "Archive Conversation 2",
+      exact: true,
+    });
+    await expect(archiveSecond).toBeFocused();
+    await expect(archiveSecond).toHaveCSS("opacity", "1");
+    await page.keyboard.press("Enter");
     const archivedChat = page.getByRole("button", {
       name: "Conversation 2 Archived",
     });
