@@ -3,9 +3,16 @@
 What a Hallvi that replaces itself had to prove, and what it did not.
 
 Branch `claude/hallvi-downloads-updates-b1e5ee`. The archives under test were
-built from two commits on it, so an update moved between two different
-revisions and the check that the new interface reports the installed revision
-means something.
+built from two different revisions of it, so an update moved between two, and
+the check that the new interface reports the revision that was installed means
+something.
+
+Those two revisions are what the archives' own `dist/release.json` records, and
+they are not commits on the branch as it was pushed: the branch was re-authored
+to the repository's noreply identity afterwards, which rewrote every hash.
+`a5ebcef4` is the commit now published as `53fcd6fc`; `00d645c6` was an earlier
+state of the first commit, superseded before it was pushed. The content of each
+is what was built and installed.
 
 ## Where it ran
 
