@@ -1263,10 +1263,12 @@
   text-transform: none;
   font-weight: 450;
 }
-/* A newer Hallvi exists. Two words, the weight of a caption, and gone once
-   the update is installed — it is information, not a demand. */
+/* A newer Hallvi exists. Two words, the weight of a caption, on their own
+   line under the product name so a long machine name does not squeeze them —
+   and gone once the update is installed. It is information, not a demand. */
 .hv-update-hint {
-  margin-left: 8px;
+  align-self: flex-start;
+  padding: 0 10px;
   letter-spacing: 0;
   text-transform: none;
   font-weight: 500;

@@ -48,31 +48,38 @@ export function useHostName() {
   return useThisHallvi().name;
 }
 
-/**
- * "on mac-mini", for beside the product name, and — when the last check found
- * one — the quietest possible word that a newer Hallvi exists. It is a link to
- * the place that can install it and nothing else: no badge, no count, and
- * nothing that comes back after it has been read, because the answer only
- * changes when a release does.
- */
+/** "on mac-mini", for beside the product name. Nothing until it is known. */
 export function HostName({ className }: { className?: string }) {
-  const { name, update } = useThisHallvi();
+  const name = useHostName();
   if (!name) return null;
   return (
-    <>
-      <span className={className} title={`This Hallvi runs on ${name}`}>
-        on {name}
-      </span>
-      {update && (
-        <Link
-          className="hv-update-hint"
-          href="/setup/connections#hallvi-version"
-          title={`Hallvi ${update.version} is available`}
-        >
-          Update available
-        </Link>
-      )}
-    </>
+    <span className={className} title={`This Hallvi runs on ${name}`}>
+      on {name}
+    </span>
+  );
+}
+
+/**
+ * The quietest possible word that a newer Hallvi exists: two, and a link to
+ * the one place that can install it. No badge, no count, and nothing that
+ * comes back after it has been read, because the answer only changes when a
+ * release does.
+ *
+ * It sits beside the product name rather than inside that link, which is where
+ * it belongs and also the only place it may be: a link inside a link is not
+ * markup a browser will keep.
+ */
+export function UpdateAvailable({ className }: { className?: string }) {
+  const { update } = useThisHallvi();
+  if (!update) return null;
+  return (
+    <Link
+      className={`hv-update-hint${className ? ` ${className}` : ""}`}
+      href="/setup/connections#hallvi-version"
+      title={`Hallvi ${update.version} is available`}
+    >
+      Update available
+    </Link>
   );
 }
 

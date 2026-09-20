@@ -17,7 +17,7 @@ import {
 } from "./application-sections";
 import type { ChatSummary } from "@/server/types";
 
-import { HostName } from "./host-name";
+import { HostName, UpdateAvailable } from "./host-name";
 
 /**
  * What else this application could run, one click away at the bottom of the
@@ -189,6 +189,7 @@ export function ApplicationNavigation({
           <Link href="/applications" className="hv-navigation-home">
             Hallvi <HostName className="hv-navigation-host" />
           </Link>
+          <UpdateAvailable />
           {head}
         </div>
       ) : (

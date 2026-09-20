@@ -20,7 +20,7 @@ import {
   applicationColors,
   type ApplicationKind,
 } from "./application-kind";
-import { HostName } from "../host-name";
+import { HostName, UpdateAvailable } from "../host-name";
 import { PREVIEWS } from "./interface-previews";
 import s from "./home.module.css";
 
@@ -132,6 +132,7 @@ export function ApplicationsHome({
           Hallvi
           <HostName className={s.host} />
         </Link>
+        <UpdateAvailable />
         <Link className={s.settings} href="/setup/connections">
           <GearSix aria-hidden="true" />
           <span>{piReady ? "Settings" : "Settings · Connect ChatGPT"}</span>
