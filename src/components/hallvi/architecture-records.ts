@@ -32,7 +32,10 @@ import {
   subjectsOfKind,
   topologyOf,
   type RecordCheck,
+  type Topology,
 } from "@/server/record-projection";
+
+import { protectionFromRecords } from "./backups-records";
 
 import { ago } from "./architecture-prototype/model";
 import type { ApplicationSection } from "./application-sections";
@@ -59,6 +62,11 @@ const subjects: Partial<Record<Part["kind"], SubjectKind[]>> = {
   gate: ["door", "access"],
   tls: ["certificate"],
   monitor: ["monitor"],
+  // A destination off the server is not a thing Pi states on its own; what
+  // states it is the copy that reached it. Without this the off-site card
+  // fell through to the source's fallback and read "Where the code came
+  // from", which is a sentence about a repository on a card about a bucket.
+  offsite: ["backup-copy"],
 };
 
 /** The subject a drawn part's records are under, whichever kind Pi chose. */
@@ -89,6 +97,7 @@ const tagKeys: Partial<Record<Part["kind"], string[]>> = {
   gate: ["refused", "open"],
   tls: ["valid"],
   monitor: ["answering"],
+  offsite: ["written"],
 };
 
 /** Where a reader goes to see more about a piece, or about a gap. */
@@ -101,6 +110,7 @@ const destinations: Partial<Record<Part["kind"], ApplicationSection>> = {
   gate: "security",
   tls: "domains",
   offsite: "backups",
+  monitor: "monitoring",
 };
 
 /**
@@ -301,6 +311,97 @@ function list(names: string[]) {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
+type MapPart = Topology["parts"][number];
+
+/**
+ * What the records know that this application's map does not name.
+ *
+ * A topology is composition: Pi writes what the application is made of. The
+ * machine it runs on, the watcher outside it and the place its copies land
+ * are each written down under their own subject instead, which is how Backups
+ * could say "Data on hetzner-999999" and Monitoring "Watcher checked 4 min
+ * ago" while the map drew a server card with no name on it, no watcher at
+ * all, and nothing off the server.
+ *
+ * Nothing is invented here. Each of these is drawn only because a record
+ * states it, and each is drawn under the subject that states it, so its
+ * reading, its facts and its freshness are the same ones the destination it
+ * links to shows. A subject nobody wrote stays undrawn, and the design's own
+ * placeholders keep saying that nobody has looked.
+ */
+function fromRecords(
+  records: SavedInformation[],
+  declared: Set<string>,
+  now: number,
+): MapPart[] {
+  const found: MapPart[] = [];
+  const stated = (kind: SubjectKind) =>
+    subjectsOfKind(records, kind).find((ref) => {
+      const presence = presenceOf(records, ref);
+      return presence.known && presence.presence === "present";
+    });
+
+  if (!declared.has("host")) {
+    const ref = stated("host");
+    // The reference Pi reuses on every later observation, which is the
+    // machine's identity. Its address and size are facts on the card.
+    if (ref)
+      found.push({
+        id: ref.id,
+        kind: "host",
+        name: ref.id,
+        role: "the machine this runs on",
+        plain: "the server everything here runs on",
+      });
+  }
+
+  if (!declared.has("monitor")) {
+    const ref = stated("monitor");
+    if (ref) {
+      const facts = currentFacts(records, ref);
+      const target = facts.get("target")?.value.value;
+      const interval = facts.get("interval")?.value.value;
+      found.push({
+        id: ref.id,
+        kind: "monitor",
+        // The slot is sized for a sentence: the placeholder that stands here
+        // when nothing watches says "Nothing is watching this", and the
+        // positive case is worth saying just as plainly.
+        name: "Something is watching this",
+        role: [
+          target
+            ? `checks ${target.replace(/^https?:\/\//, "")}`
+            : "checks this application",
+          interval ? `every ${interval}` : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        plain:
+          "A watcher outside the server checks this application and can tell you when it stops answering.",
+      });
+    }
+  }
+
+  if (!declared.has("offsite")) {
+    // Backups' own rule, so the two cannot disagree: where the *newest* copy
+    // went, never the union of every copy's destination and never the plan's.
+    // An off-site copy from last week does not move this morning's local copy
+    // off the server, and an intention to write to object storage is not a
+    // transfer that happened.
+    const newest = protectionFromRecords(records, now).copies[0];
+    if (newest && (newest.kind === "off-site" || newest.kind === "controller"))
+      found.push({
+        id: newest.id,
+        kind: "offsite",
+        name: newest.destination ?? "Off the server",
+        role: "where the copies go",
+        plain: "a place off this server that a copy of your data reached",
+      });
+  }
+
+  return found;
+}
+
 /**
  * How the application can be reached. `restricted` alone cannot say "we have
  * not read this back", and the design renders its absence as "anyone", so the
@@ -363,8 +464,17 @@ export function architectureFromRecords({
   // the first, which drew one part over another and left React to report the
   // duplicate key instead of the hidden part.
   const taken = new Set<string>();
+  // What Pi mapped, and what the records know that the map did not name.
+  const mapParts = [
+    ...map.value.parts,
+    ...fromRecords(
+      records,
+      new Set(map.value.parts.map((part) => part.kind)),
+      now,
+    ),
+  ];
   const slots = new Map(
-    map.value.parts.map((part) => {
+    mapParts.map((part) => {
       const wanted = slotFor(part, sshLooking(part, records));
       const slot = taken.has(wanted) ? part.id : wanted;
       taken.add(slot);
@@ -377,7 +487,7 @@ export function architectureFromRecords({
     to: slots.get(edge.to) ?? edge.to,
   }));
 
-  const parts: Part[] = map.value.parts.map((part) => {
+  const parts: Part[] = mapParts.map((part) => {
     const evidence = evidenceFor(records, part, planned, now);
     const facts =
       part.kind === "source"
@@ -492,7 +602,7 @@ export function architectureFromRecords({
   const volumes = of("volume");
   const offsite = of("offsite");
   const host = of("host")[0];
-  const hostSubject = map.value.parts.find((part) => part.kind === "host");
+  const hostSubject = mapParts.find((part) => part.kind === "host");
   const headline = web[0]?.name ?? applicationName;
   const openness = opennessOf(
     records,
@@ -543,7 +653,12 @@ export function architectureFromRecords({
         stops: stops(["volume", "offsite"]),
         summary: volumes.length
           ? offsite.length
-            ? `${list(volumes.map((part) => part.name))} live on the server and are copied to ${list(offsite.map((part) => part.name))}.`
+            ? // What a copy record establishes is that a copy reached the
+              // place, not that copies keep reaching it: the newest attempt
+              // at the same destination may since have failed, and Backups is
+              // where that verdict is read. The map says where, in the tense
+              // the evidence supports.
+              `${list(volumes.map((part) => part.name))} live on the server, and a copy of them reached ${list(offsite.map((part) => part.name))}.`
             : `${list(volumes.map((part) => part.name))} live on the server. ${offServer(records)}`
           : "No stored data is on record for this application.",
       },

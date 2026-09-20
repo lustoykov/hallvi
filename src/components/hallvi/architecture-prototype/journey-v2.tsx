@@ -271,7 +271,18 @@ function layoutFor(model: ArchitectureModel): Layout {
   const height = H + grew;
 
   const visitEnd = services.length ? BOX.svc.x : BOX.app.x;
-  const visitMain = `M196 300H${visitEnd}`;
+  // Where a journey in from outside begins.
+  //
+  // It used to begin at 196 — the right edge of the left-hand column —
+  // whether or not anything had been drawn in that column. A map whose
+  // records name no controller therefore had a line arriving out of blank
+  // canvas, which reads as a piece the page forgot to draw rather than as
+  // traffic from elsewhere. When nothing is drawn out there, the journey
+  // starts at the boundary it actually crosses: the firewall, at the server's
+  // own edge, where the wall already has a door drawn in it.
+  const column = BOX.controller.x + BOX.controller.w;
+  const outside = BOX.server.x;
+  const visitMain = `M${model.byId.controller ? column : outside} 300H${visitEnd}`;
   // A volume's wire starts at whatever mounts it and ends at wherever it was
   // placed, so ownership survives the shelf being shared.
   const centre = (rect: Rect) => rect.x + rect.w / 2;
@@ -299,13 +310,18 @@ function layoutFor(model: ArchitectureModel): Layout {
     model.byId.offsite && ordered.length
       ? `M${dataStart} ${dataY}H${rects.offsite.x}`
       : null;
-  const releaseMain =
-    model.byId.app && (model.byId.source || model.byId.controller)
+  const releaseMain = !model.byId.app
+    ? null
+    : model.byId.source || model.byId.controller
       ? `M110 ${model.byId.source ? BOX.source.y + BOX.source.h : BOX.controller.y + BOX.controller.h}V368Q110 382 124 382H372Q386 382 386 368V346`
-      : null;
-  const releaseFork = services.length
-    ? "M386 382H652Q666 382 666 368V338"
-    : null;
+      : // Same rule as the visit: with nothing drawn in the left column, the
+        // release comes in through the boundary rather than out of nowhere.
+        `M${outside} 382H372Q386 382 386 368V346`;
+  // The fork leaves the release's own run along y=382 to reach a backing
+  // service. Without that run there is nothing to leave, and drawing it
+  // anyway left an elbow on the canvas joined to nothing at either end.
+  const releaseFork =
+    releaseMain && services.length ? "M386 382H652Q666 382 666 368V338" : null;
   const legs: Record<JourneyId, string[][]> = {
     visit: [[visitMain], visitBranches].filter((leg) => leg.length),
     data: dataMain ? [[dataMain]] : [],
@@ -1037,7 +1053,7 @@ export function JourneyDirection({
             <button
               type="button"
               className={`axj2-server-head${selected === "host" ? " is-selected" : ""}${host?.checking ? " is-checking" : ""}`}
-              data-c={host?.evidence.certainty}
+              data-c={host?.evidence.certainty ?? "unknown"}
               onClick={(event) => {
                 event.stopPropagation();
                 setSelected((currentId) =>
@@ -1048,15 +1064,22 @@ export function JourneyDirection({
               <span className="axj2-icon" aria-hidden="true">
                 <HardDrives weight="duotone" />
               </span>
+              {/* The card's header is the machine's name. With no host on
+                  record it used to be an empty element beside an empty
+                  reading — a server card that looked like it had failed to
+                  load. Nothing has been established about the machine, and
+                  saying so is both true and the thing a reader can act on. */}
               <b>
                 {planned
                   ? `${host?.name ?? "Your server"}, once approved`
-                  : host?.name}
+                  : (host?.name ?? "This server")}
               </b>
               <small>{model.region}</small>
               <span className="axj2-status">
                 <i aria-hidden="true" />
-                {host?.checking ? "Checking…" : host?.evidence.short}
+                {host?.checking
+                  ? "Checking…"
+                  : (host?.evidence.short ?? "Not assessed")}
               </span>
             </button>
           </div>
