@@ -213,7 +213,25 @@ describe("Hallvi's own accounts", () => {
 
   it("keeps the account separate from one repository's access", () => {
     const connected = row(own({}), "github");
-    expect(connected.detail).toContain("Signed in as owner");
+    // Saved, not proven, and the App's grants are not the read-only ones the
+    // release happens to use.
+    expect(connected.detail).toContain("Login saved for owner");
+    expect(connected.detail).not.toMatch(/read-only/i);
+    expect(connected.note).toContain("read and write access");
     expect(connected.note).toContain("its own conversation");
+  });
+
+  // A card cannot sign an account out or change the model; those pages can.
+  it("sends a saved account to the page that can change it", () => {
+    expect(row(own({}), "chatgpt").action).toEqual({
+      kind: "link",
+      href: "/setup/pi",
+      label: "Change",
+    });
+    expect(row(own({}), "github").action).toEqual({
+      kind: "link",
+      href: "/setup/github",
+      label: "Manage",
+    });
   });
 });

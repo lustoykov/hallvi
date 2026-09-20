@@ -21,6 +21,29 @@ import type { Check, PermissionMode } from "./types";
 
 import "./onboarding.css";
 
+/**
+ * How long the provider's code still works. Outside the live region on
+ * purpose: a number that changes every second would be read aloud every
+ * second, and the sentence beside it already says what is happening.
+ */
+export function Countdown({ until }: { until: string }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (now === null) return null;
+  const left = Math.max(0, Math.ceil((Date.parse(until) - now) / 1000));
+  return (
+    <span aria-live="off">
+      Code expires in {Math.floor(left / 60)}:
+      {String(left % 60).padStart(2, "0")}
+    </span>
+  );
+}
+
 /** A request drawn as the turn in the conversation that it is. */
 export function RequestCard({
   asks,

@@ -97,6 +97,25 @@ test(
     await expect(composer).toHaveValue(draft);
     await expect(send).toBeDisabled();
 
+    // An attempt the controller no longer holds — it restarted, or the code
+    // ran out long ago — ends the waiting instead of spinning on it forever.
+    const lost = "**/api/pi/setup/login/*";
+    await page.route(lost, (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Gone" }),
+      }),
+    );
+    await startSignIn(card, "Get a new code");
+    await expect(card).toContainText("This code is no longer valid", {
+      timeout: 30_000,
+    });
+    await expect(
+      card.getByRole("button", { name: "Cancel sign-in", exact: true }),
+    ).toHaveCount(0);
+    await page.unroute(lost);
+
     // Retry, this time to a saved login. Saved is not verified, and says so.
     await startSignIn(card, "Get a new code");
     await expect(

@@ -29,6 +29,7 @@ import {
   Away,
   CheckList,
   CopyLine,
+  Countdown,
   Problem,
   Receipt,
   RequestCard,
@@ -77,29 +78,12 @@ function ended(attempt: GithubLoginAttempt | null) {
   }[attempt.status as "cancelled" | "denied" | "expired" | "failed"];
 }
 
-function Countdown({ until }: { until: string }) {
-  const [now, setNow] = useState<number | null>(null);
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    tick();
-    const timer = window.setInterval(tick, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  if (now === null) return null;
-  const left = Math.max(0, Math.ceil((Date.parse(until) - now) / 1000));
-  return (
-    <span aria-live="off">
-      Code expires in {Math.floor(left / 60)}:
-      {String(left % 60).padStart(2, "0")}
-    </span>
-  );
-}
-
 export function GithubConnect({
   repository,
   access,
   checking = false,
   onCheck,
+  onConnected,
   onClose,
   plain = false,
 }: {
@@ -114,6 +98,8 @@ export function GithubConnect({
   checking?: boolean;
   /** Checks this application's repository again with the current login. */
   onCheck?: () => void;
+  /** A login was just saved, so whatever drew this card is out of date. */
+  onConnected?: () => void;
   /** Present while the card can be put away without finishing. */
   onClose?: () => void;
 }) {
@@ -125,9 +111,11 @@ export function GithubConnect({
   const [chose, setChose] = useState(false);
   const alive = useRef(true);
   const check = useRef(onCheck);
+  const connected = useRef(onConnected);
   useEffect(() => {
     check.current = onCheck;
-  }, [onCheck]);
+    connected.current = onConnected;
+  }, [onCheck, onConnected]);
 
   const load = useCallback(async () => {
     const fresh = await request<GithubSetupStatus>("/api/github/setup");
@@ -165,6 +153,7 @@ export function GithubConnect({
           await load();
           // Signing in is the owner asking whether this now works.
           check.current?.();
+          connected.current?.();
         }
         setAttempt(next);
       } catch (caught) {
@@ -328,6 +317,7 @@ export function GithubConnect({
     if (!status)
       return (
         <RequestCard
+          plain={plain}
           asks="is reading its GitHub connection"
           state="working"
           label="GitHub account"

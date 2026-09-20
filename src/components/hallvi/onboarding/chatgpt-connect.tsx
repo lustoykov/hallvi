@@ -18,7 +18,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { PiLoginAttempt, PiSetupStatus } from "@/server/pi-setup";
 
-import { Away, CopyLine, Problem, Receipt, RequestCard } from "./pieces";
+import {
+  Away,
+  CopyLine,
+  Countdown,
+  Problem,
+  Receipt,
+  RequestCard,
+} from "./pieces";
+
+/** The status matters to the caller: 404 is an answer, not a bad line. */
+class RequestFailed extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -28,7 +45,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok || !data)
-    throw new Error(data?.error ?? "Could not reach Hallvi. Try again.");
+    throw new RequestFailed(
+      data?.error ?? "Could not reach Hallvi. Try again.",
+      response.status,
+    );
   return data;
 }
 
@@ -87,11 +107,23 @@ export function ChatgptConnect({
           if (!alive.current) return;
           if (next.state === "complete") await load();
           setAttempt(next);
-        } catch {
+        } catch (caught) {
           if (!alive.current) return;
-          // A check that failed says nothing about the sign-in: keep asking.
+          // The controller no longer holds this attempt — it was restarted, or
+          // the code ran out long ago. Waiting on it would never end.
+          const lost = caught instanceof RequestFailed && caught.status === 404;
           setAttempt((latest) =>
-            latest?.id === current.id ? { ...latest } : latest,
+            latest?.id !== current.id
+              ? latest
+              : lost
+                ? {
+                    ...latest,
+                    state: "failed",
+                    message:
+                      "This code is no longer valid. Nothing was saved; a new code takes one click.",
+                  }
+                : // A check that failed says nothing about the sign-in.
+                  { ...latest },
           );
         }
       },
@@ -193,7 +225,8 @@ export function ChatgptConnect({
           )}
           <p className="hv-ob-fine" role="status">
             <SpinnerGap className="spin" aria-hidden="true" /> Waiting for you
-            to approve on ChatGPT. Nothing else is happening.
+            to approve on ChatGPT. Nothing else is happening.{" "}
+            {attempt.expiresAt && <Countdown until={attempt.expiresAt} />}
           </p>
           <div className="hv-ob-row">
             <button

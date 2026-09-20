@@ -24,14 +24,16 @@ rounded: {card: "14px", button: "7px", help: "12px"}
 
 **Settings is one page (20 September 2026).** `/setup/connections` lists every
 account Hallvi acts through — ChatGPT, GitHub, Pi's workspace, then the owner's
-providers — each with its state in words and one action. ChatGPT and GitHub
-expand the same cards the conversation draws (`onboarding/chatgpt-connect.tsx`,
-`onboarding/github-connect.tsx`) with `plain` set, so there is one sign-in in
-the product rather than a settings copy of it. Only the first row that wants
-the owner carries the blue action. The per-account routes remain for what does
-not belong in a list: model preferences, repository checks, the workspace
-choice. The chosen direction and the alternatives are on the
-`prototype/guided-setup` branch.
+providers — each with its state in words and one action. A ChatGPT or GitHub
+row that is not connected expands the same card the conversation draws
+(`onboarding/chatgpt-connect.tsx`, `onboarding/github-connect.tsx`) with
+`plain` set, so there is one sign-in in the product rather than a settings copy
+of it. A row that already holds a login links to its own page instead: changing
+an account, signing out and choosing a model are not things a sign-in card can
+do. Only the first row that wants the owner carries the blue action. The
+per-account routes remain for what does not belong in a list: model
+preferences, repository checks, the workspace choice. The chosen direction and
+the alternatives are on the `prototype/guided-setup` branch.
 
 This documents the existing settings surface. The [operator redesign](../operator-design.md) adds permission modes whose placement and controls are not designed here yet. Preserve useful visual conventions without treating current settings as feature-complete.
 

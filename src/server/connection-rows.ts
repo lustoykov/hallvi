@@ -124,11 +124,12 @@ export function connectionRows(facts: ConnectionFacts): ConnectionItem[] {
       credential: facts.own.model.saved
         ? "Login held by this controller"
         : null,
-      action: {
-        kind: "form",
-        form: "chatgpt",
-        label: facts.own.model.saved ? "Change" : "Connect ChatGPT",
-      },
+      // Signing in belongs here, beside the row that asked for it. Changing
+      // an account that is already saved does not: that page holds the model
+      // preferences and the way to sign out, and a card cannot.
+      action: facts.own.model.saved
+        ? { kind: "link", href: "/setup/pi", label: "Change" }
+        : { kind: "form", form: "chatgpt", label: "Connect ChatGPT" },
     },
     {
       id: "github",
@@ -142,25 +143,26 @@ export function connectionRows(facts: ConnectionFacts): ConnectionItem[] {
       detail: facts.own.github.issue
         ? facts.own.github.issue
         : facts.own.github.account
-          ? `Signed in as ${facts.own.github.account}. Read-only, for the repositories you picked on GitHub.`
+          ? `Login saved for ${facts.own.github.account}, for the repositories you picked on GitHub.`
           : facts.own.github.signIn
             ? "Not connected. Public repositories are read without an account."
             : "This release can’t sign in to GitHub. Public repositories still work.",
       credential: facts.own.github.account
         ? "Login held by this controller · renews by itself"
         : null,
+      // The grants are the App's, not this release's use of them, and the
+      // owner agreed to them on GitHub: saying so here is the only place the
+      // two can be compared.
       note: facts.own.github.account
-        ? "Whether one application’s repository can be read is checked in its own conversation."
+        ? "The published Hallvi App holds read and write access to code and pull requests; this release only reads. Whether one application’s repository can be read is checked in its own conversation."
         : undefined,
-      action: {
-        kind: "form",
-        form: "github",
-        label: facts.own.github.account
-          ? "Repositories"
-          : facts.own.github.signIn
-            ? "Connect GitHub"
-            : "Why",
-      },
+      action: facts.own.github.account
+        ? { kind: "link", href: "/setup/github", label: "Manage" }
+        : {
+            kind: "form",
+            form: "github",
+            label: facts.own.github.signIn ? "Connect GitHub" : "Why",
+          },
     },
     {
       id: "workspace",

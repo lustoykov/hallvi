@@ -293,7 +293,9 @@ export function ConnectionsScreen({
                     onConnected={connected}
                   />
                 ) : item.action.form === "github" ? (
-                  <GithubConnect plain />
+                  // It stays open on its own receipt; only the row above it,
+                  // which the server drew, has to be told.
+                  <GithubConnect plain onConnected={() => router.refresh()} />
                 ) : (
                   <ProviderTokenForm
                     provider={item.action.form}
