@@ -1257,6 +1257,12 @@
   color: var(--muted);
   text-decoration: none;
 }
+/* Which machine this Hallvi runs on. Not shouted: the name is lower case. */
+.hv-navigation-host {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 450;
+}
 .hv-navigation-home:hover {
   color: var(--ink);
 }

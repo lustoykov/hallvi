@@ -8,6 +8,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 
+import { cloudflareHandoff } from "@/components/hallvi/onboarding/connection-requests";
 import {
   DomainConnect,
   wantedName,
@@ -57,14 +58,34 @@ it("names the application address beside the Cloudflare zone, not instead of it"
   expect(html).toContain(NAME);
   // The zone is named for the token's scope, and the address for publishing.
   expect(html).toContain(`choose only <b>${ZONE}</b>`);
-  expect(html).toContain(`Hallvi writes the record for <b>${NAME}</b>`);
+  // What the token can reach and what Hallvi means to write are separate
+  // claims: a Cloudflare grant is zone-wide, and saying otherwise would
+  // promise a limit the token does not carry.
+  expect(html).toContain(`can reach every record in <b>${ZONE}</b>`);
+  expect(html).toContain(`sets out to write is <b>${NAME}</b>`);
 });
 
-it("keeps the subdomain in the settled receipt instead of showing only the zone", () => {
+it("keeps the settled receipt to the connection, which is all that is done", () => {
   const html = card({ ...atCloudflare }, true);
-  expect(html).toContain(`${NAME} opens the application`);
   expect(html).toContain(`Cloudflare connected for ${ZONE}`);
-  expect(html).toContain(`Hallvi writes one record, for ${NAME}`);
+  expect(html).toContain(`ready to open ${NAME}`);
+  // Access is stored here; no record is written, nothing is published and
+  // nothing is verified. A receipt that says the name already opens the
+  // application is a success the owner cannot yet check.
+  expect(html).not.toContain(`${NAME} opens the application`);
+  expect(html).toContain(`Hallvi will write one record, for ${NAME}`);
+});
+
+it("tells Hallvi the publishing name apart from the zone, and only when they differ", () => {
+  expect(cloudflareHandoff(NAME, ZONE)).toBe(
+    `Cloudflare is connected for the zone ${ZONE}, which holds ${NAME}. ` +
+      `Please point ${NAME} at the server and publish the application at ${NAME}, not at ${ZONE}.`,
+  );
+  // A root domain is its own zone; "at X, not at X" contradicts itself.
+  expect(cloudflareHandoff(ZONE, ZONE)).toBe(
+    `Cloudflare is connected for ${ZONE}. ` +
+      `Please point ${ZONE} at the server and publish the application there.`,
+  );
 });
 
 it("says which name an unregistered answer was about, rather than its parent", () => {

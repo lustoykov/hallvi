@@ -36,6 +36,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   rmSync(config, { recursive: true, force: true });
@@ -367,4 +368,51 @@ it("watches for a manual record through public DNS when the configured resolver 
   expect(await recordResolves("test.accountant-agent.com", "203.0.113.7")).toBe(
     true,
   );
+});
+
+it("stops an unanswered DNS lookup without calling the domain unregistered", async () => {
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  vi.useFakeTimers();
+  let rejectLookup: (error: Error) => void = () => {};
+  const resolveNs = vi
+    .spyOn(Resolver.prototype, "resolveNs")
+    .mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectLookup = reject;
+        }),
+    );
+  const cancel = vi
+    .spyOn(Resolver.prototype, "cancel")
+    .mockImplementation(() => {
+      rejectLookup(
+        Object.assign(new Error("cancelled"), { code: "ECANCELLED" }),
+      );
+    });
+  const result = whoHostsDns("app.example.com");
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(await result).toEqual({ kind: "unreachable" });
+  expect(cancel).toHaveBeenCalled();
+  // The deadline ends the lookup, not only the queries in flight. The
+  // fallback resolver was idle when it fired, and cancelling cannot reach a
+  // query that was never sent: asking it now would start a fresh wait past
+  // the deadline, and each parent zone after it another.
+  expect(resolveNs).toHaveBeenCalledTimes(1);
+});
+
+it("finds the parent DNS zone and clears the deadline after an answer", async () => {
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  vi.useFakeTimers();
+  vi.spyOn(Resolver.prototype, "resolveNs")
+    .mockRejectedValueOnce(
+      Object.assign(new Error("no nameservers"), { code: "ENODATA" }),
+    )
+    .mockResolvedValueOnce(["ada.ns.cloudflare.com"]);
+  const cancel = vi.spyOn(Resolver.prototype, "cancel");
+  expect(await whoHostsDns("app.example.com")).toEqual({
+    kind: "cloudflare",
+    zone: "example.com",
+  });
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(cancel).not.toHaveBeenCalled();
 });

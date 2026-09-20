@@ -10,6 +10,7 @@
 // account id, because pointing a name at a server needs none of them.
 
 import { useEffect, useRef, useState } from "react";
+import { SpinnerGap } from "@phosphor-icons/react";
 
 import {
   Away,
@@ -128,6 +129,36 @@ export interface DomainProgress {
   guideAt: number;
 }
 
+function LookupStatus({ stage }: { stage: "dns" | "cloudflare" }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="hv-ob-lookup-status">
+      <SpinnerGap className="spin" aria-hidden="true" />
+      <div role="status">
+        <strong>
+          {stage === "dns"
+            ? "Finding your domain’s DNS provider…"
+            : "Checking your saved Cloudflare connection…"}
+        </strong>
+        <p>
+          {elapsed >= 10
+            ? "This is taking longer than usual. You can leave this for later; your current address keeps working."
+            : "This only checks access. It does not change your domain."}
+        </p>
+      </div>
+      <span aria-hidden="true">{elapsed}s</span>
+    </div>
+  );
+}
+
 export function DomainConnect({
   application,
   serverAddress,
@@ -152,7 +183,10 @@ export function DomainConnect({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState(progress.name);
-  const [looking, setLooking] = useState(false);
+  const [lookupStage, setLookupStage] = useState<"dns" | "cloudflare" | null>(
+    null,
+  );
+  const looking = lookupStage !== null;
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<CloudflareOutcome | null>(null);
   // A Cloudflare connection made earlier that already covers this zone.
@@ -178,13 +212,15 @@ export function DomainConnect({
         <Receipt
           title={
             way === "cloudflare"
-              ? `${name} opens the application · Cloudflare connected for ${zone}`
+              ? // What is done is the connection, not the publishing: no
+                // record has been written and nothing is served yet.
+                `Cloudflare connected for ${zone} · ready to open ${name}`
               : `${name} points at ${serverAddress} · added by you`
           }
         >
           <p className="hv-ob-fine">
             {way === "cloudflare"
-              ? `Hallvi writes one record, for ${name}, in the zone ${zone}; nothing else in that zone is touched. The token is saved in a file on this computer that only your user account can read, unencrypted; the AI model never sees it. It reaches only the zones you chose on Cloudflare. Delete it under My Profile › API Tokens to withdraw access.`
+              ? `Hallvi will write one record, for ${name}, and tell you when ${name} is serving the application. Cloudflare grants access a zone at a time, so the token can reach every record in ${zone}. It is saved in a file on this computer that only your user account can read, unencrypted; the AI model never sees it. Delete it under My Profile › API Tokens to withdraw access.`
               : "Hallvi holds no access to your DNS. If the server’s address ever changes, the record is yours to update."}
           </p>
         </Receipt>
@@ -194,14 +230,15 @@ export function DomainConnect({
   const lookup = async () => {
     const wanted = wantedName(draft);
     if (!wanted) return;
-    setLooking(true);
+    setLookupStage("dns");
     const answer = await transport.whoHostsDns(wanted);
+    if (answer.kind === "cloudflare") setLookupStage("cloudflare");
     const held =
       answer.kind === "cloudflare"
         ? await transport.existingCloudflare(answer.zone)
         : null;
     setExisting(held?.kind === "connected" ? held.edit : null);
-    setLooking(false);
+    setLookupStage(null);
     onProgress({
       name: wanted,
       host: answer,
@@ -263,7 +300,8 @@ export function DomainConnect({
           Not now
         </button>
       </form>
-      {edited && host && (
+      {lookupStage && <LookupStatus stage={lookupStage} />}
+      {!looking && edited && host && (
         <p className="hv-ob-fine" role="status">
           The last answer was about <b>{name}</b>. Press <b>Look up again</b> to
           check the name now in the box.
@@ -274,17 +312,17 @@ export function DomainConnect({
         current address keeps working.
       </p>
 
-      {found?.kind === "unreachable" && (
+      {!looking && found?.kind === "unreachable" && (
         <Problem title={`No DNS answer came back for ${name}`}>
           <p>
             Hallvi asked this computer&rsquo;s own DNS server and then public
             resolvers, and neither answered in time. That says nothing about{" "}
-            {name}, which may well exist. Check the network and look it up
-            again.
+            {name}, which may well exist. Your domain hasn&rsquo;t changed;
+            check the network and look it up again.
           </p>
         </Problem>
       )}
-      {found?.kind === "unregistered" && (
+      {!looking && found?.kind === "unregistered" && (
         <Problem title={`Nobody answers for ${name}`}>
           <p>
             DNS answered, and has no name servers for {name} or for any domain
@@ -388,9 +426,15 @@ export function DomainConnect({
               A Cloudflare token that can <b>read and edit DNS records</b> in
               the zones you pick, and nothing else: not your account, billing,
               other zones or storage. You choose the zone on Cloudflare&rsquo;s
-              page; choose only <b>{zone}</b>, because that is the zone{" "}
-              <b>{name}</b> sits in. Hallvi writes the record for <b>{name}</b>{" "}
-              and leaves everything else in the zone alone.
+              page; choose only <b>{zone}</b>
+              {name !== zone && (
+                <>
+                  , because that is the zone <b>{name}</b> sits in
+                </>
+              )}
+              . Cloudflare grants a whole zone at a time, so the token can reach
+              every record in <b>{zone}</b>; the one Hallvi sets out to write is{" "}
+              <b>{name}</b>.
             </p>
             <ModeLine mode={mode} action="change your DNS" />
           </div>

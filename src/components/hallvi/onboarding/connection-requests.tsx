@@ -30,6 +30,20 @@ import {
   type PermissionMode,
 } from "./types";
 
+/**
+ * What Hallvi is told once Cloudflare access is in place.
+ *
+ * The zone is where the token reaches; the name is what gets published. A
+ * subdomain names both, so it cannot be rounded up to the domain its zone is
+ * named after. A root domain is its own zone, and setting it against itself
+ * would read as two different names.
+ */
+export function cloudflareHandoff(name: string, zone: string) {
+  return name === zone
+    ? `Cloudflare is connected for ${name}. Please point ${name} at the server and publish the application there.`
+    : `Cloudflare is connected for the zone ${zone}, which holds ${name}. Please point ${name} at the server and publish the application at ${name}, not at ${zone}.`;
+}
+
 interface Held {
   requests: ConnectionRequest[];
   mode: PermissionMode;
@@ -191,6 +205,45 @@ export function useConnectionRequests({
     cards.set(point, [...(cards.get(point) ?? []), card]);
   };
 
+  // Place access choices first so a domain form at the same message follows
+  // the "Use my domain" action that opened it.
+  if (access && accessContent && held.hostAddress)
+    place(
+      access.establishedAt ?? access.createdAt,
+      <RequestCard
+        key="ladder"
+        asks="can open it to more people"
+        state="done"
+        label="Who can open it"
+      >
+        <ReachLadder
+          application={application}
+          privateUrl={
+            accessContent.mode === "private"
+              ? (access.presentation?.url ?? null)
+              : null
+          }
+          home={home}
+          directUrl={home ? null : direct}
+          domainUrl={reach === "domain" ? publicUrl : null}
+          reach={reach}
+          unclaimed="unknown"
+          busy={poll ? "direct" : null}
+          onDirect={() => {
+            onTell(
+              home
+                ? "Please open the application to the devices on my home network, at the machine's own address."
+                : `Please make the application public at its direct address, ${direct}, without a domain.`,
+            );
+          }}
+          onDomain={async () => {
+            await post({ action: "open-domain" });
+            void read();
+          }}
+        />
+      </RequestCard>,
+    );
+
   for (const request of held.requests) {
     if (request.kind === "host")
       place(
@@ -236,9 +289,6 @@ export function useConnectionRequests({
           done={Boolean(request.settledAt)}
           onReady={async (via) => {
             const { name, host } = request.progress;
-            // The zone is where the token reaches; the name is what gets
-            // published. Telling Hallvi both keeps a subdomain from being
-            // rounded up to the domain its zone is named after.
             const zone = host && "zone" in host ? host.zone : name;
             // A connection made earlier settles here; one pasted just now
             // already has, and settling twice changes nothing.
@@ -251,7 +301,7 @@ export function useConnectionRequests({
             void read();
             onTell(
               via === "cloudflare"
-                ? `Cloudflare is connected for the zone ${zone}. Please point ${name} at the server and publish the application at ${name}, not at ${zone}.`
+                ? cloudflareHandoff(name, zone)
                 : `I added the DNS record myself: ${name} now resolves to ${held.hostAddress}. Please publish the application there; there is no record for you to write.`,
             );
           }}
@@ -262,44 +312,6 @@ export function useConnectionRequests({
         />,
       );
   }
-
-  // The ladder sits with the record that says the application can be opened.
-  if (access && accessContent && held.hostAddress)
-    place(
-      access.establishedAt ?? access.createdAt,
-      <RequestCard
-        key="ladder"
-        asks="can open it to more people"
-        state="done"
-        label="Who can open it"
-      >
-        <ReachLadder
-          application={application}
-          privateUrl={
-            accessContent.mode === "private"
-              ? (access.presentation?.url ?? null)
-              : null
-          }
-          home={home}
-          directUrl={home ? null : direct}
-          domainUrl={reach === "domain" ? publicUrl : null}
-          reach={reach}
-          unclaimed="unknown"
-          busy={poll ? "direct" : null}
-          onDirect={() => {
-            onTell(
-              home
-                ? "Please open the application to the devices on my home network, at the machine's own address."
-                : `Please make the application public at its direct address, ${direct}, without a domain.`,
-            );
-          }}
-          onDomain={async () => {
-            await post({ action: "open-domain" });
-            void read();
-          }}
-        />
-      </RequestCard>,
-    );
 
   const hostRequest = held.requests.find((request) => request.kind === "host");
   const journey: JourneyFacts = {

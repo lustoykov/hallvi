@@ -195,9 +195,18 @@ type NsAnswer =
  * Who is delegated a name, asked of each resolver in turn. A resolver that
  * answers settles it; only silence moves on to the next one, so public DNS
  * is reached for exactly the queries the configured resolver dropped.
+ *
+ * Once the lookup is out of time no further query is sent: cancelling only
+ * reaches queries already in flight, and a resolver that was idle at the
+ * deadline would otherwise start a fresh wait of its own.
  */
-async function askNs(resolvers: Resolver[], zone: string): Promise<NsAnswer> {
+async function askNs(
+  resolvers: Resolver[],
+  zone: string,
+  outOfTime: () => boolean,
+): Promise<NsAnswer> {
   for (const resolver of resolvers) {
+    if (outOfTime()) break;
     try {
       const nameservers = await resolver.resolveNs(zone);
       // An empty answer is still an answer: nothing is delegated here.
@@ -224,17 +233,22 @@ async function askNs(resolvers: Resolver[], zone: string): Promise<NsAnswer> {
 export async function whoHostsDns(name: string): Promise<DnsHost> {
   const resolvers = resolverChain();
   // Bound the whole walk, parents included. These resolvers belong to this
-  // lookup, so cancelling them cannot interrupt another one.
+  // lookup, so cancelling them cannot interrupt another one. Cancelling
+  // reaches only queries in flight, so the deadline is also a fact the walk
+  // reads: no parent is tried, and no resolver asked, once it has passed.
+  let expired = false;
   const deadline = setTimeout(() => {
+    expired = true;
     for (const resolver of resolvers) resolver.cancel();
   }, LOOKUP_MS);
+  const outOfTime = () => expired;
   try {
     const labels = name.split(".");
     for (let from = 0; from < labels.length - 1; from++) {
       const zone = labels.slice(from).join(".");
       // A registry's own second level (co.uk, com.au) is nobody's zone.
       if (/^(co|com|org|net|gov|ac|edu)\.[a-z]{2}$/.test(zone)) break;
-      const answer = await askNs(resolvers, zone);
+      const answer = await askNs(resolvers, zone, outOfTime);
       if (answer.said === "nothing") return { kind: "unreachable" };
       // Nothing is delegated at this name: its parent may still hold it,
       // which is the ordinary case for a subdomain with no records yet.
