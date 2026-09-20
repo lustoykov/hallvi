@@ -84,10 +84,15 @@ flowchart TD
 
    Before the first message, an app-specific introduction says what Hallvi
    will inspect and offers **Read repository**, or **Connect ChatGPT** if
-   needed. Connection uses the existing account flow in an app-specific view
-   with the same caretaker and name. Model preferences are optional and
-   collapsed. The explicit **Read repository** action after connection sends
-   the inspection request and returns to that conversation, already queued.
+   needed. Connecting happens in the conversation
+   (`onboarding/chatgpt-connect.tsx`): the code, the waiting and the three
+   ways it can end are drawn beside the composer, so an unsent message never
+   travels and there is no trip to return from. The card reuses the existing
+   login endpoints, including the offer to share a login already on the
+   machine; model preferences stay in Settings, one link away. A saved login
+   says it is checked with the first message, because nothing has been asked
+   of ChatGPT until then. The explicit **Read repository** action sends
+   the inspection request.
    It asks Pi to explain the app, its requirements and a sensible hosting
    option, without renting, deploying or changing anything. Authentication
    alone never starts a turn. The existing message request key makes retries
@@ -343,8 +348,6 @@ though the direct address still answers.
 - Settings › Connections still uses the bare token forms (with corrected
   wording): the write probe needs an application's key, which that page does
   not have. `provider-token-form.tsx` therefore stays.
-- ChatGPT sign-in inside the conversation is drawn only in the prototype; the
-  product still uses the existing setup-return trip.
 - Keyboard order, screen-reader output, contrast at zoom and widths under
   640px were not audited. Backups are out of scope and can reuse the card.
 - Developed on Node 26 because Node 22 is not installed on this machine; the
