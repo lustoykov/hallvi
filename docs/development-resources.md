@@ -44,7 +44,7 @@ source history, and keeping old runtime data there is not an acceptance
 requirement.
 
 **One registered environment is the exception, and being the exception is what
-it is for.** The [persistent development environment](development-environment.md)
+it is for.** The [development environment](development-environment.md)
 keeps its applications, conversations, records and the deployed applications'
 own data across restarts, code upgrades and supported schema changes. Starting
 it empty would destroy the only thing it can prove. So a change to how Hallvi

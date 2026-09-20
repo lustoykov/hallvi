@@ -11,10 +11,11 @@ Development runs locally on the owner's MacBook, not on the Mac mini.
 Before creating or retiring development resources, read and follow
 [development resource ownership and cleanup](docs/development-resources.md).
 Before building a fixture, check whether the
-[persistent development environment](docs/development-environment.md) already
-has one: it keeps four really deployed applications, with their conversations
-and data, between tasks. Inspect it freely; claim it before changing it; use a
-disposable fixture for deletion, failure and recovery work.
+[development environment](docs/development-environment.md) already has one:
+`npm run dev` in the designated checkout opens four really deployed
+applications with their conversations and data. Say which one you are
+changing, and say when you are done; use a disposable fixture for deletion,
+failure and recovery work.
 This file is for agents developing Hallvi, never the product operator Pi.
 Pi has separate runtime instructions; do not inject contributor instructions,
 local agent skills or development automation prompts into product sessions.
