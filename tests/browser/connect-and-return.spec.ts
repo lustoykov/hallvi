@@ -87,12 +87,46 @@ test(
     const card = page.getByRole("region", { name: "Connect ChatGPT" });
     await expect(card).toBeVisible();
 
-    // A cancelled sign-in leaves everything where it was.
+    // Hold an already-issued poll across cancellation: its old waiting result
+    // must not bring the cancelled card back to life.
+    let releasePoll!: () => void;
+    const held = new Promise<void>((resolve) => {
+      releasePoll = resolve;
+    });
+    let sawPoll!: () => void;
+    const polling = new Promise<void>((resolve) => {
+      sawPoll = resolve;
+    });
+    const pollPath = "**/api/pi/setup/login/*";
+    await page.route(pollPath, async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const response = await route.fetch();
+      const result = await response.json();
+      sawPoll();
+      await held;
+      await route.fulfill({ json: { ...result, state: "awaiting-user" } });
+    });
     await startSignIn(card);
+    await polling;
     await card
       .getByRole("button", { name: "Cancel sign-in", exact: true })
       .click();
     await expect(card).toContainText("Nothing was saved");
+    const staleResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/pi/setup/login/") &&
+        response.request().method() === "GET",
+    );
+    releasePoll();
+    await staleResponse;
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    await expect(card).toContainText("Sign-in cancelled");
+    await page.unroute(pollPath);
     expect(page.url()).toBe(conversation);
     await expect(composer).toHaveValue(draft);
     await expect(send).toBeDisabled();

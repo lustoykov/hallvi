@@ -98,17 +98,18 @@ export function ChatgptConnect({
   useEffect(() => {
     if (!pending(attempt)) return;
     const current = attempt!;
+    let active = true;
     const timer = window.setTimeout(
       async () => {
         try {
           const next = await request<PiLoginAttempt>(
             `/api/pi/setup/login/${current.id}`,
           );
-          if (!alive.current) return;
+          if (!active || !alive.current) return;
           if (next.state === "complete") await load();
           setAttempt(next);
         } catch (caught) {
-          if (!alive.current) return;
+          if (!active || !alive.current) return;
           // The controller no longer holds this attempt — it was restarted, or
           // the code ran out long ago. Waiting on it would never end.
           const lost = caught instanceof RequestFailed && caught.status === 404;
@@ -129,7 +130,10 @@ export function ChatgptConnect({
       },
       current.state === "starting" ? 700 : 1_500,
     );
-    return () => window.clearTimeout(timer);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [attempt, load]);
 
   async function act(work: () => Promise<void>) {
@@ -170,6 +174,18 @@ export function ChatgptConnect({
         {error ? (
           <Problem title="Hallvi didn’t answer">
             <p>{error}</p>
+            <button
+              type="button"
+              className="hv-ob-quiet"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await load();
+                })
+              }
+            >
+              Try again
+            </button>
           </Problem>
         ) : (
           <p>

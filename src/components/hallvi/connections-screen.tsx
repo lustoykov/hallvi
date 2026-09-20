@@ -251,7 +251,11 @@ export function ConnectionsScreen({
                     className={`${
                       item.id === leading ? s.primary : s.textButton
                     } ${s.connectionAction}`}
-                    href={item.action.href}
+                    href={
+                      item.action.href.startsWith("/setup/")
+                        ? `${item.action.href}${returnTo?.query ?? ""}`
+                        : item.action.href
+                    }
                   >
                     {item.action.label}
                   </Link>
