@@ -356,16 +356,18 @@ between, so opening a page never waits on the network.
 changes.
 
 **A new version that keeps its records in another schema** is either migrated
-or refused, and never guessed at. Hallvi asks
-[the list of supported migrations](../scripts/migrations.mjs) whether anything
-joins the two versions.
+or refused, and never guessed at. The release says which schemas it can take
+records from, in its signed manifest; the installation reading it is the older
+one and could not know about a migration written after it shipped.
 
-If nothing does, the release is refused before it is downloaded, naming both
-schemas, and refused again by the installer against the real database. Keep or
+If it does not name yours, the release is refused before it is downloaded,
+naming both schemas, and the claim is checked again by the installer against
+the real database from
+[the list in the archive](../scripts/migrations.mjs). Keep or
 reinstall the version that wrote the database, or move the database aside and
 start fresh. Nothing deletes or rewrites it.
 
-If something does, the upgrade carries it out, in this order and no other:
+If it does, the upgrade carries it out, in this order and no other:
 
 1. Pi stops taking new work, and says how much is still going on. Work in
    progress stops the update rather than being interrupted.
@@ -378,8 +380,11 @@ If something does, the upgrade carries it out, in this order and no other:
    finished once the interface reports the installed revision and the worker
    answers.
 
-**If step 5 or 6 fails**, the installer puts the records back from the copy it
-made and the old program back from the one it kept, and starts it again.
+**If step 5 or 6 fails**, the installer first stops the service and waits for
+the service manager to agree it is gone — a start that reported failure can
+leave a service loaded and being retried, and nothing is replaced while
+anything might still be writing. Then it puts the records back from the copy
+it made, the old program back from the one it kept, and starts it again.
 Putting the program back is not on its own a rollback: the old version would
 meet a database in a schema it does not know and refuse it, which is the
 correct refusal and not a recovery. If you ever need to do this by hand, the
