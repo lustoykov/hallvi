@@ -34,6 +34,7 @@ Archives, both built on the platform they run on:
 | `0.2.0-alpha.4`, `0.2.0-alpha.5` | `146a7819` | Ubuntu 24.04 x64 |
 | `0.3.0-alpha.1`, `0.3.0-alpha.2` | `8bd12548` | Ubuntu 24.04 x64 |
 | `0.3.0-alpha.3`, `0.3.0-alpha.4` | `b2a7ccad` | Ubuntu 24.04 x64 |
+| `0.3.0-alpha.5` | `7e2b45c6` | Ubuntu 24.04 x64 |
 
 Each Linux archive is 278 MB and carries Node.js 22.23.2, the built interface,
 the Pi worker and production dependencies with both native modules.
@@ -142,12 +143,21 @@ small panel — revision, machine, channel, last looked, the offer, **Update**
 and **Check for updates** — when the line is clicked. Settings went back to
 the six accounts.
 
-That move was installed and read in the running product too, over four more
-updates (`0.3.0-alpha.1` through `0.3.0-alpha.4`, all from `b2a7ccad` and
-`8bd12548`). It found one layout defect on the way: `.hv-application-navigation
-button` gives every button in that sidebar a row's height and type size, which
-outranked these rules and cut the version to an ellipsis the moment the second
-line appeared. Scoped past it and stacked.
+That move was installed and read in the running product too, over five more
+updates (`0.3.0-alpha.1` through `0.3.0-alpha.5`). It found three layout
+defects on the way, each fixed and reinstalled before the next look:
+
+- `.hv-application-navigation button` gives every button in that sidebar a
+  row's height and type size, which outranked these rules and cut the version
+  to an ellipsis the moment the second line appeared. Scoped past it, and the
+  two lines stacked.
+- The panel opened in the flow and grew the footer from 56 to 167 pixels,
+  pushing Settings and the conversation list about every time. It is a layer
+  now, beside the line, and the footer measures 56 pixels open or shut. A click
+  away or Escape dismisses it; both checked in the running product.
+- The machine name beside the product name wrapped onto a second line whenever
+  it was long, which is most of them. It is cut instead, with the whole name
+  still in its title and in the tab title.
 
 ### Releases that must not be installed
 
