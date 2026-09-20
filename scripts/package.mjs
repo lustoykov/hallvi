@@ -115,6 +115,7 @@ try {
     "scripts/dev-environment.mjs",
     "scripts/state-location.mjs",
     "scripts/installed-ports.mjs",
+    "scripts/worker-socket.mjs",
     "scripts/pi-workspace",
     "dist/worker.mjs",
     "dist/worker.mjs.map",
@@ -154,6 +155,12 @@ try {
     join(target, "dist", "release.json"),
     `${JSON.stringify({ version, revision, platform, nodeVersion: NODE_VERSION }, null, 2)}\n`,
   );
+  // Exercise the shipped command, not the checkout's imports. A missing
+  // runtime helper must fail packaging before the archive is handed out.
+  execFileSync(resolve(target, "node", "bin", "node"), ["scripts/cli.mjs"], {
+    cwd: target,
+    stdio: "inherit",
+  });
   writeFileSync(
     join(target, "dist", "github-app.json"),
     `${JSON.stringify({ clientId: githubClientId, slug: githubSlug }, null, 2)}\n`,

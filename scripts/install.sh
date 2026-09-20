@@ -121,6 +121,8 @@ rm "$staging/install.sh"
 # nothing to check yet.
 say "Checking the controller database"
 "$staging/node/bin/node" "$staging/app/scripts/serve.mjs" --check-installed
+"$staging/node/bin/node" "$staging/app/scripts/cli.mjs" >/dev/null ||
+  fail "the archive's command cannot load; nothing was replaced."
 
 # Everything that can fail has happened. Only now does a running service stop,
 # so a failed upgrade leaves the old one serving. Its state is elsewhere and is
