@@ -115,6 +115,7 @@ try {
     "scripts/dev-environment.mjs",
     "scripts/state-location.mjs",
     "scripts/installed-ports.mjs",
+    "scripts/service-owner.mjs",
     "scripts/worker-socket.mjs",
     "scripts/pi-workspace",
     "dist/worker.mjs",

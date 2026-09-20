@@ -142,6 +142,10 @@ and private data from any logs you share.
 | Model account (ChatGPT connection) | `~/.config/hallvi/pi` | Kept |
 | Service definition | `~/Library/LaunchAgents/com.hallvi.plist` or `~/.config/systemd/user/hallvi.service` | Rewritten by `start` |
 
+There is one service per user account, whatever `HOME` or `HALLVI_DATA_DIR`
+say. `start`, `stop`, `restart` and `uninstall` refuse, changing nothing, when
+the loaded service runs from a different program directory than the command.
+
 Optional settings go in `~/.local/share/hallvi/hallvi.env`, one
 `NAME=value` per line, read at every start: `HALLVI_PORT` to move the
 interface. A release with a configured GitHub App can connect private
