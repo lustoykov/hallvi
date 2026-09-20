@@ -29,6 +29,7 @@ import {
   Away,
   CheckList,
   CopyLine,
+  Countdown,
   Problem,
   Receipt,
   RequestCard,
@@ -77,37 +78,28 @@ function ended(attempt: GithubLoginAttempt | null) {
   }[attempt.status as "cancelled" | "denied" | "expired" | "failed"];
 }
 
-function Countdown({ until }: { until: string }) {
-  const [now, setNow] = useState<number | null>(null);
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    tick();
-    const timer = window.setInterval(tick, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  if (now === null) return null;
-  const left = Math.max(0, Math.ceil((Date.parse(until) - now) / 1000));
-  return (
-    <span aria-live="off">
-      Code expires in {Math.floor(left / 60)}:
-      {String(left % 60).padStart(2, "0")}
-    </span>
-  );
-}
-
 export function GithubConnect({
   repository,
   access,
-  checking,
+  checking = false,
   onCheck,
+  onConnected,
   onClose,
+  plain = false,
 }: {
-  /** "owner/name". */
-  repository: string;
-  access: RepositoryAccess;
-  checking: boolean;
+  /** Outside a conversation, where nobody asked: no "Hallvi asks" line. */
+  plain?: boolean;
+  /**
+   * The repository this is about, as "owner/name". Settings has none: there
+   * the card is about the account alone, and says only what that establishes.
+   */
+  repository?: string;
+  access?: RepositoryAccess;
+  checking?: boolean;
   /** Checks this application's repository again with the current login. */
-  onCheck: () => void;
+  onCheck?: () => void;
+  /** A login was just saved, so whatever drew this card is out of date. */
+  onConnected?: () => void;
   /** Present while the card can be put away without finishing. */
   onClose?: () => void;
 }) {
@@ -119,9 +111,11 @@ export function GithubConnect({
   const [chose, setChose] = useState(false);
   const alive = useRef(true);
   const check = useRef(onCheck);
+  const connected = useRef(onConnected);
   useEffect(() => {
     check.current = onCheck;
-  }, [onCheck]);
+    connected.current = onConnected;
+  }, [onCheck, onConnected]);
 
   const load = useCallback(async () => {
     const fresh = await request<GithubSetupStatus>("/api/github/setup");
@@ -158,7 +152,8 @@ export function GithubConnect({
         if (next.status === "connected") {
           await load();
           // Signing in is the owner asking whether this now works.
-          check.current();
+          check.current?.();
+          connected.current?.();
         }
         setAttempt(next);
       } catch (caught) {
@@ -186,6 +181,232 @@ export function GithubConnect({
   const connection =
     status?.connection && !status.issue ? status.connection : null;
   const account = connection?.account.login;
+
+  const close = onClose && !pending(attempt) && (
+    <button type="button" className="hv-ob-quiet" onClick={onClose}>
+      Not now
+    </button>
+  );
+  const failure = ended(attempt);
+  const known = access && (
+    <details className="hv-ob-more">
+      <summary>What I actually know</summary>
+      <p>{access.result}</p>
+      {!connection && access.status !== "not-yet" && (
+        <p>
+          GitHub gives the same answer for a private repository, a mistyped
+          address and a deleted repository, so this doesn’t prove it is private.
+        </p>
+      )}
+    </details>
+  );
+  const again = onCheck && (
+    <button
+      type="button"
+      className="hv-ob-quiet"
+      disabled={checking}
+      onClick={onCheck}
+    >
+      {checking ? "Checking…" : "Check again"}
+    </button>
+  );
+  /**
+   * The sign-in itself: the same code, the same waiting and the same three
+   * ways it can end, whether it was asked for beside a repository or in
+   * Settings. Only the sentence above it knows about a repository.
+   */
+  const signIn = (
+    <>
+      {pending(attempt) && attempt ? (
+        <>
+          <p>Enter this code on GitHub, then approve Hallvi:</p>
+          {attempt.userCode ? (
+            <div className="hv-ob-code">
+              <CopyLine value={attempt.userCode} label="Copy code" />
+            </div>
+          ) : (
+            <p>
+              <SpinnerGap className="spin" aria-hidden="true" /> Getting a code…
+            </p>
+          )}
+          <Away href={attempt.verificationUrl}>Open GitHub</Away>
+          <p className="hv-ob-fine" role="status">
+            <SpinnerGap className="spin" aria-hidden="true" /> Waiting for you
+            to approve on GitHub. Nothing else is happening.{" "}
+            {attempt.expiresAt && <Countdown until={attempt.expiresAt} />}
+          </p>
+          <div className="hv-ob-row">
+            <button
+              type="button"
+              className="hv-ob-quiet"
+              disabled={busy}
+              onClick={() =>
+                void act(async () =>
+                  setAttempt(
+                    await request<GithubLoginAttempt>(
+                      `/api/github/setup/login/${attempt.id}`,
+                      "DELETE",
+                    ),
+                  ),
+                )
+              }
+            >
+              Cancel sign-in
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {failure ? (
+            <Problem title={failure.title}>
+              <p>{failure.body}</p>
+            </Problem>
+          ) : (
+            <>
+              <p>
+                {repository
+                  ? `If ${repository} is private, signing in lets me read it.`
+                  : "A GitHub account lets Hallvi read private repositories."}{" "}
+                You approve Hallvi on GitHub’s own page with a short code; your
+                password never reaches Hallvi.
+              </p>
+              <p className="hv-ob-fine">
+                Choose which repositories the App can access on GitHub. The
+                published Hallvi App requests read and write access to code and
+                pull requests. This connection check only reads; it does not
+                push changes or open a PR. Reading public repositories needs no
+                connection.
+              </p>
+            </>
+          )}
+          {repository && known}
+          <div className="hv-ob-row">
+            <button
+              type="button"
+              className="hv-ob-primary"
+              disabled={busy}
+              onClick={() =>
+                void act(async () =>
+                  setAttempt(
+                    await request<GithubLoginAttempt>(
+                      "/api/github/setup/login",
+                      "POST",
+                    ),
+                  ),
+                )
+              }
+            >
+              {failure ? "Get a new code" : "Connect GitHub"}
+            </button>
+            {again}
+            {close}
+          </div>
+        </>
+      )}
+      {error && (
+        <Problem title="That didn’t work">
+          <p>{error}</p>
+        </Problem>
+      )}
+    </>
+  );
+
+  // Settings: the account, and only what the account establishes. Whether a
+  // particular repository can be read is that application's own question.
+  if (!repository || !access) {
+    if (!status)
+      return (
+        <RequestCard
+          plain={plain}
+          asks="is reading its GitHub connection"
+          state="working"
+          label="GitHub account"
+        >
+          {error ? (
+            <Problem title="Hallvi didn’t answer">
+              <p>{error}</p>
+              <button
+                type="button"
+                className="hv-ob-quiet"
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    const fresh = await load();
+                    if (fresh)
+                      setAttempt(pending(fresh.attempt) ? fresh.attempt : null);
+                  })
+                }
+              >
+                Try again
+              </button>
+            </Problem>
+          ) : (
+            <p>
+              <SpinnerGap className="spin" aria-hidden="true" /> Looking at the
+              GitHub connection…
+            </p>
+          )}
+        </RequestCard>
+      );
+    if (connection)
+      return (
+        <Receipt plain={plain} title={`GitHub login saved for ${account}`}>
+          <p>
+            For the repositories you picked on GitHub. The published Hallvi App
+            requests read and write access to code and pull requests; this
+            release only reads. Whether a particular application can be read is
+            checked in its own conversation.
+          </p>
+          <p>
+            <a
+              className="hv-ob-quiet"
+              href={connection.accessUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Choose repositories on GitHub
+              <ArrowSquareOut weight="bold" aria-hidden="true" />
+            </a>
+          </p>
+        </Receipt>
+      );
+    if (!status.registration)
+      return (
+        <RequestCard
+          plain={plain}
+          asks="can’t sign in to GitHub in this release"
+          state="done"
+          label="GitHub account"
+        >
+          <p>
+            Public repositories work without any GitHub account. Private ones
+            need a sign-in, and this release was built without it.
+          </p>
+          <details className="hv-ob-more">
+            <summary>How this gets fixed</summary>
+            <p>
+              Hallvi signs in to GitHub as one published app whose public
+              identifier ships inside each release; this build has none. Install
+              a release that includes GitHub sign-in over this one. Applications
+              and history are kept. You never need to register a GitHub App,
+              paste a token or edit environment files.
+            </p>
+          </details>
+        </RequestCard>
+      );
+    return (
+      <RequestCard
+        plain={plain}
+        asks="can connect a GitHub account"
+        state={
+          pending(attempt) ? "working" : ended(attempt) ? "failed" : "waiting"
+        }
+        label="GitHub account"
+      >
+        {signIn}
+      </RequestCard>
+    );
+  }
 
   if (access.status === "passed")
     return (
@@ -240,33 +461,6 @@ export function GithubConnect({
   // GitHub did not answer, or nobody has asked yet: that says nothing about
   // the repository, so it is not dressed as an access problem.
   const unchecked = access.status === "not-yet";
-  const known = (
-    <details className="hv-ob-more">
-      <summary>What I actually know</summary>
-      <p>{access.result}</p>
-      {!connection && !unchecked && (
-        <p>
-          GitHub gives the same answer for a private repository, a mistyped
-          address and a deleted repository, so this doesn’t prove it is private.
-        </p>
-      )}
-    </details>
-  );
-  const again = (
-    <button
-      type="button"
-      className="hv-ob-quiet"
-      disabled={checking}
-      onClick={onCheck}
-    >
-      {checking ? "Checking…" : "Check again"}
-    </button>
-  );
-  const close = onClose && !pending(attempt) && (
-    <button type="button" className="hv-ob-quiet" onClick={onClose}>
-      Not now
-    </button>
-  );
 
   if (!connection && !status.registration)
     return (
@@ -313,9 +507,11 @@ export function GithubConnect({
         </p>
         {known}
         <div className="hv-ob-row">
+          {/* A text action: nothing is known to be wrong, so this does not
+              compete with a request that is actually waiting. */}
           <button
             type="button"
-            className="hv-ob-primary"
+            className="hv-ob-next"
             disabled={checking}
             onClick={onCheck}
           >
@@ -326,8 +522,7 @@ export function GithubConnect({
       </RequestCard>
     );
 
-  if (!connection) {
-    const failure = ended(attempt);
+  if (!connection)
     return (
       <RequestCard
         asks={`needs GitHub to open ${repository}`}
@@ -341,99 +536,9 @@ export function GithubConnect({
         }
         label="Connect GitHub"
       >
-        {pending(attempt) && attempt ? (
-          <>
-            <p>Enter this code on GitHub, then approve Hallvi:</p>
-            {attempt.userCode ? (
-              <div className="hv-ob-code">
-                <CopyLine value={attempt.userCode} label="Copy code" />
-              </div>
-            ) : (
-              <p>
-                <SpinnerGap className="spin" aria-hidden="true" /> Getting a
-                code…
-              </p>
-            )}
-            <Away href={attempt.verificationUrl}>Open GitHub</Away>
-            <p className="hv-ob-fine" role="status">
-              <SpinnerGap className="spin" aria-hidden="true" /> Waiting for you
-              to approve on GitHub. Nothing else is happening.{" "}
-              {attempt.expiresAt && <Countdown until={attempt.expiresAt} />}
-            </p>
-            <div className="hv-ob-row">
-              <button
-                type="button"
-                className="hv-ob-quiet"
-                disabled={busy}
-                onClick={() =>
-                  void act(async () =>
-                    setAttempt(
-                      await request<GithubLoginAttempt>(
-                        `/api/github/setup/login/${attempt.id}`,
-                        "DELETE",
-                      ),
-                    ),
-                  )
-                }
-              >
-                Cancel sign-in
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            {failure ? (
-              <Problem title={failure.title}>
-                <p>{failure.body}</p>
-              </Problem>
-            ) : (
-              <>
-                <p>
-                  If {repository} is private, signing in lets me read it. You
-                  approve Hallvi on GitHub’s own page with a short code; your
-                  password never reaches Hallvi.
-                </p>
-                <p className="hv-ob-fine">
-                  Choose which repositories the App can access on GitHub. The
-                  published Hallvi App requests read and write access to code
-                  and pull requests. This connection check only reads; it does
-                  not push changes or open a PR. Reading public repositories
-                  needs no connection.
-                </p>
-              </>
-            )}
-            {known}
-            <div className="hv-ob-row">
-              <button
-                type="button"
-                className="hv-ob-primary"
-                disabled={busy}
-                onClick={() =>
-                  void act(async () =>
-                    setAttempt(
-                      await request<GithubLoginAttempt>(
-                        "/api/github/setup/login",
-                        "POST",
-                      ),
-                    ),
-                  )
-                }
-              >
-                {failure ? "Get a new code" : "Connect GitHub"}
-              </button>
-              {again}
-              {close}
-            </div>
-          </>
-        )}
-        {error && (
-          <Problem title="That didn’t work">
-            <p>{error}</p>
-          </Problem>
-        )}
+        {signIn}
       </RequestCard>
     );
-  }
 
   // A saved account does not prove current access to this repository.
   const checks: Check[] = [

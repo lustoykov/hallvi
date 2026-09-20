@@ -15,7 +15,6 @@
 
 import { ArrowRight, Check } from "@phosphor-icons/react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useState } from "react";
 
 import "./journey-rail.css";
@@ -50,8 +49,6 @@ export interface WelcomeRepository {
   connected: boolean;
   /** This release can sign in to GitHub at all. */
   signIn: boolean;
-  /** The card is open in the transcript below. */
-  open: boolean;
   checking: boolean;
   onOpen: () => void;
   onCheck: () => void;
@@ -99,7 +96,8 @@ export function JourneyRail({
   placement,
   canStart,
   onStart,
-  connectHref,
+  onConnect,
+  requestOpen,
   repository,
 }: {
   application: string;
@@ -111,7 +109,10 @@ export function JourneyRail({
   /** A message can be sent: the model is connected and nothing is running. */
   canStart?: boolean;
   onStart?: () => void;
-  connectHref?: string;
+  /** ChatGPT is not connected; this opens the request for it below. */
+  onConnect?: () => void;
+  /** A request is open in the transcript: the welcome steps back to a line. */
+  requestOpen?: boolean;
   /** The repository cannot be read yet; the welcome says so instead. */
   repository?: WelcomeRepository;
 }) {
@@ -142,7 +143,7 @@ export function JourneyRail({
     );
     // The request is open in the transcript: the welcome steps back to one
     // line, so the blocker is said in one place.
-    if (repository?.open)
+    if (requestOpen)
       return (
         <section className="hv-first-app" data-compact>
           {mascot("ready")}
@@ -168,7 +169,7 @@ export function JourneyRail({
             I’ll read the repository and explain what it needs. Then we’ll
             choose where it runs.
           </p>
-          {unread && connectHref ? (
+          {unread && onConnect ? (
             // Both are missing. They are different things, so they are two
             // lines, and only the first one is blue.
             <ul className="hv-first-app-needs" aria-label="Before we start">
@@ -177,9 +178,13 @@ export function JourneyRail({
                   <strong>A model to think with</strong>
                   ChatGPT isn’t connected.
                 </span>
-                <Link className="hv-rail-start" href={connectHref}>
+                <button
+                  type="button"
+                  className="hv-rail-start"
+                  onClick={onConnect}
+                >
                   Connect ChatGPT <ArrowRight aria-hidden="true" />
-                </Link>
+                </button>
               </li>
               <li>
                 <span>
@@ -211,14 +216,18 @@ export function JourneyRail({
                 {unread.action && <ArrowRight aria-hidden="true" />}
               </button>
             </>
-          ) : connectHref ? (
+          ) : onConnect ? (
             <>
               <p className="hv-first-app-next">
                 Connect ChatGPT so I can read {application}.
               </p>
-              <Link className="hv-rail-start" href={connectHref}>
+              <button
+                type="button"
+                className="hv-rail-start"
+                onClick={onConnect}
+              >
                 Connect ChatGPT <ArrowRight aria-hidden="true" />
-              </Link>
+              </button>
             </>
           ) : (
             <button

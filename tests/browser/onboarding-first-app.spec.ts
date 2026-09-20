@@ -1,13 +1,14 @@
-import type { Page } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { openConversation } from "./workspace-helpers";
 
 test.use({ freshSetup: true, isolatedApp: true });
 
-// Wait for the actual login request before trusting the click: the setup
-// route can still be hydrating when its server-rendered button appears.
-async function startSignIn(page: Page) {
-  const connect = page.getByRole("button", {
+// Wait for the actual login request before trusting the click: the card can
+// still be reading the saved setup when its button appears.
+async function startSignIn(card: Locator) {
+  const page = card.page();
+  const connect = card.getByRole("button", {
     name: "Connect ChatGPT",
     exact: true,
   });
@@ -78,17 +79,18 @@ test("the first application connects ChatGPT and starts one explicitly requested
     }),
   ).toBeVisible();
   const applicationPath = new URL(page.url()).pathname;
-  const connect = page.getByRole("link", {
+  const applicationId = applicationPath.split("/")[2];
+  const chatId = (
+    await (await page.request.get(`/api${applicationPath}`)).json()
+  ).selectedChatId;
+  expect(chatId).toMatch(/^[\da-f-]{36}$/);
+  const welcome = page.getByRole("region", {
+    name: "Get to know your application",
+  });
+  const connect = welcome.getByRole("button", {
     name: "Connect ChatGPT",
     exact: true,
   });
-  const setupUrl = new URL((await connect.getAttribute("href"))!, page.url());
-  const applicationId = applicationPath.split("/")[2];
-  const chatId = setupUrl.searchParams.get("chat");
-  expect(setupUrl.pathname).toBe("/setup/pi");
-  expect(setupUrl.searchParams.get("application")).toBe(applicationId);
-  expect(setupUrl.searchParams.get("onboarding")).toBe("1");
-  expect(chatId).toMatch(/^[\da-f-]{36}$/);
   const endpoint = `/api/applications/${applicationId}/chats/${chatId}/messages`;
   const userMessages = async () => {
     const response = await page.request.get(endpoint);
@@ -98,14 +100,21 @@ test("the first application connects ChatGPT and starts one explicitly requested
       (message: { role: string }) => message.role === "user",
     );
   };
+  // Without its records the welcome cannot be drawn; connecting is still
+  // offered where the owner is about to type.
   const connectionsUrl = `**/api/applications/${applicationId}/connections`;
   await page.route(connectionsUrl, (route) =>
     route.fulfill({ status: 503, body: "Unavailable" }),
   );
   await page.reload();
   await openConversation(page);
+  await page
+    .getByRole("textbox", { name: "Message Hallvi" })
+    .fill("What does it need?");
   await expect(
-    page.getByRole("link", { name: "Open Settings", exact: true }),
+    page
+      .locator(".hv-pi-required")
+      .getByRole("button", { name: "Connect ChatGPT", exact: true }),
   ).toBeVisible();
   await page.unroute(connectionsUrl);
   await page.reload();
@@ -121,24 +130,20 @@ test("the first application connects ChatGPT and starts one explicitly requested
       sends.push(request.postDataJSON());
   });
 
+  // Connecting happens in the conversation: the address never changes.
   await connect.click();
-  await page.waitForURL(/\/setup\/pi\?.*onboarding=1/, { timeout: 60_000 });
+  const card = page.getByRole("region", { name: "Connect ChatGPT" });
+  await expect(card).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe(applicationPath);
+  expect(await userMessages()).toHaveLength(0);
+  await startSignIn(card);
   await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: "Let’s get to know onboarding-first-app.",
-    }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Model", { exact: true })).toBeHidden();
-  const read = page.getByRole("button", {
+    page.getByText("ChatGPT login saved · checked with your first message"),
+  ).toBeVisible({ timeout: 60_000 });
+  expect(new URL(page.url()).pathname).toBe(applicationPath);
+  const read = welcome.getByRole("button", {
     name: "Read repository",
     exact: true,
-  });
-  await expect(read).toBeDisabled();
-  expect(await userMessages()).toHaveLength(0);
-  await startSignIn(page);
-  await expect(page.getByText("Login saved", { exact: true })).toBeVisible({
-    timeout: 60_000,
   });
   await expect(read).toBeEnabled();
   // Saving credentials must not itself authorize a model turn.
@@ -152,15 +157,7 @@ test("the first application connects ChatGPT and starts one explicitly requested
   );
   await read.click();
   expect((await accepted).status()).toBe(202);
-  await page.waitForURL(
-    (url) =>
-      url.pathname === applicationPath &&
-      url.searchParams.get("chat") === chatId,
-    { timeout: 60_000 },
-  );
-  await openConversation(page);
   expect(sends).toHaveLength(1);
-  expect(sends[0].requestKey).toBe(chatId);
   // The action authorizes inspection, not provisioning or deployment.
   expect(sends[0].message).toMatch(/read this repository/i);
   expect(sends[0].message).toContain(

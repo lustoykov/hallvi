@@ -852,8 +852,8 @@ export function OperatorShell({
           selectedChatId={view.selectedChatId}
           settingsHref={
             applicationId && view.selectedChatId
-              ? `/setup/pi?application=${applicationId}&chat=${view.selectedChatId}`
-              : "/setup/pi"
+              ? `/setup/connections?application=${applicationId}&chat=${view.selectedChatId}`
+              : "/setup/connections"
           }
           section={activeSection}
           busy={busy !== null}
@@ -909,6 +909,7 @@ export function OperatorShell({
             inert={recordVisible || undefined}
           >
             <ChatPane
+              onModelConnected={() => setConnectedSince(true)}
               checkingRepository={busy === "repository"}
               onCheckRepository={checkRepository}
               activeChat={activeChat}

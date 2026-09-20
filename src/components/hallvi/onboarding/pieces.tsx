@@ -21,26 +21,64 @@ import type { Check, PermissionMode } from "./types";
 
 import "./onboarding.css";
 
+/**
+ * How long the provider's code still works. Outside the live region on
+ * purpose: a number that changes every second would be read aloud every
+ * second, and the sentence beside it already says what is happening.
+ */
+export function Countdown({ until }: { until: string }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (now === null) return null;
+  const left = Math.max(0, Math.ceil((Date.parse(until) - now) / 1000));
+  return (
+    <span aria-live="off">
+      Code expires in {Math.floor(left / 60)}:
+      {String(left % 60).padStart(2, "0")}
+    </span>
+  );
+}
+
 /** A request drawn as the turn in the conversation that it is. */
 export function RequestCard({
   asks,
   state,
   label,
+  plain = false,
   children,
 }: {
   /** Completes "Hallvi …": "needs a place to run it". */
   asks: string;
   state: "waiting" | "working" | "done" | "failed";
   label: string;
+  /**
+   * Drops the "Hallvi asks" line. In a conversation the frame says who is
+   * asking and why it appeared; in Settings the owner opened it themselves,
+   * and a card that claims to be asking would be putting words in Hallvi's
+   * mouth.
+   */
+  plain?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className="hv-ob" data-state={state} aria-label={label}>
-      <div className="hv-ob-who">
-        <HallviMark />
-        <strong>Hallvi</strong>
-        <span>{asks}</span>
-      </div>
+    <section
+      className="hv-ob"
+      data-state={state}
+      data-plain={plain ? "" : undefined}
+      aria-label={label}
+    >
+      {!plain && (
+        <div className="hv-ob-who">
+          <HallviMark />
+          <strong>Hallvi</strong>
+          <span>{asks}</span>
+        </div>
+      )}
       <div className="hv-ob-body">{children}</div>
     </section>
   );
@@ -351,13 +389,16 @@ export function Problem({
 
 export function Receipt({
   title,
+  plain = false,
   children,
 }: {
   title: string;
+  /** Sits flush where it is not a turn in a conversation. */
+  plain?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <details className="hv-ob-receipt">
+    <details className="hv-ob-receipt" data-plain={plain ? "" : undefined}>
       <summary>
         <CheckIcon weight="bold" aria-hidden="true" />
         {title}

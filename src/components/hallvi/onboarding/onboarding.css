@@ -43,6 +43,14 @@
   font-size: 10px;
   font-weight: 700;
 }
+/* Outside a conversation the card is not a turn: no avatar, no indent. */
+.hv-ob[data-plain] {
+  margin: 0;
+}
+.hv-ob[data-plain] .hv-ob-body,
+.hv-ob-receipt[data-plain] {
+  margin-left: 0;
+}
 .hv-ob-body {
   display: grid;
   gap: 14px;
