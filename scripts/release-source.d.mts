@@ -74,3 +74,5 @@ export declare function migrates(
   manifest: { migratesFrom?: number[] },
   schema: number,
 ): boolean;
+
+export declare const UNCHANGED: symbol;

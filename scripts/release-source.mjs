@@ -190,12 +190,26 @@ async function fetchOk(url, fetching, accept) {
  * token, and a draft is by definition something the maintainer has not
  * decided to publish. A prerelease is, which is what this channel is for.
  */
+/**
+ * The newest release this installation would accept, or nothing.
+ *
+ * `known` is the tag a previous look already verified. An hourly check that
+ * finds the same release again has nothing to learn from downloading and
+ * re-verifying the same two assets, so it says so and stops there; the caller
+ * keeps what it had. Anything else — a new tag, or no cached tag — is fetched
+ * and verified in full.
+ */
 export async function discover({
   channel = DEFAULT_CHANNEL,
-  source = process.env.HALLVI_RELEASE_SOURCE?.trim() || DEFAULT_RELEASE_SOURCE,
+  source,
   env = process.env,
+  known = null,
   fetch: get = fetch,
 } = {}) {
+  // From the environment handed in, the same one the key comes from. Reading
+  // the key from `env` and the source from `process.env` would make a caller
+  // that supplies both get one of them.
+  source ??= env.HALLVI_RELEASE_SOURCE?.trim() || DEFAULT_RELEASE_SOURCE;
   const trust = trustedKeys(env);
   const listing = await fetchOk(source, get, "application/vnd.github+json");
   const listed = JSON.parse(
@@ -216,6 +230,9 @@ export async function discover({
       ]),
     );
     if (!assets.has(MANIFEST) || !assets.has(SIGNATURE)) continue;
+    // The same release as last time: nothing to fetch, nothing to verify
+    // again, and the listing already told us it is still the newest.
+    if (known && release.tag_name === known) return UNCHANGED;
     const [bytes, signature] = await Promise.all([
       fetchOk(assets.get(MANIFEST), get).then((response) =>
         readBounded(response, 64 * 1024, "The release manifest"),
@@ -241,6 +258,9 @@ export async function discover({
   }
   return null;
 }
+
+/** `discover` found the release the caller already knew about. */
+export const UNCHANGED = Symbol.for("hallvi.release.unchanged");
 
 /** Re-reads a candidate kept on disk, checking its signature all over again. */
 export function reopen({

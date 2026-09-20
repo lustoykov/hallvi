@@ -1,5 +1,7 @@
 import { cleanupPiWorkspaces } from "./pi-workspace";
 import { copyDue, protectController } from "./controller-protection";
+import { databasePath } from "./db";
+import { dirname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ownSessions } from "./pi-owner";
 
@@ -29,6 +31,25 @@ async function keepControllerCopy(
   }
 }
 
+/**
+ * The hourly look for a newer Hallvi, which is a look and nothing else:
+ * installing stays something the owner presses. A source that cannot be
+ * reached is recorded where the interface reads it and never stops the
+ * worker, exactly like the copy above.
+ */
+async function lookForRelease() {
+  try {
+    const { checkForReleaseIfDue } = await import(
+      /* webpackIgnore: true */ "../../scripts/update-start.mjs"
+    );
+    await checkForReleaseIfDue({ data: dirname(databasePath()) });
+  } catch (error) {
+    console.warn(
+      `Hallvi could not look for a newer release: ${error instanceof Error ? error.message : "unknown reason"}`,
+    );
+  }
+}
+
 export async function runPiWorker(signal: AbortSignal) {
   const owned = await ownSessions({ signal });
   if (!owned)
@@ -43,6 +64,10 @@ export async function runPiWorker(signal: AbortSignal) {
     await cleanupPiWorkspaces().catch(() => undefined);
     console.info("Pi worker ready.");
     let nextProtectionCheck = 0;
+    // Deliberately not another branch of the chain below: a controller with
+    // Pi working in it would never reach a fourth `else if`, and "hourly"
+    // would quietly mean "hourly while idle".
+    let nextReleaseCheck = Date.now() + 60_000;
     let worked = false;
     while (!signal.aborted) {
       if (owner.live()) worked = true;
@@ -54,6 +79,13 @@ export async function runPiWorker(signal: AbortSignal) {
         // whether anything is owed.
         nextProtectionCheck = Date.now() + 60_000;
         await keepControllerCopy("daily", owner.live() > 0);
+      }
+      if (Date.now() >= nextReleaseCheck) {
+        // A minute after starting, then every minute: the file's own hour
+        // decides whether this actually reaches the network, so starting is
+        // never delayed and a restart loop never becomes a poll.
+        nextReleaseCheck = Date.now() + 60_000;
+        await lookForRelease();
       }
       await delay(250, undefined, { signal }).catch(() => undefined);
     }

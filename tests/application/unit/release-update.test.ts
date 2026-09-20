@@ -26,6 +26,7 @@ import {
   installation,
   packageFor,
   reopen,
+  UNCHANGED,
 } from "../../../scripts/release-source.mjs";
 import { verifyManifest } from "../../../scripts/release-trust.mjs";
 import {
@@ -35,7 +36,10 @@ import {
   recordPhase,
   UpdateInProgressError,
 } from "../../../scripts/update-attempt.mjs";
-import { blockedReason } from "../../../scripts/update-start.mjs";
+import {
+  blockedReason,
+  checkForReleaseIfDue,
+} from "../../../scripts/update-start.mjs";
 
 /** A release key that is not Hallvi's, standing in for Hallvi's. */
 function keypair() {
@@ -44,6 +48,11 @@ function keypair() {
     .subarray(-32)
     .toString("base64");
   return { privateKey, raw, public: publicKeyFrom(raw) };
+}
+
+/** The raw base64 key, as HALLVI_RELEASE_KEY carries it. */
+function keyOf(key: ReturnType<typeof keypair>) {
+  return key.raw;
 }
 
 /** The SPKI form `verifyManifest` takes, from a raw Ed25519 public key. */
@@ -510,4 +519,158 @@ it("lets one update run, and reports one whose helper died as the failure it is"
   expect(() =>
     claimAttempt(root, alive, { ...attempt, id: "two" }),
   ).not.toThrow();
+});
+
+it("looks hourly, only in an installation, and only when a look is due", async () => {
+  // A checkout has nothing to update. Every worktree polling GitHub every
+  // hour is the failure this gate exists to prevent.
+  const checkout = programWith(join(root, "checkout"), "release.json", {
+    version: "0.1.0",
+    revision: "a".repeat(40),
+    platform: "darwin-arm64",
+  });
+  const data = join(root, "data");
+  mkdirSync(data, { recursive: true });
+  expect(await checkForReleaseIfDue({ program: checkout, data })).toBeNull();
+  expect(existsSync(join(data, "update-check.json"))).toBe(false);
+
+  // An installation, with an answer from four minutes ago: nothing is due.
+  const home = join(root, "home");
+  const installed = programWith(
+    join(home, ".local", "lib", "hallvi", "app"),
+    "release.json",
+    { version: "0.1.0", revision: "b".repeat(40), platform: "darwin-arm64" },
+  );
+  const fresh = {
+    checkedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    candidate: { tag: "v0.1.0-alpha.1" },
+    error: null,
+  };
+  writeFileSync(join(data, "update-check.json"), `${JSON.stringify(fresh)}\n`);
+  // Four minutes into the hour: the cached answer is handed back untouched,
+  // and nothing reaches the network.
+  expect(
+    await checkForReleaseIfDue({ program: installed, data, home }),
+  ).toMatchObject({ checkedAt: fresh.checkedAt, candidate: fresh.candidate });
+
+  // Ninety minutes in, it is due. With no reachable source it records the
+  // reason and keeps the answer it had, rather than replacing it with
+  // nothing.
+  writeFileSync(
+    join(data, "update-check.json"),
+    `${JSON.stringify({ ...fresh, checkedAt: new Date(Date.now() - 90 * 60 * 1000).toISOString() })}\n`,
+  );
+  const looked = await checkForReleaseIfDue({
+    program: installed,
+    data,
+    home,
+    env: { HALLVI_RELEASE_SOURCE: "https://127.0.0.1:1/releases" },
+  });
+  expect(looked?.checkedAt).not.toBe(fresh.checkedAt);
+  expect(looked?.error).toEqual(expect.any(String));
+  expect(looked?.candidate).toEqual(fresh.candidate);
+});
+
+it("waits out the hour after a look that failed, then looks again", async () => {
+  // The worker calls this every minute. While a source is unreachable the
+  // answer carries an error, and an error that skipped this gate meant one
+  // request a minute for as long as the outage lasted.
+  const home = join(root, "outage-home");
+  const installed = programWith(
+    join(home, ".local", "lib", "hallvi", "app"),
+    "release.json",
+    { version: "0.1.0", revision: "c".repeat(40), platform: "darwin-arm64" },
+  );
+  const data = join(root, "outage-data");
+  mkdirSync(data, { recursive: true });
+  const unreachable = {
+    ...process.env,
+    HALLVI_RELEASE_SOURCE: "https://127.0.0.1:1/releases",
+  };
+  const failed = {
+    candidate: { tag: "v0.1.0-alpha.1" },
+    error: "The release source could not be reached.",
+  };
+
+  // Four minutes after a failed look: handed back untouched, nothing dialled.
+  const recent = new Date(Date.now() - 4 * 60 * 1000).toISOString();
+  writeFileSync(
+    join(data, "update-check.json"),
+    `${JSON.stringify({ ...failed, checkedAt: recent })}\n`,
+  );
+  expect(
+    await checkForReleaseIfDue({
+      program: installed,
+      data,
+      home,
+      env: unreachable,
+    }),
+  ).toMatchObject({ checkedAt: recent, error: failed.error });
+
+  // Ninety minutes in, it is due again, error or no error.
+  const stale = new Date(Date.now() - 90 * 60 * 1000).toISOString();
+  writeFileSync(
+    join(data, "update-check.json"),
+    `${JSON.stringify({ ...failed, checkedAt: stale })}\n`,
+  );
+  const looked = await checkForReleaseIfDue({
+    program: installed,
+    data,
+    home,
+    env: unreachable,
+  });
+  expect(looked?.checkedAt).not.toBe(stale);
+  expect(looked?.error).toEqual(expect.any(String));
+});
+
+it("does not fetch a release it has already verified", async () => {
+  const key = keypair();
+  const manifest = manifestFor();
+  const { bytes, signature } = signedBy(key, manifest);
+  const asked: string[] = [];
+  const listing = JSON.stringify([
+    {
+      tag_name: "v0.1.0-alpha.2",
+      draft: false,
+      assets: [
+        {
+          name: "hallvi-release.json",
+          browser_download_url: "https://example.com/hallvi-release.json",
+        },
+        {
+          name: "hallvi-release.json.sig",
+          browser_download_url: "https://example.com/hallvi-release.json.sig",
+        },
+      ],
+    },
+  ]);
+  const get = async (url: string) => {
+    asked.push(String(url));
+    const body = String(url).endsWith(".sig")
+      ? signature
+      : String(url).endsWith("hallvi-release.json")
+        ? bytes.toString("utf8")
+        : listing;
+    return new Response(body, { status: 200 });
+  };
+
+  // Told nothing, it fetches the listing and both assets and verifies them.
+  const found = await discover({
+    source: "https://example.com/releases",
+    env: { HALLVI_RELEASE_KEY: keyOf(key) },
+    fetch: get as unknown as typeof fetch,
+  });
+  expect(found).not.toBe(UNCHANGED);
+  expect(asked).toHaveLength(3);
+
+  // Told the tag it already has, it reads the listing and stops there.
+  asked.length = 0;
+  const again = await discover({
+    source: "https://example.com/releases",
+    env: { HALLVI_RELEASE_KEY: keyOf(key) },
+    known: "v0.1.0-alpha.2",
+    fetch: get as unknown as typeof fetch,
+  });
+  expect(again).toBe(UNCHANGED);
+  expect(asked).toEqual(["https://example.com/releases"]);
 });

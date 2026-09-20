@@ -11,15 +11,22 @@ browser to connect your model account, add a repository and deploy it to a
 Linux application server. The machine running Hallvi and the application
 server have separate requirements.
 
-Download the archive for your machine from
-[Releases](https://github.com/lustoykov/hallvi/releases), with its `.sha256`
-and `install-hallvi.sh`, and run the installer. You do not need to clone this
-repository or install Node.js, npm, Python or a compiler. Once it is installed,
-the version at the bottom of the sidebar, or `hallvi update`, installs the
-next release.
+Take `install-hallvi.sh` from
+[Releases](https://github.com/lustoykov/hallvi/releases) and run it:
+
+```sh
+sh install-hallvi.sh
+```
+
+It finds the newest release for your machine, checks it against the signed
+manifest and installs it. You do not need to clone this repository or install
+Node.js, npm, Python or a compiler. Once it is installed, Hallvi looks for a
+newer release once an hour and offers it at the bottom of the sidebar;
+installing is still something you press, or `hallvi update`.
 
 **Alpha:** the first release has not been published yet, so that page is empty
-and the maintainer still supplies the three files by hand. Publishing one is
+and the maintainer supplies an archive by hand — `sh install-hallvi.sh
+./hallvi-<version>-<platform>.tgz` installs one. Publishing a release is
 [a documented sequence](docs/releases.md) that a merge never triggers.
 
 | Your machine | Start here |
