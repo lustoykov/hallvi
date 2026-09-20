@@ -57,8 +57,7 @@ export function ChatgptConnect({
   }, [onConnected]);
 
   const load = useCallback(async () => {
-    // The preview asks what is already on this machine without saving it.
-    const fresh = await request<PiSetupStatus>("/api/pi/setup?preview=1");
+    const fresh = await request<PiSetupStatus>("/api/pi/setup");
     if (!alive.current) return null;
     setStatus(fresh);
     if (fresh.ready) connected.current();
