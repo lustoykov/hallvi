@@ -66,9 +66,11 @@ Use a small representative set of redacted transcripts and execution records, wi
 `npm test` runs the application tests; `npm run test:e2e:smoke` runs the browser
 smoke subset; `npm run test:operator` runs the Python checks for the host-side
 scripts under `scripts/` — the scheduled-backup runner's bounded failures,
-receipts and recovery path, and the SQLite backup proof. They need only
-`python3` and take under a second, and nothing invoked them before this
-command existed. Nothing in `src/` currently installs
+receipts and recovery path, and the SQLite backup proof. They need
+`python3` 3.11 or newer — the runner hashes with `hashlib.file_digest` — and
+take under a second, and nothing invoked them before this command existed. On
+an older interpreter, such as the macOS system `python3`, most of them fail on
+that one attribute and the failures look like the scripts are broken. Nothing in `src/` currently installs
 `scripts/scheduled-backups/runner.py`; its coverage stays until that is
 decided rather than being dropped on the way past. Select checks relevant to the change rather than running both by
 default. Tests use disposable databases and synthetic provider/model responses.

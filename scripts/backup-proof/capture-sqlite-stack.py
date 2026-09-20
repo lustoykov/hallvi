@@ -245,6 +245,11 @@ def capture(deployment_id, proof_id):
                 target_connection = sqlite3.connect(target / database_name)
                 try:
                     source_connection.backup(target_connection, pages=256)
+                    # The copy inherits WAL mode but none of the sidecars that
+                    # make a WAL database readable, so a read-only open of it
+                    # fails. Settle it the way the scheduled runner does,
+                    # leaving every committed page in the file itself.
+                    target_connection.execute("PRAGMA journal_mode=DELETE")
                 finally:
                     target_connection.close()
                     source_connection.close()
