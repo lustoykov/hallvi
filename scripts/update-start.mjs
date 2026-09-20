@@ -10,7 +10,6 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 
-import { supported } from "./migrations.mjs";
 import {
   compareVersions,
   DEFAULT_CHANNEL,
@@ -19,6 +18,7 @@ import {
   packageFor,
   programSchemaVersion,
 } from "./release-source.mjs";
+import { migrates } from "./release-source.mjs";
 import {
   attemptStatus,
   claimAttempt,
@@ -94,10 +94,16 @@ export async function checkForRelease(
 export function blockedReason(program, candidate) {
   const schema = programSchemaVersion(program);
   const wanted = candidate.manifest.schemaVersion;
-  // A different schema is only a refusal when nothing can join the two. When
-  // something can, the upgrade carries it out, having backed it up first.
-  if (schema !== null && wanted !== schema && !supported(schema, wanted))
-    return `Hallvi ${candidate.manifest.version} keeps its records in schema ${wanted} and this one uses schema ${schema}. There is no supported migration between them, so this release cannot be installed over your records.`;
+  // Whether the two can be joined is the *release's* answer, carried in its
+  // signed manifest. It cannot be this program's: the migration belongs to
+  // the version being installed, and an installation old enough to need one
+  // is by definition too old to know it exists.
+  if (
+    schema !== null &&
+    wanted !== schema &&
+    !migrates(candidate.manifest, schema)
+  )
+    return `Hallvi ${candidate.manifest.version} keeps its records in schema ${wanted} and this one uses schema ${schema}, and does not say it can migrate them. This release cannot be installed over your records.`;
   try {
     packageFor(candidate.manifest);
     return null;

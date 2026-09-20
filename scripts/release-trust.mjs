@@ -144,6 +144,18 @@ export function verifyManifest({ bytes, signature, channel, keys }) {
     Number.isInteger(value.schemaVersion) && value.schemaVersion > 0,
     "The release manifest does not say which database schema it needs.",
   );
+  // Which schemas this release can take records from. A release that says
+  // nothing can take only its own, which is what every release before this
+  // field meant.
+  const migratesFrom = value.migratesFrom ?? [];
+  want(
+    Array.isArray(migratesFrom) &&
+      migratesFrom.every(
+        (from) =>
+          Number.isInteger(from) && from > 0 && from < value.schemaVersion,
+      ),
+    "The release manifest lists schemas it cannot have migrated from.",
+  );
   want(
     typeof value.notes === "string" && value.notes.startsWith("https://"),
     "The release manifest has no release-notes address.",
@@ -190,6 +202,7 @@ export function verifyManifest({ bytes, signature, channel, keys }) {
     version: value.version,
     revision: value.revision,
     schemaVersion: value.schemaVersion,
+    migratesFrom: [...migratesFrom],
     releasedAt: value.releasedAt,
     notes: value.notes,
     packages,

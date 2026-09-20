@@ -12,6 +12,7 @@ export interface ReleaseManifest {
   version: string;
   revision: string;
   schemaVersion: number;
+  migratesFrom: number[];
   releasedAt: string;
   notes: string;
   packages: Partial<Record<ReleasePlatform, ReleasePackage>>;

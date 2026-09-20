@@ -13,6 +13,7 @@ import { createPrivateKey, sign } from "node:crypto";
 import { createHash } from "node:crypto";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { MIGRATIONS, supported } from "./migrations.mjs";
 
 import { PLATFORMS, trustedKeys, verifyManifest } from "./release-trust.mjs";
 
@@ -78,6 +79,13 @@ const schemaVersion = JSON.parse(
   readFileSync(join("src", "server", "schema-version.json"), "utf8"),
 ).version;
 
+// Which schemas this release can take records from. It has to travel with the
+// release: the installation deciding whether to download it is the older one,
+// and its own list cannot know about a migration written after it shipped.
+const migratesFrom = [...new Set(MIGRATIONS.map((step) => step.from))].filter(
+  (from) => from !== schemaVersion && supported(from, schemaVersion),
+);
+
 const packages = {};
 for (const platform of PLATFORMS) {
   const file = `hallvi-${version}-${platform}.tgz`;
@@ -115,6 +123,7 @@ const bytes = Buffer.from(
       version,
       revision,
       schemaVersion,
+      migratesFrom,
       releasedAt: new Date().toISOString(),
       notes,
       packages,

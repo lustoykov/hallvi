@@ -69,3 +69,8 @@ export function downloadPackage(
     onProgress?: (read: number, size: number) => void;
   },
 ): Promise<{ file: string; bytes: number; sha256: string }>;
+
+export declare function migrates(
+  manifest: { migratesFrom?: number[] },
+  schema: number,
+): boolean;

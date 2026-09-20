@@ -1,6 +1,14 @@
 import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -114,7 +122,9 @@ it("upgrades a schema-15 database without rewriting anything in it, and leaves t
     from: 15,
     to: 18,
     changes: ["the controller database"],
-    copied: ["hallvi.db"],
+    // The exact file it came from, so restoring cannot guess a name back.
+    database: path,
+    copied: [{ name: "hallvi.db", target: path }],
   });
   expect(readdirSync(kept).sort()).toEqual(["hallvi.db", "manifest.json"]);
 
@@ -158,5 +168,112 @@ it("refuses a schema it has no migration for, and leaves it alone", () => {
   expect(after.pragma("user_version", { simple: true })).toBe(14);
   after.close();
   expect(readdirSync(data).sort()).toEqual(["hallvi.db"]);
+  rmSync(data, { recursive: true, force: true });
+});
+
+it("restores the exact database it backed up, and never one beside it", () => {
+  const data = mkdtempSync(join(tmpdir(), "hv-custom-"));
+  const custom = join(data, "custom.sqlite");
+  const bystander = join(data, "hallvi.db");
+  const make = (path: string, version: number, name: string) => {
+    const made = new Database(path);
+    made.exec(readFileSync("tests/fixtures/schema-15.sql", "utf8"));
+    made
+      .prepare(
+        `INSERT INTO applications (id,name,repository_url,repository_owner,repository_name,permission_mode,created_at,updated_at)
+         VALUES ('a',?,'u','o','r','pi-decides','t','t')`,
+      )
+      .run(name);
+    made.pragma(`user_version = ${version}`);
+    made.close();
+  };
+  make(custom, 15, "the one being migrated");
+  make(bystander, 18, "an unrelated database sitting beside it");
+
+  const run = (...args: string[]) =>
+    execFileSync(process.execPath, ["scripts/migrate-state.mjs", ...args], {
+      encoding: "utf8",
+      env: { ...process.env, HALLVI_DB_PATH: custom },
+      stdio: "pipe",
+    });
+  run("--apply");
+  const kept = join(
+    data,
+    "migrations",
+    readdirSync(join(data, "migrations"))[0],
+  );
+  run("--restore", kept);
+
+  const read = (path: string) => {
+    const open = new Database(path, { readonly: true });
+    const row = {
+      version: open.pragma("user_version", { simple: true }),
+      name: open.prepare("SELECT name FROM applications").get() as {
+        name: string;
+      },
+    };
+    open.close();
+    return { version: row.version, name: row.name.name };
+  };
+  expect(read(custom)).toEqual({ version: 15, name: "the one being migrated" });
+  expect(read(bystander)).toEqual({
+    version: 18,
+    name: "an unrelated database sitting beside it",
+  });
+  rmSync(data, { recursive: true, force: true });
+});
+
+it("keeps the records when the copy it was asked to restore is no good", () => {
+  const data = mkdtempSync(join(tmpdir(), "hv-damaged-"));
+  const database = join(data, "hallvi.db");
+  const made = new Database(database);
+  made.exec(readFileSync("tests/fixtures/schema-15.sql", "utf8"));
+  made.pragma("user_version = 15");
+  made.close();
+
+  const run = (...args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ["scripts/migrate-state.mjs", ...args, "--data", data],
+      { encoding: "utf8", stdio: "pipe" },
+    );
+  run("--apply");
+  const kept = join(
+    data,
+    "migrations",
+    readdirSync(join(data, "migrations"))[0],
+  );
+  const alive = () => {
+    const open = new Database(database, { readonly: true });
+    const version = open.pragma("user_version", { simple: true });
+    open.close();
+    return version;
+  };
+
+  // Gone. Deleting the live records before reading the copy would turn this
+  // into no records at all, which is the one outcome a restore must not have.
+  renameSync(join(kept, "hallvi.db"), join(kept, "kept-aside"));
+  expect(() => run("--restore", kept)).toThrow(/is missing hallvi\.db/);
+  expect(alive()).toBe(18);
+
+  // There, but not a database.
+  writeFileSync(join(kept, "hallvi.db"), randomBytes(4096));
+  expect(() => run("--restore", kept)).toThrow(/could not be opened/);
+  expect(alive()).toBe(18);
+
+  // There, readable, and not the schema it claims.
+  rmSync(join(kept, "hallvi.db"));
+  const wrong = new Database(join(kept, "hallvi.db"));
+  wrong.exec(readFileSync("tests/fixtures/schema-15.sql", "utf8"));
+  wrong.pragma("user_version = 18");
+  wrong.close();
+  expect(() => run("--restore", kept)).toThrow(/not the schema 15 it claims/);
+  expect(alive()).toBe(18);
+
+  // And the real one still works.
+  rmSync(join(kept, "hallvi.db"));
+  renameSync(join(kept, "kept-aside"), join(kept, "hallvi.db"));
+  expect(run("--restore", kept)).toContain("to schema 15");
+  expect(alive()).toBe(15);
   rmSync(data, { recursive: true, force: true });
 });

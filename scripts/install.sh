@@ -86,22 +86,64 @@ backup=""
 migrated=""
 committed=no
 stopped=no
+# Stops the service and does not return success until the service manager
+# agrees it is gone. A start that reported failure can still have left a
+# process serving, and both managers restart what they own; replacing a
+# database out from under one is the thing this exists to prevent.
+service_is_gone() {
+  if [ "$os" = darwin ]; then
+    ! launchctl print "gui/$(id -u)/com.hallvi" >/dev/null 2>&1
+  else
+    ! systemctl --user is-enabled hallvi.service >/dev/null 2>&1 &&
+      ! systemctl --user is-active --quiet hallvi.service
+  fi
+}
+
+ensure_stopped() {
+  service_is_gone && return 0
+  "$bin/hallvi" stop >/dev/null 2>&1 || :
+  if [ "$os" = darwin ]; then
+    launchctl bootout "gui/$(id -u)/com.hallvi" >/dev/null 2>&1 || :
+  else
+    systemctl --user disable --now hallvi.service >/dev/null 2>&1 || :
+  fi
+  attempt=0
+  while [ "$attempt" -lt 30 ]; do
+    service_is_gone && return 0
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+  return 1
+}
+
 restore_records() {
   # Putting the old program back is not a rollback once its database has been
   # migrated under it: it would refuse the schema it now finds, correctly.
   # Copying the backup back is, and it needs no program to do it.
   [ -n "$migrated" ] && [ -f "$migrated/hallvi.db" ] || return 0
+  if ! ensure_stopped; then
+    say "Hallvi is still running; the records were left alone. The copy taken before the upgrade is at $migrated" >&2
+    return 0
+  fi
   rm -f "$data/hallvi.db-wal" "$data/hallvi.db-shm"
-  if cp "$migrated/hallvi.db" "$data/hallvi.db"; then
+  if cp "$migrated/hallvi.db" "$data/hallvi.db.restoring" &&
+    mv "$data/hallvi.db.restoring" "$data/hallvi.db"; then
     say "The records were put back as they were, from $migrated"
     migrated=""
   else
+    rm -f "$data/hallvi.db.restoring"
     say "Could not put the records back; the backup is at $migrated" >&2
   fi
 }
 cleanup() {
   result=$?
   trap - EXIT
+  # Nothing is replaced while anything might still be writing. This only
+  # applies when there is something to undo: a failure before anything was
+  # touched must leave a working service exactly as it found it.
+  if [ "$committed" = no ] && { [ -n "$migrated" ] || [ -n "$backup" ]; }; then
+    ensure_stopped || say "Hallvi could not be stopped for recovery." >&2
+  fi
   restore_records
   if [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
     if [ -d "$home" ] && is_installation "$home"; then rm -rf "$home"; fi

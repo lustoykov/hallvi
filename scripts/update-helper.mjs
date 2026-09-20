@@ -28,10 +28,10 @@ import { userInfo } from "node:os";
 import { join } from "node:path";
 
 import { installedPorts } from "./installed-ports.mjs";
-import { supported } from "./migrations.mjs";
 import {
   currentPlatform,
   downloadPackage,
+  migrates,
   packageFor,
   programSchemaVersion,
   ReleaseRefusal,
@@ -148,18 +148,19 @@ async function main() {
       "The release changed between choosing it and installing it.",
     );
 
-  // A schema nothing can join to this one is refused here, before anything is
-  // downloaded. A schema something *can* join is not a refusal: `install.sh`
-  // carries the migration out from the unpacked archive, after the service has
-  // stopped and with a backup taken first. This only saves the download in the
-  // hopeless case, and says so in words the owner can act on.
+  // A schema this release does not claim to migrate is refused here, before
+  // anything is downloaded. One it does claim is not a refusal: `install.sh`
+  // carries the migration out from the unpacked archive — which holds the
+  // list the claim was made from — after the service has stopped and with a
+  // backup taken first. The claim travels in the signed manifest because this
+  // program is the old one, and cannot know a migration written after it.
   const schema = programSchemaVersion(program);
   const migrating = schema !== null && manifest.schemaVersion !== schema;
-  if (migrating && !supported(schema, manifest.schemaVersion)) {
+  if (migrating && !migrates(manifest, schema)) {
     recordPhase(
       data,
       "blocked",
-      `Hallvi ${manifest.version} keeps its records in schema ${manifest.schemaVersion} and this one uses schema ${schema}. There is no supported migration between them, so nothing was downloaded and nothing was changed.`,
+      `Hallvi ${manifest.version} keeps its records in schema ${manifest.schemaVersion} and this one uses schema ${schema}, and does not say it can migrate them. Nothing was downloaded and nothing was changed.`,
     );
     say("blocked: schema");
     return;

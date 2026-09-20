@@ -21,6 +21,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -161,6 +162,7 @@ async function fill(into, state, steps, from, to) {
       if (!existsSync(path)) continue;
       const name =
         path === state.database ? "hallvi.db" : path.split("/").pop();
+      copied.push({ name, target: path });
       if (path === state.database) {
         // Through SQLite's own backup, so a write-ahead log in front of the
         // file goes with it instead of being left behind.
@@ -175,10 +177,9 @@ async function fill(into, state, steps, from, to) {
           preserveTimestamps: true,
         });
       }
-      copied.push(name);
     }
 
-  if (copied.includes("hallvi.db")) {
+  if (copied.some((each) => each.name === "hallvi.db")) {
     const check = new Database(join(into, "hallvi.db"), { readonly: true });
     const intact =
       check.pragma("integrity_check", { simple: true }) === "ok" &&
@@ -205,6 +206,10 @@ async function fill(into, state, steps, from, to) {
         changes: changedStores(steps),
         copied,
         state: dirname(state.database),
+        // The exact file, not a directory and a convention: a controller
+        // whose database is somewhere else must be restored to where it is,
+        // and never over a different database that happens to sit beside it.
+        database: state.database,
         restore: `node scripts/migrate-state.mjs --restore ${into}`,
       },
       null,
@@ -246,29 +251,100 @@ function apply(state, steps, to) {
     );
 }
 
-async function restore(from) {
+/** Everything a backup says it holds, checked before anything is replaced. */
+function inspectBackup(from) {
   const manifest = JSON.parse(
     readFileSync(join(from, "manifest.json"), "utf8"),
   );
-  const state = stateFiles(manifest.state);
-  return withoutWriters(state.database, () => {
-    for (const name of manifest.copied) {
-      const target =
-        name === "hallvi.db" ? state.database : join(manifest.state, name);
-      if (name === "hallvi.db") {
-        // The write-ahead log and shared-memory file belong to the database
-        // being replaced; leaving them would put the old file behind newer
-        // pages that are no longer its own.
-        for (const companion of ["-wal", "-shm"])
-          rmSync(`${target}${companion}`, { force: true });
-      }
-      rmSync(target, { recursive: true, force: true });
-      cpSync(join(from, name), target, {
-        recursive: true,
-        preserveTimestamps: true,
-      });
+  if (!manifest.database || !Array.isArray(manifest.copied))
+    throw new Error(`${from} is not a backup this can restore.`);
+  for (const entry of manifest.copied) {
+    if (!entry?.name || !entry?.target)
+      throw new Error(
+        `${from} does not say where one of its copies came from.`,
+      );
+    if (!existsSync(join(from, entry.name)))
+      throw new Error(
+        `${from} is missing ${entry.name}. Nothing was changed; the records are as they are.`,
+      );
+  }
+  const database = manifest.copied.find((each) => each.name === "hallvi.db");
+  if (database) {
+    let version;
+    let intact;
+    try {
+      const check = new Database(join(from, "hallvi.db"), { readonly: true });
+      version = check.pragma("user_version", { simple: true });
+      intact = check.pragma("integrity_check", { simple: true }) === "ok";
+      check.close();
+    } catch (cause) {
+      throw new Error(
+        `The copy in ${from} could not be opened (${cause instanceof Error ? cause.message : cause}). Nothing was changed; the records are as they are.`,
+      );
     }
-    return `Restored ${manifest.copied.join(", ")} to schema ${manifest.from} from ${from}.`;
+    for (const companion of ["-wal", "-shm"])
+      rmSync(join(from, `hallvi.db${companion}`), { force: true });
+    if (!intact || version !== manifest.from)
+      throw new Error(
+        `The copy in ${from} is schema ${version}${intact ? "" : " and does not check out"}, not the schema ${manifest.from} it claims. Nothing was changed.`,
+      );
+  }
+  return manifest;
+}
+
+/**
+ * Putting a backup back, in an order that cannot leave less than there was.
+ *
+ * The copy is opened and checked first, then staged beside each target, and
+ * only then moved into place. Deleting the live records before reading the
+ * copy would turn a damaged backup into no records at all, which is the one
+ * outcome a restore must never produce.
+ */
+async function restore(from) {
+  const manifest = inspectBackup(from);
+  return await withoutWriters(manifest.database, () => {
+    const staged = [];
+    try {
+      for (const entry of manifest.copied) {
+        const staging = `${entry.target}.restoring`;
+        rmSync(staging, { recursive: true, force: true });
+        cpSync(join(from, entry.name), staging, {
+          recursive: true,
+          preserveTimestamps: true,
+        });
+        staged.push({ ...entry, staging });
+      }
+      const database = staged.find((each) => each.name === "hallvi.db");
+      if (database) {
+        const check = new Database(database.staging, { readonly: true });
+        const version = check.pragma("user_version", { simple: true });
+        check.close();
+        for (const companion of ["-wal", "-shm"])
+          rmSync(`${database.staging}${companion}`, { force: true });
+        if (version !== manifest.from)
+          throw new Error("The staged copy did not survive being copied.");
+      }
+    } catch (error) {
+      for (const each of staged)
+        rmSync(each.staging, { recursive: true, force: true });
+      throw error;
+    }
+
+    // Nothing below can fail on its own terms: each target is replaced by a
+    // rename of something already there and already checked.
+    for (const entry of staged) {
+      if (entry.name === "hallvi.db")
+        // The write-ahead log and shared-memory file belong to the database
+        // being replaced; leaving them would put the copy behind newer pages
+        // that are no longer its own.
+        for (const companion of ["-wal", "-shm"])
+          rmSync(`${entry.target}${companion}`, { force: true });
+      rmSync(entry.target, { recursive: true, force: true });
+      renameSync(entry.staging, entry.target);
+    }
+    return `Restored ${manifest.copied
+      .map((each) => each.target)
+      .join(", ")} to schema ${manifest.from} from ${from}.`;
   });
 }
 
