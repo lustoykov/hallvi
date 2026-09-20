@@ -31,6 +31,7 @@ import {
   openSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -46,6 +47,7 @@ const backups = join(root, "backups");
 const run = join(root, "run");
 const registerPath = join(root, "instance.json");
 const claimsPath = join(root, "claims.json");
+const claimsLock = join(root, "claims.lock");
 const pidPath = join(run, "dev-instance.pid");
 const logPath = join(run, "dev-instance.log");
 const configuration = join(state, "config");
@@ -104,8 +106,9 @@ const port = () => Number(register().port);
 const url = () => `http://127.0.0.1:${port()}`;
 
 /**
- * The revision the controller is running, and which tracked files differ from
- * it. `next build` rewrites `next-env.d.ts`, so a built program is never quite
+ * The program checkout's revision, and which tracked files differ from it.
+ * It cannot establish which build a process loaded before a later checkout.
+ * `next build` rewrites `next-env.d.ts`, so a built program is never quite
  * clean; naming the files is more use than calling the whole thing edited.
  */
 function revision() {
@@ -167,6 +170,17 @@ function running() {
   if (!Number.isInteger(recorded)) return null;
   try {
     process.kill(recorded, 0);
+    const printed = execFileSync(
+      "ps",
+      ["-p", String(recorded), "-o", "pgid=", "-o", "command="],
+      { encoding: "utf8" },
+    );
+    const found = /^\s*(\d+)\s+(.+)$/.exec(printed.trimEnd());
+    if (
+      Number(found?.[1]) !== recorded ||
+      !found?.[2].includes(join(program, "scripts", "serve.mjs"))
+    )
+      return null;
     return recorded;
   } catch {
     return null;
@@ -176,6 +190,32 @@ function running() {
 // ---------------------------------------------------------------- claims
 
 const claims = () => readJson(claimsPath, []);
+
+/** Only one caller may compare and write claims at a time. */
+function withClaimsLock(work) {
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  try {
+    mkdirSync(claimsLock, { mode: 0o700 });
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    return fail(
+      `Another claim change is in progress at ${claimsLock}. Retry; if it persists, verify that the other task is gone before removing that exact lock.`,
+    );
+  }
+  try {
+    return work();
+  } finally {
+    rmdirSync(claimsLock);
+  }
+}
+
+function canonicalScope(scope) {
+  if (scope === "environment") return scope;
+  const found = register().applications.find(
+    (application) => application.id === scope || application.name === scope,
+  );
+  return found?.id ?? fail(`No registered application named ${scope}.`);
+}
 
 /**
  * Who is asking. A task sets HALLVI_DEV_HOLDER to its own id; otherwise it is
@@ -207,8 +247,18 @@ function claim([scope, ...rest]) {
   const reason = rest.join(" ").trim();
   if (!reason)
     return fail("Say why, in a few words: dev-instance claim <scope> <reason>");
-  const held = claims();
-  const blocked = conflicting(scope, held);
+  const normalized = canonicalScope(scope);
+  const mine = holder();
+  const blocked = withClaimsLock(() => {
+    const held = claims();
+    const conflicts = conflicting(normalized, held);
+    if (conflicts.length) return conflicts;
+    writeJson(claimsPath, [
+      ...held,
+      { scope: normalized, holder: mine, reason, at: new Date().toISOString() },
+    ]);
+    return [];
+  });
   if (blocked.length) {
     console.error("Held by someone else:");
     for (const claim of blocked)
@@ -220,11 +270,6 @@ function claim([scope, ...rest]) {
     );
     process.exit(1);
   }
-  const mine = holder();
-  writeJson(claimsPath, [
-    ...held,
-    { scope, holder: mine, reason, at: new Date().toISOString() },
-  ]);
   console.log(
     `Claimed ${scope} as ${mine}. Release it when you are done:\n  dev-instance release ${scope}`,
   );
@@ -233,18 +278,28 @@ function claim([scope, ...rest]) {
 function release([scope, ...rest]) {
   if (!scope) return fail("Name what you are releasing.");
   const forced = rest.includes("--force");
-  const held = claims();
+  const normalized = canonicalScope(scope);
   const mine = holder();
-  const remaining = held.filter(
-    (claim) => claim.scope !== scope || !(forced || claim.holder === mine),
-  );
-  if (remaining.length === held.length)
+  const result = withClaimsLock(() => {
+    const held = claims();
+    const remaining = held.filter(
+      (claim) =>
+        claim.scope !== normalized || !(forced || claim.holder === mine),
+    );
+    if (remaining.length === held.length)
+      return {
+        released: false,
+        heldByOther: held.some((claim) => claim.scope === normalized),
+      };
+    writeJson(claimsPath, remaining);
+    return { released: true };
+  });
+  if (!result.released)
     return fail(
-      held.some((claim) => claim.scope === scope)
+      result.heldByOther
         ? `${scope} is held by someone else. Use --force only when you know that task has stopped.`
         : `Nothing claims ${scope}.`,
     );
-  writeJson(claimsPath, remaining);
   console.log(`Released ${scope}.`);
 }
 
@@ -259,6 +314,10 @@ async function start() {
   if (!existsSync(join(program, "dist", "worker.mjs")))
     return fail(
       `${program} is not built. Run: npm ci && npm run build, in that directory.`,
+    );
+  if (!existsSync(database))
+    return fail(
+      `The persistent database is missing at ${database}. Restore its backup before starting; an empty replacement would hide lost applications and conversations.`,
     );
   const { database: held, program: needed } = schema();
   if (held !== null && held !== needed)
@@ -380,6 +439,10 @@ async function stop() {
  * would not agree with the sessions it is writing.
  */
 async function backup(label = "manual") {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(label))
+    return fail(
+      "Use a short backup label with letters, numbers, dots, dashes or underscores.",
+    );
   if (running() || (await answering()) !== null)
     return fail("Stop the controller first: dev-instance stop");
   if (!existsSync(database)) return fail(`No state at ${database}.`);
@@ -602,10 +665,11 @@ async function smoke() {
   const held = register();
   const results = [];
   const controller = await answering();
+  const ownProcess = running();
   results.push([
-    controller !== null && controller < 500,
-    `controller answers ${url()}`,
-    String(controller),
+    ownProcess !== null && controller !== null && controller < 500,
+    `this environment's controller answers ${url()}`,
+    `pid ${ownProcess ?? "unknown"}, HTTP ${controller}`,
   ]);
   const present = new Map(applications().map((row) => [row.id, row]));
   for (const application of held.applications) {

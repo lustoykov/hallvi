@@ -429,7 +429,7 @@ do not share a database by default.
   acceptance remains open; each later archive needs its own trial.
 - macOS Intel, Linux arm64 and other Linux distributions have no prebuilt
   release target yet.
-- No schema migrations between versions (see [Update](#update)). An update to a
+- Installed self-update does not apply schema migrations (see [Update](#update)). An update to a
   release needing another schema is refused; nothing migrates and nothing is
   deleted.
 - Updates are only ever started by the owner. There is no automatic

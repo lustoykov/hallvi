@@ -153,8 +153,9 @@ manifest's own bytes while it updates and verifies them again in the program
 that does the installing, rather than trusting what the interface read.
 
 `schemaVersion` is the database schema that release needs. An installation
-whose records are in another schema says so and does not download, because
-there are no migrations between schemas yet.
+whose records are in another schema says so and does not download. The
+installed self-update path does not apply schema migrations; the persistent
+development environment can use a separately verified database upgrade.
 
 ## The channel
 

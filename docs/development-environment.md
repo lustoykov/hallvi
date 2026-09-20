@@ -28,7 +28,7 @@ nothing here touches that one.
 node scripts/dev-instance.mjs status
 ```
 
-It prints where the state is, which revision the controller is running and
+It prints where the state is, which revision the program checkout has and
 whether that is the baseline, the schema the database holds, the applications
 it should have and whether they are there, and who currently holds a claim.
 
@@ -40,8 +40,10 @@ If it matters that everything is answering, run the check:
 node scripts/dev-instance.mjs smoke
 ```
 
-That asks the controller and each deployed application for an answer, and
-names whatever did not give one.
+That checks the recorded controller process and asks it and each deployed
+application for an HTTP answer, naming whatever did not give one. It does not
+prove that application data or a background worker survived a change; inspect
+the sample data and conversations for that.
 
 If the controller is not running, start it — it is an ordinary background
 process, not a service:
@@ -88,9 +90,9 @@ Several people can do that at once.
 A change needs the scope it affects, and only that scope:
 
 ```sh
-node scripts/dev-instance.mjs claim miniflux "checking the feed import"
+node scripts/dev-instance.mjs claim v2 "checking the feed import"
 # ... do the work ...
-node scripts/dev-instance.mjs release miniflux
+node scripts/dev-instance.mjs release v2
 ```
 
 | What you are doing | Claim |
@@ -98,9 +100,15 @@ node scripts/dev-instance.mjs release miniflux
 | Asking one application's Pi to change that application | that application |
 | Upgrading the controller, migrating the schema, changing the shared host, Caddy or the firewall | `environment` |
 
-`environment` conflicts with everything, because all three applications sit on
+`environment` conflicts with everything, because all four applications sit on
 one host behind one Caddy. Two tasks reconfiguring that at once is the failure
 this is here to prevent.
+
+Use the application's registered name (Miniflux is registered as `v2`) or its
+full ID. The command stores the ID, so a name and an ID cannot take separate
+claims on the same application. Claim changes are serialized; if a claim lock
+remains after a crashed command, verify the other command has ended before
+removing that exact `claims.lock` directory.
 
 If a task crashed holding a claim, `status` shows who held it and since when.
 Releasing someone else's claim is deliberate, never automatic:
