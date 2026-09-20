@@ -147,6 +147,52 @@ At 375 px both pages lay out in one column with no horizontal scroll. Adding
 two links had pushed the dashboard's own bar past a narrow window; it wraps
 now.
 
+## A second review, and the fallback that never ran
+
+**The stock-macOS path was broken, and said the wrong thing about it.**
+`node -e` has no script path, so its arguments begin at `argv[1]`; the check
+read them from `argv[2]`, which pointed the import at the work directory and
+left the second argument undefined. On the only machines that path exists for
+— a Mac with no OpenSSL that can do Ed25519 — installation always failed, and
+reported *"the release manifest is not signed by the Hallvi release key"* when
+in truth nothing had been verified at all.
+
+The complete fallback, exercised against a signed manifest, the key that
+signed it, a key that did not, and a verifier that is missing:
+
+```
+                        before            after
+correct key             not signed ✗      signed, exit 0
+wrong key               not signed        not signed, exit 1
+check cannot run        not signed ✗      could not be checked, exit 1
+```
+
+The two outcomes now exit differently, so "could not check" is never again
+reported as "not signed".
+
+**A failed look skipped the hourly interval.** The gate excluded cached errors,
+and the worker comes round every minute, so an unreachable source became a
+request a minute for as long as the outage lasted. Eight worker ticks during
+an outage, before and after:
+
+```
+requests that left the machine:   8  ->  1
+Check now, inside the hour:       still forces one
+```
+
+Both gates that decide how often to look now say the same thing; there were
+two, with different rules.
+
+## About "all green"
+
+The reviewer is right that it described local verification. **GitHub Actions is
+disabled for this repository** — `actions/permissions` answers
+`{"enabled": false}`, and the last workflow runs were on 12 September — so no
+PR has checks, and this is a repository setting rather than a workflow that
+needs fixing. Turning it on is the owner's call, not something to flip in
+passing. It also means the Releases page's **Build draft release** button
+cannot succeed until it is on.
+
 ## What this does not establish
 
 - **No release was published.** Everything above ran against a stand-in source
