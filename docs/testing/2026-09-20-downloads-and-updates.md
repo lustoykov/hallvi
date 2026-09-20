@@ -35,6 +35,7 @@ Archives, both built on the platform they run on:
 | `0.3.0-alpha.1`, `0.3.0-alpha.2` | `8bd12548` | Ubuntu 24.04 x64 |
 | `0.3.0-alpha.3`, `0.3.0-alpha.4` | `b2a7ccad` | Ubuntu 24.04 x64 |
 | `0.3.0-alpha.5` | `7e2b45c6` | Ubuntu 24.04 x64 |
+| `0.3.0-alpha.6` | `786629ef` | Ubuntu 24.04 x64 |
 
 Each Linux archive is 278 MB and carries Node.js 22.23.2, the built interface,
 the Pi worker and production dependencies with both native modules.
@@ -144,8 +145,8 @@ and **Check for updates** — when the line is clicked. Settings went back to
 the six accounts.
 
 That move was installed and read in the running product too, over five more
-updates (`0.3.0-alpha.1` through `0.3.0-alpha.5`). It found three layout
-defects on the way, each fixed and reinstalled before the next look:
+updates (`0.3.0-alpha.1` through `0.3.0-alpha.6`). It found four things to
+fix on the way, each installed and looked at again before the next:
 
 - `.hv-application-navigation button` gives every button in that sidebar a
   row's height and type size, which outranked these rules and cut the version
@@ -158,6 +159,11 @@ defects on the way, each fixed and reinstalled before the next look:
 - The machine name beside the product name wrapped onto a second line whenever
   it was long, which is most of them. It is cut instead, with the whole name
   still in its title and in the tab title.
+- Then the name went entirely: the alpha notice, the sidebar head and the
+  version line all named the product on one screen, and two of them named the
+  machine. The notice says both now — *Hallvi is in alpha, on
+  hallvi-update-e2e-0abbbca3.* — and the sidebar link says what it is for,
+  **All applications**.
 
 ### Releases that must not be installed
 
