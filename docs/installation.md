@@ -415,9 +415,8 @@ do not share a database by default.
 
 - No alpha release is published yet. The workflow that builds and signs one is
   ready and has never been run; the public download page is therefore empty,
-  and the maintainer still supplies archives by hand. See
-  [Publishing a release](releases.md) for the one secret that remains to be
-  configured.
+  and the maintainer still supplies archives by hand. Everything that workflow
+  needs is in place; see [Publishing a release](releases.md).
 - A first installation trusts github.com over HTTPS, not a signature. Only
   updates are verified against the key Hallvi ships; a verifier taken out of the
   archive it is verifying would prove nothing.

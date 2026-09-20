@@ -236,8 +236,10 @@ supported platform.
   packaged runtime's self-sufficiency and the archive build were checked there.
   Doing better needs a Mac other than the owner's, or a second account on it.
 - **No release has been published.** The workflow in `.github/workflows/release.yml`
-  has never run; it is read, not proved. The signing secret is still to be
-  configured, and the version→build→verify→publish sequence has only been
+  has never run; it is read, not proved. Its signing secret was configured on
+  20 September 2026, so the one thing that could have blocked it is no longer
+  outstanding, but nothing has exercised it: the version→build→verify→publish
+  sequence has only been
   exercised piecewise: `npm run package` on both platforms by hand,
   `sign-release.mjs` against real archives, and a release source serving the
   result.

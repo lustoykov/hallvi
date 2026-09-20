@@ -74,11 +74,14 @@ One secret, once.
 
 The private key was generated for this work and is on the owner's MacBook at
 `~/.config/hallvi-release/alpha-signing-key.pem`, owner-only. It is in no
-repository, no archive and no installation. Add it to the repository with:
+repository, no archive and no installation. It was added to the repository as
+`HALLVI_RELEASE_SIGNING_KEY` on 20 September 2026, with:
 
 ```bash
 gh secret set HALLVI_RELEASE_SIGNING_KEY --repo lustoykov/hallvi < ~/.config/hallvi-release/alpha-signing-key.pem
 ```
+
+The same command replaces it.
 
 Without it the release workflow stops at the signing step and says so. There is
 no unsigned fallback: an unsigned release is one no installation would accept,
