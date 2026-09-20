@@ -80,6 +80,20 @@ export function radiusFor(count: number, smallest: number) {
   return Math.max(smallest, Math.ceil((count * 64) / (2 * Math.PI)));
 }
 
+/**
+ * What to write in a node.
+ *
+ * A published port is `18321 → 3000`, which is two numbers and does not fit a
+ * circle — and the node used to give up and draw a middle dot, so the one
+ * port `Notes` has on record was drawn as an unlabelled bubble. The number
+ * that matters from outside is the first one; the whole mapping is in the
+ * panel beside it and in the node's own tooltip.
+ */
+function portLabel(door: Door) {
+  const outer = door.port?.split(/\s*→\s*/)[0]?.trim();
+  return outer && outer.length <= 7 ? outer : (outer?.slice(0, 6) ?? "");
+}
+
 function ring(
   doors: Door[],
   radius: number,
@@ -97,6 +111,11 @@ function ring(
         key={door.id}
         className="pm-node"
         data-open={door.established === "answered" || undefined}
+        // A way in that stops at the boundary is on the map, drawn as
+        // stopped. It used to be exiled to a box underneath, which left the
+        // one diagram on the page answering "what is let in" with half the
+        // ports it had.
+        data-refused={placeOf(door) === "refused" || undefined}
         data-picked={door.id === picked || undefined}
         role="button"
         tabIndex={0}
@@ -112,9 +131,12 @@ function ring(
       >
         <circle cx={x} cy={y} r={26} />
         <text className="pm-node-port" x={x} y={y + 4}>
-          {door.port && door.port.length <= 6 ? door.port : "·"}
+          {portLabel(door)}
         </text>
-        <title>{door.title}</title>
+        <title>
+          {door.title}
+          {door.port ? ` · ${door.port}` : ""}
+        </title>
       </g>
     );
   });
@@ -144,9 +166,32 @@ export function PerimeterDirection({
   const answered = outside.filter((door) => door.established === "answered");
 
   const within = [...restricted, ...inside];
-  const innerR = radiusFor(within.length, 86);
-  const outerR = Math.max(radiusFor(outside.length, 150), innerR + 78);
-  const size = (outerR + 44) * 2;
+  // Everything that arrives from the internet, whether it answered or was
+  // refused. Both are what a reader came to see, and the node says which.
+  const arriving = [...outside, ...refused];
+  /**
+   * Rings that hold their content, rather than a fixed circle the real data
+   * never fills.
+   *
+   * The floors were sized for a crowd — an outer ring of 150 around an inner
+   * of 86 around a 46 core — so an application with one port was two empty
+   * circles and a name, and `Notes`, whose only port is on the inner ring,
+   * drew a large empty ring captioned OPEN TO THE INTERNET around it. The
+   * inner ring is drawn only when something is on it, and the outer one
+   * keeps a tighter distance when nothing is.
+   */
+  const coreR = 44;
+  const innerR = within.length
+    ? Math.max(radiusFor(within.length, 92), coreR + 48)
+    : coreR;
+  const outerR = Math.max(
+    arriving.length ? radiusFor(arriving.length, 118) : 0,
+    innerR + (arriving.length ? 72 : 46),
+  );
+  // Room for the node that sits on top of the ring, and for the caption
+  // above it: the first port is placed at -90°, so a caption tucked close to
+  // the ring was drawn inside that node's own circle.
+  const size = (outerR + 52) * 2;
   // The projection files three kinds under holes. A port being open to
   // everyone is established, and the map above says it better than a list.
   const unknowns = story.holes.filter((hole) => !hole.id.startsWith("open:"));
@@ -163,9 +208,23 @@ export function PerimeterDirection({
           <div>
             <h2>What is let in, and from where.</h2>
             <p>
+              {/* What is actually drawn below, which is not always two
+                  rings: the inner one exists only when something is on it,
+                  and the outer one holds ports that refused as well as ones
+                  that answered. */}
               {ways.length === 0
                 ? "No record names a port on this server. What has been established about the way in is below."
-                : "The outer ring is open to the internet. The inner ring limits access to specific sources or the server itself. Select a port to see what is configured and what has been checked."}
+                : [
+                    within.length
+                      ? "The outer ring is what reaches in from the internet; the inner one is what has to be let in first."
+                      : "The ring is what reaches in from the internet.",
+                    refused.length
+                      ? "A dashed port is one that refused the connection when it was checked."
+                      : null,
+                    "Select a port to see what is configured and what has been checked.",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
             </p>
           </div>
           {ways.length > 0 && (
@@ -173,6 +232,7 @@ export function PerimeterDirection({
               {outside.length} open to the internet
               {answered.length > 0 &&
                 ` · ${answered.length} answered when checked`}
+              {refused.length > 0 && ` · ${refused.length} refused`}
               {unplaced.length > 0 &&
                 ` · ${unplaced.length} nobody has checked`}
             </span>
@@ -186,6 +246,11 @@ export function PerimeterDirection({
             <div className="pm-map">
               <svg
                 viewBox={`${250 - size / 2} ${232 - size / 2} ${size} ${size}`}
+                // The map is as big as what is on it. Stretching it to the
+                // column's full width scaled one port up to fill 520px,
+                // which is how two circles and a name came to take up half
+                // the page.
+                style={{ width: size, maxWidth: "100%" }}
                 aria-label="What can reach in"
               >
                 <circle
@@ -194,15 +259,23 @@ export function PerimeterDirection({
                   cy="232"
                   r={outerR}
                 />
-                <circle
-                  className="pm-ring-inner"
-                  cx="250"
-                  cy="232"
-                  r={innerR}
-                />
-                <circle className="pm-core" cx="250" cy="232" r="46" />
-                <text className="pm-ring-caption" x="250" y={232 - outerR - 26}>
-                  OPEN TO THE INTERNET
+                {within.length > 0 && (
+                  <circle
+                    className="pm-ring-inner"
+                    cx="250"
+                    cy="232"
+                    r={innerR}
+                  />
+                )}
+                <circle className="pm-core" cx="250" cy="232" r={coreR} />
+                <text className="pm-ring-caption" x="250" y={232 - outerR - 34}>
+                  {/* The ring holds what arrives from the internet, which
+                      includes a port that refused it. Calling the ring
+                      itself "open" was true only while the refused ones
+                      were drawn somewhere else. */}
+                  {refused.length > 0
+                    ? "FROM THE INTERNET"
+                    : "OPEN TO THE INTERNET"}
                 </text>
                 <text className="pm-core-label" x="250" y="228">
                   {story.name}
@@ -212,32 +285,25 @@ export function PerimeterDirection({
                     ? "needs to be let in first"
                     : "nothing else on record"}
                 </text>
-                {ring(outside, outerR, -90, picked, setPicked)}
+                {ring(arriving, outerR, -90, picked, setPicked)}
                 {ring(within, innerR, -50, picked, setPicked)}
               </svg>
 
-              <ul className="pm-key">
-                <li data-tone="outside">
-                  <i aria-hidden="true" /> Open to the internet
-                </li>
-                <li data-tone="inside">
-                  <i aria-hidden="true" /> Needs to be let in first
-                </li>
-                {answered.length > 0 && (
-                  <li data-tone="open">
-                    <i aria-hidden="true" /> A check connected to it
-                  </li>
-                )}
-              </ul>
-
+              {/* One list, grouped, rather than a legend and three boxes
+                  saying the same ports over again. Each chip carries its own
+                  state, which is what the key used to be for. */}
               <ol className="pm-list">
-                {[
-                  ["Open to the internet", outside] as const,
-                  ["Needs to be let in first", within] as const,
-                ]
+                {(
+                  [
+                    ["Open to the internet", outside, undefined],
+                    ["Needs to be let in first", within, undefined],
+                    ["Refused when checked", refused, "refused"],
+                    ["Nobody has looked at these", unplaced, "unasked"],
+                  ] as const
+                )
                   .filter(([, list]) => list.length)
-                  .map(([heading, list]) => (
-                    <li key={heading}>
+                  .map(([heading, list, kind]) => (
+                    <li key={heading} data-kind={kind}>
                       <h4>{heading}</h4>
                       <div>
                         {list.map((one) => (
@@ -251,7 +317,7 @@ export function PerimeterDirection({
                             }
                             onClick={() => setPicked(one.id)}
                           >
-                            <code>{one.port}</code>
+                            {one.port && <code>{one.port}</code>}
                             {one.title}
                           </button>
                         ))}
@@ -260,52 +326,11 @@ export function PerimeterDirection({
                   ))}
               </ol>
 
-              {refused.length > 0 && (
-                <div className="pm-unplaced" data-kind="refused">
-                  <span>
-                    No connection was established during the check on{" "}
-                    {refused.length === 1 ? "this port" : "these ports"}
-                  </span>
-                  <div>
-                    {refused.map((one) => (
-                      <button
-                        key={one.id}
-                        type="button"
-                        aria-pressed={one.id === picked}
-                        data-picked={one.id === picked || undefined}
-                        onClick={() => setPicked(one.id)}
-                      >
-                        {one.title}
-                        {one.port && <code>{one.port}</code>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {unplaced.length > 0 && (
-                <div className="pm-unplaced">
-                  <span>Not on the map: nobody has looked at these</span>
-                  <div>
-                    {unplaced.map((one) => (
-                      <button
-                        key={one.id}
-                        type="button"
-                        aria-pressed={one.id === picked}
-                        data-picked={one.id === picked || undefined}
-                        onClick={() => setPicked(one.id)}
-                      >
-                        {one.title}
-                        {one.port && <code>{one.port}</code>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <p className="pm-caption">
                 A ring is what it takes to reach something, not where the
                 software runs.
+                {answered.length > 0 &&
+                  " A heavier ring is a port something connected to."}
               </p>
             </div>
 

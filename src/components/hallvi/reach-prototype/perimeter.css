@@ -41,7 +41,7 @@
 .pm-layout {
   display: grid;
   gap: 28px;
-  grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
   align-items: start;
 }
 @media (max-width: 1120px) {
@@ -52,9 +52,11 @@
 
 /* ---------- The map ---------- */
 
+/* The map is centred at whatever size its content needs; `width` comes from
+   the drawing, so a stretch rule here would undo it. */
 .pm-map svg {
   display: block;
-  width: 100%;
+  margin: 0 auto;
   height: auto;
   overflow: visible;
 }
@@ -112,9 +114,25 @@
   stroke: rgba(25, 35, 56, 0.55);
   stroke-width: 1.8;
 }
+/* A port that refused is a way in that stops at the boundary. Dashed for a
+   circle that does not let anything through, and the number struck out, which
+   is the same mark the list beside it uses. */
+.pm-node[data-refused] circle {
+  fill: #fff;
+  stroke: rgba(25, 35, 56, 0.3);
+  stroke-width: 1.3;
+  stroke-dasharray: 3 3.5;
+}
+.pm-node[data-refused] .pm-node-port {
+  fill: #8792a6;
+  text-decoration: line-through;
+}
 .pm-node[data-picked] circle {
   stroke: #192338;
   stroke-width: 2.2;
+}
+.pm-node[data-refused][data-picked] circle {
+  stroke: #33405a;
 }
 .pm-node:focus-visible circle {
   stroke: #285ad8;
@@ -177,80 +195,13 @@
   color: #59667b;
 }
 
-.pm-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-  margin: 10px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.pm-key li {
-  display: inline-flex;
-  gap: 7px;
-  align-items: center;
-  color: var(--ax-muted, #59667b);
-  font-size: 12px;
-}
-.pm-key i {
-  width: 11px;
-  height: 11px;
-  border: 1.3px solid rgba(25, 35, 56, 0.3);
-  border-radius: 999px;
-  background: #fff;
-}
-.pm-key li[data-tone="inside"] i {
-  background: rgba(25, 35, 56, 0.1);
-}
-.pm-key li[data-tone="open"] i {
-  border-color: rgba(25, 35, 56, 0.55);
-  border-width: 1.8px;
-  background: rgba(25, 35, 56, 0.06);
-}
-
-/* Dashed for what nobody has looked at, solid for what a check settled.
-   The difference is certainty, and it is drawn as certainty. */
-.pm-unplaced {
-  display: grid;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px dashed rgba(25, 35, 56, 0.22);
-  border-radius: 10px;
-}
-.pm-unplaced[data-kind="refused"] {
-  border-style: solid;
-}
-.pm-unplaced[data-kind="refused"] code {
+/* Struck out in the list too, so a refused port reads the same in both
+   places a reader meets it. */
+.pm-list li[data-kind="refused"] code {
   text-decoration: line-through;
 }
-.pm-unplaced > span {
-  color: var(--ax-muted, #59667b);
-  font-size: 12px;
-}
-.pm-unplaced div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.pm-unplaced button {
-  display: inline-flex;
-  gap: 8px;
-  align-items: baseline;
-  padding: 6px 11px;
-  border: 1px solid rgba(25, 35, 56, 0.18);
-  border-radius: 8px;
-  background: #fff;
-  font: 500 12.5px/1.3 inherit;
-  color: #33405a;
-  cursor: pointer;
-}
-.pm-unplaced button[data-picked] {
-  border-color: #192338;
-}
-.pm-unplaced code {
-  font-size: 11.5px;
-  color: #59667b;
+.pm-list li[data-kind="unasked"] button {
+  border-style: dashed;
 }
 
 .pm-caption {
