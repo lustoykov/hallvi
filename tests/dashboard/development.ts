@@ -281,10 +281,15 @@ const MUST_BE_PRESENT = [
 
 export function archiveBoundary(entries: string[]) {
   const inside = entries.map((entry) => entry.replace(/^[^/]+\//, ""));
+  // Only Hallvi's own paths are judged. A real archive carries 65,000
+  // entries, most of them third-party: a dependency ships its own `tests/`
+  // and the bundled Node.js carries npm's `src/`, and reading either as a
+  // leak would make this check cry wolf on every build.
+  const ours = inside.filter((entry) => !/^(node_modules|node)\//.test(entry));
   return {
     absent: MUST_BE_ABSENT.map(({ what, test }) => ({
       what,
-      offenders: inside.filter((entry) => test(entry)).slice(0, 5),
+      offenders: ours.filter((entry) => test(entry)).slice(0, 5),
     })),
     present: MUST_BE_PRESENT.map((path) => ({
       path,

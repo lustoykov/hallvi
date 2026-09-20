@@ -227,7 +227,7 @@ folder=${name%.tgz}
 tar -xzf "$work/$name" -C "$work" ||
   fail "the archive could not be unpacked."
 [ -f "$work/$folder/install.sh" ] ||
-  fail "the archive is missing its installer."
+  fail "the archive does not contain $folder/install.sh. Nothing was installed."
 
 # The fallback signature check, where the host could not do it itself.
 if [ "$verified_how" = "a signature checked with code from the archive itself" ]; then
