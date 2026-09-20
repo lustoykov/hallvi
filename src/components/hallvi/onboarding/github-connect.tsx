@@ -282,9 +282,11 @@ export function GithubConnect({
                 password never reaches Hallvi.
               </p>
               <p className="hv-ob-fine">
-                Hallvi gets read-only access to the repositories you choose
-                next. It can’t push, open pull requests or see anything you
-                don’t pick. Public repositories never need this.
+                Choose which repositories the App can access on GitHub. The
+                published Hallvi App requests read and write access to code and
+                pull requests. This connection check only reads; it does not
+                push changes or open a PR. Reading public repositories needs no
+                connection.
               </p>
             </>
           )}
@@ -333,6 +335,20 @@ export function GithubConnect({
           {error ? (
             <Problem title="Hallvi didn’t answer">
               <p>{error}</p>
+              <button
+                type="button"
+                className="hv-ob-quiet"
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    const fresh = await load();
+                    if (fresh)
+                      setAttempt(pending(fresh.attempt) ? fresh.attempt : null);
+                  })
+                }
+              >
+                Try again
+              </button>
             </Problem>
           ) : (
             <p>
@@ -344,11 +360,12 @@ export function GithubConnect({
       );
     if (connection)
       return (
-        <Receipt plain={plain} title={`GitHub connected as ${account}`}>
+        <Receipt plain={plain} title={`GitHub login saved for ${account}`}>
           <p>
-            Read-only, for the repositories you picked on GitHub. Whether a
-            particular application can be read is checked in its own
-            conversation.
+            For the repositories you picked on GitHub. The published Hallvi App
+            requests read and write access to code and pull requests; this
+            release only reads. Whether a particular application can be read is
+            checked in its own conversation.
           </p>
           <p>
             <a
@@ -411,8 +428,8 @@ export function GithubConnect({
         }
       >
         <p>
-          Read-only. Nothing has started: reading the repository is still yours
-          to ask for.
+          The access check only read from GitHub. Nothing has started: reading
+          the repository is still yours to ask for.
         </p>
       </Receipt>
     );
@@ -427,6 +444,20 @@ export function GithubConnect({
         {error ? (
           <Problem title="Hallvi didn’t answer">
             <p>{error}</p>
+            <button
+              type="button"
+              className="hv-ob-quiet"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  const fresh = await load();
+                  if (fresh)
+                    setAttempt(pending(fresh.attempt) ? fresh.attempt : null);
+                })
+              }
+            >
+              Try again
+            </button>
           </Problem>
         ) : (
           <p>
@@ -519,9 +550,9 @@ export function GithubConnect({
       </RequestCard>
     );
 
-  // Signed in. The account is fine; what is missing is this repository.
+  // A saved account does not prove current access to this repository.
   const checks: Check[] = [
-    { id: "account", label: `Signed in as ${account}`, state: "passed" },
+    { id: "account", label: `Login saved for ${account}`, state: "pending" },
     {
       id: "repository",
       label: `${repository} is among the repositories Hallvi may read`,
@@ -538,7 +569,7 @@ export function GithubConnect({
       <p>
         {unchecked
           ? "It hasn’t been checked with this sign-in yet."
-          : `Your sign-in is fine. On GitHub, you choose which repositories Hallvi may read, and ${repository} isn’t one of them yet — or the address is wrong.`}
+          : `Hallvi has a saved login, but could not read ${repository}. Check the repository address and the App’s repository access on GitHub.`}
       </p>
       <p className="hv-ob-fine">
         In an organization you don’t own, GitHub sends its owners a request

@@ -65,7 +65,7 @@ function repositorySays(repository: WelcomeRepository) {
     };
   if (repository.connected)
     return {
-      says: `GitHub is connected, but ${name} isn’t among the repositories you picked for Hallvi.`,
+      says: `Hallvi has a GitHub login saved, but couldn’t read ${name}. Check its address and repository access.`,
       action: "Choose repositories",
       run: repository.onOpen,
     };

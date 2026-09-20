@@ -6,7 +6,7 @@
 // wrong kind; a machine that answers with another identity is not the machine.
 // Nothing is saved unless every step passed.
 
-import { resolve4, resolveNs } from "node:dns/promises";
+import { resolve4, Resolver } from "node:dns/promises";
 
 import type {
   DnsHost,
@@ -157,28 +157,36 @@ const KNOWN_DNS: [RegExp, string][] = [
  * `example.co.uk` without a suffix list.
  */
 export async function whoHostsDns(name: string): Promise<DnsHost> {
-  const labels = name.split(".");
-  for (let from = 0; from < labels.length - 1; from++) {
-    const zone = labels.slice(from).join(".");
-    // A registry's own second level (co.uk, com.au) is nobody's zone.
-    if (/^(co|com|org|net|gov|ac|edu)\.[a-z]{2}$/.test(zone)) break;
-    try {
-      const nameservers = await resolveNs(zone);
-      if (!nameservers.length) continue;
-      if (nameservers.some((host) => /\.ns\.cloudflare\.com$/i.test(host)))
-        return { kind: "cloudflare", zone };
-      const who =
-        KNOWN_DNS.find(([pattern]) =>
-          nameservers.some((host) => pattern.test(host.toLowerCase())),
-        )?.[1] ?? null;
-      return { kind: "other", zone, nameservers, who };
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== "ENOTFOUND" && code !== "ENODATA")
-        return { kind: "unreachable" };
+  const resolver = new Resolver({ timeout: 3000, tries: 2 });
+  // Bound the whole lookup, including attempts at parent zones. This resolver
+  // belongs to this request, so cancelling it cannot interrupt another lookup.
+  const deadline = setTimeout(() => resolver.cancel(), 15000);
+  try {
+    const labels = name.split(".");
+    for (let from = 0; from < labels.length - 1; from++) {
+      const zone = labels.slice(from).join(".");
+      // A registry's own second level (co.uk, com.au) is nobody's zone.
+      if (/^(co|com|org|net|gov|ac|edu)\.[a-z]{2}$/.test(zone)) break;
+      try {
+        const nameservers = await resolver.resolveNs(zone);
+        if (!nameservers.length) continue;
+        if (nameservers.some((host) => /\.ns\.cloudflare\.com$/i.test(host)))
+          return { kind: "cloudflare", zone };
+        const who =
+          KNOWN_DNS.find(([pattern]) =>
+            nameservers.some((host) => pattern.test(host.toLowerCase())),
+          )?.[1] ?? null;
+        return { kind: "other", zone, nameservers, who };
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "ENOTFOUND" && code !== "ENODATA")
+          return { kind: "unreachable" };
+      }
     }
+    return { kind: "unregistered" };
+  } finally {
+    clearTimeout(deadline);
   }
-  return { kind: "unregistered" };
 }
 
 /** Whether public DNS hands out this address for the name yet. */

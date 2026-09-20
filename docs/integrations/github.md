@@ -35,10 +35,14 @@ permissions before including it in a candidate:
 2. Enable **Device Flow** and keep user-token expiration enabled. Device login
    needs no callback URL. Leave **Request user authorization during
    installation** disabled because Hallvi initiates sign-in separately.
-3. Disable webhooks. Choose **Repository permissions → Contents → Read-only**.
-   Metadata read is mandatory; leave other repository, account and
-   organization permissions unset. Hallvi does not need write access or a
-   private key for this user device flow.
+3. Disable webhooks. The published Hallvi App requests **Contents: Read &
+   write**, **Pull requests: Read & write** and mandatory **Metadata: Read**
+   (verified through GitHub’s public App API on 20 September 2026). Keep other
+   permissions unset and let users select repositories. These grants are
+   broader than this release’s repository-reading integration: PR publishing
+   is not implemented in this release. Consent must disclose the write grants;
+   neither read-only inspection nor an intended branch-and-PR workflow makes
+   the credential technically read-only. Device flow needs no private key.
 4. Review the public client ID and slug. `npm run package` writes the
    published App's values to `dist/github-app.json`; a fork sets both
    `HALLVI_RELEASE_GITHUB_CLIENT_ID` and `HALLVI_RELEASE_GITHUB_APP_SLUG` to

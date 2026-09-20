@@ -60,6 +60,14 @@
   font-weight: 650;
   letter-spacing: -0.025em;
 }
+/* Which machine this Hallvi runs on: said quietly beside the name. */
+.host {
+  margin-left: -4px;
+  font-size: 13px;
+  font-weight: 450;
+  letter-spacing: 0;
+  color: var(--muted, #687183);
+}
 .brandMark {
   position: relative;
   display: flex;
