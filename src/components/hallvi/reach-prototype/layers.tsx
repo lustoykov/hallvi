@@ -13,11 +13,10 @@
 // Bands stack from outside in and a way in is drawn in the band where it
 // stops. That has three consequences the rings could not manage:
 //
-//   - A port that refused is on the map. It stops at the firewall, which is
-//     a band, so it is drawn there instead of being listed under the map.
-//   - The provider's firewall is in the picture. It is the one thing that
-//     actually refuses anything, and it used to be a definition-list item
-//     below the drawing.
+//   - A port whose check did not get through is on the map, in its own band.
+//     The check alone cannot say where the connection stopped.
+//   - The provider's firewall policy is in the picture as separate evidence;
+//     a failed connection does not prove that policy caused it.
 //   - An empty band costs one line. Saying "nothing answers from the
 //     internet" no longer requires drawing a circle around nothing.
 //
@@ -36,9 +35,8 @@ import "./layers.css";
 /**
  * Where a way in stops, which is the band it is drawn in.
  *
- * `refused` is its own place rather than a kind of `outside`: it is a way in
- * that gets as far as the boundary and no further, and drawing it among the
- * ports that answer would say the opposite of its own check.
+ * `refused` is its own outcome rather than a kind of `outside`: its recorded
+ * check did not get through. The check does not locate what stopped it.
  */
 type Place = "outside" | "refused" | "restricted" | "inside" | "unasked";
 
@@ -120,10 +118,10 @@ const BANDS: {
     empty: "Nothing on record answers from out here.",
   },
   {
-    id: "firewall",
-    title: "The provider's firewall",
+    id: "unreached",
+    title: "Did not get through",
     holds: "refused",
-    empty: "Nothing on record was refused when it was checked.",
+    empty: "No recorded connection check failed to get through.",
   },
   {
     id: "named",
@@ -198,10 +196,10 @@ export function LayersDirection({
           </div>
           {ways.length > 0 && (
             // A count, not a verdict. Neither figure is a judgement about the
-            // server: a public site needs a port open to the internet.
+            // server: a public site may deliberately face the internet.
             <span className="ly-count">
-              {outside.length} open to the internet
-              {` · ${checked.length} of ${ways.length} checked from outside`}
+              {outside.length} recorded as internet-facing
+              {` · ${checked.length} of ${ways.length} connection checked`}
             </span>
           )}
         </header>
@@ -214,8 +212,9 @@ export function LayersDirection({
                 <section key={band.id} className="ly-band" data-band={band.id}>
                   <header>
                     <h3>{band.title}</h3>
-                    {band.id === "firewall" && (
+                    {band.id === "unreached" && (
                       <small>
+                        A connection check does not identify what stopped it.{" "}
                         {story.firewall.state === "read"
                           ? [
                               stop(story.firewall.detail),

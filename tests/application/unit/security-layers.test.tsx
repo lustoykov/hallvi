@@ -80,18 +80,23 @@ const refusedDoor = () =>
   );
 
 describe("every way in is drawn somewhere", () => {
-  it("puts a port that refused in the firewall band, not in a list below the map", () => {
+  it("shows a port that did not answer without attributing the cause to the provider firewall", () => {
     const story = read([openDoor, refusedDoor()]);
     const ways = story.doors.filter((door) => door.id !== "rest");
     expect(ways).toHaveLength(2);
     const refused = ways.find((door) => door.port === "5432")!;
     expect(placeOf(refused)).toBe("refused");
-    expect(BANDS.find((band) => band.holds === "refused")?.id).toBe("firewall");
+    expect(BANDS.find((band) => band.holds === "refused")?.id).toBe(
+      "unreached",
+    );
     // Both ports reach the page, which is the regression that matters: the
     // rings drew one and exiled the other.
     const html = draw([openDoor, refusedDoor()]);
     expect(html).toContain("443");
     expect(html).toContain("5432");
+    expect(html).toContain(
+      "A connection check does not identify what stopped it.",
+    );
   });
 
   it("gives every way in exactly one band, or the unlooked-at group", () => {
@@ -146,7 +151,7 @@ describe("how sure we are is separate from how far in it reaches", () => {
     const html = draw(unsettled);
     expect(html).toContain("unsettled");
     expect(html).not.toContain("not checked");
-    expect(html).toContain("1 of 1 checked from outside");
+    expect(html).toContain("1 of 1 connection checked");
   });
 
   it("marks a port something connected to apart from one only configured", () => {
@@ -165,7 +170,8 @@ describe("how sure we are is separate from how far in it reaches", () => {
 
   it("counts what has been checked without calling any of it a verdict", () => {
     const html = draw([openDoor, refusedDoor()]);
-    expect(html).toContain("checked from outside");
+    expect(html).toContain("connection checked");
+    expect(html).toContain("recorded as internet-facing");
     // Exposure is stated, never graded: a public site needs a port open.
     expect(html).not.toMatch(/\b(secure|insecure|safe|at risk|vulnerable)\b/i);
   });
