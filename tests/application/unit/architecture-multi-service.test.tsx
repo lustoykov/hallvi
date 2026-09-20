@@ -10,7 +10,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { architectureFromRecords } from "@/components/hallvi/architecture-records";
-import { JourneyDirection } from "@/components/hallvi/architecture-prototype/journey-v2";
+import {
+  JourneyDirection,
+  layoutFor,
+  MAP_W,
+  MAP_TOP,
+} from "@/components/hallvi/architecture-prototype/journey-v2";
 import type { SavedInformation } from "@/server/operator-data";
 
 const APPLICATION = "26820a4b-a4c2-49f8-8002-678503aeb385";
@@ -96,6 +101,22 @@ const model = architectureFromRecords({
 })!;
 
 describe("a map with two backing services and three volumes", () => {
+  it("keeps wires aligned with a growing map without implying absent backup or SSH destinations", () => {
+    const layout = layoutFor(model);
+    const html = renderToStaticMarkup(
+      <JourneyDirection
+        model={model}
+        onOpenDestination={() => undefined}
+        onAsk={() => undefined}
+      />,
+    );
+    expect(html).toContain(`viewBox="0 ${MAP_TOP} ${MAP_W} ${layout.height}"`);
+    expect(model.byId.offsite).toBeUndefined();
+    expect(layout.legs.data).toEqual([]);
+    expect(html).not.toContain('class="axj2-wire-ssh"');
+    expect(html).not.toContain('class="axj2-zone"');
+  });
+
   it("gives every part its own place", () => {
     expect(
       model.parts.filter((item) => !item.id.startsWith("gap:")).length,

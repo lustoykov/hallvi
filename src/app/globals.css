@@ -95,3 +95,57 @@ textarea:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
+
+/* The alpha notice is part of the layout, never an overlay on the workspace. */
+.hv-app-frame {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.hv-app-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.hv-app-content .hv-shell {
+  height: 100%;
+}
+.hv-alpha-notice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  color: var(--navy);
+  background: var(--amber-soft);
+  border-bottom: 1px solid var(--line);
+}
+.hv-alpha-label {
+  flex: none;
+  padding: 5px 9px;
+  border-radius: var(--radius-s);
+  background: var(--navy);
+  color: white;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hv-alpha-notice strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.hv-alpha-notice p {
+  margin: 3px 0 0;
+  max-width: 90ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+@media (max-width: 640px) {
+  .hv-alpha-notice {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+  }
+}

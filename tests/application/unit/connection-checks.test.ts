@@ -1,3 +1,4 @@
+import { Resolver } from "node:dns/promises";
 // The claims a connection card makes to someone who cannot check them: a
 // provider that did not answer has not judged the credential, a credential of
 // the wrong kind is not saved, and a zone a token cannot see is not reported
@@ -34,6 +35,8 @@ beforeEach(() => {
   vi.resetModules();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   rmSync(config, { recursive: true, force: true });
@@ -214,4 +217,44 @@ it("keeps a host request whose sentences run long, instead of dropping the card"
   expect(request?.kind).toBe("host");
   expect(request?.kind === "host" && request.estimate.length).toBe(240);
   expect(request?.kind === "host" && request.needs.length).toBe(400);
+});
+
+it("stops an unanswered DNS lookup without calling the domain unregistered", async () => {
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  vi.useFakeTimers();
+  let rejectLookup: (error: Error) => void = () => {};
+  vi.spyOn(Resolver.prototype, "resolveNs").mockImplementation(
+    () =>
+      new Promise((_, reject) => {
+        rejectLookup = reject;
+      }),
+  );
+  const cancel = vi
+    .spyOn(Resolver.prototype, "cancel")
+    .mockImplementation(() => {
+      rejectLookup(
+        Object.assign(new Error("cancelled"), { code: "ECANCELLED" }),
+      );
+    });
+  const result = whoHostsDns("app.example.com");
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(await result).toEqual({ kind: "unreachable" });
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
+it("finds the parent DNS zone and clears the deadline after an answer", async () => {
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  vi.useFakeTimers();
+  vi.spyOn(Resolver.prototype, "resolveNs")
+    .mockRejectedValueOnce(
+      Object.assign(new Error("no nameservers"), { code: "ENODATA" }),
+    )
+    .mockResolvedValueOnce(["ada.ns.cloudflare.com"]);
+  const cancel = vi.spyOn(Resolver.prototype, "cancel");
+  expect(await whoHostsDns("app.example.com")).toEqual({
+    kind: "cloudflare",
+    zone: "example.com",
+  });
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(cancel).not.toHaveBeenCalled();
 });

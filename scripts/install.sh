@@ -174,7 +174,7 @@ if [ "$upgrade" = no ] && [ -z "$use" ]; then
   else
     use=here
   fi
-  if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+  if ( : <>/dev/tty ) 2>/dev/null; then
     {
       say ""
       say "Where will you use Hallvi?"

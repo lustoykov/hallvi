@@ -57,7 +57,7 @@ export function remoteAccess({ user, address, name, ports }) {
       ),
     ].join("\n"),
     // A non-interactive SSH shell rarely has ~/.local/bin on its PATH.
-    setup: `ssh ${user}@${address} '~/.local/bin/hallvi remote --config ${user}@${address}' > ${file}`,
+    setup: `mkdir -p ~/.ssh && ssh ${user}@${address} '~/.local/bin/hallvi remote --config ${user}@${address}' > ${file}`,
     connect: `ssh -F ${file} -N ${host}`,
     url: `http://127.0.0.1:${ports.web}`,
   };

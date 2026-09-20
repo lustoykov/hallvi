@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -81,4 +81,43 @@ it("moves every port together and keeps the other settings", () => {
   );
   expect(() => saveInstalledPort(settings, "80")).toThrow();
   expect(readFileSync(settings, "utf8")).toContain("HALLVI_PORT=5747");
+});
+
+it("refuses a foreign service before changing the stored port", () => {
+  const home = mkdtempSync(join(tmpdir(), "hallvi-port-owner-"));
+  temporary.push(home);
+  const bin = join(home, "bin");
+  const state = join(home, "state");
+  mkdirSync(bin);
+  mkdirSync(state);
+  const original = "HALLVI_PORT=4747\nHALLVI_TRACING=0\n";
+  const settings = join(state, "hallvi.env");
+  writeFileSync(settings, original);
+  // Stub the service manager itself: even a broken guard cannot touch the
+  // owner's real service. HOME alone is not isolation from launchd/systemd.
+  for (const command of ["launchctl", "systemctl"]) {
+    writeFileSync(
+      join(bin, command),
+      `#!/bin/sh
+case " $* " in
+  *" print "*) printf 'working directory = /another/hallvi/app\n' ;;
+  *" show "*) printf 'WorkingDirectory=/another/hallvi/app\n' ;;
+  *) printf 'unexpected mutation\n' >> '${join(home, "unexpected")}' ;;
+esac
+`,
+      { mode: 0o700 },
+    );
+  }
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/cli.mjs", "port", "5747"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, HOME: home, HALLVI_DATA_DIR: state, PATH: bin },
+    },
+  );
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("belongs to another installation");
+  expect(readFileSync(settings, "utf8")).toBe(original);
+  expect(() => readFileSync(join(home, "unexpected"))).toThrow();
 });

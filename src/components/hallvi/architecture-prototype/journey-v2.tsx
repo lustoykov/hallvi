@@ -99,8 +99,8 @@ const placer = (height: number) => ({
 const { place, point } = placer(H);
 
 const BOX: Record<string, Rect> = {
-  source: { x: 24, y: 96, w: 172, h: 72 },
-  controller: { x: 24, y: 264, w: 172, h: 72 },
+  source: { x: 24, y: 96, w: 172, h: 96 },
+  controller: { x: 24, y: 264, w: 172, h: 84 },
   server: { x: 262, y: 80, w: 616, h: 452 },
   header: { x: 262, y: 80, w: 616, h: 54 },
   private: { x: 566, y: 206, w: 292, h: 170 },
@@ -108,14 +108,14 @@ const BOX: Record<string, Rect> = {
   // Wider than the original 196: `paperless-webserver` is an ordinary
   // container name and it wrapped to two lines, which pushed the reading out
   // of the bottom of the card.
-  app: { x: 308, y: 262, w: 244, h: 84 },
+  app: { x: 308, y: 262, w: 244, h: 96 },
   svc: { x: 612, y: 262, w: 196, h: 76 },
-  appVol: { x: 332, y: 434, w: 196, h: 60 },
-  svcVol: { x: 612, y: 434, w: 196, h: 60 },
-  offsite: { x: 924, y: 428, w: 176, h: 72 },
+  appVol: { x: 332, y: 434, w: 196, h: 70 },
+  svcVol: { x: 612, y: 434, w: 196, h: 70 },
+  offsite: { x: 924, y: 428, w: 176, h: 96 },
   // Taller than its neighbours on purpose: this slot holds a placeholder
   // whose headline is a sentence, and at 1280 a 72-unit box cut it off.
-  watch: { x: 918, y: 96, w: 190, h: 86 },
+  watch: { x: 918, y: 96, w: 190, h: 96 },
   http: { x: 204, y: 284, w: 116, h: 32 },
   ssh: { x: 204, y: 366, w: 116, h: 32 },
 };
@@ -243,7 +243,7 @@ function layoutFor(model: ArchitectureModel): Layout {
     const rowHeight = rows > 1 ? 68 : BOX.appVol.h;
     const rowGap = 10;
     // The shelf grows to hold its rows rather than letting them out of it.
-    const label = 26;
+    const label = 36;
     const needed = label + rows * rowHeight + (rows - 1) * rowGap + 12;
     rects.shelf =
       needed > BOX.shelf.h ? { ...BOX.shelf, h: needed } : BOX.shelf;
@@ -295,17 +295,24 @@ function layoutFor(model: ArchitectureModel): Layout {
   const dataY = ordered.length
     ? rects[ordered[0].id].y + rects[ordered[0].id].h / 2
     : 464;
-  const dataMain = `M${dataStart} ${dataY}H924`;
-  const releaseMain = "M110 168V368Q110 382 124 382H372Q386 382 386 368V346";
+  const dataMain =
+    model.byId.offsite && ordered.length
+      ? `M${dataStart} ${dataY}H${rects.offsite.x}`
+      : null;
+  const releaseMain =
+    model.byId.app && (model.byId.source || model.byId.controller)
+      ? `M110 ${model.byId.source ? BOX.source.y + BOX.source.h : BOX.controller.y + BOX.controller.h}V368Q110 382 124 382H372Q386 382 386 368V346`
+      : null;
   const releaseFork = services.length
     ? "M386 382H652Q666 382 666 368V338"
     : null;
   const legs: Record<JourneyId, string[][]> = {
     visit: [[visitMain], visitBranches].filter((leg) => leg.length),
-    data: [[dataMain]],
-    release: [[releaseMain], releaseFork ? [releaseFork] : []].filter(
-      (leg) => leg.length,
-    ),
+    data: dataMain ? [[dataMain]] : [],
+    release: [
+      releaseMain ? [releaseMain] : [],
+      releaseFork ? [releaseFork] : [],
+    ].filter((leg) => leg.length),
   };
   const wires = (Object.keys(legs) as JourneyId[]).flatMap((journey) =>
     legs[journey].flat().map((d) => ({ d, journey })),
@@ -527,7 +534,11 @@ function Card({
             staying while the box shrinks under it — is how
             `paperless-postgres-data` ended up written across a wire. */}
         {!part.quiet && (
-          <span className="axj2-status" data-tight={tight || undefined}>
+          <span
+            className="axj2-status"
+            data-tight={tight || undefined}
+            title={part.checking ? "Checking…" : part.evidence.short}
+          >
             <i aria-hidden="true" />
             {tight ? null : part.checking ? "Checking…" : part.evidence.short}
           </span>
@@ -1006,286 +1017,309 @@ export function JourneyDirection({
       </div>
 
       <div
-        style={{ aspectRatio: `${W} / ${layout.height}` }}
-        className={`axj2-stage${touring ? " is-touring" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
-        data-journey={journey}
-        data-shift={shift ?? undefined}
-        onClick={() => setSelected(null)}
+        className="axj2-viewport"
+        tabIndex={0}
+        role="region"
+        aria-label="Architecture diagram; scroll horizontally to explore"
       >
-        {/* The server, as a place. */}
         <div
-          className="axj2-server"
-          style={place(layout.rects.server ?? BOX.server)}
+          style={{ aspectRatio: `${W} / ${layout.height}` }}
+          className={`axj2-stage${touring ? " is-touring" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
+          data-journey={journey}
+          data-shift={shift ?? undefined}
+          onClick={() => setSelected(null)}
         >
-          <button
-            type="button"
-            className={`axj2-server-head${selected === "host" ? " is-selected" : ""}${host?.checking ? " is-checking" : ""}`}
-            data-c={host?.evidence.certainty}
-            onClick={(event) => {
-              event.stopPropagation();
-              setSelected((currentId) =>
-                currentId === "host" ? null : "host",
-              );
-            }}
-          >
-            <span className="axj2-icon" aria-hidden="true">
-              <HardDrives weight="duotone" />
-            </span>
-            <b>
-              {planned
-                ? `${host?.name ?? "Your server"}, once approved`
-                : host?.name}
-            </b>
-            <small>{model.region}</small>
-            <span className="axj2-status">
-              <i aria-hidden="true" />
-              {host?.checking ? "Checking…" : host?.evidence.short}
-            </span>
-          </button>
-        </div>
-        {services.length > 0 && (
+          {/* The server, as a place. */}
           <div
-            className="axj2-region axj2-private"
-            style={place(layout.rects.private ?? BOX.private)}
+            className="axj2-server"
+            style={place(layout.rects.server ?? BOX.server)}
           >
-            <span>Private network · no ports open</span>
-          </div>
-        )}
-        {volumes.length > 0 && (
-          <div
-            className="axj2-region axj2-shelf"
-            style={place(layout.rects.shelf ?? BOX.shelf)}
-          >
-            <span>Disk · kept when containers are replaced</span>
-          </div>
-        )}
-        <span className="axj2-zone" style={point(924, 404)}>
-          Off the server
-        </span>
-
-        {/* Wires, and the light that travels them. */}
-        <svg
-          className="axj2-wires"
-          viewBox={`0 ${TOP} ${W} ${H}`}
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient
-              id="axj2Light"
-              gradientUnits="userSpaceOnUse"
-              x1="0"
-              y1="0"
-              x2={W}
-              y2="0"
-            >
-              <stop offset="0" stopColor="#285ad8" />
-              <stop offset="0.45" stopColor="#5f82ee" />
-              <stop offset="0.75" stopColor="#46a2de" />
-              <stop offset="1" stopColor="#285ad8" />
-            </linearGradient>
-            <filter id="axj2Blur" x="-10%" y="-10%" width="120%" height="120%">
-              <feGaussianBlur stdDeviation="3" />
-            </filter>
-          </defs>
-          {/* The firewall: a wall of blocks, open only where a door is. */}
-          <path
-            className="axj2-wall"
-            d="M262 146V280M262 320V362M262 402V510"
-          />
-          <path
-            className="axj2-jamb"
-            d="M255 280H269M255 320H269M255 362H269M255 402H269"
-          />
-          {layout.wires.map((wire) => (
-            <path
-              key={`base:${wire.d}`}
-              ref={(element) => {
-                pathRefs.current[wire.d] = element;
+            <button
+              type="button"
+              className={`axj2-server-head${selected === "host" ? " is-selected" : ""}${host?.checking ? " is-checking" : ""}`}
+              data-c={host?.evidence.certainty}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelected((currentId) =>
+                  currentId === "host" ? null : "host",
+                );
               }}
-              d={wire.d}
-              className={`axj2-wire j-${wire.journey}${wire.journey === journey ? " is-on" : ""}`}
-            />
-          ))}
-          <path
-            className="axj2-wire-ssh"
-            d="M110 336V368Q110 382 124 382H204"
-          />
-          {(ghostPart ||
-            model.parts.some(
-              (part) => part.kind === "monitor" && !part.id.startsWith("gap:"),
-            )) && <path d="M878 132H924" className="axj2-wire-ghost" />}
-          {!planned &&
-            layout.legs[journey].flat().map((d) => (
-              <g
-                key={`glow:${journey}:${d}`}
-                className={`axj2-glow${touring ? "" : " is-lit"}`}
+            >
+              <span className="axj2-icon" aria-hidden="true">
+                <HardDrives weight="duotone" />
+              </span>
+              <b>
+                {planned
+                  ? `${host?.name ?? "Your server"}, once approved`
+                  : host?.name}
+              </b>
+              <small>{model.region}</small>
+              <span className="axj2-status">
+                <i aria-hidden="true" />
+                {host?.checking ? "Checking…" : host?.evidence.short}
+              </span>
+            </button>
+          </div>
+          {services.length > 0 && (
+            <div
+              className="axj2-region axj2-private"
+              style={place(layout.rects.private ?? BOX.private)}
+            >
+              <span>Private network · no ports open</span>
+            </div>
+          )}
+          {volumes.length > 0 && (
+            <div
+              className="axj2-region axj2-shelf"
+              style={place(layout.rects.shelf ?? BOX.shelf)}
+            >
+              <span>Disk · kept when containers are replaced</span>
+            </div>
+          )}
+          {model.byId.offsite && (
+            <span className="axj2-zone" style={point(924, 404)}>
+              Off the server
+            </span>
+          )}
+
+          {/* Wires, and the light that travels them. */}
+          <svg
+            className="axj2-wires"
+            viewBox={`0 ${TOP} ${W} ${layout.height}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient
+                id="axj2Light"
+                gradientUnits="userSpaceOnUse"
+                x1="0"
+                y1="0"
+                x2={W}
+                y2="0"
               >
-                <path
-                  d={d}
-                  className="axj2-glow-soft"
-                  filter="url(#axj2Blur)"
-                  pathLength={1}
-                />
-                <path d={d} className="axj2-glow-line" pathLength={1} />
-              </g>
-            ))}
-          {!planned &&
-            !touring &&
-            !reduced &&
-            layout.legs[journey].flat().map((d) =>
-              [0, 1, 2].map((i) => (
-                <circle key={`p:${d}:${i}`} r="2.4" className="axj2-particle">
-                  <animateMotion
-                    dur={`${Math.max(1.6, d.length / 12)}s`}
-                    begin={`${i * 1.1}s`}
-                    repeatCount="indefinite"
-                    path={d}
-                  />
-                </circle>
-              )),
-            )}
-          {[0, 1].map((i) => (
-            <g
-              key={i}
-              ref={(element) => {
-                comets.current[i] = element;
-              }}
-              className="axj2-comet"
-              style={{ opacity: 0 }}
-            >
-              {Array.from({ length: 8 }, (_, k) => (
-                <circle
-                  key={k}
-                  r={Math.max(1.1, 5 - k * 0.55)}
-                  style={{ opacity: 1 - k * 0.12 }}
-                />
-              ))}
-            </g>
-          ))}
-        </svg>
-
-        {/* The ways in. */}
-        {/* The firewall is named where its wall begins. */}
-        <span className="axj2-wall-label" style={point(276, 151)}>
-          Firewall ·{" "}
-          {(() => {
-            // Count what the map draws rather than assuming two.
-            const doors = model.parts.filter(
-              (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
-            ).length;
-            // No door drawn is not a count of zero: it means the rules
-            // have not been drawn, which is a different thing from none.
-            if (!doors) return "rules not drawn";
-            const named = doors === 1 ? "one door" : `${doors} doors`;
-            return model.openness === "restricted"
-              ? `only ${named} open`
-              : model.openness === "public"
-                ? `${named} open`
-                : `${named} on record`;
-          })()}
-        </span>
-        {(["gate:http", "gate:ssh"] as const).map((id) =>
-          model.byId[id] ? (
-            <Port
-              key={id}
-              part={model.byId[id]}
-              rect={layout.rects[id]}
-              model={model}
-              selected={selected === id}
-              dim={!onPath.has(id) && !touring}
-              lit={lit.has(id)}
-              onSelect={(value) =>
-                setSelected((currentId) => (currentId === value ? null : value))
-              }
+                <stop offset="0" stopColor="#285ad8" />
+                <stop offset="0.45" stopColor="#5f82ee" />
+                <stop offset="0.75" stopColor="#46a2de" />
+                <stop offset="1" stopColor="#285ad8" />
+              </linearGradient>
+              <filter
+                id="axj2Blur"
+                x="-10%"
+                y="-10%"
+                width="120%"
+                height="120%"
+              >
+                <feGaussianBlur stdDeviation="3" />
+              </filter>
+            </defs>
+            {/* The firewall: a wall of blocks, open only where a door is. */}
+            <path
+              className="axj2-wall"
+              d="M262 146V280M262 320V362M262 402V510"
             />
-          ) : null,
-        )}
-        {model.byId.tls && model.byId.tls.evidence.certainty === "absent" && (
-          <button
-            type="button"
-            className={`axj2-ghost axj2-ghost-tls${selected === "tls" ? " is-selected" : ""}${!onPath.has("tls") && !touring ? " is-dim" : ""}`}
-            style={place(layout.rects.tls)}
-            onClick={(event) => {
-              event.stopPropagation();
-              setSelected((currentId) => (currentId === "tls" ? null : "tls"));
-            }}
-          >
-            <LockOpen weight="bold" /> no HTTPS
-          </button>
-        )}
-
-        {/* The stops. */}
-        {(
-          [
-            "source",
-            "controller",
-            "app",
-            ...services.map((service) => service.id),
-            ...volumes.map((volume) => volume.id),
-            ...model.parts
-              .filter(
+            <path
+              className="axj2-jamb"
+              d="M255 280H269M255 320H269M255 362H269M255 402H269"
+            />
+            {layout.wires.map((wire) => (
+              <path
+                key={`base:${wire.d}`}
+                ref={(element) => {
+                  pathRefs.current[wire.d] = element;
+                }}
+                d={wire.d}
+                className={`axj2-wire j-${wire.journey}${wire.journey === journey ? " is-on" : ""}`}
+              />
+            ))}
+            {model.byId.controller && model.byId["gate:ssh"] && (
+              <path
+                className="axj2-wire-ssh"
+                d="M110 336V368Q110 382 124 382H204"
+              />
+            )}
+            {(ghostPart ||
+              model.parts.some(
                 (part) =>
                   part.kind === "monitor" && !part.id.startsWith("gap:"),
-              )
-              .map((part) => part.id),
-            "offsite",
-          ].filter(Boolean) as string[]
-        ).map((id, index) =>
-          model.byId[id] && layout.rects[id] ? (
+              )) && <path d="M878 132H924" className="axj2-wire-ghost" />}
+            {!planned &&
+              layout.legs[journey].flat().map((d) => (
+                <g
+                  key={`glow:${journey}:${d}`}
+                  className={`axj2-glow${touring ? "" : " is-lit"}`}
+                >
+                  <path
+                    d={d}
+                    className="axj2-glow-soft"
+                    filter="url(#axj2Blur)"
+                    pathLength={1}
+                  />
+                  <path d={d} className="axj2-glow-line" pathLength={1} />
+                </g>
+              ))}
+            {!planned &&
+              !touring &&
+              !reduced &&
+              layout.legs[journey].flat().map((d) =>
+                [0, 1, 2].map((i) => (
+                  <circle key={`p:${d}:${i}`} r="2.4" className="axj2-particle">
+                    <animateMotion
+                      dur={`${Math.max(1.6, d.length / 12)}s`}
+                      begin={`${i * 1.1}s`}
+                      repeatCount="indefinite"
+                      path={d}
+                    />
+                  </circle>
+                )),
+              )}
+            {[0, 1].map((i) => (
+              <g
+                key={i}
+                ref={(element) => {
+                  comets.current[i] = element;
+                }}
+                className="axj2-comet"
+                style={{ opacity: 0 }}
+              >
+                {Array.from({ length: 8 }, (_, k) => (
+                  <circle
+                    key={k}
+                    r={Math.max(1.1, 5 - k * 0.55)}
+                    style={{ opacity: 1 - k * 0.12 }}
+                  />
+                ))}
+              </g>
+            ))}
+          </svg>
+
+          {/* The ways in. */}
+          {/* The firewall is named where its wall begins. */}
+          <span className="axj2-wall-label" style={point(276, 151)}>
+            Firewall ·{" "}
+            {(() => {
+              // Count what the map draws rather than assuming two.
+              const doors = model.parts.filter(
+                (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
+              ).length;
+              // No door drawn is not a count of zero: it means the rules
+              // have not been drawn, which is a different thing from none.
+              if (!doors) return "rules not drawn";
+              const named = doors === 1 ? "one door" : `${doors} doors`;
+              return model.openness === "restricted"
+                ? `only ${named} open`
+                : model.openness === "public"
+                  ? `${named} open`
+                  : `${named} on record`;
+            })()}
+          </span>
+          {(["gate:http", "gate:ssh"] as const).map((id) =>
+            model.byId[id] ? (
+              <Port
+                key={id}
+                part={model.byId[id]}
+                rect={layout.rects[id]}
+                model={model}
+                selected={selected === id}
+                dim={!onPath.has(id) && !touring}
+                lit={lit.has(id)}
+                onSelect={(value) =>
+                  setSelected((currentId) =>
+                    currentId === value ? null : value,
+                  )
+                }
+              />
+            ) : null,
+          )}
+          {model.byId.tls && model.byId.tls.evidence.certainty === "absent" && (
+            <button
+              type="button"
+              className={`axj2-ghost axj2-ghost-tls${selected === "tls" ? " is-selected" : ""}${!onPath.has("tls") && !touring ? " is-dim" : ""}`}
+              style={place(layout.rects.tls)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelected((currentId) =>
+                  currentId === "tls" ? null : "tls",
+                );
+              }}
+            >
+              <LockOpen weight="bold" /> no HTTPS
+            </button>
+          )}
+
+          {/* The stops. */}
+          {(
+            [
+              "source",
+              "controller",
+              "app",
+              ...services.map((service) => service.id),
+              ...volumes.map((volume) => volume.id),
+              ...model.parts
+                .filter(
+                  (part) =>
+                    part.kind === "monitor" && !part.id.startsWith("gap:"),
+                )
+                .map((part) => part.id),
+              "offsite",
+            ].filter(Boolean) as string[]
+          ).map((id, index) =>
+            model.byId[id] && layout.rects[id] ? (
+              <Card
+                key={id}
+                index={index}
+                rect={layout.rects[id]}
+                compact={
+                  model.byId[id].kind === "volume" ||
+                  model.byId[id].kind === "private" ||
+                  // A placeholder's headline already says nothing has looked;
+                  // its subtitle said so again, in a card with no room for
+                  // either sentence.
+                  id.startsWith("gap:")
+                }
+                // Read from the box the layout actually gave it, so a map that
+                // had to make room says less per card rather than saying the
+                // same amount outside the card.
+                tight={layout.rects[id].h < 58}
+                placeAt={place}
+                {...cardProps(model.byId[id])}
+              />
+            ) : null,
+          )}
+
+          {ghostPart && (
             <Card
-              key={id}
-              index={index}
-              rect={layout.rects[id]}
-              compact={
-                model.byId[id].kind === "volume" ||
-                // A placeholder's headline already says nothing has looked;
-                // its subtitle said so again, in a card with no room for
-                // either sentence.
-                id.startsWith("gap:")
-              }
-              // Read from the box the layout actually gave it, so a map that
-              // had to make room says less per card rather than saying the
-              // same amount outside the card.
-              tight={layout.rects[id].h < 58}
+              index={9}
+              rect={BOX.watch}
+              part={ghostPart}
+              model={model}
+              selected={selected === ghostPart.id}
+              dim={false}
+              lit={false}
+              arriving={false}
+              ghost
               placeAt={place}
-              {...cardProps(model.byId[id])}
+              // The headline already says nothing has looked. The subtitle said
+              // so a second time, in a card that had room for neither.
+              compact
+              onSelect={(id) =>
+                setSelected((currentId) => (currentId === id ? null : id))
+              }
             />
-          ) : null,
-        )}
+          )}
 
-        {ghostPart && (
-          <Card
-            index={9}
-            rect={BOX.watch}
-            part={ghostPart}
-            model={model}
-            selected={selected === ghostPart.id}
-            dim={false}
-            lit={false}
-            arriving={false}
-            ghost
-            placeAt={place}
-            // The headline already says nothing has looked. The subtitle said
-            // so a second time, in a card that had room for neither.
-            compact
-            onSelect={(id) =>
-              setSelected((currentId) => (currentId === id ? null : id))
-            }
-          />
-        )}
-
-        {selectedPart && selectedRect && (
-          <Popover
-            key={selectedPart.id}
-            part={selectedPart}
-            rect={selectedRect}
-            model={model}
-            onClose={() => setSelected(null)}
-            onOpenDestination={onOpenDestination}
-            onAsk={onAsk}
-          />
-        )}
+          {selectedPart && selectedRect && (
+            <Popover
+              key={selectedPart.id}
+              part={selectedPart}
+              rect={selectedRect}
+              model={model}
+              onClose={() => setSelected(null)}
+              onOpenDestination={onOpenDestination}
+              onAsk={onAsk}
+            />
+          )}
+        </div>
       </div>
     </section>
   );

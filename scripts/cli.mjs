@@ -28,6 +28,7 @@ import {
   remoteAccess,
   saveInstalledPort,
 } from "./installed-ports.mjs";
+import { foreignService } from "./service-owner.mjs";
 import { workerSocketPath } from "./worker-socket.mjs";
 import {
   piAccountLocation,
@@ -153,6 +154,21 @@ function loaded() {
         .status === 0;
 }
 
+/**
+ * Every command that changes the service asks this first. The service is the
+ * user's, not this program's: a checkout or a second copy would otherwise
+ * replace the installation that is really running.
+ */
+function ownService() {
+  const printed = mac
+    ? run("launchctl", ["print", `${domain}/${LABEL}`], { quiet: true })
+    : run("systemctl", ["--user", "show", UNIT, "-p", "WorkingDirectory"], {
+        quiet: true,
+      });
+  const refusal = foreignService(printed.stdout ?? "", app);
+  if (refusal) throw new Error(refusal);
+}
+
 function lingering() {
   return /Linger=yes/.test(
     run("loginctl", ["show-user", userInfo().username, "-p", "Linger"], {
@@ -171,6 +187,7 @@ function unload() {
 }
 
 function start() {
+  ownService();
   mkdirSync(dirname(log), { recursive: true, mode: 0o700 });
   if (mac) {
     // launchd appends for ever; keep one previous log instead.
@@ -196,6 +213,7 @@ function start() {
 }
 
 function stop() {
+  ownService();
   if (mac) {
     unload();
     rmSync(plist, { force: true });
@@ -357,6 +375,7 @@ then run both commands above again.`);
 function port() {
   const next = process.argv[3];
   if (!next) return console.log(installedPorts().web);
+  ownService();
   const ports = saveInstalledPort(state.settings, next);
   process.env.HALLVI_PORT = String(ports.web);
   const running = loaded();
