@@ -282,6 +282,28 @@ warned and then replaced the program directory anyway, which turns one failed
 upgrade into two broken installations. It now keeps both versions and says
 where each is, and does not touch the records either.
 
+**And a third, found by the next review: a refused restore still let the
+program be rolled back.** Stopping the unsafe copy was only half of it.
+Recovery went on to put the old program back in front of records that had
+already moved to the new schema — which that program refuses to open,
+correctly — so the outcome of a failed upgrade was an installation that
+cannot start. Reproduced, and now:
+
+```
+  The copy of your records was refused, so it was not put back …
+  Your records are still at the schema the upgrade left them, so the program
+  was not rolled back: the previous version cannot open them. This version is
+  at …/home, the previous one is at …/backup, and the copy … at …/bad
+
+  program at home:   NEW PROGRAM
+  previous kept at:  OLD PROGRAM
+  records:           schema 18
+```
+
+An ordinary failed upgrade, with no migration in it, still restores the
+previous program and starts it — checked separately, because a guard that
+also blocks the normal path is not a fix.
+
 ## What this does not establish
 
 - **The updater's own discovery path was not exercised across a schema change.**
