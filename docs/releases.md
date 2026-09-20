@@ -137,7 +137,9 @@ The development dashboard dispatches the checkout's pushed branch and supplies
 the exact displayed commit as `expected_revision`. If the branch moves before
 dispatch, the workflow refuses before building. Reload to review the new commit;
 uncommitted changes are never included. Actions must be enabled in the repository
-for either the dashboard or manual dispatch to work.
+for either the dashboard or manual dispatch to work. The dashboard reports when
+repository Actions are disabled; a maintainer enables them in Settings →
+Actions → General before building a draft.
 
 **Verify.** The workflow signs the manifest and then verifies its own
 signature with the public key Hallvi ships, so a key that no longer matches is
@@ -150,7 +152,7 @@ a draft to a reader without a token, so nothing discovers it. Pressing publish
 is the release.
 
 **Discover.** Installations following `alpha` find it at their next check, or
-when the owner presses **Check for updates**. Each checks once a day at most,
+when the owner presses **Check for updates**. Each checks once an hour at most,
 from the last answer in between.
 
 Merging a pull request never reaches any of this.
