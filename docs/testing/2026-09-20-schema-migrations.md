@@ -102,9 +102,10 @@ history original 88cc8549e4839c24
 interface: http 307
 ```
 
-The recovery is a file copy the installer does itself. It deliberately does not
-call either program: a recovery that needs the thing that just failed is not
-one.
+Recovery runs the checked restore command from the available new program.
+It does not start the Hallvi service. If the restore command cannot run or
+refuses the copy, recovery leaves the records untouched and reports their
+location. There is no unchecked file-copy fallback.
 
 ## Why the program alone is not a rollback
 

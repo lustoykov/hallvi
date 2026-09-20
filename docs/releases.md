@@ -133,6 +133,12 @@ checks its published checksum, installs locked production dependencies and
 loads both native modules before it writes the archive. Nothing is
 cross-built, and a platform with no runner has no release.
 
+The development dashboard dispatches the checkout's pushed branch and supplies
+the exact displayed commit as `expected_revision`. If the branch moves before
+dispatch, the workflow refuses before building. Reload to review the new commit;
+uncommitted changes are never included. Actions must be enabled in the repository
+for either the dashboard or manual dispatch to work.
+
 **Verify.** The workflow signs the manifest and then verifies its own
 signature with the public key Hallvi ships, so a key that no longer matches is
 a failed release rather than an update nobody can install. Install the draft's

@@ -12,7 +12,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/" data-route><strong>Hallvi</strong><span class="brand-tag">Testing</span></a>
-    <nav class="pages" aria-label="Pages"><a id="checks-link" href="/" data-route>Run checks</a><a id="reviews-link" href="/evals" data-route>Eval archive <span id="pending" class="chip discuss" hidden></span></a><a id="about-link" href="/about" data-route>How it works</a></nav>
+    <nav class="pages" aria-label="Pages"><a id="checks-link" href="/" data-route>Run checks</a><a id="reviews-link" href="/evals" data-route>Eval archive <span id="pending" class="chip discuss" hidden></span></a><a id="development-link" href="/development" data-route>Development</a><a id="releases-link" href="/releases" data-route>Releases</a><a id="about-link" href="/about" data-route>How it works</a></nav>
     <nav class="resources" aria-label="Resources"><span id="origin" class="local"></span><a href="/guide">Acceptance guide</a><a href="http://127.0.0.1:3000/applications" target="_blank" rel="noreferrer">Open app<svg class="ext" aria-hidden="true" viewBox="0 0 12 12"><path d="M4 1.5h6.5V8M10.5 1.5 1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="visually-hidden"> (opens in a new tab)</span></a></nav>
   </header>
   <main>
@@ -29,6 +29,16 @@
         <div id="history" class="history-list"></div>
         <section id="log-panel" class="log-panel" aria-labelledby="log-title" hidden><header><h3 id="log-title"></h3><button id="log-close" class="text-button" type="button">Hide output</button></header><pre id="log"></pre></section>
       </section>
+    </section>
+
+    <section id="development-panel" aria-labelledby="development-title" hidden>
+      <div class="page-heading"><div><h1 id="development-title" tabindex="-1">Development</h1><p>What is running, which records it opened, and the applications this environment keeps. Registered things only &mdash; nothing here searches the machine.</p></div></div>
+      <div id="development-body" class="surface-list"></div>
+    </section>
+
+    <section id="releases-panel" aria-labelledby="releases-title" hidden>
+      <div class="page-heading"><div><h1 id="releases-title" tabindex="-1">Releases</h1><p>What a release would be built from, what a built package actually contains, and the draft waiting to be published. Building and publishing use the <code>gh</code> login already on this machine.</p></div></div>
+      <div id="releases-body" class="surface-list"></div>
     </section>
 
     <section id="about-panel" aria-labelledby="about-title" hidden>
