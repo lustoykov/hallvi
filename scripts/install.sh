@@ -145,18 +145,11 @@ restore_records() {
     say "The copy of your records was refused, so it was not put back. Your records are as the upgrade left them, and the copy is at $migrated" >&2
     return 0
   done
-  # Nothing intact to run it with. A recovery that needs the program that
-  # just failed is not one, so copy the file back by hand — staged and
-  # renamed, never written over in place.
-  rm -f "$data/hallvi.db-wal" "$data/hallvi.db-shm"
-  if cp "$migrated/hallvi.db" "$data/hallvi.db.restoring" &&
-    mv "$data/hallvi.db.restoring" "$data/hallvi.db"; then
-    say "The records were put back as they were, from $migrated"
-    migrated=""
-  else
-    rm -f "$data/hallvi.db.restoring"
-    say "Could not put the records back; the backup is at $migrated" >&2
-  fi
+  # Nothing on disk to run it with. There was a hand copy here once, for
+  # exactly this case; it is gone, because the only thing it could do is put a
+  # file nobody checked over the records — and it could only ever run when the
+  # installation was already in a state where that is the last thing to do.
+  say "No Hallvi on this machine can check the copy, so the records were left alone. The copy taken before the upgrade is at $migrated" >&2
 }
 cleanup() {
   result=$?
