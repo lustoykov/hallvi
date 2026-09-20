@@ -49,12 +49,13 @@ export function saveInformation(
     )
       throw new Error("Evidence execution not found in this application.");
   }
-  // An ID Pi chose for a record it is creating is not a mistake to refuse:
-  // the ID belongs to this application and naming it is how Pi refers back
-  // to the record later. Save under it, whether or not it is already there.
-  const existing =
+  // An ID names a record that already exists here. Record IDs are unique
+  // across every application, so inventing one for a new record would
+  // eventually land on another application's record; saying what to do
+  // instead is what Pi needs, and it can act on it in the same turn.
+  if (
     id &&
-    db()
+    !db()
       .select()
       .from(savedInformation)
       .where(
@@ -63,9 +64,13 @@ export function saveInformation(
           eq(savedInformation.applicationId, applicationId),
         ),
       )
-      .get();
+      .get()
+  )
+    throw new Error(
+      "No saved information has that ID in this application. Omit id to create a record; supply id only to update one a previous save returned.",
+    );
   const now = new Date().toISOString();
-  if (id && existing)
+  if (id)
     return db()
       .update(savedInformation)
       .set({ ...value, updatedAt: now })
@@ -81,7 +86,7 @@ export function saveInformation(
     .insert(savedInformation)
     .values({
       ...value,
-      id: id || randomUUID(),
+      id: randomUUID(),
       applicationId,
       createdAt: now,
       updatedAt: now,

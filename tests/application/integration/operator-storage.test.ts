@@ -102,27 +102,46 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
     (await getOperatorView(app, chat)).information?.[0].retiredAt,
   ).toBeTruthy();
 });
-it("saves a record under the ID its author chose, and updates it there", () => {
-  const chosen = "3b59539b-a80c-4511-a247-05561b0fede4";
-  const created = saveInformation(
-    app,
-    { title: "Private access is ready", body: "Open it on this computer." },
-    chosen,
-  );
-  expect(created.id).toBe(chosen);
-  expect(listInformation(app, "private access").map((r) => r.id)).toEqual([
-    chosen,
-  ]);
-  // The same ID again is the update it was always meant to be, not a second
-  // record.
+it("tells an author who invented an ID what to do instead, and never touches another application's record", async () => {
+  // Pi supplied IDs of its own when creating records, and the refusal said
+  // only that they were not found. Record IDs are unique across every
+  // application, so an invented one is a mistake worth naming precisely.
+  const invented = "deployment";
+  expect(() =>
+    saveInformation(app, { title: "Deployed", body: "It runs." }, invented),
+  ).toThrow(/Omit id to create a record/);
+  expect(listInformation(app)).toHaveLength(0);
+
+  // Creating without an ID works and hands back the ID to update with.
+  const created = saveInformation(app, {
+    title: "Deployed",
+    body: "It runs.",
+  });
   saveInformation(
     app,
-    { title: "Private access is ready", body: "The link is open again." },
-    chosen,
+    { title: "Deployed", body: "It runs, and the data survived." },
+    created.id,
   );
-  const again = listInformation(app, "private access");
-  expect(again).toHaveLength(1);
-  expect(again[0].body).toBe("The link is open again.");
+  const records = listInformation(app);
+  expect(records).toHaveLength(1);
+  expect(records[0].body).toBe("It runs, and the data survived.");
+
+  // A second application cannot reach the first one's record by naming its
+  // ID, and the first one's record is left exactly as it was.
+  const other = (
+    await createApplication({
+      repositoryUrl: "https://github.com/example/other",
+    })
+  ).application.id;
+  expect(() =>
+    saveInformation(
+      other,
+      { title: "Mine now", body: "Overwritten." },
+      created.id,
+    ),
+  ).toThrow(/Omit id to create a record/);
+  expect(listInformation(other)).toHaveLength(0);
+  expect(listInformation(app)[0].body).toBe("It runs, and the data survived.");
 });
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
   saveInformation(app, { title: "Note", body: "Saved" });
