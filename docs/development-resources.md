@@ -33,14 +33,27 @@ and its runtime prompt. Automatic disposal of Pi's repository workspaces and agr
 backup retention are separate, narrowly scoped product behavior; they do not
 inherit this development policy.
 
-## Discarding development data
+## Discarding development data, except where keeping it is the point
 
-The owner explicitly authorized discarding existing Hallvi **development**
-data along with its code and tests. Start a new schema empty; do not build
+Disposable development data stays disposable. In a test fixture, a scratch
+checkout or a worktree's own `.hallvi`, start a new schema empty: do not build
 migrations, legacy readers, archive or import features, or compatibility
-adapters to carry the old application forward. Remove obsolete workflows and
+adapters to carry an old prototype forward, and remove obsolete workflows and
 their recovery machinery outright as the new path replaces them. Git retains
-source history, and keeping old runtime data is not an acceptance requirement.
+source history, and keeping old runtime data there is not an acceptance
+requirement.
+
+**One registered environment is the exception, and being the exception is what
+it is for.** The [persistent development environment](development-environment.md)
+keeps its applications, conversations, records and the deployed applications'
+own data across restarts, code upgrades and supported schema changes. Starting
+it empty would destroy the only thing it can prove. So a change to how Hallvi
+stores anything arrives with the migration for the supported schemas, and with
+evidence that its applications still open, still show their history and still
+hold their data.
+
+That is a supported upgrade path, not compatibility with every version that
+ever existed. A schema nobody registered still needs no reader.
 
 The authorization covers this development installation and nothing else. It is
 not a default operational policy for the applications Pi manages through the

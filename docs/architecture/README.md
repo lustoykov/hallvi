@@ -19,6 +19,7 @@ Each of these is linked from the document that owns its decision.
 | [Repository workspace boundary](../architecture.md#repository-workspace-architecture) | [Architecture](../architecture.md) |
 | [Proposing a repository change](../integrations/github.md#proposing-a-change) | [GitHub](../integrations/github.md) |
 | [Development cleanup decision flow](development-cleanup-decision.html) | [Development resources](../development-resources.md) |
+| [The persistent development environment](development-environment.md) | [Development environment](../development-environment.md) |
 | [Cleanup scope](cleanup-scope.md) | [Development resources](../development-resources.md#discarding-development-data) |
 | [Where a check belongs, and where it does not](where-coverage-lives.md) | [Testing](../../tests/README.md#the-8020-bar) |
 | [Select tests by the behavior they protect](test-selection.md) | [Testing](../../tests/README.md#the-8020-bar) |
