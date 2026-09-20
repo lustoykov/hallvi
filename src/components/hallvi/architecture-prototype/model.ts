@@ -75,6 +75,15 @@ export interface Part {
    * were the same sentence while the map only ever drew one door.
    */
   admits?: "open" | "refused" | "unknown";
+  /**
+   * Gates: the part this port leads to, when a record says which.
+   *
+   * Read from a topology edge leaving the gate, the same way a volume's
+   * `owner` is read from its disk edge — and never from the port number or
+   * the subject's name. A port called `postgres` is not evidence that
+   * PostgreSQL is behind it.
+   */
+  serves?: string;
   destination?: ApplicationSection;
   /** Parts with no state of their own (the controller) hide their tag. */
   quiet?: boolean;

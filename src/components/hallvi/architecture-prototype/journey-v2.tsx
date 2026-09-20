@@ -246,7 +246,10 @@ function layoutFor(model: ArchitectureModel): Layout {
   // server's header and the application. They share the band rather than
   // marching off the top of it: a port that does not fit is a port silently
   // dropped, and the count below says so when one is.
-  const band = { start: WALL_TOP + 6, end: 268 };
+  // Stops short of the application, whose card begins at 262: at 268 the
+  // lowest of them overlapped its top-left corner, and the wire leaving it
+  // ran across the card's own edge.
+  const band = { start: WALL_TOP + 6, end: BOX.app.y - 2 };
   const step = BOX.http.h + 10;
   const room = Math.max(0, Math.floor((band.end - band.start + 10) / step));
   const placed = spare.slice(0, room);
@@ -330,6 +333,31 @@ function layoutFor(model: ArchitectureModel): Layout {
   rects.host = BOX.header;
   const height = H + grew;
 
+  // A wire from a port to what it leads to, when a record says which.
+  //
+  // Only for the doors stacked up the wall: the two the design gives slots to
+  // already sit on a journey line — the visit runs through the http door at
+  // y=300, the release through the ssh one — so wiring those again would draw
+  // the same path twice.
+  //
+  // And only for a port that admits. What a refused port would have reached
+  // is in its inspector; a line from it would draw a route nothing has ever
+  // travelled, which is the opposite of what its own check says.
+  const served = placed
+    .filter(
+      (gate) =>
+        gate.admits !== "refused" &&
+        gate.serves &&
+        rects[gate.id] &&
+        rects[gate.serves],
+    )
+    .map((gate) => {
+      const from = rects[gate.id];
+      const to = rects[gate.serves!];
+      const y = from.y + from.h / 2;
+      return `M${from.x + from.w} ${y}H${to.x + to.w / 2}V${to.y}`;
+    });
+
   const visitEnd = services.length ? BOX.svc.x : BOX.app.x;
   // Where a journey in from outside begins.
   //
@@ -383,7 +411,7 @@ function layoutFor(model: ArchitectureModel): Layout {
   const releaseFork =
     releaseMain && services.length ? "M386 382H652Q666 382 666 368V338" : null;
   const legs: Record<JourneyId, string[][]> = {
-    visit: [[visitMain], visitBranches].filter((leg) => leg.length),
+    visit: [[visitMain], served, visitBranches].filter((leg) => leg.length),
     data: dataMain ? [[dataMain]] : [],
     release: [
       releaseMain ? [releaseMain] : [],

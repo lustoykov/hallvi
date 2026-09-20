@@ -352,6 +352,8 @@ function admitsOf(
 function fromRecords(
   records: SavedInformation[],
   declared: Set<string>,
+  /** Part ids the topology already names, so a door is not drawn twice. */
+  named: Set<string>,
   now: number,
 ): MapPart[] {
   const found: MapPart[] = [];
@@ -375,11 +377,16 @@ function fromRecords(
       });
   }
 
-  if (!declared.has("gate")) {
-    // Every door, not the first one. A map that drew one and said nothing
-    // about the other is the map claiming a shape the records contradict —
-    // and the one it dropped was the database port, which is the one a
-    // reader most wants to know the state of.
+  {
+    // Every door, not the first one, and not all-or-nothing either.
+    //
+    // A map that drew one and said nothing about the other is the map
+    // claiming a shape the records contradict — and the one it dropped was
+    // the database port, which is the one a reader most wants the state of.
+    // Skipping every door the moment the topology declared one had the same
+    // effect by a different route: Pi naming one gate silently dropped every
+    // other door on record.
+    //
     // A way in is a door; Pi may reasonably speak of the tunnel through it as
     // access instead, and the two are the same thing on the map. So whichever
     // Pi chose is read, and not both — the alternative is one way in drawn
@@ -388,6 +395,7 @@ function fromRecords(
     for (const ref of doors.length
       ? doors
       : subjectsOfKind(records, "access")) {
+      if (named.has(ref.id)) continue;
       const presence = presenceOf(records, ref);
       if (!presence.known || presence.presence !== "present") continue;
       const port = currentFacts(records, ref).get("port")?.value.value;
@@ -518,6 +526,7 @@ export function architectureFromRecords({
     ...fromRecords(
       records,
       new Set(map.value.parts.map((part) => part.kind)),
+      new Set(map.value.parts.map((part) => part.id)),
       now,
     ),
   ];
@@ -574,6 +583,14 @@ export function architectureFromRecords({
       facts: evidence.certainty === "absent" ? [] : facts,
       evidence,
       admits: part.kind === "gate" ? admitsOf(records, part) : undefined,
+      // What a port leads to, from the edge leaving it — the same move the
+      // disk edge makes for a volume's owner. Never from the port number or
+      // the subject's name: a door Pi called `postgres` is not evidence that
+      // PostgreSQL is behind it.
+      serves:
+        part.kind === "gate"
+          ? edges.find((edge) => edge.from === slots.get(part.id))?.to
+          : undefined,
       destination: destinations[part.kind as Part["kind"]],
       // Hallvi and the repository have no state of their own to tag.
       quiet: part.kind === "controller",
