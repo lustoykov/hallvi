@@ -134,10 +134,20 @@ test.describe("operating the destinations", () => {
       await page.goto(`${ACCEPTANCE}/applications/${app}#overview`);
       await page.waitForLoadState("networkidle").catch(() => {});
       const sidebar = page.locator("nav[aria-label='Application workspace']");
+      // The sidebar hides what an application's records do not establish, so
+      // on an application nobody has deployed these two rows sit behind Show
+      // more and carry their reason under their name — "Processes\nafter
+      // deployment". Reveal them and match the name, the way the reachability
+      // case does; this journey is about back and forward, not about which
+      // rows are offered.
+      await sidebar.getByRole("button", { name: /show more/i }).click();
       // Clicked, not navigated: a hash-only goto does not push the same way,
       // and clicking is what a reader does.
       for (const label of ["Processes", "Storage"]) {
-        await sidebar.getByRole("button", { name: label, exact: true }).click();
+        await sidebar
+          .getByRole("button", { name: new RegExp(`^${label}`) })
+          .first()
+          .click();
         await page.waitForTimeout(200);
       }
 
