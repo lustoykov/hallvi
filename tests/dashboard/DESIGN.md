@@ -89,3 +89,28 @@ Cards, the answer card and dialogs use 12px radii; controls 7px; chips 5px; queu
 - Do state costs next to paid actions; reading and grading spend nothing.
 - Don't add a mobile layout, a new visual identity, or product-wide design rules from this tool.
 - Don't default the verdict control; a saved verdict must be an explicit choice.
+
+## Development and Releases
+
+Two read-only pages, added beside Run checks and the Eval archive. They use
+the same surface, footnote and chip vocabulary as the rest and introduce no
+new colours: `.surface` cards, a `.facts` definition list of one fact per row,
+`.warn` for something that needs a person and `.ok` for a check that passed.
+
+Three rules they follow, which are the reason they are worth having:
+
+- **Report, do not operate.** No SQL, no bulk actions, no credential values.
+  The only two buttons dispatch the existing release workflow and publish a
+  draft that already exists.
+- **Registered things only.** The database shown is the one the development
+  environment's register names. Nothing scans the machine for databases, and
+  Hallvi's own records are kept visually distinct from the applications' own
+  databases on their own host.
+- **Measure, do not assume.** The running Hallvi's serving directory is read
+  from the process rather than assumed to be this checkout, and an archive's
+  contents are read from the archive once one has been built — before that the
+  page says it is showing a plan.
+
+They are read when their page is opened rather than polled: nothing on them
+changes by itself except a workflow run, and `gh` every 2.5 seconds would be
+rude to the laptop and to GitHub.
