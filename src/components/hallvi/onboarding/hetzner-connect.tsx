@@ -220,8 +220,8 @@ export function HetznerConnect({
               body: (
                 <>
                   <p>
-                    Inside the project: <b>Security</b> in the left menu, then{" "}
-                    <b>API tokens</b> along the top, then{" "}
+                    Inside the project: <b>Security</b> at the bottom of the
+                    left menu, then <b>API tokens</b> along the top, then{" "}
                     <b>Generate API token</b>. Choose <b>Read &amp; Write</b>; a
                     Read token cannot create a server and cannot be upgraded
                     later.
