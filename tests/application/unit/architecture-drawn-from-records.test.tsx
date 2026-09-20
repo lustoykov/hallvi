@@ -223,6 +223,98 @@ describe("whether anything is watching", () => {
   });
 });
 
+describe("the doors in the firewall", () => {
+  const door = (id: string, port: string, sources: string, open: boolean) =>
+    states(
+      { kind: "door", id },
+      {
+        title: open
+          ? `Port ${port} is open to everyone`
+          : `Port ${port} refuses from outside`,
+        facts: [fact("port", port), fact("sources", sources)] as never[],
+        checks: [check(open ? "open" : "refused", "passed")] as never[],
+      },
+    );
+
+  it("draws every door on record, not only the first", () => {
+    // The map had two slots and put every non-SSH door in the first of them,
+    // so the second kept its own id, got no place, and was never drawn — and
+    // the one it dropped was the database port.
+    const records = [
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      door("postgres", "5432", "the container network", false),
+    ];
+    const html = draw(records);
+    expect(html).toContain("443");
+    expect(html).toContain("5432");
+    expect(html).toContain("anywhere");
+    expect(html).toContain("the container network");
+  });
+
+  it("counts a port that refuses as refused, not as a door that is open", () => {
+    const html = draw([
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      door("postgres", "5432", "the container network", false),
+    ]);
+    expect(html).toContain("1 open, 1 refused");
+  });
+
+  it("cuts the wall open for a door that admits and not for one that refuses", () => {
+    const shut = layoutFor(
+      modelOf([
+        topology([web] as never[]),
+        door("https", "443", "anywhere", true),
+        door("postgres", "5432", "the container network", false),
+      ]),
+    ).wall;
+    const openToo = layoutFor(
+      modelOf([
+        topology([web] as never[]),
+        door("https", "443", "anywhere", true),
+        door("alt", "8443", "anywhere", true),
+      ]),
+    ).wall;
+    // The two doorways the journeys cross are drawn either way; an extra
+    // door earns a third gap only by being open.
+    expect(shut.wall.split("M").length - 1).toBe(3);
+    expect(openToo.wall.split("M").length - 1).toBe(4);
+  });
+
+  it("reads a way in Pi called access, when that is what it wrote", () => {
+    const html = draw([
+      topology([web] as never[]),
+      states(
+        { kind: "access", id: "tunnel" },
+        {
+          title: "Reachable through the tunnel only",
+          facts: [fact("port", "8080"), fact("sources", "Hallvi")] as never[],
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ]);
+    expect(html).toContain("8080");
+  });
+
+  it("keeps a port that refuses off the path a visit travels", () => {
+    const layout = layoutFor(
+      modelOf([
+        topology([web] as never[]),
+        door("https", "443", "anywhere", true),
+        door("postgres", "5432", "the container network", false),
+      ]),
+    );
+    expect(layout.stops.visit).toContain("gate:http");
+    expect(layout.stops.visit).not.toContain("postgres");
+  });
+
+  it("says the rules are not drawn rather than counting zero", () => {
+    const html = draw([topology([web] as never[])]);
+    expect(html).toContain("rules not drawn");
+  });
+});
+
 describe("the place off the server that copies reach", () => {
   const copy = (id: string, at: string, kind: string, where: string) =>
     states(

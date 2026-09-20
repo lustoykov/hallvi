@@ -314,6 +314,26 @@ function list(names: string[]) {
 type MapPart = Topology["parts"][number];
 
 /**
+ * Whether a way in is open, or a port that refuses.
+ *
+ * The check Pi wrote answers this and nothing else does: the application's own
+ * reach is a different question, and reading one as the other is how a
+ * database port that refuses from outside would have been counted among the
+ * doors that are open.
+ */
+function admitsOf(
+  records: SavedInformation[],
+  part: { id: string; kind: Part["kind"] },
+): NonNullable<Part["admits"]> {
+  const ref = refFor(records, part);
+  if (!ref) return "unknown";
+  const held = currentChecks(records, ref);
+  if (held.get("refused")) return "refused";
+  if (held.get("open")) return "open";
+  return "unknown";
+}
+
+/**
  * What the records know that this application's map does not name.
  *
  * A topology is composition: Pi writes what the application is made of. The
@@ -353,6 +373,34 @@ function fromRecords(
         role: "the machine this runs on",
         plain: "the server everything here runs on",
       });
+  }
+
+  if (!declared.has("gate")) {
+    // Every door, not the first one. A map that drew one and said nothing
+    // about the other is the map claiming a shape the records contradict —
+    // and the one it dropped was the database port, which is the one a
+    // reader most wants to know the state of.
+    // A way in is a door; Pi may reasonably speak of the tunnel through it as
+    // access instead, and the two are the same thing on the map. So whichever
+    // Pi chose is read, and not both — the alternative is one way in drawn
+    // twice under two names.
+    const doors = subjectsOfKind(records, "door");
+    for (const ref of doors.length
+      ? doors
+      : subjectsOfKind(records, "access")) {
+      const presence = presenceOf(records, ref);
+      if (!presence.known || presence.presence !== "present") continue;
+      const port = currentFacts(records, ref).get("port")?.value.value;
+      found.push({
+        id: ref.id,
+        kind: "gate",
+        name: port ? `Port ${port}` : ref.id,
+        // Pi's own sentence about this port, which is what the card's
+        // second line and the inspector both read.
+        role: presence.record.title,
+        plain: presence.record.title,
+      });
+    }
   }
 
   if (!declared.has("monitor")) {
@@ -525,6 +573,7 @@ export function architectureFromRecords({
       // described the thing that is gone; it is in the series, not here.
       facts: evidence.certainty === "absent" ? [] : facts,
       evidence,
+      admits: part.kind === "gate" ? admitsOf(records, part) : undefined,
       destination: destinations[part.kind as Part["kind"]],
       // Hallvi and the repository have no state of their own to tag.
       quiet: part.kind === "controller",

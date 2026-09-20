@@ -611,6 +611,7 @@
 .axj2-port {
   position: absolute;
   z-index: 3;
+  width: max-content;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -1534,11 +1535,21 @@
 }
 
 /* Doors: two lines, the port and what it carries, then who may use it. */
+/* A port pill is as wide as its words, between the slot the design gave it
+   and a cap that keeps it out of the application beside it. `sources` is
+   Pi's own phrase — "anywhere", "the container network" — and pinning the
+   pill to one width had the longer ones spill out of their own border. */
 .axj2-port-text {
   display: grid;
   gap: 1px;
+  min-width: 0;
   text-align: left;
   line-height: 1.15;
+}
+.axj2-port-text b,
+.axj2-port-text em {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .axj2-port-text b {
   font-size: 12.5px;
