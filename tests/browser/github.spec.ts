@@ -87,16 +87,18 @@ test(
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
     await openConversation(page);
-    // The unread repository is a request in the conversation, not a strip
-    // above it, and nothing has been established yet, so it only offers to ask.
-    const card = page.getByRole("region", { name: "Repository access" });
-    await expect(card).toContainText("hasn’t been able to check");
-    await expect(card).toContainText(
-      "Run the repository check, or connect GitHub if this repository is private.",
-    );
+    // Nothing has been established with the login gone, so the welcome only
+    // offers to ask, and never offers to read what it has not opened.
+    const welcome = page.getByRole("region", {
+      name: "Get to know your application",
+    });
+    await expect(welcome).toContainText("haven’t been able to check");
     await expect(
-      card.getByRole("button", { name: "Check repository" }),
+      welcome.getByRole("button", { name: "Check repository" }),
     ).toBeEnabled();
+    await expect(
+      welcome.getByRole("button", { name: "Read repository" }),
+    ).toHaveCount(0);
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     const draft = "Continue after connecting my repository.";
     await composer.fill(draft);
