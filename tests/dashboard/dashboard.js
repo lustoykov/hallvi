@@ -1057,7 +1057,10 @@ const bytes = (n) =>
 const when = (iso) => {
   if (!iso) return "never";
   const at = new Date(iso);
-  return Number.isNaN(at.getTime()) ? "unknown" : at.toLocaleString();
+  if (Number.isNaN(at.getTime())) return "unknown";
+  // GitHub answers with year 0001 for a draft that was never published,
+  // which renders as a real date and reads as a very old one.
+  return at.getUTCFullYear() < 1980 ? "not published" : at.toLocaleString();
 };
 
 function card(title, rows, extra = "") {

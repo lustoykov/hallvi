@@ -1825,4 +1825,18 @@ dialog .form-row {
   .surface {
     padding: 14px 16px;
   }
+  /* The bar was already one unwrapping row; two more pages pushed it past a
+     narrow window. It wraps now instead of scrolling the whole page. */
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .topbar .pages,
+  .topbar .resources {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .topbar .resources {
+    margin-left: 0;
+  }
 }
