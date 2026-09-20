@@ -31,6 +31,7 @@ Archives, both built on the platform they run on:
 | `0.2.0-alpha.1` | `00d645c6` | Ubuntu 24.04 x64, and Apple silicon |
 | `0.2.0-alpha.2` | `a5ebcef4` | Ubuntu 24.04 x64, and Apple silicon |
 | `0.2.0-alpha.3` | `a5ebcef4` | Ubuntu 24.04 x64 |
+| `0.2.0-alpha.4`, `0.2.0-alpha.5` | `146a7819` | Ubuntu 24.04 x64 |
 
 Each Linux archive is 278 MB and carries Node.js 22.23.2, the built interface,
 the Pi worker and production dependencies with both native modules.
@@ -113,6 +114,21 @@ helper and the same `install.sh`; `releaseView` and `startUpdate` in
 `scripts/update-start.mjs` are what each calls. A second `hallvi update --yes`
 started while the first was running printed the *first* attempt's phases
 rather than starting its own.
+
+### One more, on the final code
+
+Two defects the preview itself found were fixed and the whole thing run again
+from the finished branch: `0.2.0-alpha.4` (`146a7819`) installed over
+`0.2.0-alpha.3` from Settings through the tunnel, then `0.2.0-alpha.5` built
+from the same commit and published so the running product could be seen with a
+release waiting.
+
+In the running product, on that build: the **Update available** link sits on
+its own line under the machine name and is no longer a link inside the brand
+link — which is not markup a browser keeps; and typing into an unconnected
+first conversation no longer summons a strip repeating what the welcome and
+the composer's placeholder already say. The same unsent draft was still in the
+composer, four updates after it was typed.
 
 ### Releases that must not be installed
 
@@ -238,6 +254,15 @@ supported platform.
   signed in the earlier `0.1.0-alpha.*` manifests.
 - Nothing here says anything about deploying applications. This is the
   controller updating itself.
+
+## Checks
+
+`npm test` (981 passing, 3 skipped), `npm run lint`, `npx tsc --noEmit` and
+`npm run build`, all on the branch tip, locally on Node.js 22.23.2.
+
+GitHub Actions has run nothing in this repository since 12 September, so the
+`Hallvi checks` workflow did not run on this branch and the new release
+workflow has never run either. Both are read rather than proved.
 
 ## Resources
 
