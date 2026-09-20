@@ -151,6 +151,65 @@ to it.
 - **Verifying a copy left a write-ahead log beside it.** A backup directory now
   holds exactly what its manifest lists.
 
+## What the review found, and how each was checked
+
+Four faults, all real, all fixed on this branch.
+
+**Eligibility was asked of the wrong program.** `update-start.mjs` and
+`update-helper.mjs` consulted *this* installation's migration list. That list
+belongs to the version being installed: a migration to schema 19 is written in
+the release that introduces 19, so an installation at 18 has never heard of it
+and would refuse the only kind of update that needs one. The claim now travels
+in the signed manifest as `migratesFrom`, filled in by the build being signed,
+validated by `release-trust.mjs`, and checked again by `install.sh` from the
+unpacked archive's own list.
+
+The check is asked of an installed program whose list contains only 15 to 18:
+
+```
+a release at schema 19 that declares it migrates from 18:
+  not blocked — the upgrade would proceed
+a release at schema 19 that declares only 15:
+  …uses schema 18, and does not say it can migrate them.
+a release at schema 19 that declares nothing at all:
+  …uses schema 18, and does not say it can migrate them.
+```
+
+A manifest claiming to migrate from a schema newer than its own is refused by
+verification, so the field cannot be used to smuggle a downgrade.
+
+**Records were restored while something might still be writing them.** A start
+that reports failure can leave a service loaded and being retried; both service
+managers restart what they own. The installer now stops the service and waits
+for the service manager to agree it is gone before it replaces anything, and
+only then puts the records back and then the program. A failure *before*
+anything was touched still leaves a running service alone, which is why the
+stop is conditional on there being something to undo.
+
+**Restoring rebuilt the database path instead of remembering it.** A controller
+whose database is not called `hallvi.db` was restored to `<directory>/hallvi.db`
+— the wrong file, and possibly a different controller's. Reproduced, then
+fixed: the manifest records the exact file.
+
+```
+before   custom.sqlite  schema 18    hallvi.db  schema 18  (an unrelated database)
+restore
+after    custom.sqlite  schema 15    hallvi.db  schema 18  — untouched
+```
+
+**Restoring deleted the live records before reading the copy.** A backup whose
+database was missing left nothing at all. The copy is now opened, checked
+against the schema it claims, and staged beside its target before anything is
+removed; the target is replaced by a rename of something already verified.
+Three damaged backups, each leaving the live records where they were:
+
+```
+missing      …is missing hallvi.db. Nothing was changed.        live: schema 18
+not a database  …could not be opened (file is not a database).  live: schema 18
+wrong schema …is schema 18, not the schema 15 it claims.        live: schema 18
+then the real copy                                              live: schema 15
+```
+
 ## What this does not establish
 
 - **The updater's own discovery path was not exercised across a schema change.**
