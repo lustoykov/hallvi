@@ -236,20 +236,45 @@ describe("the doors in the firewall", () => {
       },
     );
 
-  it("draws every door on record, not only the first", () => {
+  it("draws every way in on record, not only the first", () => {
     // The map had two slots and put every non-SSH door in the first of them,
-    // so the second kept its own id, got no place, and was never drawn — and
-    // the one it dropped was the database port.
-    const records = [
+    // so a second one kept its own id, got no place, and was never drawn.
+    const html = draw([
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      door("alt", "8443", "the office", true),
+    ]);
+    expect(html).toContain("443");
+    expect(html).toContain("8443");
+    expect(html).toContain("anywhere");
+    expect(html).toContain("the office");
+  });
+
+  it("does not draw a port that refuses as a door", () => {
+    // Nothing travels through it, so it is on no journey this map follows —
+    // and beside a port that does answer, the only thing telling them apart
+    // is a missing gap in a dashed line. The count still says it is there,
+    // and Security draws it in the band where it stops.
+    const html = draw([
       topology([web] as never[]),
       door("https", "443", "anywhere", true),
       door("postgres", "5432", "the container network", false),
-    ];
-    const html = draw(records);
+    ]);
     expect(html).toContain("443");
-    expect(html).toContain("5432");
-    expect(html).toContain("anywhere");
-    expect(html).toContain("the container network");
+    expect(html).not.toContain("5432");
+    expect(html).not.toContain("the container network");
+    expect(html).toContain("1 open, 1 refused");
+  });
+
+  it("draws nothing in the doorways when every port on record refuses", () => {
+    const html = draw([
+      topology([web] as never[]),
+      door("postgres", "5432", "the container network", false),
+    ]);
+    expect(html).not.toContain("5432");
+    // And says so, rather than falling back to "rules not drawn", which would
+    // read as nobody having looked.
+    expect(html).toContain("one door, refused");
   });
 
   it("counts a port that refuses as refused, not as a door that is open", () => {
