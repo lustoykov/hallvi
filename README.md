@@ -11,9 +11,15 @@ browser to connect your model account, add a repository and deploy it to a
 Linux application server. The machine running Hallvi and the application
 server have separate requirements.
 
-**Private beta:** there is no public download yet. Obtain the platform release
-archive, matching checksum and installer script from the maintainer; you do not
-need to clone this repository or install Node.js, npm, Python or a compiler.
+Download the archive for your machine from
+[Releases](https://github.com/lustoykov/hallvi/releases), with its `.sha256`
+and `install-hallvi.sh`, and run the installer. You do not need to clone this
+repository or install Node.js, npm, Python or a compiler. Once it is installed,
+**Settings → This Hallvi** or `hallvi update` installs the next release.
+
+**Alpha:** the first release has not been published yet, so that page is empty
+and the maintainer still supplies the three files by hand. Publishing one is
+[a documented sequence](docs/releases.md) that a merge never triggers.
 
 | Your machine | Start here |
 | --- | --- |
@@ -34,8 +40,8 @@ workspace. See [Pi’s workspace](docs/installation.md#pis-workspace).
 After a local installation, open <http://127.0.0.1:4747>. For a headless VPS,
 use the [laptop browser handoff](docs/installation.md#on-another-machine).
 Follow [your first deployment](docs/installation.md#your-first-deployment).
-For service commands, upgrades and troubleshooting, see the
-[full installation guide](docs/installation.md).
+For service commands, [updates](docs/installation.md#update) and
+troubleshooting, see the [full installation guide](docs/installation.md).
 
 Application deployments target Docker Compose on one Linux instance, with
 PostgreSQL or SQLite, required Redis/Valkey services, workers, scheduled
