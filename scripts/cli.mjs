@@ -441,8 +441,14 @@ async function update() {
   if (!view.ownKey)
     console.log("  releases  trusting a key from this installation's settings");
   if (view.checkError) console.log(`  ${view.checkError}`);
+  // A check that could not be made does not get to say there is nothing newer.
   if (!view.available)
-    return (console.log(`This is the newest ${view.channel} release.`), 0);
+    return view.checkError
+      ? (console.log(
+          `Hallvi could not read the ${view.channel} channel, so it cannot say whether a newer release exists.`,
+        ),
+        1)
+      : (console.log(`This is the newest ${view.channel} release.`), 0);
 
   console.log(
     `Hallvi ${view.available.version} is available${

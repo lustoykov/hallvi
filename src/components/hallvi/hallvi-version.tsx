@@ -276,7 +276,8 @@ export function HallviVersion({ initial }: { initial: HallviVersionState }) {
         {installed.kind === "installed" &&
           !state.available &&
           !attempt &&
-          state.checkedAt && (
+          state.checkedAt &&
+          !state.checkError && (
             <p className={s.hint}>
               This is the newest {state.channel} release.
             </p>

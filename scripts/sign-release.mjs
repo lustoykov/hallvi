@@ -126,15 +126,19 @@ const bytes = Buffer.from(
 );
 const signature = sign(null, bytes, key).toString("base64");
 
-// What Hallvi will do with this, done here first.
-const trust = trustedKeys({});
+// What an installation will do with this, done here first. The key checked
+// against is the one the readers of this release use: Hallvi's own, unless
+// this environment names another, as a fork's or a test installation's does.
+const trust = trustedKeys();
 try {
   verifyManifest({ bytes, signature, channel, keys: trust.keys });
 } catch (error) {
   console.error(
-    `Release blocked: this key does not match the public key Hallvi ships (${
-      error instanceof Error ? error.message : error
-    }).
+    `Release blocked: this signing key does not match the ${
+      trust.own
+        ? "public key Hallvi ships"
+        : "public key HALLVI_RELEASE_KEY names"
+    } (${error instanceof Error ? error.message : error}).
 Signing with a key installations do not trust would publish a release none of them can install.`,
   );
   process.exit(1);
@@ -142,7 +146,11 @@ Signing with a key installations do not trust would publish a release none of th
 
 writeFileSync(out, bytes);
 writeFileSync(`${out}.sig`, `${signature}\n`);
-console.log(`Signed ${channel} release ${version} (${revision.slice(0, 7)}):`);
+console.log(
+  `Signed ${channel} release ${version} (${revision.slice(0, 7)})${
+    trust.own ? "" : " with a key from HALLVI_RELEASE_KEY, not Hallvi's own"
+  }:`,
+);
 for (const [platform, entry] of Object.entries(packages))
   console.log(`  ${platform}  ${entry.file}  ${entry.sha256.slice(0, 16)}…`);
 console.log(`  manifest  ${out}`);

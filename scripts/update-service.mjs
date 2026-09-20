@@ -207,6 +207,10 @@ export function startHelper({ data, program, attempt }) {
     "--description=Hallvi update",
     "--working-directory",
     data,
+    // Where the attempt says it is. Without this the output goes to the
+    // journal and the log path Hallvi prints would name nothing.
+    `--property=StandardOutput=append:${log}`,
+    `--property=StandardError=append:${log}`,
     ...Object.entries(environment).map(
       ([key, value]) => `--setenv=${key}=${value}`,
     ),

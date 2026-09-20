@@ -350,5 +350,9 @@ try {
     entry.endsWith(".tgz"),
   ))
     rmSync(join(data, "updates", name), { force: true });
+  // Including this program's own copy: every module it runs on is loaded,
+  // and a hundred megabytes of runtime should not outlive the update.
+  if (process.env.HALLVI_UPDATE_STAGING)
+    rmSync(process.env.HALLVI_UPDATE_STAGING, { recursive: true, force: true });
   retireHelper();
 }
