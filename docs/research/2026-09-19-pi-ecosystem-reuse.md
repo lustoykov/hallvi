@@ -1,5 +1,11 @@
 # Pi ecosystem reuse audit
 
+> Historical research snapshot, written before the Pi harness integration in
+> [PR #156](https://github.com/lustoykov/hallvi/pull/156) and its subsequent
+> simplifications. References below to “current main,” proposals and unverified
+> integration describe that earlier review, not the shipped architecture. See
+> [operator design](../operator-design.md) for the current implementation.
+
 Date: 2026-09-19. Status: source and package audit; no runtime proof of fit.
 
 Follow-up: [runtime evolution and strategy](2026-09-19-pi-runtime-evolution.md)

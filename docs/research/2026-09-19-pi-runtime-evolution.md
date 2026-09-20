@@ -1,5 +1,11 @@
 # Hallvi's three runtime designs and Pi's direction
 
+> Historical research snapshot, written before the Pi harness integration in
+> [PR #156](https://github.com/lustoykov/hallvi/pull/156) and its subsequent
+> simplifications. References below to “current main,” proposals and unverified
+> integration describe that earlier review, not the shipped architecture. See
+> [operator design](../operator-design.md) for the current implementation.
+
 Research date: September 19, 2026. This is explanatory research, not a product
 change or deployment acceptance. It follows the [ecosystem audit](2026-09-19-pi-ecosystem-reuse.md).
 
