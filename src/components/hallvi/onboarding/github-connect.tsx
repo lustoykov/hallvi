@@ -299,9 +299,11 @@ export function GithubConnect({
         </p>
         {known}
         <div className="hv-ob-row">
+          {/* A text action: nothing is known to be wrong, so this does not
+              compete with a request that is actually waiting. */}
           <button
             type="button"
-            className="hv-ob-primary"
+            className="hv-ob-next"
             disabled={checking}
             onClick={onCheck}
           >

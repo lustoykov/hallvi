@@ -1,7 +1,7 @@
 import { openConversation } from "./workspace-helpers";
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
-import type { Page } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 
 // ChatGPT is not connected here: this is what a first run looks like.
 test.use({ freshSetup: true });
@@ -11,11 +11,9 @@ test.use({ freshSetup: true });
  * the page. A click that lands before this page hydrates is simply lost, so
  * the one retry covers it; repeating blindly would restart the sign-in.
  */
-async function startSignIn(page: Page) {
-  const connect = page.getByRole("button", {
-    name: "Connect ChatGPT",
-    exact: true,
-  });
+async function startSignIn(card: Locator, name = "Connect ChatGPT") {
+  const page = card.page();
+  const connect = card.getByRole("button", { name, exact: true });
   const begun = () =>
     page.waitForResponse(
       (response) =>
@@ -45,11 +43,11 @@ async function startSignIn(page: Page) {
  * question was about. Connecting ended on the applications list.
  *
  * What this protects: the question can be written before the connection
- * exists, setup returns to the exact conversation, and the draft is still
- * there — whether the sign-in was saved or cancelled.
+ * exists, connecting happens in that same conversation without leaving it,
+ * and the draft is still there — whether the sign-in was saved or cancelled.
  */
 test(
-  "connecting ChatGPT returns to the conversation with the draft intact",
+  "connecting ChatGPT in the conversation keeps the draft intact",
   journey("connect-and-return"),
   async ({ page }, testInfo) => {
     test.setTimeout(180_000);
@@ -80,59 +78,32 @@ test(
       fullPage: true,
     });
 
-    // The way to setup carries this conversation, and nothing else.
-    const toSettings = page.getByRole("link", { name: "Open Settings" });
-    const settingsUrl = new URL(
-      (await toSettings.getAttribute("href"))!,
-      page.url(),
-    );
-    expect(settingsUrl.pathname).toBe("/setup/pi");
-    expect(settingsUrl.searchParams.get("application")).toBe(
-      new URL(conversation).pathname.split("/")[2],
-    );
-    expect(settingsUrl.searchParams.get("chat")).toMatch(/^[\da-f-]{36}$/);
-    // The draft itself never travels.
-    expect(settingsUrl.search).not.toContain("weekend");
-
-    await toSettings.click();
-    // Routes compile on first visit in this development fixture.
-    await page.waitForURL(/\/setup\/pi\?/, { timeout: 60_000 });
-
-    // A cancelled sign-in still has a way home, and it is the conversation.
-    await startSignIn(page);
+    // Connecting happens here, so the draft never has to travel anywhere.
+    const draft = "Does this need a bigger server before the weekend?";
     await page
+      .locator(".hv-pi-required")
+      .getByRole("button", { name: "Connect ChatGPT", exact: true })
+      .click();
+    const card = page.getByRole("region", { name: "Connect ChatGPT" });
+    await expect(card).toBeVisible();
+
+    // A cancelled sign-in leaves everything where it was.
+    await startSignIn(card);
+    await card
       .getByRole("button", { name: "Cancel sign-in", exact: true })
       .click();
-    await page
-      .getByRole("link", { name: "Back to the conversation" })
-      .first()
-      .click();
-    await page.waitForURL(/\/applications\/[\da-f-]{36}\?chat=/, {
-      timeout: 60_000,
-    });
-    await openConversation(page);
-    await expect(composer).toHaveValue(
-      "Does this need a bigger server before the weekend?",
-    );
+    await expect(card).toContainText("Nothing was saved");
+    expect(page.url()).toBe(conversation);
+    await expect(composer).toHaveValue(draft);
     await expect(send).toBeDisabled();
 
-    // Retry, this time to a saved login.
-    await page.getByRole("link", { name: "Open Settings" }).click();
-    await page.waitForURL(/\/setup\/pi\?/, { timeout: 60_000 });
-    await startSignIn(page);
-    await expect(page.getByText("Login saved", { exact: true })).toBeVisible({
-      timeout: 60_000,
-    });
-    await page
-      .getByRole("button", { name: "Back to the conversation" })
-      .click();
-    await page.waitForURL(/\/applications\/[\da-f-]{36}\?chat=[\da-f-]{36}/, {
-      timeout: 60_000,
-    });
-    await openConversation(page);
-    await expect(composer).toHaveValue(
-      "Does this need a bigger server before the weekend?",
-    );
+    // Retry, this time to a saved login. Saved is not verified, and says so.
+    await startSignIn(card, "Get a new code");
+    await expect(
+      page.getByText("ChatGPT login saved · checked with your first message"),
+    ).toBeVisible({ timeout: 60_000 });
+    expect(page.url()).toBe(conversation);
+    await expect(composer).toHaveValue(draft);
     await expect(send).toBeEnabled();
     await page.screenshot({
       path: testInfo.outputPath("after-setup.png"),

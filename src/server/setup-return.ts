@@ -17,13 +17,11 @@ export type SetupReturn = {
   href: string;
   label: string;
   query: string;
-  firstRun?: { applicationId: string; chatId: string; name: string };
 };
 
 export function setupReturnDestination(params: {
   application?: string | string[];
   chat?: string | string[];
-  onboarding?: string | string[];
 }): SetupReturn | null {
   const applicationId = single(params.application);
   const chatId = single(params.chat);
@@ -32,27 +30,12 @@ export function setupReturnDestination(params: {
   const chat = getChat(chatId);
   if (!application || !chat || chat.applicationId !== application.id)
     return null;
-  const firstRun =
-    params.onboarding === "1" &&
-    chat.kind === "main" &&
-    !chat.archivedAt &&
-    // Pi holds nothing for it yet: nobody has written in it.
-    !chat.nativeSessionId;
   return {
-    ...(firstRun
-      ? {
-          firstRun: {
-            applicationId: application.id,
-            chatId: chat.id,
-            name: application.name,
-          },
-        }
-      : {}),
     href: `/applications/${application.id}?chat=${chat.id}`,
     label: "Back to the conversation",
     // Carried from one Settings tab to the next, so connecting a second
     // account does not strand the reader away from their conversation.
-    query: `?application=${application.id}&chat=${chat.id}${firstRun ? "&onboarding=1" : ""}`,
+    query: `?application=${application.id}&chat=${chat.id}`,
   };
 }
 
