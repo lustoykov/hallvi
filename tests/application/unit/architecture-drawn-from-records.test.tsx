@@ -250,31 +250,53 @@ describe("the doors in the firewall", () => {
     expect(html).toContain("the office");
   });
 
-  it("does not draw a port that refuses as a door", () => {
-    // Nothing travels through it, so it is on no journey this map follows —
-    // and beside a port that does answer, the only thing telling them apart
-    // is a missing gap in a dashed line. The count still says it is there,
-    // and Security draws it in the band where it stops.
+  it("draws a port that refuses, and says so in as many words", () => {
+    // This page is the overview. Leaving the port off had the firewall's own
+    // count referring to something nobody could see — and the fault was never
+    // that it was drawn, but that it was drawn as a peer of a port that
+    // answers, with only a missing gap in a dashed line telling them apart.
     const html = draw([
       topology([web] as never[]),
       door("https", "443", "anywhere", true),
       door("postgres", "5432", "the container network", false),
     ]);
     expect(html).toContain("443");
-    expect(html).not.toContain("5432");
-    expect(html).not.toContain("the container network");
+    expect(html).toContain("5432");
     expect(html).toContain("1 open, 1 refused");
+    // It says "refused" rather than where it would admit from, which is what
+    // an open port says and is how the two came to read alike.
+    expect(html).toContain("refused");
+    expect(html).not.toContain("the container network");
   });
 
-  it("draws nothing in the doorways when every port on record refuses", () => {
+  it("says so when every port on record refuses", () => {
     const html = draw([
       topology([web] as never[]),
       door("postgres", "5432", "the container network", false),
     ]);
-    expect(html).not.toContain("5432");
-    // And says so, rather than falling back to "rules not drawn", which would
-    // read as nobody having looked.
+    expect(html).toContain("5432");
+    // A finding, not the same as "rules not drawn", which reads as nobody
+    // having looked.
     expect(html).toContain("one door, refused");
+  });
+
+  it("counts a port it had no room to draw rather than dropping it", () => {
+    // Eight doors is more than the wall's band can hold. A port the map
+    // cannot show is a port the reader cannot know about, so the count says
+    // how many are missing.
+    const many = Array.from({ length: 8 }, (_, index) =>
+      door(`d${index}`, `${9000 + index}`, "anywhere", true),
+    );
+    const model = modelOf([topology([web] as never[]), ...many]);
+    const layout = layoutFor(model);
+    expect(layout.undrawnGates).toBeGreaterThan(0);
+    const drawn = model.parts.filter(
+      (part) => part.kind === "gate" && layout.rects[part.id],
+    ).length;
+    expect(drawn + layout.undrawnGates).toBe(8);
+    expect(draw([topology([web] as never[]), ...many])).toContain(
+      `${layout.undrawnGates} more on record`,
+    );
   });
 
   it("counts a port that refuses as refused, not as a door that is open", () => {

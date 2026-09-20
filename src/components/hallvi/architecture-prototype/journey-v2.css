@@ -664,6 +664,20 @@
 .axj2-port.is-dim {
   opacity: 0.55;
 }
+/* A port that refuses: its number struck through, and the wall behind it is
+   solid. It is on the map because the map is the overview — leaving it off
+   had the firewall's own count referring to something nobody could see. */
+.axj2-port[data-refused] b {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: #59667b;
+}
+.axj2-port[data-refused] em {
+  color: #59667b;
+}
+.axj2-port[data-refused] {
+  background: #fcfdfe;
+}
 .axj2-port[data-c="planned"] {
   border-style: dashed;
   box-shadow: none;
