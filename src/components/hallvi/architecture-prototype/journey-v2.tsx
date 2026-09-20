@@ -138,6 +138,8 @@ interface Layout {
   rects: Record<string, Rect>;
   /** The firewall, drawn around whatever doors this map has. */
   wall: { wall: string; jamb: string };
+  /** Ports on record the wall had no room for, so the count can say so. */
+  undrawnGates: number;
   /** The canvas height this model needs, in the same units as the boxes. */
   height: number;
   legs: Record<JourneyId, string[][]>;
@@ -225,29 +227,38 @@ function layoutFor(model: ArchitectureModel): Layout {
   const gates = model.parts.filter(
     (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
   );
-  // A port that refuses is not drawn here at all.
+  // Every port on record is drawn, including one that refuses.
   //
-  // It was, on a wall left solid behind it, which is a true picture and the
-  // wrong page for it. This map is a set of journeys — follow a visit, your
-  // data, a release — and nothing travels through a port that refuses, which
-  // is why it is already not a stop on any of them. Drawn in the doorway
-  // column beside a port that does answer, the only thing distinguishing the
-  // two is a missing gap in a dashed line.
+  // This page is the overview, and a port it leaves out is a port the reader
+  // has no way to know about — which is the same fault as the unnamed server
+  // and the missing watcher. A refused port was briefly dropped here on the
+  // grounds that nothing travels through it, and that left the firewall's own
+  // label counting a thing the picture could not account for.
   //
-  // Nothing is lost: the firewall's label counts it, and Security draws it in
-  // the band where it stops, with what the check found.
-  const doors = gates.filter((gate) => gate.admits !== "refused");
-  for (const gate of gates)
-    if (gate.admits === "refused") delete rects[gate.id];
-  const spare = doors.filter(
+  // What was actually wrong is that it was drawn as a peer of a port that
+  // answers, and the only thing telling the two apart was a missing gap in a
+  // dashed line. So it is drawn and it says `refused` in as many words, with
+  // its number struck through and the wall solid behind it.
+  const spare = gates.filter(
     (gate) => gate.id !== "gate:http" && gate.id !== "gate:ssh",
   );
-  spare.forEach((gate, index) => {
-    // Upwards from above the visit's door, in the clear band between the
-    // server's header and the application.
-    const y = 228 - index * 44;
-    if (y >= WALL_TOP + 6) rects[gate.id] = { ...BOX.http, y, h: BOX.http.h };
+  // Stacked up the wall above the visit's door, in the clear band between the
+  // server's header and the application. They share the band rather than
+  // marching off the top of it: a port that does not fit is a port silently
+  // dropped, and the count below says so when one is.
+  const band = { start: WALL_TOP + 6, end: 268 };
+  const step = BOX.http.h + 10;
+  const room = Math.max(0, Math.floor((band.end - band.start + 10) / step));
+  const placed = spare.slice(0, room);
+  const undrawn = spare.length - placed.length;
+  placed.forEach((gate, index) => {
+    rects[gate.id] = {
+      ...BOX.http,
+      y: band.end - BOX.http.h - index * step,
+      h: BOX.http.h,
+    };
   });
+  for (const gate of spare.slice(room)) delete rects[gate.id];
   // A monitor Pi recorded takes the place the placeholder would have had, so
   // "something is watching this" is visible rather than merely not-missing.
   const monitor = model.parts.find(
@@ -383,14 +394,14 @@ function layoutFor(model: ArchitectureModel): Layout {
     legs[journey].flat().map((d) => ({ d, journey })),
   );
   // The wall is solid except where a drawn door opens it.
-  // Every door that is drawn is a way in, so every one of them opens the
-  // wall. How sure anyone is that it is open is the card's own reading, not
-  // the wall's: a solid wall behind a drawn door would say it refuses, which
-  // is a claim nobody made about a port nobody has checked.
+  // The wall opens where a door admits and stays shut behind one that
+  // refuses, which is the structural half of the distinction — the word on
+  // the card is the other half. A port nobody has checked still opens it:
+  // leaving it shut would say it refuses, which is a claim no record made.
   const openings = [
     ...JOURNEY_DOORS,
-    ...spare
-      .filter((gate) => rects[gate.id])
+    ...placed
+      .filter((gate) => gate.admits !== "refused" && rects[gate.id])
       .map(
         (gate) =>
           [rects[gate.id].y - 4, rects[gate.id].y + rects[gate.id].h + 4] as [
@@ -418,6 +429,7 @@ function layoutFor(model: ArchitectureModel): Layout {
   return {
     rects,
     wall,
+    undrawnGates: undrawn,
     height,
     legs,
     wires,
@@ -680,6 +692,7 @@ function Port({
       type="button"
       className={`axj2-port${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${part.checking ? " is-checking" : ""}`}
       data-c={part.evidence.certainty}
+      data-refused={part.admits === "refused" || undefined}
       style={{
         ...place(rect),
         // The slot is the floor, not the ceiling: the pill grows to hold
@@ -716,19 +729,26 @@ function Port({
           {part.id === "gate:ssh" && <small> · SSH</small>}
         </b>
         <em>
-          {/* Where this port admits from, in Pi's words. The application's
-              own reach answers a different question, and answering with it
-              had a refused database port reading "anyone". */}
-          {part.facts.find((fact) => fact.label === "sources")?.value ??
-            (part.id === "gate:ssh"
-              ? "Hallvi"
-              : part.admits === "refused"
-                ? "refused from outside"
+          {/* A port that refuses says so, in the word its own check used.
+              It used to show where it admits from — "the container network"
+              — which is what an open port says, so the two read alike and
+              only a missing gap in the wall behind them told them apart.
+              Where it would admit from is in the inspector.
+
+              Otherwise: where this port admits from, in Pi's words. The
+              application's own reach answers a different question, and
+              answering with it had a refused database port reading
+              "anyone". */}
+          {part.admits === "refused"
+            ? "refused"
+            : (part.facts.find((fact) => fact.label === "sources")?.value ??
+              (part.id === "gate:ssh"
+                ? "Hallvi"
                 : model.openness === "restricted"
                   ? "your network"
                   : model.openness === "public"
                     ? "anyone"
-                    : "not read back")}
+                    : "not read back"))}
         </em>
       </span>
     </button>
@@ -1351,13 +1371,20 @@ export function JourneyDirection({
               const open = gates.length - shut;
               const named = (count: number) =>
                 count === 1 ? "one door" : `${count} doors`;
-              if (shut && open) return `${open} open, ${shut} refused`;
-              if (shut) return `${named(shut)}, refused`;
-              return model.openness === "restricted"
-                ? `only ${named(open)} open`
-                : model.openness === "public"
-                  ? `${named(open)} open`
-                  : `${named(open)} on record`;
+              // A port the map had no room for is a port the reader cannot
+              // see, so the count is where it gets said rather than nowhere.
+              const over = layout.undrawnGates
+                ? ` · ${layout.undrawnGates} more on record`
+                : "";
+              if (shut && open) return `${open} open, ${shut} refused${over}`;
+              if (shut) return `${named(shut)}, refused${over}`;
+              return (
+                (model.openness === "restricted"
+                  ? `only ${named(open)} open`
+                  : model.openness === "public"
+                    ? `${named(open)} open`
+                    : `${named(open)} on record`) + over
+              );
             })()}
           </span>
           {gates.map(({ id }) =>
