@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Archive,
   CaretDown,
   CaretRight,
   ChatCircle,
@@ -146,6 +147,7 @@ export function ApplicationNavigation({
   onSection,
   onChat,
   onCreate,
+  onArchive,
   sections = applicationSections,
   hidden = [],
   revealed = false,
@@ -171,6 +173,7 @@ export function ApplicationNavigation({
   onSection: (section: ApplicationSection) => void;
   onChat: (id: string) => void;
   onCreate: () => void;
+  onArchive: (id: string) => void;
 }) {
   const primary = sections.filter((item) => item.group !== "activity");
   const activity = sections.filter((item) => item.group === "activity");
@@ -235,21 +238,36 @@ export function ApplicationNavigation({
           </button>
         </div>
         {chats.map((chat) => (
-          <button
-            key={chat.id}
-            disabled={busy}
-            className={!section && chat.id === selectedChatId ? "selected" : ""}
-            aria-current={
-              !section && chat.id === selectedChatId ? "page" : undefined
-            }
-            onClick={() => onChat(chat.id)}
-          >
-            <ChatCircle />
-            <span>
-              {chat.title}
-              {chat.archivedAt && <small>Archived</small>}
-            </span>
-          </button>
+          <div className="hv-chat-nav-row" key={chat.id}>
+            <button
+              disabled={busy}
+              className={
+                !section && chat.id === selectedChatId ? "selected" : ""
+              }
+              aria-current={
+                !section && chat.id === selectedChatId ? "page" : undefined
+              }
+              onClick={() => onChat(chat.id)}
+            >
+              <ChatCircle aria-hidden="true" />
+              <span>
+                {chat.title}
+                {chat.archivedAt && <small>Archived</small>}
+              </span>
+            </button>
+            {chat.id !== chats[0]?.id && !chat.archivedAt && (
+              <button
+                type="button"
+                className="hv-chat-archive"
+                aria-label={`Archive ${chat.title}`}
+                title={`Archive ${chat.title}`}
+                disabled={busy}
+                onClick={() => onArchive(chat.id)}
+              >
+                <Archive aria-hidden="true" />
+              </button>
+            )}
+          </div>
         ))}
       </nav>
       <Link className="hv-navigation-settings" href={settingsHref}>
