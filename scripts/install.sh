@@ -125,6 +125,24 @@ restore_records() {
     say "Hallvi is still running; the records were left alone. The copy taken before the upgrade is at $migrated" >&2
     return 0
   fi
+  # The migrator's own restore is the one that checks the copy against the
+  # schema it claims and stages it before replacing anything. Use it wherever
+  # a program that has it is still on disk — after the swap that is the new
+  # one, before the swap it is the unpacked archive.
+  for candidate in "$home" "$staging"; do
+    [ -n "$candidate" ] || continue
+    [ -x "$candidate/node/bin/node" ] || continue
+    [ -f "$candidate/app/scripts/migrate-state.mjs" ] || continue
+    if "$candidate/node/bin/node" \
+      "$candidate/app/scripts/migrate-state.mjs" --restore "$migrated"; then
+      migrated=""
+      return 0
+    fi
+    break
+  done
+  # Nothing intact to run it with. A recovery that needs the program that
+  # just failed is not one, so copy the file back by hand — staged and
+  # renamed, never written over in place.
   rm -f "$data/hallvi.db-wal" "$data/hallvi.db-shm"
   if cp "$migrated/hallvi.db" "$data/hallvi.db.restoring" &&
     mv "$data/hallvi.db.restoring" "$data/hallvi.db"; then

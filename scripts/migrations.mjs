@@ -66,7 +66,12 @@ export function plan(from, to) {
   const steps = [];
   let at = from;
   while (at !== to) {
-    const step = MIGRATIONS.find((each) => each.from === at);
+    const leaving = MIGRATIONS.filter((each) => each.from === at);
+    if (leaving.length > 1)
+      throw new UnsupportedMigration(
+        `Two migrations both start at schema ${at}. One of them is wrong; the list has to say which single thing happens next.`,
+      );
+    const step = leaving[0];
     if (!step || step.to <= at || step.to > to)
       throw new UnsupportedMigration(
         `There is no supported migration from schema ${from} to ${to}${

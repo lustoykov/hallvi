@@ -15,10 +15,10 @@ import {
   DEFAULT_CHANNEL,
   discover,
   installation,
+  migrates,
   packageFor,
   programSchemaVersion,
 } from "./release-source.mjs";
-import { migrates } from "./release-source.mjs";
 import {
   attemptStatus,
   claimAttempt,
