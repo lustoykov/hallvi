@@ -277,3 +277,36 @@ it("keeps the records when the copy it was asked to restore is no good", () => {
   expect(alive()).toBe(15);
   rmSync(data, { recursive: true, force: true });
 });
+
+it("restores when the database it is replacing is not there at all", () => {
+  // The case a restore most exists for. Naming the worker lock after a file
+  // that is gone refused exactly then.
+  const data = mkdtempSync(join(tmpdir(), "hv-gone-"));
+  const database = join(data, "hallvi.db");
+  const made = new Database(database);
+  made.exec(readFileSync("tests/fixtures/schema-15.sql", "utf8"));
+  made.pragma("user_version = 15");
+  made.close();
+
+  const run = (...args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ["scripts/migrate-state.mjs", ...args, "--data", data],
+      { encoding: "utf8", stdio: "pipe" },
+    );
+  run("--apply");
+  const kept = join(
+    data,
+    "migrations",
+    readdirSync(join(data, "migrations"))[0],
+  );
+  for (const companion of ["", "-wal", "-shm"])
+    rmSync(`${database}${companion}`, { force: true });
+
+  expect(run("--restore", kept)).toContain("to schema 15");
+  const back = new Database(database, { readonly: true });
+  expect(back.pragma("user_version", { simple: true })).toBe(15);
+  expect(back.pragma("integrity_check", { simple: true })).toBe("ok");
+  back.close();
+  rmSync(data, { recursive: true, force: true });
+});

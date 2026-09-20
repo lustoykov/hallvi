@@ -25,7 +25,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -93,9 +93,13 @@ function currentVersion(database) {
  * than the first.
  */
 async function withoutWriters(database, work) {
-  const lock = new Database(`${realpathSync(database)}.worker-lock`, {
-    timeout: 0,
-  });
+  // The lock is named from the canonical directory rather than the database,
+  // because restoring is also what you do when the database is not there any
+  // more, and resolving a file that is gone would refuse exactly then.
+  const lock = new Database(
+    `${join(realpathSync(dirname(database)), basename(database))}.worker-lock`,
+    { timeout: 0 },
+  );
   try {
     lock.exec("BEGIN EXCLUSIVE");
   } catch {
