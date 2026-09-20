@@ -16,6 +16,8 @@ import {
 } from "./application-sections";
 import type { ChatSummary } from "@/server/types";
 
+import { HostName } from "./host-name";
+
 /**
  * What else this application could run, one click away at the bottom of the
  * destinations: the hidden stack destinations as muted rows, each saying why
@@ -182,7 +184,7 @@ export function ApplicationNavigation({
       {head ? (
         <div className="hv-navigation-head">
           <Link href="/applications" className="hv-navigation-home">
-            Hallvi
+            Hallvi <HostName className="hv-navigation-host" />
           </Link>
           {head}
         </div>

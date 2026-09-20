@@ -81,12 +81,9 @@ ordinary user account over SSH or at the machine.
    Run without `sudo`. The installer verifies the archive, installs the user
    service and checks both the interface and worker.
 
-2. To use Hallvi from a laptop, run this on the Ubuntu machine with its
-   address, then follow the printed SSH configuration on the laptop:
-
-   ```bash
-   ~/.local/bin/hallvi remote you@vm.example.com
-   ```
+2. The installer asks where you will use Hallvi. Over SSH it suggests
+   **From another computer**, and then prints the two commands to run on the
+   laptop. `~/.local/bin/hallvi remote` prints them again at any time.
 
    A headless VPS needs no desktop browser. Open Hallvi in the laptop browser
    after starting the printed SSH connection. If status says boot without
@@ -217,14 +214,11 @@ to 64 MB, stays with the run's journal under the state directory.
 
 <a id="on-a-virtual-machine"></a>
 
-For a Mac mini, install while logged in to its desktop using the macOS steps.
-You can use Hallvi directly in that Mac's browser. To use your laptop's browser,
-follow the forwarding instructions below; the Mac must remain awake and allow
-SSH connections.
-
-For a Linux virtual machine, use the Linux steps over SSH. In the instructions
-below, replace `you@vm.example.com` with your username and the address of the
-machine running Hallvi.
+A new installation asks where you will use Hallvi: on this computer, or from
+another one. It cannot work that out: a Mac mini has a desktop and is still
+used from a laptop. Being signed in over SSH, or having no display, only chooses
+which answer Enter gives; `HALLVI_USE=here` or `HALLVI_USE=remote` answers for
+a scripted installation. The Mac must remain awake and allow SSH connections.
 
 Hallvi listens on the machine's loopback only. It has no login, so it must never be
 bound to a public address; use SSH forwarding for remote browser access.
@@ -233,41 +227,52 @@ Forwarding the interface alone is not enough. Pages also name two other kinds
 of loopback port: the browser terminal's, and the port of every private
 application link (`http://127.0.0.1:<port>`), which end on the machine running Hallvi.
 An installation therefore fixes all of them, and you forward them together, each
-to the same number:
+to the same number. An installation used from another computer starts on 5747
+rather than 4747, so it cannot meet a Hallvi on the laptop, and its address
+differs from a local one:
 
-| Port | What |
-| --- | --- |
-| 4747 | Interface |
-| 4748 | Browser terminal |
-| 4757–4766 | Private application links, one per open link |
+| Used here | Used from another computer | What |
+| --- | --- | --- |
+| 4747 | 5747 | Interface |
+| 4748 | 5748 | Browser terminal |
+| 4757–4766 | 5757–5766 | Private application links, one per open link |
 
-On the machine running Hallvi, print the configuration for your laptop:
-
-```bash
-~/.local/bin/hallvi remote you@vm.example.com
-```
-
-Paste the `Host hallvi` block it prints into `~/.ssh/config` on the laptop,
-then run the command below. Every local forward explicitly binds the laptop's
-`127.0.0.1`, even when its SSH defaults allow forwarded ports on other
-interfaces:
+The installer ends by printing two commands for the laptop, with this
+machine's user and the address you reached it on already filled in.
+`~/.local/bin/hallvi remote` prints them again; give it `you@address` to name
+a different address.
 
 ```bash
-ssh -N hallvi
+# once: writes the SSH settings to their own file, leaving ~/.ssh/config alone
+ssh you@mac-mini.local '~/.local/bin/hallvi remote --config you@mac-mini.local' > ~/.ssh/hallvi-mac-mini
+
+# now, and whenever the connection drops
+ssh -F ~/.ssh/hallvi-mac-mini -N mac-mini
 ```
 
-Keep that running while you use Hallvi, and open
-<http://127.0.0.1:4747> on the laptop. A private application link Pi opens, for
-example `http://127.0.0.1:4757`, now works in the laptop's browser as it is
-written. Connecting ChatGPT and GitHub uses device codes, so both work through
-the same connection with nothing further to forward. If the SSH session drops,
-rerun `ssh -N hallvi`; the Hallvi service, saved account connections and
-conversation remain on the VPS. A private application link may need Pi to
-reopen it after a service restart.
+The second command stays open and says nothing while it is connected. Every
+forward explicitly binds the laptop's `127.0.0.1`, even when its SSH defaults
+allow forwarded ports on other interfaces. Open the address the installer
+printed, for example <http://127.0.0.1:5747>. The tab title and the line beside
+the product name say which machine you have reached. A private application
+link Pi opens, for example `http://127.0.0.1:5757`, works in the laptop's
+browser as it is written. Connecting ChatGPT and GitHub uses device codes, so
+both work through the same connection with nothing further to forward. If the
+SSH session drops, run the second command again; the Hallvi service, saved
+account connections and conversation remain on the other machine. A private
+application link may need Pi to reopen it after a service restart.
 
-If one of those ports is already used on the laptop, `ssh` refuses to start and
-names it. Free the port, or move the whole installation with `HALLVI_PORT`
-on the machine running Hallvi: every other port is derived from it.
+If one of those ports is already used on the laptop, `ssh` refuses the whole
+connection and names it, so no page half-works. Leave whatever has the port
+running and move this installation instead, on the machine running Hallvi:
+
+```bash
+~/.local/bin/hallvi port 6747
+```
+
+Every other port follows it, the service restarts, and applications and
+history are unchanged. Then run both laptop commands again; the first simply
+replaces its file.
 
 Keeping that machine updated, and its SSH access protected, is yours to
 do. Prefer a machine other than the one your applications run on; the concept
@@ -354,7 +359,7 @@ do not share a database by default.
 - Private application links close when the service restarts or the machine
   reboots. The Overview shows the link as closed; ask Pi to open it again.
 - One installation per user account.
-- A laptop that runs its own installation and also forwards one from a virtual
-  machine needs them on different ports: set `HALLVI_PORT` on one of them.
+- A laptop that forwards two remote installations needs them on different
+  ports: `hallvi port` on one of them.
 - macOS keeps one service log, `~/.local/share/hallvi/logs/service.log`,
   rotated only when it passes 10 MB at a `hallvi start`.
