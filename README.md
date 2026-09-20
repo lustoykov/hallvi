@@ -99,6 +99,10 @@ rest of this section is development.
 Development runs locally on the owner's MacBook; the Mac mini is retired from development.
 Before creating or retiring a branch, worktree, local runtime or cloud test resource,
 read [development resource ownership and cleanup](docs/development-resources.md).
+One Hallvi is kept running between tasks, with four applications really
+deployed on a shared host and their conversations and data intact: the
+[persistent development environment](docs/development-environment.md). Look
+there before building a fixture, and read that document before changing it.
 Finishing a task includes classifying its resources, preserving anything
 valuable or uncertain, cleaning up only confirmed disposable resources, and
 recording the result before its branch or worktree is retired.
