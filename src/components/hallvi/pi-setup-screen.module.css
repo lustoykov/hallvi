@@ -220,6 +220,12 @@
   align-items: center;
   gap: 8px;
 }
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.saved svg,
 .success svg {
   width: 20px;
   height: 20px;

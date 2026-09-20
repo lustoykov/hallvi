@@ -45,6 +45,7 @@ export async function githubArchive(fullName: string, sha: string) {
 }
 export async function githubJson(path: string, _token: string, _options: { method?: "POST" | "PATCH"; body?: unknown; allowNotFound?: boolean } = {}) {
   const current = scenario();
+  if (current.repository === "private" && !_token) throw new GithubAccessError("The repository is missing or this login cannot access it.", "access");
   if (current.repository === "revoked") throw new GithubAccessError("GitHub no longer accepts this login. Reconnect in Settings → GitHub.", "auth");
   let data: unknown;
   if (path === "/user") data = { id: 42, login: "qa-fixture-user" };

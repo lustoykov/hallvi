@@ -462,13 +462,16 @@ export function PiSetupScreen({
               ) : connectionReady ? (
                 <div className={s.accountRow}>
                   <div>
-                    <strong className={s.success}>
+                    {/* Saved is not proven: nothing has been asked of ChatGPT
+                        with it yet, so it does not wear the verified green. */}
+                    <strong className={s.saved}>
                       <Check /> Login saved
                     </strong>
                     <p>
+                      ChatGPT checks it when you send your first message.{" "}
                       {status.mode === "shared"
-                        ? "Sharing the existing Pi login file"
-                        : "Separate login for Hallvi"}
+                        ? "Sharing the existing Pi login file."
+                        : "Separate login for Hallvi."}
                     </p>
                   </div>
                   <button
