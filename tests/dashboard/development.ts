@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import Database from "better-sqlite3";
 
 export const DEVELOPMENT_ROOT = join(
   homedir(),
@@ -47,18 +48,16 @@ function readJsonFile<T>(path: string): T | null {
   }
 }
 
-/** The schema stamped in a SQLite file, read without opening a driver. */
-function schemaOf(path: string) {
+/** Read the committed schema, including a change still in SQLite's WAL. */
+export function schemaOf(path: string) {
+  let database: Database.Database | undefined;
   try {
-    const head = Buffer.alloc(64);
-    const file = readFileSync(path);
-    file.copy(head, 0, 0, 64);
-    if (head.subarray(0, 15).toString("latin1") !== "SQLite format 3")
-      return null;
-    // `user_version` is a big-endian 32-bit word at offset 60 of the header.
-    return head.readUInt32BE(60);
+    database = new Database(path, { readonly: true, fileMustExist: true });
+    return database.pragma("user_version", { simple: true }) as number;
   } catch {
     return null;
+  } finally {
+    database?.close();
   }
 }
 
@@ -389,6 +388,16 @@ export async function releasesState(root: string) {
     return printed ? safeParse(printed) : null;
   })();
 
+  const actionsEnabled = (() => {
+    const printed = run("gh", [
+      "api",
+      `repos/lustoykov/hallvi/actions/permissions`,
+      "--jq",
+      ".enabled",
+    ]);
+    return printed === "true" ? true : printed === "false" ? false : null;
+  })();
+
   return {
     version,
     schema,
@@ -402,6 +411,7 @@ export async function releasesState(root: string) {
     plannedContents: built.length ? null : plannedContents(root),
     releases,
     runs,
+    actionsEnabled,
     signedIn: run("gh", ["auth", "status"]) !== null,
   };
 }

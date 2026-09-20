@@ -1290,10 +1290,13 @@ function renderReleases(state) {
         .join("")}</ul>`
     : `<p class="footnote">No workflow runs yet.</p>`;
 
-  const actions = state.signedIn
-    ? `<div class="actions"><button id="build-release" class="primary" type="button" data-version="${escape(state.version ?? "")}" data-revision="${escape(here.revision ?? "")}">Build draft release</button></div>
+  const actions =
+    state.actionsEnabled === false
+      ? `<p class="warn" role="status">Release building is unavailable: GitHub Actions is disabled for this repository. A maintainer must enable it in repository Settings → Actions → General before starting a draft build.</p>`
+      : state.signedIn
+        ? `<div class="actions"><button id="build-release" class="primary" type="button" data-version="${escape(state.version ?? "")}" data-revision="${escape(here.revision ?? "")}">Build draft release</button></div>
        <p class="footnote">Dispatches the existing workflow for version ${escape(state.version ?? "")} at <code>${escape((here.revision ?? "").slice(0, 9))}</code>. Signing stays in the workflow. Publishing promotes the reviewed draft without rebuilding it.</p>`
-    : `<p class="warn">Not signed in to GitHub. Run <code>gh auth login</code>; no token is entered here.</p>`;
+        : `<p class="warn">Not signed in to GitHub. Run <code>gh auth login</code>; no token is entered here.</p>`;
 
   $("releases-body").innerHTML =
     what +
@@ -1321,20 +1324,26 @@ document.addEventListener("click", async (event) => {
   const build = event.target.closest("#build-release");
   if (build) {
     build.disabled = true;
-    const answer = await fetch("/api/releases/build", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Hallvi-Testing-Token": token,
-      },
-      body: JSON.stringify({
+    try {
+      const answer = await api("/api/releases/build", {
         version: build.dataset.version,
         revision: build.dataset.revision,
-      }),
-    }).then((response) => response.json());
-    if (!answer.started)
-      window.alert(answer.error ?? "The workflow did not start.");
-    await loadPanel("/api/releases", "releases-body", renderReleases);
+      });
+      if (answer?.started === true) {
+        await loadPanel("/api/releases", "releases-body", renderReleases);
+      } else {
+        window.alert(
+          answer?.error ??
+            "The workflow did not start. Retry after checking GitHub Actions.",
+        );
+      }
+    } catch (error) {
+      window.alert(
+        `Could not start the release build: ${error.message}. Check the connection and retry.`,
+      );
+    } finally {
+      build.disabled = false;
+    }
     return;
   }
   const publish = event.target.closest("[data-publish]");
@@ -1347,16 +1356,22 @@ document.addEventListener("click", async (event) => {
   )
     return;
   publish.disabled = true;
-  const answer = await fetch("/api/releases/publish", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Hallvi-Testing-Token": token,
-    },
-    body: JSON.stringify({ tag }),
-  }).then((response) => response.json());
-  if (!answer.published) window.alert(answer.error ?? "It was not published.");
-  await loadPanel("/api/releases", "releases-body", renderReleases);
+  try {
+    const answer = await api("/api/releases/publish", { tag });
+    if (answer?.published === true) {
+      await loadPanel("/api/releases", "releases-body", renderReleases);
+    } else {
+      window.alert(
+        answer?.error ?? `${tag} was not published. Check the draft and retry.`,
+      );
+    }
+  } catch (error) {
+    window.alert(
+      `Could not publish ${tag}: ${error.message}. Check the connection and retry.`,
+    );
+  } finally {
+    publish.disabled = false;
+  }
 });
 
 // Two real URLs sharing one shell, so moving between them keeps unsaved notes.

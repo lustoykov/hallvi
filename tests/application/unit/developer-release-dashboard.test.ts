@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { actualContents } from "../../dashboard/development";
+import Database from "better-sqlite3";
+import { actualContents, schemaOf } from "../../dashboard/development";
 import { dispatchRelease } from "../../dashboard/server";
 
 vi.mock("node:child_process", async (original) => {
@@ -25,6 +26,20 @@ function fixture() {
 afterEach(() => {
   for (const path of temporary.splice(0)) rmSync(path, { recursive: true });
   vi.clearAllMocks();
+});
+
+it("reports a schema committed in the WAL while the controller is running", () => {
+  const path = join(fixture(), "hallvi.db");
+  const writer = new Database(path);
+  try {
+    writer.pragma("user_version = 15");
+    writer.pragma("journal_mode = WAL");
+    writer.pragma("wal_autocheckpoint = 0");
+    writer.pragma("user_version = 18");
+    expect(schemaOf(path)).toBe(18);
+  } finally {
+    writer.close();
+  }
 });
 
 it("reads a dependency archive whose path listing exceeds Node's default buffer", () => {

@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import {
   mkdtempSync,
+  mkdirSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -13,6 +14,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { pushTestDatabase } from "../../test-database";
+import { discover } from "../../../scripts/release-source.mjs";
+import { blockedReason } from "../../../scripts/update-start.mjs";
 
 // An existing controller's records are migrated in place, with a verified copy
 // of exactly what the migration rewrites kept first. This is the one
@@ -46,6 +49,108 @@ const shape = (path: string) => {
     database.close();
   }
 };
+
+it("discovers a signed schema upgrade and keeps controller data beside the migrated database", async () => {
+  const data = mkdtempSync(join(root, "signed-upgrade-"));
+  const path = join(data, "hallvi.db");
+  const database = new Database(path);
+  database.exec(readFileSync("tests/fixtures/schema-15.sql", "utf8"));
+  database.exec(`
+    INSERT INTO applications (id, name, repository_url, repository_owner, repository_name, permission_mode, created_at, updated_at)
+      VALUES ('app', 'Kept app', 'https://github.com/qa/shop', 'qa', 'shop', 'pi-decides', 't', 't');
+    INSERT INTO conversations (id, application_id, title, kind, status, native_session_id, created_at, updated_at)
+      VALUES ('chat', 'app', 'Main', 'main', 'idle', 'native-1', 't', 't');
+  `);
+  database.pragma("user_version = 15");
+  database.close();
+
+  const history = join(data, "pi-sessions", "app", "chat.jsonl");
+  const credentials = join(data, "config", "credentials.json");
+  mkdirSync(join(data, "pi-sessions", "app"), { recursive: true });
+  mkdirSync(join(data, "config"));
+  writeFileSync(history, '{"fixture":"history"}\n');
+  writeFileSync(credentials, '{"fixture":"credential"}\n');
+  const preserved = [history, credentials].map((file) => readFileSync(file));
+
+  const program = join(data, "old-program");
+  mkdirSync(join(program, "dist"), { recursive: true });
+  writeFileSync(join(program, "dist", "schema-version.json"), '{"version":15}');
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const key = Buffer.from(publicKey.export({ type: "spki", format: "der" }))
+    .subarray(-32)
+    .toString("base64");
+  const platform = process.platform === "darwin" ? "darwin-arm64" : "linux-x64";
+  const manifest = Buffer.from(
+    JSON.stringify({
+      hallviRelease: 1,
+      channel: "alpha",
+      version: "0.2.0-alpha.1",
+      revision: "a".repeat(40),
+      schemaVersion: 18,
+      migratesFrom: [15],
+      releasedAt: "2026-09-20T09:00:00.000Z",
+      notes: "https://github.com/lustoykov/hallvi/releases/tag/v0.2.0-alpha.1",
+      packages: {
+        [platform]: {
+          file: `hallvi-0.2.0-alpha.1-${platform}.tgz`,
+          url: `https://github.com/lustoykov/hallvi/releases/download/v0.2.0-alpha.1/hallvi-0.2.0-alpha.1-${platform}.tgz`,
+          size: 100_000_000,
+          sha256: "b".repeat(64),
+        },
+      },
+    }),
+  );
+  const signature = sign(null, manifest, privateKey).toString("base64");
+  const assets = ["hallvi-release.json", "hallvi-release.json.sig"].map(
+    (name) => ({
+      name,
+      browser_download_url: `https://releases.test/${name}`,
+    }),
+  );
+  const responses = new Map<string, string | Buffer>([
+    [
+      "https://releases.test/index",
+      JSON.stringify([{ tag_name: "v0.2.0-alpha.1", draft: false, assets }]),
+    ],
+    ["https://releases.test/hallvi-release.json", manifest],
+    ["https://releases.test/hallvi-release.json.sig", signature],
+  ]);
+  const candidate = await discover({
+    source: "https://releases.test/index",
+    env: { ...process.env, HALLVI_RELEASE_KEY: key },
+    fetch: (async (url: string) => {
+      const body = responses.get(url);
+      return new Response(
+        typeof body === "string" ? body : body ? new Uint8Array(body) : null,
+      );
+    }) as typeof fetch,
+  });
+  expect(candidate?.manifest).toMatchObject({
+    schemaVersion: 18,
+    migratesFrom: [15],
+  });
+  if (!candidate) throw new Error("The signed release was not discovered.");
+  expect(blockedReason(program, candidate)).toBeNull();
+
+  execFileSync(process.execPath, [
+    "scripts/migrate-state.mjs",
+    "--apply",
+    "--data",
+    data,
+  ]);
+  const migrated = new Database(path, { readonly: true });
+  expect(migrated.pragma("user_version", { simple: true })).toBe(18);
+  expect(migrated.prepare("SELECT name FROM applications").get()).toEqual({
+    name: "Kept app",
+  });
+  expect(
+    migrated.prepare("SELECT native_session_id FROM conversations").get(),
+  ).toEqual({ native_session_id: "native-1" });
+  migrated.close();
+  expect([history, credentials].map((file) => readFileSync(file))).toEqual(
+    preserved,
+  );
+});
 
 it("upgrades a schema-15 database without rewriting anything in it, and leaves the original for rollback", () => {
   const path = join(root, "hallvi.db");
