@@ -250,6 +250,38 @@ live database deleted; now restoring:
   live database back at schema 15 | integrity ok
 ```
 
+## A second review, and two more refusals that were not refusals
+
+**A restore the migrator rejected was carried out anyway.** `install.sh` fell
+through to copying the same file over the database by hand. That path was
+meant for "no program left to run the migrator with"; it was also taken when
+the migrator ran and said no, which installed exactly what had just been
+rejected.
+
+Reproduced with a backup whose manifest claims schema 15 and whose file is
+4 KB of sevens, over live records at schema 18:
+
+```
+The copy in …/migrations/bad could not be opened (file is not a database).
+Nothing was changed; the records are as they are.
+The copy of your records was refused, so it was not put back. Your records
+are as the upgrade left them, and the copy is at …/migrations/bad
+
+live records after the installer: schema 18 | THE-LIVE-RECORDS
+the copy is still there: 4096 bytes
+```
+
+A refusal is now a hard stop, and **the hand copy is gone entirely**. With the
+refusal handled, the only case left for it was "no Hallvi on this machine can
+check the copy" — and the one thing it could do there is put a file nobody
+checked over the records. Recovery now says where the copy is and stops. The
+installer is shorter for it.
+
+**Rollback continued when Hallvi could not be confirmed stopped.** Cleanup
+warned and then replaced the program directory anyway, which turns one failed
+upgrade into two broken installations. It now keeps both versions and says
+where each is, and does not touch the records either.
+
 ## What this does not establish
 
 - **The updater's own discovery path was not exercised across a schema change.**
