@@ -1,56 +1,51 @@
-# The persistent development environment
+# The development environment
 
-One Hallvi, running on the owner's MacBook, with a few applications that are
-really deployed and stay deployed between tasks. Use it instead of building a
-fresh fixture whenever the question is about the product rather than about a
-clean start.
+Development is `npm ci` and `npm run dev`, like any other project. What makes
+this checkout worth having is what `npm run dev` opens: four applications that
+are really deployed, with the conversations, records, credentials and
+connections they were deployed with, kept between tasks.
 
 Fixtures made and thrown away inside a single task can only ever show that a
-new database works. What this environment is for is the rest: an application
-whose identity, conversation and data are older than the code now running, so
-an upgrade that quietly drops one of them is visible rather than theoretical.
-
-It is development infrastructure. It is not the owner's installation, and
-nothing here touches that one.
+new database works. This keeps the other half — an application whose identity,
+conversation and data are older than the code now running, so an upgrade that
+quietly drops one of them is visible rather than theoretical.
 
 |  |  |
 | --- | --- |
+| Start it | `npm ci && npm run dev` in the designated checkout |
 | Open it | <http://127.0.0.1:5147> |
-| Everything it has | `~/.local/share/hallvi-dev` |
-| The command | `node scripts/dev-instance.mjs <command>`, from any checkout |
-| Cost | EUR 5.99/month, one Hetzner cx23 shared by every application |
+| Its records | `~/.local/share/hallvi-dev/state` |
+| Backups | `~/.local/share/hallvi-dev/backups` |
+| What it costs | EUR 5.99/month, one Hetzner cx23 shared by every application |
 
-[The four stores and who owns each](architecture/development-environment.md).
+[Where the records live, and which of them travel](architecture/development-environment.md).
 
-## Look first
+## The designated checkout
 
-```sh
-node scripts/dev-instance.mjs status
-```
-
-It prints where the state is, which revision the program checkout has and
-whether that is the baseline, the schema the database holds, the applications
-it should have and whether they are there, and who currently holds a claim.
-
-`status` is a reading, taken now. **Persistent** here means retained until
-somebody retires it deliberately — not monitored, and not guaranteed to be up.
-If it matters that everything is answering, run the check:
+One checkout opens the retained state, and it opens it because of four lines
+in its `.env.local` — a file git ignores, which is the point. A worktree made
+for a task has no such file and keeps its own throwaway `.hallvi` beside the
+source, which is also the point: attaching every temporary checkout to the
+shared database by default is how four live applications would acquire a
+second writer nobody meant to start.
 
 ```sh
-node scripts/dev-instance.mjs smoke
+# .env.local, in the designated checkout only
+HALLVI_DB_PATH=~/.local/share/hallvi-dev/state/hallvi.db
+HALLVI_CONFIG_DIR=~/.local/share/hallvi-dev/state/config
+HALLVI_PI_CONFIG_DIR=~/.config/hallvi/pi
+PORT=5147
 ```
 
-That checks the recorded controller process and asks it and each deployed
-application for an HTTP answer, naming whatever did not give one. It does not
-prove that application data or a background worker survived a change; inspect
-the sample data and conversations for that.
+Write the paths out in full; `~` is not expanded here. The third line is not
+optional bookkeeping: a controller directory named without it would take the
+ChatGPT connection with it and ask the owner to sign in again. The fourth is
+read by `next dev` itself, so the address stays the one people know.
 
-If the controller is not running, start it — it is an ordinary background
-process, not a service:
-
-```sh
-node scripts/dev-instance.mjs start
-```
+Nothing else changes. `npm run dev` starts the same three processes it always
+did — the interface, the Pi worker that carries its conversations, and a
+Drizzle Studio on the same database — and the **Database** link in the
+application top bar opens that Studio.
 
 ## What is deployed, and what each one is for
 
@@ -66,59 +61,40 @@ its own port, behind the Caddy already on that host.
 
 They are also a scenario rather than four unrelated deployments: Uptime Kuma
 watches whoami and Miniflux, so its monitor list is itself a statement about
-whether the environment is up, and those monitors are among the data an upgrade
-has to carry.
-
-Paperless is deliberately restrained to fit this host: one task worker, one
-thread, and no Tika or Gotenberg. If you need those, that is a conversation
-about a bigger plan, not a change to make quietly.
+whether the environment is up.
 
 Each row's middle column is the specific thing to look at after an upgrade, a
 redeployment or a restore. A record that survived and data that survived are
 different claims, and this environment exists to keep them apart.
 
-Sign-in details were generated by Pi rather than typed in, which is what lets
-them be read back: open the application in Hallvi and look under **Environment
-Variables**.
+Paperless is deliberately restrained to fit this host: one task worker, one
+thread, and no Tika or Gotenberg. Sign-in details were generated by Pi rather
+than typed in, which is what lets them be read back: open the application and
+look under **Environment Variables**.
 
-## Changing something
+`~/.local/share/hallvi-dev/instance.json` registers which applications belong
+to this environment, what each exercises and where it answers.
 
-Reading changes nothing, so **inspection needs no claim**: open the interface,
-read conversations and records, click around, visit the deployed applications.
-Several people can do that at once.
+## Working on it with other people
 
-A change needs the scope it affects, and only that scope:
+There is no claim command and no lock file. These applications are mostly
+read: opening the interface, reading a conversation, clicking around, visiting
+a deployed application. Several people can do all of that at once.
 
-```sh
-node scripts/dev-instance.mjs claim v2 "checking the feed import"
-# ... do the work ...
-node scripts/dev-instance.mjs release v2
-```
+Changing one is worth a sentence to whoever else is working — say which
+application you are about to change, and say when you are done. That is the
+whole protocol, and it is proportionate to four sample applications on one
+host.
 
-| What you are doing | Claim |
-| --- | --- |
-| Asking one application's Pi to change that application | that application |
-| Upgrading the controller, migrating the schema, changing the shared host, Caddy or the firewall | `environment` |
+Two things are enforced rather than agreed, and they stay that way:
 
-`environment` conflicts with everything, because all four applications sit on
-one host behind one Caddy. Two tasks reconfiguring that at once is the failure
-this is here to prevent.
-
-Use the application's registered name (Miniflux is registered as `v2`) or its
-full ID. The command stores the ID, so a name and an ID cannot take separate
-claims on the same application. Claim changes are serialized; if a claim lock
-remains after a crashed command, verify the other command has ended before
-removing that exact `claims.lock` directory.
-
-If a task crashed holding a claim, `status` shows who held it and since when.
-Releasing someone else's claim is deliberate, never automatic:
-
-```sh
-node scripts/dev-instance.mjs release environment --force
-```
-
-Nothing expires on its own. A stale claim is a question for a person, and an
-answer a script invents would be wrong exactly when it mattered.
+- **One worker owns the records.** A second `npm run dev` against the same
+  state finds the worker lock held and steps aside instead of starting a rival
+  worker. That is runtime integrity, not coordination etiquette.
+- **The applications are registered as retained.** The server, its firewall,
+  its key and its addresses carry `sg-lifecycle=persistent` and
+  `sg-cleanup=retain` with no expiry, so the daily cleanup leaves them alone.
+  See [development resources](development-resources.md).
 
 ## When a disposable fixture is still the right thing
 
@@ -126,51 +102,37 @@ Keep using a fresh fixture, or a local stand-in, for:
 
 - deleting an application, destroying a host, or any recovery that has to
   start from real loss;
-- migrations that are meant to fail, and any incompatible-schema experiment;
+- migrations meant to fail, and any incompatible-schema experiment;
 - fault injection, firewall lockouts, filling a disk;
-- the automated suites. `npm test` and the browser tests stay deterministic and
-  offline; no test may depend on this environment being up.
+- the automated suites. `npm test` and the browser tests stay deterministic
+  and offline, and `.env.local` is loaded only by `npm run dev` and
+  `npm run worker`, so no test ever sees this database.
 
 The rule is short: if what you are proving is that something breaks, break a
 copy.
 
-## Upgrading it, and going back
+## Seeding
 
-The controller runs a pinned checkout at `~/.local/share/hallvi-dev/program`.
-The baseline is a revision known to work, recorded in `instance.json`; trying
-a candidate is a deliberate, claimed action.
+There is no seed command for this environment, deliberately. The retained data
+is the starting point, and a command that wrote sample rows into four live
+applications would be manufacturing history.
 
-```sh
-node scripts/dev-instance.mjs claim environment "trying <sha>"
-node scripts/dev-instance.mjs stop
-node scripts/dev-instance.mjs backup before-<sha>
+`npm run scenarios` remains what it was: it builds its **own** database from
+scratch under `tests/results/scenarios`, never reads `HALLVI_DB_PATH` and
+never opens this state. Use it for screenshots and UI work that wants invented
+records.
 
-cd ~/.local/share/hallvi-dev/program
-git fetch origin && git checkout <sha>
-npm ci && npm run build
+Starting `npm run dev` provisions nothing. It rents no server, redeploys
+nothing, and will not recreate an application somebody deleted on purpose — if
+one is missing, it is missing, and the register says what used to be there.
 
-node scripts/dev-instance.mjs start
-node scripts/dev-instance.mjs smoke
-```
+## Upgrading the records
 
-To go back, check out the baseline, build, and start again.
-
-Two things make this safe rather than hopeful:
-
-- **An older program cannot open a newer database.** `scripts/serve.mjs`
-  compares the schema it was built with against the one in the file, and stops
-  with both numbers and no write if they differ. `start` makes the same
-  comparison first, so the usual answer is a sentence rather than a crash.
-- **Reverting the code is not a database rollback.** If the candidate's schema
-  is newer, going back to the baseline needs the backup as well; the code alone
-  leaves a file the baseline refuses to open, which is the correct refusal.
-
-When a candidate does need a schema change, it runs the same migration an
-installation would — the same list, the same code, the same verified copy
-taken first. There is no separate development path:
+When a change alters how Hallvi stores anything, this environment is the
+acceptance test. It runs the same migration an installation would — the same
+list, the same code, the same verified copy taken first:
 
 ```sh
-cd ~/.local/share/hallvi-dev/program
 node scripts/migrate-state.mjs --plan  --data ~/.local/share/hallvi-dev/state
 node scripts/migrate-state.mjs --apply --data ~/.local/share/hallvi-dev/state
 ```
@@ -182,64 +144,33 @@ node scripts/migrate-state.mjs --apply --data ~/.local/share/hallvi-dev/state
 node scripts/migrate-state.mjs --restore <that directory>
 ```
 
-A transition that is not in
-[the list](../scripts/migrations.mjs) is refused, and the records are left
-exactly as they were.
+A transition that is not in [the list](../scripts/migrations.mjs) is refused,
+and the records are left exactly as they were. Add the transition to that
+list, run it here, and check that the four applications still open, still show
+their history and still hold their data.
 
-**If you change how Hallvi stores anything, this environment is your
-acceptance test.** Add the transition to that list, run it here, and check
-that the four applications still open, still show their history, and still
-hold their data.
+An older program will not open a newer database: `src/server/db.ts` compares
+the schema it was built with against the one in the file and refuses, which is
+why reverting code is not by itself a rollback.
 
-## Backups
+## Backups, and getting back
+
+Stop `npm run dev` first — a copy taken under a running worker would not agree
+with the conversations it is writing. Then copy the state directory:
 
 ```sh
-node scripts/dev-instance.mjs stop
-node scripts/dev-instance.mjs backup before-<whatever>
+cp -a ~/.local/share/hallvi-dev/state \
+      ~/.local/share/hallvi-dev/backups/$(date -u +%Y-%m-%dT%H-%M-%SZ)-<label>
 ```
 
-The controller has to be stopped: a copy taken under a running worker would not
-agree with the conversations it is writing.
-
-Closing any Hallvi tab first makes `stop` quick. With a page open the interface
-waits out a 30-second grace period on its live event stream before being
-killed; the worker exits immediately either way, and `stop` says which of them
-was still there. The database is copied through
-SQLite's own backup so a checkpoint mid-write cannot tear it, the conversations,
-credentials and configuration are copied beside it, and the copy is then opened
-and checked before the command says it succeeded. A copy that does not verify
-is deleted and the state is left alone.
-
-Restoring is the same move backwards: stop, then put a backup directory's
-contents back over `state/`. Each backup carries a `manifest.json` saying what
-schema it holds, how many applications, and which revision wrote it.
+A backup taken around a migration is made for you and verified, by
+`migrate-state.mjs --apply`, and that is the one to prefer when there is one.
 
 What a backup covers, and what it deliberately does not: it holds Hallvi's own
-four stores — the database, the conversations, the credentials and the
-connection configuration. **It does not hold the applications' own data.**
-Uptime Kuma's monitors and Miniflux's articles live on the host, and restoring
-this backup would bring back a controller describing data that is still, or no
-longer, there. Their own backups are the applications' own business.
-
-## When something is missing
-
-```sh
-node scripts/dev-instance.mjs bootstrap
-```
-
-Safe to run at any time, and it never invents anything. It makes the
-directories, keeps the port setting, repoints the applications' SSH keys at
-this environment's own copies if they were pointing at some worktree, and then
-says what is registered but absent.
-
-It will not redeploy a missing application. An application that is gone was
-either deleted on purpose or lost, and both deserve a sentence rather than a
-silent redeployment. Deploy it again through a conversation here, restore a
-backup, or say that it is meant to be gone:
-
-```sh
-node scripts/dev-instance.mjs forget <application id>
-```
+records — the database, the conversations, the credentials and the connection
+configuration. **It does not hold the applications' own data.** Uptime Kuma's
+monitors and Miniflux's articles live on the host; restoring this backup would
+bring back a controller describing data that is still, or no longer, there.
 
 ## Retention
 
@@ -248,3 +179,7 @@ inventory that [development resources](development-resources.md) describes. It
 does not inherit the 72-hour disposable lease, and the daily Dev Cleanup task
 leaves it alone. Retiring it is a deliberate act with its own evidence, not
 something an expiry does.
+
+"Persistent" means retained until somebody retires it deliberately — not
+monitored, and not guaranteed to be up. If it matters that everything is
+answering, open the four addresses above.
