@@ -154,7 +154,7 @@ export function connectionRows(facts: ConnectionFacts): ConnectionItem[] {
       // owner agreed to them on GitHub: saying so here is the only place the
       // two can be compared.
       note: facts.own.github.account
-        ? "The published Hallvi App holds read and write access to code and pull requests; this release only reads. Whether one application’s repository can be read is checked in its own conversation."
+        ? "The published Hallvi App holds read and write access to code and pull requests. Hallvi reads a repository, and writes only by opening a branch of its own and a pull request you review; it never writes to the branch you deploy from and never merges. Whether one application’s repository can be read is checked in its own conversation."
         : undefined,
       action: facts.own.github.account
         ? { kind: "link", href: "/setup/github", label: "Manage" }

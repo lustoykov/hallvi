@@ -28,7 +28,16 @@ import {
   retireInformation,
 } from "./saved-information";
 import { Type } from "typebox";
-import { PiWorkspace, piWorkspaceTools } from "./pi-workspace";
+import {
+  PiWorkspace,
+  canonicalCapturePath,
+  piWorkspaceTools,
+} from "./pi-workspace";
+import {
+  PROPOSAL_LIMITS,
+  normalizeProposalBranch,
+  proposeRepositoryChanges,
+} from "./github-proposal";
 import { applicationWorkspaceSource } from "./pi-workspace-source";
 import {
   executionContext,
@@ -68,6 +77,8 @@ For server preparation, inspect the repository first. Use hetzner_request to rea
 When no host is attached, do not send the owner to Settings, ask for a token or walk them through SSH in prose: inspect the repository, then call request_connection and end your turn. Its card offers both renting a Hetzner server and using a machine the owner already has, guides whichever they choose, verifies it on the controller, and a message tells you which was connected. A machine connected that way is already attached with its host key pinned against the fingerprint the owner pasted; connect_server remains for a Hetzner server you create, and for an owner who prefers to give you an address and SHA256 ED25519 host-key fingerprint themselves. Do not ask for passwords, private keys or controller file paths. Hetzner connections pin the SSH host key on first use at the provider-reported address; a supplied fingerprint is verified when available. An attached host proves SSH access, not application health.
 
 You have a repository workspace and, when connected, general Bash access to the application's server through server_bash. Choose the commands and scripts the task needs. Deployment, diagnosis and repair happen in this conversation. There is no release proposal or separate deployment planner to invoke.
+
+Some of what an application needs to run lives in its repository: a Dockerfile or Compose file, a start entrypoint, a health endpoint, a port read from the environment, a packaging or configuration fix. Make those in the workspace and, when the owner wants them kept, publish them with open_pull_request: it puts exactly the files you name on a branch of its own and opens a pull request against the branch the workspace copy came from. That is the whole of your code-writing scope — operability, not features and not general bug fixes — and everything else about the application still happens on the server. You never write to the branch the application deploys from, you never merge, and opening a pull request deploys nothing: the owner reviews and merges, and a merged change reaches the application through an ordinary release you run afterwards. Tell them the URL, the branch, what the change does and what you actually checked — a Compose file that validates is a file that validates, not an application that runs. If access is not enough, the tool says which of the three things is missing (a connected account, this repository inside the installation, or the write permissions GitHub grants it); pass that on instead of trying another route. If it reports a published branch without a pull request, say exactly that and ask again with the same branch name rather than starting another.
 
 Application access is private by default: accessible only from the PC running Hallvi through an SSH tunnel. Bind application/container published ports and any reverse proxy to server loopback (127.0.0.1 and, if needed, ::1); do not publish on all interfaces or open application HTTP/HTTPS firewall ports. Keep SSH reachable. Use open_server_port for the chosen server loopback port, then verify the application through that returned local URL and inspect IPv4/IPv6 listeners and firewall exposure. A tunnel alone does not make an already public service private. Give the local URL to the user and save it with the access mode and verification evidence; explain that it works on the controller PC while the tunnel is alive and can be reopened with open_server_port after disconnection/reboot. If this controller is on a different machine from the user's browser, explain that localhost refers to the controller and obtain their intended access arrangement. Only configure public application access, public domain/HTTPS ingress or public application firewall rules when the user explicitly requests public access. The owner does not need a domain to ask for it. When they ask for the application at its direct address and the server has a public IPv4 address, publish it at https://<that address with dashes for dots>.sslip.io (203.0.113.9 becomes 203-0-113-9.sslip.io): sslip.io is a public DNS service that answers such a name with the address inside it, so Caddy can obtain an ordinary certificate for it, which it cannot do for a bare IP address. Everything in the publishing procedure below applies unchanged, except that there is no DNS record to write; verify with check_public_access that the name resolves to the server before relying on it, and say plainly that the name depends on that third-party service while the private link does not. Never offer plain http://<address> as the public entry point: sign-in over it is unencrypted and applications that need a secure context break. When the attached host has a private-network address (10.x, 172.16-31.x, 192.168.x), a direct address means the machine's own address and port on the owner's network over plain HTTP, reachable only from that network; say so, open that port to the local subnet only, and do not describe it as public. These defaults do not alter the selected permission mode.
 
@@ -823,6 +834,59 @@ export async function openPiSession(
                     : `Whether ${params.expectAddress} answers on ${(params.ports ?? []).join(", ")}`,
                   params,
                   () => checkPublicAccess(params, signal ?? options.signal),
+                  false,
+                  id,
+                  signal,
+                ),
+              );
+            },
+          }),
+          defineTool({
+            name: "open_pull_request",
+            label: "Propose a change to the repository",
+            description:
+              "Publish files you changed in the repository workspace on a branch of their own and open a pull request for the owner to review and merge. Use it for the narrow changes that make an application run — a Dockerfile or Compose file, a start entrypoint, a health endpoint, an environment-driven port, a packaging or configuration fix — and not for application features or general bug fixes. Write the files in the workspace first with write or edit, then list exactly those paths here; anything you do not list stays in the workspace. paths are relative to the workspace root. branch is a short name for the change, such as \"add-dockerfile\"; reuse the same branch to add to work you already published rather than opening a second one. title and body are the pull request's, and body should say what the change does, why the deployment needed it and what you checked. The change is published against the exact revision this workspace was copied from, so the diff is the one you inspected. Nothing is merged and nothing is deployed: say so, give the owner the returned URL, and leave merging to them. A file the workspace holds only redacted, one that carries credential-shaped text, and build output are all refused with a reason; secrets belong in the application's environment, never in the repository.",
+            parameters: Type.Object({
+              paths: Type.Array(Type.String(), {
+                minItems: 1,
+                maxItems: PROPOSAL_LIMITS.paths,
+              }),
+              branch: Type.String(),
+              title: Type.String(),
+              body: Type.String(),
+            }),
+            async execute(id, params, signal) {
+              if (workspaceUnavailable)
+                throw new Error(
+                  `The repository workspace is unavailable, so there are no changes to publish. Reason: ${workspaceUnavailable}`,
+                );
+              // Normalized before the record is written, so what the owner is
+              // asked to approve names the branch and the files that will
+              // actually appear, in the spelling they will appear under.
+              const branch = normalizeProposalBranch(params.branch);
+              const paths = params.paths.map(canonicalCapturePath);
+              const captured = await builtinWorkspace.capture(
+                paths,
+                signal ?? options.signal,
+              );
+              if (!captured.provenance)
+                throw new Error(
+                  "This workspace has no repository revision behind it, so a change cannot be proposed from it. Check the application's GitHub access, then read the repository again.",
+                );
+              return json(
+                await execution.execute(
+                  "open_pull_request",
+                  `${captured.provenance.repository} · ${branch}`,
+                  { branch, paths, title: params.title },
+                  () =>
+                    proposeRepositoryChanges({
+                      provenance: captured.provenance!,
+                      files: captured.files,
+                      branch,
+                      title: params.title,
+                      body: params.body,
+                      signal: signal ?? options.signal,
+                    }),
                   false,
                   id,
                   signal,

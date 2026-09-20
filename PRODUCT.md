@@ -104,7 +104,7 @@ Use one representative application in each of the [three complexity tiers](docs/
 
 - It prepares both repository and host: Docker/Compose, process definitions, environment/secrets, required packages, storage and networking. It runs existing migrations and performs authorized releases, restarts and compatible rollbacks.
 - It surfaces application exceptions, wrong behavior and migration-code defects with impact, evidence and a copyable coding-agent handoff. The owner-merged fix returns through ordinary release verification.
-- A missing health endpoint, environment-driven port or start entrypoint can be proposed in a small operability PR. Business logic and general bug fixes remain outside its code-writing scope.
+- A missing health endpoint, environment-driven port or start entrypoint can be proposed in a small operability PR: Hallvi publishes the files it changed on a branch of its own and opens a pull request against the branch it read. It never writes to that branch, never merges, and opening a pull request deploys nothing — a merged change reaches the application through an ordinary release afterwards. Publishing is a change like any other and follows the [permission modes](#permission-modes); there is no separate publishing grant or approval flow. Business logic and general bug fixes remain outside its code-writing scope. [GitHub](docs/integrations/github.md#proposing-a-change) owns what the connection makes possible and what Hallvi actually does with it.
 
 **Product and development instructions stay separate.** Pi uses its own runtime
 instructions and the user's application request. Contributor files, local agent

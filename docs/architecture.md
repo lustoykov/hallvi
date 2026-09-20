@@ -67,7 +67,7 @@ output is large and append-only. And local diagnostics, under `diagnostics/`.
 
 ## What Pi can do
 
-Twenty-two tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
+Twenty-three tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
 engine behind them: Pi reads the repository, decides what to do and does it,
 and the tools are the only things that can reach outside.
 
@@ -84,6 +84,10 @@ and the tools are the only things that can reach outside.
   [Onboarding](design/onboarding.md) owns the design.
 - **Publishing.** `set_domain_record` writes one DNS record; `check_domain`
   and `check_public_access` ask the internet what it can see.
+- **The repository.** `open_pull_request` publishes the files Pi changed in the
+  workspace on a branch of their own and opens a pull request against the
+  branch the copy came from. It never writes to that branch and never merges.
+  [GitHub](integrations/github.md#proposing-a-change) owns the flow.
 - **Records.** `save_information` writes what Pi established;
   `search_information` reads it back; `get_application_status` is the current
   state on demand, rather than a summary injected into every reply.
@@ -338,6 +342,7 @@ Core source: [Pi runtime](../src/server/pi.ts),
 [record projection](../src/server/record-projection.ts),
 [saved information](../src/server/saved-information.ts),
 [publishing](../src/server/public-access.ts),
+[proposing a repository change](../src/server/github-proposal.ts),
 [private access](../src/server/private-access.ts),
 [secrets](../src/server/application-secrets.ts) and
 [controller protection](../src/server/controller-protection.ts).

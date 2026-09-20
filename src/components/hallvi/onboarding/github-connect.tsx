@@ -273,9 +273,11 @@ export function GithubConnect({
               <p className="hv-ob-fine">
                 Choose which repositories the App can access on GitHub. The
                 published Hallvi App requests read and write access to code and
-                pull requests. This connection check only reads; it does not
-                push changes or open a PR. Reading public repositories needs no
-                connection.
+                pull requests. Connecting only reads. Later, with your
+                permission, Hallvi can propose a deployment change by putting it
+                on a branch of its own and opening a pull request — never a
+                write to the branch you deploy from, and never a merge. Reading
+                public repositories needs no connection.
               </p>
             </>
           )}
@@ -353,9 +355,10 @@ export function GithubConnect({
         <Receipt plain={plain} title={`GitHub login saved for ${account}`}>
           <p>
             For the repositories you picked on GitHub. The published Hallvi App
-            requests read and write access to code and pull requests; this
-            release only reads. Whether a particular application can be read is
-            checked in its own conversation.
+            requests read and write access to code and pull requests: Hallvi
+            reads them, and writes only by opening a branch of its own and a
+            pull request you review. Whether a particular application can be
+            read is checked in its own conversation.
           </p>
           <p>
             <a

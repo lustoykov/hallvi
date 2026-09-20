@@ -37,6 +37,16 @@ export async function applicationWorkspaceSource(
     throw new Error("GitHub did not identify the default branch revision.");
   const snapshot = await fetchBaseTree(repository, commit.sha, token, signal);
   return {
+    // What a proposed change is published against: the exact revision this
+    // copy was made from, not whatever the branch holds by the time Pi
+    // finishes working.
+    provenance: {
+      repository,
+      repositoryId: found.id,
+      branch,
+      commitSha: commit.sha,
+      omitted: snapshot.omitted.map((file) => file.path),
+    },
     description:
       `${repository}@${commit.sha}, the ${branch} branch when this request started; repository snapshot for this request` +
       // A missing path must not read as a path that is not in the repository.

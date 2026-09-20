@@ -144,6 +144,27 @@ describe.skipIf(process.env.HALLVI_DOCKER_TESTS !== "1")(
             .soft(await run("bash", { command: "wc -c < large.txt" }))
             .toContain("200000");
 
+          // Capture reads the copy's own files, and nothing a link points at:
+          // Docker resolves `escape/passwd` before it answers, so the folders
+          // on the way have to be folders the copy really holds.
+          await run("bash", {
+            command: "chmod +x scripts/check.sh && ln -s /etc escape",
+          });
+          const captured = await workspace.capture([
+            "scripts/check.sh",
+            "absent.txt",
+          ]);
+          expect
+            .soft(captured.files.get("scripts/check.sh"))
+            .toMatchObject({ executable: true });
+          expect.soft(captured.files.get("absent.txt")).toBeNull();
+          await expect(workspace.capture(["escape/passwd"])).rejects.toThrow(
+            /not a folder inside the workspace/,
+          );
+          await expect(workspace.capture(["src"])).rejects.toThrow(
+            /not a regular file in the workspace/,
+          );
+
           // Not the controller: no host files, credentials, socket or network.
           const isolation = await run("bash", {
             command: `test ! -e ${controllerFile} && test ! -e /var/run/docker.sock && echo isolated; env | grep -q HALLVI_PROBE_TOKEN || echo no-credentials; node -e 'process.exit(Object.values(require("node:os").networkInterfaces()).flat().some(a => !a.internal) ? 1 : 0)' && echo no-external-address`,

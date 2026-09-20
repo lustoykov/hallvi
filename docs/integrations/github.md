@@ -1,8 +1,16 @@
 # GitHub connection
 
-This is the GitHub connection and repository-access reference. Hallvi reads repositories; it does not write to them or open pull requests. The [product boundary](../../PRODUCT.md#operating-boundary) limits any future application-code proposal to narrow operability changes the owner merges.
+This is the GitHub connection and repository-access reference.
 
-Repository access uses an explicitly chosen installation-wide connection; application records and repository evidence remain scoped to the application. Schema 14 retired the publication workflow and its per-application publishing grants; their records remain as read-only history, and branches or pull requests it opened on GitHub are left as they are.
+Three separate things decide what Hallvi can do with a repository, and they are easy to confuse:
+
+1. **Which repositories the installation reaches.** The owner chooses them on GitHub when they install the App, and can change the selection at any time. Hallvi never widens it.
+2. **What GitHub grants the App there.** `hallvi-app` asks for **Contents: read and write**, **Pull requests: read and write** and **Metadata: read**. The token is a real write credential for the selected repositories; it is not technically restricted to pull requests.
+3. **What Hallvi does with it.** It reads the repository to work out how the application is deployed, and it writes only by publishing a branch of its own and opening a pull request against the branch the copy came from. It never writes to that branch, never merges, and opening a pull request deploys nothing. Each publish is a change like any other and follows the application's [permission mode](../../PRODUCT.md#permission-modes).
+
+The [product boundary](../../PRODUCT.md#operating-boundary) limits what those changes may contain: narrow operability changes — packaging, configuration, a start entrypoint, a health endpoint, an environment-driven port — which the owner reviews and merges. Business logic and general bug fixes stay outside it.
+
+Repository access uses an explicitly chosen installation-wide connection; application records and repository evidence remain scoped to the application. Schema 14 retired the old publication workflow and its per-application publishing grants; their records remain as read-only history, and branches or pull requests it opened on GitHub are left as they are. What replaced it has no preparation phase, no publication state, no separate grant and no queue: [proposing a change](#proposing-a-change) is one tool call inside the conversation.
 
 ## One GitHub App connection
 
@@ -14,7 +22,7 @@ Legacy response fields are compatibility details, not a second supported login m
 
 The release distributor configures **one** Hallvi GitHub App. An end user
 connects their own GitHub account to that App and chooses which repositories
-it may read; they do not register an App, paste a token or edit environment
+it may reach; they do not register an App, paste a token or edit environment
 files. GitHub states that a private App can only be installed by its owning
 account, while an App set to **Any account** can be installed by other users.
 [GitHub visibility rules](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/making-a-github-app-public-or-private).
@@ -38,11 +46,13 @@ permissions before including it in a candidate:
 3. Disable webhooks. The published Hallvi App requests **Contents: Read &
    write**, **Pull requests: Read & write** and mandatory **Metadata: Read**
    (verified through GitHub’s public App API on 20 September 2026). Keep other
-   permissions unset and let users select repositories. These grants are
-   broader than this release’s repository-reading integration: PR publishing
-   is not implemented in this release. Consent must disclose the write grants;
-   neither read-only inspection nor an intended branch-and-PR workflow makes
-   the credential technically read-only. Device flow needs no private key.
+   permissions unset and let users select repositories. These are the grants
+   [proposing a change](#proposing-a-change) needs: a branch and a pull
+   request. Consent must disclose them as write grants; neither read-only
+   inspection nor a branch-and-PR workflow makes the credential technically
+   read-only. A release whose App grants Contents read only still reads
+   repositories; proposing a change then fails naming the missing permission.
+   Device flow needs no private key.
 4. Review the public client ID and slug. `npm run package` writes the
    published App's values to `dist/github-app.json`; a fork sets both
    `HALLVI_RELEASE_GITHUB_CLIENT_ID` and `HALLVI_RELEASE_GITHUB_APP_SLUG` to
@@ -80,6 +90,61 @@ Public repositories need neither GitHub step.
 
 The device flow exchanges the public client ID and device code for a user access token; no App secret is required. Keep private keys/client secrets out of the distributed app, git and browser. A real installation and device sign-in were verified without generating either. GitHub's own [user access-token documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app) describes the supported flow and expiration.
 
+## Proposing a change
+
+`open_pull_request` publishes files Pi changed in the repository workspace and
+opens a pull request for the owner. It exists because some of what an
+application needs to run lives in its repository, and a change Hallvi makes
+only in its disposable copy is lost when the copy goes.
+
+```mermaid
+flowchart LR
+  W["Repository workspace<br/>copy of owner/name@sha"] -->|"capture the named paths"| C["Controller"]
+  C -->|"App user token, this module only"| G["GitHub API"]
+  G --> B["Branch hallvi/…<br/>commit parented on that sha"]
+  B --> P["Pull request into the branch<br/>the copy came from"]
+  P -.->|"owner reviews and merges"| M["Default branch"]
+  M -.->|"a release Pi runs afterwards"| A["Application host"]
+```
+
+The workspace is a folder holding a copy of one commit, not a Git checkout, so
+nothing inside it knows where it came from and there is no remote to push to.
+The revision travels beside the copy and the commit is assembled through
+GitHub's git data API — blob, tree on top of that exact commit's tree, commit,
+ref, pull request — which is what makes the published diff the diff Pi
+inspected even when the branch has moved on meanwhile. If the default branch
+has been renamed or replaced since the copy was taken, the publish is refused
+rather than silently rebased onto something else.
+
+- The branch always starts `hallvi/`, so it can never be the branch the
+  application deploys from. Merging is the owner's.
+- Only the paths Pi names are published, each under the one spelling the
+  workspace reads it by, so `./config.yml` cannot slip past a check made
+  against `config.yml`. A path the copy holds only redacted, one whose current
+  contents are credential-shaped, build output and installed dependencies are
+  each refused with the reason. Files are not deleted. A file whose bytes
+  already match but whose executable bit does not is still a change: making an
+  entrypoint executable is often the fix. In a repository too large for GitHub
+  to list in one response that bit cannot be read, and the path is reported as
+  left out rather than called unchanged.
+- Asked again with the same branch, it commits on top of the work already
+  there and returns the pull request already open for it rather than a second
+  one. That branch has to be Hallvi's own: one that does not continue the
+  revision this work is based on, or that carries a commit Hallvi did not
+  publish, is refused by name rather than committed onto.
+- When the push succeeds and the pull request does not, the result says so and
+  names the branch and commit, so the owner can find the work and a retry does
+  not duplicate it.
+- The token stays inside `src/server/github-proposal.ts`. It reaches no shell,
+  no Git remote, no commit, no branch name, no pull request and no execution
+  record; what leaves is a URL and a list of paths.
+
+Access is three separate failures with three separate recoveries: no connected
+account, this repository not inside the installation, or the installation
+without **Contents: read and write** / **Pull requests: read and write**. The
+tool names which one it met. A repository the owner cannot write to would need
+a fork of their own; Hallvi says so and does not create one.
+
 ## Automatic checks after reconnecting
 
 After either login path succeeds in Settings, the page shows **Checking repository…** and sends a same-origin POST with the newly saved connection ID. Hallvi checks each existing application's repository and shows the individual results with links back to the applications. This uses the GitHub adapter directly, not Pi or another model call.
@@ -116,7 +181,12 @@ Repository access counts only a passing Observation from the **currently selecte
 
 ## Verification
 
-`tests/application/integration/github-setup.test.ts` exercises the real coordinator, connection files, route boundary and repository adapter against synthetic provider responses. `tests/application/unit/github-api.test.ts` tests request/error handling without real tokens or network requests. `tests/browser/github.spec.ts` covers consent, device cancellation/denial/success, disconnect/reconnect, the application's repository notice and permission recovery with **Check again** in a disposable desktop app.
+`tests/application/integration/github-setup.test.ts` exercises the real coordinator, connection files, route boundary and repository adapter against synthetic provider responses. `tests/application/unit/github-api.test.ts` tests request/error handling without real tokens or network requests. `tests/application/integration/github-proposal.test.ts` runs a real workspace
+and Pi's real file tools against an in-memory GitHub, and covers the published
+diff and its parent revision, the untouched default branch, refusing a redacted
+or credential-carrying file, naming the missing installation permission, and
+the retry after a pull request that did not open.
+`tests/browser/github.spec.ts` covers consent, device cancellation/denial/success, disconnect/reconnect, the application's repository notice and permission recovery with **Check again** in a disposable desktop app.
 
 The browser fixture replaces only GitHub's API/credential boundary. The real GitHub setup routes, coordinator, domain code and SQLite run in the fixture. Pi and ChatGPT login use their existing synthetic adapters. CI never authorizes a real account. Earlier local/live evidence is recorded in the [archived acceptance guide](https://github.com/lustoykov/hallvi/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md#latest-verification).
 

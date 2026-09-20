@@ -15,6 +15,12 @@ const mocks = vi.hoisted(() => ({
   publicKey: vi.fn(),
   connect: vi.fn(),
   tunnel: vi.fn(),
+  capture: vi.fn(),
+  propose: vi.fn(),
+}));
+vi.mock("../../../src/server/github-proposal", async (original) => ({
+  ...(await original<object>()),
+  proposeRepositoryChanges: mocks.propose,
 }));
 vi.mock("../../../src/server/hetzner", () => ({
   hetzner: mocks.provider,
@@ -63,6 +69,7 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
     dispose = mocks.dispose;
     unavailable = mocks.unavailable;
     prompt = mocks.workspacePrompt;
+    capture = mocks.capture;
   },
 }));
 import { openPiSession, describePiFailure } from "../../../src/server/pi";
@@ -116,6 +123,18 @@ beforeEach(() => {
     work(() => {}),
   );
   mocks.host.mockResolvedValue({ output: "Linux", exitCode: 0 });
+  mocks.capture.mockResolvedValue({
+    provenance: {
+      repository: "qa/app",
+      branch: "main",
+      commitSha: "a",
+      omitted: [],
+    },
+    files: new Map([
+      ["Dockerfile", { content: Buffer.from("x"), executable: false }],
+    ]),
+  });
+  mocks.propose.mockResolvedValue({ status: "opened" });
 });
 /** A tool as the harness calls it. */
 const call = (name: string, id: string, args: unknown) =>
@@ -203,6 +222,37 @@ it("a declined file mutation never reaches the workspace", async () => {
     await call("write", "call", { path: "file", content: "hello" }),
   ).toMatchObject({ content: [{ text: '{"declined":true}' }] });
   expect(mocks.workspace).not.toHaveBeenCalled();
+});
+it("proposing a change to the repository goes through the permission boundary, and a decline never reaches GitHub", async () => {
+  await openPiSession(scope);
+  await call("open_pull_request", "call", {
+    paths: ["Dockerfile"],
+    branch: "Add Dockerfile!",
+    title: "Add a Dockerfile",
+    body: "why",
+  });
+  // The branch the owner is asked to approve is the branch that gets made.
+  expect(mocks.execute).toHaveBeenCalledWith(
+    "open_pull_request",
+    "qa/app · hallvi/add-dockerfile",
+    expect.objectContaining({ branch: "hallvi/add-dockerfile" }),
+    expect.any(Function),
+    false,
+    "call",
+    undefined,
+  );
+  expect(mocks.propose).toHaveBeenCalledOnce();
+
+  mocks.execute.mockResolvedValue({ declined: true });
+  expect(
+    await call("open_pull_request", "declined", {
+      paths: ["Dockerfile"],
+      branch: "add-dockerfile",
+      title: "Add a Dockerfile",
+      body: "why",
+    }),
+  ).toMatchObject({ content: [{ text: '{"declined":true}' }] });
+  expect(mocks.propose).toHaveBeenCalledOnce();
 });
 it("releases the history when the session cannot be opened, without leaking why", async () => {
   mocks.create.mockRejectedValue(new Error("Secret bearer token"));
