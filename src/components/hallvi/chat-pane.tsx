@@ -49,6 +49,7 @@ import {
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import { useConnectionRequests } from "./onboarding/connection-requests";
+import { GithubConnect } from "./onboarding/github-connect";
 import {
   JourneyRail,
   READ_REPOSITORY_MESSAGE,
@@ -226,7 +227,12 @@ export function ChatPane({
   highlight,
   reachable,
   workerAlive,
+  checkingRepository = false,
+  onCheckRepository,
 }: {
+  /** The repository check the owner asked for is still running. */
+  checkingRepository?: boolean;
+  onCheckRepository?: () => void;
   view: OperatorView;
   activeChat: Chat | null;
   busy: string | null;
@@ -477,6 +483,25 @@ export function ChatPane({
   const showFirstWelcome =
     firstConversation && !requestPending && pendingMessage === null;
 
+  /**
+   * A repository Hallvi cannot read is a request in this conversation, not a
+   * strip above it. In an untouched conversation the welcome says it first and
+   * the card opens when asked for; anywhere else the card is simply there.
+   * Once opened it stays for the visit, so it can fold into its receipt.
+   */
+  const [repositoryOpen, setRepositoryOpen] = useState(false);
+  const access = application && secretsHere ? view.repository : undefined;
+  const unread = access && access.status !== "passed" ? access : null;
+  const repositoryName = application
+    ? `${application.repositoryOwner}/${application.repositoryName}`
+    : "";
+  const repositoryCard =
+    access && onCheckRepository && !archived
+      ? unread
+        ? !showFirstWelcome || repositoryOpen
+        : repositoryOpen
+      : false;
+
   const stopLabel =
     waiting.length > 0 ? `Stop + cancel ${waiting.length} waiting` : "Stop";
   return (
@@ -510,6 +535,21 @@ export function ChatPane({
               waitingOnYou={secrets.some((secret) => !secret.establishedAt)}
               placement="welcome"
               canStart={piReady && !busy && !requestPending && Boolean(onTell)}
+              repository={
+                unread && onCheckRepository
+                  ? {
+                      name: repositoryName,
+                      status:
+                        unread.status === "blocked" ? "blocked" : "not-yet",
+                      connected: unread.connected,
+                      signIn: unread.signIn,
+                      open: repositoryOpen,
+                      checking: checkingRepository,
+                      onOpen: () => setRepositoryOpen(true),
+                      onCheck: onCheckRepository,
+                    }
+                  : undefined
+              }
               connectHref={
                 !piReady && chatId
                   ? `/setup/pi?application=${view.application.id}&chat=${chatId}&onboarding=1`
@@ -849,6 +889,17 @@ export function ChatPane({
           )}
 
           {connections.rest}
+          {repositoryCard && access && onCheckRepository && (
+            <GithubConnect
+              repository={repositoryName}
+              access={access}
+              checking={checkingRepository}
+              onCheck={onCheckRepository}
+              onClose={
+                showFirstWelcome ? () => setRepositoryOpen(false) : undefined
+              }
+            />
+          )}
           {error && application && (
             <div className="hv-error" role="alert">
               {error}

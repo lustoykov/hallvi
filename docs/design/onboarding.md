@@ -64,7 +64,22 @@ flowchart TD
    the form. Adding checks repository access; it does not imply that Pi has
    read its contents. The layout fits narrow windows, including the form and
    action. GitHub remains a quiet link for private repositories, and the typed
-   address is kept across that trip. Approval behavior is explained briefly
+   address is kept across that trip.
+
+   A repository Hallvi cannot read is a request in the conversation
+   (`github-connect.tsx`), not a strip above it. In an untouched conversation
+   the welcome says it first, in one sentence with the one action that state
+   allows, and never offers **Read repository** beside it; when ChatGPT is
+   missing too, the two are two lines and only the first is blue. The card
+   keeps three things apart because they fail apart: whether this release can
+   sign in to GitHub, whether an account is signed in, and whether that
+   account's chosen repositories include this one. "Not found" is reported as
+   what GitHub said, never as proof the repository is private, and a check
+   that has not run is grey and only offers to run. Sign-in is the existing
+   device flow; a cancelled, declined or expired code says nothing was saved
+   and offers a new one. Finishing folds the card into a receipt and starts
+   nothing. Chosen from a switchable prototype; the options and the verdict
+   are on the `prototype/guided-setup` branch. Approval behavior is explained briefly
    in plain language; its detailed control stays in the conversation.
 
    Before the first message, an app-specific introduction says what Hallvi

@@ -41,6 +41,50 @@ export interface JourneyFacts {
   opens: boolean;
 }
 
+/** What the welcome needs to know about a repository it cannot read yet. */
+export interface WelcomeRepository {
+  /** "owner/name". */
+  name: string;
+  status: "blocked" | "not-yet";
+  /** A GitHub account is signed in. */
+  connected: boolean;
+  /** This release can sign in to GitHub at all. */
+  signIn: boolean;
+  /** The card is open in the transcript below. */
+  open: boolean;
+  checking: boolean;
+  onOpen: () => void;
+  onCheck: () => void;
+}
+
+/** One sentence and one action. Never an action this release cannot take. */
+function repositorySays(repository: WelcomeRepository) {
+  const { name } = repository;
+  if (repository.status === "not-yet")
+    return {
+      says: `I haven’t been able to check ${name} yet.`,
+      action: repository.checking ? "Checking…" : "Check repository",
+      run: repository.onCheck,
+    };
+  if (repository.connected)
+    return {
+      says: `Hallvi has a GitHub login saved, but couldn’t read ${name}. Check its address and repository access.`,
+      action: "Choose repositories",
+      run: repository.onOpen,
+    };
+  if (repository.signIn)
+    return {
+      says: `I couldn’t open ${name}. If it’s private, connecting GitHub lets me in.`,
+      action: "Connect GitHub",
+      run: repository.onOpen,
+    };
+  return {
+    says: `I couldn’t open ${name}, and this Hallvi release can’t sign in to GitHub. Public repositories still work.`,
+    action: null,
+    run: repository.onOpen,
+  };
+}
+
 const STOPS = [
   { id: "read", label: "Read it" },
   { id: "place", label: "A place to run" },
@@ -56,6 +100,7 @@ export function JourneyRail({
   canStart,
   onStart,
   connectHref,
+  repository,
 }: {
   application: string;
   facts: JourneyFacts;
@@ -67,6 +112,8 @@ export function JourneyRail({
   canStart?: boolean;
   onStart?: () => void;
   connectHref?: string;
+  /** The repository cannot be read yet; the welcome says so instead. */
+  repository?: WelcomeRepository;
 }) {
   const done = [facts.read, facts.placed, facts.deployed, facts.opens];
   // A later stop proves the earlier ones, however the records arrived.
@@ -77,32 +124,94 @@ export function JourneyRail({
   const [dances, setDances] = useState(0);
   const needsYou = waitingOnYou || facts.placeWaiting;
 
-  if (placement === "welcome")
+  if (placement === "welcome") {
+    const mascot = (mood: "waving" | "ready") => (
+      <button
+        type="button"
+        className="hv-first-app-mascot hv-rail-mascot"
+        aria-label="Make Hallvi dance"
+        onClick={() => setDances((count) => count + 1)}
+      >
+        <Mascot
+          color="#7a8bd6"
+          mood={mood}
+          dance="shuffle"
+          danceRequest={dances}
+        />
+      </button>
+    );
+    // The request is open in the transcript: the welcome steps back to one
+    // line, so the blocker is said in one place.
+    if (repository?.open)
+      return (
+        <section className="hv-first-app" data-compact>
+          {mascot("ready")}
+          <div>
+            <h2>Let’s get to know {application}.</h2>
+            <p>
+              One thing first — it’s just below. Reading the repository is still
+              yours to start afterwards.
+            </p>
+          </div>
+        </section>
+      );
+    const unread = repository ? repositorySays(repository) : null;
     return (
       <section
         className="hv-first-app"
         aria-label="Get to know your application"
       >
-        <button
-          type="button"
-          className="hv-first-app-mascot hv-rail-mascot"
-          aria-label="Make Hallvi dance"
-          onClick={() => setDances((count) => count + 1)}
-        >
-          <Mascot
-            color="#7a8bd6"
-            mood="waving"
-            dance="shuffle"
-            danceRequest={dances}
-          />
-        </button>
+        {mascot(unread ? "ready" : "waving")}
         <div>
           <h2>Let’s get to know {application}.</h2>
           <p>
             I’ll read the repository and explain what it needs. Then we’ll
             choose where it runs.
           </p>
-          {connectHref ? (
+          {unread && connectHref ? (
+            // Both are missing. They are different things, so they are two
+            // lines, and only the first one is blue.
+            <ul className="hv-first-app-needs" aria-label="Before we start">
+              <li>
+                <span>
+                  <strong>A model to think with</strong>
+                  ChatGPT isn’t connected.
+                </span>
+                <Link className="hv-rail-start" href={connectHref}>
+                  Connect ChatGPT <ArrowRight aria-hidden="true" />
+                </Link>
+              </li>
+              <li>
+                <span>
+                  <strong>Open {repository!.name}</strong>
+                  {unread.says}
+                </span>
+                <button
+                  type="button"
+                  className="hv-first-app-quiet"
+                  disabled={repository!.checking}
+                  onClick={unread.run}
+                >
+                  {unread.action ?? "See why"}
+                </button>
+              </li>
+            </ul>
+          ) : unread ? (
+            <>
+              <p className="hv-first-app-next">{unread.says}</p>
+              <button
+                type="button"
+                className={
+                  unread.action ? "hv-rail-start" : "hv-first-app-quiet"
+                }
+                disabled={repository!.checking}
+                onClick={unread.run}
+              >
+                {unread.action ?? "See why"}{" "}
+                {unread.action && <ArrowRight aria-hidden="true" />}
+              </button>
+            </>
+          ) : connectHref ? (
             <>
               <p className="hv-first-app-next">
                 Connect ChatGPT so I can read {application}.
@@ -127,6 +236,7 @@ export function JourneyRail({
         </div>
       </section>
     );
+  }
 
   if (finished) return null;
 
