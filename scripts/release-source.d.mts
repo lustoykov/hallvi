@@ -45,10 +45,19 @@ export function installation(
       reason: string;
     };
 export function compareVersions(left: string, right: string): number;
+/** Only a caller that names a tag it already has can be told "that one". */
+export function discover(options: {
+  channel?: string;
+  source?: string;
+  env?: NodeJS.ProcessEnv;
+  known: string;
+  fetch?: typeof fetch;
+}): Promise<ReleaseCandidate | typeof UNCHANGED | null>;
 export function discover(options?: {
   channel?: string;
   source?: string;
   env?: NodeJS.ProcessEnv;
+  known?: null;
   fetch?: typeof fetch;
 }): Promise<ReleaseCandidate | null>;
 export function reopen(options: {

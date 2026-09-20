@@ -564,7 +564,10 @@ it("looks hourly, only in an installation, and only when a look is due", async (
     program: installed,
     data,
     home,
-    env: { HALLVI_RELEASE_SOURCE: "https://127.0.0.1:1/releases" },
+    env: {
+      ...process.env,
+      HALLVI_RELEASE_SOURCE: "https://127.0.0.1:1/releases",
+    },
   });
   expect(looked?.checkedAt).not.toBe(fresh.checkedAt);
   expect(looked?.error).toEqual(expect.any(String));
@@ -657,7 +660,7 @@ it("does not fetch a release it has already verified", async () => {
   // Told nothing, it fetches the listing and both assets and verifies them.
   const found = await discover({
     source: "https://example.com/releases",
-    env: { HALLVI_RELEASE_KEY: keyOf(key) },
+    env: { ...process.env, HALLVI_RELEASE_KEY: keyOf(key) },
     fetch: get as unknown as typeof fetch,
   });
   expect(found).not.toBe(UNCHANGED);
@@ -667,7 +670,7 @@ it("does not fetch a release it has already verified", async () => {
   asked.length = 0;
   const again = await discover({
     source: "https://example.com/releases",
-    env: { HALLVI_RELEASE_KEY: keyOf(key) },
+    env: { ...process.env, HALLVI_RELEASE_KEY: keyOf(key) },
     known: "v0.1.0-alpha.2",
     fetch: get as unknown as typeof fetch,
   });

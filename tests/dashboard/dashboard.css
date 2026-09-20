@@ -1740,3 +1740,89 @@ dialog .form-row {
   font-weight: 400;
   color: var(--ink);
 }
+
+/* Development and Releases: read-only surfaces, one fact per row. These pages
+   report rather than operate, so they use the same card and footnote
+   vocabulary as the rest and add no new colours. */
+.surface-list {
+  display: grid;
+  gap: 16px;
+}
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.surface h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+.facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.fact {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 8px 16px;
+  align-items: baseline;
+}
+.fact dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.fact dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fact dd .footnote {
+  display: block;
+  margin-top: 2px;
+}
+.surface ul.plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.surface ul.plain li {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.surface ul.plain li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.surface .warn,
+.surface .ok {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.surface .warn {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+.surface .ok {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.surface .actions {
+  margin-top: 14px;
+}
+
+/* A laptop split beside an editor, and a phone looking at a build. */
+@media (max-width: 720px) {
+  .fact {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .surface {
+    padding: 14px 16px;
+  }
+}

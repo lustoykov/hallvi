@@ -20,10 +20,114 @@ import {
 import { browserJourneys } from "../browser/journeys.ts";
 import { suiteGuides } from "./suite-guides.ts";
 import { guidePage, renderMarkdown } from "./markdown.ts";
+import { developmentState, releasesState } from "./development.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
-export const API_VERSION = 6;
+export const API_VERSION = 7;
+
+const REPOSITORY = "lustoykov/hallvi";
+
+/** `gh`, with fixed arguments, or the reason it could not run. */
+function gh(args: string[]) {
+  try {
+    return {
+      ok: true as const,
+      output: execFileSync("gh", args, {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 30_000,
+      }).trim(),
+    };
+  } catch (error) {
+    const said =
+      error && typeof error === "object" && "stderr" in error
+        ? String((error as { stderr: unknown }).stderr).trim()
+        : "";
+    return {
+      ok: false as const,
+      error:
+        said ||
+        (error instanceof Error ? error.message : "gh could not be run."),
+    };
+  }
+}
+
+/**
+ * Starts the existing release workflow for one version at one revision. It
+ * signs in as nobody: `gh` uses the login already on this machine, and no
+ * token is entered, stored or displayed here.
+ */
+function dispatchRelease(version: string, revision: string) {
+  const started = gh([
+    "workflow",
+    "run",
+    "release.yml",
+    "--repo",
+    REPOSITORY,
+    "--ref",
+    revision,
+    "-f",
+    `version=${version}`,
+    "-f",
+    "channel=alpha",
+  ]);
+  if (!started.ok) return { started: false, error: started.error };
+  // The run id is not returned by `workflow run`; the list is how the panel
+  // finds the run it just asked for.
+  const listed = gh([
+    "run",
+    "list",
+    "--repo",
+    REPOSITORY,
+    "--workflow",
+    "release.yml",
+    "--limit",
+    "1",
+    "--json",
+    "databaseId,url,status,headSha",
+  ]);
+  return {
+    started: true,
+    version,
+    revision,
+    run: listed.ok ? JSON.parse(listed.output)[0] : null,
+  };
+}
+
+/** Promotes a draft this repository already has. Nothing is rebuilt. */
+function publishRelease(tag: string) {
+  const drafts = gh([
+    "release",
+    "list",
+    "--repo",
+    REPOSITORY,
+    "--limit",
+    "20",
+    "--json",
+    "tagName,isDraft",
+  ]);
+  if (!drafts.ok) return { published: false, error: drafts.error };
+  const known = (
+    JSON.parse(drafts.output) as { tagName: string; isDraft: boolean }[]
+  ).some((release) => release.tagName === tag && release.isDraft);
+  if (!known)
+    return {
+      published: false,
+      error: `${tag} is not a draft release of ${REPOSITORY}.`,
+    };
+  const done = gh([
+    "release",
+    "edit",
+    tag,
+    "--repo",
+    REPOSITORY,
+    "--draft=false",
+  ]);
+  return done.ok
+    ? { published: true, tag }
+    : { published: false, error: done.error };
+}
 export const suites = [
   {
     id: "unit",
@@ -266,11 +370,23 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     try {
       if (
         request.method === "GET" &&
-        ["/", "/evals", "/about", "/dashboard.js", "/dashboard.css"].includes(
-          url.pathname,
-        )
+        [
+          "/",
+          "/evals",
+          "/about",
+          "/development",
+          "/releases",
+          "/dashboard.js",
+          "/dashboard.css",
+        ].includes(url.pathname)
       ) {
-        const name = ["/", "/evals", "/about"].includes(url.pathname)
+        const name = [
+          "/",
+          "/evals",
+          "/about",
+          "/development",
+          "/releases",
+        ].includes(url.pathname)
           ? "dashboard.html"
           : url.pathname.slice(1);
         response.setHeader(
@@ -336,6 +452,14 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         });
         return;
       }
+      if (request.method === "GET" && url.pathname === "/api/development") {
+        json({ apiVersion: API_VERSION, ...(await developmentState(root)) });
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/releases") {
+        json({ apiVersion: API_VERSION, ...(await releasesState(root)) });
+        return;
+      }
       if (
         request.method !== "POST" ||
         ![
@@ -344,6 +468,8 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           "/api/review/bulk",
           "/api/runs/archive",
           "/api/stop",
+          "/api/releases/build",
+          "/api/releases/publish",
         ].includes(url.pathname)
       ) {
         json({ error: "Not found" }, 404);
@@ -373,6 +499,29 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         json(start(body), 202);
         return;
       } // commandFor validates before any launch or artifact write.
+      if (url.pathname === "/api/releases/build") {
+        // A narrow wrapper: two validated values become fixed arguments to
+        // one known command. Nothing here builds a shell string, and the
+        // signing key stays where it is, in the workflow.
+        const input = z
+          .strictObject({
+            version: z.string().regex(/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?$/),
+            revision: z.string().regex(/^[0-9a-f]{40}$/),
+          })
+          .parse(body);
+        json(dispatchRelease(input.version, input.revision));
+        return;
+      }
+      if (url.pathname === "/api/releases/publish") {
+        // Publishing promotes the reviewed draft. It never rebuilds, and it
+        // never invents a tag: the tag has to be one gh already lists as a
+        // draft of this repository.
+        const input = z
+          .strictObject({ tag: z.string().regex(/^v[0-9A-Za-z.\-+]{1,60}$/) })
+          .parse(body);
+        json(publishRelease(input.tag));
+        return;
+      }
       if (url.pathname === "/api/runs/archive") {
         const input = z
           .strictObject({

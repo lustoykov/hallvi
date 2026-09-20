@@ -1038,10 +1038,338 @@ for (const button of document.querySelectorAll("[data-close]"))
 $("stop").addEventListener("click", () => {
   void api("/api/stop", {}).then(refresh).catch(failure);
 });
+
+// ------------------------------------------------ Development and Releases
+//
+// Both panels are read on demand rather than polled: nothing on them changes
+// by itself except a workflow run, and a dashboard that re-fetched `gh` every
+// 2.5 seconds would be rude to a laptop and to GitHub.
+
+const bytes = (n) =>
+  n == null
+    ? "unknown size"
+    : n >= 1e9
+      ? `${(n / 1e9).toFixed(2)} GB`
+      : n >= 1e6
+        ? `${Math.round(n / 1e6)} MB`
+        : `${Math.round(n / 1e3)} kB`;
+
+const when = (iso) => {
+  if (!iso) return "never";
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? "unknown" : at.toLocaleString();
+};
+
+function card(title, rows, extra = "") {
+  const body = rows
+    .filter(Boolean)
+    .map(
+      ([label, value, note]) =>
+        `<div class="fact"><dt>${label}</dt><dd>${value}${note ? `<span class="footnote">${note}</span>` : ""}</dd></div>`,
+    )
+    .join("");
+  return `<section class="surface"><h2>${title}</h2><dl class="facts">${body}</dl>${extra}</section>`;
+}
+
+const escape = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
+
+function renderDevelopment(state) {
+  const { checkout: here, running: live, records, applications } = state;
+  const serving = live.serving;
+  const mismatch =
+    state.sameRevision === false
+      ? `<p class="warn">The running Hallvi was built from ${escape((live.revision ?? "").slice(0, 9))}, not the ${escape(here.short ?? "")} in this checkout. Restart it to serve these files.</p>`
+      : state.sameCheckout === false
+        ? `<p class="warn">It is serving a different checkout from this dashboard: <code>${escape(serving?.path ?? "")}</code>${serving?.branch ? ` on <strong>${escape(serving.branch)}</strong> at <code>${escape(serving.short ?? "")}</code>` : ""}. The branch and revision above describe these files, not what is answering.</p>`
+        : "";
+  const edited = here.changed.length
+    ? `${here.changed.length} tracked file${here.changed.length === 1 ? "" : "s"} changed`
+    : "no tracked changes";
+
+  const where = card("This checkout", [
+    ["Path", `<code>${escape(here.path)}</code>`],
+    ["Branch", escape(here.branch ?? "detached")],
+    ["Revision", `<code>${escape(here.short ?? "unknown")}</code>`, edited],
+  ]);
+
+  const process = card(
+    "What is running",
+    [
+      [
+        "Address",
+        live.up
+          ? `<a href="${escape(live.address)}" target="_blank" rel="noreferrer">${escape(live.address)}</a>`
+          : `${escape(live.address)} — not answering`,
+      ],
+      live.up && [
+        "Serving",
+        serving
+          ? `<code>${escape(serving.path)}</code>`
+          : "could not be determined",
+        serving && state.sameCheckout ? "this checkout" : undefined,
+      ],
+      live.up &&
+        serving && [
+          "Its branch",
+          `${escape(serving.branch ?? "detached")} at <code>${escape(serving.short ?? "unknown")}</code>`,
+          serving.changed.length
+            ? `${serving.changed.length} tracked file${serving.changed.length === 1 ? "" : "s"} changed there`
+            : undefined,
+        ],
+      live.up && [
+        "Release identity",
+        live.revision
+          ? `<code>${escape(live.revision.slice(0, 9))}</code>${live.version ? ` · ${escape(live.version)}` : ""}`
+          : "none — a development run is not built from a release",
+      ],
+    ],
+    mismatch,
+  );
+
+  const store = records
+    ? card("Its records", [
+        [
+          "Database",
+          `<code>${escape(records.path)}</code>`,
+          "registered, not discovered",
+        ],
+        [
+          "Schema",
+          records.schema == null ? "unreadable" : String(records.schema),
+        ],
+        [
+          "Browse",
+          live.up
+            ? `<a href="${escape(records.browser)}" target="_blank" rel="noreferrer">open Hallvi</a> — the <strong>Database</strong> link in its top bar opens Drizzle Studio on this file`
+            : "start <code>npm run dev</code> to browse it",
+        ],
+      ])
+    : card("Its records", [
+        [
+          "Database",
+          "none registered",
+          "no development environment on this machine",
+        ],
+      ]);
+
+  const apps = applications.length
+    ? `<section class="surface"><h2>Sample applications</h2><p class="footnote">Deployed on ${escape(state.host?.address ?? "a shared host")}. Each keeps its own database there; Hallvi's records above are separate and local.</p><ul class="plain">${applications
+        .map(
+          (application) =>
+            `<li><strong>${escape(application.name)}</strong> <code>${escape(application.id.slice(0, 8))}</code><br><span class="footnote">${escape(application.exercises ?? "")}</span>${application.url ? `<br><a href="${escape(application.url)}" target="_blank" rel="noreferrer">${escape(application.url)}</a>` : ""}</li>`,
+        )
+        .join("")}</ul></section>`
+    : "";
+
+  const copies = state.backups.length
+    ? `<section class="surface"><h2>Copies</h2><ul class="plain">${state.backups
+        .map(
+          (backup) =>
+            `<li><code>${escape(backup.path.replace(/^.*hallvi-dev\//, ""))}</code><br><span class="footnote">${escape(backup.kind)} · ${escape(when(backup.takenAt))}</span></li>`,
+        )
+        .join("")}</ul></section>`
+    : `<section class="surface"><h2>Copies</h2><p class="footnote">None recorded yet.</p></section>`;
+
+  $("development-body").innerHTML = where + process + store + apps + copies;
+}
+
+function renderReleases(state) {
+  const here = state.checkout;
+  const transitions = state.migrations.length
+    ? state.migrations.map((step) => `${step.from} to ${step.to}`).join(", ")
+    : "none";
+
+  const what = card("What would be built", [
+    ["Version", escape(state.version ?? "unknown")],
+    [
+      "From revision",
+      `<code>${escape(here.revision ?? "unknown")}</code>`,
+      escape(here.branch ?? ""),
+    ],
+    ["Platforms", state.platforms.map(escape).join(" and ")],
+    [
+      "Schema",
+      `${escape(String(state.schema ?? "?"))}`,
+      `migrations it could carry out: ${escape(transitions)}`,
+    ],
+    [
+      "Local changes",
+      state.excludesLocalChanges
+        ? `${here.changed.length} changed file${here.changed.length === 1 ? "" : "s"} would <strong>not</strong> be in it`
+        : "none — the revision is what is on disk",
+      state.excludesLocalChanges
+        ? escape(here.changed.slice(0, 6).join(", "))
+        : undefined,
+    ],
+  ]);
+
+  const contents = state.built.length
+    ? state.built
+        .map((archive) => {
+          const boundary = archive.contents;
+          const leaks = boundary
+            ? boundary.absent.filter((rule) => rule.offenders.length)
+            : [];
+          const missing = boundary
+            ? boundary.present.filter((rule) => !rule.there)
+            : [];
+          const verdict = !boundary
+            ? `<p class="footnote">Could not read the archive.</p>`
+            : leaks.length || missing.length
+              ? `<p class="warn">${leaks
+                  .map(
+                    (rule) =>
+                      `${escape(rule.what)} — found ${escape(rule.offenders.join(", "))}`,
+                  )
+                  .concat(missing.map((rule) => `missing ${escape(rule.path)}`))
+                  .join("; ")}</p>`
+              : `<p class="ok">Checked against the built archive: ${boundary.absent.length} things that must not ship are absent, and ${boundary.present.length} that must ship are present.</p>`;
+          return card(
+            `Built: ${escape(archive.name)}${archive.stale ? " (older packaging)" : ""}`,
+            [
+              ["Size", escape(bytes(archive.size))],
+              ["Built", escape(when(archive.builtAt))],
+              [
+                "SHA-256",
+                archive.checksum
+                  ? `<code>${escape(archive.checksum.slice(0, 24))}…</code>`
+                  : "no checksum beside it",
+              ],
+              [
+                "Entries",
+                archive.entries == null ? "unknown" : String(archive.entries),
+              ],
+            ],
+            `${archive.stale ? `<p class="warn">This archive's name carries no platform, so it predates the current packaging. Build again before reading anything into the list below.</p>` : ""}${verdict}${boundary ? `<p class="footnote">${escape(boundary.shared)}</p>` : ""}`,
+          );
+        })
+        .join("")
+    : card("Contents, as planned", [
+        [
+          "Nothing built yet",
+          `The archive would carry ${state.plannedContents ? state.plannedContents.length : "the allowlisted"} paths from <code>scripts/package.mjs</code>, plus a pinned Node.js, the built interface and production dependencies.`,
+          "This is the plan, not a measurement. Build one to have its contents read from the archive itself.",
+        ],
+      ]);
+
+  const drafts = Array.isArray(state.releases) ? state.releases : [];
+  const draftRows = drafts.length
+    ? `<ul class="plain">${drafts
+        .map(
+          (release) =>
+            `<li><strong>${escape(release.tagName)}</strong> — ${release.isDraft ? "draft" : "published"}${release.isPrerelease ? " · prerelease" : ""}<br><span class="footnote">${escape(when(release.publishedAt ?? release.createdAt))}</span>${
+              release.isDraft
+                ? ` <button class="secondary small" type="button" data-publish="${escape(release.tagName)}">Review and publish</button>`
+                : ""
+            }</li>`,
+        )
+        .join("")}</ul>`
+    : `<p class="footnote">No releases yet.</p>`;
+
+  const runs = Array.isArray(state.runs) ? state.runs : [];
+  const runRows = runs.length
+    ? `<ul class="plain">${runs
+        .map(
+          (run) =>
+            `<li><a href="${escape(run.url)}" target="_blank" rel="noreferrer">run ${escape(run.databaseId)}</a> — ${escape(run.status)}${run.conclusion ? ` · ${escape(run.conclusion)}` : ""}<br><span class="footnote"><code>${escape(String(run.headSha ?? "").slice(0, 9))}</code> · ${escape(when(run.createdAt))}</span></li>`,
+        )
+        .join("")}</ul>`
+    : `<p class="footnote">No workflow runs yet.</p>`;
+
+  const actions = state.signedIn
+    ? `<div class="actions"><button id="build-release" class="primary" type="button">Build draft release</button></div>
+       <p class="footnote">Dispatches the existing workflow for version ${escape(state.version ?? "")} at <code>${escape((here.revision ?? "").slice(0, 9))}</code>. Signing stays in the workflow. Publishing promotes the reviewed draft without rebuilding it.</p>`
+    : `<p class="warn">Not signed in to GitHub. Run <code>gh auth login</code>; no token is entered here.</p>`;
+
+  $("releases-body").innerHTML =
+    what +
+    contents +
+    `<section class="surface"><h2>Releases</h2>${draftRows}</section>` +
+    `<section class="surface"><h2>Workflow runs</h2>${runRows}${actions}</section>`;
+}
+
+async function loadPanel(path, into, render) {
+  $(into).innerHTML = `<p class="footnote">Reading…</p>`;
+  try {
+    const response = await fetch(path, {
+      headers: { "X-Hallvi-Testing-Token": token },
+    });
+    if (!response.ok)
+      throw new Error((await response.json()).error ?? "unavailable");
+    render(await response.json());
+  } catch (error) {
+    $(into).innerHTML =
+      `<section class="surface"><p class="warn">${escape(error.message)}</p></section>`;
+  }
+}
+
+document.addEventListener("click", async (event) => {
+  const build = event.target.closest("#build-release");
+  if (build) {
+    build.disabled = true;
+    const current = await fetch("/api/releases", {
+      headers: { "X-Hallvi-Testing-Token": token },
+    }).then((response) => response.json());
+    const answer = await fetch("/api/releases/build", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Hallvi-Testing-Token": token,
+      },
+      body: JSON.stringify({
+        version: current.version,
+        revision: current.checkout.revision,
+      }),
+    }).then((response) => response.json());
+    if (!answer.started)
+      window.alert(answer.error ?? "The workflow did not start.");
+    await loadPanel("/api/releases", "releases-body", renderReleases);
+    return;
+  }
+  const publish = event.target.closest("[data-publish]");
+  if (!publish) return;
+  const tag = publish.dataset.publish;
+  if (
+    !window.confirm(
+      `Publish ${tag}? This promotes the draft's existing assets. Nothing is rebuilt.`,
+    )
+  )
+    return;
+  publish.disabled = true;
+  const answer = await fetch("/api/releases/publish", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Hallvi-Testing-Token": token,
+    },
+    body: JSON.stringify({ tag }),
+  }).then((response) => response.json());
+  if (!answer.published) window.alert(answer.error ?? "It was not published.");
+  await loadPanel("/api/releases", "releases-body", renderReleases);
+});
+
 // Two real URLs sharing one shell, so moving between them keeps unsaved notes.
 const pages = {
   "/": ["runs", "checks-link", "checks-title", "Run checks"],
   "/evals": ["reviews", "reviews-link", "reviews-title", "Eval runs"],
+  "/development": [
+    "development",
+    "development-link",
+    "development-title",
+    "Development",
+  ],
+  "/releases": ["releases", "releases-link", "releases-title", "Releases"],
   "/about": ["about", "about-link", "about-title", "How it works"],
 };
 function currentPage() {
@@ -1049,6 +1377,10 @@ function currentPage() {
 }
 function renderPage() {
   const [panel, link, , title] = currentPage();
+  if (panel === "development")
+    void loadPanel("/api/development", "development-body", renderDevelopment);
+  if (panel === "releases")
+    void loadPanel("/api/releases", "releases-body", renderReleases);
   for (const [name, id] of Object.values(pages)) {
     $(`${name}-panel`).hidden = name !== panel;
     if (id === link) $(id).setAttribute("aria-current", "page");
