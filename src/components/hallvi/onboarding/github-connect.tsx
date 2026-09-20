@@ -274,10 +274,10 @@ export function GithubConnect({
                 Choose which repositories the App can access on GitHub. The
                 published Hallvi App requests read and write access to code and
                 pull requests. Connecting only reads. Later, with your
-                permission, Hallvi can propose a deployment change by putting
-                it on a branch of its own and opening a pull request — never a
-                write to the branch you deploy from, and never a merge.
-                Reading public repositories needs no connection.
+                permission, Hallvi can propose a deployment change by putting it
+                on a branch of its own and opening a pull request — never a
+                write to the branch you deploy from, and never a merge. Reading
+                public repositories needs no connection.
               </p>
             </>
           )}

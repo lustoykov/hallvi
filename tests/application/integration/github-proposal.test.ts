@@ -51,6 +51,8 @@ type Fake = {
   defaultBranch: string;
   permissions: Record<string, string>;
   files: Map<string, string>;
+  /** Upstream paths the repository holds with the executable bit set. */
+  executable: Set<string>;
   refs: Map<string, string>;
   blobs: Map<string, Buffer>;
   trees: Map<string, Array<{ path: string; mode: string; sha: string }>>;
@@ -58,6 +60,8 @@ type Fake = {
   pulls: Array<{ number: number; head: string; base: string; title: string }>;
   /** Set to make the next pull-request creation fail. */
   refusePulls?: string;
+  /** Set when the repository is too large for GitHub to list in one go. */
+  truncatedTree?: boolean;
   calls: string[];
 };
 let github: Fake;
@@ -104,8 +108,19 @@ function answer(path: string, options?: { method?: string; body?: unknown }) {
   const compare = match(/^\/repos\/qa\/app\/compare\/([^.]+)\.\.\.(.+)$/);
   if (compare) {
     const [, from, to] = compare;
-    // Only commits this test made descend from BASE, and they all do.
-    return { status: from === to ? "identical" : "ahead" };
+    // Only commits this test made descend from BASE, and they all do; what
+    // the branch carries beyond the revision is what publishing looks at.
+    const carried: Array<{ commit: { message: string } }> = [];
+    for (let at = to; at !== from && github.commits.has(at);) {
+      const commit = github.commits.get(at)!;
+      carried.unshift({ commit: { message: commit.message } });
+      at = commit.parents[0];
+    }
+    return {
+      status: from === to ? "identical" : "ahead",
+      total_commits: carried.length,
+      commits: carried,
+    };
   }
   const contents = match(/^\/repos\/qa\/app\/contents\/(.+)\?ref=(.+)$/);
   if (contents) {
@@ -134,6 +149,25 @@ function answer(path: string, options?: { method?: string; body?: unknown }) {
           content: Buffer.from(upstream).toString("base64"),
           sha: sha(upstream),
         };
+  }
+  const listing = match(/^\/repos\/qa\/app\/git\/trees\/(.+)\?recursive=1$/);
+  if (listing) {
+    if (github.truncatedTree) return { truncated: true, tree: [] };
+    const known = github.commits.get(decodeURIComponent(listing[1]));
+    return {
+      truncated: false,
+      tree: known
+        ? (github.trees.get(known.tree) ?? []).map((entry) => ({
+            path: entry.path,
+            mode: entry.mode,
+            type: "blob",
+          }))
+        : [...github.files.keys()].map((path) => ({
+            path,
+            mode: github.executable.has(path) ? "100755" : "100644",
+            type: "blob",
+          })),
+    };
   }
   if (match(/^\/repos\/qa\/app\/commits\/(.+)$/))
     return { sha: github.refs.get(github.defaultBranch) ?? BASE };
@@ -186,8 +220,9 @@ function answer(path: string, options?: { method?: string; body?: unknown }) {
   }
   if (path.startsWith(`/repos/${repo}/pulls?`)) {
     const head = decodeURIComponent(path.split("head=")[1]).split(":")[1];
+    const into = decodeURIComponent(path.split("base=")[1].split("&")[0]);
     return github.pulls
-      .filter((pull) => pull.head === head)
+      .filter((pull) => pull.head === head && pull.base === into)
       .map((pull) => ({
         number: pull.number,
         html_url: `https://github.com/${repo}/pull/${pull.number}`,
@@ -223,7 +258,9 @@ beforeEach(() => {
       ["src/server.js", "const port = 3000;\n"],
       ["README.md", "# app\n"],
       ["config.yml", `token: ${secret}\n`],
+      ["deploy/run.sh", "#!/bin/sh\nnode src/server.js\n"],
     ]),
+    executable: new Set<string>(),
     refs: new Map([["main", BASE]]),
     blobs: new Map(),
     trees: new Map(),
@@ -257,7 +294,7 @@ function workspaceOver(chatId: string) {
       },
       files: [...github.files].map(([path, content]) => ({
         path,
-        mode: 0o644,
+        mode: github.executable.has(path) ? 0o755 : 0o644,
         content: Buffer.from(content),
       })),
     }),
@@ -443,5 +480,88 @@ it("will not publish against a branch other than the one the copy came from", as
     /copy was taken from main[\s\S]*default branch is now trunk/,
   );
   expect(github.calls.filter((call) => call.startsWith("POST"))).toEqual([]);
+  await workspace.dispose();
+}, 60_000);
+
+it("reads a path by one spelling, so a redacted file cannot be published under another", async () => {
+  const { workspace, run } = workspaceOver("spellings");
+  await run("write", { path: "Dockerfile", content: "FROM node:22-slim\n" });
+
+  // `./config.yml` is `config.yml`: the copy holds it redacted, and the
+  // refusal must not depend on how the path was typed.
+  const outcome = await propose(workspace, ["./config.yml", "src//server.js"]);
+  expect(outcome.status).toBe("no-changes");
+  expect(outcome.skipped).toEqual([
+    { path: "config.yml", reason: expect.stringContaining("[REDACTED]") },
+  ]);
+  expect(github.blobs.size).toBe(0);
+  expect(github.refs.size).toBe(1);
+
+  await expect(workspace.capture(["../outside.txt"])).rejects.toThrow(
+    /relative path to a file inside the workspace/,
+  );
+  await expect(workspace.capture([".git/config"])).rejects.toThrow(
+    /Git metadata/,
+  );
+  await workspace.dispose();
+}, 60_000);
+
+it("leaves a branch carrying somebody else's commits alone", async () => {
+  const { workspace, run } = workspaceOver("occupied");
+  await run("write", { path: "Dockerfile", content: "FROM node:22-slim\n" });
+  // A person wrote their own work under the name Pi happens to choose.
+  const theirs = sha("commit:theirs");
+  github.commits.set(theirs, {
+    tree: sha("tree:theirs"),
+    parents: [BASE],
+    message: "Try a Dockerfile of my own",
+  });
+  github.trees.set(sha("tree:theirs"), []);
+  github.refs.set("hallvi/add-dockerfile", theirs);
+
+  await expect(propose(workspace, ["Dockerfile"])).rejects.toThrow(
+    /carries commits Hallvi did not publish/,
+  );
+  expect(github.refs.get("hallvi/add-dockerfile")).toBe(theirs);
+  expect(github.calls.filter((call) => call.startsWith("POST"))).toEqual([]);
+  await workspace.dispose();
+}, 60_000);
+
+it("making an entrypoint executable is a change, not nothing", async () => {
+  const { workspace, run } = workspaceOver("executable");
+  expect(
+    await run("bash", { command: "chmod +x deploy/run.sh" }),
+  ).not.toMatchObject({ isError: true });
+
+  const outcome = await propose(workspace, ["deploy/run.sh"]);
+  expect(outcome).toMatchObject({ status: "opened" });
+  expect(outcome.changes).toEqual([
+    { path: "deploy/run.sh", change: "modified" },
+  ]);
+  expect(github.trees.get(github.commits.get(outcome.commit!)!.tree)).toEqual([
+    {
+      path: "deploy/run.sh",
+      mode: "100755",
+      sha: expect.any(String),
+      type: "blob",
+    },
+  ]);
+
+  // And the bit the repository already has is not a change on its own.
+  github.executable.add("deploy/run.sh");
+  const { workspace: second } = workspaceOver("executable-already");
+  const again = await propose(second, ["deploy/run.sh"], "keep-the-bit");
+  expect(again.status).toBe("no-changes");
+  await second.dispose();
+
+  // A repository GitHub will not list in one response cannot answer the
+  // question, and saying "nothing changed" would be a claim, not a fact.
+  github.truncatedTree = true;
+  const { workspace: third, run: runThird } = workspaceOver("executable-blind");
+  await runThird("bash", { command: "chmod +x deploy/run.sh" });
+  const blind = await propose(third, ["deploy/run.sh"], "cannot-tell");
+  expect(blind.status).toBe("no-changes");
+  expect(blind.skipped[0].reason).toContain("executable bit");
+  await third.dispose();
   await workspace.dispose();
 }, 60_000);

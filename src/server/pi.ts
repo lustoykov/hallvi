@@ -28,7 +28,11 @@ import {
   retireInformation,
 } from "./saved-information";
 import { Type } from "typebox";
-import { PiWorkspace, piWorkspaceTools } from "./pi-workspace";
+import {
+  PiWorkspace,
+  canonicalCapturePath,
+  piWorkspaceTools,
+} from "./pi-workspace";
 import {
   PROPOSAL_LIMITS,
   normalizeProposalBranch,
@@ -857,10 +861,12 @@ export async function openPiSession(
                   `The repository workspace is unavailable, so there are no changes to publish. Reason: ${workspaceUnavailable}`,
                 );
               // Normalized before the record is written, so what the owner is
-              // asked to approve names the branch that will actually appear.
+              // asked to approve names the branch and the files that will
+              // actually appear, in the spelling they will appear under.
               const branch = normalizeProposalBranch(params.branch);
+              const paths = params.paths.map(canonicalCapturePath);
               const captured = await builtinWorkspace.capture(
-                params.paths,
+                paths,
                 signal ?? options.signal,
               );
               if (!captured.provenance)
@@ -871,7 +877,7 @@ export async function openPiSession(
                 await execution.execute(
                   "open_pull_request",
                   `${captured.provenance.repository} · ${branch}`,
-                  { branch, paths: params.paths, title: params.title },
+                  { branch, paths, title: params.title },
                   () =>
                     proposeRepositoryChanges({
                       provenance: captured.provenance!,

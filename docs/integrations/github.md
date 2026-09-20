@@ -118,13 +118,20 @@ rather than silently rebased onto something else.
 
 - The branch always starts `hallvi/`, so it can never be the branch the
   application deploys from. Merging is the owner's.
-- Only the paths Pi names are published. A path the copy holds only redacted,
-  one whose current contents are credential-shaped, build output and installed
-  dependencies are each refused with the reason. Files are not deleted.
+- Only the paths Pi names are published, each under the one spelling the
+  workspace reads it by, so `./config.yml` cannot slip past a check made
+  against `config.yml`. A path the copy holds only redacted, one whose current
+  contents are credential-shaped, build output and installed dependencies are
+  each refused with the reason. Files are not deleted. A file whose bytes
+  already match but whose executable bit does not is still a change: making an
+  entrypoint executable is often the fix. In a repository too large for GitHub
+  to list in one response that bit cannot be read, and the path is reported as
+  left out rather than called unchanged.
 - Asked again with the same branch, it commits on top of the work already
-  there when that work descends from the same revision, and returns the pull
-  request already open for it rather than a second one. A branch that does not
-  continue that revision is refused by name.
+  there and returns the pull request already open for it rather than a second
+  one. That branch has to be Hallvi's own: one that does not continue the
+  revision this work is based on, or that carries a commit Hallvi did not
+  publish, is refused by name rather than committed onto.
 - When the push succeeds and the pull request does not, the result says so and
   names the branch and commit, so the owner can find the work and a retry does
   not duplicate it.

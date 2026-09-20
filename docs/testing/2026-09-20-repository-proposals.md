@@ -61,11 +61,14 @@ counted. It covers the published diff and its parent revision, build output
 and dependencies left out, the untouched default branch, a file the copy holds
 only redacted and a file a command left a credential in, an installation
 without write permission naming the missing permission and writing nothing, a
-default branch renamed since the copy was taken, and the retry after a pull
-request that did not open. `tests/application/unit/pi.test.ts` covers the tool
-going through the permission boundary and a decline reaching no GitHub call.
+default branch renamed since the copy was taken, the retry after a pull
+request that did not open, a path spelled `./config.yml` refused like
+`config.yml`, a branch carrying somebody else's commits left alone, and an
+entrypoint made executable published as a change.
+`tests/application/unit/pi.test.ts` covers the tool going through the
+permission boundary and a decline reaching no GitHub call.
 
-The whole application suite passes on Node 22 (959 tests, 3 opt-in skipped),
+The whole application suite passes on Node 22 (971 tests, 3 opt-in skipped),
 along with `npx tsc --noEmit`, `npm run lint` and `npm run format`.
 
 ## What this does not establish
@@ -76,7 +79,18 @@ along with `npx tsc --noEmit`, `npm run lint` and `npm run format`.
   owner's own installation to prove the message was not worth the disruption.
 - Nothing was built, deployed or merged. A pull request that opens is a pull
   request, not a working application.
-- The Docker workspace path was not exercised live; the direct workspace was.
+- The Docker workspace was not published from live; the direct workspace was.
+  A separate review did put the capture through a real container on 20
+  September 2026, against the Docker Engine's archive endpoint it reads: a
+  file answers with one entry named after it, a folder answers with the folder
+  and its children, and a link answers with a link header. Docker also
+  resolves a link before it answers, so `escape/passwd` through an
+  `escape -> /etc` left in the copy answered with one ordinary `passwd` — the
+  container's own file, under a name inside the workspace. A capture now takes
+  only the single entry named after the path, and every folder on the way has
+  to be a folder the copy really holds. That case is covered by
+  `tests/application/integration/pi-workspace.docker.test.ts`, which is opt-in
+  with `HALLVI_DOCKER_TESTS=1` and needs a local Docker Engine.
 - Publishing works only while the workspace that made the changes is still
   alive. A worker restart ends it, and the changes have to be made again.
 

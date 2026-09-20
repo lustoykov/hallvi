@@ -28,6 +28,8 @@ export const PROPOSAL_LIMITS = {
 } as const;
 
 const BRANCH_PREFIX = "hallvi/";
+/** In every commit this module makes, and in nobody else's. */
+const COMMIT_TRAILER = "Proposed by Hallvi from ";
 
 export interface ProposedChange {
   path: string;
@@ -259,13 +261,57 @@ export async function proposeRepositoryChanges(
         token,
         { signal },
       )
-    ).data as { status?: string };
+    ).data as {
+      status?: string;
+      total_commits?: number;
+      commits?: Array<{ commit?: { message?: string } }>;
+    };
     if (!["ahead", "identical"].includes(comparison.status ?? ""))
       throw new Error(
         `${branch} already exists in ${repository} and does not continue ${provenance.commitSha.slice(0, 8)}, the revision this work is based on. Publish under a different branch name, or look at that branch on GitHub first.`,
       );
+    // Continuing the same revision does not make the branch Hallvi's. Somebody
+    // may have written their own work under a name Pi happened to choose, and
+    // committing onto it would mix this change into theirs.
+    const carried = comparison.commits ?? [];
+    if (
+      carried.length !== (comparison.total_commits ?? carried.length) ||
+      carried.some((each) => !each.commit?.message?.includes(COMMIT_TRAILER))
+    )
+      throw new Error(
+        `${branch} already exists in ${repository} and carries commits Hallvi did not publish. Publish under a different branch name so that work is left as it is.`,
+      );
   }
   const parent = existingTip ?? provenance.commitSha;
+
+  // GitHub's contents endpoint does not say whether a file is executable, and
+  // making an entrypoint executable is a change even when its bytes are the
+  // same. The parent commit's tree says so, in one request, and only when a
+  // path turns out to be byte-identical. A tree too large to return whole
+  // says nothing, and undefined here means exactly that.
+  let parentModes: Map<string, string> | null | undefined;
+  const modeAt = async (path: string) => {
+    if (parentModes === undefined) {
+      const tree = (
+        await githubJson(
+          `/repos/${repository}/git/trees/${parent}?recursive=1`,
+          token,
+          { signal },
+        )
+      ).data as {
+        truncated?: boolean;
+        tree?: Array<{ path: string; mode: string; type: string }>;
+      };
+      parentModes = tree.truncated
+        ? null
+        : new Map(
+            (tree.tree ?? [])
+              .filter((entry) => entry.type === "blob")
+              .map((entry) => [entry.path, entry.mode]),
+          );
+    }
+    return parentModes?.get(path);
+  };
 
   const skipped: ProposalOutcome["skipped"] = [];
   const changes: ProposedChange[] = [];
@@ -318,8 +364,24 @@ export async function proposeRepositoryChanges(
       });
       continue;
     }
+    const mode = file.executable ? "100755" : "100644";
     const current = await contentAt(repository, path, parent, token, signal);
-    if (current && current.equals(content)) continue;
+    if (current && current.equals(content)) {
+      // Identical bytes are not always an identical file: making an entrypoint
+      // executable is the change. Calling it unchanged without having read
+      // the mode would be a claim nothing here can support, so an unreadable
+      // tree is reported instead of assumed away.
+      const known = await modeAt(path);
+      if (known === mode) continue;
+      if (known === undefined) {
+        skipped.push({
+          path,
+          reason:
+            "Its contents already match the repository's, and whether its executable bit does could not be read: GitHub would not list this repository's files in one response. Nothing was published for it rather than guessing either way.",
+        });
+        continue;
+      }
+    }
     total += content.length;
     if (total > PROPOSAL_LIMITS.totalBytes)
       throw new Error(
@@ -337,11 +399,7 @@ export async function proposeRepositoryChanges(
         `GitHub did not store the new contents of ${path}.`,
         "access",
       );
-    blobs.push({
-      path,
-      sha: blob.sha,
-      mode: file.executable ? "100755" : "100644",
-    });
+    blobs.push({ path, sha: blob.sha, mode });
     changes.push({ path, change: current ? "modified" : "added" });
   }
 
@@ -409,7 +467,7 @@ export async function proposeRepositoryChanges(
       signal,
       method: "POST",
       body: {
-        message: `${redactSecrets(request.title.trim()).text.slice(0, 72)}\n\nProposed by Hallvi from ${repository}@${provenance.commitSha}.`,
+        message: `${redactSecrets(request.title.trim()).text.slice(0, 72)}\n\n${COMMIT_TRAILER}${repository}@${provenance.commitSha}.`,
         tree: tree.sha,
         parents: [parent],
       },
@@ -477,7 +535,7 @@ async function pullRequestFor(options: {
   try {
     const open = (
       await githubJson(
-        `/repos/${repository}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}`,
+        `/repos/${repository}/pulls?state=open&base=${encodeURIComponent(base)}&head=${encodeURIComponent(`${owner}:${branch}`)}`,
         token,
         { signal },
       )

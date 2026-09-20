@@ -383,6 +383,27 @@ export interface WorkspaceSource {
   provenance?: WorkspaceProvenance;
 }
 
+/**
+ * What Docker says the path it answered about is a link to, `""` when it is
+ * not one, and `"unreadable"` when it did not say — which is not a confined
+ * path either, because nothing confirms it.
+ */
+function containerLinkTarget(
+  headers: Record<string, string | string[] | undefined>,
+) {
+  try {
+    const stat = JSON.parse(
+      Buffer.from(
+        String(headers["x-docker-container-path-stat"]),
+        "base64",
+      ).toString("utf8"),
+    ) as { linkTarget?: string };
+    return String(stat.linkTarget ?? "");
+  } catch {
+    return "unreadable";
+  }
+}
+
 /** One file as the workspace holds it now. */
 export interface CapturedFile {
   content: Buffer;
@@ -390,19 +411,34 @@ export interface CapturedFile {
   executable: boolean;
 }
 
-/** A path a capture may name: inside the copy, and not its git metadata. */
-export function capturablePathProblem(path: string) {
-  if (!path || path.length > 512)
-    return `"${path}" is not a usable path in the workspace.`;
+/**
+ * The one spelling a capture works with: inside the copy, not its git
+ * metadata, and with `./` and repeated slashes gone. Everything downstream
+ * matches paths exactly — the redacted list, the paths too large to carry,
+ * the credential paths, the tree GitHub is sent — so `./config.yml` and
+ * `config.yml` must not be able to be two different files. A path is brought
+ * to this form once, before it is approved, captured or published.
+ */
+export function canonicalCapturePath(path: string) {
+  const segments = path
+    .split("/")
+    .filter((segment) => segment.length > 0 && segment !== ".");
+  const canonical = segments.join("/");
   if (
+    !canonical ||
+    canonical.length > 512 ||
     path.startsWith("/") ||
-    /(^|\/)\.\.(\/|$)/.test(path) ||
-    path.endsWith("/")
+    path.endsWith("/") ||
+    segments.includes("..")
   )
-    return `"${path}" must be a relative path inside the workspace.`;
-  if (path === ".git" || path.startsWith(".git/"))
-    return "Git metadata is not part of the workspace copy and cannot be published.";
-  return null;
+    throw new Error(
+      `"${path}" must be a relative path to a file inside the workspace.`,
+    );
+  if (canonical === ".git" || canonical.startsWith(".git/"))
+    throw new Error(
+      "Git metadata is not part of the workspace copy and cannot be published.",
+    );
+  return canonical;
 }
 
 /**
@@ -916,10 +952,7 @@ export class PiWorkspace {
    * decides what that means; publishing does.
    */
   async capture(paths: readonly string[], signal?: AbortSignal) {
-    for (const path of paths) {
-      const problem = capturablePathProblem(path);
-      if (problem) throw new Error(problem);
-    }
+    const canonical = paths.map(canonicalCapturePath);
     const run = this.tail.then(async () => {
       if (this.closed)
         throw new Error(
@@ -935,7 +968,7 @@ export class PiWorkspace {
       await this.started;
       combined.throwIfAborted();
       const files = new Map<string, CapturedFile | null>();
-      for (const path of paths)
+      for (const path of canonical)
         files.set(
           path,
           this.isolation === "docker"
@@ -982,6 +1015,23 @@ export class PiWorkspace {
   private async captureFromContainer(
     path: string,
   ): Promise<CapturedFile | null> {
+    // Docker resolves a link before it answers, so `out/passwd` through an
+    // `out -> /etc` left in the copy would come back as one ordinary file
+    // named passwd. The direct workspace refuses that through realpath; here
+    // every folder on the way has to be a folder the copy really holds.
+    const folders = path.split("/").slice(0, -1);
+    for (let depth = 1; depth <= folders.length; depth++) {
+      const ancestor = folders.slice(0, depth).join("/");
+      const stat = await this.docker!.request(
+        `/containers/${this.container}/archive?path=${encodeURIComponent(`${containerPath}/${ancestor}`)}`,
+        { method: "HEAD", timeoutMs: 15_000 },
+      );
+      if (stat.status === 404) return null;
+      if (stat.status >= 400 || containerLinkTarget(stat.headers))
+        throw new Error(
+          `${ancestor} is not a folder inside the workspace, so ${path} cannot be read from it.`,
+        );
+    }
     const response = await this.docker!.request(
       `/containers/${this.container}/archive?path=${encodeURIComponent(`${containerPath}/${path}`)}`,
       { maxBytes: maxCaptureBytes + 64 * 1024, timeoutMs: 15_000 },
@@ -991,11 +1041,13 @@ export class PiWorkspace {
       throw new Error(
         `${path} could not be read from the workspace, or is larger than the ${Math.round(maxCaptureBytes / 1024)} KB a proposed change may carry.`,
       );
-    // readTar rejects links outright, so only a regular file comes back.
-    const file = readTar(response.body, { maxBytes: maxCaptureBytes }).find(
-      (entry) => entry.type === "file",
-    );
-    if (!file)
+    // Docker answers with the path itself: one entry named after it when it
+    // is a file, and the whole folder when it is a folder. Anything but that
+    // single entry would publish some other file under the name Pi asked for.
+    // readTar rejects a link outright, so what is left is a regular file.
+    const entries = readTar(response.body, { maxBytes: maxCaptureBytes });
+    const file = entries.length === 1 ? entries[0] : undefined;
+    if (!file || file.type !== "file" || file.path !== basename(path))
       throw new Error(`${path} is not a regular file in the workspace.`);
     return { content: file.content, executable: Boolean(file.mode & 0o111) };
   }
