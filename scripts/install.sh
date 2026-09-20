@@ -138,7 +138,12 @@ restore_records() {
       migrated=""
       return 0
     fi
-    break
+    # It read the copy and refused it. This is the only thing here that checks a
+    # backup against the schema it claims, so putting the same file into place by
+    # hand would install exactly what it just rejected. Leave both untouched and
+    # say where the copy is.
+    say "The copy of your records was refused, so it was not put back. Your records are as the upgrade left them, and the copy is at $migrated" >&2
+    return 0
   done
   # Nothing intact to run it with. A recovery that needs the program that
   # just failed is not one, so copy the file back by hand — staged and
@@ -159,11 +164,17 @@ cleanup() {
   # Nothing is replaced while anything might still be writing. This only
   # applies when there is something to undo: a failure before anything was
   # touched must leave a working service exactly as it found it.
+  recovery_stopped=yes
   if [ "$committed" = no ] && { [ -n "$migrated" ] || [ -n "$backup" ]; }; then
-    ensure_stopped || say "Hallvi could not be stopped for recovery." >&2
+    ensure_stopped || recovery_stopped=no
   fi
   restore_records
-  if [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
+  if [ "$recovery_stopped" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
+    # Swapping the program directory while something may still be writing to it
+    # turns one failed upgrade into two broken installations. Keep both versions
+    # and let a person decide.
+    say "Hallvi could not be stopped, so the program was left as it is. This version is at $home and the previous one is at $backup" >&2
+  elif [ "$committed" = no ] && [ -n "$backup" ] && [ -d "$backup" ]; then
     if [ -d "$home" ] && is_installation "$home"; then rm -rf "$home"; fi
     if [ ! -e "$home" ]; then
       mv "$backup" "$home"
