@@ -64,6 +64,17 @@ export interface Part {
   evidence: Evidence;
   /** Volumes: the part that mounts them. Private services: who calls them. */
   owner?: string;
+  /**
+   * Gates: whether this way in is open, or a port that refuses.
+   *
+   * The map draws both — a closed port is part of what is let in, and Security
+   * lists it — but only an open one is a gap in the wall, and only an open one
+   * may be counted as a door that is open. Read from the check Pi wrote, never
+   * from the application's own reach: `postgres` refusing from outside says
+   * nothing about how far the application can be reached from, and the two
+   * were the same sentence while the map only ever drew one door.
+   */
+  admits?: "open" | "refused" | "unknown";
   destination?: ApplicationSection;
   /** Parts with no state of their own (the controller) hide their tag. */
   quiet?: boolean;

@@ -98,6 +98,20 @@ const placer = (height: number) => ({
 });
 const { place, point } = placer(H);
 
+/**
+ * The firewall's wall: where it starts, where it stops, and the two doorways
+ * the journeys pass through. Those two are drawn whether or not a door has
+ * been recorded in them — they are the shape of the server's edge, not a
+ * claim about its rules, and the visit and the release cross the boundary
+ * through them either way.
+ */
+const WALL_TOP = 146;
+const WALL_BOTTOM = 510;
+const JOURNEY_DOORS: [number, number][] = [
+  [280, 320],
+  [362, 402],
+];
+
 const BOX: Record<string, Rect> = {
   source: { x: 24, y: 96, w: 172, h: 96 },
   controller: { x: 24, y: 264, w: 172, h: 84 },
@@ -122,6 +136,8 @@ const BOX: Record<string, Rect> = {
 
 interface Layout {
   rects: Record<string, Rect>;
+  /** The firewall, drawn around whatever doors this map has. */
+  wall: { wall: string; jamb: string };
   /** The canvas height this model needs, in the same units as the boxes. */
   height: number;
   legs: Record<JourneyId, string[][]>;
@@ -198,6 +214,25 @@ function layoutFor(model: ArchitectureModel): Layout {
       w: services.length > 1 ? BOX.private.w - 28 : BOX.svc.w,
       h: serviceRows[index].size,
     };
+  });
+  // Every door on record gets a place on the wall.
+  //
+  // Two of them keep the slots the design drew, because the journeys pass
+  // through them: the way a visit comes in, and the way Hallvi delivers. The
+  // rest stack up the wall above those, rather than landing on top of the
+  // first one and leaving React to report the duplicate key instead of the
+  // hidden port — which is what happened to `postgres` on 5432.
+  const gates = model.parts.filter(
+    (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
+  );
+  const spare = gates.filter(
+    (gate) => gate.id !== "gate:http" && gate.id !== "gate:ssh",
+  );
+  spare.forEach((gate, index) => {
+    // Upwards from above the visit's door, in the clear band between the
+    // server's header and the application.
+    const y = 228 - index * 44;
+    if (y >= WALL_TOP + 6) rects[gate.id] = { ...BOX.http, y, h: BOX.http.h };
   });
   // A monitor Pi recorded takes the place the placeholder would have had, so
   // "something is watching this" is visible rather than merely not-missing.
@@ -333,17 +368,53 @@ function layoutFor(model: ArchitectureModel): Layout {
   const wires = (Object.keys(legs) as JourneyId[]).flatMap((journey) =>
     legs[journey].flat().map((d) => ({ d, journey })),
   );
+  // The wall is solid except where something opens it. A port that refuses is
+  // still drawn — it is part of what is let in, and Security lists it — but
+  // it is not a gap: a closed port cut into the wall would say the opposite
+  // of what its own check says.
+  const openings = [
+    ...JOURNEY_DOORS,
+    ...spare
+      .filter((gate) => gate.admits === "open" && rects[gate.id])
+      .map(
+        (gate) =>
+          [rects[gate.id].y - 4, rects[gate.id].y + rects[gate.id].h + 4] as [
+            number,
+            number,
+          ],
+      ),
+  ].sort((a, b) => a[0] - b[0]);
+  const bottom = Math.max(WALL_BOTTOM, rects.server.y + rects.server.h - 22);
+  let cursor = WALL_TOP;
+  const segments: string[] = [];
+  for (const [from, to] of openings) {
+    if (from > cursor) segments.push(`M262 ${cursor}V${from}`);
+    cursor = Math.max(cursor, to);
+  }
+  if (bottom > cursor) segments.push(`M262 ${cursor}V${bottom}`);
+  const wall = {
+    wall: segments.join(""),
+    jamb: openings
+      .flatMap(([from, to]) => [`M255 ${from}H269`, `M255 ${to}H269`])
+      .join(""),
+  };
   const ids = (...values: (string | undefined)[]) =>
     values.filter((value): value is string => Boolean(value));
   return {
     rects,
+    wall,
     height,
     legs,
     wires,
     stops: {
       visit: ids(
         "controller",
-        "gate:http",
+        // A port that refuses is drawn, because it is part of what is let in
+        // — but a visit does not come through it, so it is not a stop on the
+        // way. Nobody having looked is not a refusal and stays on the path.
+        ...gates
+          .filter((gate) => gate.admits !== "refused")
+          .map((gate) => gate.id),
         "tls",
         "app",
         ...services.map((service) => service.id),
@@ -353,7 +424,7 @@ function layoutFor(model: ArchitectureModel): Layout {
       release: ids(
         "source",
         "controller",
-        "gate:ssh",
+        ...gates.filter((gate) => gate.id === "gate:ssh").map((g) => g.id),
         "host",
         "app",
         ...services.map((service) => service.id),
@@ -435,8 +506,16 @@ function iconFor(
     case "offsite":
       return <CloudArrowUp weight="duotone" />;
     case "gate":
+      // This door's own check first: a port that refuses is a shield whatever
+      // the application's reach is. Only when the door itself says nothing
+      // does the application's openness get a vote, and when that says
+      // nothing either it is a question mark rather than a claim.
       return part.id === "gate:ssh" ? (
         <Key weight="bold" />
+      ) : part.admits === "refused" ? (
+        <ShieldCheck weight="bold" />
+      ) : part.admits === "open" ? (
+        <Globe weight="bold" />
       ) : openness === "restricted" ? (
         <ShieldCheck weight="bold" />
       ) : openness === "public" ? (
@@ -586,7 +665,24 @@ function Port({
       type="button"
       className={`axj2-port${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${part.checking ? " is-checking" : ""}`}
       data-c={part.evidence.certainty}
-      style={place(rect)}
+      style={{
+        ...place(rect),
+        // The slot is the floor, not the ceiling: the pill grows to hold
+        // Pi's phrase — "anywhere", "the container network" — and stops
+        // short of whatever is actually beside it at that height, which is
+        // the application for the door a visit comes through and open
+        // canvas for the doors stacked above it.
+        width: undefined,
+        minWidth: pct(rect.w, W),
+        maxWidth: pct(
+          (rect.y < BOX.app.y + BOX.app.h && rect.y + rect.h > BOX.app.y
+            ? BOX.app.x
+            : BOX.private.x) -
+            rect.x -
+            8,
+          W,
+        ),
+      }}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(part.id);
@@ -599,16 +695,25 @@ function Port({
       <span className="axj2-port-text">
         <b>
           {part.name.replace("Port ", "")}
-          <small> · {part.id === "gate:ssh" ? "SSH" : "HTTP"}</small>
+          {/* The protocol only when the slot establishes it. It used to read
+              "HTTP" for every door that was not the SSH one, which labelled
+              443 and 5432 as HTTP because there were only ever two. */}
+          {part.id === "gate:ssh" && <small> · SSH</small>}
         </b>
         <em>
-          {part.id === "gate:ssh"
-            ? "Hallvi"
-            : model.openness === "restricted"
-              ? "your network"
-              : model.openness === "public"
-                ? "anyone"
-                : "not read back"}
+          {/* Where this port admits from, in Pi's words. The application's
+              own reach answers a different question, and answering with it
+              had a refused database port reading "anyone". */}
+          {part.facts.find((fact) => fact.label === "sources")?.value ??
+            (part.id === "gate:ssh"
+              ? "Hallvi"
+              : part.admits === "refused"
+                ? "refused from outside"
+                : model.openness === "restricted"
+                  ? "your network"
+                  : model.openness === "public"
+                    ? "anyone"
+                    : "not read back")}
         </em>
       </span>
     </button>
@@ -946,6 +1051,9 @@ export function JourneyDirection({
 
   const onPath = new Set(layout.stops[journey]);
   const services = model.parts.filter((part) => part.kind === "private");
+  const gates = model.parts.filter(
+    (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
+  );
   const volumes = model.parts.filter((part) => part.kind === "volume");
   const monitoringGap = model.gaps.find((gap) => gap.id === "monitoring");
   // The model owns what the ghost's state is — unassessed is not absent —
@@ -1137,14 +1245,8 @@ export function JourneyDirection({
               </filter>
             </defs>
             {/* The firewall: a wall of blocks, open only where a door is. */}
-            <path
-              className="axj2-wall"
-              d="M262 146V280M262 320V362M262 402V510"
-            />
-            <path
-              className="axj2-jamb"
-              d="M255 280H269M255 320H269M255 362H269M255 402H269"
-            />
+            <path className="axj2-wall" d={layout.wall.wall} />
+            <path className="axj2-jamb" d={layout.wall.jamb} />
             {layout.wires.map((wire) => (
               <path
                 key={`base:${wire.d}`}
@@ -1221,23 +1323,30 @@ export function JourneyDirection({
           <span className="axj2-wall-label" style={point(276, 151)}>
             Firewall ·{" "}
             {(() => {
-              // Count what the map draws rather than assuming two.
-              const doors = model.parts.filter(
-                (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
-              ).length;
               // No door drawn is not a count of zero: it means the rules
               // have not been drawn, which is a different thing from none.
-              if (!doors) return "rules not drawn";
-              const named = doors === 1 ? "one door" : `${doors} doors`;
+              if (!gates.length) return "rules not drawn";
+              // Each door's own check, never the application's reach. A
+              // database port that refuses from outside was being counted
+              // among the doors that are open, which is the map saying the
+              // opposite of the check printed on the card beside it.
+              const shut = gates.filter(
+                (gate) => gate.admits === "refused",
+              ).length;
+              const open = gates.length - shut;
+              const named = (count: number) =>
+                count === 1 ? "one door" : `${count} doors`;
+              if (shut && open) return `${open} open, ${shut} refused`;
+              if (shut) return `${named(shut)}, refused`;
               return model.openness === "restricted"
-                ? `only ${named} open`
+                ? `only ${named(open)} open`
                 : model.openness === "public"
-                  ? `${named} open`
-                  : `${named} on record`;
+                  ? `${named(open)} open`
+                  : `${named(open)} on record`;
             })()}
           </span>
-          {(["gate:http", "gate:ssh"] as const).map((id) =>
-            model.byId[id] ? (
+          {gates.map(({ id }) =>
+            layout.rects[id] ? (
               <Port
                 key={id}
                 part={model.byId[id]}
