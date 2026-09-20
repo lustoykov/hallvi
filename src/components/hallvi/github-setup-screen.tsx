@@ -261,6 +261,11 @@ export function GithubSetupScreen({
             aria-labelledby="github-account-heading"
           >
             <h2 id="github-account-heading">GitHub account</h2>
+            <p className={s.hint}>
+              The published Hallvi App requests read and write access to code
+              and pull requests in the repositories you select on GitHub.
+              Connecting only checks access; it does not change your repository.
+            </p>
             {working && attempt ? (
               <div className={s.device}>
                 {connected && status.connection && (
@@ -598,10 +603,11 @@ export function GithubSetupScreen({
         </p>
         <h3>Permissions</h3>
         <p>
-          The GitHub App limits access to installed repositories and its granted
-          permissions. Repository inspection is read-only. Publishing a
-          preparation branch and pull request also requires your permission
-          within Hallvi.
+          Choose which repositories the App can access on GitHub. The published
+          Hallvi App requests read and write access to code and pull requests.
+          Repository checks only read; connecting does not push changes, open a
+          PR or start a deployment. This release does not yet provide PR
+          publishing.
         </p>
         <h3>Disconnect</h3>
         <p>

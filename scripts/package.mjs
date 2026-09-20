@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 const NODE_VERSION = "22.23.2";
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 // Hallvi's published GitHub App (github.com/apps/hallvi-app): device flow,
-// read-only contents, no secret and no callback. Both values are public, and
+// no secret and no callback. Both values are public, and
 // shipping them is what lets an ordinary user press Connect GitHub instead of
 // registering an App of their own. A fork names its own App in the environment.
 const releaseApp = {

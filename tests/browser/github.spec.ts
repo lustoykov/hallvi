@@ -70,6 +70,9 @@ test(
     await expect(
       page.getByRole("heading", { name: "Storage & privacy" }),
     ).toBeVisible();
+    await expect(page.locator("#github-storage")).toContainText(
+      "read and write access to code and pull requests",
+    );
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Disconnect", exact: true }).click();
     await page
@@ -313,15 +316,13 @@ test(
     const welcome = page.getByRole("region", {
       name: "Get to know your application",
     });
-    await expect(welcome).toContainText(
-      "isn’t among the repositories you picked for Hallvi",
-    );
+    await expect(welcome).toContainText("couldn’t read qa/github-permissions");
     await expect(
       welcome.getByRole("button", { name: "Read repository" }),
     ).toHaveCount(0);
     await welcome.getByRole("button", { name: "Choose repositories" }).click();
     const card = page.getByRole("region", { name: "Repository access" });
-    await expect(card).toContainText("Signed in as qa-fixture-user");
+    await expect(card).toContainText("Login saved for qa-fixture-user");
     await expect(card).toContainText("read access");
     await card
       .getByRole("button", { name: "Check again", exact: true })
@@ -417,5 +418,85 @@ test(
     expect(JSON.parse(readFileSync(connectionPath, "utf8")).id).not.toBe(
       old.id,
     );
+  },
+);
+
+test(
+  "GitHub sign-in in the conversation discloses permissions and preserves the draft",
+  journey("github-connection"),
+  async ({ page, fixture }, testInfo) => {
+    test.setTimeout(90_000);
+    const scenario = (login: string) =>
+      writeFileSync(
+        join(fixture.state, "github-scenario.json"),
+        JSON.stringify({ repository: "private", login }),
+      );
+    expect(
+      (
+        await page.request.delete("/api/github/setup", {
+          data: { confirm: "disconnect" },
+        })
+      ).ok(),
+    ).toBe(true);
+    scenario("pending");
+    const response = await page.request.post("/api/applications", {
+      data: {
+        repositoryUrl: "https://github.com/qa/inline-consent",
+        requestKey: crypto.randomUUID(),
+      },
+    });
+    expect(response.ok()).toBe(true);
+    const before = await response.json();
+    expect(before.repository.status).toBe("blocked");
+    const path = `/applications/${before.application.id}`;
+    await page.goto(path);
+    await openConversation(page);
+    const draft = "Read this after I connect GitHub.";
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    await composer.fill(draft);
+    await page
+      .getByRole("region", { name: "Get to know your application" })
+      .getByRole("button", { name: "Connect GitHub", exact: true })
+      .click();
+    const card = page.getByRole("region", {
+      name: "Connect GitHub",
+      exact: true,
+    });
+    await expect(card).toContainText(
+      "read and write access to code and pull requests",
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("inline-github-consent-desktop.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: testInfo.outputPath("inline-github-consent-mobile.png"),
+      fullPage: true,
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.setViewportSize({ width: 1193, height: 900 });
+    await card
+      .getByRole("button", { name: "Connect GitHub", exact: true })
+      .click();
+    await expect(card.getByText("ABCD-1234", { exact: true })).toBeVisible();
+    await card.getByRole("button", { name: "Cancel sign-in" }).click();
+    await expect(card).toContainText("Sign-in cancelled");
+    expect(
+      (await (await page.request.get("/api/github/setup")).json()).connection,
+    ).toBeNull();
+    scenario("success");
+    await card.getByRole("button", { name: "Get a new code" }).click();
+    await expect(
+      page.getByText("can read qa/inline-consent", { exact: false }),
+    ).toBeVisible();
+    await expect(composer).toHaveValue(draft);
+    const after = await (await page.request.get(`/api${path}`)).json();
+    expect(after.repository.status).toBe("passed");
+    expect(after.messages).toEqual(before.messages);
   },
 );
