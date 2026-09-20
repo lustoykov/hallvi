@@ -257,8 +257,9 @@ supported platform.
 
 ## Checks
 
-`npm test` (981 passing, 3 skipped), `npm run lint`, `npx tsc --noEmit` and
-`npm run build`, all on the branch tip, locally on Node.js 22.23.2.
+`npm test` (992 passing, 3 skipped), `npm run lint`, `npx tsc --noEmit` and
+`npm run build`, on the branch tip with `main` merged in, locally on
+Node.js 22.23.2.
 
 GitHub Actions has run nothing in this repository since 12 September, so the
 `Hallvi checks` workflow did not run on this branch and the new release
