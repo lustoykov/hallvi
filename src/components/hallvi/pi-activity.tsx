@@ -78,6 +78,11 @@ const kinds: { test: RegExp; kind: Kind; verb: string }[] = [
   },
   { test: /^server_public_key$/, kind: "read", verb: "Read the managed key" },
   { test: /^request_approval$/, kind: "asked", verb: "Asked you about" },
+  {
+    test: /^open_pull_request$/,
+    kind: "called",
+    verb: "Proposed a change to",
+  },
 ];
 
 const icons: Record<Kind, typeof FileText> = {

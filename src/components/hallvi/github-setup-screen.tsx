@@ -451,7 +451,7 @@ export function GithubSetupScreen({
             <h2>Repository access</h2>
             <p className={s.hint}>
               {status.connection?.mode === "app"
-                ? "Choose which repositories Hallvi can read on GitHub. Existing applications are checked automatically after reconnecting."
+                ? "Choose on GitHub which repositories Hallvi may reach. Existing applications are checked automatically after reconnecting."
                 : connected
                   ? "Existing applications are checked automatically after reconnecting. New applications are checked when you add them."
                   : "Connect an account to check repository access for your applications."}
@@ -596,10 +596,17 @@ export function GithubSetupScreen({
         </p>
         <h3>Permissions</h3>
         <p>
-          The GitHub App limits access to installed repositories and its granted
-          permissions. Repository inspection is read-only. Publishing a
-          preparation branch and pull request also requires your permission
-          within Hallvi.
+          You choose on GitHub which repositories this App may reach. In those,
+          GitHub grants it read and write access to contents and pull requests —
+          a real write credential, not one GitHub restricts to pull requests.
+        </p>
+        <p>
+          What Hallvi does with it is narrower. It reads a repository to work
+          out how your application is deployed, and it writes only by putting a
+          change on a branch of its own and opening a pull request. It never
+          writes to the branch you deploy from and never merges; opening a pull
+          request deploys nothing. Each one follows the application’s permission
+          mode, like any other change.
         </p>
         <h3>Disconnect</h3>
         <p>

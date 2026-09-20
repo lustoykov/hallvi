@@ -125,13 +125,26 @@ const installationSchema = z.object({
   suspended_at: z.string().nullable(),
 });
 
-async function verifyInstallation(
+export type GithubInstallation = z.infer<typeof installationSchema>;
+
+/**
+ * The App installation in this repository's owning account that lists this
+ * exact repository, or null when there is none. It reports what GitHub
+ * granted and judges nothing: reading needs `contents: read`, publishing
+ * needs `contents: write` and `pull_requests: write`, and each caller says so
+ * in its own words.
+ */
+export async function installationForRepository(
   token: string,
   connection: GithubConnection,
-  repo: z.infer<typeof repositorySchema>,
-) {
-  if (connection.mode !== "app") return {};
+  repo: { id: number; full_name: string },
+): Promise<{
+  installation: GithubInstallation;
+  listsRepository: boolean;
+} | null> {
+  if (connection.mode !== "app") return null;
   const owner = repo.full_name.split("/")[0];
+  let inOwningAccount: GithubInstallation | undefined;
   for (let page = 1; page <= 20; page++) {
     const { installations } = z
       .object({ installations: z.array(installationSchema) })
@@ -148,14 +161,7 @@ async function verifyInstallation(
         item.app_slug === connection.slug &&
         item.account.login.toLowerCase() === owner.toLowerCase(),
     )) {
-      if (
-        installation.suspended_at ||
-        !["read", "write"].includes(installation.permissions.contents)
-      )
-        throw new GithubAccessError(
-          "Grant Hallvi read access to repository contents on GitHub, then run the check again.",
-          "access",
-        );
+      inOwningAccount ??= installation;
       for (let repoPage = 1; repoPage <= 20; repoPage++) {
         const { repositories } = z
           .object({
@@ -172,20 +178,43 @@ async function verifyInstallation(
             ).data,
           );
         if (repositories.some((item) => item.id === repo.id))
-          return {
-            installationId: installation.id,
-            repositorySelection: installation.repository_selection,
-            grantedPermissions: installation.permissions,
-          };
+          return { installation, listsRepository: true };
         if (repositories.length < 100) break;
       }
     }
     if (installations.length < 100) break;
   }
-  throw new GithubAccessError(
-    "Allow this exact repository in Hallvi’s GitHub App installation, then run the check again.",
-    "access",
-  );
+  return inOwningAccount
+    ? { installation: inOwningAccount, listsRepository: false }
+    : null;
+}
+
+async function verifyInstallation(
+  token: string,
+  connection: GithubConnection,
+  repo: z.infer<typeof repositorySchema>,
+) {
+  if (connection.mode !== "app") return {};
+  const found = await installationForRepository(token, connection, repo);
+  if (
+    found &&
+    (found.installation.suspended_at ||
+      !["read", "write"].includes(found.installation.permissions.contents))
+  )
+    throw new GithubAccessError(
+      "Grant Hallvi read access to repository contents on GitHub, then run the check again.",
+      "access",
+    );
+  if (!found?.listsRepository)
+    throw new GithubAccessError(
+      "Allow this exact repository in Hallvi’s GitHub App installation, then run the check again.",
+      "access",
+    );
+  return {
+    installationId: found.installation.id,
+    repositorySelection: found.installation.repository_selection,
+    grantedPermissions: found.installation.permissions,
+  };
 }
 
 export async function inspectGithubRepository(

@@ -119,6 +119,12 @@ const PLACES: Record<string, { said: string; detail?: string }> = {
   search_information: { said: "In Hallvi's records" },
   get_application_status: { said: "In Hallvi's records" },
   hetzner_request: { said: "At Hetzner" },
+  // A branch and a pull request on GitHub: outside this PC, and outside the
+  // application's server. It changes neither of them.
+  open_pull_request: {
+    said: "In the repository on GitHub",
+    detail: "a branch of its own, for you to review and merge",
+  },
   set_domain_record: { said: "At the DNS provider" },
   // Each of these runs here and reaches outward: a tunnel this PC holds
   // open, a key this PC keeps, an SSH check this PC makes, a request this

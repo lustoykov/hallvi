@@ -177,6 +177,7 @@ export function releasesFromRecords(
 
 const TITLE_OF: Record<string, string> = {
   server_bash: "On the server",
+  open_pull_request: "In the repository on GitHub",
   bash: "In the repository copy",
   powershell: "In the repository copy",
   hetzner_request: "With the provider",
