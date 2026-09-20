@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Resolver } from "node:dns/promises";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { recogniseCloudflare } from "../../../src/components/hallvi/onboarding/domain-connect";
@@ -34,6 +35,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   rmSync(config, { recursive: true, force: true });
@@ -214,4 +216,155 @@ it("keeps a host request whose sentences run long, instead of dropping the card"
   expect(request?.kind).toBe("host");
   expect(request?.kind === "host" && request.estimate.length).toBe(240);
   expect(request?.kind === "host" && request.needs.length).toBe(400);
+});
+
+// Finding the zone that holds a name.
+//
+// The failure these guard is one afternoon of an owner's life: a Mac mini
+// whose configured DNS server dropped the query for a subdomain that does
+// not exist yet, which Hallvi read as terminal and never walked up from, so
+// the parent zone at Cloudflare was never found. Entering the root domain
+// instead got through setup and quietly published the wrong address.
+
+/** A DNS answer that is not one: the resolver never came back. */
+const SILENT = "ETIMEOUT";
+/** DNS answering that the name delegates nowhere. */
+const NOTHING_THERE = "ENOTFOUND";
+
+/**
+ * Scripts each resolver in the chain separately, and records what was asked
+ * of which, so a test can say that a parent was never consulted.
+ */
+function scriptDns(answers: {
+  configured?: Record<string, string[] | string>;
+  public?: Record<string, string[] | string>;
+}) {
+  const asked: string[] = [];
+  const viaPublic = new WeakSet<object>();
+  vi.spyOn(Resolver.prototype, "setServers").mockImplementation(function (
+    this: object,
+  ) {
+    viaPublic.add(this);
+  });
+  vi.spyOn(Resolver.prototype, "resolveNs").mockImplementation(async function (
+    this: object,
+    zone: string,
+  ) {
+    const from = viaPublic.has(this) ? "public" : "configured";
+    asked.push(`${from} ${zone}`);
+    const said = (from === "public" ? answers.public : answers.configured)?.[
+      zone
+    ];
+    if (said === undefined || typeof said === "string")
+      throw Object.assign(new Error(said ?? SILENT), { code: said ?? SILENT });
+    return said;
+  });
+  return asked;
+}
+
+const CLOUDFLARE = ["annalise.ns.cloudflare.com", "pranab.ns.cloudflare.com"];
+
+it("walks up to the parent zone when the configured resolver drops the subdomain", async () => {
+  const asked = scriptDns({
+    // The reproduced Mac mini: silent for the new name, right for the root.
+    configured: { "accountant-agent.com": CLOUDFLARE },
+    public: { "test.accountant-agent.com": NOTHING_THERE },
+  });
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+    kind: "cloudflare",
+    zone: "accountant-agent.com",
+  });
+  // Public DNS is asked for exactly the query the configured resolver lost.
+  expect(asked).toEqual([
+    "configured test.accountant-agent.com",
+    "public test.accountant-agent.com",
+    "configured accountant-agent.com",
+  ]);
+});
+
+it("finds the zone for a subdomain that has no DNS records yet", async () => {
+  const asked = scriptDns({
+    configured: {
+      "test.accountant-agent.com": NOTHING_THERE,
+      "accountant-agent.com": CLOUDFLARE,
+    },
+  });
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+    kind: "cloudflare",
+    zone: "accountant-agent.com",
+  });
+  // A resolver that answered settles it; public DNS is never troubled.
+  expect(asked).toEqual([
+    "configured test.accountant-agent.com",
+    "configured accountant-agent.com",
+  ]);
+});
+
+it("keeps a delegated subdomain as its own zone instead of stripping a label", async () => {
+  const asked = scriptDns({
+    configured: {
+      "test.accountant-agent.com": ["ns-1.awsdns-01.org"],
+      "accountant-agent.com": CLOUDFLARE,
+    },
+  });
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+    kind: "other",
+    zone: "test.accountant-agent.com",
+    nameservers: ["ns-1.awsdns-01.org"],
+    who: "Amazon Route 53",
+  });
+  expect(asked).toEqual(["configured test.accountant-agent.com"]);
+});
+
+it("does not hand a name to its parent when no resolver answered for it", async () => {
+  // A name delegated to name servers that are down is not the parent's to
+  // write in, so a silent level is reported rather than climbed past.
+  const asked = scriptDns({
+    configured: { "accountant-agent.com": CLOUDFLARE },
+  });
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+    kind: "unreachable",
+  });
+  expect(asked).toEqual([
+    "configured test.accountant-agent.com",
+    "public test.accountant-agent.com",
+  ]);
+});
+
+it("calls a domain unregistered only when DNS itself said nothing is there", async () => {
+  scriptDns({
+    configured: {
+      "test.nowhere-at-all.com": NOTHING_THERE,
+      "nowhere-at-all.com": NOTHING_THERE,
+    },
+  });
+  const { whoHostsDns } = await import("../../../src/server/connection-checks");
+  expect(await whoHostsDns("test.nowhere-at-all.com")).toEqual({
+    kind: "unregistered",
+  });
+});
+
+it("watches for a manual record through public DNS when the configured resolver is silent", async () => {
+  const viaPublic = new WeakSet<object>();
+  vi.spyOn(Resolver.prototype, "setServers").mockImplementation(function (
+    this: object,
+  ) {
+    viaPublic.add(this);
+  });
+  vi.spyOn(Resolver.prototype, "resolve4").mockImplementation(async function (
+    this: object,
+  ) {
+    if (!viaPublic.has(this))
+      throw Object.assign(new Error(SILENT), { code: SILENT });
+    return ["203.0.113.7"];
+  });
+  const { recordResolves } =
+    await import("../../../src/server/connection-checks");
+  expect(await recordResolves("test.accountant-agent.com", "203.0.113.7")).toBe(
+    true,
+  );
 });

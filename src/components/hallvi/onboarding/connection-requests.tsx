@@ -236,6 +236,10 @@ export function useConnectionRequests({
           done={Boolean(request.settledAt)}
           onReady={async (via) => {
             const { name, host } = request.progress;
+            // The zone is where the token reaches; the name is what gets
+            // published. Telling Hallvi both keeps a subdomain from being
+            // rounded up to the domain its zone is named after.
+            const zone = host && "zone" in host ? host.zone : name;
             // A connection made earlier settles here; one pasted just now
             // already has, and settling twice changes nothing.
             if (via === "cloudflare" && host && "zone" in host)
@@ -247,7 +251,7 @@ export function useConnectionRequests({
             void read();
             onTell(
               via === "cloudflare"
-                ? `Cloudflare is connected for ${name}. Please point ${name} at the server and publish the application there.`
+                ? `Cloudflare is connected for the zone ${zone}. Please point ${name} at the server and publish the application at ${name}, not at ${zone}.`
                 : `I added the DNS record myself: ${name} now resolves to ${held.hostAddress}. Please publish the application there; there is no record for you to write.`,
             );
           }}

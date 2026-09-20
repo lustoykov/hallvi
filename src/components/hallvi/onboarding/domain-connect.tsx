@@ -106,6 +106,21 @@ function settle(outcome: CloudflareOutcome, zone: string): Check[] {
   ];
 }
 
+/**
+ * What the typed box means as a domain name, or "" while it is not one yet.
+ * The lookup and the card agree on this, so what a card offers is always
+ * about the name the owner can currently read in the field.
+ */
+export function wantedName(draft: string) {
+  const value = draft
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .replace(/\.$/, "");
+  return /^([a-z0-9-]+\.)+[a-z]{2,}$/.test(value) ? value : "";
+}
+
 export interface DomainProgress {
   name: string;
   host: DnsHost | null;
@@ -144,8 +159,13 @@ export function DomainConnect({
   const [existing, setExisting] = useState<"reported" | "unknown" | null>(null);
   const staged = useStagedChecks();
   const { name, host, way } = progress;
+  // An answer describes the name it was asked about. Once the box says
+  // something else, the answer is put away rather than offered for a name
+  // it was never about: pressing on would publish the old one.
+  const edited = wantedName(draft) !== name;
+  const found = edited ? null : host;
   const zone =
-    host && "zone" in host ? host.zone : name.split(".").slice(-2).join(".");
+    found && "zone" in found ? found.zone : name.split(".").slice(-2).join(".");
   const label = name === zone ? "@" : name.slice(0, -zone.length - 1);
 
   if (done)
@@ -158,13 +178,13 @@ export function DomainConnect({
         <Receipt
           title={
             way === "cloudflare"
-              ? `Cloudflare connected for ${zone}`
+              ? `${name} opens the application · Cloudflare connected for ${zone}`
               : `${name} points at ${serverAddress} · added by you`
           }
         >
           <p className="hv-ob-fine">
             {way === "cloudflare"
-              ? "The token is saved in a file on this computer that only your user account can read, unencrypted; the AI model never sees it. It reaches only the zones you chose on Cloudflare. Delete it under My Profile › API Tokens to withdraw access."
+              ? `Hallvi writes one record, for ${name}, in the zone ${zone}; nothing else in that zone is touched. The token is saved in a file on this computer that only your user account can read, unencrypted; the AI model never sees it. It reaches only the zones you chose on Cloudflare. Delete it under My Profile › API Tokens to withdraw access.`
               : "Hallvi holds no access to your DNS. If the server’s address ever changes, the record is yours to update."}
           </p>
         </Receipt>
@@ -172,27 +192,23 @@ export function DomainConnect({
     );
 
   const lookup = async () => {
-    const wanted = draft
-      .trim()
-      .toLowerCase()
-      .replace(/^https?:\/\//, "")
-      .replace(/\/.*$/, "");
-    if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(wanted)) return;
+    const wanted = wantedName(draft);
+    if (!wanted) return;
     setLooking(true);
-    const found = await transport.whoHostsDns(wanted);
+    const answer = await transport.whoHostsDns(wanted);
     const held =
-      found.kind === "cloudflare"
-        ? await transport.existingCloudflare(found.zone)
+      answer.kind === "cloudflare"
+        ? await transport.existingCloudflare(answer.zone)
         : null;
     setExisting(held?.kind === "connected" ? held.edit : null);
     setLooking(false);
     onProgress({
       name: wanted,
-      host: found,
+      host: answer,
       way:
-        found.kind === "other"
+        answer.kind === "other"
           ? "manual"
-          : found.kind === "cloudflare"
+          : answer.kind === "cloudflare"
             ? "cloudflare"
             : null,
       guideAt: 0,
@@ -247,45 +263,69 @@ export function DomainConnect({
           Not now
         </button>
       </form>
+      {edited && host && (
+        <p className="hv-ob-fine" role="status">
+          The last answer was about <b>{name}</b>. Press <b>Look up again</b> to
+          check the name now in the box.
+        </p>
+      )}
       <p className="hv-ob-fine">
         No domain yet? Buy one from any registrar first; this can wait, and the
         current address keeps working.
       </p>
 
-      {host?.kind === "unreachable" && (
-        <Problem title="Public DNS could not be asked from this computer">
+      {found?.kind === "unreachable" && (
+        <Problem title={`No DNS answer came back for ${name}`}>
           <p>
-            That says nothing about {name}. Check the internet connection and
-            look it up again.
+            Hallvi asked this computer&rsquo;s own DNS server and then public
+            resolvers, and neither answered in time. That says nothing about{" "}
+            {name}, which may well exist. Check the network and look it up
+            again.
           </p>
         </Problem>
       )}
-      {host?.kind === "unregistered" && (
-        <Problem title={`Nobody answers for ${zone}`}>
+      {found?.kind === "unregistered" && (
+        <Problem title={`Nobody answers for ${name}`}>
           <p>
-            Public DNS has no name servers for it, which usually means a typo or
-            a domain that is not registered yet. Check the spelling.
+            DNS answered, and has no name servers for {name} or for any domain
+            above it. That usually means a typo or a domain that is not
+            registered yet. Check the spelling.
           </p>
         </Problem>
       )}
 
-      {(host?.kind === "cloudflare" || host?.kind === "other") && (
+      {(found?.kind === "cloudflare" || found?.kind === "other") && (
         <>
+          {name !== zone && (
+            <dl className="hv-ob-record">
+              <div>
+                <dt>Application address</dt>
+                <dd>{name}</dd>
+              </div>
+              <div>
+                <dt>
+                  {found.kind === "cloudflare" ? "Cloudflare zone" : "DNS zone"}
+                </dt>
+                <dd>{zone}</dd>
+              </div>
+            </dl>
+          )}
           <p className="hv-ob-found">
-            {host.kind === "cloudflare" ? (
+            {found.kind === "cloudflare" ? (
               <>
                 <b>{zone}</b> has its DNS at <b>Cloudflare</b>, so Hallvi can
-                add the record for you.
+                add the one record that makes <b>{name}</b> open the
+                application.
               </>
             ) : (
               <>
                 <b>{zone}</b> has its DNS at{" "}
-                <b>{host.who ?? host.nameservers[0]}</b>. Hallvi cannot sign in
-                there, so you add one record and Hallvi does the rest.
+                <b>{found.who ?? found.nameservers[0]}</b>. Hallvi cannot sign
+                in there, so you add one record and Hallvi does the rest.
               </>
             )}
           </p>
-          {host.kind === "cloudflare" && (
+          {found.kind === "cloudflare" && (
             <div
               className="hv-ob-switch"
               role="group"
@@ -310,7 +350,7 @@ export function DomainConnect({
         </>
       )}
 
-      {host && way === "manual" && (
+      {found && way === "manual" && (
         <ManualRecord
           name={name}
           label={label}
@@ -321,7 +361,7 @@ export function DomainConnect({
         />
       )}
 
-      {host?.kind === "cloudflare" && way === "cloudflare" && existing && (
+      {found?.kind === "cloudflare" && way === "cloudflare" && existing && (
         <div className="hv-ob-path">
           <p className="hv-ob-lede">
             Cloudflare is already connected here, and{" "}
@@ -340,7 +380,7 @@ export function DomainConnect({
           </button>
         </div>
       )}
-      {host?.kind === "cloudflare" && way === "cloudflare" && !existing && (
+      {found?.kind === "cloudflare" && way === "cloudflare" && !existing && (
         <div className="hv-ob-path">
           <div className="hv-ob-grant">
             <h4>What you are giving Hallvi</h4>
@@ -348,7 +388,9 @@ export function DomainConnect({
               A Cloudflare token that can <b>read and edit DNS records</b> in
               the zones you pick, and nothing else: not your account, billing,
               other zones or storage. You choose the zone on Cloudflare&rsquo;s
-              page; choose only <b>{zone}</b>.
+              page; choose only <b>{zone}</b>, because that is the zone{" "}
+              <b>{name}</b> sits in. Hallvi writes the record for <b>{name}</b>{" "}
+              and leaves everything else in the zone alone.
             </p>
             <ModeLine mode={mode} action="change your DNS" />
           </div>
