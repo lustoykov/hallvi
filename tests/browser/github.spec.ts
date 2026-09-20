@@ -87,30 +87,27 @@ test(
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".hv-repository-notice");
-    await expect(notice).toContainText(
+    // The unread repository is a request in the conversation, not a strip
+    // above it, and nothing has been established yet, so it only offers to ask.
+    const card = page.getByRole("region", { name: "Repository access" });
+    await expect(card).toContainText("hasn’t been able to check");
+    await expect(card).toContainText(
       "Run the repository check, or connect GitHub if this repository is private.",
     );
     await expect(
-      notice.getByRole("button", { name: "Check again" }),
+      card.getByRole("button", { name: "Check repository" }),
     ).toBeEnabled();
-    const settings = notice.getByRole("link", {
-      name: "Connect GitHub",
-      exact: true,
-    });
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     const draft = "Continue after connecting my repository.";
     await composer.fill(draft);
-    await expect(settings).toHaveAttribute(
-      "href",
-      `/setup/github?application=${before.application.id}&chat=${before.selectedChatId}`,
-    );
     await page.screenshot({
       path: testInfo.outputPath("github-recovery-action.png"),
       fullPage: true,
     });
-    await settings.click();
-    await expect(page).toHaveURL(/\/setup\/github\?application=.*&chat=/);
+    // Settings still reconnects, and still returns to this conversation.
+    await page.goto(
+      `/setup/github?application=${before.application.id}&chat=${before.selectedChatId}`,
+    );
     let releaseCheck!: () => void;
     const heldCheck = new Promise<void>((resolve) => {
       releaseCheck = resolve;
@@ -154,7 +151,9 @@ test(
     );
     await openConversation(page);
     await expect(composer).toHaveValue(draft);
-    await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Repository access" }),
+    ).toHaveCount(0);
     // Ordinary Settings uses the same return contract as connection recovery.
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await page
@@ -305,12 +304,30 @@ test(
     writeFileSync(join(fixture.state, "github-scenario.json"), "{}");
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".hv-repository-notice");
-    await expect(notice).toContainText("read access");
-    await notice
+    // Signed in, but this repository is not among the ones chosen: the card
+    // says which of the two is missing, and folds away once the check passes.
+    // In an untouched conversation the welcome says it first, and never
+    // offers to read a repository it cannot open.
+    const welcome = page.getByRole("region", {
+      name: "Get to know your application",
+    });
+    await expect(welcome).toContainText(
+      "isn’t among the repositories you picked for Hallvi",
+    );
+    await expect(
+      welcome.getByRole("button", { name: "Read repository" }),
+    ).toHaveCount(0);
+    await welcome.getByRole("button", { name: "Choose repositories" }).click();
+    const card = page.getByRole("region", { name: "Repository access" });
+    await expect(card).toContainText("Signed in as qa-fixture-user");
+    await expect(card).toContainText("read access");
+    await card
       .getByRole("button", { name: "Check again", exact: true })
       .click();
-    await expect(notice).toHaveCount(0);
+    await expect(
+      page.getByText("can read qa/github-permissions", { exact: false }),
+    ).toBeVisible();
+    await expect(card).toHaveCount(0);
     const passed = await (await page.request.get(`/api${path}`)).json();
     expect(passed.repository.status).toBe("passed");
   },
@@ -351,7 +368,9 @@ test(
     const old = expireAccess();
     await page.reload();
     await openConversation(page);
-    await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Repository access" }),
+    ).toHaveCount(0);
     // Checking again renews the expired access without another login.
     expect((await checkAgain()).status()).toBe(200);
     expect(

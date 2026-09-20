@@ -53,7 +53,7 @@ async function request<T>(url: string, method = "GET"): Promise<T> {
 const pending = (attempt: GithubLoginAttempt | null) =>
   attempt?.status === "waiting" || attempt?.status === "starting";
 
-/** What ended a sign-in, in the owner's terms. Nothing was saved in any case. */
+/** What ended a sign-in, in the owner's terms. Nothing was ever saved. */
 function ended(attempt: GithubLoginAttempt | null) {
   if (!attempt || pending(attempt) || attempt.status === "connected")
     return null;
@@ -132,9 +132,13 @@ export function GithubConnect({
 
   useEffect(() => {
     alive.current = true;
-    // A sign-in begun before a reload is still waiting on the controller.
+    // A sign-in begun before a reload is still waiting on the controller, so
+    // it is picked up. One that already ended was said where it ended.
     void load()
-      .then((fresh) => fresh && setAttempt(fresh.attempt))
+      .then(
+        (fresh) =>
+          fresh && setAttempt(pending(fresh.attempt) ? fresh.attempt : null),
+      )
       .catch((caught: Error) => setError(caught.message));
     return () => {
       alive.current = false;
@@ -280,19 +284,56 @@ export function GithubConnect({
       </RequestCard>
     );
 
+  // Nobody has an answer yet, so the one useful thing is to ask. Grey, because
+  // nothing is known to be wrong.
+  if (unchecked && !pending(attempt) && !ended(attempt))
+    return (
+      <RequestCard
+        asks={`hasn’t been able to check ${repository} yet`}
+        state={checking ? "working" : "done"}
+        label="Repository access"
+      >
+        <p>
+          That says nothing about the repository or your access. Checking only
+          reads from GitHub.
+        </p>
+        {known}
+        <div className="hv-ob-row">
+          <button
+            type="button"
+            className="hv-ob-primary"
+            disabled={checking}
+            onClick={onCheck}
+          >
+            {checking ? "Checking…" : "Check repository"}
+          </button>
+          {close}
+        </div>
+      </RequestCard>
+    );
+
   if (!connection) {
     const failure = ended(attempt);
     return (
       <RequestCard
         asks={`needs GitHub to open ${repository}`}
-        state={pending(attempt) ? "working" : failure ? "failed" : "waiting"}
+        state={
+          pending(attempt)
+            ? "working"
+            : // Stopping it yourself is not something that went wrong.
+              failure && attempt?.status !== "cancelled"
+              ? "failed"
+              : "waiting"
+        }
         label="Connect GitHub"
       >
         {pending(attempt) && attempt ? (
           <>
             <p>Enter this code on GitHub, then approve Hallvi:</p>
             {attempt.userCode ? (
-              <CopyLine value={attempt.userCode} label="Copy code" />
+              <div className="hv-ob-code">
+                <CopyLine value={attempt.userCode} label="Copy code" />
+              </div>
             ) : (
               <p>
                 <SpinnerGap className="spin" aria-hidden="true" /> Getting a
@@ -415,7 +456,7 @@ export function GithubConnect({
             {checking ? "Checking…" : "Check access"}
           </button>
         ) : null}
-        {/* One blue action at a time: going to GitHub first, checking after. */}
+        {/* One blue action at a time: GitHub first, the check after. */}
         <a
           className={unchecked || chose ? "hv-ob-quiet" : "hv-ob-away"}
           href={connection.accessUrl}

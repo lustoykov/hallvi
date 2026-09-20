@@ -31,7 +31,7 @@ function greeting(
     role: "assistant",
     body:
       chat.kind === "main"
-        ? `I’ve added ${name}. Next, I can read its repository and explain what it needs to run.`
+        ? `I’ve added ${name}. Once I’ve read its repository, I’ll explain what it needs to run.`
         : `This is a read-only side chat for ${name}. I can explain the application and its execution history. Send commands and changes to the main conversation.`,
     source: "hallvi",
     status: "completed",

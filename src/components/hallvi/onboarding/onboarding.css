@@ -329,6 +329,15 @@ a.hv-ob-quiet {
   gap: 5px;
   text-decoration: none;
 }
+/* A sign-in code is read off one screen and typed into another. */
+.hv-ob-code .hv-ob-copy {
+  width: fit-content;
+}
+.hv-ob-code .hv-ob-copy code {
+  font-size: 22px;
+  letter-spacing: 0.1em;
+  user-select: all;
+}
 /* A card's actions: the one blue action first, the quiet ones after it. */
 .hv-ob-row {
   display: flex;
