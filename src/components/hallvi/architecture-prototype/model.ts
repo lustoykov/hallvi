@@ -75,6 +75,8 @@ export interface Part {
    * were the same sentence while the map only ever drew one door.
    */
   admits?: "open" | "refused" | "unknown";
+  /** Gates: who the door's own record says may use it. */
+  sources?: string;
   /**
    * Gates: the part this port leads to, when a record says which.
    *

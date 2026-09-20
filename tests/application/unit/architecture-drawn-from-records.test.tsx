@@ -278,7 +278,49 @@ describe("the doors in the firewall", () => {
     expect(html).toContain("5432");
     // A finding, not the same as "rules not drawn", which reads as nobody
     // having looked.
-    expect(html).toContain("one door, refused");
+    expect(html).toContain("1 refused");
+  });
+
+  it("does not count an unsuccessful check as an open or refused port", () => {
+    const records = [
+      topology([web] as never[]),
+      states(
+        { kind: "door", id: "unknown" },
+        {
+          title: "The port was checked without an answer",
+          facts: [fact("port", "8080")] as never[],
+          checks: [check("open", "failed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.find((part) => part.kind === "gate")?.admits,
+    ).toBe("unknown");
+    expect(draw(records)).toContain("1 unconfirmed");
+  });
+
+  it("uses the latest connection result when a door changes state", () => {
+    const records = [
+      topology([web] as never[]),
+      states(
+        { kind: "door", id: "site" },
+        {
+          at: EARLIER,
+          title: "The port refused",
+          checks: [check("refused", "passed")] as never[],
+        },
+      ),
+      states(
+        { kind: "door", id: "site" },
+        {
+          title: "The port answered",
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.find((part) => part.kind === "gate")?.admits,
+    ).toBe("open");
   });
 
   it("counts a port it had no room to draw rather than dropping it", () => {
@@ -343,6 +385,52 @@ describe("the doors in the firewall", () => {
       ),
     ]);
     expect(html).toContain("8080");
+  });
+
+  it("keeps a distinct access beside a door", () => {
+    const records = [
+      topology([web] as never[]),
+      door("https", "443", "anywhere", true),
+      states(
+        { kind: "access", id: "tunnel" },
+        {
+          title: "The private way in",
+          facts: [fact("port", "8080")] as never[],
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.filter((part) => part.kind === "gate"),
+    ).toHaveLength(2);
+    expect(draw(records)).toContain("8080");
+  });
+
+  it("reads sources by their key when Pi gives the fact a human label", () => {
+    const records = [
+      topology([web] as never[]),
+      states(
+        { kind: "door", id: "private" },
+        {
+          title: "Private port",
+          facts: [
+            fact("port", "5432"),
+            {
+              key: "sources",
+              label: "Allowed from",
+              value: "the office network",
+              claim: "configuration",
+              basis: "observed",
+            } as never,
+          ] as never[],
+          checks: [check("open", "passed")] as never[],
+        },
+      ),
+    ];
+    expect(
+      modelOf(records).parts.find((part) => part.kind === "gate")?.sources,
+    ).toBe("the office network");
+    expect(draw(records)).toContain("the office network");
   });
 
   it("keeps a port that refuses off the path a visit travels", () => {

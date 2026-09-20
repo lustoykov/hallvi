@@ -327,10 +327,17 @@ function admitsOf(
 ): NonNullable<Part["admits"]> {
   const ref = refFor(records, part);
   if (!ref) return "unknown";
-  const held = currentChecks(records, ref);
-  if (held.get("refused")) return "refused";
-  if (held.get("open")) return "open";
-  return "unknown";
+  // The newest connection observation decides. A failed `open` check does
+  // not establish an open port, and an older refusal cannot overrule a newer
+  // successful connection (or vice versa).
+  const observation = [...currentChecks(records, ref).entries()].find(
+    ([key]) => key === "open" || key === "refused",
+  );
+  return observation?.[1].value.status === "passed"
+    ? observation[0] === "open"
+      ? "open"
+      : "refused"
+    : "unknown";
 }
 
 /**
@@ -392,9 +399,16 @@ function fromRecords(
     // Pi chose is read, and not both — the alternative is one way in drawn
     // twice under two names.
     const doors = subjectsOfKind(records, "door");
-    for (const ref of doors.length
-      ? doors
-      : subjectsOfKind(records, "access")) {
+    const doorIds = new Set(doors.map((ref) => ref.id));
+    // A door and an access record with the same id describe one way in;
+    // distinct access records still describe distinct ways in.
+    const waysIn = [
+      ...doors,
+      ...subjectsOfKind(records, "access").filter(
+        (ref) => !doorIds.has(ref.id),
+      ),
+    ];
+    for (const ref of waysIn) {
       if (named.has(ref.id)) continue;
       const presence = presenceOf(records, ref);
       if (!presence.known || presence.presence !== "present") continue;
@@ -583,6 +597,10 @@ export function architectureFromRecords({
       facts: evidence.certainty === "absent" ? [] : facts,
       evidence,
       admits: part.kind === "gate" ? admitsOf(records, part) : undefined,
+      sources:
+        part.kind === "gate"
+          ? (factOf(records, part, "sources") ?? undefined)
+          : undefined,
       // What a port leads to, from the edge leaving it — the same move the
       // disk edge makes for a volume's owner. Never from the port number or
       // the subject's name: a door Pi called `postgres` is not evidence that

@@ -769,7 +769,7 @@ function Port({
               "anyone". */}
           {part.admits === "refused"
             ? "refused"
-            : (part.facts.find((fact) => fact.label === "sources")?.value ??
+            : (part.sources ??
               (part.id === "gate:ssh"
                 ? "Hallvi"
                 : model.openness === "restricted"
@@ -1396,22 +1396,23 @@ export function JourneyDirection({
               const shut = gates.filter(
                 (gate) => gate.admits === "refused",
               ).length;
-              const open = gates.length - shut;
-              const named = (count: number) =>
-                count === 1 ? "one door" : `${count} doors`;
+              const open = gates.filter(
+                (gate) => gate.admits === "open",
+              ).length;
+              const unknown = gates.length - open - shut;
               // A port the map had no room for is a port the reader cannot
               // see, so the count is where it gets said rather than nowhere.
               const over = layout.undrawnGates
                 ? ` · ${layout.undrawnGates} more on record`
                 : "";
-              if (shut && open) return `${open} open, ${shut} refused${over}`;
-              if (shut) return `${named(shut)}, refused${over}`;
               return (
-                (model.openness === "restricted"
-                  ? `only ${named(open)} open`
-                  : model.openness === "public"
-                    ? `${named(open)} open`
-                    : `${named(open)} on record`) + over
+                [
+                  open ? `${open} open` : null,
+                  shut ? `${shut} refused` : null,
+                  unknown ? `${unknown} unconfirmed` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ") + over
               );
             })()}
           </span>
