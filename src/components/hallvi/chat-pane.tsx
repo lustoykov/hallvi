@@ -49,6 +49,7 @@ import {
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import { useConnectionRequests } from "./onboarding/connection-requests";
+import { ChatgptConnect } from "./onboarding/chatgpt-connect";
 import { GithubConnect } from "./onboarding/github-connect";
 import {
   JourneyRail,
@@ -229,7 +230,10 @@ export function ChatPane({
   workerAlive,
   checkingRepository = false,
   onCheckRepository,
+  onModelConnected,
 }: {
+  /** A ChatGPT login was saved from the conversation: sending is possible. */
+  onModelConnected?: () => void;
   /** The repository check the owner asked for is still running. */
   checkingRepository?: boolean;
   onCheckRepository?: () => void;
@@ -502,6 +506,24 @@ export function ChatPane({
         : repositoryOpen
       : false;
 
+  /**
+   * Connecting ChatGPT is a request here too. It opens where the reader asked
+   * for it, and stays for the visit so it can fold into its receipt.
+   */
+  const [modelOpen, setModelOpen] = useState(false);
+  const settingsHref =
+    application && chatId
+      ? `/setup/pi?application=${application.id}&chat=${chatId}`
+      : "/setup/pi";
+  const openModel = () => {
+    setModelOpen(true);
+    requestAnimationFrame(() =>
+      document
+        .querySelector('[aria-label="Connect ChatGPT"]')
+        ?.scrollIntoView({ block: "nearest" }),
+    );
+  };
+
   const stopLabel =
     waiting.length > 0 ? `Stop + cancel ${waiting.length} waiting` : "Stop";
   return (
@@ -543,18 +565,14 @@ export function ChatPane({
                         unread.status === "blocked" ? "blocked" : "not-yet",
                       connected: unread.connected,
                       signIn: unread.signIn,
-                      open: repositoryOpen,
                       checking: checkingRepository,
                       onOpen: () => setRepositoryOpen(true),
                       onCheck: onCheckRepository,
                     }
                   : undefined
               }
-              connectHref={
-                !piReady && chatId
-                  ? `/setup/pi?application=${view.application.id}&chat=${chatId}&onboarding=1`
-                  : undefined
-              }
+              onConnect={!piReady && onModelConnected ? openModel : undefined}
+              requestOpen={modelOpen ? !piReady : repositoryOpen && !!unread}
               onStart={() => onTell?.(READ_REPOSITORY_MESSAGE)}
             />
           )}
@@ -900,6 +918,13 @@ export function ChatPane({
               }
             />
           )}
+          {modelOpen && application && onModelConnected && !archived && (
+            <ChatgptConnect
+              settingsHref={settingsHref}
+              onConnected={onModelConnected}
+              onClose={() => setModelOpen(false)}
+            />
+          )}
           {error && application && (
             <div className="hv-error" role="alert">
               {error}
@@ -1009,6 +1034,7 @@ export function ChatPane({
         )}
         {application &&
           !piReady &&
+          !modelOpen &&
           (!firstConversation || Boolean(composer.trim())) && (
             <div className="hv-pi-required">
               <WarningCircle weight="bold" />
@@ -1019,18 +1045,16 @@ export function ChatPane({
                   anything you have typed here is kept.
                 </p>
               </div>
-              {/* The two ids are what brings the reader back to this exact
-                conversation afterwards. They name records, not a URL, and
-                the draft stays in this browser rather than travelling. */}
-              <Link
-                href={
-                  chatId
-                    ? `/setup/pi?application=${application.id}&chat=${chatId}`
-                    : "/setup/pi"
-                }
-              >
-                Open Settings
-              </Link>
+              {/* Connecting happens here, in the conversation, so what has
+                  been typed never has to travel. Settings stays a link for
+                  someone who wants the model preferences. */}
+              {onModelConnected && !modelOpen ? (
+                <button type="button" onClick={openModel}>
+                  Connect ChatGPT
+                </button>
+              ) : (
+                <Link href={settingsHref}>Open Settings</Link>
+              )}
             </div>
           )}
         <div

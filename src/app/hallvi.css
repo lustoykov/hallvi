@@ -1041,12 +1041,22 @@
   background: #f4e3cd;
   font-size: 11px;
 }
-.hv-pi-required a {
+.hv-pi-required a,
+.hv-pi-required > button {
   margin-left: auto;
   color: #784112;
   font-weight: 600;
   white-space: nowrap;
   text-underline-offset: 3px;
+}
+.hv-pi-required > button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* Block flow, not a grid: sections keep their content height inside the

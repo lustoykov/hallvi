@@ -897,6 +897,7 @@ export function OperatorShell({
             inert={recordVisible || undefined}
           >
             <ChatPane
+              onModelConnected={() => setConnectedSince(true)}
               checkingRepository={busy === "repository"}
               onCheckRepository={checkRepository}
               activeChat={activeChat}
