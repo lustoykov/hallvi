@@ -1761,6 +1761,9 @@ dialog .form-row {
 }
 .facts {
   display: grid;
+  /* Named, because the sheet's own `dl` rule is two columns and a definition
+     list here is one row per fact. */
+  grid-template-columns: 1fr;
   gap: 10px;
   margin: 0;
 }
