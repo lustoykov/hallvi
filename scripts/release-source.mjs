@@ -141,10 +141,17 @@ async function readBounded(response, limit, what) {
   const length = Number(response.headers.get("content-length"));
   if (Number.isFinite(length) && length > limit)
     throw new ReleaseRefusal(`${what} is larger than Hallvi will read.`);
-  const buffer = Buffer.from(await response.arrayBuffer());
-  if (buffer.length > limit)
-    throw new ReleaseRefusal(`${what} is larger than Hallvi will read.`);
-  return buffer;
+  if (!response.body) throw new ReleaseRefusal(`${what} has no body.`);
+  const chunks = [];
+  let read = 0;
+  for await (const chunk of response.body) {
+    read += chunk.byteLength;
+    if (read > limit) {
+      throw new ReleaseRefusal(`${what} is larger than Hallvi will read.`);
+    }
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks, read);
 }
 
 async function fetchOk(url, fetching, accept) {

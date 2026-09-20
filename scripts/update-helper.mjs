@@ -54,6 +54,8 @@ if (!data || !program) {
 const state = stateFiles(data);
 const mac = process.platform === "darwin";
 const say = (line) => console.log(`${new Date().toISOString()} ${line}`);
+let downloadedArchive;
+let unpackedPath;
 
 const run = (command, args, options = {}) =>
   spawnSync(command, args, { encoding: "utf8", ...options });
@@ -163,6 +165,7 @@ async function main() {
   const downloads = join(data, "updates");
   mkdirSync(downloads, { recursive: true, mode: 0o700 });
   const archive = join(downloads, entry.file);
+  downloadedArchive = archive;
 
   recordPhase(data, "downloading", `Downloading Hallvi ${manifest.version}.`);
   say(`downloading ${entry.url}`);
@@ -190,6 +193,7 @@ async function main() {
     "Checking the package against the signed release.",
   );
   const unpacked = join(downloads, `unpacked-${attempt.id}`);
+  unpackedPath = unpacked;
   rmSync(unpacked, { recursive: true, force: true });
   mkdirSync(unpacked, { recursive: true, mode: 0o700 });
   const extracted = run("tar", [
@@ -252,9 +256,18 @@ async function main() {
         return;
       }
     } catch (error) {
-      // No worker to ask is not a reason to stop: the service may be up
-      // without one, and the installer stops the pair either way.
-      say(`worker hold: ${error instanceof Error ? error.message : error}`);
+      // A running service may still have active work. Without a successful
+      // hold response, replacing it would interrupt work we cannot count.
+      await askWorker("release", {}).catch(() => undefined);
+      recordPhase(
+        data,
+        "blocked",
+        "Pi did not confirm it had stopped taking work. Nothing was installed; check hallvi status and try again.",
+      );
+      say(
+        `blocked: worker hold: ${error instanceof Error ? error.message : error}`,
+      );
+      return;
     }
   }
 
@@ -341,15 +354,8 @@ try {
 } finally {
   // The archive and the unpacked copy are a hundred megabytes that have done
   // their job. The attempt file is what the next Hallvi reads.
-  const finished = readAttempt(data);
-  rmSync(join(data, "updates", `unpacked-${finished?.id}`), {
-    recursive: true,
-    force: true,
-  });
-  for (const name of readdirSync(join(data, "updates")).filter((entry) =>
-    entry.endsWith(".tgz"),
-  ))
-    rmSync(join(data, "updates", name), { force: true });
+  if (unpackedPath) rmSync(unpackedPath, { recursive: true, force: true });
+  if (downloadedArchive) rmSync(downloadedArchive, { force: true });
   // Including this program's own copy: every module it runs on is loaded,
   // and a hundred megabytes of runtime should not outlive the update.
   if (process.env.HALLVI_UPDATE_STAGING)

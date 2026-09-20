@@ -10,7 +10,9 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -30,6 +32,8 @@ export const PHASES = [
 export const FINISHED = ["completed", "failed", "blocked"];
 
 export const attemptFile = (data) => join(data, "update-attempt.json");
+const claimLock = (data) => join(data, "update-attempt.claiming");
+const STARTING_GRACE_MS = 2 * 60 * 1000;
 
 /** An attempt is already under way, and a second one would fight it. */
 export class UpdateInProgressError extends Error {}
@@ -66,15 +70,20 @@ export function attemptStatus(data, alive) {
   const attempt = readAttempt(data);
   if (!attempt) return null;
   if (FINISHED.includes(attempt.phase)) return { ...attempt, running: false };
-  if (alive(attempt)) return { ...attempt, running: true };
-  return write(data, {
+  if (
+    alive(attempt) ||
+    (attempt.phase === "checking" &&
+      Date.now() - Date.parse(attempt.startedAt) < STARTING_GRACE_MS)
+  )
+    return { ...attempt, running: true };
+  return {
     ...attempt,
     phase: "failed",
     running: false,
     message:
-      "The update stopped without finishing. Hallvi is running the version it had; look at the update log, then try again.",
+      "The update stopped without finishing. Check hallvi status and the update log to see which version is running before trying again.",
     finishedAt: new Date().toISOString(),
-  });
+  };
 }
 
 /**
@@ -83,18 +92,34 @@ export function attemptStatus(data, alive) {
  * the second one is told the first is running and does nothing.
  */
 export function claimAttempt(data, alive, attempt) {
-  const current = attemptStatus(data, alive);
-  if (current?.running)
-    throw new UpdateInProgressError(
-      `An update to ${current.to?.version ?? "a new version"} is already ${current.phase}.`,
-    );
-  return write(data, {
-    ...attempt,
-    phase: "checking",
-    startedAt: new Date().toISOString(),
-    finishedAt: null,
-    message: "Preparing the update.",
-  });
+  mkdirSync(data, { recursive: true, mode: 0o700 });
+  const lock = claimLock(data);
+  try {
+    mkdirSync(lock, { mode: 0o700 });
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    // A process that died while claiming cannot hold the slot forever.
+    if (Date.now() - statSync(lock).mtimeMs <= STARTING_GRACE_MS)
+      throw new UpdateInProgressError("An update is already being prepared.");
+    rmSync(lock, { recursive: true, force: true });
+    mkdirSync(lock, { mode: 0o700 });
+  }
+  try {
+    const current = attemptStatus(data, alive);
+    if (current?.running)
+      throw new UpdateInProgressError(
+        `An update to ${current.to?.version ?? "a new version"} is already ${current.phase}.`,
+      );
+    return write(data, {
+      ...attempt,
+      phase: "checking",
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      message: "Preparing the update.",
+    });
+  } finally {
+    rmdirSync(lock);
+  }
 }
 
 /** Moves the running attempt to a phase, keeping everything else it holds. */

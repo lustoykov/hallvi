@@ -287,6 +287,23 @@ it("finds the newest published release, skipping drafts and anything signed by a
   ).rejects.toThrow(/not signed by the key this Hallvi trusts/);
 });
 
+it("stops reading an oversized release list without a Content-Length", async () => {
+  let sent = 0;
+  const oversized = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      sent++;
+      controller.enqueue(new Uint8Array(1024 * 1024));
+    },
+  });
+  await expect(
+    discover({
+      source: "https://releases.test/index",
+      fetch: async () => new Response(oversized),
+    }),
+  ).rejects.toThrow("The release list is larger than Hallvi will read.");
+  expect(sent).toBeLessThan(10);
+});
+
 it("orders releases the way their numbers read", () => {
   expect(compareVersions("0.1.0-alpha.2", "0.1.0-alpha.1")).toBe(1);
   expect(compareVersions("0.1.0-alpha.10", "0.1.0-alpha.9")).toBe(1);
@@ -409,6 +426,16 @@ it("lets one update run, and reports one whose helper died as the failure it is"
   const alive = () => running;
 
   claimAttempt(root, alive, attempt);
+  // The helper has not started yet; a second caller must still see the slot.
+  running = false;
+  expect(attemptStatus(root, alive)).toMatchObject({
+    phase: "checking",
+    running: true,
+  });
+  expect(() => claimAttempt(root, alive, { ...attempt, id: "two" })).toThrow(
+    UpdateInProgressError,
+  );
+  running = true;
   recordPhase(root, "downloading", "Downloading Hallvi 0.1.0-alpha.2.");
   // A second attempt while the first one holds the slot changes nothing.
   expect(() => claimAttempt(root, alive, { ...attempt, id: "two" })).toThrow(

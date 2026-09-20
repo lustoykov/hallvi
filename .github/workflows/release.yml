@@ -66,11 +66,13 @@ jobs:
           esac
 
       - name: The version being released is the version in this commit
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -eu
           have=$(node -p "require('./package.json').version")
-          [ "$have" = "${{ inputs.version }}" ] || {
-            echo "package.json says $have and this release says ${{ inputs.version }}."
+          [ "$have" = "$RELEASE_VERSION" ] || {
+            echo "package.json says $have and this release says $RELEASE_VERSION."
             echo "Raise the version in a pull request first; that is the commit a release names."
             exit 1
           }
@@ -119,39 +121,43 @@ jobs:
       - name: Sign the release manifest
         env:
           HALLVI_RELEASE_SIGNING_KEY: ${{ secrets.HALLVI_RELEASE_SIGNING_KEY }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
           node scripts/sign-release.mjs \
-            --version "${{ inputs.version }}" \
-            --revision "${{ github.sha }}" \
-            --channel "${{ inputs.channel }}" \
-            --repository "${{ github.repository }}"
+            --version "$RELEASE_VERSION" \
+            --revision "$GITHUB_SHA" \
+            --channel "$RELEASE_CHANNEL" \
+            --repository "$GITHUB_REPOSITORY"
 
       # A draft is not a release: GitHub does not serve it to a reader without
       # a token, so nothing discovers it until the maintainer publishes it.
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
           set -eu
-          tag="v${{ inputs.version }}"
+          tag="v${RELEASE_VERSION}"
           gh release create "$tag" \
             --draft \
             --prerelease \
-            --target "${{ github.sha }}" \
-            --title "Hallvi ${{ inputs.version }}" \
-            --notes "Hallvi ${{ inputs.version }} (${{ inputs.channel }}), built from ${{ github.sha }}.
+            --target "$GITHUB_SHA" \
+            --title "Hallvi $RELEASE_VERSION" \
+            --notes "Hallvi $RELEASE_VERSION ($RELEASE_CHANNEL), built from $GITHUB_SHA.
 
           Download the archive for your machine, its \`.sha256\`, and \`install-hallvi.sh\`, then run:
 
           \`\`\`
-          sh ./install-hallvi.sh ./hallvi-${{ inputs.version }}-darwin-arm64.tgz
+          sh ./install-hallvi.sh ./hallvi-${RELEASE_VERSION}-darwin-arm64.tgz
           \`\`\`
 
           Installed already? Settings → This Hallvi, or \`hallvi update\`." \
-            dist/hallvi-${{ inputs.version }}-darwin-arm64.tgz \
-            dist/hallvi-${{ inputs.version }}-darwin-arm64.tgz.sha256 \
-            dist/hallvi-${{ inputs.version }}-linux-x64.tgz \
-            dist/hallvi-${{ inputs.version }}-linux-x64.tgz.sha256 \
+            dist/hallvi-${RELEASE_VERSION}-darwin-arm64.tgz \
+            dist/hallvi-${RELEASE_VERSION}-darwin-arm64.tgz.sha256 \
+            dist/hallvi-${RELEASE_VERSION}-linux-x64.tgz \
+            dist/hallvi-${RELEASE_VERSION}-linux-x64.tgz.sha256 \
             dist/install-hallvi.sh \
             dist/hallvi-release.json \
             dist/hallvi-release.json.sig
