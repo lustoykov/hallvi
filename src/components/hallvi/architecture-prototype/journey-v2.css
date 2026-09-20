@@ -83,7 +83,18 @@
 
 /* ---------- The stage: a quiet canvas ---------- */
 
+.axj2-viewport {
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 0 24px;
+  scrollbar-width: thin;
+}
+.axj2-viewport:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: -2px;
+}
 .axj2-stage {
+  min-width: 900px;
   position: relative;
   width: 100%;
   aspect-ratio: 1120 / 500;
@@ -172,7 +183,7 @@
   align-items: center;
   gap: 10px;
   height: 54px;
-  padding: 0 124px 0 18px;
+  padding: 0 18px;
   border: 0;
   border-bottom: 1px solid #e6ebf2;
   border-radius: 24px 24px 0 0;
@@ -525,7 +536,7 @@
 .axj2-text small {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   overflow: hidden;
   font-size: 12px;
   line-height: 1.35;
@@ -540,9 +551,10 @@
   font-size: 11.5px;
   font-weight: 560;
   color: var(--ax-muted);
-  /* "Helsinki (hel1)" was cut at the narrower desktop width. It is three
-     words, not an identifier, so it wraps rather than losing its region. */
-  text-wrap: pretty;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: color 600ms;
 }
 .axj2-status i {
