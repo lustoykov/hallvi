@@ -1257,46 +1257,6 @@
   color: var(--muted);
   text-decoration: none;
 }
-/* A small peek from the existing face mark; no additional canvas or animation. */
-.hv-navigation-peek {
-  position: relative;
-  flex: none;
-  width: 36px;
-  height: 31px;
-  overflow: hidden;
-  margin-block: -8px;
-}
-.hv-navigation-peek-head {
-  position: absolute;
-  top: 8px;
-  left: 5px;
-  transform: rotate(9deg);
-}
-.hv-navigation-antenna {
-  position: absolute;
-  top: -6px;
-  left: 4px;
-  width: 2px;
-  height: 9px;
-  border-radius: 2px;
-  background: var(--muted);
-  transform: rotate(-12deg);
-}
-.hv-navigation-antenna + .hv-navigation-antenna {
-  left: 20px;
-  transform: rotate(12deg);
-}
-.hv-navigation-antenna::before {
-  content: "";
-  position: absolute;
-  top: -2px;
-  left: -1px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--muted);
-}
-
 .hv-navigation-home:hover {
   color: var(--ink);
 }

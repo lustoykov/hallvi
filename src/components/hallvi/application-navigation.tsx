@@ -15,7 +15,6 @@ import {
   type ApplicationSection,
   type ApplicationSectionDefinition,
 } from "./application-sections";
-import { HallviMark } from "./hallvi-mark";
 import type { ChatSummary } from "@/server/types";
 
 /**
@@ -187,13 +186,6 @@ export function ApplicationNavigation({
         <div className="hv-navigation-head">
           <Link href="/applications" className="hv-navigation-home">
             Hallvi
-            <span className="hv-navigation-peek" aria-hidden="true">
-              <span className="hv-navigation-peek-head">
-                <span className="hv-navigation-antenna" />
-                <span className="hv-navigation-antenna" />
-                <HallviMark size={26} />
-              </span>
-            </span>
           </Link>
           {head}
         </div>
