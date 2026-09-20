@@ -1882,3 +1882,50 @@ dd.hv-protection-warn {
 .hv-arch-unmapped button {
   margin-top: 4px;
 }
+
+/* Chat selection and archiving are sibling controls, never nested buttons. */
+.hv-chat-nav-row {
+  position: relative;
+}
+.hv-chat-nav-row:has(.hv-chat-archive) > button:first-child {
+  padding-right: 38px;
+}
+.hv-application-navigation .hv-chat-archive {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  min-height: 30px;
+  padding: 6px;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+}
+.hv-chat-nav-row:hover .hv-chat-archive,
+.hv-chat-nav-row:focus-within .hv-chat-archive {
+  opacity: 1;
+  pointer-events: auto;
+}
+.hv-chat-nav-row button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+@media (hover: none), (pointer: coarse) {
+  .hv-application-navigation .hv-chat-archive {
+    opacity: 1;
+    pointer-events: auto;
+    width: 38px;
+    min-height: 38px;
+  }
+  .hv-chat-nav-row:has(.hv-chat-archive) > button:first-child {
+    padding-right: 44px;
+  }
+}
+@media (max-width: 640px) {
+  .hv-chat-nav-row {
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 230px;
+  }
+}

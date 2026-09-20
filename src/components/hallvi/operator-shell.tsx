@@ -613,9 +613,20 @@ export function OperatorShell({
     focusComposer();
   }
 
+  function archiveChat(chatId: string) {
+    if (!application) return;
+    void run("archive", async () => {
+      const next = await api.archiveChat(application.id, chatId);
+      // A sidebar action on another conversation must not navigate away from
+      // the conversation being read. Archiving the active chat returns home.
+      return view.selectedChatId && view.selectedChatId !== chatId
+        ? api.view(application.id, view.selectedChatId)
+        : next;
+    });
+  }
+
   function archiveActiveChat() {
-    if (!application || !activeChat) return;
-    void run("archive", () => api.archiveChat(application.id, activeChat.id));
+    if (activeChat) archiveChat(activeChat.id);
   }
 
   /** `told` is a message a card sends for the owner; the draft is kept. */
@@ -849,6 +860,7 @@ export function OperatorShell({
           onSection={selectSection}
           onChat={selectChat}
           onCreate={createChat}
+          onArchive={archiveChat}
           sections={visibleSections(activeSection, recordedHere)}
           hidden={hiddenSections(activeSection, recordedHere)}
           revealed={stackRevealed}

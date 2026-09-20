@@ -191,6 +191,45 @@ export function useConnectionRequests({
     cards.set(point, [...(cards.get(point) ?? []), card]);
   };
 
+  // Place access choices first so a domain form at the same message follows
+  // the "Use my domain" action that opened it.
+  if (access && accessContent && held.hostAddress)
+    place(
+      access.establishedAt ?? access.createdAt,
+      <RequestCard
+        key="ladder"
+        asks="can open it to more people"
+        state="done"
+        label="Who can open it"
+      >
+        <ReachLadder
+          application={application}
+          privateUrl={
+            accessContent.mode === "private"
+              ? (access.presentation?.url ?? null)
+              : null
+          }
+          home={home}
+          directUrl={home ? null : direct}
+          domainUrl={reach === "domain" ? publicUrl : null}
+          reach={reach}
+          unclaimed="unknown"
+          busy={poll ? "direct" : null}
+          onDirect={() => {
+            onTell(
+              home
+                ? "Please open the application to the devices on my home network, at the machine's own address."
+                : `Please make the application public at its direct address, ${direct}, without a domain.`,
+            );
+          }}
+          onDomain={async () => {
+            await post({ action: "open-domain" });
+            void read();
+          }}
+        />
+      </RequestCard>,
+    );
+
   for (const request of held.requests) {
     if (request.kind === "host")
       place(
@@ -258,44 +297,6 @@ export function useConnectionRequests({
         />,
       );
   }
-
-  // The ladder sits with the record that says the application can be opened.
-  if (access && accessContent && held.hostAddress)
-    place(
-      access.establishedAt ?? access.createdAt,
-      <RequestCard
-        key="ladder"
-        asks="can open it to more people"
-        state="done"
-        label="Who can open it"
-      >
-        <ReachLadder
-          application={application}
-          privateUrl={
-            accessContent.mode === "private"
-              ? (access.presentation?.url ?? null)
-              : null
-          }
-          home={home}
-          directUrl={home ? null : direct}
-          domainUrl={reach === "domain" ? publicUrl : null}
-          reach={reach}
-          unclaimed="unknown"
-          busy={poll ? "direct" : null}
-          onDirect={() => {
-            onTell(
-              home
-                ? "Please open the application to the devices on my home network, at the machine's own address."
-                : `Please make the application public at its direct address, ${direct}, without a domain.`,
-            );
-          }}
-          onDomain={async () => {
-            await post({ action: "open-domain" });
-            void read();
-          }}
-        />
-      </RequestCard>,
-    );
 
   const hostRequest = held.requests.find((request) => request.kind === "host");
   const journey: JourneyFacts = {

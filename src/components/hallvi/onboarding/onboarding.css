@@ -916,3 +916,29 @@ a.hv-ob-quiet {
     transition: none;
   }
 }
+
+.hv-ob-lookup-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--ob-ink-2);
+  font-size: 13px;
+}
+.hv-ob-lookup-status > svg {
+  flex: none;
+  margin-top: 2px;
+  font-size: 18px;
+}
+.hv-ob-lookup-status > div {
+  flex: 1;
+}
+.hv-ob-lookup-status strong {
+  color: var(--ob-ink);
+}
+.hv-ob-lookup-status p {
+  margin: 4px 0 0;
+}
+.hv-ob-lookup-status > span {
+  font-variant-numeric: tabular-nums;
+}

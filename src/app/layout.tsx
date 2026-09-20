@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { HostTitle } from "@/components/hallvi/host-name";
 import { StandInNotice } from "@/components/hallvi/stand-in-notice";
 
 import "./globals.css";
@@ -26,9 +27,22 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+      <body
+        className={`hv-app-frame ${geistSans.variable} ${geistMono.variable}`}
+      >
+        <aside className="hv-alpha-notice" aria-label="Hallvi alpha release">
+          <span className="hv-alpha-label">Alpha</span>
+          <div>
+            <strong>Hallvi is just getting started.</strong>
+            <p>
+              Expect frequent changes, especially to the views and how we
+              surface information. This is only the beginning.
+            </p>
+          </div>
+        </aside>
+        <div className="hv-app-content">{children}</div>
         <StandInNotice />
+        <HostTitle />
       </body>
     </html>
   );
