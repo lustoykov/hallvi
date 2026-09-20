@@ -167,7 +167,19 @@ wrong key               not signed        not signed, exit 1
 check cannot run        not signed ✗      could not be checked, exit 1
 ```
 
-The two outcomes now exit differently, so "could not check" is never again
+**And the messages were unreachable anyway.** `cmd; verdict=$?` never reaches
+the assignment under `set -e`: the failing command ends the script itself. The
+table above came from a harness that did not set `-e`, which is exactly why it
+reported them working. Under the real thing:
+
+```
+                        before            after
+wrong key               <silence>, 2      not signed, 1
+check cannot run        <silence>, 1      could not be checked, 1
+```
+
+The status is captured with `||` now, which is what keeps both refusals
+reachable, and the two outcomes exit differently so "could not check" is never
 reported as "not signed".
 
 **A failed look skipped the hourly interval.** The gate excluded cached errors,
@@ -182,6 +194,23 @@ Check now, inside the hour:       still forces one
 
 Both gates that decide how often to look now say the same thing; there were
 two, with different rules.
+
+## About the verification itself
+
+Two corrections to what was claimed earlier, both found by review rather than
+by me.
+
+**The dependencies did not match the lockfile.** This worktree had
+`pi-ai` and `pi-coding-agent` at 0.84.4 against a lockfile pinning 0.85.1, and
+`pi-agent-core` was not installed at all. Three type errors were reported here
+as "pre-existing SDK drift"; they were nothing of the kind. After
+`npm ci` under Node 22 and deleting a stale `.next`, `npx tsc --noEmit` is
+**clean** — zero errors — and `npm run build`, which type-checks everything
+including the tests, passes. Every number below was taken after that
+reinstall.
+
+**The `set -e` harness gap above** is the same category of mistake: a check
+that did not reproduce the conditions it claimed to check.
 
 ## About "all green"
 
