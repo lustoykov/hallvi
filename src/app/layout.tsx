@@ -33,10 +33,9 @@ export default function RootLayout({
         <aside className="hv-alpha-notice" aria-label="Hallvi alpha release">
           <span className="hv-alpha-label">Alpha</span>
           <div>
-            <strong>Hallvi is just getting started.</strong>
+            <strong>Hallvi is in alpha.</strong>
             <p>
-              Expect frequent changes, especially to the views and how we
-              surface information. This is only the beginning.
+              Expect frequent changes as we figure out the best user experience.
             </p>
           </div>
         </aside>
