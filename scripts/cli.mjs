@@ -29,6 +29,13 @@ import {
   saveInstalledPort,
 } from "./installed-ports.mjs";
 import { foreignService } from "./service-owner.mjs";
+import { FINISHED } from "./update-attempt.mjs";
+import {
+  currentAttempt,
+  dismissUpdate,
+  releaseView,
+  startUpdate,
+} from "./update-start.mjs";
 import { workerSocketPath } from "./worker-socket.mjs";
 import {
   piAccountLocation,
@@ -389,6 +396,122 @@ From another computer, run both commands from: hallvi remote`,
   );
 }
 
+/**
+ * The same update the interface starts, said in a terminal.
+ *
+ * It is deliberately the same code: `releaseView` and `startUpdate` are what
+ * the interface calls, the helper it starts is the same helper, and the
+ * installer that helper runs is the one an owner would run by hand. This
+ * command adds only the two things a terminal has and a page does not — a
+ * question with a yes, and a line per phase until it is over.
+ */
+async function update() {
+  const options = process.argv.slice(3);
+  const only = options.includes("--check");
+  const yes = options.includes("--yes") || options.includes("-y");
+
+  const running = currentAttempt(data);
+  if (options.includes("--status")) {
+    if (!running) return (console.log("No update has been attempted."), 0);
+    console.log(`${running.phase}: ${running.message}`);
+    if (running.helper?.log) console.log(`  log  ${running.helper.log}`);
+    return running.phase === "completed"
+      ? 0
+      : running.phase === "failed"
+        ? 1
+        : 0;
+  }
+  if (running?.running) {
+    console.log(
+      `An update to ${running.to?.version} is already ${running.phase}.`,
+    );
+    return follow();
+  }
+
+  const view = await releaseView({ program: app, data, check: true });
+  if (view.installed.kind === "development") {
+    console.log(`Hallvi from a development checkout at ${app}`);
+    console.log(`  ${view.installed.reason}`);
+    console.log("  Nothing here is replaced by a release. Use git.");
+    return 1;
+  }
+  console.log(
+    `Hallvi ${view.installed.version} (${view.installed.revision.slice(0, 7)}) on ${view.machine}`,
+  );
+  if (!view.ownKey)
+    console.log("  releases  trusting a key from this installation's settings");
+  if (view.checkError) console.log(`  ${view.checkError}`);
+  // A check that could not be made does not get to say there is nothing newer.
+  if (!view.available)
+    return view.checkError
+      ? (console.log(
+          `Hallvi could not read the ${view.channel} channel, so it cannot say whether a newer release exists.`,
+        ),
+        1)
+      : (console.log(`This is the newest ${view.channel} release.`), 0);
+
+  console.log(
+    `Hallvi ${view.available.version} is available${
+      view.available.size
+        ? ` (${Math.round(view.available.size / (1024 * 1024))} MB)`
+        : ""
+    }`,
+  );
+  console.log(`  notes  ${view.available.notes}`);
+  if (view.available.blocked)
+    return (console.log(`  ${view.available.blocked}`), 1);
+  if (only) return (console.log("Run `hallvi update` to install it."), 0);
+
+  if (!yes) {
+    if (!process.stdin.isTTY)
+      return (
+        console.log(
+          "Run `hallvi update --yes` to install it without a question.",
+        ),
+        0
+      );
+    console.log(
+      "Hallvi stops and starts again on the same address. Applications, conversations, credentials and ports are untouched.",
+    );
+    process.stdout.write(`Update to ${view.available.version}? [y/N] `);
+    const answer = await new Promise((done) => {
+      process.stdin.setEncoding("utf8");
+      process.stdin.once("data", (value) =>
+        done(String(value).trim().toLowerCase()),
+      );
+      process.stdin.resume();
+    });
+    process.stdin.pause();
+    if (answer !== "y" && answer !== "yes")
+      return (console.log("Nothing was changed."), 0);
+  }
+
+  await startUpdate({ program: app, data });
+  return follow();
+
+  /** One line per phase, until the attempt has an outcome. */
+  async function follow() {
+    let said = "";
+    for (let waited = 0; waited < 900; waited++) {
+      const attempt = currentAttempt(data);
+      if (!attempt) return (console.log("The update attempt disappeared."), 1);
+      const line = `${attempt.phase}: ${attempt.message}`;
+      if (line !== said) console.log((said = line));
+      if (FINISHED.includes(attempt.phase)) {
+        if (attempt.helper?.log && attempt.phase === "failed")
+          console.log(`  log  ${attempt.helper.log}`);
+        if (attempt.phase === "completed") dismissUpdate(data);
+        return attempt.phase === "completed" ? 0 : 1;
+      }
+      await new Promise((done) => setTimeout(done, 1000));
+    }
+    console.log(
+      "The update is taking longer than expected: hallvi update --status",
+    );
+    return 1;
+  }
+}
+
 function uninstall() {
   // This removes the directory above the program, so be certain that is an
   // installation: run from an unpacked archive or a checkout it would
@@ -421,6 +544,7 @@ const commands = {
   logs,
   remote,
   port,
+  update,
   uninstall,
 };
 const command = process.argv[2];
@@ -444,6 +568,8 @@ if (Object.hasOwn(commands, command)) {
              the two commands for using this installation from another computer
   port [number]
              show the interface port, or move every port to a new number
+  update [--check | --status | --yes]
+             install the newest release, as the interface does
   uninstall  remove the program and the service; keep all state`);
   process.exitCode = command ? 1 : 0;
 }

@@ -10,27 +10,34 @@ compiler. Each release archive includes Node.js 22 and dependencies built for
 its named platform. The installer checks the archive against its matching
 SHA-256 file before changing the installed program.
 
-[macOS](#macos) · [Linux](#linux) · [First deployment](#your-first-deployment) ·
-[Troubleshooting](#troubleshooting) · [Remote access](#on-another-machine) ·
-[Upgrade](#upgrade) · [Uninstall](#uninstall)
+[Download](#download) · [macOS](#macos) · [Linux](#linux) ·
+[First deployment](#your-first-deployment) · [Troubleshooting](#troubleshooting) ·
+[Remote access](#on-another-machine) · [Update](#update) · [Uninstall](#uninstall)
 
-## Get the package
+## Download
 
-Hallvi is in private beta. There is no public download yet. Obtain these three
-files from the maintainer, keeping them in the same directory:
+Hallvi is published at
+[github.com/lustoykov/hallvi/releases](https://github.com/lustoykov/hallvi/releases).
+Each release carries one archive per platform. Take three files from the newest
+release and keep them in the same directory:
 
-- `install-hallvi.sh`
-- `hallvi-0.1.0-darwin-arm64.tgz` **or** `hallvi-0.1.0-linux-x64.tgz`
-- the matching `.tgz.sha256` file
+| Your machine | Take |
+| --- | --- |
+| Apple-silicon macOS | `install-hallvi.sh`, `hallvi-<version>-darwin-arm64.tgz` and its `.tgz.sha256` |
+| Ubuntu 24.04 x64 | `install-hallvi.sh`, `hallvi-<version>-linux-x64.tgz` and its `.tgz.sha256` |
 
-The names above use version `0.1.0`; substitute the supplied version if it
-differs. Use the Mac archive on Apple silicon and the Linux archive on Ubuntu
-24.04 x64. The installer rejects a mismatched platform or checksum. Obtain the
-checksum through the same trusted release channel as the archive; a checksum
-does not authenticate an untrusted distributor.
+The installer rejects a mismatched platform, and checks the archive against its
+`.sha256` before it changes anything. That check catches a damaged download. It
+is not a signature: whoever serves the archive serves the checksum beside it,
+so what you are trusting for a first installation is github.com over HTTPS.
+Updates are different — Hallvi verifies those against a key it ships; see
+[Update](#update) and [the trust boundary](releases.md#what-trusts-what).
 
-Contributors creating a package should use [Build a release archive](#build-a-release-archive).
-Installing a supplied archive does not require a source checkout.
+Hallvi is in alpha, and **the first alpha release has not been published yet**.
+Until it is, obtain the three files from the maintainer and use them exactly as
+below. [Publishing a release](releases.md) is the maintainer's side.
+
+Installing does not need a source checkout, Node.js, npm, Python or a compiler.
 
 ## Supported machines
 
@@ -47,7 +54,7 @@ source-plus-compile archive and do not certify a new prebuilt archive.
 
 ## macOS
 
-1. In Terminal, go to the directory containing the supplied files and run:
+1. In Terminal, go to the directory you downloaded into and run:
 
    ```bash
    cd ~/Downloads
@@ -72,7 +79,7 @@ background service, not before login or while the Mac is asleep.
 These commands are for Ubuntu 24.04 x64 with a systemd user session. Use an
 ordinary user account over SSH or at the machine.
 
-1. From the directory containing the supplied files, run:
+1. From the directory you downloaded into, run:
 
    ```bash
    sh ./install-hallvi.sh ./hallvi-0.1.0-linux-x64.tgz
@@ -123,7 +130,10 @@ server when needed.
 | Repository inspection says Docker is unavailable | Start the local Docker Engine and retry, or choose **On this computer** in **Settings → Workspace**. Hallvi never switches modes automatically. |
 | Linux service does not survive logout or start at boot | Check `~/.local/bin/hallvi status` and follow its lingering instruction. |
 | Linux reports that it cannot connect to the user service manager | Run from a normal login session for the installing user on a systemd machine, rather than through `sudo`. |
-| Upgrade reports a schema mismatch | Keep the installed version and follow [Upgrade](#upgrade). Do not delete the database to bypass the check. |
+| An update reports a schema mismatch | Keep the installed version and read [Update](#update). Do not delete the database to bypass the check. |
+| An update says the release is not signed by the key this Hallvi trusts | Stop. Nothing was downloaded. Check you are looking at [the real releases page](https://github.com/lustoykov/hallvi/releases), and tell the maintainer. |
+| An update says Pi is working | Let the conversation finish, then start the update again. The package it downloaded has already been checked. |
+| An update stopped without finishing | Hallvi is on the version it had. Read `~/.local/share/hallvi/logs/update.log`, then try again. |
 
 When reporting a problem, include the installed revision from
 `~/.local/bin/hallvi status`, your OS and the relevant error. Remove credentials
@@ -136,6 +146,7 @@ and private data from any logs you share.
 | Program, its Node.js and dependencies | `~/.local/lib/hallvi` | Replaced / removed |
 | The `hallvi` command | `~/.local/bin/hallvi` | Replaced / removed |
 | Database, credentials, SSH keys, conversations, logs | `~/.local/share/hallvi` | Kept |
+| What the last update did, and its log | `~/.local/share/hallvi/update-attempt.json`, `logs/update.log` | Kept |
 | Model account (ChatGPT connection) | `~/.config/hallvi/pi` | Kept |
 | Service definition | `~/Library/LaunchAgents/com.hallvi.plist` or `~/.config/systemd/user/hallvi.service` | Rewritten by `start` |
 
@@ -145,7 +156,9 @@ the loaded service runs from a different program directory than the command.
 
 Optional settings go in `~/.local/share/hallvi/hallvi.env`, one
 `NAME=value` per line, read at every start: `HALLVI_PORT` to move the
-interface. A release with a configured GitHub App can connect private
+interface, and `HALLVI_RELEASE_SOURCE` / `HALLVI_RELEASE_KEY` to follow a
+release source of your own
+([testing a release](releases.md#testing-a-release-without-publishing-one)). A release with a configured GitHub App can connect private
 repositories; see [GitHub setup](integrations/github.md). Public repositories
 need no login.
 
@@ -257,8 +270,9 @@ ssh -F ~/.ssh/hallvi-mac-mini -N mac-mini
 The second command stays open and says nothing while it is connected. Every
 forward explicitly binds the laptop's `127.0.0.1`, even when its SSH defaults
 allow forwarded ports on other interfaces. Open the address the installer
-printed, for example <http://127.0.0.1:5747>. The tab title and the line beside
-the product name say which machine you have reached. A private application
+printed, for example <http://127.0.0.1:5747>. The tab title says which machine
+you have reached, and so does the version at the foot of the sidebar when you
+click it. A private application
 link Pi opens, for example `http://127.0.0.1:5757`, works in the laptop's
 browser as it is written. Connecting ChatGPT and GitHub uses device codes, so
 both work through the same connection with nothing further to forward. If the
@@ -282,22 +296,75 @@ Keeping that machine updated, and its SSH access protected, is yours to
 do. Prefer a machine other than the one your applications run on; the concept
 note explains why.
 
-## Upgrade
+## Update
 
-Obtain the new platform archive and checksum, then run `install-hallvi.sh`
-against it. Verification, unpacking, native-module loading and the database
-compatibility check happen while the old service keeps serving. The installer
-then stops the service, swaps the program and returns the service to the state
-it found: running if it was running, stopped if you had stopped it. A failed
-check or stop leaves the old installation in place; if the replacement fails
-to start, the installer restores the previous program. State is not touched.
+<a id="upgrade"></a>
 
-A new version that changes the database schema is refused before the installed
-program is replaced. It says which versions are involved and changes nothing.
-If a managed service encounters an incompatible database later, it stops after
-reporting the mismatch instead of restarting indefinitely. Until schema
-migrations exist, the choices are to keep or reinstall the version that wrote
-the database, or to move the database aside and start fresh.
+Hallvi updates itself. Its version sits at the bottom of the sidebar, under
+**Settings**; when a release is waiting it says **Update available** under it.
+Click that line and press **Update**. Or, in a terminal:
+
+```bash
+hallvi update            # look, then ask before installing
+hallvi update --check    # look only
+hallvi update --yes      # install without the question
+hallvi update --status   # what the last attempt did
+```
+
+They are the same update. The sidebar and the command find the release the
+same way, check it the same way, and hand the work to the same installer; the
+command adds only a question with a yes and a line per step.
+
+**What happens.** Hallvi looks for the newest release on the `alpha` channel
+and reads its signed manifest. Nothing is believed before that signature is
+checked against the key Hallvi ships — not the version, not the platform, not
+the address to download from. It then downloads the archive, refusing anything
+that is not the exact size and SHA-256 the manifest named, unpacks it, and
+reads the release record inside to confirm it is the release the manifest
+described. Only then does it stop the service, swap the program and start
+again. It is finished when the new interface answers with the revision that was
+installed and the Pi worker is back.
+
+**What it keeps.** Applications, conversations, evidence, credentials, SSH
+keys, the ChatGPT connection, your `hallvi.env` settings and your ports. The
+update returns the service to the state it found: running if it was running,
+stopped if you had stopped it. Unsent text in a conversation is kept too.
+
+**Where it is installed.** The machine running Hallvi. Reached through an SSH
+connection from a laptop, it updates the machine at the other end, keeps its
+ports, and the page comes back on the same address when it restarts.
+
+**While Pi is working.** Downloading happens alongside whatever Pi is doing.
+Installing does not: before the service stops, Hallvi asks the worker to take
+no new work and, in the same answer, whether any is still in hand. A
+conversation that is running — including one waiting for your approval — stops
+the update there, with the package already downloaded and checked. Let the work
+finish and start the update again.
+
+**When it fails.** Anything that can be checked is checked while the old
+version is still serving, so a refusal changes nothing. If the new version is
+installed but does not start, the installer puts the previous program back and
+starts it, and both the sidebar and `hallvi update --status` say which version
+you are on. The helper's own account is in `~/.local/share/hallvi/logs/update.log`.
+
+Only one update runs at a time; a second is told what the first is doing.
+Installing is always something you press: Hallvi never replaces itself on its
+own. It looks for a release at most once a day, and keeps the answer in
+between, so opening a page never waits on the network.
+
+**A development checkout** says what it is and offers nothing. `git` is how it
+changes.
+
+A new version that needs a different database schema is refused before anything
+is downloaded, naming both schemas. It is refused a second time by the
+installer, against the real database, before the program is replaced. If a
+running service meets an incompatible database later, it stops after reporting
+the mismatch instead of restarting for ever. Until migrations exist, the
+choices are to keep or reinstall the version that wrote the database, or to
+move the database aside and start fresh. Nothing deletes or rewrites it.
+
+You can still install an archive by hand with `install-hallvi.sh`, which does
+the same thing without the release manifest.
 
 ## Uninstall
 
@@ -312,8 +379,10 @@ discard the state as well, delete those two directories yourself.
 
 ## Build a release archive
 
-This section is for contributors preparing an archive for someone else. From
-an authorized source checkout using Node.js 22 and locked dependencies:
+Publishing a release is [its own document](releases.md): the version, the
+signed manifest, the workflow and the one secret it needs. This section is the
+single archive underneath it, for a contributor who wants one by hand. From an
+authorized source checkout using Node.js 22 and locked dependencies:
 
 ```bash
 npm ci
@@ -328,7 +397,8 @@ that platform. It verifies the native modules load, then writes
 `dist/install-hallvi.sh`. Distribute the three files together with the source
 revision and verification performed on that candidate. The
 [beta walkthrough](beta-walkthrough.md) defines the fresh-user acceptance
-check. Packaging does not publish a release.
+check. Packaging does not publish a release, and neither does merging a pull
+request: [Publishing a release](releases.md) is run by hand and leaves a draft.
 
 When packaging from a source copy without `.git`, set
 `HALLVI_SOURCE_REVISION` to the full commit SHA that copy came from. The
@@ -345,10 +415,13 @@ do not share a database by default.
 
 ## Limits today
 
-- No download link or signed release; the package is built from a checkout.
-  Public binaries with private source versus invited testers with repository
-  access remains an owner decision. Shipped JavaScript can be inspected even
-  when the source repository is private.
+- No alpha release is published yet. The workflow that builds and signs one is
+  ready and has never been run; the public download page is therefore empty,
+  and the maintainer still supplies archives by hand. Everything that workflow
+  needs is in place; see [Publishing a release](releases.md).
+- A first installation trusts github.com over HTTPS, not a signature. Only
+  updates are verified against the key Hallvi ships; a verifier taken out of the
+  archive it is verifying would prove nothing.
 - The [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md)
   was installed on Apple-silicon macOS and Ubuntu 24.04 x64. A fresh ChatGPT
   connection on the installed Ubuntu controller drove real public-repository
@@ -356,7 +429,12 @@ do not share a database by default.
   acceptance remains open; each later archive needs its own trial.
 - macOS Intel, Linux arm64 and other Linux distributions have no prebuilt
   release target yet.
-- No schema migrations between versions (see Upgrade).
+- No schema migrations between versions (see [Update](#update)). An update to a
+  release needing another schema is refused; nothing migrates and nothing is
+  deleted.
+- Updates are only ever started by the owner. There is no automatic
+  installation, no scheduled one, and no way to ask for one.
+- One update at a time, and only the last attempt is remembered.
 - On this computer, Pi's workspace is a precaution rather than isolation; see
   [Pi's workspace](#pis-workspace). A first search there may download `rg`
   or `fd` into the temporary directory when neither is installed.

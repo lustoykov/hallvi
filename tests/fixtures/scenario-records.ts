@@ -333,7 +333,7 @@ export function scenarios(): Scenario[] {
       id: rich,
       name: "Scenario · everything",
       shows:
-        "Every destination populated at once, with awkward values: long names, Unicode, odd units.",
+        "Every destination populated at once, with awkward values: long names, non-ASCII, odd units.",
       records: richRecords(rich),
     },
     {
@@ -668,8 +668,19 @@ function richRecords(id: string): SavedInformation[] {
           parts: [
             {
               id: long,
+              // A real word, not mojibake.
+              //
+              // This was `Ünïcøde Wéb`, which exercised the same code path and
+              // looked to a reader exactly like text the product had failed to
+              // decode — on the one scenario whose screenshots end up in front
+              // of people. A Norwegian name carries a non-ASCII letter in the
+              // position that matters most, the first one, and reads as
+              // something somebody would actually run. Keep it a real name if
+              // this ever changes again; the awkwardness worth testing is in
+              // the container name, the mount point and the subdomain, all of
+              // which are still here.
               kind: "web",
-              name: "Ünïcøde Wéb",
+              name: "Øyeblikk",
               role: "the web app",
               plain: "the web app",
             },
@@ -703,12 +714,11 @@ function richRecords(id: string): SavedInformation[] {
         title: "The web process is healthy",
         views: ["processes"],
         facts: [
-          fact("product", "Ünïcøde Wéb", "identity", "reported"),
+          fact("product", "Øyeblikk", "identity", "reported"),
           fact("port", "127.0.0.1:8443 → 8443/tcp"),
           fact(
             "image",
-            "registry.example.com:5000/team/ünïcøde-web@sha256:" +
-              "c".repeat(64),
+            "registry.example.com:5000/team/øyeblikk@sha256:" + "c".repeat(64),
             "identity",
           ),
           fact(
@@ -1064,7 +1074,7 @@ function richRecords(id: string): SavedInformation[] {
         services: [
           {
             process: long,
-            image: "registry.example.com:5000/team/ünïcøde-web:2.4.0",
+            image: "registry.example.com:5000/team/øyeblikk:2.4.0",
             digest: "sha256:" + "c".repeat(64),
           },
           {
@@ -1272,8 +1282,39 @@ function paperlessRecords(id: string): SavedInformation[] {
               role: holds,
               plain: holds,
             })),
+            // Two ways in, declared on the map and stated as their own door
+            // subjects under the same ids. This is the shape the contract
+            // asks for: the part carries the place, the door record carries
+            // the port, who it is open to and whether anything answered.
+            {
+              id: "paperless-http",
+              kind: "gate" as const,
+              name: "Port 8000",
+              role: "the way in to the site",
+              plain: "how people reach it",
+            },
+            {
+              id: "paperless-db-port",
+              kind: "gate" as const,
+              name: "Port 5432",
+              role: "the database port",
+              plain: "the way in to the database",
+            },
           ],
           edges: [
+            // What each port leads to. Nothing else on record says which
+            // service a port is for, and without these the map can only put
+            // a port on the boundary and leave the reader to guess.
+            {
+              from: "paperless-http",
+              to: "paperless-webserver",
+              network: "loopback" as const,
+            },
+            {
+              from: "paperless-db-port",
+              to: "paperless-postgres",
+              network: "private" as const,
+            },
             {
               from: "paperless-webserver",
               to: "paperless-postgres",
@@ -1311,6 +1352,39 @@ function paperlessRecords(id: string): SavedInformation[] {
             },
           ],
         },
+      },
+    ),
+    // The two doors the map declares, each stating its own port and who it
+    // is open to. The database port is open to the private network and
+    // something answered on it, which is why the map draws a line from it to
+    // PostgreSQL: a record says which service that port is for.
+    states(
+      id,
+      { kind: "door", id: "paperless-http" },
+      {
+        at: ago(2 * HOUR),
+        title: "The site is reachable through the tunnel",
+        views: ["security"],
+        facts: [
+          fact("port", "8000"),
+          fact("sources", "Server loopback via SSH tunnel"),
+        ],
+        checks: [check("open", "passed", "reachability")],
+      },
+    ),
+    states(
+      id,
+      { kind: "door", id: "paperless-db-port" },
+      {
+        at: ago(2 * HOUR),
+        title: "The database port is open on the private network",
+        views: ["security"],
+        facts: [fact("port", "5432"), fact("sources", "the container network")],
+        checks: [
+          check("open", "passed", "reachability", {
+            detail: "answered from the compose network",
+          }),
+        ],
       },
     ),
     states(

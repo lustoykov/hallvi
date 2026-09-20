@@ -30,14 +30,14 @@ export default function RootLayout({
       <body
         className={`hv-app-frame ${geistSans.variable} ${geistMono.variable}`}
       >
+        {/* The chip is the word. Saying "Hallvi is in alpha" beside it said
+            alpha twice and the product name a third time on a screen that
+            already carries it; what is worth a line is what alpha means. */}
         <aside className="hv-alpha-notice" aria-label="Hallvi alpha release">
           <span className="hv-alpha-label">Alpha</span>
-          <div>
-            <strong>Hallvi is in alpha.</strong>
-            <p>
-              Expect frequent changes as we figure out the best user experience.
-            </p>
-          </div>
+          <p>
+            Expect frequent changes as we figure out the best user experience.
+          </p>
         </aside>
         <div className="hv-app-content">{children}</div>
         <StandInNotice />

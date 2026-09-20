@@ -113,15 +113,15 @@ textarea:focus-visible {
 .hv-alpha-notice {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 14px 24px;
+  gap: 12px;
+  padding: 9px 24px;
   color: var(--navy);
   background: var(--amber-soft);
   border-bottom: 1px solid var(--line);
 }
 .hv-alpha-label {
   flex: none;
-  padding: 5px 9px;
+  padding: 3px 9px;
   border-radius: var(--radius-s);
   background: var(--navy);
   color: white;
@@ -130,13 +130,8 @@ textarea:focus-visible {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.hv-alpha-notice strong {
-  display: block;
-  font-size: 16px;
-  line-height: 1.4;
-}
 .hv-alpha-notice p {
-  margin: 3px 0 0;
+  margin: 0;
   max-width: 90ch;
   font-size: 13px;
   line-height: 1.5;

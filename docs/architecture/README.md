@@ -31,6 +31,7 @@ Each of these is linked from the document that owns its decision.
 | [Who owns a conversation's lifecycle](conversation-lifecycle.md) | [Operator design](../operator-design.md#interaction-while-pi-is-busy) |
 | [Who holds a credential, and who may read it](credential-lifecycle.html) | [Roadmap](../../ROADMAP.md) |
 | [Where the way in is answered](private-access-reachability.html) | [Roadmap](../../ROADMAP.md) |
+| [What trusts what in a release](../releases.md#what-trusts-what) | [Publishing a release](../releases.md) |
 
 ## Historical
 

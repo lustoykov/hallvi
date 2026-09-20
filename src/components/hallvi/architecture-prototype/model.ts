@@ -64,6 +64,28 @@ export interface Part {
   evidence: Evidence;
   /** Volumes: the part that mounts them. Private services: who calls them. */
   owner?: string;
+  /**
+   * Gates: whether this way in is open, or a port that refuses.
+   *
+   * The map draws both — a closed port is part of what is let in, and Security
+   * lists it — but only an open one is a gap in the wall, and only an open one
+   * may be counted as a door that is open. Read from the check Pi wrote, never
+   * from the application's own reach: `postgres` refusing from outside says
+   * nothing about how far the application can be reached from, and the two
+   * were the same sentence while the map only ever drew one door.
+   */
+  admits?: "open" | "refused" | "unknown";
+  /** Gates: who the door's own record says may use it. */
+  sources?: string;
+  /**
+   * Gates: the part this port leads to, when a record says which.
+   *
+   * Read from a topology edge leaving the gate, the same way a volume's
+   * `owner` is read from its disk edge — and never from the port number or
+   * the subject's name. A port called `postgres` is not evidence that
+   * PostgreSQL is behind it.
+   */
+  serves?: string;
   destination?: ApplicationSection;
   /** Parts with no state of their own (the controller) hide their tag. */
   quiet?: boolean;
