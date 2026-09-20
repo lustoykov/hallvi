@@ -168,17 +168,130 @@
 .hv-application-navigation > nav::-webkit-scrollbar-thumb:hover {
   background-color: #bcc5d4;
 }
-.hv-navigation-settings {
-  display: flex;
+.hv-navigation-foot {
   flex: none;
-  gap: 10px;
-  align-items: center;
-  padding: 14px 10px 0;
   margin-top: auto;
+  padding-top: 14px;
   border-top: 1px solid var(--nav-groove);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%);
+}
+.hv-navigation-settings {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0 10px;
   color: var(--muted);
   text-decoration: none;
+}
+
+/* Hallvi's own version. A program's version belongs at the bottom, dim,
+   saying nothing until it has something to say — so this is one line, and a
+   second word only while a release is waiting or an update is running. */
+.hv-this-hallvi {
+  position: relative;
+  margin-top: 6px;
+}
+/* Scoped past `.hv-application-navigation button`, which gives every button
+   in this sidebar a row's height, padding and type size. This is a caption,
+   not a row: two stacked lines that keep the version whole when the second
+   one appears. */
+.hv-navigation-foot .hv-this-hallvi-line {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-height: 0;
+  padding: 2px 10px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.hv-navigation-foot .hv-this-hallvi-line:hover {
+  background: none;
+  color: var(--ink);
+}
+.hv-this-hallvi-ready {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--link, #315bc6);
+  white-space: nowrap;
+}
+.hv-this-hallvi-phase {
+  margin: 0;
+  padding: 0 10px 2px;
+  font-size: 11px;
+  color: var(--working-text, #2852a6);
+}
+.hv-this-hallvi-phase.hv-update-completed {
+  color: var(--verified-text, #0f7a4e);
+}
+.hv-this-hallvi-phase.hv-update-failed {
+  color: var(--failed, #a6312b);
+}
+.hv-this-hallvi-phase.hv-update-blocked {
+  color: var(--amber, #b25a16);
+}
+/* Beside the line, not under it. In the flow it grew the footer by a hundred
+   and fifty pixels and pushed Settings and the conversations about; as a
+   layer it costs the sidebar nothing and goes away when it is dismissed. */
+.hv-this-hallvi-panel {
+  position: absolute;
+  bottom: 0;
+  left: calc(100% - 4px);
+  z-index: 30;
+  width: 268px;
+  padding: 12px;
+  border: 1px solid var(--line, #e7e9ee);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 10px 30px rgb(28 52 110 / 14%);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.hv-this-hallvi-panel p {
+  margin: 0;
+}
+.hv-this-hallvi-panel p + p,
+.hv-this-hallvi-offer,
+.hv-this-hallvi-actions {
+  margin-top: 6px;
+}
+.hv-this-hallvi-quiet {
+  color: var(--muted);
+}
+.hv-this-hallvi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.hv-navigation-foot .hv-this-hallvi-actions button {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link, #315bc6);
+  font-size: 11px;
+  cursor: pointer;
+}
+.hv-navigation-foot .hv-this-hallvi-actions button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.hv-navigation-foot .hv-this-hallvi-go {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--blue, #285ad8);
+  color: white;
+  font-weight: 600;
+}
+.hv-navigation-foot .hv-this-hallvi-go:hover:not(:disabled) {
+  background: var(--blue-hover, #2350c4);
 }
 .hv-adaptive-shell .hv-workspace {
   grid-column: 2;
@@ -255,7 +368,7 @@
     padding: 0;
   }
   .hv-conversations-heading > span,
-  .hv-navigation-settings {
+  .hv-navigation-foot {
     display: none;
   }
   .hv-adaptive-shell .hv-topbar {

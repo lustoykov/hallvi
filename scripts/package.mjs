@@ -124,6 +124,14 @@ try {
     "scripts/installed-ports.mjs",
     "scripts/service-owner.mjs",
     "scripts/worker-socket.mjs",
+    // Updating itself: the trusted key, the release source, and the helper
+    // that outlives the service while it is replaced.
+    "scripts/release-trust.mjs",
+    "scripts/release-source.mjs",
+    "scripts/update-attempt.mjs",
+    "scripts/update-service.mjs",
+    "scripts/update-start.mjs",
+    "scripts/update-helper.mjs",
     "scripts/pi-workspace",
     "dist/worker.mjs",
     "dist/worker.mjs.map",

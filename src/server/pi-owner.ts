@@ -109,6 +109,12 @@ export function sessionOwner(
 ) {
   /** The worker is going away: Pi keeps what it has, and nothing goes on. */
   let closing = false;
+  /**
+   * An update is about to stop this worker, and has asked it to stop taking
+   * work first. The deadline is not a policy: it is what keeps a held worker
+   * from staying held for ever if whoever asked never comes back.
+   */
+  let heldUntil = 0;
   const opened = new Map<string, Opened>();
   /** One thing at a time per conversation; reads of an open one skip this. */
   const lines = new Map<string, Promise<unknown>>();
@@ -321,6 +327,20 @@ export function sessionOwner(
     return transcript;
   }
 
+  /**
+   * Refuses, synchronously, before anything is awaited. That is the point:
+   * `hold` sets the deadline in its own turn of the event loop, so a message
+   * that arrives afterwards cannot get past this line and then be counted as
+   * "nothing was running" by the check that follows.
+   */
+  function assertTaking() {
+    if (Date.now() < heldUntil)
+      throw new WorkerRefusal(
+        "Hallvi is installing an update, so it is not taking new work. Try again once it has restarted.",
+        "updating",
+      );
+  }
+
   const actions = {
     async transcript(scope: Scope): Promise<Transcript> {
       const open = opened.get(scope.chatId);
@@ -365,7 +385,8 @@ export function sessionOwner(
     },
 
     /** Resolves once Pi has durably taken the message, and not before. */
-    send: (scope: Scope, message: SentMessage) =>
+    send: (scope: Scope, message: SentMessage) => (
+      assertTaking(),
       inLine(scope.chatId, async () => {
         assertChatWritable(loadChat(scope.applicationId, scope.chatId).chat);
         const conversation = hasHistory(scope)
@@ -404,10 +425,12 @@ export function sessionOwner(
         }
         drive(live, message.id, () => run(live, message.id));
         return { accepted: true };
-      }),
+      })
+    ),
 
     /** Pi goes on with what an interruption left: its operation, its queue. */
-    continue: (scope: Scope) =>
+    continue: (scope: Scope) => (
+      assertTaking(),
       inLine(scope.chatId, async () => {
         const viewing = await ensure(scope);
         const snapshot = await viewing.fresh();
@@ -429,7 +452,29 @@ export function sessionOwner(
           drive(live, operationId, () => run(live, operationId));
         }
         return {};
-      }),
+      })
+    ),
+
+    /**
+     * Stop taking work, then say whether any is still going on.
+     *
+     * The order is what makes this usable by an update: new messages are
+     * refused from the moment this is asked, and only then does it wait for
+     * whatever was already in hand to settle and count what is still running.
+     * A turn cannot start in between, so a `busy` of nothing means nothing.
+     */
+    async hold(_scope: Scope, message: unknown) {
+      const minutes = (message as { minutes?: number })?.minutes ?? 20;
+      heldUntil = Date.now() + minutes * 60_000;
+      await Promise.allSettled([...lines.values()]);
+      return { held: true, busy: owner.live(), until: heldUntil };
+    },
+
+    /** Take work again. An update that cannot go on calls this. */
+    async release() {
+      heldUntil = 0;
+      return { held: false };
+    },
 
     /** Pi's abort ends its operation and empties its queues. */
     async stop(scope: Scope) {
@@ -477,7 +522,7 @@ export function sessionOwner(
     },
   };
 
-  return {
+  const owner = {
     /**
      * A crash never reaches a worker's own cleanup, so evidence still marked
      * running belongs to work that no longer exists. Only the owner may say
@@ -515,6 +560,7 @@ export function sessionOwner(
         throw new AggregateError(errors, "Pi session cleanup failed.");
     },
   };
+  return owner;
 }
 
 /** Become the owner of Pi's sessions for this database, unless there is one. */

@@ -3,43 +3,49 @@
 // Which Hallvi this is.
 //
 // A controller is opened at a loopback address, on the machine itself or
-// through an SSH connection from another one, and nothing on the page said
-// which. With two installations that is two identical tabs. The machine's name
-// goes in the tab title and beside the product name, quietly, everywhere.
+// through an SSH connection from another one, and nothing said which. With two
+// installations that is two identical tabs, so the machine's name goes in the
+// tab title, where two tabs are told apart. The version at the foot of the
+// sidebar names it too, for anyone who asks the page itself.
 
 import { useEffect, useState } from "react";
 
-let asked: Promise<string | null> | undefined;
+interface ThisHallvi {
+  name: string | null;
+  /** A newer release the last check found, or nothing. */
+  update: { version: string } | null;
+}
 
-function hostName() {
+let asked: Promise<ThisHallvi> | undefined;
+
+function thisHallvi() {
   asked ??= fetch("/api/host", { cache: "no-store" })
     .then((response) => (response.ok ? response.json() : null))
-    .then((body) => (typeof body?.name === "string" ? body.name : null))
-    .catch(() => null);
+    .then((body) => ({
+      name: typeof body?.name === "string" ? body.name : null,
+      update:
+        typeof body?.update?.version === "string"
+          ? { version: body.update.version as string }
+          : null,
+    }))
+    .catch(() => ({ name: null, update: null }));
   return asked;
 }
 
-export function useHostName() {
-  const [name, setName] = useState<string | null>(null);
+function useThisHallvi() {
+  const [value, setValue] = useState<ThisHallvi>({ name: null, update: null });
   useEffect(() => {
     let alive = true;
-    void hostName().then((found) => alive && setName(found));
+    void thisHallvi().then((found) => alive && setValue(found));
     return () => {
       alive = false;
     };
   }, []);
-  return name;
+  return value;
 }
 
-/** "on mac-mini", for beside the product name. Nothing until it is known. */
-export function HostName({ className }: { className?: string }) {
-  const name = useHostName();
-  if (!name) return null;
-  return (
-    <span className={className} title={`This Hallvi runs on ${name}`}>
-      on {name}
-    </span>
-  );
+export function useHostName() {
+  return useThisHallvi().name;
 }
 
 /**

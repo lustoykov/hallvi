@@ -486,6 +486,16 @@ export function ChatPane({
     !connections.journey?.read;
   const showFirstWelcome =
     firstConversation && !requestPending && pendingMessage === null;
+  /**
+   * The welcome is already asking for ChatGPT, with the button that connects
+   * it. While it is on screen the strip above the composer would be the third
+   * place saying so, after it and the composer's own placeholder, so it waits
+   * until the welcome has gone.
+   */
+  const welcomeAsksForModel =
+    showFirstWelcome &&
+    Boolean(connections.journey && view.application) &&
+    Boolean(onModelConnected);
 
   /**
    * A repository Hallvi cannot read is a request in this conversation, not a
@@ -1032,31 +1042,28 @@ export function ChatPane({
             </div>
           </div>
         )}
-        {application &&
-          !piReady &&
-          !modelOpen &&
-          (!firstConversation || Boolean(composer.trim())) && (
-            <div className="hv-pi-required">
-              <WarningCircle weight="bold" />
-              <div>
-                <strong>Connect ChatGPT to chat</strong>
-                <p>
-                  Your applications and chat history are still available, and
-                  anything you have typed here is kept.
-                </p>
-              </div>
-              {/* Connecting happens here, in the conversation, so what has
+        {application && !piReady && !modelOpen && !welcomeAsksForModel && (
+          <div className="hv-pi-required">
+            <WarningCircle weight="bold" />
+            <div>
+              <strong>Connect ChatGPT to chat</strong>
+              <p>
+                Your applications and chat history are still available, and
+                anything you have typed here is kept.
+              </p>
+            </div>
+            {/* Connecting happens here, in the conversation, so what has
                   been typed never has to travel. Settings stays a link for
                   someone who wants the model preferences. */}
-              {onModelConnected && !modelOpen ? (
-                <button type="button" onClick={openModel}>
-                  Connect ChatGPT
-                </button>
-              ) : (
-                <Link href={settingsHref}>Open Settings</Link>
-              )}
-            </div>
-          )}
+            {onModelConnected && !modelOpen ? (
+              <button type="button" onClick={openModel}>
+                Connect ChatGPT
+              </button>
+            ) : (
+              <Link href={settingsHref}>Open Settings</Link>
+            )}
+          </div>
+        )}
         <div
           className={`hv-composer-box${composerDisabled ? " disabled" : ""}`}
         >

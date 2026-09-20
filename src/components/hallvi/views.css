@@ -1248,20 +1248,27 @@
 .hv-navigation-home {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   padding: 3px 10px 5px;
   font-size: var(--view-meta);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--muted);
   text-decoration: none;
 }
-/* Which machine this Hallvi runs on. Not shouted: the name is lower case. */
+/* Which machine this Hallvi runs on. Not shouted: the name is lower case, and
+   a long one is cut rather than wrapped onto a second line — the whole name is
+   in its title and in the tab title. */
 .hv-navigation-host {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   letter-spacing: 0;
   text-transform: none;
   font-weight: 450;
+}
+.hv-navigation-home {
+  min-width: 0;
 }
 .hv-navigation-home:hover {
   color: var(--ink);

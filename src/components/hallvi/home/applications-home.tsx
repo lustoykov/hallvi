@@ -20,7 +20,6 @@ import {
   applicationColors,
   type ApplicationKind,
 } from "./application-kind";
-import { HostName } from "../host-name";
 import { PREVIEWS } from "./interface-previews";
 import s from "./home.module.css";
 
@@ -130,7 +129,6 @@ export function ApplicationsHome({
             <b />
           </span>
           Hallvi
-          <HostName className={s.host} />
         </Link>
         <Link className={s.settings} href="/setup/connections">
           <GearSix aria-hidden="true" />
