@@ -1263,6 +1263,21 @@
   text-transform: none;
   font-weight: 450;
 }
+/* A newer Hallvi exists. Two words, the weight of a caption, and gone once
+   the update is installed — it is information, not a demand. */
+.hv-update-hint {
+  margin-left: 8px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--link, #315bc6);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hv-update-hint:hover {
+  text-decoration: underline;
+}
 .hv-navigation-home:hover {
   color: var(--ink);
 }

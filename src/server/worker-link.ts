@@ -112,15 +112,23 @@ export async function serveWorker(
         outgoing.writeHead(status, { "Content-Type": "application/json" });
         outgoing.end(JSON.stringify(value));
       };
-      handle((incoming.url ?? "/").slice(1), JSON.parse(text || "null")).then(
-        (value) => reply(200, value ?? {}),
-        (error) =>
-          reply(error instanceof WorkerRefusal ? 409 : 500, {
-            error:
-              error instanceof Error ? error.message : "The worker failed.",
-            code: error instanceof WorkerRefusal ? error.code : "failed",
-          }),
-      );
+      // Started in its own turn so that a handler which refuses before it
+      // awaits anything — an unknown action, or one that is not being taken
+      // right now — becomes this answer rather than an exception nobody
+      // catches, which would take the worker down with it.
+      Promise.resolve()
+        .then(() =>
+          handle((incoming.url ?? "/").slice(1), JSON.parse(text || "null")),
+        )
+        .then(
+          (value) => reply(200, value ?? {}),
+          (error) =>
+            reply(error instanceof WorkerRefusal ? 409 : 500, {
+              error:
+                error instanceof Error ? error.message : "The worker failed.",
+              code: error instanceof WorkerRefusal ? error.code : "failed",
+            }),
+        );
     });
   });
   await new Promise<void>((resolve, reject) => {

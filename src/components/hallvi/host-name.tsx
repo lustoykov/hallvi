@@ -7,38 +7,72 @@
 // which. With two installations that is two identical tabs. The machine's name
 // goes in the tab title and beside the product name, quietly, everywhere.
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
-let asked: Promise<string | null> | undefined;
+interface ThisHallvi {
+  name: string | null;
+  /** A newer release the last check found, or nothing. */
+  update: { version: string } | null;
+}
 
-function hostName() {
+let asked: Promise<ThisHallvi> | undefined;
+
+function thisHallvi() {
   asked ??= fetch("/api/host", { cache: "no-store" })
     .then((response) => (response.ok ? response.json() : null))
-    .then((body) => (typeof body?.name === "string" ? body.name : null))
-    .catch(() => null);
+    .then((body) => ({
+      name: typeof body?.name === "string" ? body.name : null,
+      update:
+        typeof body?.update?.version === "string"
+          ? { version: body.update.version as string }
+          : null,
+    }))
+    .catch(() => ({ name: null, update: null }));
   return asked;
 }
 
-export function useHostName() {
-  const [name, setName] = useState<string | null>(null);
+function useThisHallvi() {
+  const [value, setValue] = useState<ThisHallvi>({ name: null, update: null });
   useEffect(() => {
     let alive = true;
-    void hostName().then((found) => alive && setName(found));
+    void thisHallvi().then((found) => alive && setValue(found));
     return () => {
       alive = false;
     };
   }, []);
-  return name;
+  return value;
 }
 
-/** "on mac-mini", for beside the product name. Nothing until it is known. */
+export function useHostName() {
+  return useThisHallvi().name;
+}
+
+/**
+ * "on mac-mini", for beside the product name, and — when the last check found
+ * one — the quietest possible word that a newer Hallvi exists. It is a link to
+ * the place that can install it and nothing else: no badge, no count, and
+ * nothing that comes back after it has been read, because the answer only
+ * changes when a release does.
+ */
 export function HostName({ className }: { className?: string }) {
-  const name = useHostName();
+  const { name, update } = useThisHallvi();
   if (!name) return null;
   return (
-    <span className={className} title={`This Hallvi runs on ${name}`}>
-      on {name}
-    </span>
+    <>
+      <span className={className} title={`This Hallvi runs on ${name}`}>
+        on {name}
+      </span>
+      {update && (
+        <Link
+          className="hv-update-hint"
+          href="/setup/connections#hallvi-version"
+          title={`Hallvi ${update.version} is available`}
+        >
+          Update available
+        </Link>
+      )}
+    </>
   );
 }
 

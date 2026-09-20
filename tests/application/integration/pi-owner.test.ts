@@ -910,3 +910,40 @@ it("keeps an older stopped reply stopped, and its calls with it, after a later t
       ?.status,
   ).toBe("succeeded");
 });
+
+it("an update's hold stops new work, counts an approval wait as work, and lets go", async () => {
+  const a = application("shop", "203.0.113.7");
+  const hold = (minutes?: number) =>
+    askWorker<{ held: boolean; busy: number }>("hold", {
+      message: minutes === undefined ? {} : { minutes },
+    });
+  const release = () => askWorker<{ held: boolean }>("release", {});
+
+  // Nothing is running: an update may take the worker away.
+  expect(await hold()).toMatchObject({ held: true, busy: 0 });
+  // And while it is held, nothing new starts. This is the whole point: the
+  // count above and this refusal are one answer, so a message cannot arrive
+  // between "nothing is running" and the service stopping.
+  await expect(a.send("deploy it")).rejects.toMatchObject({
+    code: "updating",
+  });
+  await release();
+
+  // Waiting for the owner's approval is work in progress, not idleness: the
+  // turn has not ended, and an update that stopped Hallvi now would cut it.
+  await a.send("[approve] restart it");
+  await until(() => expect(approval(a.id)).toBeTruthy());
+  expect(await hold()).toMatchObject({ busy: 1 });
+  await release();
+
+  decideExecution(a.id, approval(a.id)!.id, true);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(await hold()).toMatchObject({ busy: 0 });
+  await release();
+
+  // A hold nobody released does not last for ever, so a helper that died
+  // cannot leave a worker that refuses every message.
+  expect(await hold(0)).toMatchObject({ held: true });
+  await a.send("hello");
+  await until(async () => expect(await a.status()).toBe("idle"));
+});

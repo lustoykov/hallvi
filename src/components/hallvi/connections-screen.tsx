@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ChatgptConnect } from "./onboarding/chatgpt-connect";
+import { HallviVersion, type HallviVersionState } from "./hallvi-version";
 import { GithubConnect } from "./onboarding/github-connect";
 import { ProviderTokenForm } from "./provider-token-form";
 import type { SetupReturn } from "@/server/setup-return";
@@ -138,12 +139,15 @@ function RecoveryKit({
 export function ConnectionsScreen({
   connections,
   recoveryKit,
+  hallvi,
   returnTo,
   prototype = false,
 }: {
   returnTo?: SetupReturn;
   connections: ConnectionItem[];
   recoveryKit?: { confirmedAt: string | null; bucket: string; host: string };
+  /** Hallvi's own version, in the same card shape as the accounts above. */
+  hallvi?: HallviVersionState;
   prototype?: boolean;
 }) {
   const router = useRouter();
@@ -311,6 +315,7 @@ export function ConnectionsScreen({
           ))}
         </section>
         {recoveryKit && <RecoveryKit kit={recoveryKit} />}
+        {hallvi && <HallviVersion initial={hallvi} />}
         <p className={s.hint}>
           Connecting an account changes nothing by itself. What happens next
           follows each application&rsquo;s permission mode: Always ask waits for

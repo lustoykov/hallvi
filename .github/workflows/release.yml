@@ -1,0 +1,159 @@
+name: Hallvi release
+
+# Publishing is a decision, so this workflow only ever runs because somebody
+# ran it. Merging a pull request — including the one that raises the version —
+# does not reach it, and what it produces is a draft: the maintainer presses
+# publish, and only then does any installation see the release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release. Must already be package.json's version on this ref.
+        required: true
+        type: string
+      channel:
+        description: Release channel
+        type: choice
+        default: alpha
+        options: [alpha]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package ${{ matrix.platform }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # Each archive carries native modules, so each is built on the
+          # operating system and processor it will run on. Nothing is
+          # cross-built, and a platform with no runner here has no release.
+          - runner: macos-15
+            platform: darwin-arm64
+          - runner: ubuntu-24.04
+            platform: linux-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: This runner is the platform it claims to build
+        run: |
+          set -eu
+          echo "runner: $(uname -s) $(uname -m)"
+          case "${{ matrix.platform }}" in
+            darwin-arm64)
+              [ "$(uname -s)" = Darwin ] || { echo "not macOS"; exit 1; }
+              [ "$(uname -m)" = arm64 ] || { echo "not Apple silicon"; exit 1; }
+              ;;
+            linux-x64)
+              [ "$(uname -s)" = Linux ] || { echo "not Linux"; exit 1; }
+              [ "$(uname -m)" = x86_64 ] || { echo "not x64"; exit 1; }
+              grep -qx 'ID=ubuntu' /etc/os-release || { echo "not Ubuntu"; exit 1; }
+              grep -Eq '^VERSION_ID="?24\.04"?$' /etc/os-release || { echo "not 24.04"; exit 1; }
+              ldd --version | head -1
+              ;;
+          esac
+
+      - name: The version being released is the version in this commit
+        run: |
+          set -eu
+          have=$(node -p "require('./package.json').version")
+          [ "$have" = "${{ inputs.version }}" ] || {
+            echo "package.json says $have and this release says ${{ inputs.version }}."
+            echo "Raise the version in a pull request first; that is the commit a release names."
+            exit 1
+          }
+
+      - run: npm ci
+
+      # package.mjs downloads the pinned Node.js, checks its published
+      # checksum, builds, installs locked production dependencies here and
+      # proves both native modules load before it writes the archive.
+      - name: Build the platform archive
+        env:
+          HALLVI_SOURCE_REVISION: ${{ github.sha }}
+        run: npm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hallvi-${{ matrix.platform }}
+          path: |
+            dist/hallvi-${{ inputs.version }}-${{ matrix.platform }}.tgz
+            dist/hallvi-${{ inputs.version }}-${{ matrix.platform }}.tgz.sha256
+            dist/install-hallvi.sh
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Sign and draft the release
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: collected
+          merge-multiple: true
+
+      - run: mkdir -p dist && cp collected/* dist/ && ls -l dist
+
+      # No key, no release. There is no unsigned fallback here or anywhere
+      # else: an installation refuses a manifest it cannot verify, so an
+      # unsigned release would only look published.
+      - name: Sign the release manifest
+        env:
+          HALLVI_RELEASE_SIGNING_KEY: ${{ secrets.HALLVI_RELEASE_SIGNING_KEY }}
+        run: |
+          node scripts/sign-release.mjs \
+            --version "${{ inputs.version }}" \
+            --revision "${{ github.sha }}" \
+            --channel "${{ inputs.channel }}" \
+            --repository "${{ github.repository }}"
+
+      # A draft is not a release: GitHub does not serve it to a reader without
+      # a token, so nothing discovers it until the maintainer publishes it.
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag="v${{ inputs.version }}"
+          gh release create "$tag" \
+            --draft \
+            --prerelease \
+            --target "${{ github.sha }}" \
+            --title "Hallvi ${{ inputs.version }}" \
+            --notes "Hallvi ${{ inputs.version }} (${{ inputs.channel }}), built from ${{ github.sha }}.
+
+          Download the archive for your machine, its \`.sha256\`, and \`install-hallvi.sh\`, then run:
+
+          \`\`\`
+          sh ./install-hallvi.sh ./hallvi-${{ inputs.version }}-darwin-arm64.tgz
+          \`\`\`
+
+          Installed already? Settings → This Hallvi, or \`hallvi update\`." \
+            dist/hallvi-${{ inputs.version }}-darwin-arm64.tgz \
+            dist/hallvi-${{ inputs.version }}-darwin-arm64.tgz.sha256 \
+            dist/hallvi-${{ inputs.version }}-linux-x64.tgz \
+            dist/hallvi-${{ inputs.version }}-linux-x64.tgz.sha256 \
+            dist/install-hallvi.sh \
+            dist/hallvi-release.json \
+            dist/hallvi-release.json.sig
+          gh release view "$tag" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
+          echo "Draft created. Publishing it is a separate, deliberate step." >> "$GITHUB_STEP_SUMMARY"

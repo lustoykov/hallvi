@@ -9,6 +9,7 @@ import { connectionRows } from "@/server/connection-rows";
 import { controllerProtectionState } from "@/server/controller-protection";
 import { listApplications } from "@/server/db";
 import { getGithubSetupStatus } from "@/server/github-setup";
+import { releaseState } from "@/server/hallvi-release";
 import { getPiSetupStatus } from "@/server/pi-setup";
 import { hetznerConnectionId } from "@/server/hetzner";
 import { setupReturnDestination } from "@/server/setup-return";
@@ -39,15 +40,18 @@ export default async function ConnectionsPage({
     : null;
   const kit = controllerProtectionState().kit;
   // Hallvi's own accounts, read the way their own settings pages read them.
-  const [model, github, workspace] = await Promise.all([
+  const [model, github, workspace, hallvi] = await Promise.all([
     getPiSetupStatus(),
     getGithubSetupStatus(),
     workspaceSettingStatus(),
+    // Read, never looked for: opening Settings must not wait on GitHub.
+    releaseState(),
   ]);
 
   return (
     <ConnectionsScreen
       returnTo={returnTo}
+      hallvi={hallvi}
       recoveryKit={
         kit
           ? {
