@@ -225,7 +225,21 @@ function layoutFor(model: ArchitectureModel): Layout {
   const gates = model.parts.filter(
     (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
   );
-  const spare = gates.filter(
+  // A port that refuses is not drawn here at all.
+  //
+  // It was, on a wall left solid behind it, which is a true picture and the
+  // wrong page for it. This map is a set of journeys — follow a visit, your
+  // data, a release — and nothing travels through a port that refuses, which
+  // is why it is already not a stop on any of them. Drawn in the doorway
+  // column beside a port that does answer, the only thing distinguishing the
+  // two is a missing gap in a dashed line.
+  //
+  // Nothing is lost: the firewall's label counts it, and Security draws it in
+  // the band where it stops, with what the check found.
+  const doors = gates.filter((gate) => gate.admits !== "refused");
+  for (const gate of gates)
+    if (gate.admits === "refused") delete rects[gate.id];
+  const spare = doors.filter(
     (gate) => gate.id !== "gate:http" && gate.id !== "gate:ssh",
   );
   spare.forEach((gate, index) => {
@@ -368,14 +382,15 @@ function layoutFor(model: ArchitectureModel): Layout {
   const wires = (Object.keys(legs) as JourneyId[]).flatMap((journey) =>
     legs[journey].flat().map((d) => ({ d, journey })),
   );
-  // The wall is solid except where something opens it. A port that refuses is
-  // still drawn — it is part of what is let in, and Security lists it — but
-  // it is not a gap: a closed port cut into the wall would say the opposite
-  // of what its own check says.
+  // The wall is solid except where a drawn door opens it.
+  // Every door that is drawn is a way in, so every one of them opens the
+  // wall. How sure anyone is that it is open is the card's own reading, not
+  // the wall's: a solid wall behind a drawn door would say it refuses, which
+  // is a claim nobody made about a port nobody has checked.
   const openings = [
     ...JOURNEY_DOORS,
     ...spare
-      .filter((gate) => gate.admits === "open" && rects[gate.id])
+      .filter((gate) => rects[gate.id])
       .map(
         (gate) =>
           [rects[gate.id].y - 4, rects[gate.id].y + rects[gate.id].h + 4] as [
