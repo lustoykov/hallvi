@@ -169,14 +169,18 @@ fi
 # fails, cleanup puts both the records and the program back.
 if [ "$upgrade" = yes ]; then
   say "Checking the schema of the records"
+  # The output is read before the exit status is acted on: the copy is made,
+  # and its location printed, before anything is migrated, so a failure that
+  # happens afterwards must still leave cleanup knowing where to go back to.
+  migration_ok=yes
   migration_output=$("$staging/node/bin/node" \
-    "$staging/app/scripts/migrate-state.mjs" --apply --data "$data" 2>&1) || {
-    printf '%s\n' "$migration_output" >&2
-    fail "the records could not be migrated; nothing was replaced."
-  }
+    "$staging/app/scripts/migrate-state.mjs" --apply --data "$data" 2>&1) ||
+    migration_ok=no
   printf '%s\n' "$migration_output"
   migrated=$(printf '%s\n' "$migration_output" |
     sed -n 's/^Backed up to //p' | tail -1)
+  [ "$migration_ok" = yes ] ||
+    fail "the records could not be migrated; nothing was replaced."
 fi
 
 if [ "$upgrade" = yes ]; then
