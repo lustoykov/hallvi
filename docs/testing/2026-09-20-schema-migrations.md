@@ -10,8 +10,12 @@ release must be built on Ubuntu 24.04 x64.
 
 | | Revision | Schema | sha256 |
 | --- | --- | --- | --- |
-| **A** | `db009f61` — the first archive to carry its own Node.js | 15 | `9ccf2f62b898606c…` |
-| **B** | this branch | 18 | `52c88c4a0e58cdae…` |
+| **A** | `db009f61` — the first archive to carry its own Node.js | 15 | `c81b2fd91da8f528…` |
+| **B** | this branch, after the review fixes | 18 | `b0608c12281acc55…` |
+
+The first run of these checks used archives built before the review; every
+result quoted here was taken again on the fixed build, on a second disposable
+host, `166636611`.
 
 `db009f61` was chosen because it is the oldest revision whose installation
 layout release B recognizes. An earlier schema-15 build exists, but it predates
@@ -164,16 +168,25 @@ in the signed manifest as `migratesFrom`, filled in by the build being signed,
 validated by `release-trust.mjs`, and checked again by `install.sh` from the
 unpacked archive's own list.
 
-The check is asked of an installed program whose list contains only 15 to 18:
+Asked of a *real installed* Hallvi at schema 18, whose own list holds only
+15 to 18 — the old registry the review named — with three signed manifests it
+could not have known about:
 
 ```
+installed schema       18
+its own migration list 15->18
+
 a release at schema 19 that declares it migrates from 18:
   not blocked — the upgrade would proceed
 a release at schema 19 that declares only 15:
-  …uses schema 18, and does not say it can migrate them.
+  …keeps its records in schema 19 and this one uses schema 18, and does not
+  say it can migrate them.
 a release at schema 19 that declares nothing at all:
-  …uses schema 18, and does not say it can migrate them.
+  …and does not say it can migrate them.
 ```
+
+Before the fix, the first of those three was refused too, by the only program
+in a position to want it.
 
 A manifest claiming to migrate from a schema newer than its own is refused by
 verification, so the field cannot be used to smuggle a downgrade.
@@ -185,6 +198,22 @@ for the service manager to agree it is gone before it replaces anything, and
 only then puts the records back and then the program. A failure *before*
 anything was touched still leaves a running service alone, which is why the
 stop is conditional on there being something to undo.
+
+Run again on a real installation, with something taking port 4747 the moment
+the service let go — systemd holding the unit and retrying it while the
+database had already moved to 18:
+
+```
+install: Hallvi did not become ready; check hallvi logs.
+The records were put back as they were, from …/2026-09-20T16-36-31-114Z-15-to-18
+The previous Hallvi program was restored.
+```
+
+Then, with the port freed: schema 15, program schema 15, the application, its
+conversation and native session id, both messages, the saved fact and the
+history hash all as they were, and the interface answering. That message only
+appears once the service manager has agreed the service is gone; when it will
+not stop, the installer says so and leaves the records alone.
 
 **Restoring rebuilt the database path instead of remembering it.** A controller
 whose database is not called `hallvi.db` was restored to `<directory>/hallvi.db`
@@ -208,6 +237,17 @@ missing      …is missing hallvi.db. Nothing was changed.        live: schema 1
 not a database  …could not be opened (file is not a database).  live: schema 18
 wrong schema …is schema 18, not the schema 15 it claims.        live: schema 18
 then the real copy                                              live: schema 15
+```
+
+**And one the review did not name, found while checking the fourth.**
+Restoring resolved the worker lock through the database file itself, so a
+restore refused with `ENOENT` when the database was missing — which is exactly
+the situation a restore is for. The lock is now named from the directory.
+
+```
+live database deleted; now restoring:
+  Restored …/hallvi.db to schema 15 from …
+  live database back at schema 15 | integrity ok
 ```
 
 ## What this does not establish
