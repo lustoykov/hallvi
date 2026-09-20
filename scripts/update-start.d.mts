@@ -54,10 +54,6 @@ export function releaseView(options: {
   check?: boolean;
   env?: NodeJS.ProcessEnv;
 }): Promise<ReleaseViewValue>;
-export function quietHint(options: {
-  program: string;
-  data: string;
-}): { version: string } | null;
 export function startUpdate(options: {
   program: string;
   data: string;

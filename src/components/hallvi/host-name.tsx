@@ -7,7 +7,6 @@
 // which. With two installations that is two identical tabs. The machine's name
 // goes in the tab title and beside the product name, quietly, everywhere.
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface ThisHallvi {
@@ -56,30 +55,6 @@ export function HostName({ className }: { className?: string }) {
     <span className={className} title={`This Hallvi runs on ${name}`}>
       on {name}
     </span>
-  );
-}
-
-/**
- * The quietest possible word that a newer Hallvi exists: two, and a link to
- * the one place that can install it. No badge, no count, and nothing that
- * comes back after it has been read, because the answer only changes when a
- * release does.
- *
- * It sits beside the product name rather than inside that link, which is where
- * it belongs and also the only place it may be: a link inside a link is not
- * markup a browser will keep.
- */
-export function UpdateAvailable({ className }: { className?: string }) {
-  const { update } = useThisHallvi();
-  if (!update) return null;
-  return (
-    <Link
-      className={`hv-update-hint${className ? ` ${className}` : ""}`}
-      href="/setup/connections#hallvi-version"
-      title={`Hallvi ${update.version} is available`}
-    >
-      Update available
-    </Link>
   );
 }
 

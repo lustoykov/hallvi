@@ -2,7 +2,7 @@ import { hostname } from "node:os";
 
 import { NextResponse } from "next/server";
 
-import { quietUpdateHint, runningRelease } from "@/server/hallvi-release";
+import { runningRelease } from "@/server/hallvi-release";
 
 export const runtime = "nodejs";
 // Read when asked, never at build time: a packaged release must name the
@@ -27,8 +27,5 @@ export function GET() {
     name: hostname().replace(/\.(local|lan)$/i, "") || "this computer",
     version: release?.version ?? null,
     revision: release?.revision ?? null,
-    // Read from the last check, never a look of its own: this answers on
-    // every page, and a page load is not a reason to talk to GitHub.
-    update: quietUpdateHint(),
   });
 }

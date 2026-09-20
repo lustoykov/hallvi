@@ -12,7 +12,6 @@ import type { UpdateAttempt } from "../../scripts/update-attempt.mjs";
 import {
   currentAttempt,
   dismissUpdate as dismiss,
-  quietHint,
   releaseView,
   startUpdate,
 } from "../../scripts/update-start.mjs";
@@ -67,11 +66,6 @@ export function releaseState({ check = false } = {}): Promise<ReleaseState> {
     data: data(),
     check,
   }) as Promise<ReleaseState>;
-}
-
-/** A newer release is waiting, from the last check alone — never a new look. */
-export function quietUpdateHint() {
-  return quietHint({ program: program(), data: data() });
 }
 
 /** Hands the update to a program outside this one and returns at once. */

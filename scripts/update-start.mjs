@@ -171,17 +171,6 @@ export async function releaseView({
   };
 }
 
-/** A newer release is waiting, from the last check alone: cheap to ask. */
-export function quietHint({ program, data }) {
-  const here = installation(program);
-  if (here.kind !== "installed") return null;
-  const candidate = readCheck(data)?.candidate ?? null;
-  if (!candidate) return null;
-  return compareVersions(candidate.manifest.version, here.release.version) > 0
-    ? { version: candidate.manifest.version }
-    : null;
-}
-
 /**
  * Hands the update to a program outside this one and returns at once. After
  * this the attempt file is the only thing that knows what is happening,

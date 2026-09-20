@@ -1,20 +1,21 @@
 "use client";
 
-// Which Hallvi this is, and the one action that changes it.
+// Which Hallvi this is, in the chrome rather than in Settings.
 //
-// An update here is not a download the owner then runs. They press one button
-// and Hallvi replaces itself while they watch, which means the only honest
-// thing this card can do is say exactly where that has got to — and, when it
-// fails, say what is still installed. So the phases are the helper's own
-// phases, read back from the attempt file, and "done" is not the moment the
-// files were swapped: it is the moment the new interface answers with the
-// revision that was installed and the worker is back.
-import { ArrowClockwise, Check, Warning } from "@phosphor-icons/react";
+// Hallvi's own version is not an account it acts through, so it does not
+// belong in the list of those. It belongs where a program's version belongs:
+// dim, at the bottom, saying nothing until it has something to say. One line
+// under Settings, a second word when a release is waiting, and a small panel
+// when the reader asks for one.
+//
+// An update is the rare thing here that takes Hallvi away and brings it back,
+// so while one runs its phase is on that line whether the panel is open or
+// not — and "done" is not the moment the files were swapped, it is the moment
+// the new interface answers with the revision that was installed.
 import { useCallback, useEffect, useState } from "react";
 
 import { ExternalLink } from "./external-link";
 import { LocalTime } from "./local-time";
-import s from "./pi-setup-screen.module.css";
 
 type Phase =
   | "checking"
@@ -26,14 +27,13 @@ type Phase =
   | "failed"
   | "blocked";
 
-export interface UpdateAttemptView {
+interface UpdateAttemptView {
   id: string;
   phase: Phase;
   message: string;
   progress?: number;
-  running?: boolean;
   from: { version: string } | null;
-  to: { version: string; notes?: string } | null;
+  to: { version: string } | null;
 }
 
 export interface HallviVersionState {
@@ -86,34 +86,39 @@ const RUNNING: Phase[] = [
   "reconnecting",
 ];
 
-function megabytes(size: number | null) {
-  return size ? `${Math.round(size / (1024 * 1024))} MB` : null;
+const megabytes = (size: number | null) =>
+  size ? `${Math.round(size / (1024 * 1024))} MB` : null;
+
+/** One answer per page, however many places ask for it. */
+let asked: Promise<HallviVersionState | null> | undefined;
+function readState() {
+  asked ??= fetch("/api/hallvi/update", { cache: "no-store" })
+    .then((response) => (response.ok ? response.json() : null))
+    .catch(() => null);
+  return asked;
 }
 
-export function HallviVersion({ initial }: { initial: HallviVersionState }) {
-  const [state, setState] = useState(initial);
+export function ThisHallvi({ className }: { className?: string }) {
+  const [state, setState] = useState<HallviVersionState | null>(null);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"check" | "install" | null>(null);
   const [error, setError] = useState("");
-  const running = Boolean(
-    state.attempt && RUNNING.includes(state.attempt.phase),
-  );
 
-  const ask = useCallback(async (action: "check" | "install" | "dismiss") => {
-    const response = await fetch("/api/hallvi/update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    const value = await response.json();
-    if (!response.ok)
-      throw new Error(value?.error ?? "Hallvi could not do that.");
-    return value as HallviVersionState;
+  useEffect(() => {
+    let alive = true;
+    void readState().then((found) => alive && setState(found));
+    return () => {
+      alive = false;
+    };
   }, []);
 
+  const attempt = state?.attempt ?? null;
+  const running = Boolean(attempt && RUNNING.includes(attempt.phase));
+
   /**
-   * While an update runs, this page is one of the things being replaced. It
-   * keeps asking, and the requests that fail while the interface is down are
-   * the expected shape of "reconnecting" rather than an error to report.
+   * While an update runs, this page is one of the things being replaced. The
+   * requests that fail while the interface is down are the shape of
+   * "reconnecting", not an error to report.
    */
   useEffect(() => {
     if (!running) return;
@@ -125,9 +130,10 @@ export function HallviVersion({ initial }: { initial: HallviVersionState }) {
         });
         if (!response.ok) return;
         const value = (await response.json()) as HallviVersionState;
+        asked = Promise.resolve(value);
         if (alive) setState(value);
       } catch {
-        // The interface is restarting. That is the phase, not a failure.
+        // The interface is restarting. That is the phase.
       }
     }, 2000);
     return () => {
@@ -136,11 +142,20 @@ export function HallviVersion({ initial }: { initial: HallviVersionState }) {
     };
   }, [running]);
 
-  async function act(action: "check" | "install" | "dismiss") {
+  const act = useCallback(async (action: "check" | "install" | "dismiss") => {
     setError("");
     setBusy(action === "dismiss" ? null : action);
     try {
-      setState(await ask(action));
+      const response = await fetch("/api/hallvi/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const value = await response.json();
+      if (!response.ok)
+        throw new Error(value?.error ?? "Hallvi could not do that.");
+      asked = Promise.resolve(value);
+      setState(value as HallviVersionState);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Hallvi could not do that.",
@@ -148,174 +163,144 @@ export function HallviVersion({ initial }: { initial: HallviVersionState }) {
     } finally {
       setBusy(null);
     }
-  }
+  }, []);
 
-  const installed = state.installed;
-  const attempt = state.attempt;
+  if (!state) return null;
+  const { installed, available } = state;
+  const offering = Boolean(available && !available.blocked && !running);
+
   return (
-    <section className={s.card} aria-label="This Hallvi" id="hallvi-version">
-      <section className={s.section}>
-        <h2>
-          <span className={s.step} aria-hidden="true">
-            {state.available && !state.available.blocked ? (
-              <ArrowClockwise />
-            ) : (
-              <Check />
-            )}
-          </span>
-          This Hallvi
-          {installed.kind === "development" && (
-            <em className="hv-connection-state">Development checkout</em>
-          )}
-        </h2>
-        <div className={s.accountRow}>
-          <div>
+    <div className={`hv-this-hallvi${className ? ` ${className}` : ""}`}>
+      <button
+        type="button"
+        className="hv-this-hallvi-line"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+        title={
+          installed.kind === "installed"
+            ? `Hallvi ${installed.version} (${installed.revision.slice(0, 7)}) on ${state.machine}`
+            : installed.reason
+        }
+      >
+        <span>
+          {installed.kind === "installed"
+            ? `Hallvi ${installed.version}`
+            : "Hallvi · development checkout"}
+        </span>
+        {offering && <em className="hv-this-hallvi-ready">Update available</em>}
+      </button>
+
+      {attempt && (
+        <p
+          className={`hv-this-hallvi-phase hv-update-${attempt.phase}`}
+          role="status"
+          aria-live="polite"
+        >
+          {SAYS[attempt.phase]}
+          {attempt.to ? ` · ${attempt.to.version}` : ""}
+          {attempt.phase === "downloading" && attempt.progress
+            ? ` · ${attempt.progress}%`
+            : ""}
+        </p>
+      )}
+
+      {open && (
+        <div className="hv-this-hallvi-panel">
+          {installed.kind === "installed" ? (
             <p>
-              {installed.kind === "installed" ? (
-                <>
-                  Version {installed.version} ({installed.revision.slice(0, 7)})
-                  on {state.machine}
-                </>
-              ) : (
-                <>
-                  Running on {state.machine}
-                  {installed.version ? ` as ${installed.version}` : ""}
-                  {installed.revision
-                    ? ` (${installed.revision.slice(0, 7)})`
-                    : ""}
-                </>
-              )}
+              {installed.version} ({installed.revision.slice(0, 7)}) on{" "}
+              {state.machine}
             </p>
-            {installed.kind === "development" ? (
-              <p className={s.hint}>
-                {installed.reason} It updates when you change the code, so
-                Hallvi does not offer to replace it with a release.
-              </p>
-            ) : (
-              <p className={s.hint}>
-                Following the {state.channel} channel.{" "}
+          ) : (
+            <p>{installed.reason} Use git; a release does not replace it.</p>
+          )}
+
+          {installed.kind === "installed" && (
+            <>
+              <p className="hv-this-hallvi-quiet">
+                {state.channel} channel ·{" "}
                 {state.checkedAt ? (
                   <>
-                    Last looked{" "}
-                    <LocalTime value={state.checkedAt} variant="compact" />.
+                    looked{" "}
+                    <LocalTime value={state.checkedAt} variant="compact" />
                   </>
                 ) : (
-                  "Not looked yet."
+                  "not looked yet"
                 )}
-                {!state.ownKey &&
-                  " This installation trusts a release key from its own settings rather than Hallvi's."}
+                {!state.ownKey && " · trusting a key from this installation"}
               </p>
-            )}
-          </div>
-          {installed.kind === "installed" && (
-            <button
-              type="button"
-              className={`${s.textButton} ${s.connectionAction}`}
-              disabled={busy !== null || running}
-              onClick={() => act("check")}
-            >
-              {busy === "check" ? "Checking…" : "Check for updates"}
-            </button>
-          )}
-        </div>
 
-        {state.checkError && (
-          <p className={s.hint} role="status">
-            <Warning aria-hidden="true" /> {state.checkError}
-          </p>
-        )}
-        {error && (
-          <p className={s.error} role="alert">
-            {error}
-          </p>
-        )}
+              {available ? (
+                <div className="hv-this-hallvi-offer">
+                  <p>
+                    <strong>{available.version}</strong> is available
+                    {megabytes(available.size)
+                      ? ` (${megabytes(available.size)})`
+                      : ""}
+                    {" · "}
+                    <ExternalLink href={available.notes}>notes</ExternalLink>
+                  </p>
+                  <p className="hv-this-hallvi-quiet">
+                    {available.blocked ??
+                      "Hallvi checks it against the signed release, then stops and starts itself. Applications, conversations, credentials and ports stay as they are, and this page comes back on the same address."}
+                  </p>
+                </div>
+              ) : state.checkError ? (
+                <p className="hv-this-hallvi-quiet">
+                  {state.checkError} Hallvi cannot say whether a newer release
+                  exists.
+                </p>
+              ) : (
+                state.checkedAt && (
+                  <p className="hv-this-hallvi-quiet">
+                    This is the newest {state.channel} release.
+                  </p>
+                )
+              )}
 
-        {installed.kind === "installed" && state.available && !running && (
-          <div className="hv-update-available">
-            <div className={s.accountRow}>
-              <div>
-                <p>
-                  Hallvi {state.available.version} is available
-                  {megabytes(state.available.size)
-                    ? ` (${megabytes(state.available.size)})`
+              {attempt && !RUNNING.includes(attempt.phase) && (
+                <p className="hv-this-hallvi-quiet">
+                  {attempt.message}
+                  {attempt.phase === "failed" && attempt.from
+                    ? ` Hallvi ${attempt.from.version} is still installed.`
                     : ""}
-                  .
                 </p>
-                <p className={s.hint}>
-                  Published{" "}
-                  <LocalTime
-                    value={state.available.releasedAt}
-                    variant="compact"
-                  />
-                  .{" "}
-                  <ExternalLink href={state.available.notes}>
-                    Release notes
-                  </ExternalLink>
+              )}
+
+              {error && (
+                <p className="hv-this-hallvi-quiet" role="alert">
+                  {error}
                 </p>
-                <p className={s.hint}>
-                  {state.available.blocked ??
-                    "Hallvi downloads it, checks it against the signed release, then stops and starts itself. Your applications, conversations, credentials and ports stay as they are, and this page comes back on the same address."}
-                </p>
-              </div>
-              {!state.available.blocked && (
+              )}
+
+              <div className="hv-this-hallvi-actions">
+                {offering && (
+                  <button
+                    type="button"
+                    className="hv-this-hallvi-go"
+                    disabled={busy !== null}
+                    onClick={() => act("install")}
+                  >
+                    {busy === "install" ? "Starting…" : "Update"}
+                  </button>
+                )}
                 <button
                   type="button"
-                  className={s.primary}
-                  disabled={busy !== null}
-                  onClick={() => act("install")}
+                  disabled={busy !== null || running}
+                  onClick={() => act("check")}
                 >
-                  {busy === "install"
-                    ? "Starting…"
-                    : `Update to ${state.available.version}`}
+                  {busy === "check" ? "Checking…" : "Check for updates"}
                 </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {installed.kind === "installed" &&
-          !state.available &&
-          !attempt &&
-          state.checkedAt &&
-          !state.checkError && (
-            <p className={s.hint}>
-              This is the newest {state.channel} release.
-            </p>
+                {attempt && !RUNNING.includes(attempt.phase) && (
+                  <button type="button" onClick={() => act("dismiss")}>
+                    Dismiss
+                  </button>
+                )}
+              </div>
+            </>
           )}
-
-        {attempt && (
-          <div
-            className={`hv-update-attempt hv-update-${attempt.phase}`}
-            role="status"
-            aria-live="polite"
-          >
-            <p>
-              <strong>{SAYS[attempt.phase]}</strong>
-              {attempt.to ? ` · Hallvi ${attempt.to.version}` : ""}
-              {attempt.phase === "downloading" && attempt.progress
-                ? ` · ${attempt.progress}%`
-                : ""}
-            </p>
-            <p className={s.hint}>{attempt.message}</p>
-            {attempt.phase === "failed" && attempt.from && (
-              <p className={s.hint}>
-                Hallvi {attempt.from.version} is still installed and running.
-                Try again, or run <code>hallvi update</code> to see the same
-                steps in a terminal.
-              </p>
-            )}
-            {!RUNNING.includes(attempt.phase) && (
-              <button
-                type="button"
-                className={s.textButton}
-                onClick={() => act("dismiss")}
-              >
-                Dismiss
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-    </section>
+        </div>
+      )}
+    </div>
   );
 }
