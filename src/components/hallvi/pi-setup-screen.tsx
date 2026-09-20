@@ -11,13 +11,6 @@ import {
   X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { READ_REPOSITORY_MESSAGE } from "./onboarding/journey-rail";
-
-const Mascot = dynamic(
-  () => import("./home/mascot-scene").then((m) => m.MascotScene),
-  { ssr: false, loading: () => null },
-);
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { DetectedPiSetup } from "@/server/pi-configuration";
@@ -66,8 +59,6 @@ export function PiSetupScreen({
   returnTo?: SetupReturn;
 }) {
   const router = useRouter();
-  const firstRun = returnTo?.firstRun;
-  const [greetings, setGreetings] = useState(0);
   const [status, setStatus] = useState(initialStatus);
   const [detected, setDetected] = useState<DetectedPiSetup | null>(
     initialStatus.detected,
@@ -306,32 +297,13 @@ export function PiSetupScreen({
             }),
           ),
         );
-      if (firstRun) {
-        // A click, never login completion or a page load, starts the first
-        // inspection. The chat id makes retries of this request idempotent.
-        await readJson(
-          await fetch(
-            `/api/applications/${firstRun.applicationId}/chats/${firstRun.chatId}/messages`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: READ_REPOSITORY_MESSAGE,
-                requestKey: firstRun.chatId,
-              }),
-            },
-          ),
-        );
-      }
       router.push(returnTo?.href ?? "/applications");
       router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : firstRun
-            ? "Could not start the repository inspection. Try again."
-            : "Could not save model preferences.",
+          : "Could not save model preferences.",
       );
     } finally {
       setSaving(false);
@@ -361,34 +333,11 @@ export function PiSetupScreen({
         </Link>
       </header>
       <div className={s.page}>
-        {!firstRun && <SettingsNav current="pi" returnTo={returnTo} />}
-        <header className={`${s.heading} ${firstRun ? s.firstRunHeading : ""}`}>
-          {firstRun && (
-            <button
-              type="button"
-              className={s.caretaker}
-              aria-label="Make Hallvi dance"
-              onClick={() => setGreetings((count) => count + 1)}
-            >
-              <Mascot
-                color="#7a8bd6"
-                mood={connectionReady ? "ready" : "waving"}
-                danceRequest={greetings}
-                dance="shuffle"
-              />
-            </button>
-          )}
+        <SettingsNav current="pi" returnTo={returnTo} />
+        <header className={s.heading}>
           <div>
-            <h1>
-              {firstRun ? `Let’s get to know ${firstRun.name}.` : "Settings"}
-            </h1>
-            <p>
-              {firstRun
-                ? connectionReady
-                  ? "Ready. Let’s see what it needs. I’ll read the repository and explain the next step."
-                  : `Connect ChatGPT so I can read ${firstRun.name} and explain what it needs to run.`
-                : "ChatGPT account and model preferences."}
-            </p>
+            <h1>Settings</h1>
+            <p>ChatGPT account and model preferences.</p>
           </div>
         </header>
         <section className={s.card} aria-label="ChatGPT and model settings">
@@ -462,13 +411,16 @@ export function PiSetupScreen({
               ) : connectionReady ? (
                 <div className={s.accountRow}>
                   <div>
-                    <strong className={s.success}>
+                    {/* Saved is not proven: nothing has been asked of ChatGPT
+                        with it yet, so it does not wear the verified green. */}
+                    <strong className={s.saved}>
                       <Check /> Login saved
                     </strong>
                     <p>
+                      ChatGPT checks it when you send your first message.{" "}
                       {status.mode === "shared"
-                        ? "Sharing the existing Pi login file"
-                        : "Separate login for Hallvi"}
+                        ? "Sharing the existing Pi login file."
+                        : "Separate login for Hallvi."}
                     </p>
                   </div>
                   <button
@@ -511,7 +463,7 @@ export function PiSetupScreen({
                       </button>
                     </>
                   )}
-                  {!firstRun && detected && !detected.canReuse && (
+                  {detected && !detected.canReuse && (
                     <p className={s.hint}>No reusable ChatGPT login found.</p>
                   )}
                   <button
@@ -583,13 +535,8 @@ export function PiSetupScreen({
               )}
             </div>
           </section>
-          <details
-            className={`${s.section} ${s.preferences}`}
-            open={!firstRun || !validSelection}
-          >
-            <summary id="model-heading">
-              Model preferences{firstRun && <span> Optional</span>}
-            </summary>
+          <details className={`${s.section} ${s.preferences}`} open>
+            <summary id="model-heading">Model preferences</summary>
             <div className={s.fields}>
               <label htmlFor="pi-model">
                 Model
@@ -660,14 +607,10 @@ export function PiSetupScreen({
               {working
                 ? "Finish sign-in to continue."
                 : !connectionReady
-                  ? firstRun
-                    ? "Connect your account, then we can read the repository."
-                    : "Connect your account to continue."
+                  ? "Connect your account to continue."
                   : hasChanges
                     ? "Your model preferences will be saved."
-                    : firstRun
-                      ? "This first look won’t rent a server or deploy anything."
-                      : "Access is checked when you send a message."}
+                    : "Access is checked when you send a message."}
             </span>
             <button
               className={s.primary}
@@ -677,13 +620,7 @@ export function PiSetupScreen({
               }
               onClick={viewApplications}
             >
-              {saving
-                ? firstRun && connectionReady
-                  ? "Starting…"
-                  : "Saving…"
-                : firstRun
-                  ? "Read repository"
-                  : (returnTo?.label ?? "View applications")}
+              {saving ? "Saving…" : (returnTo?.label ?? "View applications")}
               <ArrowRight />
             </button>
           </footer>

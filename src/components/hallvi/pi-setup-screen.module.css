@@ -220,6 +220,12 @@
   align-items: center;
   gap: 8px;
 }
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.saved svg,
 .success svg {
   width: 20px;
   height: 20px;
@@ -514,40 +520,6 @@
   flex-wrap: wrap;
 }
 
-.firstRunHeading {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.firstRunHeading > div {
-  min-width: 0;
-}
-.firstRunHeading h1 {
-  font-size: clamp(26px, 4vw, 36px);
-  overflow-wrap: anywhere;
-}
-.caretaker {
-  flex: none;
-  width: 132px;
-  height: 152px;
-  padding: 0;
-  border: 0;
-  background: none;
-  border-radius: 12px;
-}
-.caretaker :global(.mascot-scene) {
-  width: 100%;
-  height: 100%;
-}
-.caretaker :global(canvas) {
-  display: block;
-}
-.caretaker :global(.mascot-fallback) {
-  display: none;
-}
-.caretaker :global([data-fallback="true"] .mascot-fallback) {
-  display: block;
-}
 /* Settings → Workspace: one choice between two ways of working. */
 .choices {
   display: grid;
@@ -612,13 +584,4 @@
 .preferences summary:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 4px;
-}
-@media (max-width: 540px) {
-  .firstRunHeading {
-    gap: 12px;
-  }
-  .caretaker {
-    width: 78px;
-    height: 102px;
-  }
 }

@@ -143,7 +143,7 @@ function Activity({
 export function ApplicationNavigation({
   chats,
   selectedChatId,
-  settingsHref = "/setup/pi",
+  settingsHref = "/setup/connections",
   section,
   busy,
   onSection,

@@ -22,11 +22,18 @@ Legacy response fields are compatibility details, not a second supported login m
 
 The release distributor configures **one** Hallvi GitHub App. An end user
 connects their own GitHub account to that App and chooses which repositories
-it may reach; they do not register an App. GitHub states that a private App can
-only be installed by its owning account, while an App set to **Any account**
-can be installed by other users. The current personal App configuration has
-not been verified as distributable, so private-repository beta access remains
-pending that decision. [GitHub visibility rules](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/making-a-github-app-public-or-private).
+it may reach; they do not register an App, paste a token or edit environment
+files. GitHub states that a private App can only be installed by its owning
+account, while an App set to **Any account** can be installed by other users.
+[GitHub visibility rules](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/making-a-github-app-public-or-private).
+
+The published App is [`hallvi-app`](https://github.com/apps/hallvi-app), client
+ID `Iv23likHtcclbuys1lVG`. Both values are public, and `npm run package` ships
+them unless the environment names another App. On 20 September 2026 GitHub
+issued a device code for that client ID from a loopback-only development
+controller, which establishes that Device Flow is enabled and that no callback
+is needed. Sign-in, installation and a private-repository read by an account
+other than the App's owner are not yet exercised (step 5).
 
 The distributor should review the App's identity, homepage, ownership and
 permissions before including it in a candidate:
@@ -36,19 +43,23 @@ permissions before including it in a candidate:
 2. Enable **Device Flow** and keep user-token expiration enabled. Device login
    needs no callback URL. Leave **Request user authorization during
    installation** disabled because Hallvi initiates sign-in separately.
-3. Disable webhooks. Choose **Repository permissions → Contents → Read and
-   write** and **Pull requests → Read and write**, which is what publishing a
-   branch and opening a pull request needs. Metadata read is mandatory; leave
-   other repository, account and organization permissions unset. Hallvi needs
-   no private key and no client secret for this user device flow. A release
-   whose App grants Contents read only still reads repositories; proposing a
-   change then fails naming the missing permission.
-4. Review the public client ID and slug. Build the archive with both
-   `HALLVI_RELEASE_GITHUB_CLIENT_ID` and
-   `HALLVI_RELEASE_GITHUB_APP_SLUG`; `npm run package` includes only these
-   public values in `dist/github-app.json`. A release without both values
-   clearly shows private access as unavailable. Do not put client secrets,
-   private keys or user tokens in the archive.
+3. Disable webhooks. The published Hallvi App requests **Contents: Read &
+   write**, **Pull requests: Read & write** and mandatory **Metadata: Read**
+   (verified through GitHub’s public App API on 20 September 2026). Keep other
+   permissions unset and let users select repositories. These are the grants
+   [proposing a change](#proposing-a-change) needs: a branch and a pull
+   request. Consent must disclose them as write grants; neither read-only
+   inspection nor a branch-and-PR workflow makes the credential technically
+   read-only. A release whose App grants Contents read only still reads
+   repositories; proposing a change then fails naming the missing permission.
+   Device flow needs no private key.
+4. Review the public client ID and slug. `npm run package` writes the
+   published App's values to `dist/github-app.json`; a fork sets both
+   `HALLVI_RELEASE_GITHUB_CLIENT_ID` and `HALLVI_RELEASE_GITHUB_APP_SLUG` to
+   name its own. A controller with neither a release App nor a local override
+   says that the release cannot sign in, keeps public repositories working and
+   offers no Connect button. Do not put client secrets, private keys or user
+   tokens in the archive.
 5. Test with a different GitHub account: device sign-in, selected-repository
    installation, a private repository check, permission denial and retry.
    A personal owner's existing installation is not external-user proof.

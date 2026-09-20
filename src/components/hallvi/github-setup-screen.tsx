@@ -261,6 +261,11 @@ export function GithubSetupScreen({
             aria-labelledby="github-account-heading"
           >
             <h2 id="github-account-heading">GitHub account</h2>
+            <p className={s.hint}>
+              The published Hallvi App requests read and write access to code
+              and pull requests in the repositories you select on GitHub.
+              Connecting only checks access; it does not change your repository.
+            </p>
             {working && attempt ? (
               <div className={s.device}>
                 {connected && status.connection && (
@@ -388,13 +393,15 @@ export function GithubSetupScreen({
                 {!status.registration && (
                   <details className={s.connectionHelp} open>
                     <summary>
-                      Private repository connection is unavailable
+                      This Hallvi release can’t sign in to GitHub
                     </summary>
                     <p>
-                      This Hallvi release has no GitHub App configured. You can
-                      still add public repositories without signing in. Ask the
-                      person who supplied this release to enable private
-                      repository access.
+                      That’s a gap in the release, not something you missed.
+                      Public repositories work without any GitHub account.
+                      Install a release that includes GitHub sign-in over this
+                      one and Connect GitHub appears here; applications and
+                      history are kept. You never need to register a GitHub App
+                      or paste a token.
                     </p>
                   </details>
                 )}
@@ -605,8 +612,9 @@ export function GithubSetupScreen({
           out how your application is deployed, and it writes only by putting a
           change on a branch of its own and opening a pull request. It never
           writes to the branch you deploy from and never merges; opening a pull
-          request deploys nothing. Each one follows the application’s permission
-          mode, like any other change.
+          request deploys nothing, and connecting on its own changes nothing.
+          Each proposal follows the application’s permission mode, like any
+          other change.
         </p>
         <h3>Disconnect</h3>
         <p>

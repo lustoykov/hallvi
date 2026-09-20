@@ -49,6 +49,8 @@ import {
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import { useConnectionRequests } from "./onboarding/connection-requests";
+import { ChatgptConnect } from "./onboarding/chatgpt-connect";
+import { GithubConnect } from "./onboarding/github-connect";
 import {
   JourneyRail,
   READ_REPOSITORY_MESSAGE,
@@ -226,7 +228,15 @@ export function ChatPane({
   highlight,
   reachable,
   workerAlive,
+  checkingRepository = false,
+  onCheckRepository,
+  onModelConnected,
 }: {
+  /** A ChatGPT login was saved from the conversation: sending is possible. */
+  onModelConnected?: () => void;
+  /** The repository check the owner asked for is still running. */
+  checkingRepository?: boolean;
+  onCheckRepository?: () => void;
   view: OperatorView;
   activeChat: Chat | null;
   busy: string | null;
@@ -477,6 +487,43 @@ export function ChatPane({
   const showFirstWelcome =
     firstConversation && !requestPending && pendingMessage === null;
 
+  /**
+   * A repository Hallvi cannot read is a request in this conversation, not a
+   * strip above it. In an untouched conversation the welcome says it first and
+   * the card opens when asked for; anywhere else the card is simply there.
+   * Once opened it stays for the visit, so it can fold into its receipt.
+   */
+  const [repositoryOpen, setRepositoryOpen] = useState(false);
+  const access = application && secretsHere ? view.repository : undefined;
+  const unread = access && access.status !== "passed" ? access : null;
+  const repositoryName = application
+    ? `${application.repositoryOwner}/${application.repositoryName}`
+    : "";
+  const repositoryCard =
+    access && onCheckRepository && !archived
+      ? unread
+        ? !showFirstWelcome || repositoryOpen
+        : repositoryOpen
+      : false;
+
+  /**
+   * Connecting ChatGPT is a request here too. It opens where the reader asked
+   * for it, and stays for the visit so it can fold into its receipt.
+   */
+  const [modelOpen, setModelOpen] = useState(false);
+  const settingsHref =
+    application && chatId
+      ? `/setup/pi?application=${application.id}&chat=${chatId}`
+      : "/setup/pi";
+  const openModel = () => {
+    setModelOpen(true);
+    requestAnimationFrame(() =>
+      document
+        .querySelector('[aria-label="Connect ChatGPT"]')
+        ?.scrollIntoView({ block: "nearest" }),
+    );
+  };
+
   const stopLabel =
     waiting.length > 0 ? `Stop + cancel ${waiting.length} waiting` : "Stop";
   return (
@@ -510,11 +557,22 @@ export function ChatPane({
               waitingOnYou={secrets.some((secret) => !secret.establishedAt)}
               placement="welcome"
               canStart={piReady && !busy && !requestPending && Boolean(onTell)}
-              connectHref={
-                !piReady && chatId
-                  ? `/setup/pi?application=${view.application.id}&chat=${chatId}&onboarding=1`
+              repository={
+                unread && onCheckRepository
+                  ? {
+                      name: repositoryName,
+                      status:
+                        unread.status === "blocked" ? "blocked" : "not-yet",
+                      connected: unread.connected,
+                      signIn: unread.signIn,
+                      checking: checkingRepository,
+                      onOpen: () => setRepositoryOpen(true),
+                      onCheck: onCheckRepository,
+                    }
                   : undefined
               }
+              onConnect={!piReady && onModelConnected ? openModel : undefined}
+              requestOpen={modelOpen ? !piReady : repositoryOpen && !!unread}
               onStart={() => onTell?.(READ_REPOSITORY_MESSAGE)}
             />
           )}
@@ -849,6 +907,24 @@ export function ChatPane({
           )}
 
           {connections.rest}
+          {repositoryCard && access && onCheckRepository && (
+            <GithubConnect
+              repository={repositoryName}
+              access={access}
+              checking={checkingRepository}
+              onCheck={onCheckRepository}
+              onClose={
+                showFirstWelcome ? () => setRepositoryOpen(false) : undefined
+              }
+            />
+          )}
+          {modelOpen && application && onModelConnected && !archived && (
+            <ChatgptConnect
+              settingsHref={settingsHref}
+              onConnected={onModelConnected}
+              onClose={() => setModelOpen(false)}
+            />
+          )}
           {error && application && (
             <div className="hv-error" role="alert">
               {error}
@@ -958,6 +1034,7 @@ export function ChatPane({
         )}
         {application &&
           !piReady &&
+          !modelOpen &&
           (!firstConversation || Boolean(composer.trim())) && (
             <div className="hv-pi-required">
               <WarningCircle weight="bold" />
@@ -968,18 +1045,16 @@ export function ChatPane({
                   anything you have typed here is kept.
                 </p>
               </div>
-              {/* The two ids are what brings the reader back to this exact
-                conversation afterwards. They name records, not a URL, and
-                the draft stays in this browser rather than travelling. */}
-              <Link
-                href={
-                  chatId
-                    ? `/setup/pi?application=${application.id}&chat=${chatId}`
-                    : "/setup/pi"
-                }
-              >
-                Open Settings
-              </Link>
+              {/* Connecting happens here, in the conversation, so what has
+                  been typed never has to travel. Settings stays a link for
+                  someone who wants the model preferences. */}
+              {onModelConnected && !modelOpen ? (
+                <button type="button" onClick={openModel}>
+                  Connect ChatGPT
+                </button>
+              ) : (
+                <Link href={settingsHref}>Open Settings</Link>
+              )}
             </div>
           )}
         <div

@@ -15,7 +15,6 @@
 
 import { ArrowRight, Check } from "@phosphor-icons/react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useState } from "react";
 
 import "./journey-rail.css";
@@ -41,6 +40,48 @@ export interface JourneyFacts {
   opens: boolean;
 }
 
+/** What the welcome needs to know about a repository it cannot read yet. */
+export interface WelcomeRepository {
+  /** "owner/name". */
+  name: string;
+  status: "blocked" | "not-yet";
+  /** A GitHub account is signed in. */
+  connected: boolean;
+  /** This release can sign in to GitHub at all. */
+  signIn: boolean;
+  checking: boolean;
+  onOpen: () => void;
+  onCheck: () => void;
+}
+
+/** One sentence and one action. Never an action this release cannot take. */
+function repositorySays(repository: WelcomeRepository) {
+  const { name } = repository;
+  if (repository.status === "not-yet")
+    return {
+      says: `I haven’t been able to check ${name} yet.`,
+      action: repository.checking ? "Checking…" : "Check repository",
+      run: repository.onCheck,
+    };
+  if (repository.connected)
+    return {
+      says: `Hallvi has a GitHub login saved, but couldn’t read ${name}. Check its address and repository access.`,
+      action: "Choose repositories",
+      run: repository.onOpen,
+    };
+  if (repository.signIn)
+    return {
+      says: `I couldn’t open ${name}. If it’s private, connecting GitHub lets me in.`,
+      action: "Connect GitHub",
+      run: repository.onOpen,
+    };
+  return {
+    says: `I couldn’t open ${name}, and this Hallvi release can’t sign in to GitHub. Public repositories still work.`,
+    action: null,
+    run: repository.onOpen,
+  };
+}
+
 const STOPS = [
   { id: "read", label: "Read it" },
   { id: "place", label: "A place to run" },
@@ -55,7 +96,9 @@ export function JourneyRail({
   placement,
   canStart,
   onStart,
-  connectHref,
+  onConnect,
+  requestOpen,
+  repository,
 }: {
   application: string;
   facts: JourneyFacts;
@@ -66,7 +109,12 @@ export function JourneyRail({
   /** A message can be sent: the model is connected and nothing is running. */
   canStart?: boolean;
   onStart?: () => void;
-  connectHref?: string;
+  /** ChatGPT is not connected; this opens the request for it below. */
+  onConnect?: () => void;
+  /** A request is open in the transcript: the welcome steps back to a line. */
+  requestOpen?: boolean;
+  /** The repository cannot be read yet; the welcome says so instead. */
+  repository?: WelcomeRepository;
 }) {
   const done = [facts.read, facts.placed, facts.deployed, facts.opens];
   // A later stop proves the earlier ones, however the records arrived.
@@ -77,39 +125,109 @@ export function JourneyRail({
   const [dances, setDances] = useState(0);
   const needsYou = waitingOnYou || facts.placeWaiting;
 
-  if (placement === "welcome")
+  if (placement === "welcome") {
+    const mascot = (mood: "waving" | "ready") => (
+      <button
+        type="button"
+        className="hv-first-app-mascot hv-rail-mascot"
+        aria-label="Make Hallvi dance"
+        onClick={() => setDances((count) => count + 1)}
+      >
+        <Mascot
+          color="#7a8bd6"
+          mood={mood}
+          dance="shuffle"
+          danceRequest={dances}
+        />
+      </button>
+    );
+    // The request is open in the transcript: the welcome steps back to one
+    // line, so the blocker is said in one place.
+    if (requestOpen)
+      return (
+        <section className="hv-first-app" data-compact>
+          {mascot("ready")}
+          <div>
+            <h2>Let’s get to know {application}.</h2>
+            <p>
+              One thing first — it’s just below. Reading the repository is still
+              yours to start afterwards.
+            </p>
+          </div>
+        </section>
+      );
+    const unread = repository ? repositorySays(repository) : null;
     return (
       <section
         className="hv-first-app"
         aria-label="Get to know your application"
       >
-        <button
-          type="button"
-          className="hv-first-app-mascot hv-rail-mascot"
-          aria-label="Make Hallvi dance"
-          onClick={() => setDances((count) => count + 1)}
-        >
-          <Mascot
-            color="#7a8bd6"
-            mood="waving"
-            dance="shuffle"
-            danceRequest={dances}
-          />
-        </button>
+        {mascot(unread ? "ready" : "waving")}
         <div>
           <h2>Let’s get to know {application}.</h2>
           <p>
             I’ll read the repository and explain what it needs. Then we’ll
             choose where it runs.
           </p>
-          {connectHref ? (
+          {unread && onConnect ? (
+            // Both are missing. They are different things, so they are two
+            // lines, and only the first one is blue.
+            <ul className="hv-first-app-needs" aria-label="Before we start">
+              <li>
+                <span>
+                  <strong>A model to think with</strong>
+                  ChatGPT isn’t connected.
+                </span>
+                <button
+                  type="button"
+                  className="hv-rail-start"
+                  onClick={onConnect}
+                >
+                  Connect ChatGPT <ArrowRight aria-hidden="true" />
+                </button>
+              </li>
+              <li>
+                <span>
+                  <strong>Open {repository!.name}</strong>
+                  {unread.says}
+                </span>
+                <button
+                  type="button"
+                  className="hv-first-app-quiet"
+                  disabled={repository!.checking}
+                  onClick={unread.run}
+                >
+                  {unread.action ?? "See why"}
+                </button>
+              </li>
+            </ul>
+          ) : unread ? (
+            <>
+              <p className="hv-first-app-next">{unread.says}</p>
+              <button
+                type="button"
+                className={
+                  unread.action ? "hv-rail-start" : "hv-first-app-quiet"
+                }
+                disabled={repository!.checking}
+                onClick={unread.run}
+              >
+                {unread.action ?? "See why"}{" "}
+                {unread.action && <ArrowRight aria-hidden="true" />}
+              </button>
+            </>
+          ) : onConnect ? (
             <>
               <p className="hv-first-app-next">
                 Connect ChatGPT so I can read {application}.
               </p>
-              <Link className="hv-rail-start" href={connectHref}>
+              <button
+                type="button"
+                className="hv-rail-start"
+                onClick={onConnect}
+              >
                 Connect ChatGPT <ArrowRight aria-hidden="true" />
-              </Link>
+              </button>
             </>
           ) : (
             <button
@@ -127,6 +245,7 @@ export function JourneyRail({
         </div>
       </section>
     );
+  }
 
   if (finished) return null;
 

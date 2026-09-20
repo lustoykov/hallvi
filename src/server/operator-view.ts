@@ -5,6 +5,7 @@ import { listSecrets } from "./application-secrets";
 import { listInformation } from "./saved-information";
 import { listApplicationChatSummaries } from "./db";
 import { loadApplication, loadChat, repositoryAccess } from "./applications";
+import { githubAppRegistration } from "./github-connection";
 import type { OperatorView } from "./types";
 
 /**
@@ -47,6 +48,7 @@ export async function getOperatorView(
         ? (access.observation?.observedAt ?? null)
         : null,
       connected: access.connected,
+      signIn: Boolean(githubAppRegistration()),
     },
     executions: conversation?.executions ?? listExecutions(applicationId),
     piActivity: conversation?.piActivity ?? [],

@@ -8,8 +8,11 @@ import { backupDestination } from "@/server/backup-connection";
 import { connectionRows } from "@/server/connection-rows";
 import { controllerProtectionState } from "@/server/controller-protection";
 import { listApplications } from "@/server/db";
+import { getGithubSetupStatus } from "@/server/github-setup";
+import { getPiSetupStatus } from "@/server/pi-setup";
 import { hetznerConnectionId } from "@/server/hetzner";
 import { setupReturnDestination } from "@/server/setup-return";
+import { workspaceSettingStatus } from "@/server/workspace-isolation";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +38,12 @@ export default async function ConnectionsPage({
     ? await cloudflareBuckets().catch(() => null)
     : null;
   const kit = controllerProtectionState().kit;
+  // Hallvi's own accounts, read the way their own settings pages read them.
+  const [model, github, workspace] = await Promise.all([
+    getPiSetupStatus(),
+    getGithubSetupStatus(),
+    workspaceSettingStatus(),
+  ]);
 
   return (
     <ConnectionsScreen
@@ -49,6 +58,20 @@ export default async function ConnectionsPage({
           : undefined
       }
       connections={connectionRows({
+        own: {
+          model: { saved: model.ready, issue: model.issue },
+          github: {
+            account: github.issue
+              ? null
+              : (github.connection?.account.login ?? null),
+            issue: github.issue,
+            signIn: Boolean(github.registration),
+          },
+          workspace: {
+            isolation: workspace.isolation,
+            problem: workspace.problem,
+          },
+        },
         hetznerConnected: Boolean(hetznerConnectionId()),
         cloudflare,
         buckets: buckets?.length ?? null,

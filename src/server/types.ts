@@ -131,6 +131,8 @@ export interface OperatorView {
     checkedAt: string | null;
     /** Whether a GitHub login is saved to run the check with. */
     connected: boolean;
+    /** Whether this release carries the GitHub App it signs in through. */
+    signIn: boolean;
   };
   chats: ChatSummary[];
   selectedChatId: string | null;

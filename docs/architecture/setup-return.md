@@ -1,7 +1,13 @@
 # Leaving a conversation to connect, and coming back to it
 
-The composer says "Connect ChatGPT to chat" and points at Settings. Until
-this change it pointed nowhere in particular: the whole composer was dead, so
+**Superseded for ChatGPT and GitHub (20 September 2026).** Both sign-ins now
+happen in the conversation itself, so there is no trip and nothing to return
+from: see [onboarding](../design/onboarding.md). What remains here is the
+contract for the pages that are still a detour — model preferences, the
+workspace choice, a provider token — and it is unchanged.
+
+The composer used to say "Connect ChatGPT to chat" and point at Settings.
+Before that it pointed nowhere in particular: the whole composer was dead, so
 the question could not even be written down, and setup ended on the
 applications list with no idea which application the reader had come from.
 

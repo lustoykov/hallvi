@@ -70,6 +70,9 @@ test(
     await expect(
       page.getByRole("heading", { name: "Storage & privacy" }),
     ).toBeVisible();
+    await expect(page.locator("#github-storage")).toContainText(
+      "read and write access to code and pull requests",
+    );
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Disconnect", exact: true }).click();
     await page
@@ -87,30 +90,29 @@ test(
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".hv-repository-notice");
-    await expect(notice).toContainText(
-      "Run the repository check, or connect GitHub if this repository is private.",
-    );
-    await expect(
-      notice.getByRole("button", { name: "Check again" }),
-    ).toBeEnabled();
-    const settings = notice.getByRole("link", {
-      name: "Connect GitHub",
-      exact: true,
+    // Nothing has been established with the login gone, so the welcome only
+    // offers to ask, and never offers to read what it has not opened.
+    const welcome = page.getByRole("region", {
+      name: "Get to know your application",
     });
+    await expect(welcome).toContainText("haven’t been able to check");
+    await expect(
+      welcome.getByRole("button", { name: "Check repository" }),
+    ).toBeEnabled();
+    await expect(
+      welcome.getByRole("button", { name: "Read repository" }),
+    ).toHaveCount(0);
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     const draft = "Continue after connecting my repository.";
     await composer.fill(draft);
-    await expect(settings).toHaveAttribute(
-      "href",
-      `/setup/github?application=${before.application.id}&chat=${before.selectedChatId}`,
-    );
     await page.screenshot({
       path: testInfo.outputPath("github-recovery-action.png"),
       fullPage: true,
     });
-    await settings.click();
-    await expect(page).toHaveURL(/\/setup\/github\?application=.*&chat=/);
+    // Settings still reconnects, and still returns to this conversation.
+    await page.goto(
+      `/setup/github?application=${before.application.id}&chat=${before.selectedChatId}`,
+    );
     let releaseCheck!: () => void;
     const heldCheck = new Promise<void>((resolve) => {
       releaseCheck = resolve;
@@ -154,7 +156,9 @@ test(
     );
     await openConversation(page);
     await expect(composer).toHaveValue(draft);
-    await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Repository access" }),
+    ).toHaveCount(0);
     // Ordinary Settings uses the same return contract as connection recovery.
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await page
@@ -305,12 +309,28 @@ test(
     writeFileSync(join(fixture.state, "github-scenario.json"), "{}");
     await page.goto(path);
     await openConversation(page);
-    const notice = page.locator(".hv-repository-notice");
-    await expect(notice).toContainText("read access");
-    await notice
+    // Signed in, but this repository is not among the ones chosen: the card
+    // says which of the two is missing, and folds away once the check passes.
+    // In an untouched conversation the welcome says it first, and never
+    // offers to read a repository it cannot open.
+    const welcome = page.getByRole("region", {
+      name: "Get to know your application",
+    });
+    await expect(welcome).toContainText("couldn’t read qa/github-permissions");
+    await expect(
+      welcome.getByRole("button", { name: "Read repository" }),
+    ).toHaveCount(0);
+    await welcome.getByRole("button", { name: "Choose repositories" }).click();
+    const card = page.getByRole("region", { name: "Repository access" });
+    await expect(card).toContainText("Login saved for qa-fixture-user");
+    await expect(card).toContainText("read access");
+    await card
       .getByRole("button", { name: "Check again", exact: true })
       .click();
-    await expect(notice).toHaveCount(0);
+    await expect(
+      page.getByText("can read qa/github-permissions", { exact: false }),
+    ).toBeVisible();
+    await expect(card).toHaveCount(0);
     const passed = await (await page.request.get(`/api${path}`)).json();
     expect(passed.repository.status).toBe("passed");
   },
@@ -351,7 +371,9 @@ test(
     const old = expireAccess();
     await page.reload();
     await openConversation(page);
-    await expect(page.locator(".hv-repository-notice")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Repository access" }),
+    ).toHaveCount(0);
     // Checking again renews the expired access without another login.
     expect((await checkAgain()).status()).toBe(200);
     expect(
@@ -396,5 +418,85 @@ test(
     expect(JSON.parse(readFileSync(connectionPath, "utf8")).id).not.toBe(
       old.id,
     );
+  },
+);
+
+test(
+  "GitHub sign-in in the conversation discloses permissions and preserves the draft",
+  journey("github-connection"),
+  async ({ page, fixture }, testInfo) => {
+    test.setTimeout(90_000);
+    const scenario = (login: string) =>
+      writeFileSync(
+        join(fixture.state, "github-scenario.json"),
+        JSON.stringify({ repository: "private", login }),
+      );
+    expect(
+      (
+        await page.request.delete("/api/github/setup", {
+          data: { confirm: "disconnect" },
+        })
+      ).ok(),
+    ).toBe(true);
+    scenario("pending");
+    const response = await page.request.post("/api/applications", {
+      data: {
+        repositoryUrl: "https://github.com/qa/inline-consent",
+        requestKey: crypto.randomUUID(),
+      },
+    });
+    expect(response.ok()).toBe(true);
+    const before = await response.json();
+    expect(before.repository.status).toBe("blocked");
+    const path = `/applications/${before.application.id}`;
+    await page.goto(path);
+    await openConversation(page);
+    const draft = "Read this after I connect GitHub.";
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    await composer.fill(draft);
+    await page
+      .getByRole("region", { name: "Get to know your application" })
+      .getByRole("button", { name: "Connect GitHub", exact: true })
+      .click();
+    const card = page.getByRole("region", {
+      name: "Connect GitHub",
+      exact: true,
+    });
+    await expect(card).toContainText(
+      "read and write access to code and pull requests",
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("inline-github-consent-desktop.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: testInfo.outputPath("inline-github-consent-mobile.png"),
+      fullPage: true,
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.setViewportSize({ width: 1193, height: 900 });
+    await card
+      .getByRole("button", { name: "Connect GitHub", exact: true })
+      .click();
+    await expect(card.getByText("ABCD-1234", { exact: true })).toBeVisible();
+    await card.getByRole("button", { name: "Cancel sign-in" }).click();
+    await expect(card).toContainText("Sign-in cancelled");
+    expect(
+      (await (await page.request.get("/api/github/setup")).json()).connection,
+    ).toBeNull();
+    scenario("success");
+    await card.getByRole("button", { name: "Get a new code" }).click();
+    await expect(
+      page.getByText("can read qa/inline-consent", { exact: false }),
+    ).toBeVisible();
+    await expect(composer).toHaveValue(draft);
+    const after = await (await page.request.get(`/api${path}`)).json();
+    expect(after.repository.status).toBe("passed");
+    expect(after.messages).toEqual(before.messages);
   },
 );

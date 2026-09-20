@@ -14,11 +14,18 @@ import { join, resolve } from "node:path";
 
 const NODE_VERSION = "22.23.2";
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
-const githubClientId =
-  process.env.HALLVI_RELEASE_GITHUB_CLIENT_ID?.trim() || null;
-const githubSlug = process.env.HALLVI_RELEASE_GITHUB_APP_SLUG?.trim() || null;
-if (Boolean(githubClientId) !== Boolean(githubSlug))
+// Hallvi's published GitHub App (github.com/apps/hallvi-app): device flow,
+// no secret and no callback. Both values are public, and
+// shipping them is what lets an ordinary user press Connect GitHub instead of
+// registering an App of their own. A fork names its own App in the environment.
+const releaseApp = {
+  clientId: process.env.HALLVI_RELEASE_GITHUB_CLIENT_ID?.trim(),
+  slug: process.env.HALLVI_RELEASE_GITHUB_APP_SLUG?.trim(),
+};
+if (Boolean(releaseApp.clientId) !== Boolean(releaseApp.slug))
   throw new Error("Supply both public release GitHub App values, or neither.");
+const githubClientId = releaseApp.clientId || "Iv23likHtcclbuys1lVG";
+const githubSlug = releaseApp.slug || "hallvi-app";
 if (
   (githubClientId && !/^[A-Za-z0-9]+$/.test(githubClientId)) ||
   (githubSlug && !/^[a-z0-9-]+$/.test(githubSlug))
