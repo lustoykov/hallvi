@@ -188,6 +188,11 @@ async function fill(into, state, steps, from, to) {
       throw new Error(
         "The backup did not verify. Nothing was migrated and the records are as they were.",
       );
+    // Opening it to check it leaves a write-ahead log and a shared-memory
+    // file beside it. They hold nothing, and a copy that contains more than
+    // its manifest lists invites someone to restore the wrong thing.
+    for (const companion of ["-wal", "-shm"])
+      rmSync(join(into, `hallvi.db${companion}`), { force: true });
   }
 
   writeFileSync(
