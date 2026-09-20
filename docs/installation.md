@@ -16,26 +16,54 @@ SHA-256 file before changing the installed program.
 
 ## Download
 
-Hallvi is published at
-[github.com/lustoykov/hallvi/releases](https://github.com/lustoykov/hallvi/releases).
-Each release carries one archive per platform. Take three files from the newest
-release and keep them in the same directory:
+Take one file from
+[github.com/lustoykov/hallvi/releases](https://github.com/lustoykov/hallvi/releases)
+— `install-hallvi.sh` — and run it:
 
-| Your machine | Take |
-| --- | --- |
-| Apple-silicon macOS | `install-hallvi.sh`, `hallvi-<version>-darwin-arm64.tgz` and its `.tgz.sha256` |
-| Ubuntu 24.04 x64 | `install-hallvi.sh`, `hallvi-<version>-linux-x64.tgz` and its `.tgz.sha256` |
+```bash
+sh install-hallvi.sh
+```
 
-The installer rejects a mismatched platform, and checks the archive against its
-`.sha256` before it changes anything. That check catches a damaged download. It
-is not a signature: whoever serves the archive serves the checksum beside it,
-so what you are trusting for a first installation is github.com over HTTPS.
-Updates are different — Hallvi verifies those against a key it ships; see
+It works out whether this is an Apple-silicon Mac or an Ubuntu 24.04 x64
+machine, finds the newest published alpha release, and downloads that
+release's signed manifest and the archive for this platform. Run it as your
+normal logged-in user, without `sudo`.
+
+### What is actually checked
+
+The archive's SHA-256 **and its size come from `hallvi-release.json`, which is
+signed** — not from a checksum file sitting beside the archive, which whoever
+served the archive would also have served. The signature is checked against a
+key written into `install-hallvi.sh` itself, which you downloaded separately.
+
+Checking an Ed25519 signature needs a tool that can. Ubuntu 24.04 ships
+OpenSSL 3, so there the signature is checked **before anything is unpacked**.
+Stock macOS ships LibreSSL, which cannot load an Ed25519 key at all; there the
+same check runs after unpacking, using the Node.js inside the archive. The
+script says which of the two happened. The second is weaker and worth naming
+plainly: an archive that lied could also lie about its own verification.
+
+Underneath both, a first installation is a person fetching files from
+github.com over HTTPS, and that connection is the root of it. Updates are
+different — an installed Hallvi verifies those against the key it ships; see
 [Update](#update) and [the trust boundary](releases.md#what-trusts-what).
 
+### Installing an exact archive
+
+Give the script an archive instead, for an offline machine or a specific
+build. It keeps the old behaviour: the archive next to its `.tgz.sha256`,
+checked against it.
+
+```bash
+sh install-hallvi.sh ./hallvi-0.1.0-darwin-arm64.tgz
+```
+
+That checksum catches a damaged download and nothing more, because it came
+from wherever the archive came from.
+
 Hallvi is in alpha, and **the first alpha release has not been published yet**.
-Until it is, obtain the three files from the maintainer and use them exactly as
-below. [Publishing a release](releases.md) is the maintainer's side.
+Until it is, obtain an archive from the maintainer and use the form above.
+[Publishing a release](releases.md) is the maintainer's side.
 
 Installing does not need a source checkout, Node.js, npm, Python or a compiler.
 
@@ -58,12 +86,12 @@ source-plus-compile archive and do not certify a new prebuilt archive.
 
    ```bash
    cd ~/Downloads
-   sh ./install-hallvi.sh ./hallvi-0.1.0-darwin-arm64.tgz
+   sh ./install-hallvi.sh
    ```
 
-   Run as your normal logged-in user, without `sudo`. The installer verifies
-   the matching `.sha256` file and reports service, interface and worker
-   readiness.
+   Run as your normal logged-in user, without `sudo`. It finds the newest
+   release, checks it against the signed manifest, and reports service,
+   interface and worker readiness.
 
 2. Open Hallvi:
 
@@ -82,11 +110,12 @@ ordinary user account over SSH or at the machine.
 1. From the directory you downloaded into, run:
 
    ```bash
-   sh ./install-hallvi.sh ./hallvi-0.1.0-linux-x64.tgz
+   sh ./install-hallvi.sh
    ```
 
-   Run without `sudo`. The installer verifies the archive, installs the user
-   service and checks both the interface and worker.
+   Run without `sudo`. On Ubuntu the signed manifest is checked before
+   anything is unpacked. The installer then installs the user service and
+   checks both the interface and worker.
 
 2. The installer asks where you will use Hallvi. Over SSH it suggests
    **From another computer**, and then prints the two commands to run on the
@@ -121,7 +150,8 @@ server when needed.
 
 | What happened | What to do |
 | --- | --- |
-| Checksum fails or the checksum file is missing | Stop and obtain the matching archive and checksum together. Do not skip verification. |
+| The archive does not match the signed manifest | Stop. Nothing was installed. Run it again — a damaged download is the common cause — and if it persists, say so rather than working around it. |
+| `no published release carries a signed manifest yet` | No alpha release exists to find. Install a specific archive instead: `sh install-hallvi.sh ./hallvi-<version>-<platform>.tgz`. |
 | Installer rejects the platform | Use the archive for Apple-silicon macOS or Ubuntu 24.04 x64. Other platforms have no prebuilt release yet. |
 | Prebuilt dependency cannot load | Keep the current installation. Report the archive name, OS version and `hallvi status` output to the maintainer. |
 | `hallvi: command not found` | Use `~/.local/bin/hallvi` instead. Optionally add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file. |
@@ -398,8 +428,8 @@ node ~/.local/lib/hallvi/app/scripts/migrate-state.mjs --restore <that directory
 If a running service meets a database it cannot open later, it stops after
 reporting the mismatch instead of restarting for ever.
 
-You can still install an archive by hand with `install-hallvi.sh`, which does
-the same thing without the release manifest.
+`install-hallvi.sh` still takes an archive, for an offline machine or a
+specific build; see [installing an exact archive](#installing-an-exact-archive).
 
 ## Uninstall
 
@@ -429,8 +459,10 @@ x64. It downloads pinned Node.js 22 from nodejs.org, checks its published
 SHA-256 value, builds the app and installs locked production dependencies on
 that platform. It verifies the native modules load, then writes
 `dist/hallvi-0.1.0-<platform>.tgz`, its `.sha256`, and
-`dist/install-hallvi.sh`. Distribute the three files together with the source
-revision and verification performed on that candidate. The
+`dist/install-hallvi.sh`. A published release carries those plus the signed
+`hallvi-release.json` and its `.sig`, which is what a plain
+`sh install-hallvi.sh` finds and checks; record the source revision and the
+verification performed on that candidate. The
 [beta walkthrough](beta-walkthrough.md) defines the fresh-user acceptance
 check. Packaging does not publish a release, and neither does merging a pull
 request: [Publishing a release](releases.md) is run by hand and leaves a draft.

@@ -61,3 +61,14 @@ export function startUpdate(options: {
 }): Promise<UpdateAttempt>;
 export function dismissUpdate(data: string): void;
 export function currentAttempt(data: string): UpdateAttempt | null;
+
+export declare function checkForReleaseIfDue(options?: {
+  program?: string;
+  data?: string;
+  home?: string;
+  env?: NodeJS.ProcessEnv;
+}): Promise<{
+  checkedAt: string;
+  candidate: unknown;
+  error: string | null;
+} | null>;

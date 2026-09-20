@@ -14,6 +14,7 @@ import {
   compareVersions,
   DEFAULT_CHANNEL,
   discover,
+  UNCHANGED,
   installation,
   migrates,
   packageFor,
@@ -28,7 +29,7 @@ import {
 import { helperAlive, helperTarget, startHelper } from "./update-service.mjs";
 
 /** How long a check is believed before Hallvi looks again. */
-export const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 const checkFile = (data) => join(data, "update-check.json");
 
@@ -54,7 +55,7 @@ function writeCheck(data, value) {
 /**
  * Looks for a newer release, or hands back what the last look found.
  *
- * Rarely, and never while Hallvi is starting: the answer is kept for a day,
+ * Rarely, and never while Hallvi is starting: the answer is kept for an hour,
  * and a source that cannot be reached leaves the previous answer in place
  * with the reason beside it rather than replacing it with nothing. `force` is
  * somebody asking, which is always worth a look.
@@ -72,10 +73,14 @@ export async function checkForRelease(
   )
     return cached;
   try {
-    const candidate = await discover({ channel: DEFAULT_CHANNEL, env });
+    const candidate = await discover({
+      channel: DEFAULT_CHANNEL,
+      env,
+      known: cached?.error ? null : (cached?.candidate?.tag ?? null),
+    });
     return writeCheck(data, {
       checkedAt: new Date().toISOString(),
-      candidate,
+      candidate: candidate === UNCHANGED ? cached.candidate : candidate,
       error: null,
     });
   } catch (error) {
@@ -88,6 +93,33 @@ export async function checkForRelease(
           : "The release source could not be reached.",
     });
   }
+}
+
+/**
+ * The hourly look, for the worker to call on a deadline.
+ *
+ * It answers three questions before it does anything: is this an
+ * installation at all — a checkout has nothing to update and should not be
+ * polling GitHub; is a look actually due; and did it fail, in which case it
+ * says so where the interface reads it and nowhere else. It never installs.
+ * Pressing the button remains the only way anything is replaced.
+ */
+export async function checkForReleaseIfDue({
+  program = process.cwd(),
+  data,
+  home,
+  env = process.env,
+} = {}) {
+  const here = home ? installation(program, home) : installation(program);
+  if (here.kind !== "installed") return null;
+  const cached = readCheck(data);
+  if (
+    cached &&
+    !cached.error &&
+    Date.now() - Date.parse(cached.checkedAt) < CHECK_INTERVAL_MS
+  )
+    return cached;
+  return await checkForRelease(data, { env });
 }
 
 /** Why this candidate cannot be installed here, in one sentence, or nothing. */

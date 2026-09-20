@@ -56,13 +56,36 @@ platform, not the address to download from. A release source that is taken
 over, or an archive replaced in transit, produces a manifest that does not
 verify, and the update stops before anything is downloaded.
 
-**Installing for the first time** is a person downloading files from
-github.com over HTTPS and running them. The `.sha256` beside each archive
-catches a damaged download; it does not authenticate the distributor, because
-whoever serves the archive serves that file too. The anchor there is GitHub and
-HTTPS, and the fact that the repository is public and its source readable.
-Hallvi cannot improve on that from inside the archive being installed: a
-verifier taken out of the archive it is verifying proves nothing.
+**Installing for the first time** is a person downloading `install-hallvi.sh`
+from github.com over HTTPS and running it. That script carries the release
+public key, so it takes the archive's checksum and size from the signed
+manifest rather than from a `.sha256` file beside the archive, which whoever
+served the archive would also have served.
+
+What it can do with that key depends on the machine. Ubuntu 24.04 ships
+OpenSSL 3 and the signature is checked before anything is unpacked. Stock
+macOS ships LibreSSL, which cannot load an Ed25519 key, so the check runs
+afterwards with the Node.js from the archive — better than nothing, because
+the key still comes from the separately downloaded script, and worth stating
+plainly, because an archive that lied could lie about this too. The script
+says which of the two it did.
+
+The anchor underneath both is GitHub and HTTPS, and the fact that the
+repository is public and its source readable.
+
+## Finding out that a release exists
+
+An installed Hallvi looks once an hour, from its worker, and only looks — it
+never installs. A development checkout does not look at all; there is nothing
+for it to update, and every worktree polling GitHub hourly would be rude.
+
+A look that finds the release it already knows about stops at the listing
+rather than downloading and re-verifying the same two assets. A look that
+cannot reach the source keeps the answer it had and records why, so the
+version line can say when it last tried and what went wrong instead of
+quietly showing stale certainty. **Check for updates** forces one regardless.
+
+Installing stays a button. Nothing in the worker starts an update.
 
 ## What the owner has to supply
 

@@ -147,11 +147,14 @@ jobs:
             --title "Hallvi $RELEASE_VERSION" \
             --notes "Hallvi $RELEASE_VERSION ($RELEASE_CHANNEL), built from $GITHUB_SHA.
 
-          Download the archive for your machine, its \`.sha256\`, and \`install-hallvi.sh\`, then run:
+          Download \`install-hallvi.sh\` and run it:
 
           \`\`\`
-          sh ./install-hallvi.sh ./hallvi-${RELEASE_VERSION}-darwin-arm64.tgz
+          sh ./install-hallvi.sh
           \`\`\`
+
+          It finds this release, checks the archive against the signed manifest, and installs it.
+          To install this exact build offline, download the archive for your machine and its \`.sha256\` and pass the archive as an argument.
 
           Installed already? Settings → This Hallvi, or \`hallvi update\`." \
             dist/hallvi-${RELEASE_VERSION}-darwin-arm64.tgz \
