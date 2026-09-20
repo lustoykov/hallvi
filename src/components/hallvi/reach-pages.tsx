@@ -15,7 +15,7 @@ import type { PageChrome } from "./deployment-prototype/page-head";
 import type { ApplicationSection } from "./application-sections";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { CallersDirection } from "./reach-prototype/callers";
-import { PerimeterDirection } from "./reach-prototype/perimeter";
+import { LayersDirection } from "./reach-prototype/layers";
 import { reachFromRecords } from "./reach-records";
 import "./reach-prototype/callers.css";
 import { EmptySketch } from "./empty-sketch";
@@ -123,7 +123,7 @@ export function ReachPageView({
       {page === "domains" ? (
         <CallersDirection {...props} />
       ) : (
-        <PerimeterDirection {...props} panel={panel} />
+        <LayersDirection {...props} panel={panel} />
       )}
     </div>
   );
