@@ -49,6 +49,10 @@ export function saveInformation(
     )
       throw new Error("Evidence execution not found in this application.");
   }
+  // An ID names a record that already exists here. Record IDs are unique
+  // across every application, so inventing one for a new record would
+  // eventually land on another application's record; saying what to do
+  // instead is what Pi needs, and it can act on it in the same turn.
   if (
     id &&
     !db()
@@ -62,7 +66,9 @@ export function saveInformation(
       )
       .get()
   )
-    throw new Error("Saved information not found.");
+    throw new Error(
+      "No saved information has that ID in this application. Omit id to create a record; supply id only to update one a previous save returned.",
+    );
   const now = new Date().toISOString();
   if (id)
     return db()

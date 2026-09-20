@@ -102,6 +102,47 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
     (await getOperatorView(app, chat)).information?.[0].retiredAt,
   ).toBeTruthy();
 });
+it("tells an author who invented an ID what to do instead, and never touches another application's record", async () => {
+  // Pi supplied IDs of its own when creating records, and the refusal said
+  // only that they were not found. Record IDs are unique across every
+  // application, so an invented one is a mistake worth naming precisely.
+  const invented = "deployment";
+  expect(() =>
+    saveInformation(app, { title: "Deployed", body: "It runs." }, invented),
+  ).toThrow(/Omit id to create a record/);
+  expect(listInformation(app)).toHaveLength(0);
+
+  // Creating without an ID works and hands back the ID to update with.
+  const created = saveInformation(app, {
+    title: "Deployed",
+    body: "It runs.",
+  });
+  saveInformation(
+    app,
+    { title: "Deployed", body: "It runs, and the data survived." },
+    created.id,
+  );
+  const records = listInformation(app);
+  expect(records).toHaveLength(1);
+  expect(records[0].body).toBe("It runs, and the data survived.");
+
+  // A second application cannot reach the first one's record by naming its
+  // ID, and the first one's record is left exactly as it was.
+  const other = (
+    await createApplication({
+      repositoryUrl: "https://github.com/example/other",
+    })
+  ).application.id;
+  expect(() =>
+    saveInformation(
+      other,
+      { title: "Mine now", body: "Overwritten." },
+      created.id,
+    ),
+  ).toThrow(/Omit id to create a record/);
+  expect(listInformation(other)).toHaveLength(0);
+  expect(listInformation(app)[0].body).toBe("It runs, and the data survived.");
+});
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
   saveInformation(app, { title: "Note", body: "Saved" });
   // Without the owner nothing is removed: a history must not be orphaned.
