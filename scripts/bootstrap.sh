@@ -233,6 +233,7 @@ tar -xzf "$work/$name" -C "$work" ||
 if [ "$verified_how" = "a signature checked with code from the archive itself" ]; then
   [ -x "$work/$folder/node/bin/node" ] ||
     fail "the archive has no Node.js runtime to check the signature with."
+  verdict=0
   HALLVI_RELEASE_KEY="$release_key_base64" \
     "$work/$folder/node/bin/node" --input-type=module -e '
       import { readFileSync } from "node:fs";
@@ -257,7 +258,10 @@ if [ "$verified_how" = "a signature checked with code from the archive itself" ]
         process.stderr.write(`${error?.message ?? error}\n`);
         process.exit(2);
       }
-    ' "$work/$folder" "$work" >/dev/null 2>&1; verdict=$?
+    ' "$work/$folder" "$work" >/dev/null 2>&1 || verdict=$?
+  # `set -e` would end the script on the failing command itself, before the
+  # status could be read, and both failures below would exit saying nothing at
+  # all. The `||` is what keeps them reachable.
   [ "$verdict" -eq 0 ] ||
     if [ "$verdict" -eq 2 ]; then
       fail "the release manifest is not signed by the Hallvi release key. Nothing was installed."
