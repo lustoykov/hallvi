@@ -9,15 +9,15 @@ export function HetznerTokenSketch() {
   return (
     <figure
       className="hv-ob-sketch"
-      aria-label="In your Hetzner project: Security in the left menu, then API tokens along the top, then Generate API token. Choose Read & Write."
+      aria-label="In your Hetzner project: Security at the bottom of the left menu, then API tokens along the top, then Generate API token. Choose Read & Write."
     >
       <div className="hv-ob-sketch-window">
         <div className="hv-ob-sketch-side">
           <i />
           <i />
           <i />
-          <b>Security</b>
           <i />
+          <b>Security</b>
         </div>
         <div className="hv-ob-sketch-main">
           <div className="hv-ob-sketch-tabs">
