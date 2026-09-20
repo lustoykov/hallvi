@@ -33,17 +33,31 @@ test(
         await button.click();
     };
     await openBackups();
-    const panel = page.getByRole("region", { name: "Hallvi itself" });
+    // The band is a disclosure, so its summary is what the owner reads at a
+    // glance and everything else waits behind a deliberate open. The kit is
+    // only fetched once it is open, which is the point of the design.
+    const panel = page.getByRole("group", { name: "Hallvi on this PC" });
+    const openBand = async () => {
+      await expect(panel).toBeVisible({ timeout: 30_000 });
+      if (!(await panel.evaluate((band: HTMLDetailsElement) => band.open)))
+        await panel.getByText("Hallvi on this PC").click();
+      await expect(panel).toHaveJSProperty("open", true);
+    };
 
-    // 1. No destination: Hallvi is stated as unprotected beside the data,
-    //    and the single action that fixes both is on the page.
+    // 1. No destination: the summary says so, and opening it offers the one
+    //    action that fixes it \u2014 for Hallvi, which is not the application's
+    //    own backup plan.
     await expect(panel).toBeVisible({ timeout: 30_000 });
     await expect(panel.getByText("Not copied", { exact: true })).toBeVisible();
+    await openBand();
     await expect(
       page.getByRole("form", { name: "Connect backup storage" }),
     ).toBeVisible();
     await expect(panel).toContainText(
-      "Connecting off-host storage protects your application\u2019s data and Hallvi together",
+      "Losing this PC would lose Hallvi\u2019s conversations, connections, deployment access and decisions",
+    );
+    await expect(panel).toContainText(
+      "Application data still needs its own backup plan",
     );
 
     // 2. A copy has reached storage, but the owner has not saved the kit.
@@ -109,9 +123,12 @@ test(
     );
     await page.reload();
     await openBackups();
-    await expect(panel.getByText("Kit not saved", { exact: true })).toBeVisible(
-      { timeout: 30_000 },
-    );
+    // A reload closes the disclosure again; the summary still has to carry
+    // the state on its own.
+    await expect(
+      panel.getByText(/^Copied .*; recovery kit still needs saving$/),
+    ).toBeVisible({ timeout: 30_000 });
+    await openBand();
     await expect(
       page.getByRole("form", { name: "Connect backup storage" }),
     ).toHaveCount(0);
@@ -126,14 +143,17 @@ test(
     // 3. The owner says they saved it. One button, no form, and the page
     //    stops claiming anything it cannot back up.
     await kit.getByRole("button", { name: "I saved it" }).click();
-    await expect(panel.getByText("Recoverable", { exact: true })).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(
+      panel.getByText(/^Copied .*; recovery kit saved$/),
+    ).toBeVisible({ timeout: 30_000 });
     // Nothing is asked of the owner again, and the passphrase is not shown
-    // here a second time.
+    // here a second time. What remains is what was copied, and where.
     await expect(panel.getByLabel("Recovery kit")).toHaveCount(0);
     await expect(panel.locator("[data-recovery-passphrase]")).toHaveCount(0);
-    await expect(panel).toContainText("you hold the passphrase");
+    await expect(panel).toContainText(
+      "conversations, connections, deployment access and decisions",
+    );
+    await expect(panel).toContainText("hallvi-copies");
 
     // Settings shows it again only when the owner deliberately asks.
     await page.goto("/setup/connections");
