@@ -571,6 +571,50 @@ it("looks hourly, only in an installation, and only when a look is due", async (
   expect(looked?.candidate).toEqual(fresh.candidate);
 });
 
+it("waits out the hour after a look that failed, then looks again", async () => {
+  // The worker calls this every minute. While a source is unreachable the
+  // answer carries an error, and an error that skipped this gate meant one
+  // request a minute for as long as the outage lasted.
+  const home = join(root, "outage-home");
+  const installed = programWith(
+    join(home, ".local", "lib", "hallvi", "app"),
+    "release.json",
+    { version: "0.1.0", revision: "c".repeat(40), platform: "darwin-arm64" },
+  );
+  const data = join(root, "outage-data");
+  mkdirSync(data, { recursive: true });
+  const unreachable = { HALLVI_RELEASE_SOURCE: "https://127.0.0.1:1/releases" };
+  const failed = {
+    candidate: { tag: "v0.1.0-alpha.1" },
+    error: "The release source could not be reached.",
+  };
+
+  // Four minutes after a failed look: handed back untouched, nothing dialled.
+  const recent = new Date(Date.now() - 4 * 60 * 1000).toISOString();
+  writeFileSync(
+    join(data, "update-check.json"),
+    `${JSON.stringify({ ...failed, checkedAt: recent })}\n`,
+  );
+  expect(
+    await checkForReleaseIfDue({ program: installed, data, home, env: unreachable }),
+  ).toMatchObject({ checkedAt: recent, error: failed.error });
+
+  // Ninety minutes in, it is due again, error or no error.
+  const stale = new Date(Date.now() - 90 * 60 * 1000).toISOString();
+  writeFileSync(
+    join(data, "update-check.json"),
+    `${JSON.stringify({ ...failed, checkedAt: stale })}\n`,
+  );
+  const looked = await checkForReleaseIfDue({
+    program: installed,
+    data,
+    home,
+    env: unreachable,
+  });
+  expect(looked?.checkedAt).not.toBe(stale);
+  expect(looked?.error).toEqual(expect.any(String));
+});
+
 it("does not fetch a release it has already verified", async () => {
   const key = keypair();
   const manifest = manifestFor();

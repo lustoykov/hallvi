@@ -113,11 +113,11 @@ export async function checkForReleaseIfDue({
   const here = home ? installation(program, home) : installation(program);
   if (here.kind !== "installed") return null;
   const cached = readCheck(data);
-  if (
-    cached &&
-    !cached.error &&
-    Date.now() - Date.parse(cached.checkedAt) < CHECK_INTERVAL_MS
-  )
+  // A look that failed is still a look. Leaving errors out of this gate meant an
+  // unreachable source was retried every time the worker came round — once a
+  // minute — for as long as the outage lasted. Somebody pressing the button goes
+  // to checkForRelease with force and is unaffected.
+  if (cached && Date.now() - Date.parse(cached.checkedAt) < CHECK_INTERVAL_MS)
     return cached;
   return await checkForRelease(data, { env });
 }

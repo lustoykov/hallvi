@@ -236,18 +236,34 @@ if [ "$verified_how" = "a signature checked with code from the archive itself" ]
   HALLVI_RELEASE_KEY="$release_key_base64" \
     "$work/$folder/node/bin/node" --input-type=module -e '
       import { readFileSync } from "node:fs";
-      const [, , dir, work] = process.argv;
+      // `node -e` has no script path, so the arguments start at argv[1].
+      // Reading from argv[2] pointed dir at the work directory and left work
+      // undefined, and this whole check failed before it verified anything.
+      const [, dir, work] = process.argv;
       const { verifyManifest, trustedKeys } = await import(
         `${dir}/scripts/release-trust.mjs`
       );
-      verifyManifest({
-        bytes: readFileSync(`${work}/hallvi-release.json`),
-        signature: readFileSync(`${work}/hallvi-release.json.sig`, "utf8").trim(),
-        channel: "alpha",
-        keys: trustedKeys().keys,
-      });
-    ' "$work/$folder" "$work" >/dev/null 2>&1 ||
-    fail "the release manifest is not signed by the Hallvi release key. Nothing was installed."
+      try {
+        verifyManifest({
+          bytes: readFileSync(`${work}/hallvi-release.json`),
+          signature: readFileSync(`${work}/hallvi-release.json.sig`, "utf8").trim(),
+          channel: "alpha",
+          keys: trustedKeys().keys,
+        });
+      } catch (error) {
+        // 2 is "the signature is wrong", anything else is "the check could not
+        // run". Reporting both as a bad signature is what hid an installer that
+        // never reached the signature at all.
+        process.stderr.write(`${error?.message ?? error}\n`);
+        process.exit(2);
+      }
+    ' "$work/$folder" "$work" >/dev/null 2>&1; verdict=$?
+  [ "$verdict" -eq 0 ] ||
+    if [ "$verdict" -eq 2 ]; then
+      fail "the release manifest is not signed by the Hallvi release key. Nothing was installed."
+    else
+      fail "the release manifest's signature could not be checked on this machine. Nothing was installed."
+    fi
   say "The release manifest is signed by the Hallvi release key."
 fi
 
