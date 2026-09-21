@@ -321,8 +321,10 @@ note explains why.
 <a id="upgrade"></a>
 
 Hallvi updates itself. Its version sits at the bottom of the sidebar, under
-**Settings**; when a release is waiting it says **Update available** under it.
-Click that line and press **Update**. Or, in a terminal:
+**Settings**, with a visible **Check for updates** button below it. Press it to
+check immediately and open the result. When a release is available, press
+**Update** in that panel to install it. Checking does not start installation.
+Or, in a terminal:
 
 ```bash
 hallvi update            # look, then ask before installing
