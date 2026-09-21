@@ -69,7 +69,7 @@ describe("one current-release lead", () => {
         onAsk={() => undefined}
       />,
     );
-    expect(html).toContain("Last verified release: 9cea081.");
+    expect(html).toContain("Last verified release: 9cea081");
     expect(html).toContain("failed");
   });
 });

@@ -200,6 +200,7 @@ export function ApplicationSectionView({
         }}
         panel={children}
         onAsk={(draft) => onAsk(null, draft)}
+        onOpenDestination={onOpenDestination}
       />
     );
   if (section === "processes")

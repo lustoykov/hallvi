@@ -1,0 +1,736 @@
+/* The register: every class here starts with hv-rg-.
+   A white sheet of ruled lines: a totals strip on top, dense tables with
+   real columns, and rows that open in place. Nothing opens beside a table. */
+
+.hv-rg-sheet {
+  display: grid;
+  gap: 0;
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.hv-rg-lede {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 18px;
+}
+.hv-rg-lede p {
+  margin: 0;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+/* ------------------------------------------------------------------ head */
+.hv-rg-holds {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: -0.01em;
+}
+/* ----------------------------------------------------------------- strip */
+.hv-rg-strip {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: #fff;
+  box-shadow: var(--shadow-s);
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+.hv-rg-figure {
+  flex: 1 1 0;
+  min-width: 150px;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  padding: 12px 16px;
+  border-left: 1px solid var(--line-2);
+}
+.hv-rg-figure:first-child {
+  border-left: 0;
+}
+.hv-rg-figure small {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.hv-rg-value {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.hv-rg-figure[data-tone="bad"] .hv-rg-value {
+  color: var(--red);
+}
+.hv-rg-figure[data-tone="warn"] .hv-rg-value {
+  color: var(--amber-text);
+}
+.hv-rg-figure[data-tone="good"] .hv-rg-value {
+  color: var(--green-text);
+}
+.hv-rg-figure[data-tone="working"] .hv-rg-value {
+  color: var(--blue-text);
+}
+.hv-rg-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+/* -------------------------------------------------------------- controls */
+.hv-rg-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.hv-rg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease);
+}
+.hv-rg-chip:hover {
+  border-color: #b9c8e6;
+}
+.hv-rg-chip em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 11px;
+}
+.hv-rg-chip[data-on="true"] {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #fff;
+}
+.hv-rg-chip[data-on="true"] em {
+  color: #b9c5dc;
+}
+.hv-rg-ask {
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.hv-rg-ask svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  opacity: 0.8;
+}
+.hv-rg-ask span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-rg-ask[data-tone="bad"] {
+  border-color: #e7c5c2;
+  color: var(--red);
+}
+.hv-rg-ask[data-tone="bad"]:hover {
+  background: var(--red-soft);
+}
+/* ---------------------------------------------------------------- boards */
+.hv-rg-board {
+  margin-bottom: 26px;
+}
+.hv-rg-board-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+.hv-rg-board-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.hv-rg-board-head small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.hv-rg-board-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* -------------------------------------------------------------- register */
+.hv-rg-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: #fff;
+  box-shadow: var(--shadow-s);
+  overflow: hidden;
+}
+.hv-rg-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+.hv-rg-table thead th {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+.hv-rg-table th.hv-rg-end,
+.hv-rg-table td.hv-rg-end {
+  text-align: right;
+}
+.hv-rg-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.hv-rg-sort svg {
+  width: 9px;
+  height: 9px;
+  opacity: 0;
+}
+.hv-rg-sort:hover {
+  color: var(--ink-2);
+}
+.hv-rg-sort:hover svg {
+  opacity: 0.5;
+}
+.hv-rg-sort[data-on="true"] {
+  color: var(--ink);
+}
+.hv-rg-sort[data-on="true"] svg {
+  opacity: 1;
+}
+.hv-rg-end .hv-rg-sort {
+  flex-direction: row-reverse;
+}
+.hv-rg-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-2);
+  vertical-align: middle;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.hv-rg-table tbody:last-child tr:last-child td {
+  border-bottom: 0;
+}
+.hv-rg-row[data-click="true"] {
+  cursor: pointer;
+}
+.hv-rg-row[data-click="true"]:hover td {
+  background: #fafcff;
+}
+.hv-rg-row[data-open="true"] td {
+  background: var(--blue-soft);
+}
+.hv-rg-row[data-tone="bad"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--red);
+}
+.hv-rg-row[data-tone="warn"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+.hv-rg-row[data-tone="working"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+.hv-rg-row[data-tone="idle"] > td:first-child {
+  box-shadow: inset 3px 0 0 #ccd4e2;
+}
+.hv-rg-table .hv-rg-open {
+  padding-left: 0;
+  padding-right: 10px;
+  color: #a9b4c8;
+  text-align: right;
+}
+.hv-rg-table .hv-rg-open svg {
+  width: 10px;
+  height: 10px;
+}
+.hv-rg-group td {
+  padding: 7px 12px;
+  background: #fbfcfe;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hv-rg-group em {
+  margin-left: 8px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.hv-rg-blank td {
+  padding: 22px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+/* ---------------------------------------------------------- opened row */
+.hv-rg-detail > td {
+  padding: 0;
+  background: #fbfcfe;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 #e3eaf6;
+}
+.hv-rg-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 10px 18px;
+}
+.hv-rg-facts div {
+  min-width: 0;
+}
+.hv-rg-facts dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hv-rg-facts dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.hv-rg-out {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 210px;
+  overflow: auto;
+}
+.hv-rg-note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 82ch;
+}
+.hv-rg-sub {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.hv-rg-sub th {
+  padding: 4px 10px 4px 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+.hv-rg-sub td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid #eef2f8;
+  font-size: 12.5px;
+  vertical-align: top;
+}
+.hv-rg-sub tr:last-child td {
+  border-bottom: 0;
+}
+.hv-rg-sub tr[data-tone="bad"] td:first-child {
+  color: var(--red);
+  font-weight: 600;
+}
+.hv-rg-sub tr[data-tone="good"] td:first-child {
+  color: var(--green-text);
+}
+.hv-rg-sub tr[data-tone="working"] td:first-child {
+  color: var(--blue-text);
+}
+/* ---------------------------------------------------------- cell pieces */
+.hv-rg-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.hv-rg-bar-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 26px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e8edf6;
+  overflow: hidden;
+}
+.hv-rg-bar-fill {
+  left: 0;
+  background: #93a5c4;
+}
+.hv-rg-bar[data-tone="bad"] .hv-rg-bar-fill {
+  background: var(--red);
+}
+.hv-rg-bar[data-tone="warn"] .hv-rg-bar-fill {
+  background: var(--amber);
+}
+.hv-rg-bar[data-tone="good"] .hv-rg-bar-fill {
+  background: var(--green);
+}
+.hv-rg-bar[data-tone="working"] .hv-rg-bar-fill {
+  background: var(--blue);
+}
+.hv-rg-bar em {
+  flex: none;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.hv-rg-pips {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.hv-rg-pips i {
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  background: #cfd8e6;
+}
+.hv-rg-pips i[data-tone="good"] {
+  background: var(--green);
+}
+.hv-rg-pips i[data-tone="bad"] {
+  background: var(--red);
+}
+.hv-rg-pips i[data-tone="warn"] {
+  background: var(--amber);
+}
+.hv-rg-pips i[data-tone="working"] {
+  background: var(--blue);
+  animation: hv-rg-pulse 1.4s var(--ease) infinite;
+}
+.hv-rg-pips i[data-tone="idle"] {
+  background: #e2e8f2;
+  box-shadow: inset 0 0 0 1px #cfd8e6;
+}
+@keyframes hv-rg-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+.hv-rg-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.hv-rg-tag[data-tone="bad"] {
+  background: var(--red-soft);
+  color: var(--red);
+}
+.hv-rg-tag[data-tone="warn"] {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+.hv-rg-tag[data-tone="good"] {
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+.hv-rg-tag[data-tone="working"] {
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+.hv-rg-none {
+  color: #9aa5b9;
+}
+.hv-rg-clip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-rg-num {
+  font-variant-numeric: tabular-nums;
+}
+.hv-rg-sub-note {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-rg-name {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.hv-rg-name strong {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* ------------------------------------------------------------- footer */
+.hv-rg-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.hv-rg-foot > span {
+  min-width: 0;
+}
+.hv-rg-foot .hv-rg-ask {
+  margin-left: auto;
+}
+.hv-rg-foot .hv-rg-ask + .hv-rg-ask {
+  margin-left: 0;
+}
+
+/* ------------------------------------------------------------ additions */
+
+.hv-rg-mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.hv-rg-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b3bdd0;
+}
+.hv-rg-dot[data-tone="good"] {
+  background: var(--green);
+}
+.hv-rg-dot[data-tone="warn"] {
+  background: var(--amber);
+}
+.hv-rg-dot[data-tone="bad"] {
+  background: var(--red);
+}
+.hv-rg-dot[data-tone="working"] {
+  background: var(--blue);
+}
+
+.hv-rg-ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--link, #315bc6);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.hv-rg-ask:hover {
+  border-color: #b9c8e6;
+  background: var(--blue-soft);
+}
+
+/* The opened row. One column, and the questions close it: nothing is parked
+   beside the table for the eye to travel to. */
+.hv-rg-opened {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 16px;
+  min-width: 0;
+}
+.hv-rg-asks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+}
+.hv-rg-open button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Steps beside what they printed. */
+.hv-rg-split {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1080px) {
+  .hv-rg-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.hv-rg-sub tr[data-click] {
+  cursor: pointer;
+}
+.hv-rg-sub tr[data-click]:hover td {
+  background: #f4f7fd;
+}
+.hv-rg-sub tr[data-picked] td {
+  background: var(--blue-soft);
+}
+.hv-rg-sub tr[data-click] td:first-child {
+  padding-left: 8px;
+}
+.hv-rg-sub-pick {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* What a command printed. One pane per opened row. */
+.hv-rg-term {
+  min-width: 0;
+  border: 1px solid #1d2a44;
+  border-radius: var(--radius);
+  background: #111a2e;
+  color: #d5deef;
+  overflow: hidden;
+}
+.hv-rg-term header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  font-size: 12px;
+}
+.hv-rg-term header b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #fff;
+}
+.hv-rg-term header small {
+  margin-left: auto;
+  flex: none;
+  color: #93a3c2;
+}
+.hv-rg-term[data-tone="bad"] header small {
+  color: #f1a9a4;
+}
+.hv-rg-term code {
+  display: block;
+  padding: 8px 12px 0;
+  color: #93a3c2;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hv-rg-term code::before {
+  content: "$ ";
+  color: #5f7299;
+}
+.hv-rg-term pre {
+  margin: 0;
+  padding: 8px 12px 12px;
+  max-height: 300px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hv-rg-term p {
+  margin: 0;
+  padding: 10px 12px 12px;
+  color: #93a3c2;
+  font-size: 12px;
+}
+
+/* Beside a terminal the steps are narrow: the first three columns keep to
+   one line and the command gives way. */
+.hv-rg-split .hv-rg-sub {
+  table-layout: fixed;
+}
+.hv-rg-split .hv-rg-sub th:nth-child(1) {
+  width: 34%;
+}
+.hv-rg-split .hv-rg-sub th:nth-child(2) {
+  width: 22%;
+}
+.hv-rg-split .hv-rg-sub th:nth-child(3) {
+  width: 16%;
+}
+.hv-rg-split .hv-rg-sub td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-rg-term code {
+  max-height: 86px;
+  overflow: auto;
+}
