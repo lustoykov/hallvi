@@ -8,10 +8,9 @@ test.use({ isolatedApp: true });
 // The page pairs caretakers with their applications: one card each, with
 // the drawn screen, one word of state and what runs. What has to keep
 // working: the reader recognises an application and opens it from its card,
-// name, screen or Open app; search, once there is enough to search, never leaves
-// them on a card that opens something else; and the empty page offers the
-// one thing to do. The welcome offers another application; continuing work
-// starts inside an existing application.
+// name, screen or Open app. Search never leaves them on a card that opens
+// something else. The empty page offers the one thing to do. The welcome
+// offers another application; continuing work starts inside an existing one.
 test(
   "home lists applications, follows the selected one, and search preserves navigation",
   journey("application-shell"),
