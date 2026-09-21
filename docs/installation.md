@@ -18,17 +18,18 @@ signed release manifest before changing the installed program.
 
 **The first alpha release is available:**
 [Hallvi 0.1.1-alpha.1](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1).
-Paste this one line into Terminal as your normal user, without `sudo`:
+Paste this one line into Terminal from a directory you can write to, as your
+normal user and without `sudo`:
 
 ```bash
-curl -fsSLo "$HOME/install-hallvi.sh" https://github.com/lustoykov/hallvi/releases/download/v0.1.1-alpha.1/install-hallvi.sh && sh "$HOME/install-hallvi.sh"
+curl -fsSLo ./install-hallvi.sh https://github.com/lustoykov/hallvi/releases/download/v0.1.1-alpha.1/install-hallvi.sh && sh ./install-hallvi.sh
 ```
 
 This fetches the installer script from the published release and runs it. The
 script works out whether this is an Apple-silicon Mac or an Ubuntu 24.04 x64
 machine, finds the newest published alpha release, and downloads that
 release's signed manifest and the archive for this platform. It saves the
-installer script in your home directory, so you can inspect or rerun it.
+installer script in your current directory, so you can inspect or rerun it.
 
 ### What is actually checked
 

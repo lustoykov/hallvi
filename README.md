@@ -21,15 +21,17 @@ broader care and recovery experience remains [in progress](ROADMAP.md). See
 ## Install
 
 On an **Apple-silicon Mac** or **Ubuntu 24.04 x64** machine, paste this one line
-into Terminal. Run it as your normal user, without `sudo`:
+into Terminal from a directory you can write to. Run it as your normal user,
+without `sudo`:
 
 ```sh
-curl -fsSLo "$HOME/install-hallvi.sh" https://github.com/lustoykov/hallvi/releases/download/v0.1.1-alpha.1/install-hallvi.sh && sh "$HOME/install-hallvi.sh"
+curl -fsSLo ./install-hallvi.sh https://github.com/lustoykov/hallvi/releases/download/v0.1.1-alpha.1/install-hallvi.sh && sh ./install-hallvi.sh
 ```
 
 The script detects your platform, downloads the newest published signed alpha
 release for it, verifies the archive, installs Hallvi, and starts its background
-service. You do **not** need to clone this repository or install Node.js.
+service. The installer script remains in the current directory for inspection
+or reuse. You do **not** need to clone this repository or install Node.js.
 [Release assets](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1)
 are available for both platforms; Intel Macs and other Linux systems do not
 have a prebuilt release yet.
