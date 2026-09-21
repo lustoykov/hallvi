@@ -382,9 +382,6 @@
   color: var(--red);
   font-weight: 600;
 }
-.hv-rg-sub tr[data-tone="good"] td:first-child {
-  color: var(--green-text);
-}
 .hv-rg-sub tr[data-tone="working"] td:first-child {
   color: var(--blue-text);
 }

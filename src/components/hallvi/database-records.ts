@@ -196,3 +196,94 @@ export function databaseAssessed(records: SavedInformation[]) {
     ).length > 0
   );
 }
+
+/** One check on a database, as recorded and as it reads now. */
+export interface DatabaseProbe {
+  key: string;
+  label: string;
+  detail: string | null;
+  passed: boolean;
+  /** Still inside its claim's horizon. A stale pass is not a failure. */
+  fresh: boolean;
+  at: string | null;
+}
+
+/** One row of the Database register. */
+export interface DatabaseRow {
+  id: string;
+  /** "PostgreSQL 17.11", or the subject's own id when no engine is recorded. */
+  label: string;
+  /** A record states there is none. Different from nobody having looked. */
+  absent: boolean;
+  path: string | null;
+  size: string | null;
+  /** When the size was read, because a size is only as good as its date. */
+  sizeAt: string | null;
+  owner: string | null;
+  port: string | null;
+  probes: DatabaseProbe[];
+  lastPassed: string | null;
+  /**
+   * Everything else Pi recorded about it, in Pi's own labels: a row count, a
+   * starred entry. Read as detail and never as a column, because a key this
+   * page does not know must not decide what a designed surface says.
+   */
+  extras: { label: string; value: string }[];
+}
+
+const DECLARED = new Set([
+  "engine",
+  "version",
+  "path",
+  "size",
+  "owner",
+  "port",
+]);
+
+/** Every database a record names, for the register. */
+export function databasesFromRecords({
+  records,
+  now,
+}: {
+  records: SavedInformation[];
+  now: number;
+}): DatabaseRow[] {
+  const live = records.filter((record) => !record.retiredAt);
+  return subjectsMentioned(live, "database").map((ref) => {
+    const presence = presenceOf(live, ref);
+    const facts = currentFacts(live, ref);
+    const fact = (key: string) => facts.get(key)?.value.value ?? null;
+    const probes = [...currentChecks(live, ref).values()].map((held) => ({
+      key: held.value.key ?? held.value.label,
+      label: held.value.label,
+      detail: held.value.detail ?? null,
+      passed: held.value.status !== "failed",
+      fresh: freshnessOf(held.value, held.record, now).kind === "fresh",
+      at: held.record.establishedAt,
+    }));
+    return {
+      id: ref.id,
+      label:
+        [fact("engine"), fact("version")].filter(Boolean).join(" ") || ref.id,
+      absent: presence.known && presence.presence === "absent",
+      path: fact("path"),
+      size: fact("size"),
+      sizeAt: facts.get("size")?.record.establishedAt ?? null,
+      owner: namedProcess(live, fact("owner")) ?? fact("owner"),
+      port: fact("port"),
+      probes,
+      lastPassed:
+        probes
+          .filter((probe) => probe.passed && probe.at)
+          .map((probe) => probe.at!)
+          .sort()
+          .at(-1) ?? null,
+      extras: [...facts.entries()]
+        .filter(([key]) => !DECLARED.has(key))
+        .map(([, held]) => ({
+          label: held.value.label,
+          value: held.value.value,
+        })),
+    };
+  });
+}
