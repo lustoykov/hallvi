@@ -120,7 +120,7 @@ and the public key in the program has to be replaced, which is itself a release.
 That commit is what a release names. Merging it publishes nothing.
 
 ```
-0.1.0  →  0.1.0-alpha.1  →  0.1.0-alpha.2  …
+0.1.0  →  0.1.1-alpha.1  →  0.1.1-alpha.2  …
 ```
 
 **Build.** Run the **Hallvi release** workflow by hand — Actions → Hallvi
@@ -166,12 +166,12 @@ One file, `hallvi-release.json`, signed byte for byte. Its signature is
 {
   "hallviRelease": 1,
   "channel": "alpha",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.1-alpha.1",
   "revision": "<the 40-character commit the archives were built from>",
   "schemaVersion": 18,
   "migratesFrom": [15],
   "releasedAt": "2026-09-20T09:00:00.000Z",
-  "notes": "https://github.com/lustoykov/hallvi/releases/tag/v0.1.0-alpha.1",
+  "notes": "https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1",
   "packages": {
     "darwin-arm64": { "file": "…", "url": "https://…", "size": 240339966, "sha256": "…" },
     "linux-x64":    { "file": "…", "url": "https://…", "size": 291400178, "sha256": "…" }

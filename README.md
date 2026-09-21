@@ -33,13 +33,13 @@ sidebar or through `hallvi update`; installing an update is your choice.
 ### Before the first release
 
 Ask the maintainer for the **three matching files**: `install-hallvi.sh`, a
-prebuilt archive such as `hallvi-0.1.0-darwin-arm64.tgz`, and its
-`hallvi-0.1.0-darwin-arm64.tgz.sha256`. Put them together in `~/Downloads` on
+prebuilt archive such as `hallvi-0.1.1-alpha.1-darwin-arm64.tgz`, and its
+`hallvi-0.1.1-alpha.1-darwin-arm64.tgz.sha256`. Put them together in `~/Downloads` on
 an Apple-silicon Mac, then run:
 
 ```sh
 cd ~/Downloads
-sh ./install-hallvi.sh ./hallvi-0.1.0-darwin-arm64.tgz
+sh ./install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
 ~/.local/bin/hallvi status
 ```
 

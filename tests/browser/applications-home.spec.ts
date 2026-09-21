@@ -16,7 +16,7 @@ test(
   "home lists applications, follows the selected one, and search preserves navigation",
   journey("application-shell"),
   async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(240_000);
     await page.goto("/applications");
     await expect(page).toHaveURL(/\/applications\/new$/);
     await expect(
@@ -96,7 +96,10 @@ test(
     await expect(list.getByRole("listitem")).toHaveCount(names.length);
 
     await alpha.getByRole("link", { name: "Open app" }).click();
-    await expect(page).toHaveURL(new RegExp(`/applications/${ids[0]}$`));
+    // The first visit to this route can compile for tens of seconds in CI.
+    await expect(page).toHaveURL(new RegExp(`/applications/${ids[0]}$`), {
+      timeout: 90_000,
+    });
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toBeVisible();
