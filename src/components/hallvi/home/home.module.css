@@ -429,6 +429,11 @@
   font-size: 14px;
   line-height: 1.5;
 }
+.nextStep {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
 .foot {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

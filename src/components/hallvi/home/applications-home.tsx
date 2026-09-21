@@ -44,8 +44,8 @@ type Situation = "fine" | "working" | "needs" | "stale" | "new";
 
 function situationOf(item: HomeApplication): Situation {
   const text = item.condition.text;
-  if (item.attention > 0 || item.condition.tone === "bad") return "needs";
-  if (item.condition.tone === "warn") return "needs";
+  if (item.condition.tone === "bad" || item.condition.tone === "warn")
+    return "needs";
   if (/deploying|in progress|updating/i.test(text)) return "working";
   if (/^not deployed|^new application/i.test(text)) return "new";
   if (item.condition.tone === "muted") return "stale";
@@ -55,7 +55,7 @@ function situationOf(item: HomeApplication): Situation {
 const WORD: Record<Situation, string> = {
   fine: "Fine",
   working: "Working",
-  needs: "Needs me",
+  needs: "Needs attention",
   stale: "Not checked",
   new: "New",
 };
@@ -290,6 +290,11 @@ export function ApplicationsHome({
                           ? "No deployment recorded yet."
                           : item.condition.text}
                       </p>
+                      {item.condition.nextStep && (
+                        <p className={s.nextStep}>
+                          Next: {item.condition.nextStep}
+                        </p>
+                      )}
                       <div className={s.foot}>
                         <div>
                           {parts.length > 0 && (

@@ -66,7 +66,7 @@ describe("the applications list and Overview", () => {
         checks: [check(application, "passed")],
       }),
     ]);
-    expect(list).toEqual({ tone: "bad", text: "A recorded condition failed" });
+    expect(list).toEqual({ tone: "bad", text: "Checkout is down" });
     expect(overview.certainty).toBe("failed");
     expect(overview.text).toContain("Checkout is down");
   });
@@ -80,7 +80,10 @@ describe("the applications list and Overview", () => {
       }),
       record({ id: "domain", ref: domain, checks: [check(domain, "failed")] }),
     ]);
-    expect(list).toEqual({ tone: "bad", text: "A check did not pass" });
+    expect(list).toEqual({
+      tone: "bad",
+      text: "“public-https answered” did not pass",
+    });
     expect(overview).toEqual({
       certainty: "failed",
       text: '"public-https answered" did not pass.',

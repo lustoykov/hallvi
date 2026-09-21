@@ -39,6 +39,10 @@ collection. An empty collection goes straight to the first-application welcome.
   app navigate to the application. The external address and caretaker greeting
   keep their own actions. Greeting is a separate button, never a nested control
   or a required step. Detailed conditions remain visible after the greeting.
+- **Attention names the reason.** Only a current warning or failure gives the
+  card an attention label and amber or red dot. The card states the recorded
+  problem and its next step when one was saved. Informational recommendations
+  do not turn a passing condition into a request for help.
 
 Protection lives on the application's own pages. An undeployed app says
 “No deployment recorded yet.” rather than issuing a protection warning before
@@ -46,7 +50,7 @@ there is anything to protect.
 
 ## Data boundaries
 
-Name, repository, condition, stack, attention count and address come from
+Name, repository, condition, next step, stack and address come from
 saved records (`listApplicationItems`). Kind and purpose are read from the
 repository name (`application-kind.ts`); unknown software gets the generic
 screen and its repository as the purpose. Screen contents are decorative,
