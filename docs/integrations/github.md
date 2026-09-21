@@ -112,8 +112,9 @@ This is a source transfer, not a deployment result. Pi still chooses the build
 and deployment commands, preserves the existing application's data and verifies
 what runs. A later request to deploy `main` calls the tool again, resolving the
 branch's current tip through the same connection. No personal access token or
-server-side GitHub login is required. Deploying automatically on every push is
-not installed by this tool and remains deferred.
+server-side GitHub login is required. The tool itself installs nothing that
+reacts to a push; [the branch watch](#deploying-automatically-when-a-branch-changes)
+does that, and deploys through this same tool.
 
 Deployment source is fetched afresh from GitHub, not copied from Pi's partial,
 redacted inspection workspace. Unpublished workspace edits are not included.
@@ -126,6 +127,69 @@ Pi must install/build into the application's durable location, not rely on
 An older conversation may still ask for a checkout token. After transferring
 source successfully, Pi can use `cancel_secret_request` to withdraw that
 unfilled request and continue. The tool refuses to remove a supplied credential.
+
+## Deploying automatically when a branch changes
+
+During a first deployment Pi asks, in one card, "How should this application
+deploy?" — automatically when `main` changes, or only when asked — with the
+branch editable and what automatic authorizes spelled out: every future commit
+on that branch deploys without a question per commit. The owner sets up nothing
+on GitHub: no webhook, no token, no workflow file.
+
+Hallvi runs on a computer behind a home router, where GitHub cannot call it, so
+it **looks** rather than listens. The worker asks GitHub where the tracked
+branch is about once a minute, through the saved App connection, with a
+conditional request that costs nothing against the rate limit when nothing
+moved. A push is therefore noticed within about a minute, not instantly, and
+every surface that mentions it says so.
+
+```mermaid
+flowchart LR
+  G["GitHub · tracked branch"] -->|"worker looks about every minute (ETag)"| W["Branch watch · deployment.json"]
+  W -->|"tip ≠ verified release, not yet attempted, conversation idle"| M["Wakeup in the main conversation · one exact commit"]
+  M --> P["Pi · copy_repository_to_server(commit) · server_bash · verify"]
+  P -->|"save_information · deployment record for that commit"| R["Release records"]
+  R -->|"verified → deployed · otherwise failed, never retried by itself"| W
+  R --> D["Deployment page · same records, same deployment.json"]
+```
+
+A push is a [wakeup](../../CONTEXT.md#operator-redesign-vocabulary), not a
+second deployment system. The watch sends the application's main conversation a
+message marked **Started automatically**, naming one exact commit; Pi deploys it
+with the same tools, permission mode and evidence as a deployment the owner
+asked for, verifies the running application and saves the deployment record.
+The watch owns only what a conversation cannot:
+
+- **One at a time.** Nothing starts while the main conversation is working or
+  an attempt is running. Commits pushed meanwhile only move "latest"; when the
+  attempt ends, the newest commit is the next one, and the ones between are
+  skipped.
+- **Once per commit.** A commit that failed waits for the owner's **Retry** or
+  for the next push. Nothing retries by itself.
+- **Deployed means verified.** What is running is the newest release record a
+  check proved — the rule the Deployment page already used
+  (`release-outcome.ts`). An attempt is `deployed` only when such a record
+  exists for its commit; a record that says failed, a record with no proof, a
+  reply that failed and a turn that ended without any record are each reported
+  as what they are.
+- **Restarts.** The choice, what GitHub last said and every attempt are in
+  `operator/<application id>/deployment.json` beside the execution records;
+  what is running comes from the release records. A controller that was off
+  finds the commits it missed on its first look. One that stopped mid-deployment
+  reports that attempt as **interrupted** — what reached the server is unknown —
+  and leaves continuing or retrying to the owner, as an interrupted
+  conversation always has.
+- **The first deployment is not raced.** Automatic deployments begin once a
+  first release is verified.
+
+The record has one writer, the worker. Pi changes it through
+`deployment_settings`, the card and the Deployment page by asking the worker,
+and all three read the same file. **Watching** is never inferred from the
+choice: it is true only while GitHub has recently answered for that branch, and
+the page otherwise says since when it has not. Choosing a branch GitHub cannot
+read is refused rather than saved. Pause holds deployments and keeps looking,
+so the page still shows what is waiting. In Always ask, automatic deployment
+still asks before each command; the card says so.
 
 ## Proposing a change
 
@@ -209,7 +273,7 @@ Repository access counts only a passing Observation from the **currently selecte
 - Own configuration: `.hallvi/github-connection.json`, or `HALLVI_CONFIG_DIR/github-connection.json`. Writes are atomic with file mode `0600`. Access and refresh tokens are unencrypted at rest; do not expose this local prototype to the network or share its state directory. Neither token is included in browser data, evidence or provider-error messages.
 - **Disconnect** cancels pending sign-in and replaces the owned file with `null`, removing both tokens and the selection from that file. A pending renewal cannot restore them. It does not erase disk backups, revoke authorization on GitHub, alter CLI credentials, or delete application history.
 - Revoke upstream at [authorized GitHub Apps](https://github.com/settings/apps/authorizations); manage installed repository access at [installed GitHub Apps](https://github.com/settings/installations).
-- User access tokens normally expire after eight hours. Hallvi renews them on the next GitHub request, starting within one minute of expiry; there is no timer or background worker. [GitHub supports refreshing device-flow user tokens without a client secret](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens). The refresh token lasts six months and rotates when used. Reading Settings does not perform renewal; its “Access renews automatically” message means a usable local refresh token exists, not that remote authorization was just tested.
+- User access tokens normally expire after eight hours. Hallvi renews them on the next GitHub request, starting within one minute of expiry; there is no renewal timer. With a branch tracked, the next request is usually the worker's look at that branch, so renewal usually happens there; a process that loses a renewal race reads the rotated login from the file and cannot invalidate it. [GitHub supports refreshing device-flow user tokens without a client secret](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens). The refresh token lasts six months and rotates when used. Reading Settings does not perform renewal; its “Access renews automatically” message means a usable local refresh token exists, not that remote authorization was just tested.
 - Concurrent requests share one refresh exchange in the local Node process. Both tokens are validated and saved together before use. Late success or rejection cannot overwrite/invalidate a replacement login or a newer token; a repository request rejected because another request rotated its token retries once with the same connection's new token. Multiple server processes sharing this credential file are not supported: a future multi-process deployment needs cross-process coordination before sharing single-use refresh tokens.
 - Temporary network/provider failures preserve the saved connection for retry. A rejected or expired refresh token requires sign-in; there is never a silent CLI/account fallback. If the provider rotates tokens but its response is lost, or saving fails, a subsequent attempt may also require sign-in because the old refresh token is single-use.
 - Logins saved before automatic renewal was implemented need one new sign-in: their refresh token was not retained and cannot be recovered from the access token. They continue working until their existing access token expires. Legacy CLI selections require reconnecting through the App.
