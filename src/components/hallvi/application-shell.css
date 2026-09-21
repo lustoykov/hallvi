@@ -184,9 +184,7 @@
   text-decoration: none;
 }
 
-/* Hallvi's own version. A program's version belongs at the bottom, dim,
-   saying nothing until it has something to say — so this is one line, and a
-   second word only while a release is waiting or an update is running. */
+/* Hallvi's version and an explicit update check under Settings. */
 .hv-this-hallvi {
   position: relative;
   margin-top: 6px;
@@ -214,6 +212,29 @@
   background: none;
   color: var(--ink);
 }
+.hv-navigation-foot .hv-this-hallvi-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  min-height: 32px;
+  margin: 2px 0 0;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--link, #315bc6);
+  font-size: 12px;
+  cursor: pointer;
+}
+.hv-navigation-foot .hv-this-hallvi-check:hover:not(:disabled) {
+  background: var(--blue-soft);
+}
+.hv-navigation-foot .hv-this-hallvi-check:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
 .hv-this-hallvi-ready {
   font-style: normal;
   font-weight: 600;

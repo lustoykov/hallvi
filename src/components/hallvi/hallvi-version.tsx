@@ -4,15 +4,15 @@
 //
 // Hallvi's own version is not an account it acts through, so it does not
 // belong in the list of those. It belongs where a program's version belongs:
-// dim, at the bottom, saying nothing until it has something to say. One line
-// under Settings, a second word when a release is waiting, and a small panel
-// when the reader asks for one.
+// at the bottom, with an explicit update check below the version. The check
+// opens the result panel immediately; installing stays a separate action.
 //
 // An update is the rare thing here that takes Hallvi away and brings it back,
 // so while one runs its phase is on that line whether the panel is open or
 // not — and "done" is not the moment the files were swapped, it is the moment
 // the new interface answers with the revision that was installed.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowClockwise } from "@phosphor-icons/react";
 
 import { ExternalLink } from "./external-link";
 import { LocalTime } from "./local-time";
@@ -211,6 +211,21 @@ export function ThisHallvi({ className }: { className?: string }) {
         {offering && <em className="hv-this-hallvi-ready">Update available</em>}
       </button>
 
+      {installed.kind === "installed" && (
+        <button
+          type="button"
+          className="hv-this-hallvi-check"
+          disabled={busy !== null || running}
+          onClick={() => {
+            setOpen(true);
+            void act("check");
+          }}
+        >
+          <ArrowClockwise size={14} aria-hidden="true" />
+          {busy === "check" ? "Checking for updates…" : "Check for updates"}
+        </button>
+      )}
+
       {attempt && (
         <p
           className={`hv-this-hallvi-phase hv-update-${attempt.phase}`}
@@ -226,7 +241,11 @@ export function ThisHallvi({ className }: { className?: string }) {
       )}
 
       {open && (
-        <div className="hv-this-hallvi-panel">
+        <div
+          className="hv-this-hallvi-panel"
+          role="region"
+          aria-label="Hallvi updates"
+        >
           {installed.kind === "installed" ? (
             <p>
               {installed.version} ({installed.revision.slice(0, 7)}) on{" "}
@@ -251,7 +270,11 @@ export function ThisHallvi({ className }: { className?: string }) {
                 {!state.ownKey && " · trusting a key from this installation"}
               </p>
 
-              {available ? (
+              {busy === "check" ? (
+                <p className="hv-this-hallvi-quiet" role="status">
+                  Checking for new releases…
+                </p>
+              ) : available ? (
                 <div className="hv-this-hallvi-offer">
                   <p>
                     <strong>{available.version}</strong> is available
@@ -305,13 +328,6 @@ export function ThisHallvi({ className }: { className?: string }) {
                     {busy === "install" ? "Starting…" : "Update"}
                   </button>
                 )}
-                <button
-                  type="button"
-                  disabled={busy !== null || running}
-                  onClick={() => act("check")}
-                >
-                  {busy === "check" ? "Checking…" : "Check for updates"}
-                </button>
                 {attempt && !RUNNING.includes(attempt.phase) && (
                   <button type="button" onClick={() => act("dismiss")}>
                     Dismiss
