@@ -61,7 +61,7 @@ build. It keeps the old behaviour: the archive next to its `.tgz.sha256`,
 checked against it.
 
 ```bash
-sh install-hallvi.sh ./hallvi-0.1.0-darwin-arm64.tgz
+sh install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
 ```
 
 That checksum catches a damaged download and nothing more, because it came
@@ -466,7 +466,7 @@ Run `npm run package` once on Apple-silicon macOS and once on Ubuntu 24.04
 x64. It downloads pinned Node.js 22 from nodejs.org, checks its published
 SHA-256 value, builds the app and installs locked production dependencies on
 that platform. It verifies the native modules load, then writes
-`dist/hallvi-0.1.0-<platform>.tgz`, its `.sha256`, and
+`dist/hallvi-0.1.1-alpha.1-<platform>.tgz`, its `.sha256`, and
 `dist/install-hallvi.sh`. A published release carries those plus the signed
 `hallvi-release.json` and its `.sig`, which is what a plain
 `sh install-hallvi.sh` finds and checks; record the source revision and the
