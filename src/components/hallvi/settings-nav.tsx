@@ -38,28 +38,31 @@ export function SettingsNav({
       >
         Workspace
       </Link>
-      {process.env.NODE_ENV === "development" && (
-        <span className={s.developerLinks}>
-          <a
-            href="http://127.0.0.1:4317/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Testing dashboard (opens in a new tab)"
-          >
-            Testing dashboard
-          </a>
-          {/* Studio opens on the whole controller database: it has no URL for
+      {process.env.NODE_ENV === "development" &&
+        process.env.NEXT_PUBLIC_HALLVI_DASHBOARD_PORT && (
+          <span className={s.developerLinks}>
+            <a
+              href={`http://127.0.0.1:${process.env.NEXT_PUBLIC_HALLVI_DASHBOARD_PORT}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Testing dashboard (opens in a new tab)"
+            >
+              Testing dashboard
+            </a>
+            {/* Studio opens on the whole controller database: it has no URL for
               a table or a row, so this cannot be scoped to one application. */}
-          <a
-            href="https://local.drizzle.studio/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Database in Drizzle Studio (opens in a new tab)"
-          >
-            Database
-          </a>
-        </span>
-      )}
+            {process.env.NEXT_PUBLIC_HALLVI_STUDIO_PORT && (
+              <a
+                href={`https://local.drizzle.studio/?port=${process.env.NEXT_PUBLIC_HALLVI_STUDIO_PORT}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Database in Drizzle Studio (opens in a new tab)"
+              >
+                Database
+              </a>
+            )}
+          </span>
+        )}
     </nav>
   );
 }

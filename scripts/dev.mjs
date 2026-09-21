@@ -1,6 +1,5 @@
-// Starts everything a development Hallvi needs: the application, the Pi
-// worker that carries its conversations, and a Drizzle Studio on the same
-// database.
+// Starts a paired development application and testing dashboard, plus the Pi
+// worker and a Drizzle Studio on the same database.
 //
 // The worker was a second terminal, and forgetting it was invisible in the
 // product: a message was accepted, sat in the queue, and looked exactly like
@@ -28,7 +27,23 @@ import {
 } from "./dev-environment.mjs";
 const resolved = resolveEnvironment();
 const shared = environmentVariables(resolved);
-const preferred = Number(process.env.HALLVI_STUDIO_PORT ?? 4983);
+const nextArgs = process.argv.slice(2);
+
+function portNumber(value, label) {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error(`${label} must be a TCP port from 1 to 65535.`);
+  return port;
+}
+
+function commandPort(args) {
+  for (let index = args.length - 1; index >= 0; index--) {
+    const arg = args[index];
+    if (arg.startsWith("--port=")) return arg.slice("--port=".length);
+    if (arg === "--port" || arg === "-p") return args[index + 1];
+  }
+  return undefined;
+}
 
 function available(port) {
   return new Promise((resolve) => {
@@ -39,17 +54,42 @@ function available(port) {
   });
 }
 
-// Other checkouts run their own studios. Taking the next free port keeps this
-// one on this database instead of leaving the link pointing at theirs.
-async function studioPort() {
-  for (let port = preferred; port < preferred + 20; port++)
+async function freePort(preferred) {
+  for (let port = preferred; port <= Math.min(preferred + 19, 65535); port++)
     if (await available(port)) return port;
   return undefined;
 }
 
+// A configured app port is an identity: failing is safer than silently linking
+// the dashboard to a different controller. Unconfigured worktrees take the next
+// free port, so several paired runs can coexist.
+const requestedAppPort = commandPort(nextArgs) ?? process.env.PORT;
+const appPreferred = portNumber(requestedAppPort ?? 3000, "App port");
+const appPort = requestedAppPort
+  ? (await available(appPreferred)) && appPreferred
+  : await freePort(appPreferred);
+if (!appPort) throw new Error(`App port ${appPreferred} is unavailable.`);
+
+const dashboardPreferred = portNumber(
+  process.env.HALLVI_DASHBOARD_PORT ?? 4317,
+  "Dashboard port",
+);
+const dashboardPort = process.env.HALLVI_DASHBOARD_PORT
+  ? (await available(dashboardPreferred)) && dashboardPreferred
+  : await freePort(dashboardPreferred);
+if (!dashboardPort)
+  throw new Error(`Dashboard port ${dashboardPreferred} is unavailable.`);
+
+console.log(`Hallvi: http://127.0.0.1:${appPort}`);
+console.log(`Developer dashboard: http://127.0.0.1:${dashboardPort}`);
+
 // A studio is a convenience; the application is the point. Without a port the
 // application starts anyway and simply offers no Database link.
-const port = await studioPort();
+const preferred = portNumber(
+  process.env.HALLVI_STUDIO_PORT ?? 4983,
+  "Studio port",
+);
+const port = await freePort(preferred);
 if (port) console.log(`Studio on port ${port}, reading ${resolved.database}`);
 else console.warn(`No free studio port from ${preferred}: no Database link.`);
 
@@ -81,14 +121,35 @@ const next = start(
     "dev",
     "--hostname",
     "127.0.0.1",
-    ...process.argv.slice(2),
+    ...nextArgs,
+    "--port",
+    String(appPort),
   ],
-  // The Database link addresses the studio started above, or is absent.
-  { HALLVI_STUDIO_PORT: port ? String(port) : "" },
+  {
+    HALLVI_STUDIO_PORT: port ? String(port) : "",
+    NEXT_PUBLIC_HALLVI_STUDIO_PORT: port ? String(port) : "",
+    NEXT_PUBLIC_HALLVI_DASHBOARD_PORT: String(dashboardPort),
+  },
 );
 next.on("exit", (code) => {
   stop("SIGTERM");
   process.exitCode ??= code ?? 1;
+});
+
+const dashboard = start(
+  ["--experimental-strip-types", "tests/dashboard/server.ts"],
+  {
+    HALLVI_DASHBOARD_PORT: String(dashboardPort),
+    HALLVI_DEV_APP_PORT: String(appPort),
+  },
+);
+dashboard.on("exit", (code) => {
+  if (stopping) return;
+  console.error(
+    "The developer dashboard stopped; stopping this development pair.",
+  );
+  stop("SIGTERM");
+  process.exitCode ??= code || 1;
 });
 
 if (port) {
