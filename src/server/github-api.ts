@@ -110,7 +110,9 @@ export async function githubJson(
       throw new GithubAccessError("GitHub is unavailable. Try again later.");
     return {
       data: response.status === 204 ? null : await response.json(),
-      etag: response.headers.get("etag"),
+      ...(response.headers.get("etag")
+        ? { etag: response.headers.get("etag") }
+        : {}),
       scopes: (response.headers.get("x-oauth-scopes") ?? "")
         .split(",")
         .map((scope) => scope.trim())
