@@ -42,10 +42,13 @@ optional bookkeeping: a controller directory named without it would take the
 ChatGPT connection with it and ask the owner to sign in again. The fourth is
 read by `next dev` itself, so the address stays the one people know.
 
-Nothing else changes. `npm run dev` starts the same three processes it always
-did — the interface, the Pi worker that carries its conversations, and a
-Drizzle Studio on the same database — and the **Database** link in the
-application top bar opens that Studio.
+`npm run dev` starts the interface, the Pi worker that carries its conversations,
+a Drizzle Studio on the same database, and the developer dashboard. It prints
+both browser addresses. The app's **Developer** link opens the dashboard for
+this checkout, and the dashboard's **Open app** link returns to this controller.
+The **Database** link in the application top bar opens the paired Studio. The
+retained controller keeps its explicit port 5147; a second launch against that
+port fails instead of starting another controller on different records.
 
 ## What is deployed, and what each one is for
 

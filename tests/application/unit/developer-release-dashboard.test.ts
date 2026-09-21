@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import Database from "better-sqlite3";
 import { actualContents, schemaOf } from "../../dashboard/development";
-import { dispatchRelease } from "../../dashboard/server";
+import { createDashboard, dispatchRelease } from "../../dashboard/server";
 
 vi.mock("node:child_process", async (original) => {
   const real = await original<typeof import("node:child_process")>();
@@ -25,7 +25,36 @@ function fixture() {
 }
 afterEach(() => {
   for (const path of temporary.splice(0)) rmSync(path, { recursive: true });
+  vi.unstubAllEnvs();
   vi.clearAllMocks();
+});
+
+it("links a paired dashboard to its controller and reports that controller's database", async () => {
+  const root = fixture();
+  const path = join(root, "paired.db");
+  new Database(path).close();
+  vi.stubEnv("HALLVI_DEV_APP_PORT", "60491");
+  vi.stubEnv("HALLVI_DB_PATH", path);
+  const dashboard = createDashboard(root);
+  dashboard.server.listen(0, "127.0.0.1");
+  try {
+    await new Promise<void>((resolve) =>
+      dashboard.server.once("listening", resolve),
+    );
+    const address = dashboard.server.address();
+    if (!address || typeof address === "string") throw new Error("No port");
+    const origin = `http://127.0.0.1:${address.port}`;
+    const page = await (await fetch(origin)).text();
+    expect(page).toContain('href="http://127.0.0.1:60491/applications"');
+    const development = await fetch(`${origin}/api/development`, {
+      headers: { "x-hallvi-testing-token": dashboard.token },
+    });
+    const state = await development.json();
+    expect(state.running.address).toBe("http://127.0.0.1:60491");
+    expect(state.records.path).toBe(path);
+  } finally {
+    dashboard.stop();
+  }
 });
 
 it("reports a schema committed in the WAL while the controller is running", () => {

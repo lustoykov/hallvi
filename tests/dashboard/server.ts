@@ -225,6 +225,8 @@ export type Launch = (
   options: SpawnOptions,
 ) => ChildProcess;
 export function createDashboard(root: string, launch: Launch = spawn) {
+  const pairedAppPort = Number(process.env.HALLVI_DEV_APP_PORT) || undefined;
+  const appUrl = `http://127.0.0.1:${pairedAppPort ?? 3000}`;
   const storage = directory(join(root, "tests/results"));
   const historyDir = directory(join(storage, "runs"));
   const token = randomUUID();
@@ -405,10 +407,9 @@ export function createDashboard(root: string, launch: Launch = spawn) {
               : "text/javascript",
         );
         response.end(
-          readFileSync(new URL(name, import.meta.url), "utf8").replace(
-            "CSRF_TOKEN",
-            token,
-          ),
+          readFileSync(new URL(name, import.meta.url), "utf8")
+            .replace("CSRF_TOKEN", token)
+            .replace("HALLVI_APP_URL", appUrl),
         );
         return;
       }
@@ -460,7 +461,15 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/development") {
-        json({ apiVersion: API_VERSION, ...(await developmentState(root)) });
+        json({
+          apiVersion: API_VERSION,
+          ...(await developmentState(
+            root,
+            pairedAppPort && process.env.HALLVI_DB_PATH
+              ? { port: pairedAppPort, database: process.env.HALLVI_DB_PATH }
+              : undefined,
+          )),
+        });
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/releases") {
@@ -606,9 +615,12 @@ if (
   if (!existsSync(join(root, "tests/browser", "journeys.ts")))
     throw new Error("Run from the Hallvi repository");
   const dashboard = createDashboard(root);
-  dashboard.server.listen(4317, "127.0.0.1", () =>
+  const port = Number(process.env.HALLVI_DASHBOARD_PORT ?? 4317);
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error("HALLVI_DASHBOARD_PORT must be a TCP port from 1 to 65535");
+  dashboard.server.listen(port, "127.0.0.1", () =>
     console.log(
-      "Hallvi Testing: http://127.0.0.1:4317 (local only; no checks start automatically)",
+      `Hallvi Testing: http://127.0.0.1:${port} (local only; no checks start automatically)`,
     ),
   );
   dashboard.server.on("error", (error) => {

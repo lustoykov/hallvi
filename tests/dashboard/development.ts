@@ -158,12 +158,16 @@ function backups(root: string) {
   return found.sort((a, b) => b.takenAt.localeCompare(a.takenAt)).slice(0, 12);
 }
 
-export async function developmentState(root: string) {
+export async function developmentState(
+  root: string,
+  paired?: { port: number; database: string },
+) {
   const register = readJsonFile<Registered>(
     join(DEVELOPMENT_ROOT, "instance.json"),
   );
-  const database = join(DEVELOPMENT_ROOT, "state", "hallvi.db");
-  const port = register?.port ?? 5147;
+  const database =
+    paired?.database ?? join(DEVELOPMENT_ROOT, "state", "hallvi.db");
+  const port = paired?.port ?? register?.port ?? 5147;
   const live = await running(port);
   const here = checkout(root);
   const from = live.up ? servingFrom(port) : null;
@@ -172,6 +176,7 @@ export async function developmentState(root: string) {
   // assumed to be this checkout.
   const serving = from ? { ...checkout(from), path: from } : null;
   return {
+    paired: Boolean(paired),
     checkout: here,
     running: { ...live, serving },
     sameCheckout: from ? from === root : null,

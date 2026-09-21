@@ -1,8 +1,10 @@
 # One development command, and what happens when the worker stops
 
 `npm run dev` resolves the database, controller directory, Pi account directory
-and diagnostics directory once, then hands the same values to all three
-children. The worker stays its own process: it alone owns Pi's sessions, and
+and diagnostics directory once, then hands the same values to its children.
+It starts one paired app and developer dashboard per checkout, choosing free
+local ports unless explicitly configured. Each interface links to its pair.
+The worker stays its own process: it alone owns Pi's sessions, and
 the app reaches it over `worker.sock` beside the database.
 
 ```mermaid
@@ -10,6 +12,8 @@ flowchart TD
   A[npm run dev] --> B[Resolve database, controller dir,<br/>Pi account dir, diagnostics dir]
   B --> C[Next dev]
   B --> D[Drizzle Studio]
+  B --> I[Developer dashboard: tests and checkout state]
+  C <-->|paired local links| I
   B --> E[Pi worker: take the owner's lock, then listen on worker.sock]
   E -->|exits: another worker holds the lock| F[Leave that worker alone]
   E -->|exits: first unexpected failure| G[Say so, start it once more]
