@@ -840,6 +840,16 @@ export function OperatorShell({
               and you find the application inside it. */}
             {process.env.NODE_ENV === "development" && applicationId && (
               <span className="hv-topbar-debug">
+                {process.env.NEXT_PUBLIC_HALLVI_DASHBOARD_PORT && (
+                  <a
+                    href={`http://127.0.0.1:${process.env.NEXT_PUBLIC_HALLVI_DASHBOARD_PORT}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Tests, development state, and releases in this checkout's dashboard"
+                  >
+                    Developer
+                  </a>
+                )}
                 {activeChat && (
                   <a
                     href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}

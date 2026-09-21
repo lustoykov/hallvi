@@ -1145,7 +1145,7 @@ function renderDevelopment(state) {
         [
           "Database",
           `<code>${escape(records.path)}</code>`,
-          "registered, not discovered",
+          state.paired ? "from this launch" : "registered, not discovered",
         ],
         [
           "Schema",
@@ -1161,13 +1161,15 @@ function renderDevelopment(state) {
     : card("Its records", [
         [
           "Database",
-          "none registered",
-          "no development environment on this machine",
+          state.paired ? "not created yet" : "none registered",
+          state.paired
+            ? "run npm run db:push in this checkout"
+            : "no development environment on this machine",
         ],
       ]);
 
   const apps = applications.length
-    ? `<section class="surface"><h2>Sample applications</h2><p class="footnote">Deployed on ${escape(state.host?.address ?? "a shared host")}. Each keeps its own database there; Hallvi's records above are separate and local.</p><ul class="plain">${applications
+    ? `<section class="surface"><h2>Retained sample applications</h2><p class="footnote">Registered in the persistent development environment and deployed on ${escape(state.host?.address ?? "a shared host")}. They may not be present in this checkout's controller. Each keeps its own database there; Hallvi's records above are separate and local.</p><ul class="plain">${applications
         .map(
           (application) =>
             `<li><strong>${escape(application.name)}</strong> <code>${escape(application.id.slice(0, 8))}</code><br><span class="footnote">${escape(application.exercises ?? "")}</span>${application.url ? `<br><a href="${escape(application.url)}" target="_blank" rel="noreferrer">${escape(application.url)}</a>` : ""}</li>`,
@@ -1176,13 +1178,13 @@ function renderDevelopment(state) {
     : "";
 
   const copies = state.backups.length
-    ? `<section class="surface"><h2>Copies</h2><ul class="plain">${state.backups
+    ? `<section class="surface"><h2>Retained environment copies</h2><ul class="plain">${state.backups
         .map(
           (backup) =>
             `<li><code>${escape(backup.path.replace(/^.*hallvi-dev\//, ""))}</code><br><span class="footnote">${escape(backup.kind)} · ${escape(when(backup.takenAt))}</span></li>`,
         )
         .join("")}</ul></section>`
-    : `<section class="surface"><h2>Copies</h2><p class="footnote">None recorded yet.</p></section>`;
+    : `<section class="surface"><h2>Retained environment copies</h2><p class="footnote">None recorded yet.</p></section>`;
 
   $("development-body").innerHTML = where + process + store + apps + copies;
 }

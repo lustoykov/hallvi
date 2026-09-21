@@ -16,7 +16,13 @@ SHA-256 file before changing the installed program.
 
 ## Download
 
-Take one file from
+**There is no published release yet.** The script below can discover and
+install Hallvi only after the first signed release is published. Until then,
+use a maintainer-supplied archive, checksum and installer as described in
+[Installing an exact archive](#installing-an-exact-archive). You do not need a
+source checkout for either path.
+
+Once a signed release is published, take one file from
 [github.com/lustoykov/hallvi/releases](https://github.com/lustoykov/hallvi/releases)
 — `install-hallvi.sh` — and run it:
 
@@ -55,7 +61,7 @@ build. It keeps the old behaviour: the archive next to its `.tgz.sha256`,
 checked against it.
 
 ```bash
-sh install-hallvi.sh ./hallvi-0.1.0-darwin-arm64.tgz
+sh install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
 ```
 
 That checksum catches a damaged download and nothing more, because it came
@@ -89,9 +95,11 @@ source-plus-compile archive and do not certify a new prebuilt archive.
    sh ./install-hallvi.sh
    ```
 
-   Run as your normal logged-in user, without `sudo`. It finds the newest
-   release, checks it against the signed manifest, and reports service,
-   interface and worker readiness.
+   Run as your normal logged-in user, without `sudo`. This command requires a
+   published release. Before the first release, put the three matching files
+   from [Installing an exact archive](#installing-an-exact-archive) in this
+   directory and pass the archive to the script instead. The installer reports
+   service, interface and worker readiness.
 
 2. Open Hallvi:
 
@@ -458,7 +466,7 @@ Run `npm run package` once on Apple-silicon macOS and once on Ubuntu 24.04
 x64. It downloads pinned Node.js 22 from nodejs.org, checks its published
 SHA-256 value, builds the app and installs locked production dependencies on
 that platform. It verifies the native modules load, then writes
-`dist/hallvi-0.1.0-<platform>.tgz`, its `.sha256`, and
+`dist/hallvi-0.1.1-alpha.1-<platform>.tgz`, its `.sha256`, and
 `dist/install-hallvi.sh`. A published release carries those plus the signed
 `hallvi-release.json` and its `.sig`, which is what a plain
 `sh install-hallvi.sh` finds and checks; record the source revision and the

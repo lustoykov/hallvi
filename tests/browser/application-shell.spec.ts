@@ -6,8 +6,9 @@ test(
   journey("application-shell"),
   async ({ page }) => {
     // This journey first compiles creation, chat selection and message routes.
-    // Bound each HTTP acceptance separately; keep UI assertions at 10 seconds.
-    test.setTimeout(180_000);
+    // Bound each HTTP acceptance separately; the first route transition also
+    // waits for a cold Next dev compilation on shared CI runners.
+    test.setTimeout(240_000);
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })
@@ -16,7 +17,7 @@ test(
       .getByRole("button", { name: "Add application", exact: true })
       .click();
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {
-      timeout: 30000,
+      timeout: 90_000,
     });
     const nav = page.getByRole("navigation", { name: "Application workspace" });
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });

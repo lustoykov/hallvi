@@ -1,39 +1,66 @@
 # Hallvi
 
-[Documentation map](docs/README.md) · [Operator redesign](docs/operator-design.md) · [Current implementation](docs/architecture.md)
-
 **The agent for self-hosted software.** Deploy one application stack on a server you control, keep it healthy and protect its data. Conversation drives setup and operations; stable views show the same recorded facts and results.
 
 ## Install Hallvi
 
-Hallvi runs in the background on your Mac or Linux machine. Use it in your
-browser to connect your model account, add a repository and deploy it to a
-Linux application server. The machine running Hallvi and the application
-server have separate requirements.
+**No public download is available yet.** The [GitHub Releases page](https://github.com/lustoykov/hallvi/releases)
+has no published Hallvi release. The installer script is only the first step:
+without a published release or a supplied archive, it has no application to
+install. A draft release is not available to ordinary visitors.
 
-Take `install-hallvi.sh` from
-[Releases](https://github.com/lustoykov/hallvi/releases) and run it:
+**You do not need to clone this repository or install Node.js, npm, Python or a
+compiler.** Hallvi runs as a background service on an Apple-silicon Mac or
+Ubuntu 24.04 x64 machine. You use it in a browser; the applications it manages
+run on a Linux deployment host with separate requirements.
+
+### When a release is published
+
+Download `install-hallvi.sh` from [GitHub Releases](https://github.com/lustoykov/hallvi/releases).
+On the machine where Hallvi will run, open Terminal in the download directory
+and run it as your normal user, without `sudo`:
 
 ```sh
-sh install-hallvi.sh
+cd ~/Downloads
+sh ./install-hallvi.sh
 ```
 
-It finds the newest release for your machine, checks it against the signed
-manifest and installs it. You do not need to clone this repository or install
-Node.js, npm, Python or a compiler. Once it is installed, Hallvi looks for a
-newer release once an hour and offers it at the bottom of the sidebar;
-installing is still something you press, or `hallvi update`.
+The script finds the newest published release for that machine, verifies its
+signed manifest and archive, installs Hallvi and starts the service. Open
+<http://127.0.0.1:4747> on the same machine. Updates are offered in the
+sidebar or through `hallvi update`; installing an update is your choice.
 
-**Alpha:** the first release has not been published yet, so that page is empty
-and the maintainer supplies an archive by hand — `sh install-hallvi.sh
-./hallvi-<version>-<platform>.tgz` installs one. Publishing a release is
-[a documented sequence](docs/releases.md) that a merge never triggers.
+### Before the first release
+
+Ask the maintainer for the **three matching files**: `install-hallvi.sh`, a
+prebuilt archive such as `hallvi-0.1.1-alpha.1-darwin-arm64.tgz`, and its
+`hallvi-0.1.1-alpha.1-darwin-arm64.tgz.sha256`. Put them together in `~/Downloads` on
+an Apple-silicon Mac, then run:
+
+```sh
+cd ~/Downloads
+sh ./install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
+~/.local/bin/hallvi status
+```
+
+Use the exact archive name you received. This checks the supplied checksum;
+it is not the signed-release verification above. The maintainer builds the
+archive with [`npm run package`](docs/installation.md#build-a-release-archive).
+Publishing a release is a [separate reviewed step](docs/releases.md), not a
+result of merging code.
+
+If Hallvi is on a Mac mini and you will use it from a laptop, choose **From
+another computer** when the installer asks. Follow [remote browser access](docs/installation.md#on-another-machine)
+to forward its local ports; opening `127.0.0.1` on your laptop without that
+connection reaches your laptop, not the Mac mini.
 
 | Your machine | Start here |
 | --- | --- |
 | Apple-silicon macOS | [macOS installation](docs/installation.md#macos) |
 | Ubuntu 24.04 x64 with systemd | [Linux installation](docs/installation.md#linux) |
 | Another machine, including a Mac mini or Linux VM | [Remote browser access](docs/installation.md#on-another-machine) after installing there |
+
+[Documentation map](docs/README.md) · [Operator redesign](docs/operator-design.md) · [Current implementation](docs/architecture.md)
 
 The [integrated prebuilt candidate](docs/testing/2026-09-19-integrated-prebuilt-installation.md)
 was installed on Apple-silicon macOS and Ubuntu 24.04 x64. On the installed
@@ -122,7 +149,9 @@ npm run db:push
 npm run dev
 ```
 
-Open <http://127.0.0.1:3000>. That one command starts three processes: the application, the Pi worker that carries its conversations, and a Drizzle Studio on the same database. The launcher loads `.env` and `.env.local`, resolves the database path, controller directory, Pi account directory and diagnostics directory once, and hands all three children the same values, so they cannot disagree about which database and which ChatGPT connection they are using. `HALLVI_DB_PATH` overrides the default `.hallvi/hallvi.db`. The Studio takes the first free port from 4983 or from `HALLVI_STUDIO_PORT`, and the application is told which port it chose.
+Open the app and developer dashboard at the two addresses printed by `npm run dev` (normally <http://127.0.0.1:3000> and <http://127.0.0.1:4317>). They link to each other. Each worktree gets its own pair on free local ports; the dashboard runs checks and reports for that checkout. An explicit `PORT`, including the retained environment's 5147, is kept exactly and must be free. `HALLVI_DASHBOARD_PORT` similarly pins a dashboard port when needed.
+
+That one command starts four processes: the application, the Pi worker that carries its conversations, a Drizzle Studio on the same database, and the local developer dashboard. The launcher loads `.env` and `.env.local`, resolves the database path, controller directory, Pi account directory and diagnostics directory once, and hands the children the same values, so they cannot disagree about which database and which ChatGPT connection they are using. `HALLVI_DB_PATH` overrides the default `.hallvi/hallvi.db`. The Studio takes the first free port from 4983 or from `HALLVI_STUDIO_PORT`, and the application is told which port it chose.
 
 The worker stays a separate process, the only one that opens Pi's sessions; the app reaches it over a socket beside the database ([what the launcher does when it stops](docs/architecture/development-start.md)). If it exits unexpectedly, the launcher says so and starts it once more; if it exits again, the launcher stops the children it started and exits non-zero rather than leaving the application unable to accept a message. A worker that finds another one already serving this database steps aside, and the launcher leaves that running worker alone. For debugging, `npm run worker` still starts one on its own from the same checkout.
 
@@ -167,4 +196,4 @@ npm run build
 npm run test:e2e:smoke
 ```
 
-[tests/README.md](tests/README.md) describes full browser journeys, synthetic fixtures, Docker checks and opt-in real-model evals. `npm run test:dashboard` opens the local testing workbench at <http://127.0.0.1:4317>. Synthetic tests are not provider or deployment evidence. See the [testing index](docs/testing/README.md) for acceptance coverage and known limits.
+[tests/README.md](tests/README.md) describes full browser journeys, synthetic fixtures, Docker checks and opt-in real-model evals. `npm run dev` starts the local testing workbench beside the app; `npm run test:dashboard` can still run it alone on <http://127.0.0.1:4317> when that port is free. Synthetic tests are not provider or deployment evidence. See the [testing index](docs/testing/README.md) for acceptance coverage and known limits.
