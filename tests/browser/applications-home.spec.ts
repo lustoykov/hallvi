@@ -7,8 +7,8 @@ test.use({ isolatedApp: true });
 
 // The page pairs caretakers with their applications: one card each, with
 // the drawn screen, one word of state and what runs. What has to keep
-// working: the reader recognises an application and opens it from its name,
-// its screen or Open app; search, once there is enough to search, never leaves
+// working: the reader recognises an application and opens it from its card,
+// name, screen or Open app; search, once there is enough to search, never leaves
 // them on a card that opens something else; and the empty page offers the
 // one thing to do. The welcome offers another application; continuing work
 // starts inside an existing application.
@@ -95,7 +95,14 @@ test(
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(list.getByRole("listitem")).toHaveCount(names.length);
 
-    await alpha.getByRole("link", { name: "Open app" }).click();
+    const state = alpha.getByText("No deployment recorded yet.");
+    await state.scrollIntoViewIfNeeded();
+    const cardSurface = await state.boundingBox();
+    expect(cardSurface).not.toBeNull();
+    await page.mouse.click(
+      cardSurface!.x + cardSurface!.width / 2,
+      cardSurface!.y + cardSurface!.height / 2,
+    );
     // The first visit to this route can compile for tens of seconds in CI.
     await expect(page).toHaveURL(new RegExp(`/applications/${ids[0]}$`), {
       timeout: 90_000,

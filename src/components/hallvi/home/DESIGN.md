@@ -35,9 +35,10 @@ collection. An empty collection goes straight to the first-application welcome.
 - **The screen is an illustration.** `interface-previews.tsx` draws each kind
   of software in a tilted window, explicitly marked Illustration. The window
   settles on hover and its contents wake once. It is never a live screenshot.
-- **The useful action stays obvious.** Name, preview and Open app navigate to
-  the application. Greeting is a separate button, never a nested control or a
-  required step. Detailed conditions remain visible after the greeting.
+- **The useful action stays obvious.** The card surface, name, preview and Open
+  app navigate to the application. The external address and caretaker greeting
+  keep their own actions. Greeting is a separate button, never a nested control
+  or a required step. Detailed conditions remain visible after the greeting.
 
 Protection lives on the application's own pages. An undeployed app says
 “No deployment recorded yet.” rather than issuing a protection warning before
