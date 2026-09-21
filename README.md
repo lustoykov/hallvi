@@ -1,39 +1,66 @@
 # Hallvi
 
-[Documentation map](docs/README.md) · [Operator redesign](docs/operator-design.md) · [Current implementation](docs/architecture.md)
-
 **The agent for self-hosted software.** Deploy one application stack on a server you control, keep it healthy and protect its data. Conversation drives setup and operations; stable views show the same recorded facts and results.
 
 ## Install Hallvi
 
-Hallvi runs in the background on your Mac or Linux machine. Use it in your
-browser to connect your model account, add a repository and deploy it to a
-Linux application server. The machine running Hallvi and the application
-server have separate requirements.
+**No public download is available yet.** The [GitHub Releases page](https://github.com/lustoykov/hallvi/releases)
+has no published Hallvi release. The installer script is only the first step:
+without a published release or a supplied archive, it has no application to
+install. A draft release is not available to ordinary visitors.
 
-Take `install-hallvi.sh` from
-[Releases](https://github.com/lustoykov/hallvi/releases) and run it:
+**You do not need to clone this repository or install Node.js, npm, Python or a
+compiler.** Hallvi runs as a background service on an Apple-silicon Mac or
+Ubuntu 24.04 x64 machine. You use it in a browser; the applications it manages
+run on a Linux deployment host with separate requirements.
+
+### When a release is published
+
+Download `install-hallvi.sh` from [GitHub Releases](https://github.com/lustoykov/hallvi/releases).
+On the machine where Hallvi will run, open Terminal in the download directory
+and run it as your normal user, without `sudo`:
 
 ```sh
-sh install-hallvi.sh
+cd ~/Downloads
+sh ./install-hallvi.sh
 ```
 
-It finds the newest release for your machine, checks it against the signed
-manifest and installs it. You do not need to clone this repository or install
-Node.js, npm, Python or a compiler. Once it is installed, Hallvi looks for a
-newer release once an hour and offers it at the bottom of the sidebar;
-installing is still something you press, or `hallvi update`.
+The script finds the newest published release for that machine, verifies its
+signed manifest and archive, installs Hallvi and starts the service. Open
+<http://127.0.0.1:4747> on the same machine. Updates are offered in the
+sidebar or through `hallvi update`; installing an update is your choice.
 
-**Alpha:** the first release has not been published yet, so that page is empty
-and the maintainer supplies an archive by hand — `sh install-hallvi.sh
-./hallvi-<version>-<platform>.tgz` installs one. Publishing a release is
-[a documented sequence](docs/releases.md) that a merge never triggers.
+### Before the first release
+
+Ask the maintainer for the **three matching files**: `install-hallvi.sh`, a
+prebuilt archive such as `hallvi-0.1.0-darwin-arm64.tgz`, and its
+`hallvi-0.1.0-darwin-arm64.tgz.sha256`. Put them together in `~/Downloads` on
+an Apple-silicon Mac, then run:
+
+```sh
+cd ~/Downloads
+sh ./install-hallvi.sh ./hallvi-0.1.0-darwin-arm64.tgz
+~/.local/bin/hallvi status
+```
+
+Use the exact archive name you received. This checks the supplied checksum;
+it is not the signed-release verification above. The maintainer builds the
+archive with [`npm run package`](docs/installation.md#build-a-release-archive).
+Publishing a release is a [separate reviewed step](docs/releases.md), not a
+result of merging code.
+
+If Hallvi is on a Mac mini and you will use it from a laptop, choose **From
+another computer** when the installer asks. Follow [remote browser access](docs/installation.md#on-another-machine)
+to forward its local ports; opening `127.0.0.1` on your laptop without that
+connection reaches your laptop, not the Mac mini.
 
 | Your machine | Start here |
 | --- | --- |
 | Apple-silicon macOS | [macOS installation](docs/installation.md#macos) |
 | Ubuntu 24.04 x64 with systemd | [Linux installation](docs/installation.md#linux) |
 | Another machine, including a Mac mini or Linux VM | [Remote browser access](docs/installation.md#on-another-machine) after installing there |
+
+[Documentation map](docs/README.md) · [Operator redesign](docs/operator-design.md) · [Current implementation](docs/architecture.md)
 
 The [integrated prebuilt candidate](docs/testing/2026-09-19-integrated-prebuilt-installation.md)
 was installed on Apple-silicon macOS and Ubuntu 24.04 x64. On the installed
