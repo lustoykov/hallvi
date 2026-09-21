@@ -102,7 +102,7 @@ const BOX: Record<string, Rect> = {
   // Wider than the original 196: `paperless-webserver` is an ordinary
   // container name and it wrapped to two lines, which pushed the reading out
   // of the bottom of the card.
-  app: { x: 308, y: 262, w: 244, h: 96 },
+  app: { x: 312, y: 262, w: 244, h: 96 },
   svc: { x: 612, y: 262, w: 196, h: 76 },
   appVol: { x: 332, y: 434, w: 196, h: 70 },
   svcVol: { x: 612, y: 434, w: 196, h: 70 },
@@ -121,6 +121,49 @@ interface Layout {
   wires: { d: string; journey: JourneyId }[];
   labels: { x: number; y: number; text: string }[];
   stops: Record<JourneyId, string[]>;
+}
+
+/** Round elbows while preserving endpoints and routing lanes. */
+function roundedRoute(...points: [number, number][]) {
+  const vertices = points
+    .filter(
+      (point, index) =>
+        index === 0 ||
+        point[0] !== points[index - 1][0] ||
+        point[1] !== points[index - 1][1],
+    )
+    .filter((point, index, all) => {
+      const previous = all[index - 1],
+        next = all[index + 1];
+      return (
+        !previous ||
+        !next ||
+        !(
+          (previous[0] === point[0] && point[0] === next[0]) ||
+          (previous[1] === point[1] && point[1] === next[1])
+        )
+      );
+    });
+  let d = `M${vertices[0][0]} ${vertices[0][1]}`;
+  for (let index = 1; index < vertices.length - 1; index++) {
+    const [x, y] = vertices[index];
+    const previous = vertices[index - 1],
+      next = vertices[index + 1];
+    const incoming = Math.hypot(x - previous[0], y - previous[1]);
+    const outgoing = Math.hypot(next[0] - x, next[1] - y);
+    const radius = Math.min(12, incoming / 2, outgoing / 2);
+    const enter = [
+      x + ((previous[0] - x) * radius) / incoming,
+      y + ((previous[1] - y) * radius) / incoming,
+    ];
+    const leave = [
+      x + ((next[0] - x) * radius) / outgoing,
+      y + ((next[1] - y) * radius) / outgoing,
+    ];
+    d += `L${enter[0]} ${enter[1]}Q${x} ${y} ${leave[0]} ${leave[1]}`;
+  }
+  const end = vertices[vertices.length - 1];
+  return `${d}L${end[0]} ${end[1]}`;
 }
 
 /** Recorded routes and generous routing lanes; probes are listed separately. */
@@ -160,8 +203,18 @@ function layoutFor(model: ArchitectureModel): Layout {
     };
   });
   services.forEach((part, index) => {
-    rects[part.id] = { x: 610, y: appY + index * 108, w: 234, h: 76 };
+    rects[part.id] = { x: 610, y: appY + 10 + index * 108, w: 234, h: 76 };
   });
+  const sourceTarget = model.edges.find(
+    (edge) => edge.from === "source" && rects[edge.to],
+  );
+  if (sourceTarget) {
+    const target = rects[sourceTarget.to];
+    rects.source = {
+      ...rects.source,
+      y: target.y + target.h / 2 - rects.source.h / 2,
+    };
+  }
   const ordered = [...volumes].sort(
     (a, b) => Number(b.owner === "app") - Number(a.owner === "app"),
   );
@@ -205,18 +258,28 @@ function layoutFor(model: ArchitectureModel): Layout {
     let d: string;
     let label: { x: number; y: number };
     if (edge.from === "host") {
-      d = `M${BOX.server.x} ${middle(to)}H${to.x}`;
-      label = { x: BOX.server.x + 4, y: middle(to) - 12 };
+      d = roundedRoute([BOX.server.x, middle(to)], [to.x, middle(to)]);
+      label = { x: BOX.server.x + 4, y: middle(to) - 28 };
     } else if (from.x === to.x && to.y >= from.y + from.h) {
-      d = `M${centre(from)} ${from.y + from.h}V${to.y}`;
+      d = roundedRoute([centre(from), from.y + from.h], [centre(from), to.y]);
       label = { x: centre(from) + 12, y: (from.y + from.h + to.y) / 2 };
     } else if (to.x >= from.x + from.w) {
       const lane = (from.x + from.w + to.x) / 2;
-      d = `M${from.x + from.w} ${middle(from)}H${lane}V${middle(to)}H${to.x}`;
-      label = { x: from.x + from.w + 8, y: middle(from) - 12 };
+      d = roundedRoute(
+        [from.x + from.w, middle(from)],
+        [lane, middle(from)],
+        [lane, middle(to)],
+        [to.x, middle(to)],
+      );
+      label = { x: from.x + from.w + 8, y: middle(from) - 28 };
     } else {
       const lane = Math.min(from.x, to.x) - 18;
-      d = `M${from.x} ${middle(from)}H${lane}V${middle(to)}H${to.x}`;
+      d = roundedRoute(
+        [from.x, middle(from)],
+        [lane, middle(from)],
+        [lane, middle(to)],
+        [to.x, middle(to)],
+      );
       label = { x: lane + 8, y: (middle(from) + middle(to)) / 2 };
     }
     visit.push(d);
@@ -234,26 +297,49 @@ function layoutFor(model: ArchitectureModel): Layout {
     const laneY = row === 0 ? shelfY - 20 : shelfY + row * 108 + 16;
     if (volume.owner === "app")
       return [
-        `M${centre(owner)} ${owner.y + owner.h}V${laneY}H${centre(target)}V${target.y}`,
+        roundedRoute(
+          [centre(owner), owner.y + owner.h],
+          [centre(owner), laneY],
+          [centre(target), laneY],
+          [centre(target), target.y],
+        ),
       ];
     // Leave a backing service sideways: dropping out of PostgreSQL would
     // cut through Redis below it. Enter each storage row through its gap.
     return [
-      `M${owner.x + owner.w} ${middle(owner)}H880V${laneY}H${centre(target)}V${target.y}`,
+      roundedRoute(
+        [owner.x + owner.w, middle(owner)],
+        [880, middle(owner)],
+        [880, laneY],
+        [centre(target), laneY],
+        [centre(target), target.y],
+      ),
     ];
   });
   const copies =
     model.byId.offsite && ordered.length
       ? ordered.map((volume) => {
           const r = rects[volume.id];
-          return `M${centre(r)} ${r.y + r.h}V${r.y + r.h + 16}H894V${middle(rects.offsite)}H${rects.offsite.x}`;
+          return roundedRoute(
+            [centre(r), r.y + r.h],
+            [centre(r), r.y + r.h + 16],
+            [894, r.y + r.h + 16],
+            [894, middle(rects.offsite)],
+            [rects.offsite.x, middle(rects.offsite)],
+          );
         })
       : [];
   const release =
     model.byId.source?.facts.some((fact) => fact.label === "Revision") &&
     model.byId.app
       ? [
-          `M${rects.source.x + rects.source.w / 2} ${rects.source.y + rects.source.h}V${appY + 126}H286V${middle(rects.app)}H${rects.app.x}`,
+          roundedRoute(
+            [centre(rects.source), rects.source.y + rects.source.h],
+            [centre(rects.source), appY + 126],
+            [286, appY + 126],
+            [286, middle(rects.app)],
+            [rects.app.x, middle(rects.app)],
+          ),
         ]
       : [];
   const legs: Layout["legs"] = {
@@ -757,11 +843,10 @@ export function JourneyDirection({
             return;
           }
           const t = Math.min(1, (time - start) / duration);
-          const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
           elements.forEach((element, i) => {
             const comet = comets.current[i];
             if (!comet) return;
-            const head = lengths[i] * eased;
+            const head = lengths[i] * t;
             comet.style.opacity = "1";
             const circles = comet.children;
             for (let k = 0; k < circles.length; k++) {
@@ -790,7 +875,7 @@ export function JourneyDirection({
       await wait(delay);
       for (const leg of legs[journey]) {
         if (!alive()) return;
-        await travel(leg, 0.18);
+        await travel(leg, 0.32);
         if (!alive()) return;
         hide();
         await wait(90);
@@ -1073,7 +1158,7 @@ export function JourneyDirection({
                 [0].map((i) => (
                   <circle key={`p:${d}:${i}`} r="1.8" className="axj2-particle">
                     <animateMotion
-                      dur="12s"
+                      dur="6s"
                       begin={`${i * 1.1}s`}
                       repeatCount="indefinite"
                       path={d}

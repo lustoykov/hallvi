@@ -125,23 +125,30 @@ describe("a map with two backing services and three volumes", () => {
     for (const { d } of layout.wires) {
       let x = 0,
         y = 0;
-      for (const match of d.matchAll(/([MHV])([\d.]+)(?: ([\d.]+))?/g)) {
-        const nextX = match[1] === "V" ? x : Number(match[2]);
-        const nextY =
-          match[1] === "H" ? y : Number(match[1] === "M" ? match[3] : match[2]);
+      for (const match of d.matchAll(/([MLQ])([^MLQ]+)/g)) {
+        const values = match[2].trim().split(/\s+/).map(Number);
+        const [nextX, nextY] = values.slice(-2);
         if (match[1] !== "M") {
-          for (const r of cards) {
-            const intersects =
-              x === nextX
-                ? x > r.x &&
-                  x < r.x + r.w &&
-                  Math.max(y, nextY) > r.y &&
-                  Math.min(y, nextY) < r.y + r.h
-                : y > r.y &&
-                  y < r.y + r.h &&
-                  Math.max(x, nextX) > r.x &&
-                  Math.min(x, nextX) < r.x + r.w;
-            expect(intersects, `${d} crosses a card`).toBe(false);
+          // Sample the actual quadratic bends as well as straight segments.
+          for (let step = 0; step <= 40; step++) {
+            const t = step / 40;
+            const px =
+              match[1] === "Q"
+                ? (1 - t) ** 2 * x +
+                  2 * (1 - t) * t * values[0] +
+                  t ** 2 * nextX
+                : x + (nextX - x) * t;
+            const py =
+              match[1] === "Q"
+                ? (1 - t) ** 2 * y +
+                  2 * (1 - t) * t * values[1] +
+                  t ** 2 * nextY
+                : y + (nextY - y) * t;
+            for (const r of cards) {
+              const inside =
+                px > r.x && px < r.x + r.w && py > r.y && py < r.y + r.h;
+              expect(inside, `${d} crosses a card`).toBe(false);
+            }
           }
         }
         x = nextX;

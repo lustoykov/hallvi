@@ -276,8 +276,9 @@
 }
 .axj2-wire {
   fill: none;
-  stroke: #d3dbe7;
-  stroke-width: 1.5;
+  stroke: #bdc9dc;
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition:
@@ -291,7 +292,7 @@
   opacity: 0.55;
 }
 .axj2-wire.is-on {
-  stroke: #c3cfe2;
+  stroke: #aabbd6;
 }
 .axj2-stage.is-planned .axj2-wire {
   stroke-dasharray: 5 5;
@@ -309,12 +310,13 @@
 }
 .axj2-glow-soft {
   stroke: #6f8ff0;
-  stroke-width: 4;
-  opacity: 0.12;
+  stroke-width: 5;
+  opacity: 0.18;
 }
 .axj2-glow-line {
   stroke: url(#axj2Light);
-  stroke-width: 1.4;
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
 }
 .axj2-particle {
   fill: #ffffff;
@@ -360,13 +362,12 @@
     filter 480ms var(--ax-ease-out);
 }
 .axj2-card:hover {
-  transform: translateY(-2px);
   box-shadow:
     0 2px 4px rgb(23 34 56 / 6%),
     0 18px 36px -18px rgb(23 34 56 / 34%);
 }
 .axj2-card:active {
-  transform: translateY(0) scale(0.985);
+  transform: none;
 }
 .axj2-card.is-compact {
   grid-template-columns: 30px minmax(0, 1fr);
