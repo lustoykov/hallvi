@@ -45,7 +45,6 @@ type Situation = "fine" | "working" | "needs" | "stale" | "new";
 function situationOf(item: HomeApplication): Situation {
   const text = item.condition.text;
   if (item.attention > 0 || item.condition.tone === "bad") return "needs";
-  if (text === "Checked a while ago") return "stale";
   if (item.condition.tone === "warn") return "needs";
   if (/deploying|in progress|updating/i.test(text)) return "working";
   if (/^not deployed|^new application/i.test(text)) return "new";
@@ -88,7 +87,7 @@ function summary(items: HomeApplication[]) {
   const parts = [
     needs && `${needs} ${needs === 1 ? "needs" : "need"} attention`,
     working && `${working} in progress`,
-    stale && `${stale} awaiting a fresh check`,
+    stale && `${stale} not checked yet`,
     fresh && `${fresh} new`,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "Latest recorded checks passed.";

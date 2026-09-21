@@ -475,6 +475,58 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 - Automatic work says “automatic” in origin lines and Recent changes; work a person started names its conversation.
 - Times render in the reader’s zone through `LocalTime`; a schedule states its own timezone next to the time.
 
+### Calm by default
+
+Decided 21 September 2026, after the owner found the pages made him "feel
+paranoid": three of Overview's four lanes read "Out of date" in amber on an
+application with nothing wrong.
+
+- **An old pass is a pass.** It draws neutral with its date ("Held · last
+  checked 19 h ago"), never amber, and no sentence says it "may have changed".
+- **Hallvi re-asks, the owner does not.** The pulse (`pulse.tsx`,
+  `src/server/pulse.ts`) asks the application's address and the server's SSH
+  whenever an application is open. What just answered is green and says
+  "now". What was asked and said nothing is the one aged thing worth amber.
+  The pulse vouches only for the question it asked (`pulse-asks.ts`): it
+  never turns a container, volume or database check green, and a lane holding
+  those reads "Answering · other checks 20 h ago", not "Verified".
+- **Not set up is an offer, not an alarm.** No backups, no firewall read, no
+  watcher, Hallvi's own records not copied: each is stated once, plainly, with
+  the question that would change it. Storage draws no "stays behind" wall
+  unless a plan exists and leaves that data out.
+- **Amber means somebody is needed.** Pi's own `warning` on a record, a
+  decision waiting, a watch gone quiet, a backup that was promised and is
+  overdue. Red is a check that ran and failed. If a page shows more than one
+  or two amber marks on a healthy application, the page is wrong.
+
+### The register
+
+Chosen 21 September 2026 from the ten-directions exploration (direction F), and
+the shared vocabulary of the inventory destinations: Deployment, Processes and
+Database are registers; Security and Monitoring borrow its strip and table
+around the visual they already had. It lives in `register.tsx` and
+`register.css`, every class prefixed `hv-rg-`.
+
+- **Strip, then table.** A strip of three or four figures states the totals
+  and the verdict; one table carries the inventory with the columns that
+  subject deserves. The strip is the page's hierarchy: a reader who stops there
+  has the answer.
+- **Rows open in place.** What a row has to say sits directly under it, in one
+  column. Nothing opens beside the table: a side panel sends the eye away from
+  the row that was clicked. The questions worth taking to the conversation
+  close the opened row as a line of small ask buttons.
+- **Commands sit beside what they printed.** A release opens onto its steps
+  with one terminal pane next to them; picking a step shows its output. It
+  starts on the step a reader came for: the one running, else the one that
+  failed, else the last.
+- **Grey means nobody recorded it.** A missing reading is "not recorded", never
+  a zero and never a dash that reads as none. Colour is for readings: green for
+  a pass that still counts, amber for one too old to count, red only for a
+  check that ran and failed.
+- **Pips are evidence at a glance.** One pip per step or check, in the row, so
+  a release that holds with a failed command inside it shows before it is
+  opened.
+
 ### Buttons and fields
 
 One primary button everywhere (19 September): 34px tall (`--button-height`), 0 by 14px padding, 13px at weight 560, 8px radius, 15px icons, action blue with `--button-shadow` — a faint top light and a short shadow — so it reads as the action without sheer size. The home call to action, the setup and connection footers, the new-application form, dialogs and the Deployment “Open” button all use it; none is 44px or full-width on desktop. Secondary buttons share the height on white with a `field-line` border and no shadow. Smaller variants stay small and take the same shadow: the 32px Send, the 30px in-transcript retry and record pills, the onboarding rail start. Every primary uses `--blue` and `--blue-hover`; no file hard-codes its own blue. Password inputs keep a `field-line` border; inside records the input is 8px by 10px at 12px type.

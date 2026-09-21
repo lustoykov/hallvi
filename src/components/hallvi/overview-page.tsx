@@ -33,7 +33,8 @@ import "./overview-plain.css";
 
 const tone = {
   verified: "verified",
-  stale: "stale",
+  // An aged pass is calm; amber is Pi's own warning. See `pulse.tsx`.
+  stale: "aged",
   failed: "failed",
   warning: "stale",
   absent: "absent",
@@ -309,7 +310,7 @@ export function OverviewPage({
                 {condition.certainty === "verified"
                   ? "Verified"
                   : condition.certainty === "stale"
-                    ? "Out of date"
+                    ? "Held"
                     : condition.certainty === "failed"
                       ? "Failed"
                       : condition.certainty === "warning"

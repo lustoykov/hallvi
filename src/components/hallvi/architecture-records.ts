@@ -18,6 +18,7 @@
 // picture. A part nobody has looked at reads unknown; a part Pi declared
 // missing reads absent; the two are not the same and neither is healthy.
 
+import { pulseAsks } from "./pulse-asks";
 import type {
   Ref,
   SavedInformation,
@@ -235,11 +236,12 @@ function evidenceFor(
       `${held.value.label}: ${held.value.status}.` +
       (held.value.detail ? ` ${held.value.detail}` : "") +
       (freshness.kind === "stale"
-        ? " It held when it was checked; enough time has passed that it may have changed."
+        ? " It held when it was checked."
         : freshness.kind === "unknowable"
           ? " The record does not say what kind of claim this is, so there is no telling whether it still holds."
           : ""),
     at,
+    reasked: reading === "stale" ? pulseAsks(held.value, ref) : null,
   };
 }
 
@@ -774,7 +776,7 @@ export function architectureFromRecords({
       : readings.includes("stale")
         ? {
             certainty: "stale",
-            text: "It held when it was last checked, and enough time has passed that it may have changed.",
+            text: "It held when it was last checked.",
           }
         : readings.includes("verified")
           ? {

@@ -65,7 +65,7 @@ describe("offering a way in", () => {
       onAsk: () => undefined,
     });
     expect(html).toContain('href="http://127.0.0.1:18000"');
-    expect(html).toContain("from this PC only");
+    expect(html).toContain("From this PC only");
   });
 
   it("says it is still checking rather than claiming the tunnel is up", () => {
@@ -75,7 +75,7 @@ describe("offering a way in", () => {
       reachable: "checking",
       onAsk: () => undefined,
     });
-    expect(html).toContain("checking that the tunnel still answers");
+    expect(html).toContain("Checking that the tunnel still answers");
   });
 
   it("does not withhold a public address because this PC's tunnel is down", () => {

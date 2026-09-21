@@ -397,7 +397,7 @@
   border: 7px solid var(--ax-verified);
 }
 .axm-stop.is-now[data-tone="stale"] .axm-dot {
-  border-color: var(--ax-amber);
+  border-color: #8fbfa7;
 }
 .axm-stop.is-now[data-tone="failed"] .axm-dot {
   border-color: var(--ax-failed);

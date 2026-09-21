@@ -367,6 +367,12 @@ export interface WatchedPart {
   kind: string;
   kindWord: string;
   looks: PartLook[];
+  /**
+   * Every dated reading of this part, oldest first: one mark per record that
+   * checked it. The run is what shows absence — a part read once, a day ago,
+   * is a single mark and then a long stretch of nobody looking.
+   */
+  readings: { at: string; failed: boolean; title: string }[];
   lastAt: string | null;
   state: "failed" | "counts" | "expired" | "never";
   /** Whether the running watcher covers it. */
@@ -439,8 +445,34 @@ export function watchingFromRecords(
         });
 
     const judged = looks.filter((look) => look.state !== "read");
+    const readings = ref
+      ? live
+          .flatMap((record) => {
+            const about = (record.presentation?.checks ?? []).filter(
+              (check) => {
+                const subject = check.about ?? record.presentation?.states?.ref;
+                return (
+                  subject?.kind === ref.kind &&
+                  subject.id === ref.id &&
+                  check.status !== "info"
+                );
+              },
+            );
+            return record.establishedAt && about.length
+              ? [
+                  {
+                    at: record.establishedAt,
+                    failed: about.some((check) => check.status === "failed"),
+                    title: record.title,
+                  },
+                ]
+              : [];
+          })
+          .sort((a, b) => a.at.localeCompare(b.at))
+      : [];
     return {
       id,
+      readings,
       name:
         drawn?.name ??
         (ref ? currentFacts(live, ref).get("product")?.value.value : null) ??

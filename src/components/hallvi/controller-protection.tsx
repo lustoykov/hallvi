@@ -77,8 +77,18 @@ export function ControllerProtectionBand({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>
-        <span className="cpb-icon" data-state={facts.state} aria-hidden="true">
-          {facts.state === "recoverable" ? (
+        {/* Never set up is not a warning, it is an offer. Amber is for a copy
+            that exists and still needs its recovery kit saved, red for one
+            that failed. */}
+        <span
+          className="cpb-icon"
+          data-state={
+            !facts.connected && !facts.lastCopyAt ? "unset" : facts.state
+          }
+          aria-hidden="true"
+        >
+          {facts.state === "recoverable" ||
+          (!facts.connected && !facts.lastCopyAt) ? (
             <ShieldCheck weight="bold" />
           ) : (
             <Warning weight="bold" />

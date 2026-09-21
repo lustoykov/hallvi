@@ -12,6 +12,7 @@
 // was about, and its headline condition is the applications list's reading of
 // every subject the records mention.
 
+import { allAsk } from "./pulse-asks";
 import { clip, commandOf, essence } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { Ref, SavedInformation } from "@/server/operator-data";
@@ -76,7 +77,10 @@ const chrome: Record<
 
 const word: Record<Certainty, string> = {
   verified: "Verified",
-  stale: "Out of date",
+  // A pass that has aged is still a pass, and it is dated in the line under
+  // it. "Out of date" in amber on three lanes out of four taught an owner to
+  // expect a problem on an application that had none.
+  stale: "Held",
   failed: "Failed",
   // Not "Verified", and not "Failed": something is set up and it does
   // less than the lane's name suggests.
@@ -464,6 +468,21 @@ export function overviewFromRecords({
       label: chrome[id].label,
       value: word[certainty],
       status: { certainty, text },
+      reasked:
+        certainty === "stale"
+          ? allAsk(
+              held
+                .filter(
+                  (item) =>
+                    checkAsNow(item.check, item.record, now) === "stale",
+                )
+                .map((item) => ({
+                  check: item.check,
+                  subject:
+                    item.check.about ?? item.record.presentation?.states?.ref,
+                })),
+            )
+          : null,
       lines: held.slice(0, 4).map((item) => item.check.label),
       // Needs a recurrence Pi cannot write yet.
       countdownTo: null,
@@ -596,8 +615,8 @@ export function applicationCondition(
     return {
       certainty: "stale",
       text: lapsed
-        ? `It held when it was last checked, ${when(lapsed, now)}. Enough time has passed that it may have changed.`
-        : "It held when it was last checked; enough time has passed that it may have changed.",
+        ? `It held when it was last checked, ${when(lapsed, now)}.`
+        : "It held when it was last checked.",
     };
   }
   if (reading === "verified") {

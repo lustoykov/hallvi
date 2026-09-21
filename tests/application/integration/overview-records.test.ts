@@ -109,7 +109,10 @@ describe("the application's own condition, from the record that states it", () =
     // Reachability is worth twelve hours; this is a day old.
     const reading = applicationCondition([healthy], APP, A_DAY_ON);
     expect(reading.certainty).toBe("stale");
-    expect(reading.text).toContain("may have changed");
+    // Dated, and said calmly: an old pass is not a warning. Whether it still
+    // holds is what the live pulse re-asks when the page is open.
+    expect(reading.text).toContain("It held when it was last checked");
+    expect(reading.text).not.toContain("may have changed");
   });
 
   it("reads failed when a check ran and did not pass, whatever the clock says", () => {

@@ -108,17 +108,26 @@ function itemState(
           label: "In the backup plan",
           detail: "No completed copy exists yet.",
         }
-      : protection.declaredAbsent || protection.planned
+      : protection.planned
         ? {
+            // A plan exists and leaves this out: a real hole, worth amber.
             tone: "gap",
             label: "Not in the backup plan",
             detail: "No plan says it copies this.",
           }
-        : {
-            tone: "unknown",
-            label: "Backup status not established",
-            detail: "Hallvi has not established whether a plan covers this.",
-          };
+        : protection.declaredAbsent
+          ? {
+              // No plan at all. Said as a fact on each item, and as an offer
+              // once, in the summary below — not as four warnings.
+              tone: "unknown",
+              label: "No backups yet",
+              detail: "Hallvi checked, and nothing copies this yet.",
+            }
+          : {
+              tone: "unknown",
+              label: "Backup status not established",
+              detail: "Hallvi has not established whether a plan covers this.",
+            };
   const held = inNewestCopy(protection, piece.volume);
   if (held.held === true)
     return { tone: "included", label: "In the latest copy", detail: held.says };

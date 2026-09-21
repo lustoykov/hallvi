@@ -2,9 +2,9 @@
 
 // Deployment, on real records and real executions.
 //
-// The selected design (the spine): one list of releases, newest first, with
-// what is serving named above it and the commands that produced each release
-// inside it.
+// The selected design (the register): one inventory of releases, newest
+// first, with what is serving stated in the strip above it and the commands
+// that produced each release, beside what they printed, inside its row.
 //
 // The Transit story that used to sit under the list is gone. It told the
 // story of the latest attempt as phases, which is the same executions the
@@ -18,11 +18,13 @@ import { useMemo } from "react";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 
+import type { ApplicationSection } from "./application-sections";
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { releasesFromRecords } from "./release-records";
 import { ReleasesPanel } from "./releases-panel";
 import { EmptySketch } from "./empty-sketch";
+import { Lede } from "./register";
 
 export function DeploymentPage({
   records,
@@ -34,6 +36,7 @@ export function DeploymentPage({
   chrome,
   panel,
   onAsk,
+  onOpenDestination,
 }: {
   records: SavedInformation[];
   executions: ExecutionRecord[];
@@ -46,6 +49,7 @@ export function DeploymentPage({
   chrome: PageChrome;
   panel?: React.ReactNode;
   onAsk: (draft: string) => void;
+  onOpenDestination?: (destination: ApplicationSection) => void;
 }) {
   const access = records
     .filter((record) => !record.retiredAt)
@@ -100,7 +104,7 @@ export function DeploymentPage({
   const hasReleases = releases.all.length > 0;
 
   return (
-    <div className="ax-root" data-variant="spine">
+    <div className="ax-root" data-variant="register">
       <section className="hv-deployment" aria-label="Deployment">
         <PageHead
           bar={chrome.bar}
@@ -115,6 +119,14 @@ export function DeploymentPage({
           reachable={reachable}
           onReopen={onReopen}
         />
+        {hasReleases && (
+          <Lede
+            holds={`${releases.all.length} ${releases.all.length === 1 ? "release" : "releases"} on record`}
+          >
+            Every release Hallvi has recorded for this application, newest
+            first, with the commands that produced it.
+          </Lede>
+        )}
         {hasReleases ? (
           <ReleasesPanel
             view={releases}
@@ -124,6 +136,7 @@ export function DeploymentPage({
             reachable={reachable}
             onReopen={onReopen}
             onAsk={onAsk}
+            onOpenDestination={onOpenDestination}
           />
         ) : (
           nothing

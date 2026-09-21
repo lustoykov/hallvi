@@ -73,13 +73,15 @@ describe("application navigation", () => {
     expect(html).not.toContain("Launch Brief");
   });
 
-  it("keeps stale checks distinct from attention and preserves the private URL", () => {
+  it("reads an aged pass as fine, never as attention, and preserves the private URL", () => {
     const html = renderToStaticMarkup(
       <ApplicationsScreen
         piReady
         applications={[
           item({
-            condition: { tone: "warn", text: "Checked a while ago" },
+            // What the list now says for checks that passed a while ago: an
+            // old pass is a pass, and opening the application re-asks.
+            condition: { tone: "live", text: "Checks held" },
             attention: 0,
             address: "http://127.0.0.1:18000",
           }),
@@ -87,7 +89,8 @@ describe("application navigation", () => {
       />,
     );
     expect(html).toContain('href="http://127.0.0.1:18000"');
-    expect(html).toContain("Not checked");
+    expect(html).toContain("Fine");
+    expect(html).not.toContain("Not checked");
     expect(html).not.toContain("Needs me");
     expect(html).not.toContain("deployed yet");
   });

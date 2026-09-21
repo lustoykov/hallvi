@@ -36,6 +36,11 @@
   color: var(--ax-verified-text);
 }
 
+.cpb-icon[data-state="unset"] {
+  background: var(--ax-unknown-bg);
+  color: var(--ax-muted);
+}
+
 .cpb-icon[data-state="failing"] {
   background: var(--ax-failed-bg);
   color: var(--ax-failed);
