@@ -33,6 +33,7 @@ import {
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
+import { probeReading } from "./pulse";
 import {
   Ask,
   Board,
@@ -57,21 +58,17 @@ import {
   type Tone,
 } from "./register";
 
-function probeTone(probe: DatabaseProbe): Tone {
-  if (!probe.passed) return "bad";
-  return probe.fresh ? "good" : "warn";
-}
-
-function probeWord(probe: DatabaseProbe) {
-  if (!probe.passed) return "failed";
-  return probe.fresh ? "passed" : "passed, too long ago to count";
-}
+const probeTone = (probe: DatabaseProbe) => probeReading(probe).tone;
+const probeWord = (probe: DatabaseProbe) => probeReading(probe).word;
 
 const VERDICT_TONE: Record<string, Tone> = {
   verified: "good",
   warning: "warn",
   failed: "bad",
-  unknown: "warn",
+  // Nobody having looked, and nothing being set up, are facts about a young
+  // application. They are said plainly and offered as a next step, not
+  // coloured as something wrong.
+  unknown: "plain",
   quiet: "plain",
 };
 
@@ -165,7 +162,6 @@ export function DatabasePage({
   const first = present[0] ?? null;
   const probes = present.flatMap((row) => row.probes);
   const failed = probes.filter((probe) => !probe.passed);
-  const stale = probes.filter((probe) => probe.passed && !probe.fresh);
   const lastPassed =
     present
       .map((row) => row.lastPassed)
@@ -186,11 +182,7 @@ export function DatabasePage({
           : protection.planned
             ? "A plan, no schedule"
             : "Not known yet",
-      tone: summary.schedule
-        ? "good"
-        : protection.declaredAbsent
-          ? "bad"
-          : "warn",
+      tone: summary.schedule ? "good" : "plain",
       detail: summary.schedule
         ? `${summary.schedule.words}${summary.keep ? ` · keeps ${summary.keep}` : ""}`
         : protection.declaredAbsent
@@ -209,7 +201,7 @@ export function DatabasePage({
             ? "A copy, place unstated"
             : "Yes",
       tone: !newestCopy
-        ? "warn"
+        ? "plain"
         : newestCopy.kind === "same-server" ||
             newestCopy.kind === "unclassified"
           ? "warn"
@@ -223,7 +215,8 @@ export function DatabasePage({
       id: "restore",
       question: "Would a copy actually restore?",
       answer: summary.restore ? "One has been opened" : "Never tested",
-      tone: summary.restore ? "good" : "warn",
+      // Worth amber only once there is a copy to be unsure about.
+      tone: summary.restore ? "good" : newestCopy ? "warn" : "plain",
       detail:
         summary.restore?.detail ??
         "A backup only counts once one has been opened and loaded successfully.",
@@ -366,26 +359,14 @@ export function DatabasePage({
           <Figure
             label="Answering"
             value={
-              failed.length
-                ? "No"
-                : !probes.length
-                  ? "Not checked"
-                  : stale.length === probes.length
-                    ? "It did"
-                    : "Yes"
+              failed.length ? "No" : !probes.length ? "Not checked" : "Yes"
             }
-            tone={
-              failed.length
-                ? "bad"
-                : !probes.length || stale.length === probes.length
-                  ? "warn"
-                  : "good"
-            }
+            tone={failed.length ? "bad" : probes.length ? "good" : "plain"}
             note={
               failed.length
                 ? failed.map((probe) => probe.label).join(", ")
                 : lastPassed
-                  ? `Last passed ${ago(lastPassed, now)}${stale.length === probes.length ? " · too long ago to count" : ""}`
+                  ? `Last passed ${ago(lastPassed, now)}`
                   : "Nothing has connected to it and run a query"
             }
           />
@@ -398,7 +379,7 @@ export function DatabasePage({
                   ? "Scheduled, no copy"
                   : "No copy"
             }
-            tone={VERDICT_TONE[verdict.tone] ?? "warn"}
+            tone={VERDICT_TONE[verdict.tone] ?? "plain"}
             note={verdict.says}
           />
         </Strip>

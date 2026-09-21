@@ -22,6 +22,7 @@ import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
 import { processesFromRecords } from "./processes-records";
+import { probeReading, usePulse } from "./pulse";
 import {
   Ask,
   Bar,
@@ -44,7 +45,6 @@ import {
   Tag,
   ago,
   type Column,
-  type Tone,
 } from "./register";
 import type { ProcessCard, Probe } from "./stack-prototype/line-story";
 
@@ -63,17 +63,6 @@ export function mebibytes(text: string | null | undefined) {
     match[2].toUpperCase() as "K" | "M" | "G" | "T"
   ];
   return Number(match[1]) * scale;
-}
-
-function probeTone(probe: Probe): Tone {
-  if (probe.passed === false) return "bad";
-  // A pass that has aged out is amber: it may have changed, it did not fail.
-  return probe.fresh ? "good" : "warn";
-}
-
-function probeWord(probe: Probe) {
-  if (probe.passed === false) return "failed";
-  return probe.fresh ? "passed" : "passed, too long ago to count";
 }
 
 type Row = ProcessCard & { id: string };
@@ -106,6 +95,11 @@ export function ProcessesPage({
     () => processesFromRecords({ records, applicationId, now }),
     [records, applicationId, now],
   );
+  const pulse = usePulse();
+  // Only the web process is asked by the pulse: it is what the address
+  // reaches. Everything else keeps its own reading, calmly.
+  const read = (row: ProcessCard, probe: Probe) =>
+    probeReading(probe, row.role === "web" ? pulse.app : undefined);
   const access = records
     .filter((record) => !record.retiredAt)
     .find(
@@ -163,8 +157,8 @@ export function ProcessesPage({
   }));
   const probes = rows.flatMap((row) => row.probes);
   const failed = probes.filter((probe) => probe.passed === false);
-  const stale = probes.filter(
-    (probe) => probe.passed !== false && !probe.fresh,
+  const silent = rows.flatMap((row) =>
+    row.probes.filter((probe) => read(row, probe).tone === "warn"),
   );
   const unchecked = rows.filter((row) => !row.probes.length);
 
@@ -259,8 +253,8 @@ export function ProcessesPage({
           empty="never checked"
           items={row.probes.map((probe) => ({
             id: probe.name,
-            tone: probeTone(probe),
-            title: `${probe.name}: ${probeWord(probe)}`,
+            tone: read(row, probe).tone,
+            title: `${probe.name}: ${read(row, probe).word}`,
           }))}
         />
       ),
@@ -301,20 +295,22 @@ export function ProcessesPage({
                 ? `${probes.length - failed.length} of ${probes.length} passed`
                 : "None run"
             }
+            // Ageing never turns a pass into a warning. Amber is for a look
+            // that just came back empty, red for a check that failed.
             tone={
               failed.length
                 ? "bad"
-                : !probes.length || stale.length
+                : silent.length
                   ? "warn"
-                  : "good"
+                  : probes.length
+                    ? "good"
+                    : "plain"
             }
             note={
               failed.length
                 ? failed.map((probe) => probe.name).join(", ")
-                : stale.length
-                  ? // Ageing never turns a pass into a failure. It is a pass
-                    // nobody has repeated, and the word for that is this one.
-                    `${stale.length} passed too long ago to count${story.verifiedAt ? ` · last ${ago(story.verifiedAt, now)}` : ""}`
+                : silent.length
+                  ? "The application did not answer just now"
                   : story.verifiedAt
                     ? `Last passed ${ago(story.verifiedAt, now)}`
                     : "Checked by the deployment, not continuously"
@@ -418,7 +414,7 @@ export function ProcessesPage({
                         ]}
                         rows={row.probes.map((probe) => ({
                           id: probe.name,
-                          tone: probeTone(probe),
+                          tone: read(row, probe).tone,
                           cells: [
                             probe.name,
                             probe.probe === probe.name ? (
@@ -432,8 +428,8 @@ export function ProcessesPage({
                               <None key="from">—</None>
                             ),
                             <Num key="when">{ago(probe.at, now)}</Num>,
-                            <Tag key="result" tone={probeTone(probe)}>
-                              {probeWord(probe)}
+                            <Tag key="result" tone={read(row, probe).tone}>
+                              {read(row, probe).word}
                             </Tag>,
                           ],
                         }))}

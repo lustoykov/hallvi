@@ -287,7 +287,7 @@ button.axmw-host:hover,
 }
 .axmw-pips i[data-state="expired"],
 .axmw-key i[data-state="expired"] {
-  background: #e3b67f;
+  background: #8fbfa7;
 }
 .axmw-pips i[data-state="failed"],
 .axmw-key i[data-state="failed"] {
@@ -430,8 +430,8 @@ button.axmw-host:hover,
   height: 12px;
 }
 .axmw-detail li[data-state="expired"] .axmw-look-icon {
-  background: var(--ax-waiting-bg);
-  color: var(--ax-waiting-text);
+  background: var(--ax-unknown-bg);
+  color: var(--ax-ink-2);
 }
 .axmw-detail li[data-state="failed"] .axmw-look-icon {
   background: var(--ax-failed-bg);
@@ -466,7 +466,7 @@ button.axmw-host:hover,
   white-space: nowrap;
 }
 .axmw-detail li[data-state="expired"] em {
-  color: var(--ax-waiting-text);
+  color: var(--ax-muted);
 }
 .axmw-detail li[data-state="failed"] em {
   color: var(--ax-failed);
@@ -552,7 +552,7 @@ button.axmw-host:hover,
 .axmw-rail[data-state="expired"] > em,
 .axmw-rail[data-state="never"] > em,
 .axmw-ghost > em {
-  color: var(--ax-waiting-text);
+  color: var(--ax-muted);
 }
 .axmw-rail .axmw-badge {
   position: static;
@@ -569,8 +569,8 @@ button.axmw-host:hover,
   top: 0;
   bottom: 0;
   right: 0;
-  background: var(--ax-waiting-bg);
-  border-left: 1px dashed var(--ax-waiting-line);
+  background: #e9edf3;
+  border-left: 1px dashed var(--ax-line-2);
 }
 .axmw-since[data-state="counts"] {
   background: var(--ax-verified-bg);

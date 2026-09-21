@@ -33,6 +33,7 @@ import "./flow.css";
 const moodOf: Record<Tone, MascotMood> = {
   verified: "ready",
   stale: "resting",
+  attention: "attention",
   failed: "attention",
   planned: "ready",
   checking: "working",
@@ -147,7 +148,9 @@ export function FlowDirection({
         : "Nobody has tested whether it survives a container replacement.",
     covered.length
       ? `${guard.schedule ? "The daily backup" : "A backup"} copies ${listed(covered.map((piece) => soft(piece.label)))}${left.length ? `; it leaves out ${listed(left.map((piece) => soft(piece.label)))}` : ""}.`
-      : "Nothing on the server is in a backup plan.",
+      : // Said once, as a fact. A young application with no backups is not a
+        // page of amber walls; it is one sentence and an offer.
+        "No backups are set up yet.",
     unstated.length
       ? `${countWord(unstated.length)} more ${unstated.length === 1 ? "name is" : "names are"} used by other records, and nothing states whether ${unstated.length === 1 ? "it is" : "they are"} there.`
       : null,
@@ -192,7 +195,9 @@ export function FlowDirection({
         label: "Backup plan",
         value: piece.method
           ? `Copied as a ${piece.method}`
-          : "Not in the backup plan",
+          : covered.length
+            ? "Not in the backup plan"
+            : "None set up yet",
       },
       {
         label: "Containers replaced",
@@ -211,7 +216,9 @@ export function FlowDirection({
           ? copy
             ? `Comes back from the copy of ${when(copy.at)}`
             : "No copy on record to bring it back"
-          : "Lost with the server",
+          : covered.length
+            ? "Lost with the server"
+            : "Not copied anywhere yet",
       },
     );
   } else if (selected === "copy") {
@@ -293,6 +300,10 @@ export function FlowDirection({
           const p = drawn(item.key);
           if (!p) return null;
           const y = p.y + p.h / 2;
+          // A wall is for data a plan leaves behind. With no plan at all there
+          // is nothing to be left out of, and drawing one per volume turned
+          // "not set up yet" into four warnings.
+          if (!item.method && !covered.length) return null;
           if (!item.method) {
             // A long volume name widens the server box, which used to push
             // this label off the right of the board and clip it mid-word.
@@ -414,12 +425,13 @@ export function FlowDirection({
                   type="button"
                   className="axbf-piece"
                   data-covered={Boolean(entry.method) || undefined}
+                  data-plain={!covered.length || undefined}
                   data-hot={hot === entry.key || undefined}
                   aria-pressed={selected === entry.key}
                   onClick={() => setSelected(entry.key)}
                   {...point(entry.key)}
                 >
-                  {entry.method ? (
+                  {entry.method || !covered.length ? (
                     entry.key.endsWith(":db") ? (
                       <Database weight="bold" />
                     ) : (
@@ -432,7 +444,9 @@ export function FlowDirection({
                   <small>
                     {entry.method
                       ? `copied daily as a ${entry.method}`
-                      : "not in the backup plan"}
+                      : covered.length
+                        ? "not in the backup plan"
+                        : "on the server"}
                   </small>
                 </button>
               ))}

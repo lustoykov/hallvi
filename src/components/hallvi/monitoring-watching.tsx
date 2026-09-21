@@ -9,6 +9,7 @@
 // picked part lists its checks as sentences: what was tested, whether it
 // worked, and how much longer that result counts.
 
+import { usePulse } from "./pulse";
 import {
   ChatCircleText,
   Check,
@@ -33,7 +34,7 @@ import type {
   WatchedPart,
   Watching,
 } from "./monitoring-records";
-import { ago, countWord, when } from "./stack-prototype/stack-model";
+import { ago, when } from "./stack-prototype/stack-model";
 import "./monitoring-watching.css";
 
 /** Verified green needs evidence under a day old. */
@@ -66,13 +67,12 @@ const watchDraft = (name: string) =>
 
 export function MonitoringLede({
   story,
-  watching: parts,
   now,
   aside,
   onAsk,
 }: {
   story: MonitoringStory;
-  watching: Watching;
+  watching?: Watching;
   now: number;
   /** A sentence from outside the checks the lede should carry. */
   aside: string | null;
@@ -81,15 +81,11 @@ export function MonitoringLede({
   const failing = story.looks.find((look) => look.state === "failing");
   const watching = story.watcher?.state === "running";
   const quiet = story.watcher?.state === "stale";
-  const { counts } = parts;
-  const judged = counts.counts + counts.expired;
-  // How many results are still evidence about now. "Every check is passing"
-  // over a list of expired passes was the lede contradicting its own page.
-  const standing = !judged
-    ? null
-    : counts.expired
-      ? `${countWord(counts.counts)} of ${countWord(judged).toLowerCase()} ${judged === 1 ? "check is" : "checks are"} recent enough to count.`
-      : `${judged === 1 ? "Its one check is" : `All ${countWord(judged).toLowerCase()} checks are`} recent enough to count.`;
+  // What answered a moment ago. With no watcher, this is the page's honest
+  // good news: Hallvi asks whenever somebody has the application open.
+  const pulse = usePulse();
+  const answering = pulse.app === "answering";
+  const silent = pulse.app === "silent";
   const heard = story.watcher?.lastObservationAt ?? null;
   const lede = failing
     ? {
@@ -108,23 +104,37 @@ export function MonitoringLede({
           ? `${story.name} is being watched.`
           : quiet
             ? `Whatever was watching ${story.name} has gone quiet.`
-            : `Nothing is watching ${story.name}.`,
-        // Green only for a watcher that is reporting: a recent one-off check
-        // beside "nothing is watching" is not reassurance.
-        tone: (watching ? "verified" : "stale") as Tone,
+            : answering
+              ? `${story.name} is answering.`
+              : silent
+                ? `${story.name} did not answer just now.`
+                : `Nothing is watching ${story.name}.`,
+        // Green for a watcher that is reporting, or for an answer a moment
+        // ago. Amber only for what needs somebody: a watch that went quiet,
+        // or an application that was asked and said nothing. An old check is
+        // neither.
+        tone: (watching || answering
+          ? "verified"
+          : quiet || silent
+            ? "attention"
+            : "stale") as Tone,
         word: watching
           ? heard
             ? `Watcher reported ${ago(heard, now)}`
             : "Watcher running"
-          : story.lastCheckAt
-            ? `Last checked ${ago(story.lastCheckAt, now)}`
-            : "Never checked",
+          : answering
+            ? "Answered just now"
+            : story.lastCheckAt
+              ? `Last checked ${ago(story.lastCheckAt, now)}`
+              : "Never checked",
         sub: [
           watching ? `${story.watcher!.detail}.` : null,
+          !watching && answering
+            ? "Hallvi asks whenever you have it open. Nothing watches between visits."
+            : null,
           story.lastCheckAt
-            ? `Hallvi last checked it ${when(story.lastCheckAt)}.`
+            ? `Hallvi last checked every part ${when(story.lastCheckAt)}.`
             : "No record carries a check of it.",
-          standing,
           aside,
         ]
           .filter(Boolean)
@@ -192,7 +202,7 @@ function verdict(look: PartLook, now: number) {
   const at = ago(look.at, now);
   if (look.state === "failed") return `Failed ${at}`;
   if (look.state === "read") return `Recorded ${at}`;
-  if (look.state === "expired") return `Worked ${at} · too long ago to count`;
+  if (look.state === "expired") return `Worked ${at}`;
   return look.left === null
     ? `Worked ${at}`
     : `Worked ${at} · counts for ${lasts(look.left)} more`;
@@ -374,10 +384,10 @@ export function WatchingMap({
 
         <ul className="axmw-key" aria-label="Key">
           <li>
-            <i data-state="counts" /> Worked, and recent enough to count
+            <i data-state="counts" /> Worked, recently
           </li>
           <li>
-            <i data-state="expired" /> Worked, too long ago to count
+            <i data-state="expired" /> Worked, a while ago
           </li>
           <li>
             <i data-state="failed" /> Failed

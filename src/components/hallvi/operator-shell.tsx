@@ -1,5 +1,6 @@
 "use client";
 
+import { PulseContext, QUIET_PULSE, type Pulse } from "./pulse";
 import { ArrowLeft, TerminalWindow } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -258,12 +259,17 @@ export function OperatorShell({
   const [answered, setAnswered] = useState<{
     id: string;
     state: Reachability;
+    pulse: Pulse;
   } | null>(null);
   const applicationIdForAccess = view.application?.id;
   const reachable: Reachability =
     answered && answered.id === applicationIdForAccess
       ? answered.state
       : "checking";
+  const pulse: Pulse =
+    answered && answered.id === applicationIdForAccess
+      ? answered.pulse
+      : QUIET_PULSE;
   useEffect(() => {
     if (!applicationIdForAccess) return;
     let cancelled = false;
@@ -283,6 +289,17 @@ export function OperatorShell({
         setAnswered({
           id: applicationIdForAccess,
           state: body.open === false ? "closed" : "open",
+          // Stricter than `state`: only an address that was asked and
+          // answered vouches for anything. No address at all is `unknown`.
+          pulse: {
+            app:
+              body.open === true
+                ? "answering"
+                : body.open === false
+                  ? "silent"
+                  : "unknown",
+            server: body.server ?? "unknown",
+          },
         });
       } catch {
         // A page that cannot reach its own controller has louder problems,
@@ -787,233 +804,235 @@ export function OperatorShell({
       };
   return (
     <DemoContext.Provider value={demo}>
-      <main
-        className="hv-shell hv-adaptive-shell"
-        data-terminal={terminal.open ? "open" : undefined}
-      >
-        <header className="hv-topbar">
-          {identityVariant !== "navigation" && identity}
-          <div className="hv-topbar-where">
-            <strong>{where.title}</strong>
-            {where.detail && <span>{where.detail}</span>}
-          </div>
-          {applicationId && (
-            <button
-              type="button"
-              className="hv-topbar-terminal"
-              aria-pressed={terminal.open}
-              onClick={() =>
-                setTerminal((current) =>
-                  current.open
-                    ? { open: false, expanded: false, minimized: false }
-                    : { open: true, expanded: false, minimized: false },
-                )
-              }
-            >
-              <TerminalWindow weight="bold" aria-hidden="true" />
-              Terminal
-            </button>
-          )}
-          {/* Development only, in their own tabs: Pi's recorded conversation
+      <PulseContext.Provider value={pulse}>
+        <main
+          className="hv-shell hv-adaptive-shell"
+          data-terminal={terminal.open ? "open" : undefined}
+        >
+          <header className="hv-topbar">
+            {identityVariant !== "navigation" && identity}
+            <div className="hv-topbar-where">
+              <strong>{where.title}</strong>
+              {where.detail && <span>{where.detail}</span>}
+            </div>
+            {applicationId && (
+              <button
+                type="button"
+                className="hv-topbar-terminal"
+                aria-pressed={terminal.open}
+                onClick={() =>
+                  setTerminal((current) =>
+                    current.open
+                      ? { open: false, expanded: false, minimized: false }
+                      : { open: true, expanded: false, minimized: false },
+                  )
+                }
+              >
+                <TerminalWindow weight="bold" aria-hidden="true" />
+                Terminal
+              </button>
+            )}
+            {/* Development only, in their own tabs: Pi's recorded conversation
               for the chat you are reading, from the read-only viewer of
               `npm run inspect:conversation`, and this application's database
               in the Drizzle Studio that `npm run dev` started beside it.
               Studio has no address for a table or a row, so it opens whole
               and you find the application inside it. */}
-          {process.env.NODE_ENV === "development" && applicationId && (
-            <span className="hv-topbar-debug">
-              {activeChat && (
-                <a
-                  href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Pi's recorded conversation, in the local viewer on port 3001"
-                >
-                  Transcript
-                </a>
-              )}
-              {studioPort && (
-                <a
-                  href={`https://local.drizzle.studio/?port=${studioPort}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={`This application's database, in the Drizzle Studio on port ${studioPort}`}
-                >
-                  Database
-                </a>
-              )}
-            </span>
-          )}
-        </header>
-
-        <ApplicationNavigation
-          head={identityVariant === "navigation" ? identity : undefined}
-          chats={view.chats}
-          selectedChatId={view.selectedChatId}
-          settingsHref={
-            applicationId && view.selectedChatId
-              ? `/setup/connections?application=${applicationId}&chat=${view.selectedChatId}`
-              : "/setup/connections"
-          }
-          section={activeSection}
-          busy={busy !== null}
-          onSection={selectSection}
-          onChat={selectChat}
-          onCreate={createChat}
-          onArchive={archiveChat}
-          sections={visibleSections(activeSection, recordedHere)}
-          hidden={hiddenSections(activeSection, recordedHere)}
-          revealed={stackRevealed}
-          onReveal={setStackRevealed}
-        />
-        <section
-          className={`hv-workspace${recordVisible ? " hv-dashboard-open" : ""}`}
-        >
-          {activeSection && (
-            <ApplicationSectionView
-              key={`${applicationId}:${activeSection}`}
-              section={activeSection}
-              view={view}
-              reachable={reachable}
-              onReopen={askToReopen}
-              now={now}
-              facts={facts}
-              onRefresh={refreshDeployment}
-              onOpenDestination={selectSection}
-              onOpenConversation={openConversation}
-              onAsk={askInConversation}
-              bar={
-                <div className="hv-view-bar">
-                  <button
-                    type="button"
-                    className="hv-view-back"
-                    onClick={closeSection}
+            {process.env.NODE_ENV === "development" && applicationId && (
+              <span className="hv-topbar-debug">
+                {activeChat && (
+                  <a
+                    href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Pi's recorded conversation, in the local viewer on port 3001"
                   >
-                    <ArrowLeft aria-hidden="true" />
-                    Back to {activeChat?.title ?? "the conversation"}
-                  </button>
-                </div>
-              }
-            >
-              {activeSection === "logs" && applicationId && (
-                <OperatorConsole
-                  applicationId={applicationId}
-                  chatId={view.chats[0]?.id ?? ""}
-                  main={false}
-                />
-              )}
-            </ApplicationSectionView>
-          )}
-          <div
-            className={`hv-chat-column${recordVisible ? " hv-chat-parked" : ""}`}
-            inert={recordVisible || undefined}
+                    Transcript
+                  </a>
+                )}
+                {studioPort && (
+                  <a
+                    href={`https://local.drizzle.studio/?port=${studioPort}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`This application's database, in the Drizzle Studio on port ${studioPort}`}
+                  >
+                    Database
+                  </a>
+                )}
+              </span>
+            )}
+          </header>
+
+          <ApplicationNavigation
+            head={identityVariant === "navigation" ? identity : undefined}
+            chats={view.chats}
+            selectedChatId={view.selectedChatId}
+            settingsHref={
+              applicationId && view.selectedChatId
+                ? `/setup/connections?application=${applicationId}&chat=${view.selectedChatId}`
+                : "/setup/connections"
+            }
+            section={activeSection}
+            busy={busy !== null}
+            onSection={selectSection}
+            onChat={selectChat}
+            onCreate={createChat}
+            onArchive={archiveChat}
+            sections={visibleSections(activeSection, recordedHere)}
+            hidden={hiddenSections(activeSection, recordedHere)}
+            revealed={stackRevealed}
+            onReveal={setStackRevealed}
+          />
+          <section
+            className={`hv-workspace${recordVisible ? " hv-dashboard-open" : ""}`}
           >
-            <ChatPane
-              onModelConnected={() => setConnectedSince(true)}
-              checkingRepository={busy === "repository"}
-              onCheckRepository={checkRepository}
-              activeChat={activeChat}
-              reachable={reachable}
-              busy={busy}
-              composer={composer}
-              context={activeChat ? (contexts[activeChat.id] ?? null) : null}
-              error={error}
-              pendingMessage={pendingMessage}
-              piReady={piReady}
-              onArchive={archiveActiveChat}
-              onComposerChange={setComposer}
-              onDismissContext={() => {
-                if (!activeChat || !application) return;
-                setContexts((current) => ({
-                  ...current,
-                  [activeChat.id]: null,
-                }));
-                writeConversationContext(application.id, activeChat.id, null);
-                focusComposer();
-              }}
-              onReturnToContext={(section) => {
-                selectSection(section);
+            {activeSection && (
+              <ApplicationSectionView
+                key={`${applicationId}:${activeSection}`}
+                section={activeSection}
+                view={view}
+                reachable={reachable}
+                onReopen={askToReopen}
+                now={now}
+                facts={facts}
+                onRefresh={refreshDeployment}
+                onOpenDestination={selectSection}
+                onOpenConversation={openConversation}
+                onAsk={askInConversation}
+                bar={
+                  <div className="hv-view-bar">
+                    <button
+                      type="button"
+                      className="hv-view-back"
+                      onClick={closeSection}
+                    >
+                      <ArrowLeft aria-hidden="true" />
+                      Back to {activeChat?.title ?? "the conversation"}
+                    </button>
+                  </div>
+                }
+              >
+                {activeSection === "logs" && applicationId && (
+                  <OperatorConsole
+                    applicationId={applicationId}
+                    chatId={view.chats[0]?.id ?? ""}
+                    main={false}
+                  />
+                )}
+              </ApplicationSectionView>
+            )}
+            <div
+              className={`hv-chat-column${recordVisible ? " hv-chat-parked" : ""}`}
+              inert={recordVisible || undefined}
+            >
+              <ChatPane
+                onModelConnected={() => setConnectedSince(true)}
+                checkingRepository={busy === "repository"}
+                onCheckRepository={checkRepository}
+                activeChat={activeChat}
+                reachable={reachable}
+                busy={busy}
+                composer={composer}
+                context={activeChat ? (contexts[activeChat.id] ?? null) : null}
+                error={error}
+                pendingMessage={pendingMessage}
+                piReady={piReady}
+                onArchive={archiveActiveChat}
+                onComposerChange={setComposer}
+                onDismissContext={() => {
+                  if (!activeChat || !application) return;
+                  setContexts((current) => ({
+                    ...current,
+                    [activeChat.id]: null,
+                  }));
+                  writeConversationContext(application.id, activeChat.id, null);
+                  focusComposer();
+                }}
+                onReturnToContext={(section) => {
+                  selectSection(section);
+                  requestAnimationFrame(() =>
+                    document
+                      .querySelector<HTMLButtonElement>(
+                        '.hv-application-navigation button[aria-current="page"]',
+                      )
+                      ?.focus({ preventScroll: true }),
+                  );
+                }}
+                onSend={(delivery) => sendMessage(undefined, delivery)}
+                onTell={(told) => sendMessage(told)}
+                reconnecting={reconnecting}
+                workerAlive={view.worker?.alive}
+                onStop={stopConversation}
+                onContinue={continueConversation}
+                onNewChat={createChat}
+                view={view}
+                now={now}
+                onOpenDestination={selectSection}
+                highlight={highlight}
+              />
+            </div>
+          </section>
+
+          {renaming && application && (
+            <RenameApplicationDialog
+              current={application.name}
+              busy={busy === "rename"}
+              error={renameError}
+              onCancel={() => setRenaming(false)}
+              onRename={(name) => void renameApplication(name)}
+            />
+          )}
+          {confirmRemove && application && (
+            <ConfirmActionDialog
+              title={`Remove ${application.name}?`}
+              description="Permanently removes this application’s chats, decisions, observations, and activity from Hallvi. Your repository, other applications, and login stay unchanged. You can then add the same repository again to start fresh."
+              action="Remove application"
+              confirmation={`${application.repositoryOwner}/${application.repositoryName}`}
+              busy={busy === "remove"}
+              error={removeError}
+              onCancel={() => {
+                setConfirmRemove(false);
                 requestAnimationFrame(() =>
                   document
                     .querySelector<HTMLButtonElement>(
-                      '.hv-application-navigation button[aria-current="page"]',
+                      '[popovertarget="application-picker"]',
                     )
-                    ?.focus({ preventScroll: true }),
+                    ?.focus(),
                 );
               }}
-              onSend={(delivery) => sendMessage(undefined, delivery)}
-              onTell={(told) => sendMessage(told)}
-              reconnecting={reconnecting}
-              workerAlive={view.worker?.alive}
-              onStop={stopConversation}
-              onContinue={continueConversation}
-              onNewChat={createChat}
-              view={view}
-              now={now}
-              onOpenDestination={selectSection}
-              highlight={highlight}
+              onConfirm={() => void removeApplication()}
             />
-          </div>
-        </section>
-
-        {renaming && application && (
-          <RenameApplicationDialog
-            current={application.name}
-            busy={busy === "rename"}
-            error={renameError}
-            onCancel={() => setRenaming(false)}
-            onRename={(name) => void renameApplication(name)}
-          />
-        )}
-        {confirmRemove && application && (
-          <ConfirmActionDialog
-            title={`Remove ${application.name}?`}
-            description="Permanently removes this application’s chats, decisions, observations, and activity from Hallvi. Your repository, other applications, and login stay unchanged. You can then add the same repository again to start fresh."
-            action="Remove application"
-            confirmation={`${application.repositoryOwner}/${application.repositoryName}`}
-            busy={busy === "remove"}
-            error={removeError}
-            onCancel={() => {
-              setConfirmRemove(false);
-              requestAnimationFrame(() =>
-                document
-                  .querySelector<HTMLButtonElement>(
-                    '[popovertarget="application-picker"]',
-                  )
-                  ?.focus(),
-              );
-            }}
-            onConfirm={() => void removeApplication()}
-          />
-        )}
-        {applicationId && (
-          <TerminalPanel
-            applicationId={applicationId}
-            open={terminal.open}
-            expanded={terminal.expanded}
-            minimized={terminal.minimized}
-            piBusy={view.messages.some((item) =>
-              ["waiting", "running"].includes(item.status),
-            )}
-            onClose={() =>
-              setTerminal({ open: false, expanded: false, minimized: false })
-            }
-            onToggleExpanded={() =>
-              setTerminal((current) => ({
-                ...current,
-                expanded: !current.expanded,
-              }))
-            }
-            onToggleMinimized={() =>
-              setTerminal((current) => ({
-                ...current,
-                minimized: !current.minimized,
-              }))
-            }
-            onAskAboutSelection={askAboutTerminalText}
-          />
-        )}
-      </main>
+          )}
+          {applicationId && (
+            <TerminalPanel
+              applicationId={applicationId}
+              open={terminal.open}
+              expanded={terminal.expanded}
+              minimized={terminal.minimized}
+              piBusy={view.messages.some((item) =>
+                ["waiting", "running"].includes(item.status),
+              )}
+              onClose={() =>
+                setTerminal({ open: false, expanded: false, minimized: false })
+              }
+              onToggleExpanded={() =>
+                setTerminal((current) => ({
+                  ...current,
+                  expanded: !current.expanded,
+                }))
+              }
+              onToggleMinimized={() =>
+                setTerminal((current) => ({
+                  ...current,
+                  minimized: !current.minimized,
+                }))
+              }
+              onAskAboutSelection={askAboutTerminalText}
+            />
+          )}
+        </main>
+      </PulseContext.Provider>
     </DemoContext.Provider>
   );
 }

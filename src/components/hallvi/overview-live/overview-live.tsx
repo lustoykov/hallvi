@@ -10,6 +10,7 @@
 // prototype on the real route; the options and the verdict are on the
 // `prototype/landing-page-directions` branch.
 
+import { agedAs, usePulse, type Pulse } from "../pulse";
 import type { ReactNode } from "react";
 
 import type { ApplicationSection } from "../application-sections";
@@ -33,13 +34,59 @@ const plural = (value: number, word: string) =>
 
 const tone = {
   verified: "verified",
-  stale: "stale",
+  // An aged pass is calm; amber is Pi's own warning. See `pulse.tsx`.
+  stale: "aged",
   failed: "failed",
   warning: "stale",
   absent: "absent",
   unknown: "unknown",
   planned: "unknown",
 } as const;
+
+/**
+ * A lane as it reads right now.
+ *
+ * The record says when Pi last looked. The pulse says what answered a moment
+ * ago, and it asks the same question two of these lanes ask: whether the
+ * application answers, and whether the server does. When it just did, an old
+ * reading is simply current again; when it just did not, that is the one
+ * thing here worth amber.
+ */
+function liveReading(
+  vital: {
+    id: string;
+    value: string;
+    status: { certainty: keyof typeof tone; text: string };
+  },
+  pulse: Pulse,
+) {
+  const beat =
+    vital.id === "server"
+      ? pulse.server
+      : vital.id === "checks" || vital.id === "access"
+        ? pulse.app
+        : undefined;
+  if (vital.status.certainty === "stale") {
+    const aged = agedAs(beat);
+    if (aged === "verified")
+      return {
+        tone: "verified" as const,
+        word: "Verified",
+        text: "Answered just now",
+      };
+    if (aged === "silent")
+      return {
+        tone: "stale" as const,
+        word: "No answer",
+        text: `Did not answer just now · ${vital.status.text.toLowerCase()}`,
+      };
+  }
+  return {
+    tone: tone[vital.status.certainty],
+    word: vital.value,
+    text: vital.status.text,
+  };
+}
 
 function Tile({
   label,
@@ -182,6 +229,7 @@ export function OverviewLive({
   onOpenDestination: (destination: ApplicationSection) => void;
 }) {
   const traffic = useTraffic(applicationId);
+  const pulse = usePulse();
   const day = usage?.traffic ?? null;
   const p95 = (day?.p95Ms ?? []).filter((value) => value > 0);
   const typical = [...p95].sort((a, b) => a - b)[Math.floor(p95.length / 2)];
@@ -242,7 +290,13 @@ export function OverviewLive({
           </div>
           <p className="ovl-health-word">{health.word}</p>
           {condition.certainty !== "unknown" && (
-            <p className="ovl-foot">{condition.text}</p>
+            <p className="ovl-foot">
+              {/* An old reading under a way in that answered a second ago is
+                  the page arguing with itself. What just answered wins. */}
+              {condition.certainty === "stale" && pulse.app === "answering"
+                ? "It answered just now."
+                : condition.text}
+            </p>
           )}
         </Tile>
 
@@ -374,9 +428,16 @@ export function OverviewLive({
                 >
                   {/* Read aloud as certainty, subject, sentence; drawn with
                       the subject first. */}
-                  <Tag tone={tone[vital.status.certainty]}>{vital.value}</Tag>
-                  <b>{vital.label}</b>
-                  <span>{vital.status.text}</span>
+                  {(() => {
+                    const seen = liveReading(vital, pulse);
+                    return (
+                      <>
+                        <Tag tone={seen.tone}>{seen.word}</Tag>
+                        <b>{vital.label}</b>
+                        <span>{seen.text}</span>
+                      </>
+                    );
+                  })()}
                 </button>
               </li>
             ))}

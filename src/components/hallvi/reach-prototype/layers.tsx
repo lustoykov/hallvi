@@ -44,6 +44,7 @@ import {
   Tag,
   type Tone,
 } from "../register";
+import { usePulse } from "../pulse";
 import type { Door, ReachProps } from "./reach-story";
 
 import "./layers.css";
@@ -184,6 +185,7 @@ export function LayersDirection({
   const rest = story.doors.find((door) => door.id === "rest") ?? null;
   const unasked = ways.filter((door) => placeOf(door) === "unasked");
   const [picked, setPicked] = useState<string | null>(null);
+  const pulse = usePulse();
   const door = ways.find((one) => one.id === picked) ?? null;
 
   const outside = ways.filter((one) => placeOf(one) === "outside");
@@ -251,13 +253,26 @@ export function LayersDirection({
           />
           <Figure
             label="SSH"
-            value={story.ssh.word}
+            // The pulse asks this exact question, so an aged reading is
+            // simply current again when the server just answered.
+            value={
+              story.ssh.tone === "failed"
+                ? story.ssh.word
+                : pulse.server === "answering"
+                  ? "Answering now"
+                  : pulse.server === "silent"
+                    ? "No answer just now"
+                    : story.ssh.word
+            }
             tone={
-              story.ssh.tone === "verified"
-                ? "good"
-                : story.ssh.tone === "failed"
-                  ? "bad"
-                  : "warn"
+              story.ssh.tone === "failed"
+                ? "bad"
+                : pulse.server === "silent"
+                  ? "warn"
+                  : story.ssh.tone === "verified" ||
+                      pulse.server === "answering"
+                    ? "good"
+                    : "plain"
             }
             note={story.ssh.detail}
           />
@@ -270,7 +285,8 @@ export function LayersDirection({
                   ? "None"
                   : "Not read"
             }
-            tone={story.firewall.state === "read" ? "good" : "warn"}
+            // Not having read a policy back is a next step, not a problem.
+            tone={story.firewall.state === "read" ? "good" : "plain"}
             note={
               story.firewall.state === "read"
                 ? `${story.firewall.provider} · ${ago(story.firewall.at, now)}`

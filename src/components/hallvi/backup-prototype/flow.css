@@ -240,6 +240,21 @@
 .axbf-piece:not([data-covered]) small {
   color: var(--ax-waiting-text);
 }
+/* No plan at all: the data is simply there. Nothing is being left out. */
+.axbf-piece[data-plain] {
+  border-style: solid;
+  border-color: var(--ax-line-2);
+  background: #ffffff;
+}
+.axbf-piece[data-plain] small {
+  color: var(--ax-muted);
+}
+.axbf-piece[data-plain] svg {
+  color: var(--ax-muted);
+}
+.axbf-piece[data-plain]:is(:hover, [data-hot]) {
+  border-color: #9fb4f5;
+}
 .axbf-piece:hover,
 .axbf-piece[data-hot] {
   border-color: #9fb4f5;

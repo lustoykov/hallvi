@@ -16,10 +16,17 @@ import type { ReactNode } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 import "./presentation.css";
 
-export type Tone = "verified" | "stale" | "failed" | "unknown" | "absent";
+/**
+ * `aged` is a pass nobody has needed to repeat: calm, dated, never amber.
+ * `stale` is the amber one, and is kept for what needs the owner — Pi's own
+ * warning on a record.
+ */
+export type Tone =
+  "verified" | "aged" | "stale" | "failed" | "unknown" | "absent";
 
 const icons: Record<Tone, ReactNode> = {
   verified: <Check weight="bold" />,
+  aged: <Check weight="bold" />,
   stale: <Warning weight="bold" />,
   failed: <Warning weight="bold" />,
   unknown: <MinusCircle weight="bold" />,

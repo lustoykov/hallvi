@@ -76,7 +76,10 @@ const chrome: Record<
 
 const word: Record<Certainty, string> = {
   verified: "Verified",
-  stale: "Out of date",
+  // A pass that has aged is still a pass, and it is dated in the line under
+  // it. "Out of date" in amber on three lanes out of four taught an owner to
+  // expect a problem on an application that had none.
+  stale: "Held",
   failed: "Failed",
   // Not "Verified", and not "Failed": something is set up and it does
   // less than the lane's name suggests.
@@ -596,8 +599,8 @@ export function applicationCondition(
     return {
       certainty: "stale",
       text: lapsed
-        ? `It held when it was last checked, ${when(lapsed, now)}. Enough time has passed that it may have changed.`
-        : "It held when it was last checked; enough time has passed that it may have changed.",
+        ? `It held when it was last checked, ${when(lapsed, now)}.`
+        : "It held when it was last checked.",
     };
   }
   if (reading === "verified") {

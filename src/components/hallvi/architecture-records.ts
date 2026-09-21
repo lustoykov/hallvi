@@ -235,7 +235,7 @@ function evidenceFor(
       `${held.value.label}: ${held.value.status}.` +
       (held.value.detail ? ` ${held.value.detail}` : "") +
       (freshness.kind === "stale"
-        ? " It held when it was checked; enough time has passed that it may have changed."
+        ? " It held when it was checked."
         : freshness.kind === "unknowable"
           ? " The record does not say what kind of claim this is, so there is no telling whether it still holds."
           : ""),
@@ -774,7 +774,7 @@ export function architectureFromRecords({
       : readings.includes("stale")
         ? {
             certainty: "stale",
-            text: "It held when it was last checked, and enough time has passed that it may have changed.",
+            text: "It held when it was last checked.",
           }
         : readings.includes("verified")
           ? {

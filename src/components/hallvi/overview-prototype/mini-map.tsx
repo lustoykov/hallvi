@@ -24,9 +24,11 @@ import type {
 
 const tint: Record<Certainty, string> = {
   verified: "#14945f",
-  stale: "#c2691f",
+  // A pass that has aged: the muted green of something nobody has needed to
+  // look at again. Amber is `warning`, which is Pi's own judgement.
+  stale: "#8fbfa7",
   failed: "#a6312b",
-  // Amber, like stale: something to look at, not something broken.
+  // Amber: something to look at, not something broken.
   warning: "#c2691f",
   planned: "#8b95a5",
   unknown: "#8b95a5",

@@ -4,6 +4,7 @@
 // The certainty tag every direction shares: one icon, one short phrase, one
 // tint per state. Verified is green only with evidence younger than a day.
 
+import { agedAs, usePulse } from "../pulse";
 import {
   Check,
   CircleDashed,
@@ -30,7 +31,7 @@ const icons: Record<Certainty | "checking", ReactNode> = {
 
 export const certaintyWord: Record<Certainty, string> = {
   verified: "Verified",
-  stale: "Stale",
+  stale: "Held",
   unknown: "Not observed",
   planned: "Planned",
   absent: "Not set up",
@@ -47,15 +48,32 @@ export function CertaintyTag({
   certainty?: Certainty;
   children?: ReactNode;
 }) {
-  const state = part?.checking
+  const pulse = usePulse();
+  const recorded = part?.checking
     ? "checking"
     : (certainty ?? part?.evidence.certainty ?? "unknown");
+  // The two parts the pulse asks about directly: the machine, over SSH, and
+  // the web process, through the application's own address. When either just
+  // answered, its aged tag is simply current again.
+  const beat =
+    part?.kind === "host"
+      ? pulse.server
+      : part?.kind === "web"
+        ? pulse.app
+        : undefined;
+  const aged = recorded === "stale" && part ? agedAs(beat) : "aged";
+  const state =
+    aged === "verified" ? "verified" : aged === "silent" ? "warning" : recorded;
   return (
     <span className="ax-tag" data-c={state}>
       <span className="ax-tag-icon" aria-hidden="true">
         {icons[state]}
       </span>
-      {children ?? (part?.checking ? "Checking…" : part?.evidence.short)}
+      {aged === "verified"
+        ? "Answered just now"
+        : aged === "silent"
+          ? "Did not answer just now"
+          : (children ?? (part?.checking ? "Checking…" : part?.evidence.short))}
     </span>
   );
 }

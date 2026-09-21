@@ -65,7 +65,10 @@ export function applicationListCondition(
   if (reading === "warning")
     return { tone: "warn", text: "A recorded condition has a limit" };
   if (!checks.length) return { tone: "muted", text: "Not checked yet" };
-  if (reading === "stale") return { tone: "warn", text: "Checked a while ago" };
+  // A pass that has aged is still a pass. The home page is where an owner
+  // decides whether anything needs them, and "nobody has looked since
+  // yesterday" is not a thing that does; opening the application re-asks.
+  if (reading === "stale") return { tone: "live", text: "Checks held" };
   if (reading === "verified") return { tone: "live", text: "Checks held" };
   return { tone: "muted", text: "Recorded, not established" };
 }
