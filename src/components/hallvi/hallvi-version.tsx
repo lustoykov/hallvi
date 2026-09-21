@@ -4,15 +4,16 @@
 //
 // Hallvi's own version is not an account it acts through, so it does not
 // belong in the list of those. It belongs where a program's version belongs:
-// at the bottom, with an explicit update check below the version. The check
-// opens the result panel immediately; installing stays a separate action.
+// at the bottom, with an explicit update check below it. The check opens the
+// result panel; installing stays a separate action. Active update progress
+// gets a prominent notice because the sidebar disappears on narrow screens.
 //
 // An update is the rare thing here that takes Hallvi away and brings it back,
-// so while one runs its phase is on that line whether the panel is open or
-// not — and "done" is not the moment the files were swapped, it is the moment
-// the new interface answers with the revision that was installed.
+// so its phase stays visible whether the panel is open or not. Completion
+// means the new interface answers with the revision that was installed.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowClockwise } from "@phosphor-icons/react";
+import { createPortal } from "react-dom";
 
 import { ExternalLink } from "./external-link";
 import { LocalTime } from "./local-time";
@@ -66,18 +67,6 @@ export interface HallviVersionState {
   attempt: UpdateAttemptView | null;
 }
 
-/** What each phase is called where the owner can read it. */
-const SAYS: Record<Phase, string> = {
-  checking: "Checking",
-  downloading: "Downloading",
-  verifying: "Verifying",
-  installing: "Installing",
-  reconnecting: "Reconnecting",
-  completed: "Updated",
-  failed: "Update failed",
-  blocked: "Update not started",
-};
-
 const RUNNING: Phase[] = [
   "checking",
   "downloading",
@@ -85,6 +74,25 @@ const RUNNING: Phase[] = [
   "installing",
   "reconnecting",
 ];
+
+const UPDATE_STEPS = [
+  { phase: "checking", label: "Prepare" },
+  { phase: "downloading", label: "Download" },
+  { phase: "verifying", label: "Verify" },
+  { phase: "installing", label: "Install" },
+  { phase: "reconnecting", label: "Reconnect" },
+] as const;
+
+const UPDATE_HEADINGS: Record<Phase, string> = {
+  checking: "Preparing Hallvi update",
+  downloading: "Downloading Hallvi",
+  verifying: "Verifying download",
+  installing: "Installing Hallvi",
+  reconnecting: "Reconnecting to Hallvi",
+  completed: "Hallvi updated",
+  failed: "Hallvi update failed",
+  blocked: "Hallvi update not started",
+};
 
 const megabytes = (size: number | null) =>
   size ? `${Math.round(size / (1024 * 1024))} MB` : null;
@@ -103,6 +111,7 @@ export function ThisHallvi({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"check" | "install" | null>(null);
   const [error, setError] = useState("");
+  const [disconnected, setDisconnected] = useState(false);
   const here = useRef<HTMLDivElement>(null);
 
   /** A layer over the page closes the way one is expected to. */
@@ -146,12 +155,18 @@ export function ThisHallvi({ className }: { className?: string }) {
         const response = await fetch("/api/hallvi/update", {
           cache: "no-store",
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (alive) setDisconnected(true);
+          return;
+        }
         const value = (await response.json()) as HallviVersionState;
         asked = Promise.resolve(value);
-        if (alive) setState(value);
+        if (alive) {
+          setDisconnected(false);
+          setState(value);
+        }
       } catch {
-        // The interface is restarting. That is the phase.
+        if (alive) setDisconnected(true);
       }
     }, 2000);
     return () => {
@@ -174,6 +189,7 @@ export function ThisHallvi({ className }: { className?: string }) {
         throw new Error(value?.error ?? "Hallvi could not do that.");
       asked = Promise.resolve(value);
       setState(value as HallviVersionState);
+      if (action === "install") setOpen(false);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Hallvi could not do that.",
@@ -186,6 +202,16 @@ export function ThisHallvi({ className }: { className?: string }) {
   if (!state) return null;
   const { installed, available } = state;
   const offering = Boolean(available && !available.blocked && !running);
+  const preparing = busy === "install";
+  const noticePhase = preparing
+    ? "checking"
+    : disconnected && running
+      ? "reconnecting"
+      : (attempt?.phase ?? "checking");
+  const currentStep = UPDATE_STEPS.findIndex(
+    (step) => step.phase === noticePhase,
+  );
+  const showNotice = preparing || Boolean(attempt);
 
   return (
     <div
@@ -208,7 +234,11 @@ export function ThisHallvi({ className }: { className?: string }) {
             ? `Hallvi ${installed.version}`
             : "Hallvi · development checkout"}
         </span>
-        {offering && <em className="hv-this-hallvi-ready">Update available</em>}
+        {running ? (
+          <em className="hv-this-hallvi-ready">Update in progress</em>
+        ) : (
+          offering && <em className="hv-this-hallvi-ready">Update available</em>
+        )}
       </button>
 
       {installed.kind === "installed" && (
@@ -225,21 +255,6 @@ export function ThisHallvi({ className }: { className?: string }) {
           {busy === "check" ? "Checking for updates…" : "Check for updates"}
         </button>
       )}
-
-      {attempt && (
-        <p
-          className={`hv-this-hallvi-phase hv-update-${attempt.phase}`}
-          role="status"
-          aria-live="polite"
-        >
-          {SAYS[attempt.phase]}
-          {attempt.to ? ` · ${attempt.to.version}` : ""}
-          {attempt.phase === "downloading" && attempt.progress
-            ? ` · ${attempt.progress}%`
-            : ""}
-        </p>
-      )}
-
       {open && (
         <div
           className="hv-this-hallvi-panel"
@@ -338,6 +353,67 @@ export function ThisHallvi({ className }: { className?: string }) {
           )}
         </div>
       )}
+      {showNotice &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className={`hv-update-notice hv-update-notice-${noticePhase}`}
+            role={noticePhase === "failed" ? "alert" : "status"}
+            aria-live={noticePhase === "failed" ? "assertive" : "polite"}
+            aria-atomic="true"
+          >
+            <div className="hv-update-notice-heading">
+              <strong>{UPDATE_HEADINGS[noticePhase]}</strong>
+              {(preparing ? available?.version : attempt?.to?.version) ? (
+                <span>
+                  {preparing ? available?.version : attempt?.to?.version}
+                </span>
+              ) : null}
+            </div>
+            <p>
+              {preparing
+                ? "Checking the release before installation begins."
+                : disconnected && running
+                  ? "Hallvi is restarting. This page will reconnect on the same address."
+                  : attempt?.message}
+            </p>
+            {noticePhase === "downloading" &&
+              typeof attempt?.progress === "number" && (
+                <progress
+                  aria-label="Hallvi download progress"
+                  value={attempt.progress}
+                  max="100"
+                />
+              )}
+            {(running || preparing) && (
+              <ol className="hv-update-notice-steps" aria-label="Update steps">
+                {UPDATE_STEPS.map((step, index) => (
+                  <li
+                    key={step.phase}
+                    role="listitem"
+                    className={
+                      index < currentStep
+                        ? "complete"
+                        : index === currentStep
+                          ? "current"
+                          : ""
+                    }
+                    aria-current={index === currentStep ? "step" : undefined}
+                  >
+                    {step.label}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {attempt && !running && !preparing && (
+              <button type="button" onClick={() => act("dismiss")}>
+                Dismiss
+              </button>
+            )}
+            {error && <p role="alert">{error}</p>}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -184,7 +184,8 @@
   text-decoration: none;
 }
 
-/* Hallvi's version and an explicit update check under Settings. */
+/* Hallvi's version and an explicit update check stay under Settings. Active
+   update work gets a viewport notice so it remains visible during restart. */
 .hv-this-hallvi {
   position: relative;
   margin-top: 6px;
@@ -240,21 +241,6 @@
   font-weight: 600;
   color: var(--link, #315bc6);
   white-space: nowrap;
-}
-.hv-this-hallvi-phase {
-  margin: 0;
-  padding: 0 10px 2px;
-  font-size: 11px;
-  color: var(--working-text, #2852a6);
-}
-.hv-this-hallvi-phase.hv-update-completed {
-  color: var(--verified-text, #0f7a4e);
-}
-.hv-this-hallvi-phase.hv-update-failed {
-  color: var(--failed, #a6312b);
-}
-.hv-this-hallvi-phase.hv-update-blocked {
-  color: var(--amber, #b25a16);
 }
 /* Beside the line, not under it. In the flow it grew the footer by a hundred
    and fifty pixels and pushed Settings and the conversations about; as a
@@ -313,6 +299,121 @@
 }
 .hv-navigation-foot .hv-this-hallvi-go:hover:not(:disabled) {
   background: var(--blue-hover, #2350c4);
+}
+
+/* Portaled out of the sidebar, whose footer is hidden on narrow screens. */
+.hv-update-notice {
+  --notice-accent: #315bc6;
+  position: fixed;
+  z-index: 1000;
+  top: 112px;
+  right: 24px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100dvh - 128px);
+  overflow: auto;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgb(28 52 110 / 22%);
+  color: #202838;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.hv-update-notice-completed {
+  --notice-accent: #0f7a4e;
+}
+.hv-update-notice-failed {
+  --notice-accent: #a6312b;
+}
+.hv-update-notice-blocked {
+  --notice-accent: #a55a18;
+}
+.hv-update-notice-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hv-update-notice-heading strong {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--notice-accent);
+  font-size: 17px;
+  line-height: 1.2;
+}
+.hv-update-notice-heading strong::before {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+.hv-update-notice-heading span {
+  flex: none;
+  color: #53617a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.hv-update-notice p {
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+}
+.hv-update-notice progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin-top: 14px;
+  accent-color: var(--notice-accent);
+}
+.hv-update-notice-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.hv-update-notice-steps li {
+  padding-top: 7px;
+  border-top: 3px solid #dfe4ed;
+  color: #687183;
+  font-size: 10px;
+  text-align: center;
+}
+.hv-update-notice-steps li.complete {
+  border-color: #8eadeb;
+  color: #344363;
+}
+.hv-update-notice-steps li.current {
+  border-color: var(--notice-accent);
+  color: #202838;
+  font-weight: 700;
+}
+.hv-update-notice > button {
+  display: block;
+  margin: 14px 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid #cbd3e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #344363;
+  cursor: pointer;
+}
+.hv-update-notice > button:hover {
+  background: #f1f4fa;
+}
+.hv-update-notice > button:focus-visible {
+  outline: 2px solid #315bc6;
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .hv-update-notice {
+    top: max(104px, env(safe-area-inset-top));
+    right: 12px;
+    max-height: calc(100dvh - 116px);
+  }
 }
 .hv-adaptive-shell .hv-workspace {
   grid-column: 2;
