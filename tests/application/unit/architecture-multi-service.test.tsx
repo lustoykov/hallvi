@@ -112,9 +112,49 @@ describe("a map with two backing services and three volumes", () => {
     );
     expect(html).toContain(`viewBox="0 ${MAP_TOP} ${MAP_W} ${layout.height}"`);
     expect(model.byId.offsite).toBeUndefined();
-    expect(layout.legs.data).toEqual([]);
+    expect(layout.legs.data.flat()).toHaveLength(3);
     expect(html).not.toContain('class="axj2-wire-ssh"');
     expect(html).not.toContain('class="axj2-zone"');
+  });
+
+  it("routes around service and storage cards instead of through their interiors", () => {
+    const layout = layoutFor(model);
+    const cards = model.parts
+      .filter((part) => ["web", "private", "volume"].includes(part.kind))
+      .map((part) => layout.rects[part.id]);
+    for (const { d } of layout.wires) {
+      let x = 0,
+        y = 0;
+      for (const match of d.matchAll(/([MLQ])([^MLQ]+)/g)) {
+        const values = match[2].trim().split(/\s+/).map(Number);
+        const [nextX, nextY] = values.slice(-2);
+        if (match[1] !== "M") {
+          // Sample the actual quadratic bends as well as straight segments.
+          for (let step = 0; step <= 40; step++) {
+            const t = step / 40;
+            const px =
+              match[1] === "Q"
+                ? (1 - t) ** 2 * x +
+                  2 * (1 - t) * t * values[0] +
+                  t ** 2 * nextX
+                : x + (nextX - x) * t;
+            const py =
+              match[1] === "Q"
+                ? (1 - t) ** 2 * y +
+                  2 * (1 - t) * t * values[1] +
+                  t ** 2 * nextY
+                : y + (nextY - y) * t;
+            for (const r of cards) {
+              const inside =
+                px > r.x && px < r.x + r.w && py > r.y && py < r.y + r.h;
+              expect(inside, `${d} crosses a card`).toBe(false);
+            }
+          }
+        }
+        x = nextX;
+        y = nextY;
+      }
+    }
   });
 
   it("gives every part its own place", () => {

@@ -20,7 +20,7 @@ Reuse useful components and omit irrelevant controls. A prototype action complet
 
 ## Inspecting the reference
 
-From the repository, run the documented [development setup](../../README.md#run), choosing an available port, for example `npm run dev -- --port 3300`. No particular local server is guaranteed to be running.
+From the repository, run the documented [development setup](../development.md#run-locally), choosing an available port, for example `npm run dev -- --port 3300`. No particular local server is guaranteed to be running.
 
 - `npm run scenarios -- <port>` serves every scenario state through the real pages, from the records in `tests/fixtures/scenario-records.ts`. It prints one address per scenario, and each destination is a fragment on that address.
 - `/prototype` indexes what is left that has no records behind it; production returns 404 for these routes.

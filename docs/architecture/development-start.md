@@ -33,5 +33,5 @@ flowchart LR
   B -->|No| D[The send fails and says so;<br/>the composer keeps the text]
 ```
 
-The [README's Run section](../../README.md#run) owns this decision; this page
+The [development guide](../development.md#run-locally) owns this decision; this page
 is the picture of it.

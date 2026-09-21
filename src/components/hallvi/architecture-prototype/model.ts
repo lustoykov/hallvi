@@ -69,16 +69,9 @@ export interface Part {
   evidence: Evidence;
   /** Volumes: the part that mounts them. Private services: who calls them. */
   owner?: string;
-  /**
-   * Gates: whether this way in is open, or a port that refuses.
-   *
-   * The map draws both — a closed port is part of what is let in, and Security
-   * lists it — but only an open one is a gap in the wall, and only an open one
-   * may be counted as a door that is open. Read from the check Pi wrote, never
-   * from the application's own reach: `postgres` refusing from outside says
-   * nothing about how far the application can be reached from, and the two
-   * were the same sentence while the map only ever drew one door.
-   */
+  /** The endpoint port as recorded, including protocol when supplied. */
+  port?: string;
+  /** Gates: latest recorded connection result, never a firewall rule. */
   admits?: "open" | "refused" | "unknown";
   /** Gates: who the door's own record says may use it. */
   sources?: string;
@@ -148,6 +141,13 @@ export interface ArchitectureModel {
   /** The web process's product name, "Grafana", or the application name. */
   headline: string;
   parts: Part[];
+  /** Recorded relationships, with transport and endpoint labels preserved. */
+  edges: {
+    from: string;
+    to: string;
+    network: "public" | "private" | "loopback" | "disk";
+    label?: string;
+  }[];
   byId: Record<string, Part>;
   journeys: Journey[];
   condition: { certainty: Certainty; text: string };

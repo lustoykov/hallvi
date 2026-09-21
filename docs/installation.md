@@ -7,8 +7,8 @@ it can start at boot without a login.
 
 You do not need to clone the repository or install Node.js, npm, Python or a
 compiler. Each release archive includes Node.js 22 and dependencies built for
-its named platform. The installer checks the archive against its matching
-SHA-256 file before changing the installed program.
+its named platform. The normal download path checks the archive against a
+signed release manifest before changing the installed program.
 
 [Download](#download) · [macOS](#macos) · [Linux](#linux) ·
 [First deployment](#your-first-deployment) · [Troubleshooting](#troubleshooting) ·
@@ -16,24 +16,19 @@ SHA-256 file before changing the installed program.
 
 ## Download
 
-**There is no published release yet.** The script below can discover and
-install Hallvi only after the first signed release is published. Until then,
-use a maintainer-supplied archive, checksum and installer as described in
-[Installing an exact archive](#installing-an-exact-archive). You do not need a
-source checkout for either path.
-
-Once a signed release is published, take one file from
-[github.com/lustoykov/hallvi/releases](https://github.com/lustoykov/hallvi/releases)
-— `install-hallvi.sh` — and run it:
+**The first alpha release is available:**
+[Hallvi 0.1.1-alpha.1](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1).
+Paste this one line into Terminal as your normal user, without `sudo`:
 
 ```bash
-sh install-hallvi.sh
+curl -fsSLo "$HOME/install-hallvi.sh" https://github.com/lustoykov/hallvi/releases/download/v0.1.1-alpha.1/install-hallvi.sh && sh "$HOME/install-hallvi.sh"
 ```
 
-It works out whether this is an Apple-silicon Mac or an Ubuntu 24.04 x64
+This fetches the installer script from the published release and runs it. The
+script works out whether this is an Apple-silicon Mac or an Ubuntu 24.04 x64
 machine, finds the newest published alpha release, and downloads that
-release's signed manifest and the archive for this platform. Run it as your
-normal logged-in user, without `sudo`.
+release's signed manifest and the archive for this platform. It saves the
+installer script in your home directory, so you can inspect or rerun it.
 
 ### What is actually checked
 
@@ -67,8 +62,8 @@ sh install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
 That checksum catches a damaged download and nothing more, because it came
 from wherever the archive came from.
 
-Hallvi is in alpha, and **the first alpha release has not been published yet**.
-Until it is, obtain an archive from the maintainer and use the form above.
+The public release's normal install path above verifies a signed manifest;
+this exact-archive form verifies only the archive's matching checksum.
 [Publishing a release](releases.md) is the maintainer's side.
 
 Installing does not need a source checkout, Node.js, npm, Python or a compiler.
@@ -77,8 +72,8 @@ Installing does not need a source checkout, Node.js, npm, Python or a compiler.
 
 | Platform | Current evidence |
 | --- | --- |
-| macOS, Apple silicon | [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed; the earlier archive also passed a same-schema upgrade |
-| Ubuntu 24.04, x64 | [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, reinstalled and survived reboot |
+| macOS, Apple silicon | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, and an earlier archive passed a same-schema upgrade |
+| Ubuntu 24.04, x64 | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, reinstalled and survived reboot |
 | macOS, Intel; other Linux architectures/distributions | No prebuilt release target yet |
 
 Alpine/musl Linux and Windows are not supported. The
@@ -88,17 +83,8 @@ source-plus-compile archive and do not certify a new prebuilt archive.
 
 ## macOS
 
-1. In Terminal, go to the directory you downloaded into and run:
-
-   ```bash
-   cd ~/Downloads
-   sh ./install-hallvi.sh
-   ```
-
-   Run as your normal logged-in user, without `sudo`. This command requires a
-   published release. Before the first release, put the three matching files
-   from [Installing an exact archive](#installing-an-exact-archive) in this
-   directory and pass the archive to the script instead. The installer reports
+1. Run the [download and install command](#download) in Terminal as your
+   normal logged-in user, without `sudo`. The installer reports
    service, interface and worker readiness.
 
 2. Open Hallvi:
@@ -115,13 +101,8 @@ background service, not before login or while the Mac is asleep.
 These commands are for Ubuntu 24.04 x64 with a systemd user session. Use an
 ordinary user account over SSH or at the machine.
 
-1. From the directory you downloaded into, run:
-
-   ```bash
-   sh ./install-hallvi.sh
-   ```
-
-   Run without `sudo`. On Ubuntu the signed manifest is checked before
+1. Run the [download and install command](#download) as your normal user,
+   without `sudo`. On Ubuntu the signed manifest is checked before
    anything is unpacked. The installer then installs the user service and
    checks both the interface and worker.
 
@@ -146,7 +127,7 @@ ordinary user account over SSH or at the machine.
    separate [GitHub App configuration](integrations/github.md).
 4. Let Hallvi explain the application requirements, then connect Hetzner or
    an existing supported Linux application server through the interface.
-   Read the [beta precautions](../README.md#beta-safety) before connecting it.
+   Read the [beta precautions](beta-safety.md) before connecting it.
 5. Ask Hallvi to deploy the app and open the application link it provides.
 
 Installing Hallvi on your Mac does not make that Mac the Linux deployment
@@ -159,7 +140,7 @@ server when needed.
 | What happened | What to do |
 | --- | --- |
 | The archive does not match the signed manifest | Stop. Nothing was installed. Run it again — a damaged download is the common cause — and if it persists, say so rather than working around it. |
-| `no published release carries a signed manifest yet` | No alpha release exists to find. Install a specific archive instead: `sh install-hallvi.sh ./hallvi-<version>-<platform>.tgz`. |
+| `no published release carries a signed manifest yet` | Check that the machine can reach the [Hallvi release page](https://github.com/lustoykov/hallvi/releases) and that `HALLVI_RELEASE_SOURCE` is not set to a private test source. |
 | Installer rejects the platform | Use the archive for Apple-silicon macOS or Ubuntu 24.04 x64. Other platforms have no prebuilt release yet. |
 | Prebuilt dependency cannot load | Keep the current installation. Report the archive name, OS version and `hallvi status` output to the maintainer. |
 | `hallvi: command not found` | Use `~/.local/bin/hallvi` instead. Optionally add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file. |
@@ -484,19 +465,20 @@ The archive contains the built interface, separate Pi worker, schema, Node.js
 native modules. Native code is tied to its operating system, architecture,
 Node ABI and Linux C library; build and verify each advertised target.
 
-Development remains separate: `npm run dev` in a checkout, described in the
-[README](../README.md#development). An installation and a development checkout
+Development remains separate: `npm run dev` in a checkout, described in
+[Development](development.md). An installation and a development checkout
 do not share a database by default.
 
 ## Limits today
 
-- No alpha release is published yet. The workflow that builds and signs one is
-  ready and has never been run; the public download page is therefore empty,
-  and the maintainer still supplies archives by hand. Everything that workflow
-  needs is in place; see [Publishing a release](releases.md).
-- A first installation trusts github.com over HTTPS, not a signature. Only
-  updates are verified against the key Hallvi ships; a verifier taken out of the
-  archive it is verifying would prove nothing.
+- The [first signed alpha release](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1)
+  is published. External-user installation and deployment acceptance on that
+  exact release remains open; see [the roadmap](../ROADMAP.md#public-self-service-beta-preparation).
+- A first installation trusts github.com over HTTPS for the installer script.
+  The script carries the public release key and checks the signed manifest.
+  On stock macOS the signature check runs after unpacking with Node.js from
+  the archive, so the archive itself is part of the verifier. See
+  [what is actually checked](#what-is-actually-checked).
 - The [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md)
   was installed on Apple-silicon macOS and Ubuntu 24.04 x64. A fresh ChatGPT
   connection on the installed Ubuntu controller drove real public-repository
