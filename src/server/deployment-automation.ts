@@ -292,7 +292,12 @@ export async function chooseDeployment(
       // Only GitHub being away is let through: the look below records it and
       // the watch keeps trying. Anything else would never start working.
       if (!(error instanceof GithubAccessError) || error.kind !== "unavailable")
-        throw error;
+        throw error instanceof GithubAccessError && error.kind === "access"
+          ? new GithubAccessError(
+              `GitHub has no branch “${branch}” that this login can read. Check the name, and the repository's access on GitHub.`,
+              "access",
+            )
+          : error;
     }
     etags.delete(applicationId);
   }
