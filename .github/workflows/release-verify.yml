@@ -1,0 +1,88 @@
+name: Verify Hallvi draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Draft version to install on both supported platforms
+        required: true
+        type: string
+      expected_revision:
+        description: Full source commit the signed manifest must name
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Install draft on ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: darwin-arm64
+          - runner: ubuntu-24.04
+            platform: linux-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Download the exact draft assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -eu
+          mkdir candidate
+          gh release download "v${RELEASE_VERSION}" \
+            --repo "$GITHUB_REPOSITORY" --dir candidate \
+            --pattern "hallvi-${RELEASE_VERSION}-${RELEASE_PLATFORM}.tgz*" \
+            --pattern 'hallvi-release.json*' \
+            --pattern 'install-hallvi.sh'
+
+      - name: Verify signature, revision, size and archive hash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, statSync } from 'node:fs';
+          import { trustedKeys, verifyManifest } from './scripts/release-trust.mjs';
+
+          const bytes = readFileSync('candidate/hallvi-release.json');
+          const signature = readFileSync('candidate/hallvi-release.json.sig', 'utf8');
+          const manifest = verifyManifest({ bytes, signature, channel: 'alpha', keys: trustedKeys({}).keys });
+          if (manifest.version !== process.env.RELEASE_VERSION || manifest.revision !== process.env.EXPECTED_REVISION)
+            throw new Error('The draft does not name the reviewed version and revision.');
+          const archive = manifest.packages[process.env.RELEASE_PLATFORM];
+          const path = `candidate/${archive.file}`;
+          if (statSync(path).size !== archive.size || createHash('sha256').update(readFileSync(path)).digest('hex') !== archive.sha256)
+            throw new Error('The draft archive does not match the signed manifest.');
+          console.log(`Verified ${manifest.version} ${process.env.RELEASE_PLATFORM} from ${manifest.revision}`);
+          NODE
+
+      - name: Install and start the service
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+          HALLVI_USE: remote
+        run: |
+          sh candidate/install-hallvi.sh "candidate/hallvi-${RELEASE_VERSION}-${RELEASE_PLATFORM}.tgz"
+          "$HOME/.local/bin/hallvi" status
+
+      - name: Stop the test service
+        if: always()
+        run: |
+          if [ -x "$HOME/.local/bin/hallvi" ]; then
+            "$HOME/.local/bin/hallvi" stop || true
+          fi
