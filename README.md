@@ -4,55 +4,31 @@
 
 ## Install Hallvi
 
-**No public download is available yet.** The [GitHub Releases page](https://github.com/lustoykov/hallvi/releases)
-has no published Hallvi release. The installer script is only the first step:
-without a published release or a supplied archive, it has no application to
-install. A draft release is not available to ordinary visitors.
-
-**You do not need to clone this repository or install Node.js, npm, Python or a
-compiler.** Hallvi runs as a background service on an Apple-silicon Mac or
-Ubuntu 24.04 x64 machine. You use it in a browser; the applications it manages
-run on a Linux deployment host with separate requirements.
-
-### When a release is published
-
-Download `install-hallvi.sh` from [GitHub Releases](https://github.com/lustoykov/hallvi/releases).
-On the machine where Hallvi will run, open Terminal in the download directory
-and run it as your normal user, without `sudo`:
+**Download the [Hallvi 0.1.1 alpha release](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1).**
+On the Mac or Linux machine where Hallvi will run, download its
+`install-hallvi.sh` asset into `~/Downloads`, then run:
 
 ```sh
 cd ~/Downloads
 sh ./install-hallvi.sh
 ```
 
-The script finds the newest published release for that machine, verifies its
-signed manifest and archive, installs Hallvi and starts the service. Open
-<http://127.0.0.1:4747> on the same machine. Updates are offered in the
-sidebar or through `hallvi update`; installing an update is your choice.
+Run this as your normal user, without `sudo`. The script chooses the archive
+for your machine, checks the signed release manifest and archive, installs
+Hallvi and starts its background service. Open <http://127.0.0.1:4747> on the
+same machine, or use the address the installer prints if you chose another
+port. On a Mac mini reached from another computer, choose **From another
+computer** when asked and follow [remote browser access](docs/installation.md#on-another-machine).
 
-### Before the first release
+**You do not need to clone this repository or install Node.js, npm, Python or a
+compiler.** Hallvi runs as a background service on an Apple-silicon Mac or
+Ubuntu 24.04 x64 machine. You use it in a browser; the applications it manages
+run on a Linux deployment host with separate requirements.
 
-Ask the maintainer for the **three matching files**: `install-hallvi.sh`, a
-prebuilt archive such as `hallvi-0.1.1-alpha.1-darwin-arm64.tgz`, and its
-`hallvi-0.1.1-alpha.1-darwin-arm64.tgz.sha256`. Put them together in `~/Downloads` on
-an Apple-silicon Mac, then run:
-
-```sh
-cd ~/Downloads
-sh ./install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
-~/.local/bin/hallvi status
-```
-
-Use the exact archive name you received. This checks the supplied checksum;
-it is not the signed-release verification above. The maintainer builds the
-archive with [`npm run package`](docs/installation.md#build-a-release-archive).
-Publishing a release is a [separate reviewed step](docs/releases.md), not a
-result of merging code.
-
-If Hallvi is on a Mac mini and you will use it from a laptop, choose **From
-another computer** when the installer asks. Follow [remote browser access](docs/installation.md#on-another-machine)
-to forward its local ports; opening `127.0.0.1` on your laptop without that
-connection reaches your laptop, not the Mac mini.
+Updates are offered in the sidebar or through `hallvi update`; installing an
+update is your choice. For an exact archive, troubleshooting and uninstalling,
+see the [full installation guide](docs/installation.md). A maintainer publishes
+releases through the [separate release process](docs/releases.md).
 
 | Your machine | Start here |
 | --- | --- |
@@ -62,11 +38,12 @@ connection reaches your laptop, not the Mac mini.
 
 [Documentation map](docs/README.md) · [Operator redesign](docs/operator-design.md) · [Current implementation](docs/architecture.md)
 
-The [integrated prebuilt candidate](docs/testing/2026-09-19-integrated-prebuilt-installation.md)
-was installed on Apple-silicon macOS and Ubuntu 24.04 x64. On the installed
-Ubuntu controller, real Pi inspected a public repository, deployed it to a
-separate test host, and reopened private access after a restart with app data
-intact. External-user acceptance remains open. See
+The published alpha's [draft assets were installed and started](https://github.com/lustoykov/hallvi/actions/runs/35583807718)
+on clean Apple-silicon macOS and Ubuntu 24.04 x64 runners. The earlier
+[integrated prebuilt candidate](docs/testing/2026-09-19-integrated-prebuilt-installation.md)
+also passed a real public-repository deployment on an installed Ubuntu
+controller, with app data intact after restart. External-user acceptance on
+this exact published alpha remains open. See
 [supported machines](docs/installation.md#supported-machines).
 Pi reads repositories on this computer by default; local Docker is optional.
 Choose **In Docker** in **Settings → Workspace** if you want an isolated
