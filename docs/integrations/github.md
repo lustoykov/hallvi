@@ -90,6 +90,43 @@ Public repositories need neither GitHub step.
 
 The device flow exchanges the public client ID and device code for a user access token; no App secret is required. Keep private keys/client secrets out of the distributed app, git and browser. A real installation and device sign-in were verified without generating either. GitHub's own [user access-token documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app) describes the supported flow and expiration.
 
+## Deploying private source and later revisions
+
+`copy_repository_to_server` uses the saved GitHub App connection for deployment
+as well as inspection. Pi names a branch, tag or commit (for example `main`);
+Hallvi resolves it to an exact commit, downloads its source on the controller,
+validates the archive and transfers it over the application's managed SSH
+connection. The host verifies the transfer checksum and extracts it into a
+fresh temporary directory. GitHub tokens and signed download URLs never reach
+Pi, SSH arguments, the server or execution records.
+
+```mermaid
+flowchart LR
+  G["GitHub · main → exact commit"] -->|"saved App connection"| C["Hallvi controller · validate full source"]
+  C -->|"source archive over managed SSH"| S["Server · new source directory · checksum verified"]
+  S --> P["Pi builds and updates existing application"]
+  P --> V["Verify behavior · record deployed commit"]
+```
+
+This is a source transfer, not a deployment result. Pi still chooses the build
+and deployment commands, preserves the existing application's data and verifies
+what runs. A later request to deploy `main` calls the tool again, resolving the
+branch's current tip through the same connection. No personal access token or
+server-side GitHub login is required. Deploying automatically on every push is
+not installed by this tool and remains deferred.
+
+Deployment source is fetched afresh from GitHub, not copied from Pi's partial,
+redacted inspection workspace. Unpublished workspace edits are not included.
+The transfer accepts up to 48 MiB compressed / 128 MiB inflated, rejects unsafe
+paths and links, and fails rather than omitting files. Git submodule contents
+and LFS objects are not fetched separately. The temporary directory is staging;
+Pi must install/build into the application's durable location, not rely on
+`/tmp` surviving a reboot.
+
+An older conversation may still ask for a checkout token. After transferring
+source successfully, Pi can use `cancel_secret_request` to withdraw that
+unfilled request and continue. The tool refuses to remove a supplied credential.
+
 ## Proposing a change
 
 `open_pull_request` publishes files Pi changed in the repository workspace and

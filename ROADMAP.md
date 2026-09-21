@@ -47,6 +47,10 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 - [ ] **One fresh-user journey on that exact candidate.** Have someone outside the development setup install it, connect their model and required accounts, add a repository, deploy to a real host, use the result and return after restart. Use the [beta walkthrough](docs/beta-walkthrough.md) to record the candidate and concrete friction; dated proofs and synthetic UI checks do not establish this gate. Keep the useful application behavior, not only a green HTTP check, in the walkthrough.
 - [ ] **Clear authority before connecting.** The communication is merged in PR #142; verify it in that external-user walkthrough: what host/provider access permits, what Pi decides versus Always ask means, practical scoped-account/test-server precautions and an independent recovery copy. Keep this contextual and short rather than introduce another workflow.
 
+## Private repository deployment
+
+- [ ] **Reuse GitHub App access for source deployment — in review.** A controller-owned source transfer resolves `main` (or another requested ref) to an exact commit and copies the full validated source to a fresh directory on the connected server. Pi deploys from it without asking for a second GitHub token; later requests fetch the new branch tip. Unfilled obsolete token requests can be withdrawn without deleting saved credentials. [21 September verification](docs/testing/2026-09-21-private-repository-deployment.md) covers two private revisions through the real App connection and a real Linux host. Automatic deployment on push remains deferred.
+
 ## First-use experience
 
 - [x] **A continuous first application — [PR #141](https://github.com/lustoykov/hallvi/pull/141).** Fit narrow windows, carry the app and caretaker through ChatGPT connection, disclose optional model preferences, and start repository inspection from one explicit action. The first request explains requirements before server selection; connection alone does not start work.

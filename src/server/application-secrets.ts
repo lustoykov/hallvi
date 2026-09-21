@@ -242,6 +242,22 @@ export function requestSecret(
   };
 }
 
+/** Withdraw only an unfilled request; never delete a saved credential. */
+export function cancelSecretRequest(applicationId: string, name: string) {
+  const held = read(applicationId);
+  const request = held.find((item) => item.name === name);
+  if (request?.sealed || request?.previous)
+    throw new Error(
+      "This credential already has a value and cannot be withdrawn as an unfilled request.",
+    );
+  if (request)
+    write(
+      applicationId,
+      held.filter((item) => item.name !== name),
+    );
+  return { name, cancelled: Boolean(request) };
+}
+
 /** What the owner and every page may see: names and states, never values. */
 export function listSecrets(applicationId: string): SecretRequest[] {
   return read(applicationId).map(
