@@ -143,8 +143,11 @@ Actions → General before building a draft.
 
 **Verify.** The workflow signs the manifest and then verifies its own
 signature with the public key Hallvi ships, so a key that no longer matches is
-a failed release rather than an update nobody can install. Install the draft's
-archive on a machine of each supported platform before publishing it; the
+a failed release rather than an update nobody can install. Run **Verify Hallvi
+draft** with the draft version and its exact source revision. It downloads the
+draft assets, checks the signature and archive hash, then installs and starts
+the service on clean macOS arm64 and Ubuntu 24.04 x64 runners. Both jobs must
+pass before publishing. The
 [beta walkthrough](beta-walkthrough.md) is the fuller acceptance.
 
 **Publish.** The workflow leaves a **draft** prerelease. GitHub does not serve
