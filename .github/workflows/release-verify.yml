@@ -13,7 +13,9 @@ on:
         type: string
 
 permissions:
-  contents: read
+  # GitHub exposes draft releases only to tokens with push access. This
+  # manually dispatched workflow never creates, edits or publishes a release.
+  contents: write
 
 jobs:
   install:
