@@ -654,3 +654,22 @@ describe("a second change while one is in flight", () => {
     );
   });
 });
+
+it("withdraws an obsolete unfilled request without deleting an established credential", () => {
+  secrets.requestSecret(APP, {
+    name: "GITHUB_REPOSITORY_TOKEN",
+    why: "Old checkout request",
+  });
+  expect(secrets.cancelSecretRequest(APP, "GITHUB_REPOSITORY_TOKEN")).toEqual({
+    name: "GITHUB_REPOSITORY_TOKEN",
+    cancelled: true,
+  });
+  expect(secrets.listSecrets(APP).map((item) => item.name)).not.toContain(
+    "GITHUB_REPOSITORY_TOKEN",
+  );
+  secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
+  expect(() =>
+    secrets.cancelSecretRequest(APP, "GF_SECURITY_ADMIN_PASSWORD"),
+  ).toThrow(/already has a value/);
+  expect(secrets.listSecrets(APP)[0].establishedAt).toBeTruthy();
+});

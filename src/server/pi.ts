@@ -15,6 +15,7 @@ import {
 import { checkPublicAccess } from "./public-access";
 import {
   beginChange,
+  cancelSecretRequest,
   generateSecret,
   listSecrets,
   refuseSecretHandles,
@@ -38,6 +39,7 @@ import {
   normalizeProposalBranch,
   proposeRepositoryChanges,
 } from "./github-proposal";
+import { copyRepositoryToServer } from "./repository-transfer";
 import { applicationWorkspaceSource } from "./pi-workspace-source";
 import {
   executionContext,
@@ -77,6 +79,8 @@ For server preparation, inspect the repository first. Use hetzner_request to rea
 When no host is attached, do not send the owner to Settings, ask for a token or walk them through SSH in prose: inspect the repository, then call request_connection and end your turn. Its card offers both renting a Hetzner server and using a machine the owner already has, guides whichever they choose, verifies it on the controller, and a message tells you which was connected. A machine connected that way is already attached with its host key pinned against the fingerprint the owner pasted; connect_server remains for a Hetzner server you create, and for an owner who prefers to give you an address and SHA256 ED25519 host-key fingerprint themselves. Do not ask for passwords, private keys or controller file paths. Hetzner connections pin the SSH host key on first use at the provider-reported address; a supplied fingerprint is verified when available. An attached host proves SSH access, not application health.
 
 You have a repository workspace and, when connected, general Bash access to the application's server through server_bash. Choose the commands and scripts the task needs. Deployment, diagnosis and repair happen in this conversation. There is no release proposal or separate deployment planner to invoke.
+
+For source-based deployment, call copy_repository_to_server with the branch the owner wants (for example ref:"main"), or omit ref for the repository's default branch. It uses Hallvi's existing GitHub connection and SSH connection to put a complete source archive at an exact commit into a fresh temporary directory on the server. GitHub credentials stay on the controller. Do not ask for a personal access token, deploy key or another GitHub login to clone this repository on the server, and do not try to discover controller credentials. If access fails, explain the connection error and use the existing GitHub connection flow. The returned directory is source, not a deployed application: build/install from it with server_bash, preserve the existing application's data and stable Compose project identity, and verify the running result. Record the returned commit, not just the branch. For later deployments of main, call the tool again with ref:"main" to resolve the new tip; never reuse an old temporary source directory as though it were current. This supports deployments on request; it does not install an automatic push trigger. Save the owner's tracked branch as application information. Source comes from GitHub, not your edited inspection workspace; make any necessary server-side packaging changes explicitly and record them. If an earlier turn asked for an unnecessary GitHub checkout token, cancel that unfilled request with cancel_secret_request once the source transfer succeeds and continue the deployment.
 
 Some of what an application needs to run lives in its repository: a Dockerfile or Compose file, a start entrypoint, a health endpoint, a port read from the environment, a packaging or configuration fix. Make those in the workspace and, when the owner wants them kept, publish them with open_pull_request: it puts exactly the files you name on a branch of its own and opens a pull request against the branch the workspace copy came from. That is the whole of your code-writing scope — operability, not features and not general bug fixes — and everything else about the application still happens on the server. You never write to the branch the application deploys from, you never merge, and opening a pull request deploys nothing: the owner reviews and merges, and a merged change reaches the application through an ordinary release you run afterwards. Tell them the URL, the branch, what the change does and what you actually checked — a Compose file that validates is a file that validates, not an application that runs. If access is not enough, the tool says which of the three things is missing (a connected account, this repository inside the installation, or the write permissions GitHub grants it); pass that on instead of trying another route. If it reports a published branch without a pull request, say exactly that and ask again with the same branch name rather than starting another.
 
@@ -496,6 +500,31 @@ export async function openPiSession(
             },
           }),
           defineTool({
+            name: "copy_repository_to_server",
+            label: "Copy repository to server",
+            description:
+              "Copy this application's repository to its connected server using Hallvi's saved GitHub App access. No additional token or deploy key is needed. ref is a branch, tag or commit; omit it for the current default branch. Resolves the ref afresh, downloads a full source archive at that commit and verifies its transfer over managed SSH into a fresh temporary directory. Returns the directory and exact commit. It does not build, deploy, change existing files or install an automatic push trigger. Use server_bash next to deploy into the existing application and verify it. Workspace edits are not included. Git submodules and LFS objects are not fetched separately.",
+            parameters: Type.Object({ ref: Type.Optional(Type.String()) }),
+            async execute(id, params, signal) {
+              return json(
+                await execution.execute(
+                  "copy_repository_to_server",
+                  "Application repository → connected server",
+                  params,
+                  () =>
+                    copyRepositoryToServer(
+                      scope.applicationId,
+                      params.ref,
+                      signal ?? options.signal,
+                    ),
+                  false,
+                  id,
+                  signal,
+                ),
+              );
+            },
+          }),
+          defineTool({
             name: "server_bash",
             label: "Run on server",
             description:
@@ -612,6 +641,18 @@ export async function openPiSession(
                   ? null
                   : "The owner has not supplied it yet. It appears as a masked field in the conversation.",
               });
+            },
+          }),
+          defineTool({
+            name: "cancel_secret_request",
+            label: "Withdraw an unnecessary secret request",
+            description:
+              "Withdraw a request that no longer needs a value, such as a GitHub checkout token after copy_repository_to_server succeeded. Only unfilled requests can be withdrawn; saved credentials are never removed.",
+            parameters: Type.Object({ name: Type.String() }),
+            async execute(_id, params) {
+              return json(
+                cancelSecretRequest(scope.applicationId, params.name),
+              );
             },
           }),
           defineTool({
