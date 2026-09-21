@@ -415,6 +415,7 @@ export function DatabasePage({
           <Register
             rows={rows}
             columns={columns}
+            label={(row) => row.label}
             tone={(row) =>
               row.probes.some((probe) => !probe.passed && !probe.noted)
                 ? "bad"

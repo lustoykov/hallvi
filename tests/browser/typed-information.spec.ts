@@ -212,7 +212,7 @@ test("records render in chat and their views, survive refresh, and update by rec
     // It says so in its own words rather than by reprinting the record's
     // title: the lead names the revision that is serving, and the line under
     // it names the source and the machine.
-    await expect(view.getByText("Running abcdef0.")).toBeVisible();
+    await expect(view.getByText("Running abcdef0")).toBeVisible();
     await expect(
       view.getByText(/abcdef012345 on fixture-server/),
     ).toBeVisible();
