@@ -22,7 +22,7 @@ import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
 import { processesFromRecords } from "./processes-records";
-import { probeReading, usePulse } from "./pulse";
+import { probeReading } from "./pulse";
 import {
   Ask,
   Bar,
@@ -95,11 +95,12 @@ export function ProcessesPage({
     () => processesFromRecords({ records, applicationId, now }),
     [records, applicationId, now],
   );
-  const pulse = usePulse();
-  // Only the web process is asked by the pulse: it is what the address
-  // reaches. Everything else keeps its own reading, calmly.
-  const read = (row: ProcessCard, probe: Probe) =>
-    probeReading(probe, row.role === "web" ? pulse.app : undefined);
+  // The live pulse refreshes nothing here. It asks whether the address
+  // answers, and no process check asks that: a page can load in front of a
+  // container whose health check has started failing. See `pulse-asks.ts`.
+  const read = (_row: ProcessCard, probe: Probe) => probeReading(probe);
+  /** Ran and failed. A note (`info`) did neither. */
+  const broke = (probe: Probe) => probe.passed === false && !probe.noted;
   const access = records
     .filter((record) => !record.retiredAt)
     .find(
@@ -156,10 +157,8 @@ export function ProcessesPage({
     id: item.name,
   }));
   const probes = rows.flatMap((row) => row.probes);
-  const failed = probes.filter((probe) => probe.passed === false);
-  const silent = rows.flatMap((row) =>
-    row.probes.filter((probe) => read(row, probe).tone === "warn"),
-  );
+  const judged = probes.filter((probe) => !probe.noted);
+  const failed = probes.filter(broke);
   const unchecked = rows.filter((row) => !row.probes.length);
 
   const capacity = mebibytes(story.host?.memory);
@@ -291,29 +290,19 @@ export function ProcessesPage({
           <Figure
             label="Checks"
             value={
-              probes.length
-                ? `${probes.length - failed.length} of ${probes.length} passed`
+              judged.length
+                ? `${judged.length - failed.length} of ${judged.length} passed`
                 : "None run"
             }
             // Ageing never turns a pass into a warning. Amber is for a look
             // that just came back empty, red for a check that failed.
-            tone={
-              failed.length
-                ? "bad"
-                : silent.length
-                  ? "warn"
-                  : probes.length
-                    ? "good"
-                    : "plain"
-            }
+            tone={failed.length ? "bad" : judged.length ? "good" : "plain"}
             note={
               failed.length
                 ? failed.map((probe) => probe.name).join(", ")
-                : silent.length
-                  ? "The application did not answer just now"
-                  : story.verifiedAt
-                    ? `Last passed ${ago(story.verifiedAt, now)}`
-                    : "Checked by the deployment, not continuously"
+                : story.verifiedAt
+                  ? `Last passed ${ago(story.verifiedAt, now)}`
+                  : "Checked by the deployment, not continuously"
             }
           />
           <Figure
@@ -358,19 +347,15 @@ export function ProcessesPage({
             rows={rows}
             columns={columns}
             tone={(row) =>
-              row.probes.some((probe) => probe.passed === false)
+              row.probes.some(broke)
                 ? "bad"
                 : !row.probes.length
                   ? "idle"
                   : "plain"
             }
-            defaultOpen={
-              rows.find((row) =>
-                row.probes.some((probe) => probe.passed === false),
-              )?.id ?? null
-            }
+            defaultOpen={rows.find((row) => row.probes.some(broke))?.id ?? null}
             detail={(row) => {
-              const broken = row.probes.find((probe) => probe.passed === false);
+              const broken = row.probes.find(broke);
               return (
                 <Opened
                   asks={

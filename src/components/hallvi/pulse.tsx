@@ -51,10 +51,13 @@ export function agedAs(beat: Beat | undefined): Aged {
 
 /** One check, as a row or a pip draws it. */
 export function probeReading(
-  probe: { passed?: boolean; fresh?: boolean },
+  probe: { passed?: boolean; fresh?: boolean; noted?: boolean },
   /** The beat that asks the same thing this check asked, when one does. */
   beat?: Beat,
 ): { tone: "good" | "bad" | "warn" | "plain"; word: string } {
+  // A note is neither outcome. "Not failed" is not "passed", and "not passed"
+  // is not "failed".
+  if (probe.noted) return { tone: "plain", word: "noted" };
   if (probe.passed === false) return { tone: "bad", word: "failed" };
   if (probe.fresh) return { tone: "good", word: "passed" };
   const aged = agedAs(beat);

@@ -487,6 +487,9 @@ application with nothing wrong.
   `src/server/pulse.ts`) asks the application's address and the server's SSH
   whenever an application is open. What just answered is green and says
   "now". What was asked and said nothing is the one aged thing worth amber.
+  The pulse vouches only for the question it asked (`pulse-asks.ts`): it
+  never turns a container, volume or database check green, and a lane holding
+  those reads "Answering · other checks 20 h ago", not "Verified".
 - **Not set up is an offer, not an alarm.** No backups, no firewall read, no
   watcher, Hallvi's own records not copied: each is stated once, plainly, with
   the question that would change it. Storage draws no "stays behind" wall

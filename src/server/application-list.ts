@@ -2,6 +2,7 @@ import type { ApplicationListItem } from "@/components/hallvi/applications-scree
 import { listApplications } from "./db";
 import {
   applicationReading,
+  checkAsNow,
   presenceOf,
   subjectsOfKind,
 } from "./record-projection";
@@ -43,6 +44,14 @@ export function listApplicationItems(): ApplicationListItem[] {
   });
 }
 
+/** "19 h ago", for a card. */
+function since(at: string, now: number) {
+  const minutes = Math.max(0, Math.round((now - Date.parse(at)) / 60_000));
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
+}
+
 /**
  * Short enough for a card, and never more certain than the record allows.
  * The reading is Overview's headline reading; only the words are the card's.
@@ -68,7 +77,22 @@ export function applicationListCondition(
   // A pass that has aged is still a pass. The home page is where an owner
   // decides whether anything needs them, and "nobody has looked since
   // yesterday" is not a thing that does; opening the application re-asks.
-  if (reading === "stale") return { tone: "live", text: "Checks held" };
+  //
+  // Its age is said, though. The same two words over a check from a minute
+  // ago and one from last week made the card's "Fine" rest on something the
+  // reader could not see.
+  if (reading === "stale") {
+    const lapsed = checks
+      .filter((item) => checkAsNow(item.value, item.record, now) === "stale")
+      .map((item) => item.record.establishedAt)
+      .filter((at): at is string => Boolean(at))
+      .sort()
+      .at(-1);
+    return {
+      tone: "live",
+      text: lapsed ? `Checks held ${since(lapsed, now)}` : "Checks held",
+    };
+  }
   if (reading === "verified") return { tone: "live", text: "Checks held" };
   return { tone: "muted", text: "Recorded, not established" };
 }

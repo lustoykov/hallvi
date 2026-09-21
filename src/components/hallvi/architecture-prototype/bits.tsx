@@ -52,16 +52,12 @@ export function CertaintyTag({
   const recorded = part?.checking
     ? "checking"
     : (certainty ?? part?.evidence.certainty ?? "unknown");
-  // The two parts the pulse asks about directly: the machine, over SSH, and
-  // the web process, through the application's own address. When either just
-  // answered, its aged tag is simply current again.
-  const beat =
-    part?.kind === "host"
-      ? pulse.server
-      : part?.kind === "web"
-        ? pulse.app
-        : undefined;
-  const aged = recorded === "stale" && part ? agedAs(beat) : "aged";
+  // Not by kind of part. A web process's tag may rest on "its container is
+  // running", and a page that loads does not establish that. The projection
+  // names the question only when the tag's own check asked it.
+  const reasked = part?.evidence.reasked;
+  const aged =
+    recorded === "stale" && reasked ? agedAs(pulse[reasked]) : "aged";
   const state =
     aged === "verified" ? "verified" : aged === "silent" ? "warning" : recorded;
   return (

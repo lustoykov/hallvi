@@ -113,25 +113,34 @@ export function MonitoringLede({
         // ago. Amber only for what needs somebody: a watch that went quiet,
         // or an application that was asked and said nothing. An old check is
         // neither.
-        tone: (watching || answering
+        // In the order the headline is chosen, so the two cannot disagree: a
+        // watch that went quiet is amber even while the application answers,
+        // because the headline is about the watch.
+        tone: (watching
           ? "verified"
-          : quiet || silent
+          : quiet
             ? "attention"
-            : "stale") as Tone,
+            : answering
+              ? "verified"
+              : silent
+                ? "attention"
+                : "stale") as Tone,
         word: watching
           ? heard
             ? `Watcher reported ${ago(heard, now)}`
             : "Watcher running"
-          : answering
+          : answering && !quiet
             ? "Answered just now"
             : story.lastCheckAt
               ? `Last checked ${ago(story.lastCheckAt, now)}`
               : "Never checked",
         sub: [
           watching ? `${story.watcher!.detail}.` : null,
-          !watching && answering
-            ? "Hallvi asks whenever you have it open. Nothing watches between visits."
-            : null,
+          quiet && answering
+            ? "The application itself answered just now."
+            : !watching && answering
+              ? "Hallvi asks whenever you have it open. Nothing watches between visits."
+              : null,
           story.lastCheckAt
             ? `Hallvi last checked every part ${when(story.lastCheckAt)}.`
             : "No record carries a check of it.",

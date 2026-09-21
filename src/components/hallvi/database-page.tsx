@@ -160,15 +160,16 @@ export function DatabasePage({
 
   const present = rows.filter((row) => !row.absent);
   const first = present[0] ?? null;
-  const probes = present.flatMap((row) => row.probes);
-  const failed = probes.filter((probe) => !probe.passed);
-  const lastPassed =
-    present
-      .map((row) => row.lastPassed)
-      .filter((at): at is string => Boolean(at))
+  // The query checks, one per database, where one was ever run.
+  const queries = present.flatMap((row) =>
+    row.answering ? [row.answering] : [],
+  );
+  const queried =
+    queries
+      .filter((probe) => probe.passed && probe.at)
+      .map((probe) => probe.at!)
       .sort()
       .at(-1) ?? null;
-
   const { summary, copies, newestCopyCoverage } = protection;
   const newestCopy = copies[0] ?? null;
   const safety: ProtectionRow[] = [
@@ -306,14 +307,15 @@ export function DatabasePage({
       head: "Last answered",
       width: 120,
       align: "end",
-      sort: (row) => Date.parse(row.lastPassed ?? "") || 0,
+      sort: (row) =>
+        (row.answering?.passed && Date.parse(row.answering.at ?? "")) || 0,
       cell: (row) =>
         row.absent ? (
           <Tag>none here</Tag>
-        ) : row.lastPassed ? (
-          <Num>{ago(row.lastPassed, now)}</Num>
+        ) : row.answering?.passed && row.answering.at ? (
+          <Num>{ago(row.answering.at, now)}</Num>
         ) : (
-          <None>—</None>
+          <None>never asked</None>
         ),
     },
   ];
@@ -358,15 +360,37 @@ export function DatabasePage({
           />
           <Figure
             label="Answering"
+            // Only the check that ran a query answers this. A failed one is
+            // "No"; a pass inside its horizon is "Yes"; an older pass is what
+            // it is, a yes from last time; anything else is nobody having
+            // asked, however many other checks passed.
             value={
-              failed.length ? "No" : !probes.length ? "Not checked" : "Yes"
+              !queries.length
+                ? "Not checked"
+                : queries.some((probe) => !probe.passed && !probe.noted)
+                  ? "No"
+                  : queries.every((probe) => probe.passed && probe.fresh)
+                    ? "Yes"
+                    : queries.every((probe) => probe.passed)
+                      ? "Last time, yes"
+                      : "Not checked"
             }
-            tone={failed.length ? "bad" : probes.length ? "good" : "plain"}
+            tone={
+              queries.some((probe) => !probe.passed && !probe.noted)
+                ? "bad"
+                : queries.length &&
+                    queries.every((probe) => probe.passed && probe.fresh)
+                  ? "good"
+                  : "plain"
+            }
             note={
-              failed.length
-                ? failed.map((probe) => probe.label).join(", ")
-                : lastPassed
-                  ? `Last passed ${ago(lastPassed, now)}`
+              queries.some((probe) => !probe.passed && !probe.noted)
+                ? queries
+                    .filter((probe) => !probe.passed && !probe.noted)
+                    .map((probe) => probe.detail ?? probe.label)
+                    .join(", ")
+                : queried
+                  ? `A query ran ${ago(queried, now)}`
                   : "Nothing has connected to it and run a query"
             }
           />
@@ -392,7 +416,7 @@ export function DatabasePage({
             rows={rows}
             columns={columns}
             tone={(row) =>
-              row.probes.some((probe) => !probe.passed)
+              row.probes.some((probe) => !probe.passed && !probe.noted)
                 ? "bad"
                 : row.absent || !row.probes.length
                   ? "idle"
@@ -400,7 +424,9 @@ export function DatabasePage({
             }
             defaultOpen={rows.length === 1 ? rows[0].id : null}
             detail={(row) => {
-              const broken = row.probes.find((probe) => !probe.passed);
+              const broken = row.probes.find(
+                (probe) => !probe.passed && !probe.noted,
+              );
               return (
                 <Opened
                   asks={

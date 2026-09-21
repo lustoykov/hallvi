@@ -23,6 +23,11 @@ export interface Probe {
    */
   passed?: boolean;
   /**
+   * A note, not a judgement: the check was recorded `info`. It neither passed
+   * nor failed, and drawing it as either invents an outcome.
+   */
+  noted?: boolean;
+  /**
    * Whether the reading is still inside its claim's horizon. A pass that has
    * aged out is not a failure; it is a pass nobody has repeated.
    */

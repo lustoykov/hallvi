@@ -173,9 +173,14 @@ What re-asks is the **pulse**, not the reader. While an application is open
 the controller asks two things on its own, every thirty seconds and with no
 Pi run: whether the application's address answers, and whether the server
 accepts SSH (`src/server/pulse.ts`, the command is `true`). It writes no
-record. Where the pulse asks the same question an aged reading asked, that
-reading is current again and draws green, "answered just now"; where the
-pulse asked and got nothing, that is amber. Amber is otherwise kept for what
+record. **It vouches only for what it asked** (`pulse-asks.ts`): an `http`,
+`https` or `answering` check on the application or its access, and `ssh` on
+the host. A page that loads says nothing about a container's health check, a
+volume or a database, so those keep their own age. A lane or a tag is called
+verified by the pulse only when *every* aged reading in it asked that
+question; otherwise the tag says just what was proved ("Answering") and the
+line keeps the date of the rest. Where the pulse asked and got nothing, that
+is amber. A check recorded `info` is a note: never a pass, never a failure. Amber is otherwise kept for what
 needs the owner: Pi's own `warning`, a decision waiting, a watch gone quiet.
 Only a check that ran and failed is red.
 

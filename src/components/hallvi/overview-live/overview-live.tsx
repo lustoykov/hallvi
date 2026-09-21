@@ -47,20 +47,26 @@ const tone = {
  * A lane as it reads right now.
  *
  * The record says when Pi last looked. The pulse says what answered a moment
- * ago, and it asks the same question two of these lanes ask: whether the
- * application answers, and whether the server does. When it just did, an old
- * reading is simply current again; when it just did not, that is the one
- * thing here worth amber.
+ * ago. Where every aged check in a lane asked exactly what the pulse asks —
+ * did the address answer, did the server accept SSH — an answer makes the
+ * lane current again, and silence is the one thing here worth amber. A lane
+ * holding anything else keeps its own age.
  */
 function liveReading(
   vital: {
     id: string;
     value: string;
     status: { certainty: keyof typeof tone; text: string };
+    reasked?: "app" | "server" | null;
   },
   pulse: Pulse,
 ) {
-  const beat =
+  // Not by lane. The Checks lane also holds container and volume checks, and
+  // a page that loads says nothing about those. The projection names the
+  // question only when every aged check in the lane asked it.
+  const beat = vital.reasked ? pulse[vital.reasked] : undefined;
+  // What the pulse asked that belongs to this lane, whatever else is in it.
+  const own =
     vital.id === "server"
       ? pulse.server
       : vital.id === "checks" || vital.id === "access"
@@ -81,6 +87,21 @@ function liveReading(
         text: `Did not answer just now · ${vital.status.text.toLowerCase()}`,
       };
   }
+  // The lane holds more than the pulse asked. So the tag says only what was
+  // just proved — it answers — and the line keeps the date of everything
+  // else. Nothing unasked is called verified.
+  if (vital.status.certainty === "stale" && own === "answering")
+    return {
+      tone: "verified" as const,
+      word: "Answering",
+      text: `Answered just now · other checks ${vital.status.text.replace(/^Last checked /, "")}`,
+    };
+  if (vital.status.certainty === "stale" && own === "silent")
+    return {
+      tone: "stale" as const,
+      word: "No answer",
+      text: `Did not answer just now · ${vital.status.text.toLowerCase()}`,
+    };
   return {
     tone: tone[vital.status.certainty],
     word: vital.value,

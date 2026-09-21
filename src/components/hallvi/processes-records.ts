@@ -76,6 +76,7 @@ function probeOf(held: Held<RecordCheck>, now: number): Probe {
     inside: held.value.key === "reachable" || held.value.key === "container",
     at: held.record.establishedAt,
     passed: held.value.status === "passed",
+    noted: held.value.status === "info",
   };
 }
 

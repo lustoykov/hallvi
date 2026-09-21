@@ -202,7 +202,10 @@ export interface DatabaseProbe {
   key: string;
   label: string;
   detail: string | null;
+  /** The check ran and passed. A note (`info`) did not, and did not fail. */
   passed: boolean;
+  /** Recorded `info`: neither outcome. */
+  noted: boolean;
   /** Still inside its claim's horizon. A stale pass is not a failure. */
   fresh: boolean;
   at: string | null;
@@ -222,6 +225,12 @@ export interface DatabaseRow {
   owner: string | null;
   port: string | null;
   probes: DatabaseProbe[];
+  /**
+   * The check that connected and ran a query, and nothing else. A volume
+   * surviving a restart or a row count being right are passing checks about
+   * this database and say nothing about whether it answers.
+   */
+  answering: DatabaseProbe | null;
   lastPassed: string | null;
   /**
    * Everything else Pi recorded about it, in Pi's own labels: a row count, a
@@ -230,6 +239,9 @@ export interface DatabaseRow {
    */
   extras: { label: string; value: string }[];
 }
+
+/** The declared key, and the one the monitoring words also accept. */
+const ANSWERING_KEYS = new Set(["answering", "connects"]);
 
 const DECLARED = new Set([
   "engine",
@@ -257,7 +269,10 @@ export function databasesFromRecords({
       key: held.value.key ?? held.value.label,
       label: held.value.label,
       detail: held.value.detail ?? null,
-      passed: held.value.status !== "failed",
+      // Strictly. "Not failed" let a note read as a pass, with a "last
+      // passed" time, on the one page whose question is whether a query ran.
+      passed: held.value.status === "passed",
+      noted: held.value.status === "info",
       fresh: freshnessOf(held.value, held.record, now).kind === "fresh",
       at: held.record.establishedAt,
     }));
@@ -272,6 +287,7 @@ export function databasesFromRecords({
       owner: namedProcess(live, fact("owner")) ?? fact("owner"),
       port: fact("port"),
       probes,
+      answering: probes.find((probe) => ANSWERING_KEYS.has(probe.key)) ?? null,
       lastPassed:
         probes
           .filter((probe) => probe.passed && probe.at)

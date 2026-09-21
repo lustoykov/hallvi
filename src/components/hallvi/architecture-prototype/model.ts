@@ -50,6 +50,11 @@ export interface Evidence {
   /** What was observed, by what and when, and what was not. */
   detail: string;
   at: string | null;
+  /**
+   * Set only when this aged reading asked exactly what the live pulse asks,
+   * so an answer a moment ago makes it current. See `pulse-asks.ts`.
+   */
+  reasked?: "app" | "server" | null;
   /** Produced by a prototype scenario or the simulated re-check. */
   invented?: boolean;
 }

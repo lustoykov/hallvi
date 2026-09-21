@@ -34,6 +34,12 @@ export interface Vital {
   label: string;
   value: string;
   status: { certainty: Certainty; text: string };
+  /**
+   * Set only when the lane is aged and every aged check in it asked the one
+   * thing the live pulse asks. Then, and only then, an answer a moment ago
+   * makes the lane current. See `pulse-asks.ts`.
+   */
+  reasked?: "app" | "server" | null;
   lines: string[];
   /** The next scheduled copy, for a live countdown. */
   countdownTo?: string | null;

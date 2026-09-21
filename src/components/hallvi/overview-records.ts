@@ -12,6 +12,7 @@
 // was about, and its headline condition is the applications list's reading of
 // every subject the records mention.
 
+import { allAsk } from "./pulse-asks";
 import { clip, commandOf, essence } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { Ref, SavedInformation } from "@/server/operator-data";
@@ -467,6 +468,21 @@ export function overviewFromRecords({
       label: chrome[id].label,
       value: word[certainty],
       status: { certainty, text },
+      reasked:
+        certainty === "stale"
+          ? allAsk(
+              held
+                .filter(
+                  (item) =>
+                    checkAsNow(item.check, item.record, now) === "stale",
+                )
+                .map((item) => ({
+                  check: item.check,
+                  subject:
+                    item.check.about ?? item.record.presentation?.states?.ref,
+                })),
+            )
+          : null,
       lines: held.slice(0, 4).map((item) => item.check.label),
       // Needs a recurrence Pi cannot write yet.
       countdownTo: null,
