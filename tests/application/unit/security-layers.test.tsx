@@ -171,7 +171,7 @@ describe("how sure we are is separate from how far in it reaches", () => {
   it("counts what has been checked without calling any of it a verdict", () => {
     const html = draw([openDoor, refusedDoor()]);
     expect(html).toContain("connection checked");
-    expect(html).toContain("recorded as internet-facing");
+    expect(html).toContain("Answers the internet");
     // Exposure is stated, never graded: a public site needs a port open.
     expect(html).not.toMatch(/\b(secure|insecure|safe|at risk|vulnerable)\b/i);
   });
