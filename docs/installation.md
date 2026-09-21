@@ -16,15 +16,9 @@ SHA-256 file before changing the installed program.
 
 ## Download
 
-**There is no published release yet.** The script below can discover and
-install Hallvi only after the first signed release is published. Until then,
-use a maintainer-supplied archive, checksum and installer as described in
-[Installing an exact archive](#installing-an-exact-archive). You do not need a
-source checkout for either path.
-
-Once a signed release is published, take one file from
-[github.com/lustoykov/hallvi/releases](https://github.com/lustoykov/hallvi/releases)
-— `install-hallvi.sh` — and run it:
+**The first alpha release is available:**
+[Hallvi 0.1.1-alpha.1](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1).
+Download its `install-hallvi.sh` asset and run it:
 
 ```bash
 sh install-hallvi.sh
@@ -67,8 +61,8 @@ sh install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
 That checksum catches a damaged download and nothing more, because it came
 from wherever the archive came from.
 
-Hallvi is in alpha, and **the first alpha release has not been published yet**.
-Until it is, obtain an archive from the maintainer and use the form above.
+The public release's normal install path above verifies a signed manifest;
+this exact-archive form verifies only the archive's matching checksum.
 [Publishing a release](releases.md) is the maintainer's side.
 
 Installing does not need a source checkout, Node.js, npm, Python or a compiler.
@@ -77,8 +71,8 @@ Installing does not need a source checkout, Node.js, npm, Python or a compiler.
 
 | Platform | Current evidence |
 | --- | --- |
-| macOS, Apple silicon | [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed; the earlier archive also passed a same-schema upgrade |
-| Ubuntu 24.04, x64 | [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, reinstalled and survived reboot |
+| macOS, Apple silicon | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, and an earlier archive passed a same-schema upgrade |
+| Ubuntu 24.04, x64 | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, reinstalled and survived reboot |
 | macOS, Intel; other Linux architectures/distributions | No prebuilt release target yet |
 
 Alpine/musl Linux and Windows are not supported. The
@@ -95,10 +89,7 @@ source-plus-compile archive and do not certify a new prebuilt archive.
    sh ./install-hallvi.sh
    ```
 
-   Run as your normal logged-in user, without `sudo`. This command requires a
-   published release. Before the first release, put the three matching files
-   from [Installing an exact archive](#installing-an-exact-archive) in this
-   directory and pass the archive to the script instead. The installer reports
+   Run as your normal logged-in user, without `sudo`. The installer reports
    service, interface and worker readiness.
 
 2. Open Hallvi:
@@ -159,7 +150,7 @@ server when needed.
 | What happened | What to do |
 | --- | --- |
 | The archive does not match the signed manifest | Stop. Nothing was installed. Run it again — a damaged download is the common cause — and if it persists, say so rather than working around it. |
-| `no published release carries a signed manifest yet` | No alpha release exists to find. Install a specific archive instead: `sh install-hallvi.sh ./hallvi-<version>-<platform>.tgz`. |
+| `no published release carries a signed manifest yet` | Check that the machine can reach the [Hallvi release page](https://github.com/lustoykov/hallvi/releases) and that `HALLVI_RELEASE_SOURCE` is not set to a private test source. |
 | Installer rejects the platform | Use the archive for Apple-silicon macOS or Ubuntu 24.04 x64. Other platforms have no prebuilt release yet. |
 | Prebuilt dependency cannot load | Keep the current installation. Report the archive name, OS version and `hallvi status` output to the maintainer. |
 | `hallvi: command not found` | Use `~/.local/bin/hallvi` instead. Optionally add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file. |
