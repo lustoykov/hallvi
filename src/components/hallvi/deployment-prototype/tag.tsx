@@ -6,7 +6,7 @@
 
 import {
   Check,
-  Hourglass,
+  ClockCounterClockwise,
   MinusCircle,
   SpinnerGap,
   Warning,
@@ -17,7 +17,8 @@ import type { Tone } from "./deployment-model";
 
 const tagIcon: Record<Tone, ReactNode> = {
   verified: <Check weight="bold" />,
-  stale: <Hourglass weight="bold" />,
+  stale: <ClockCounterClockwise weight="bold" />,
+  attention: <Warning weight="bold" />,
   failed: <Warning weight="bold" />,
   planned: <MinusCircle weight="bold" />,
   checking: <SpinnerGap weight="bold" className="ax-spin" />,

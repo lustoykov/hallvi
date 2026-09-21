@@ -28,6 +28,23 @@
 import { useState } from "react";
 
 import { ago } from "../architecture-prototype/model";
+import {
+  Ask,
+  Board,
+  Clip,
+  Figure,
+  Foot,
+  Lede,
+  Name,
+  None,
+  Num,
+  Opened,
+  Register,
+  Strip,
+  Tag,
+  type Tone,
+} from "../register";
+import { usePulse } from "../pulse";
 import type { Door, ReachProps } from "./reach-story";
 
 import "./layers.css";
@@ -88,6 +105,23 @@ const BASIS_SHORT: Record<Basis, string> = {
 function basisOf(door: Door): Basis {
   return door.established ?? (door.unasked ? "unasked" : "configured");
 }
+
+/** Certainty, as a colour. Only a reading is ever green or red. */
+const BASIS_TONE: Record<Basis, Tone> = {
+  answered: "good",
+  refused: "good",
+  looked: "warn",
+  configured: "idle",
+  unasked: "idle",
+};
+
+const PLACE_WORD: Record<Place, string> = {
+  outside: "the internet",
+  refused: "did not get through",
+  restricted: "named networks",
+  inside: "the server itself",
+  unasked: "not established",
+};
 
 /** Pi's phrases are not always punctuated; these are run together. */
 const stop = (text: string) => (/[.!?]$/.test(text.trim()) ? text : `${text}.`);
@@ -151,9 +185,11 @@ export function LayersDirection({
   const rest = story.doors.find((door) => door.id === "rest") ?? null;
   const unasked = ways.filter((door) => placeOf(door) === "unasked");
   const [picked, setPicked] = useState<string | null>(null);
+  const pulse = usePulse();
   const door = ways.find((one) => one.id === picked) ?? null;
 
   const outside = ways.filter((one) => placeOf(one) === "outside");
+  const refusedWays = ways.filter((one) => placeOf(one) === "refused");
   const checked = ways.filter(probed);
   // The projection files three kinds under holes. A port being open to
   // everyone is established, not unestablished, and the band above says it
@@ -184,6 +220,81 @@ export function LayersDirection({
   return (
     <div className="ly">
       {head}
+      {/* The answer first, as four figures, then the picture of how far in
+          each way gets, then the inventory for whoever wants it row by row.
+          One hierarchy, rather than three tables of equal weight. */}
+      <div className="hv-rg-sheet ly-summary">
+        <Lede
+          holds={`${ways.length} ${ways.length === 1 ? "way in" : "ways in"} on record · ${checked.length} of ${ways.length} connection checked`}
+        >
+          What can reach this server, how far in each way gets, and what that
+          rests on.
+        </Lede>
+        <Strip>
+          <Figure
+            label="Answers the internet"
+            value={outside.length}
+            note={
+              outside.length
+                ? outside.map((one) => one.port || one.title).join(", ")
+                : "Nothing on record answers from outside"
+            }
+          />
+          <Figure
+            label="Did not get through"
+            // A count, not a verdict: exposure is stated, never graded. A
+            // public site may deliberately face the internet.
+            value={refusedWays.length}
+            note={
+              refusedWays.length
+                ? refusedWays.map((one) => one.port || one.title).join(", ")
+                : "No connection check was refused"
+            }
+          />
+          <Figure
+            label="SSH"
+            // The pulse asks this exact question, so an aged reading is
+            // simply current again when the server just answered.
+            value={
+              story.ssh.tone === "failed"
+                ? story.ssh.word
+                : pulse.server === "answering"
+                  ? "Answering now"
+                  : pulse.server === "silent"
+                    ? "No answer just now"
+                    : story.ssh.word
+            }
+            tone={
+              story.ssh.tone === "failed"
+                ? "bad"
+                : pulse.server === "silent"
+                  ? "warn"
+                  : story.ssh.tone === "verified" ||
+                      pulse.server === "answering"
+                    ? "good"
+                    : "plain"
+            }
+            note={story.ssh.detail}
+          />
+          <Figure
+            label="Firewall"
+            value={
+              story.firewall.state === "read"
+                ? "Read back"
+                : story.firewall.state === "none"
+                  ? "None"
+                  : "Not read"
+            }
+            // Not having read a policy back is a next step, not a problem.
+            tone={story.firewall.state === "read" ? "good" : "plain"}
+            note={
+              story.firewall.state === "read"
+                ? `${story.firewall.provider} · ${ago(story.firewall.at, now)}`
+                : story.firewall.detail
+            }
+          />
+        </Strip>
+      </div>
       <div className="hv-section-content">
         <header className="ly-head">
           <div>
@@ -194,14 +305,6 @@ export function LayersDirection({
                 : "Each band is one step further in, and a way in sits in the band where it stops. Select one to see what it rests on."}
             </p>
           </div>
-          {ways.length > 0 && (
-            // A count, not a verdict. Neither figure is a judgement about the
-            // server: a public site may deliberately face the internet.
-            <span className="ly-count">
-              {outside.length} recorded as internet-facing
-              {` · ${checked.length} of ${ways.length} connection checked`}
-            </span>
-          )}
         </header>
 
         {ways.length > 0 && (
@@ -270,21 +373,88 @@ export function LayersDirection({
 
         {panel}
 
-        {story.guards.length > 0 && (
-          <section className="ly-guards">
-            <h3>Protecting the server without being a way in</h3>
-            <dl>
-              {story.guards.map((guard) => (
-                <div key={guard.id}>
-                  <dt>{guard.title}</dt>
-                  <dd>
-                    {guard.detail ?? "On record for this deployment."}
-                    {guard.at && <small>Recorded {ago(guard.at, now)}</small>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
+        {ways.length > 0 && (
+          <Board
+            title="Ways in"
+            note="Every port on record. A row opens what it rests on."
+          >
+            <Register
+              rows={ways}
+              columns={[
+                {
+                  key: "port",
+                  head: "Port",
+                  width: 120,
+                  sort: (row) => Number.parseInt(row.port, 10) || 0,
+                  cell: (row) =>
+                    row.port ? <Name mono title={row.port} /> : <None />,
+                },
+                {
+                  key: "what",
+                  head: "What answers there",
+                  cell: (row) => <Clip text={row.serves ?? row.title} />,
+                },
+                {
+                  key: "stops",
+                  head: "Gets as far as",
+                  width: 170,
+                  sort: (row) => placeOf(row),
+                  cell: (row) => PLACE_WORD[placeOf(row)],
+                },
+                {
+                  key: "sources",
+                  head: "Open to",
+                  width: 190,
+                  cell: (row) =>
+                    row.sources.length ? (
+                      <Clip text={row.sources.join(", ")} mono />
+                    ) : (
+                      <None>not stated</None>
+                    ),
+                },
+                {
+                  key: "basis",
+                  head: "Rests on",
+                  width: 116,
+                  cell: (row) => (
+                    <Tag tone={BASIS_TONE[basisOf(row)]}>
+                      {BASIS_SHORT[basisOf(row)]}
+                    </Tag>
+                  ),
+                },
+                {
+                  key: "at",
+                  head: "Checked",
+                  width: 100,
+                  align: "end",
+                  cell: (row) =>
+                    row.at ? <Num>{ago(row.at, now)}</Num> : <None>—</None>,
+                },
+              ]}
+              tone={(row) => (probed(row) ? "plain" : "idle")}
+              detail={(row) => (
+                <Opened
+                  asks={
+                    <Ask
+                      onAsk={onAsk}
+                      prompt={`Connect to port ${row.port || row.title} on ${story.name}'s server from outside and record what happens.`}
+                    >
+                      Check this port from outside
+                    </Ask>
+                  }
+                >
+                  <Rests door={row} story={story} now={now} />
+                </Opened>
+              )}
+            />
+            <Foot>
+              <span>
+                {rest
+                  ? stop(rest.detail)
+                  : "A connection check does not identify what stopped it; only the firewall policy, read back, can."}
+              </span>
+            </Foot>
+          </Board>
         )}
 
         {/* With no port on record the bands have nothing to hold, so the two

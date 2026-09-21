@@ -22,6 +22,16 @@ export interface Probe {
    * a failing check read "6 of 6 checks".
    */
   passed?: boolean;
+  /**
+   * A note, not a judgement: the check was recorded `info`. It neither passed
+   * nor failed, and drawing it as either invents an outcome.
+   */
+  noted?: boolean;
+  /**
+   * Whether the reading is still inside its claim's horizon. A pass that has
+   * aged out is not a failure; it is a pass nobody has repeated.
+   */
+  fresh?: boolean;
 }
 
 export interface ProcessCard {
@@ -35,6 +45,10 @@ export interface ProcessCard {
   image: string;
   imageShort: string;
   command: string | null;
+  /** Readings, as Pi wrote them. Null is "nobody recorded one", never zero. */
+  restarts?: string | null;
+  memoryUsed?: string | null;
+  cpuUsed?: string | null;
   probes: Probe[];
   lastPassed: string | null;
 }
@@ -80,6 +94,8 @@ export interface LineStory {
   /** The one address let in, when access is restricted to it. */
   from: string | null;
   processes: ProcessCard[];
+  /** The machine they run on, and what it has, when a record says. */
+  host?: { name: string; memory: string | null } | null;
   processChanges: Change[];
   processGaps: Gap[];
 }

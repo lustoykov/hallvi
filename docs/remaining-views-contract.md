@@ -183,9 +183,13 @@ built from records, and the value was never in one.
 
 # 1 · Processes
 
-The Line design: on the left what runs and how sure we are, on the right the
-path a visit takes from the network to the web process, with everything
-private behind a wall.
+The register (chosen 21 September 2026, replacing the Line design): one row
+per process with its role, what it runs, the readings a record carries and a
+pip per check. A row opens in place onto its command and onto what proves it:
+each check, what it looked at, when, and whether the pass still counts. The
+fields below are unchanged; `restarts`, `cpu-used` and `memory-used` now have
+columns, and a reading nobody recorded is drawn grey as "not recorded", never
+as zero.
 
 | field in the design | supplies it | basis | refreshed by | derived / recorded |
 |---|---|---|---|---|
@@ -246,8 +250,13 @@ different questions and the answer to one is not evidence for the other.
 
 # 3 · Database
 
-The Timeline design: one lane each for health, copies and restores, so "when
-was it last known good" is a glance rather than an inference.
+The register (chosen 21 September 2026, replacing the Timeline design): every
+`database` subject is a row with where its data lives, its size, who uses it
+and its checks; facts under keys this page does not declare read as detail in
+the opened row. Under it, the backup situation as four rows read from the
+same projection Backups uses: is a copy scheduled, is there one off the
+server, has one been restored, and what a copy holds. The three never borrow
+from one another.
 
 | field in the design | supplies it | basis | refreshed by | derived / recorded |
 |---|---|---|---|---|

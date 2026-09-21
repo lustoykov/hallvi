@@ -65,8 +65,9 @@ const roleWords: Record<ProcessCard["role"], string> = {
  * it; without one the label has to stand in, because inventing a probe string
  * would be describing a check that was never written down that way.
  */
-function probeOf(held: Held<RecordCheck>): Probe {
+function probeOf(held: Held<RecordCheck>, now: number): Probe {
   return {
+    fresh: freshnessOf(held.value, held.record, now).kind === "fresh",
     name: held.value.label,
     probe: held.value.detail ?? held.value.label,
     // A check about a private process was necessarily run from inside; one
@@ -75,6 +76,7 @@ function probeOf(held: Held<RecordCheck>): Probe {
     inside: held.value.key === "reachable" || held.value.key === "container",
     at: held.record.establishedAt,
     passed: held.value.status === "passed",
+    noted: held.value.status === "info",
   };
 }
 
@@ -185,7 +187,7 @@ export function processesFromRecords({
             ? "worker"
             : "service";
 
-    const probes = [...checks.values()].map(probeOf);
+    const probes = [...checks.values()].map((held) => probeOf(held, now));
     return {
       name: ref.id,
       product: distinct(
@@ -207,6 +209,9 @@ export function processesFromRecords({
       image: image ?? "Not recorded",
       imageShort: image ? shortImage(image) : "Not recorded",
       command: fact("command"),
+      restarts: fact("restarts"),
+      memoryUsed: fact("memory-used"),
+      cpuUsed: fact("cpu-used"),
       probes,
       lastPassed:
         probes
@@ -290,10 +295,22 @@ export function processesFromRecords({
     verifiedAt,
     restricted,
     processes,
+    host: hostOf(live),
     from: filter,
     entry: entryFrom(access, doorPort, filter),
     processChanges: changesFor(live, refs),
     processGaps: gapsFor(processes),
+  };
+}
+
+/** The machine, and the capacity a memory reading is a share of. */
+function hostOf(records: SavedInformation[]) {
+  const ref = subjectsOfKind(records, "host").at(-1);
+  if (!ref) return null;
+  const facts = currentFacts(records, ref);
+  return {
+    name: ref.id,
+    memory: facts.get("memory")?.value.value ?? null,
   };
 }
 

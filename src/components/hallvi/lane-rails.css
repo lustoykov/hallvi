@@ -119,11 +119,12 @@
 [data-c="fact"] .axlr-answer em::before {
   background: var(--ax-verified);
 }
+/* Aged, not wrong: the muted green of a pass nobody has needed to repeat. */
 [data-c="stale"] .axlr-answer em {
-  color: var(--ax-waiting-text);
+  color: var(--ax-ink-2);
 }
 [data-c="stale"] .axlr-answer em::before {
-  background: var(--ax-amber);
+  background: #8fbfa7;
 }
 [data-c="failed"] .axlr-answer em {
   color: var(--ax-failed);

@@ -9,6 +9,7 @@
 // picked part lists its checks as sentences: what was tested, whether it
 // worked, and how much longer that result counts.
 
+import { usePulse } from "./pulse";
 import {
   ChatCircleText,
   Check,
@@ -33,7 +34,7 @@ import type {
   WatchedPart,
   Watching,
 } from "./monitoring-records";
-import { ago, countWord, when } from "./stack-prototype/stack-model";
+import { ago, when } from "./stack-prototype/stack-model";
 import "./monitoring-watching.css";
 
 /** Verified green needs evidence under a day old. */
@@ -66,13 +67,12 @@ const watchDraft = (name: string) =>
 
 export function MonitoringLede({
   story,
-  watching: parts,
   now,
   aside,
   onAsk,
 }: {
   story: MonitoringStory;
-  watching: Watching;
+  watching?: Watching;
   now: number;
   /** A sentence from outside the checks the lede should carry. */
   aside: string | null;
@@ -81,15 +81,11 @@ export function MonitoringLede({
   const failing = story.looks.find((look) => look.state === "failing");
   const watching = story.watcher?.state === "running";
   const quiet = story.watcher?.state === "stale";
-  const { counts } = parts;
-  const judged = counts.counts + counts.expired;
-  // How many results are still evidence about now. "Every check is passing"
-  // over a list of expired passes was the lede contradicting its own page.
-  const standing = !judged
-    ? null
-    : counts.expired
-      ? `${countWord(counts.counts)} of ${countWord(judged).toLowerCase()} ${judged === 1 ? "check is" : "checks are"} recent enough to count.`
-      : `${judged === 1 ? "Its one check is" : `All ${countWord(judged).toLowerCase()} checks are`} recent enough to count.`;
+  // What answered a moment ago. With no watcher, this is the page's honest
+  // good news: Hallvi asks whenever somebody has the application open.
+  const pulse = usePulse();
+  const answering = pulse.app === "answering";
+  const silent = pulse.app === "silent";
   const heard = story.watcher?.lastObservationAt ?? null;
   const lede = failing
     ? {
@@ -108,23 +104,46 @@ export function MonitoringLede({
           ? `${story.name} is being watched.`
           : quiet
             ? `Whatever was watching ${story.name} has gone quiet.`
-            : `Nothing is watching ${story.name}.`,
-        // Green only for a watcher that is reporting: a recent one-off check
-        // beside "nothing is watching" is not reassurance.
-        tone: (watching ? "verified" : "stale") as Tone,
+            : answering
+              ? `${story.name} is answering.`
+              : silent
+                ? `${story.name} did not answer just now.`
+                : `Nothing is watching ${story.name}.`,
+        // Green for a watcher that is reporting, or for an answer a moment
+        // ago. Amber only for what needs somebody: a watch that went quiet,
+        // or an application that was asked and said nothing. An old check is
+        // neither.
+        // In the order the headline is chosen, so the two cannot disagree: a
+        // watch that went quiet is amber even while the application answers,
+        // because the headline is about the watch.
+        tone: (watching
+          ? "verified"
+          : quiet
+            ? "attention"
+            : answering
+              ? "verified"
+              : silent
+                ? "attention"
+                : "stale") as Tone,
         word: watching
           ? heard
             ? `Watcher reported ${ago(heard, now)}`
             : "Watcher running"
-          : story.lastCheckAt
-            ? `Last checked ${ago(story.lastCheckAt, now)}`
-            : "Never checked",
+          : answering && !quiet
+            ? "Answered just now"
+            : story.lastCheckAt
+              ? `Last checked ${ago(story.lastCheckAt, now)}`
+              : "Never checked",
         sub: [
           watching ? `${story.watcher!.detail}.` : null,
+          quiet && answering
+            ? "The application itself answered just now."
+            : !watching && answering
+              ? "Hallvi asks whenever you have it open. Nothing watches between visits."
+              : null,
           story.lastCheckAt
-            ? `Hallvi last checked it ${when(story.lastCheckAt)}.`
+            ? `Hallvi last checked every part ${when(story.lastCheckAt)}.`
             : "No record carries a check of it.",
-          standing,
           aside,
         ]
           .filter(Boolean)
@@ -192,22 +211,10 @@ function verdict(look: PartLook, now: number) {
   const at = ago(look.at, now);
   if (look.state === "failed") return `Failed ${at}`;
   if (look.state === "read") return `Recorded ${at}`;
-  if (look.state === "expired") return `Worked ${at} · too long ago to count`;
+  if (look.state === "expired") return `Worked ${at}`;
   return look.left === null
     ? `Worked ${at}`
     : `Worked ${at} · counts for ${lasts(look.left)} more`;
-}
-
-function Pips({ part }: { part: WatchedPart }) {
-  return (
-    <span className="axmw-pips" aria-hidden="true">
-      {part.looks
-        .filter((look) => look.state !== "read")
-        .map((look) => (
-          <i key={look.id} data-state={look.state} />
-        ))}
-    </span>
-  );
 }
 
 const partWords = (part: WatchedPart, now: number) =>
@@ -240,6 +247,15 @@ export function WatchingMap({
     )?.id,
   );
   const part = watching.parts.find((item) => item.id === picked) ?? null;
+  const rails = host ? [host, ...inside] : inside;
+  // One clock for every rail: the oldest reading on record, to now.
+  const from =
+    watching.parts
+      .flatMap((item) => item.readings.map((reading) => reading.at))
+      .sort()[0] ?? null;
+  const span = from ? Math.max(now - Date.parse(from), 1) : 1;
+  const place = (at: string) =>
+    `${Math.min(100, Math.max(0, ((Date.parse(at) - (now - span)) / span) * 100)).toFixed(2)}%`;
   const on = story.watcher?.state === "running";
   const quiet = story.watcher?.state === "stale";
 
@@ -250,7 +266,9 @@ export function WatchingMap({
           <h2 id="axmw-title">Watching</h2>
           <p>
             The parts of {story.name}, when each was last checked, and whether
-            anything keeps checking. Pick a part to see its checks.
+            anything keeps checking. Every mark is a reading on record; the
+            stretch after it is how long nobody has looked. Pick a part to see
+            its checks.
           </p>
         </div>
       </header>
@@ -291,67 +309,94 @@ export function WatchingMap({
             aria-hidden="true"
           />
           <div className="axmw-frame">
-            {host ? (
-              <button
-                type="button"
-                className="axmw-host"
-                aria-pressed={host.id === picked}
-                onClick={() => setPicked(host.id)}
-              >
-                <KindIcon kind="host" />
-                <b>Server</b>
-                <span className="axmw-id">{host.id}</span>
-                <Pips part={host} />
-                <em>{partWords(host, now)}</em>
-              </button>
-            ) : (
-              <div className="axmw-host">
-                <KindIcon kind="host" />
-                <b>Server</b>
-                <em>Never checked</em>
-              </div>
-            )}
-            <div className="axmw-parts">
-              {inside.map((item) => (
+            {/* The run of readings. One rail per part on one shared clock,
+                from the oldest reading on record to now, so what stands out
+                is the stretch nobody looked at — which is the subject of
+                this page. A part the map draws and no record states is a
+                rail that was never laid. */}
+            <div className="axmw-rails">
+              {rails.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="axmw-part"
+                  className="axmw-rail"
                   data-state={item.state}
                   aria-pressed={item.id === picked}
                   title={item.id}
                   onClick={() => setPicked(item.id)}
                 >
-                  <span className="axmw-tile">
+                  <span className="axmw-rail-name">
                     <KindIcon kind={item.kind} />
-                  </span>
-                  <b>{item.name}</b>
-                  <small>{item.kindWord}</small>
-                  <Pips part={item} />
-                  <em>{partWords(item, now)}</em>
-                  {item.watched && (
-                    <span className="axmw-badge">
-                      <Eye weight="bold" /> Watched
+                    <span>
+                      <b>{item.kind === "host" ? "Server" : item.name}</b>
+                      <small>
+                        {item.kind === "host" ? item.id : item.kindWord}
+                      </small>
                     </span>
-                  )}
+                  </span>
+                  <span className="axmw-track" aria-hidden="true">
+                    {item.lastAt && (
+                      // From the last look to now: still counting, or not.
+                      <i
+                        className="axmw-since"
+                        data-state={item.state}
+                        style={{ left: place(item.lastAt) }}
+                      />
+                    )}
+                    {item.readings.map((reading) => (
+                      <i
+                        key={`${reading.at}:${reading.title}`}
+                        className="axmw-tick"
+                        data-failed={reading.failed || undefined}
+                        style={{ left: place(reading.at) }}
+                        title={reading.title}
+                      />
+                    ))}
+                  </span>
+                  <em>
+                    {partWords(item, now)}
+                    {item.watched && (
+                      <span className="axmw-badge">
+                        <Eye weight="bold" /> Watched
+                      </span>
+                    )}
+                  </em>
                 </button>
               ))}
               {watching.ghosts.map((gap) => (
-                <div key={gap.id} className="axmw-part axmw-ghost">
-                  <b>{gap.title}</b>
-                  <small>{gap.detail}</small>
+                <div key={gap.id} className="axmw-rail axmw-ghost">
+                  <span className="axmw-rail-name">
+                    <span>
+                      <b>
+                        {gap.title.replace(" is drawn but not observed", "")}
+                      </b>
+                      <small>Drawn on the map, not observed</small>
+                    </span>
+                  </span>
+                  <span className="axmw-track axmw-unlaid" title={gap.detail}>
+                    nothing has ever observed this
+                  </span>
+                  <em>No record states it</em>
                 </div>
               ))}
+              <div className="axmw-axis" aria-hidden="true">
+                <span />
+                <span>
+                  <small>{from ? ago(from, now) : ""}</small>
+                  <small>now</small>
+                </span>
+                <span />
+              </div>
             </div>
           </div>
         </div>
 
         <ul className="axmw-key" aria-label="Key">
           <li>
-            <i data-state="counts" /> Worked, and recent enough to count
+            <i data-state="counts" /> Worked, recently
           </li>
           <li>
-            <i data-state="expired" /> Worked, too long ago to count
+            <i data-state="expired" /> Worked, a while ago
           </li>
           <li>
             <i data-state="failed" /> Failed

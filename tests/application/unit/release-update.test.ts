@@ -317,6 +317,7 @@ it("orders releases the way their numbers read", () => {
   expect(compareVersions("0.1.0-alpha.2", "0.1.0-alpha.1")).toBe(1);
   expect(compareVersions("0.1.0-alpha.10", "0.1.0-alpha.9")).toBe(1);
   expect(compareVersions("0.1.0", "0.1.0-alpha.9")).toBe(1);
+  expect(compareVersions("0.1.1-alpha.1", "0.1.0")).toBe(1);
   expect(compareVersions("0.1.0-alpha.1", "0.1.0-alpha.1")).toBe(0);
   expect(compareVersions("0.1.0-alpha.1", "0.2.0-alpha.1")).toBe(-1);
 });

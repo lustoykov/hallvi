@@ -3,7 +3,9 @@
 .ly .hv-section-content {
   display: grid;
   gap: 24px;
-  max-width: 900px;
+  /* Under the summary strip, and the same width as it. */
+  padding: 4px 0 64px;
+  max-width: none;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
 }
@@ -364,4 +366,10 @@
 
 .ly .hv-primary-button {
   justify-self: start;
+}
+
+/* The register's own heading, not the section's. */
+.ly .hv-rg-board-head h2 {
+  margin: 0;
+  font-size: 13px;
 }

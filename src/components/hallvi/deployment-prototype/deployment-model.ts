@@ -36,7 +36,12 @@ export interface LiveFact {
 }
 export type StoryState =
   "none" | "working" | "awaiting" | "failed" | "live" | "unknown";
-export type Tone = "verified" | "stale" | "failed" | "planned" | "checking";
+/**
+ * `stale` is a pass that has aged, and draws calmly. `attention` is amber,
+ * and is for what needs the owner: Pi's own warning, a decision waiting.
+ */
+export type Tone =
+  "verified" | "stale" | "attention" | "failed" | "planned" | "checking";
 
 export interface DeploymentStory {
   state: StoryState;

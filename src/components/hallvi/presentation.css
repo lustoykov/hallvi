@@ -51,6 +51,13 @@
   background: var(--verified-bg);
   color: var(--verified-text);
 }
+.hv-tag[data-tone="aged"] {
+  background: var(--unknown-bg);
+  color: #3e4a60;
+}
+.hv-tag[data-tone="aged"] svg {
+  color: #6ea88a;
+}
 .hv-tag[data-tone="stale"] {
   background: var(--waiting-bg);
   color: var(--waiting-text);

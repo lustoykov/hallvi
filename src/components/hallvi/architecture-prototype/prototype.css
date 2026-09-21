@@ -107,7 +107,15 @@
   background: var(--ax-verified-bg);
   color: var(--ax-verified-text);
 }
+/* A pass that has aged is still a pass. It is said quietly, with its date,
+   and never in amber: a quiet application is not a neglected one. Amber is
+   `attention`, which is for what needs the owner. */
 .ax-tag[data-c="stale"] {
+  background: var(--ax-unknown-bg);
+  color: var(--ax-ink-2);
+}
+.ax-tag[data-c="warning"],
+.ax-tag[data-c="attention"] {
   background: var(--ax-waiting-bg);
   color: var(--ax-waiting-text);
 }

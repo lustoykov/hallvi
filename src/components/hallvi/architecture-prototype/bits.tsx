@@ -4,6 +4,7 @@
 // The certainty tag every direction shares: one icon, one short phrase, one
 // tint per state. Verified is green only with evidence younger than a day.
 
+import { agedAs, usePulse } from "../pulse";
 import {
   Check,
   CircleDashed,
@@ -30,7 +31,7 @@ const icons: Record<Certainty | "checking", ReactNode> = {
 
 export const certaintyWord: Record<Certainty, string> = {
   verified: "Verified",
-  stale: "Stale",
+  stale: "Held",
   unknown: "Not observed",
   planned: "Planned",
   absent: "Not set up",
@@ -47,15 +48,28 @@ export function CertaintyTag({
   certainty?: Certainty;
   children?: ReactNode;
 }) {
-  const state = part?.checking
+  const pulse = usePulse();
+  const recorded = part?.checking
     ? "checking"
     : (certainty ?? part?.evidence.certainty ?? "unknown");
+  // Not by kind of part. A web process's tag may rest on "its container is
+  // running", and a page that loads does not establish that. The projection
+  // names the question only when the tag's own check asked it.
+  const reasked = part?.evidence.reasked;
+  const aged =
+    recorded === "stale" && reasked ? agedAs(pulse[reasked]) : "aged";
+  const state =
+    aged === "verified" ? "verified" : aged === "silent" ? "warning" : recorded;
   return (
     <span className="ax-tag" data-c={state}>
       <span className="ax-tag-icon" aria-hidden="true">
         {icons[state]}
       </span>
-      {children ?? (part?.checking ? "Checking…" : part?.evidence.short)}
+      {aged === "verified"
+        ? "Answered just now"
+        : aged === "silent"
+          ? "Did not answer just now"
+          : (children ?? (part?.checking ? "Checking…" : part?.evidence.short))}
     </span>
   );
 }

@@ -141,7 +141,7 @@
   animation: ax-sweep 1200ms var(--ax-ease-out);
 }
 .axj2-stage[data-shift="stale"] {
-  --axj2-wash: rgb(178 90 22 / 14%);
+  --axj2-wash: rgb(104 113 131 / 10%);
 }
 .axj2-stage[data-shift="failed"] {
   --axj2-wash: rgb(166 49 43 / 12%);
@@ -564,11 +564,11 @@
   box-shadow: 0 0 0 3px rgb(20 148 95 / 14%);
 }
 [data-c="stale"] .axj2-status {
-  color: var(--ax-waiting-text);
+  color: var(--ax-ink-2);
 }
 [data-c="stale"] .axj2-status i {
-  background: var(--ax-amber);
-  box-shadow: 0 0 0 3px rgb(178 90 22 / 14%);
+  background: #8fbfa7;
+  box-shadow: 0 0 0 3px rgb(143 191 167 / 22%);
 }
 [data-c="failed"] .axj2-status {
   color: var(--ax-failed);

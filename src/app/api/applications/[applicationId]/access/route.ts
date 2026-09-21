@@ -1,6 +1,7 @@
 import { handle } from "@/server/http";
 import { privateAccessOpen } from "@/server/private-access";
 import { publicUrlReachable } from "@/server/public-access";
+import { serverBeat } from "@/server/pulse";
 import { listInformation } from "@/server/saved-information";
 
 export const runtime = "nodejs";
@@ -17,6 +18,10 @@ export const dynamic = "force-dynamic";
  * Both modes are asked rather than assumed. A public address used to be
  * reported as open on the strength of being public, which is the same
  * unchecked claim the private side was built to stop making.
+ *
+ * `server` is the same idea one layer down: whether the machine accepts the
+ * controller's SSH right now. Together they are the pulse a page uses to
+ * decide whether an old reading is worth mentioning; see `pulse.ts`.
  */
 export async function GET(
   _request: Request,
@@ -24,26 +29,34 @@ export async function GET(
 ) {
   const { applicationId } = await context.params;
   return handle(async () => {
-    const record = listInformation(applicationId).find(
-      (item) => item.presentation?.content?.kind === "application-access",
-    );
-    const access = record?.presentation?.content;
-    if (access?.kind !== "application-access") return { mode: null };
-    if (access.mode === "public") {
-      const url = record?.presentation?.url;
-      return {
-        mode: "public",
-        open: url ? await publicUrlReachable(url) : undefined,
-      };
-    }
-    if (!access.localPort || !access.remotePort) return { mode: "private" };
-    return {
-      mode: "private",
-      open: await privateAccessOpen(
-        applicationId,
-        access.remotePort,
-        access.localPort,
-      ),
-    };
+    const [access, server] = await Promise.all([
+      wayIn(applicationId),
+      serverBeat(applicationId),
+    ]);
+    return { ...access, server };
   });
+}
+
+async function wayIn(applicationId: string) {
+  const record = listInformation(applicationId).find(
+    (item) => item.presentation?.content?.kind === "application-access",
+  );
+  const access = record?.presentation?.content;
+  if (access?.kind !== "application-access") return { mode: null };
+  if (access.mode === "public") {
+    const url = record?.presentation?.url;
+    return {
+      mode: "public",
+      open: url ? await publicUrlReachable(url) : undefined,
+    };
+  }
+  if (!access.localPort || !access.remotePort) return { mode: "private" };
+  return {
+    mode: "private",
+    open: await privateAccessOpen(
+      applicationId,
+      access.remotePort,
+      access.localPort,
+    ),
+  };
 }
