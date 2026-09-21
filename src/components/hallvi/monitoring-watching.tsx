@@ -198,18 +198,6 @@ function verdict(look: PartLook, now: number) {
     : `Worked ${at} · counts for ${lasts(look.left)} more`;
 }
 
-function Pips({ part }: { part: WatchedPart }) {
-  return (
-    <span className="axmw-pips" aria-hidden="true">
-      {part.looks
-        .filter((look) => look.state !== "read")
-        .map((look) => (
-          <i key={look.id} data-state={look.state} />
-        ))}
-    </span>
-  );
-}
-
 const partWords = (part: WatchedPart, now: number) =>
   part.state === "never"
     ? "Never checked"
@@ -240,6 +228,15 @@ export function WatchingMap({
     )?.id,
   );
   const part = watching.parts.find((item) => item.id === picked) ?? null;
+  const rails = host ? [host, ...inside] : inside;
+  // One clock for every rail: the oldest reading on record, to now.
+  const from =
+    watching.parts
+      .flatMap((item) => item.readings.map((reading) => reading.at))
+      .sort()[0] ?? null;
+  const span = from ? Math.max(now - Date.parse(from), 1) : 1;
+  const place = (at: string) =>
+    `${Math.min(100, Math.max(0, ((Date.parse(at) - (now - span)) / span) * 100)).toFixed(2)}%`;
   const on = story.watcher?.state === "running";
   const quiet = story.watcher?.state === "stale";
 
@@ -250,7 +247,9 @@ export function WatchingMap({
           <h2 id="axmw-title">Watching</h2>
           <p>
             The parts of {story.name}, when each was last checked, and whether
-            anything keeps checking. Pick a part to see its checks.
+            anything keeps checking. Every mark is a reading on record; the
+            stretch after it is how long nobody has looked. Pick a part to see
+            its checks.
           </p>
         </div>
       </header>
@@ -291,57 +290,84 @@ export function WatchingMap({
             aria-hidden="true"
           />
           <div className="axmw-frame">
-            {host ? (
-              <button
-                type="button"
-                className="axmw-host"
-                aria-pressed={host.id === picked}
-                onClick={() => setPicked(host.id)}
-              >
-                <KindIcon kind="host" />
-                <b>Server</b>
-                <span className="axmw-id">{host.id}</span>
-                <Pips part={host} />
-                <em>{partWords(host, now)}</em>
-              </button>
-            ) : (
-              <div className="axmw-host">
-                <KindIcon kind="host" />
-                <b>Server</b>
-                <em>Never checked</em>
-              </div>
-            )}
-            <div className="axmw-parts">
-              {inside.map((item) => (
+            {/* The run of readings. One rail per part on one shared clock,
+                from the oldest reading on record to now, so what stands out
+                is the stretch nobody looked at — which is the subject of
+                this page. A part the map draws and no record states is a
+                rail that was never laid. */}
+            <div className="axmw-rails">
+              {rails.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="axmw-part"
+                  className="axmw-rail"
                   data-state={item.state}
                   aria-pressed={item.id === picked}
                   title={item.id}
                   onClick={() => setPicked(item.id)}
                 >
-                  <span className="axmw-tile">
+                  <span className="axmw-rail-name">
                     <KindIcon kind={item.kind} />
-                  </span>
-                  <b>{item.name}</b>
-                  <small>{item.kindWord}</small>
-                  <Pips part={item} />
-                  <em>{partWords(item, now)}</em>
-                  {item.watched && (
-                    <span className="axmw-badge">
-                      <Eye weight="bold" /> Watched
+                    <span>
+                      <b>{item.kind === "host" ? "Server" : item.name}</b>
+                      <small>
+                        {item.kind === "host" ? item.id : item.kindWord}
+                      </small>
                     </span>
-                  )}
+                  </span>
+                  <span className="axmw-track" aria-hidden="true">
+                    {item.lastAt && (
+                      // From the last look to now: still counting, or not.
+                      <i
+                        className="axmw-since"
+                        data-state={item.state}
+                        style={{ left: place(item.lastAt) }}
+                      />
+                    )}
+                    {item.readings.map((reading) => (
+                      <i
+                        key={`${reading.at}:${reading.title}`}
+                        className="axmw-tick"
+                        data-failed={reading.failed || undefined}
+                        style={{ left: place(reading.at) }}
+                        title={reading.title}
+                      />
+                    ))}
+                  </span>
+                  <em>
+                    {partWords(item, now)}
+                    {item.watched && (
+                      <span className="axmw-badge">
+                        <Eye weight="bold" /> Watched
+                      </span>
+                    )}
+                  </em>
                 </button>
               ))}
               {watching.ghosts.map((gap) => (
-                <div key={gap.id} className="axmw-part axmw-ghost">
-                  <b>{gap.title}</b>
-                  <small>{gap.detail}</small>
+                <div key={gap.id} className="axmw-rail axmw-ghost">
+                  <span className="axmw-rail-name">
+                    <span>
+                      <b>
+                        {gap.title.replace(" is drawn but not observed", "")}
+                      </b>
+                      <small>Drawn on the map, not observed</small>
+                    </span>
+                  </span>
+                  <span className="axmw-track axmw-unlaid" title={gap.detail}>
+                    nothing has ever observed this
+                  </span>
+                  <em>No record states it</em>
                 </div>
               ))}
+              <div className="axmw-axis" aria-hidden="true">
+                <span />
+                <span>
+                  <small>{from ? ago(from, now) : ""}</small>
+                  <small>now</small>
+                </span>
+                <span />
+              </div>
             </div>
           </div>
         </div>
