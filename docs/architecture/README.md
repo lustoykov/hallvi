@@ -16,6 +16,7 @@ Each of these is linked from the document that owns its decision.
 
 | Diagram | Owned by |
 | --- | --- |
+| [Architecture routes and connection evidence](../presentation-contract.md#5-architecture-the-state-the-page-needs) | [Presentation contract](../presentation-contract.md) |
 | [Repository workspace boundary](../architecture.md#repository-workspace-architecture) | [Architecture](../architecture.md) |
 | [Proposing a repository change](../integrations/github.md#proposing-a-change) | [GitHub](../integrations/github.md) |
 | [Development cleanup decision flow](development-cleanup-decision.html) | [Development resources](../development-resources.md) |

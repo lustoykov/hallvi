@@ -276,8 +276,9 @@
 }
 .axj2-wire {
   fill: none;
-  stroke: #d3dbe7;
-  stroke-width: 1.5;
+  stroke: #bdc9dc;
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition:
@@ -291,7 +292,7 @@
   opacity: 0.55;
 }
 .axj2-wire.is-on {
-  stroke: #c3cfe2;
+  stroke: #aabbd6;
 }
 .axj2-stage.is-planned .axj2-wire {
   stroke-dasharray: 5 5;
@@ -309,17 +310,19 @@
 }
 .axj2-glow-soft {
   stroke: #6f8ff0;
-  stroke-width: 6;
-  opacity: 0.35;
+  stroke-width: 5;
+  opacity: 0.18;
 }
 .axj2-glow-line {
   stroke: url(#axj2Light);
-  stroke-width: 2;
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
 }
 .axj2-particle {
   fill: #ffffff;
   stroke: #5f82ee;
-  stroke-width: 1.4;
+  stroke-width: 1;
+  opacity: 0.65;
 }
 .axj2-comet circle {
   fill: #5f82ee;
@@ -359,21 +362,20 @@
     filter 480ms var(--ax-ease-out);
 }
 .axj2-card:hover {
-  transform: translateY(-2px);
   box-shadow:
     0 2px 4px rgb(23 34 56 / 6%),
     0 18px 36px -18px rgb(23 34 56 / 34%);
 }
 .axj2-card:active {
-  transform: translateY(0) scale(0.985);
+  transform: none;
 }
 .axj2-card.is-compact {
   grid-template-columns: 30px minmax(0, 1fr);
   gap: 10px;
 }
 .axj2-card.is-dim {
-  opacity: 0.5;
-  filter: saturate(0.5);
+  opacity: 0.72;
+  filter: saturate(0.7);
   box-shadow: 0 1px 2px rgb(23 34 56 / 4%);
 }
 .axj2-card.is-lit {
@@ -386,19 +388,7 @@
     0 18px 36px -18px rgb(23 34 56 / 34%);
 }
 .axj2-card.is-arriving {
-  animation: axj2-arrive 700ms var(--ax-ease-out);
-}
-@keyframes axj2-arrive {
-  0% {
-    box-shadow:
-      0 0 0 0 rgb(40 90 216 / 45%),
-      0 12px 28px -18px rgb(23 34 56 / 28%);
-  }
-  100% {
-    box-shadow:
-      0 0 0 14px rgb(40 90 216 / 0%),
-      0 12px 28px -18px rgb(23 34 56 / 28%);
-  }
+  border-color: rgb(40 90 216 / 42%);
 }
 
 .axj2-card[data-c="planned"] {
@@ -424,8 +414,7 @@
 
 /* Scanning border while the re-check looks at a part. */
 .axj2-card.is-checking::after,
-.axj2-server-head.is-checking::after,
-.axj2-port.is-checking::after {
+.axj2-server-head.is-checking::after {
   content: "";
   position: absolute;
   inset: -2px;
@@ -608,80 +597,9 @@
 }
 
 /* Ports: small shields on the firewall edge. */
-.axj2-port {
-  position: absolute;
-  z-index: 3;
-  width: max-content;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 0 10px 0 9px;
-  border: 1px solid #d9e0ea;
-  border-radius: 11px;
-  background: #ffffff;
-  color: var(--ax-ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  box-shadow:
-    0 1px 2px rgb(23 34 56 / 6%),
-    0 6px 14px -8px rgb(23 34 56 / 25%);
-  transition:
-    border-color 400ms,
-    box-shadow 400ms,
-    opacity 480ms,
-    transform 320ms var(--ax-spring);
-}
-.axj2-port svg {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  color: #3e4a60;
-}
-.axj2-port em {
-  font-style: normal;
-  font-weight: 500;
-  color: var(--ax-muted);
-}
-.axj2-port:hover {
-  transform: translateY(-1px);
-}
-.axj2-port.is-lit {
-  border-color: rgb(40 90 216 / 45%);
-  box-shadow:
-    0 0 0 4px rgb(40 90 216 / 10%),
-    0 6px 14px -8px rgb(23 34 56 / 25%);
-}
-.axj2-port.is-lit svg {
-  color: var(--ax-blue);
-}
-.axj2-port.is-selected {
-  border-color: var(--ax-blue);
-}
-.axj2-port.is-dim {
-  opacity: 0.55;
-}
 /* A port that refuses: its number struck through, and the wall behind it is
    solid. It is on the map because the map is the overview — leaving it off
    had the firewall's own count referring to something nobody could see. */
-.axj2-port[data-refused] b {
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-  color: #59667b;
-}
-.axj2-port[data-refused] em {
-  color: #59667b;
-}
-.axj2-port[data-refused] {
-  background: #fcfdfe;
-}
-.axj2-port[data-c="planned"] {
-  border-style: dashed;
-  box-shadow: none;
-}
 
 /* Ghosts: what is not there, drawn where it would be. */
 .axj2-ghost {
@@ -941,8 +859,7 @@
 @media (prefers-reduced-motion: reduce) {
   .axj2-card[data-c="failed"] .axj2-icon,
   .axj2-card.is-checking::after,
-  .axj2-server-head.is-checking::after,
-  .axj2-port.is-checking::after {
+  .axj2-server-head.is-checking::after {
     animation: none !important;
   }
 }
@@ -1447,158 +1364,6 @@
   stroke-linecap: round;
 }
 
-/* ---------- The firewall: a wall of blocks with two doors ---------- */
-
-.axj2-wall {
-  fill: none;
-  stroke: #cdd5e1;
-  stroke-width: 8;
-  stroke-linecap: round;
-  stroke-dasharray: 9 12 15 12;
-}
-.axj2-jamb {
-  fill: none;
-  stroke: #aab4c5;
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-.axj2-stage.is-planned .axj2-wall {
-  stroke: #e3e8ef;
-}
-.axj2-stage.is-planned .axj2-jamb {
-  stroke: #c3ccda;
-}
-.axj2-wall-legend {
-  position: absolute;
-  z-index: 3;
-  display: grid;
-  justify-items: end;
-  gap: 1px;
-  text-align: right;
-  transform: translate(-100%, -50%);
-}
-.axj2-wall-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-right: -6px;
-  padding: 3px 6px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--ax-ink-2);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    color var(--ax-base),
-    background-color var(--ax-base);
-}
-.axj2-wall-name:hover,
-.axj2-wall-name.is-selected {
-  background: #ffffff;
-  box-shadow: 0 0 0 1px var(--ax-line-2);
-}
-.axj2-wall-name svg {
-  width: 13px;
-  height: 13px;
-}
-.axj2-wall-refused {
-  font-size: 11.5px;
-  line-height: 1.35;
-  white-space: nowrap;
-  color: #a0706b;
-  transition: opacity 480ms;
-}
-.axj2-wire-ssh {
-  fill: none;
-  stroke: #aab4c5;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.axj2-stage:not([data-journey="visit"]) .axj2-wall-refused {
-  opacity: 0.4;
-}
-.axj2-stage.is-touring[data-journey="visit"] .axj2-wall-refused {
-  animation: axj2-refuse 520ms 480ms var(--ax-ease-out);
-}
-@keyframes axj2-refuse {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  25% {
-    translate: -4px 0;
-  }
-  50% {
-    translate: 3px 0;
-  }
-  75% {
-    translate: -1px 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .axj2-wall-refused {
-    animation: none !important;
-  }
-}
-:root[data-ax-motion="reduced"] .axj2-wall-refused {
-  animation: none !important;
-}
-
-/* Doors: two lines, the port and what it carries, then who may use it. */
-/* A port pill is as wide as its words, between the slot the design gave it
-   and a cap that keeps it out of the application beside it. `sources` is
-   Pi's own phrase — "anywhere", "the container network" — and pinning the
-   pill to one width had the longer ones spill out of their own border. */
-.axj2-port-text {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-  text-align: left;
-  line-height: 1.15;
-}
-.axj2-port-text b,
-.axj2-port-text em {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.axj2-port-text b {
-  font-size: 12.5px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-.axj2-port-text small {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--ax-muted);
-}
-.axj2-port-text em {
-  font-size: 11px;
-}
-
-/* "no HTTPS" hangs from door 80 as a tab, under the door. */
-.axj2-ghost.axj2-ghost-tls {
-  z-index: 2;
-  gap: 4px;
-  padding: 1px 8px 0;
-  border-top: 0;
-  border-radius: 0 0 8px 8px;
-  font-size: 10.5px;
-}
-.axj2-wall-label {
-  position: absolute;
-  z-index: 2;
-  transform: translateY(-50%);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  color: #56627a;
-}
-
 /* The report's headline, above the verdict. */
 .axj3-report-say {
   display: grid;
@@ -1636,4 +1401,101 @@
 }
 .axj2-status[data-tight] {
   gap: 0;
+}
+
+/* Endpoint labels sit in routing lanes, never on the server boundary. */
+.axj2-edge-label {
+  position: absolute;
+  z-index: 2;
+  color: #52627d;
+  background: #f8faff;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 2px 5px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.axj2-connections {
+  margin: 20px 24px 36px;
+  color: var(--ax-ink, #202838);
+  max-width: 1120px;
+}
+.axj2-connections h3 {
+  margin: 24px 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.axj2-connections p {
+  color: #52627d;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 8px 0 12px;
+}
+.axj2-connection,
+.axj2-connection-check summary {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.3fr) minmax(170px, 1fr) minmax(
+      140px,
+      1fr
+    );
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid #e7e9ee;
+  padding: 12px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.axj2-connection > span:first-child {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.axj2-connection svg {
+  flex-shrink: 0;
+}
+.axj2-connection small,
+.axj2-connection-check small {
+  color: #52627d;
+  font-size: 11px;
+}
+.axj2-connection-check summary {
+  grid-template-columns:
+    minmax(80px, 0.5fr) minmax(180px, 1fr) minmax(170px, 1fr)
+    minmax(120px, 0.7fr);
+  cursor: pointer;
+}
+.axj2-connection-check summary:hover {
+  background: #f8faff;
+}
+.axj2-connection-check summary:focus-visible {
+  outline: 2px solid #285ad8;
+  outline-offset: 4px;
+}
+.axj2-connection-check summary b::before {
+  content: "+";
+  display: inline-block;
+  width: 20px;
+  color: #687183;
+}
+.axj2-connection-check[open] summary b::before {
+  content: "−";
+}
+.axj2-connection-check .ax-textlink {
+  margin-bottom: 12px;
+}
+@media (max-width: 700px) {
+  .axj2-connections {
+    margin: 16px 12px 28px;
+  }
+  .axj2-connection,
+  .axj2-connection-check summary {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+.axj2-connection-check summary b small {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
 }
