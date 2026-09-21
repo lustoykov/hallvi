@@ -475,6 +475,27 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 - Automatic work says “automatic” in origin lines and Recent changes; work a person started names its conversation.
 - Times render in the reader’s zone through `LocalTime`; a schedule states its own timezone next to the time.
 
+### Calm by default
+
+Decided 21 September 2026, after the owner found the pages made him "feel
+paranoid": three of Overview's four lanes read "Out of date" in amber on an
+application with nothing wrong.
+
+- **An old pass is a pass.** It draws neutral with its date ("Held · last
+  checked 19 h ago"), never amber, and no sentence says it "may have changed".
+- **Hallvi re-asks, the owner does not.** The pulse (`pulse.tsx`,
+  `src/server/pulse.ts`) asks the application's address and the server's SSH
+  whenever an application is open. What just answered is green and says
+  "now". What was asked and said nothing is the one aged thing worth amber.
+- **Not set up is an offer, not an alarm.** No backups, no firewall read, no
+  watcher, Hallvi's own records not copied: each is stated once, plainly, with
+  the question that would change it. Storage draws no "stays behind" wall
+  unless a plan exists and leaves that data out.
+- **Amber means somebody is needed.** Pi's own `warning` on a record, a
+  decision waiting, a watch gone quiet, a backup that was promised and is
+  overdue. Red is a check that ran and failed. If a page shows more than one
+  or two amber marks on a healthy application, the page is wrong.
+
 ### The register
 
 Chosen 21 September 2026 from the ten-directions exploration (direction F), and

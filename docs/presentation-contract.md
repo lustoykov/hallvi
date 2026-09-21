@@ -164,8 +164,20 @@ different records — that is what keeps `establishedAt` meaningful.
 | recorded outcome | Deployment's check list, History | no — keeps passed, failed, noted |
 | evidence about now | Architecture's part tag, Overview's lanes | yes — per claim |
 
-Ageing never turns green into red. Stale is amber and says it may have
-changed; only a check that ran and failed is red.
+Ageing never turns green into red, and since 21 September 2026 it does not
+turn it amber either. A pass that has aged past its horizon is still a pass:
+it draws neutral, with its date. A quiet application is not a neglected one,
+and a page of amber taught owners to expect problems that were not there.
+
+What re-asks is the **pulse**, not the reader. While an application is open
+the controller asks two things on its own, every thirty seconds and with no
+Pi run: whether the application's address answers, and whether the server
+accepts SSH (`src/server/pulse.ts`, the command is `true`). It writes no
+record. Where the pulse asks the same question an aged reading asked, that
+reading is current again and draws green, "answered just now"; where the
+pulse asked and got nothing, that is amber. Amber is otherwise kept for what
+needs the owner: Pi's own `warning`, a decision waiting, a watch gone quiet.
+Only a check that ran and failed is red.
 
 A claim we cannot age — no `claim` on the item, or nothing established — reads
 as **recorded**, not as verified. A missing input renders unknown, never
