@@ -17,7 +17,7 @@ screens. An agent's rehearsal does not complete that acceptance step.
 3. Choose a dedicated test server: either a new server in a separate Hetzner
    project or an existing machine with no valuable data. Read the contextual
    access explanation and choose the permission mode you want. The
-   [beta precautions](../README.md#beta-safety) explain the current limits.
+   [beta precautions](beta-safety.md) explain the current limits.
 4. Let Hallvi deploy it and open the private application link. Do something
    meaningful in the app: for example, save a bookmark in a bookmark manager.
    Record enough non-sensitive detail to recognize that exact item later.
