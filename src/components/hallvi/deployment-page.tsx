@@ -16,11 +16,13 @@
 import { useMemo } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
+import type { DeploymentStatus } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import { DeploymentSource } from "./deployment-source";
 import { releasesFromRecords } from "./release-records";
 import { ReleasesPanel } from "./releases-panel";
 import { EmptySketch } from "./empty-sketch";
@@ -30,6 +32,7 @@ export function DeploymentPage({
   records,
   executions,
   applicationName,
+  source,
   now,
   reachable = "checking",
   onReopen,
@@ -41,6 +44,17 @@ export function DeploymentPage({
   records: SavedInformation[];
   executions: ExecutionRecord[];
   applicationName: string;
+  /**
+   * How it deploys and what the branch watch has seen. Absent where the page
+   * is drawn from invented records, which have no worker behind them.
+   */
+  source?: {
+    applicationId: string;
+    repositoryUrl: string;
+    deployment: DeploymentStatus;
+    onChanged?: () => void;
+    onOpenConversation?: () => void;
+  };
   now: number;
   /** Whether a private way in still answers; see PageHead. */
   reachable?: Reachability;
@@ -126,6 +140,12 @@ export function DeploymentPage({
             Every release Hallvi has recorded for this application, newest
             first, with the commands that produced it.
           </Lede>
+        )}
+        {/* Where releases come from, above what is running. Before the first
+            release it appears only once the owner has chosen, so an empty
+            page stays one sentence and one button. */}
+        {source && (hasReleases || source.deployment.mode) && (
+          <DeploymentSource {...source} now={now} />
         )}
         {hasReleases ? (
           <ReleasesPanel

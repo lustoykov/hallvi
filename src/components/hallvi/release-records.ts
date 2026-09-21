@@ -22,6 +22,7 @@
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
+import { releaseOutcome } from "@/server/release-outcome";
 
 import {
   clip,
@@ -97,22 +98,6 @@ export interface ReleaseView {
   } | null;
 }
 
-function outcomeOf(record: SavedInformation): Release["outcome"] {
-  const status = record.presentation?.status;
-  const checks = record.presentation?.checks ?? [];
-  if (status === "failed" || checks.some((check) => check.status === "failed"))
-    return "failed";
-  // A release is running because something checked, not because a record was
-  // written. `verified` with no check behind it is still Pi's own judgement
-  // and counts; a record with neither says only that an attempt happened.
-  if (
-    status === "verified" ||
-    checks.some((check) => check.status === "passed")
-  )
-    return "deployed";
-  return "attempted";
-}
-
 export function releasesFromRecords(
   records: SavedInformation[],
   applicationId: string,
@@ -132,7 +117,7 @@ export function releasesFromRecords(
         server: content.server,
         changes: content.changes ?? [],
         note: record.body?.trim() ?? "",
-        outcome: outcomeOf(record),
+        outcome: releaseOutcome(record),
         checks: (record.presentation?.checks ?? []).map((check) => ({
           label: check.label,
           passed: check.status === "passed",

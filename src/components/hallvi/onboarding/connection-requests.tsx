@@ -16,10 +16,12 @@ import {
   type ReactNode,
 } from "react";
 
+import type { DeploymentStatus } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ConnectionRequest } from "@/server/connection-requests";
 
 import { directAddress, ReachLadder, type Reach } from "./access-card";
+import { DeploymentChoice } from "./deployment-choice";
 import { DomainConnect, type DomainProgress } from "./domain-connect";
 import { HostRequest, type ConnectedHost } from "./host-request";
 import type { JourneyFacts } from "./journey-rail";
@@ -50,6 +52,7 @@ interface Held {
   hostAddress: string | null;
   hetznerConnected: boolean;
   publicKey: string;
+  deployment?: DeploymentStatus;
 }
 
 function transportFor(applicationId: string): OnboardingTransport {
@@ -313,6 +316,44 @@ export function useConnectionRequests({
       );
   }
 
+  // Asked once, during the first deployment; afterwards it is the receipt of
+  // what was chosen, and Deployment is where it changes.
+  const { deployment } = held;
+  if (deployment?.askedAt)
+    place(
+      deployment.askedAt,
+      <DeploymentChoice
+        key="deployment"
+        application={application}
+        deployment={deployment}
+        permission={held.mode}
+        onChoose={async (choice) => {
+          const response = await fetch(
+            `/api/applications/${applicationId}/deployment`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "choose", choice }),
+            },
+          );
+          const saved = (await response.json().catch(() => null)) as
+            (DeploymentStatus & { error?: string }) | null;
+          if (!response.ok || !saved)
+            throw new Error(saved?.error ?? "Hallvi could not save that.");
+          void read();
+          onTell(
+            choice.mode === "automatic"
+              ? `Deploy automatically when ${choice.branch} changes. ${
+                  saved.watching
+                    ? `Hallvi has read ${choice.branch} from GitHub and is watching it.`
+                    : "The choice is saved, but GitHub has not answered for that branch yet, so check deployment_settings before saying it is active."
+                } Please carry on with the first deployment from ${choice.branch}.`
+              : `Deploy only when I ask, from ${choice.branch}. Please carry on with the first deployment from ${choice.branch}.`,
+          );
+        }}
+      />,
+    );
+
   const hostRequest = held.requests.find((request) => request.kind === "host");
   const journey: JourneyFacts = {
     read:
@@ -334,6 +375,8 @@ export function useConnectionRequests({
     at: (messageId: string) => cards.get(messageId) ?? null,
     /** Cards whose asking message is not in this transcript. */
     rest: cards.get(null) ?? null,
-    waiting: held.requests.filter((request) => !request.settledAt).length,
+    waiting:
+      held.requests.filter((request) => !request.settledAt).length +
+      (deployment?.askedAt && !deployment.mode ? 1 : 0),
   };
 }

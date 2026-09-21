@@ -1,5 +1,6 @@
 import { controllerProtectionFacts } from "./controller-protection";
 import { chatSnapshot } from "./pi-conversation";
+import { deploymentStatus } from "./deployment-automation";
 import { listExecutions } from "./operator-execution";
 import { listSecrets } from "./application-secrets";
 import { listInformation } from "./saved-information";
@@ -60,6 +61,7 @@ export async function getOperatorView(
       (r) => r.presentation,
     ),
     secrets: listSecrets(application.id),
+    deployment: deploymentStatus(application.id),
     // Hallvi's own protection is the same fact for every application:
     // read from the controller's records, not from this application's.
     facts: { controllerProtection: controllerProtectionFacts() },

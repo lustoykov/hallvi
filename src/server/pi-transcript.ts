@@ -15,9 +15,17 @@ import type { ChatMessage } from "./types";
 
 /** Every message handed to Pi carries the id its sender gave it. */
 export const MESSAGE_TAG = "hallviMessageId";
+/**
+ * A message Hallvi sent itself, such as the branch watch waking Pi to deploy.
+ * The id says so, because Pi's history is the only record of a message and
+ * such a message must never read as the owner's own words.
+ */
+export const WAKEUP_PREFIX = "wakeup:";
 export const tagOf = (message: unknown) =>
   (message as Record<string, unknown> | undefined)?.[MESSAGE_TAG] as
     string | undefined;
+const sourceOf = (message: unknown): "hallvi" | "user" =>
+  tagOf(message)?.startsWith(WAKEUP_PREFIX) ? "hallvi" : "user";
 
 /**
  * One of Pi's tool calls, as Pi recorded it: where it sits, what it was, and
@@ -265,7 +273,7 @@ export function projectTranscript(
         chatId,
         role: "user",
         body: textOf(message.content),
-        source: "user",
+        source: sourceOf(message),
         status: "delivered",
         createdAt: at(message.timestamp ?? entry.timestamp),
         revision: 0,
@@ -329,7 +337,7 @@ export function projectTranscript(
       chatId,
       role: "user",
       body: textOf((item.message as { content: unknown }).content),
-      source: "user",
+      source: sourceOf(item.message),
       status: "waiting",
       delivery: item.kind === "steer" ? "steer" : "next",
       createdAt: at((item.message as { timestamp?: number }).timestamp),
