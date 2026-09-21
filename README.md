@@ -1,5 +1,9 @@
 # Hallvi
 
+<p align="center">
+  <img src="docs/assets/hallvi-mascot.svg" alt="Hallvi, the smiling little server mascot, holding a wrench" width="132" />
+</p>
+
 **The agent for self-hosted software.** Hallvi helps you deploy an application
 stack on a server you control, understand what is running, and operate it
 through a conversation. The goal is to make owning your software practical
