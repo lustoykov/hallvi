@@ -16,7 +16,13 @@ SHA-256 file before changing the installed program.
 
 ## Download
 
-Take one file from
+**There is no published release yet.** The script below can discover and
+install Hallvi only after the first signed release is published. Until then,
+use a maintainer-supplied archive, checksum and installer as described in
+[Installing an exact archive](#installing-an-exact-archive). You do not need a
+source checkout for either path.
+
+Once a signed release is published, take one file from
 [github.com/lustoykov/hallvi/releases](https://github.com/lustoykov/hallvi/releases)
 — `install-hallvi.sh` — and run it:
 
@@ -89,9 +95,11 @@ source-plus-compile archive and do not certify a new prebuilt archive.
    sh ./install-hallvi.sh
    ```
 
-   Run as your normal logged-in user, without `sudo`. It finds the newest
-   release, checks it against the signed manifest, and reports service,
-   interface and worker readiness.
+   Run as your normal logged-in user, without `sudo`. This command requires a
+   published release. Before the first release, put the three matching files
+   from [Installing an exact archive](#installing-an-exact-archive) in this
+   directory and pass the archive to the script instead. The installer reports
+   service, interface and worker readiness.
 
 2. Open Hallvi:
 
