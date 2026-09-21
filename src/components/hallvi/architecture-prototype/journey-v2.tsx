@@ -1,12 +1,7 @@
 "use client";
 
-// PROTOTYPE · claude/architecture-directions · throwaway.
-// Direction A, third pass: Journeys. A visit, your data and a release travel
-// through one server, drawn as crafted cards on a quiet canvas; stops light
-// up as the light passes and open their details beside themselves. The header
-// keeps the way back and Open, then comes the map, with what is not set up
-// drawn where it would go. Hallvi's report lives on Overview, which
-// shares this map's shape in miniature.
+// Architecture journeys drawn from saved topology and connection evidence.
+// The original visual direction is preserved; routes follow recorded parts.
 
 import {
   ArrowRight,
@@ -96,27 +91,12 @@ const placer = (height: number) => ({
     top: pct(y - TOP, height),
   }),
 });
-const { place, point } = placer(H);
-
-/**
- * The firewall's wall: where it starts, where it stops, and the two doorways
- * the journeys pass through. Those two are drawn whether or not a door has
- * been recorded in them — they are the shape of the server's edge, not a
- * claim about its rules, and the visit and the release cross the boundary
- * through them either way.
- */
-const WALL_TOP = 146;
-const WALL_BOTTOM = 510;
-const JOURNEY_DOORS: [number, number][] = [
-  [280, 320],
-  [362, 402],
-];
 
 const BOX: Record<string, Rect> = {
   source: { x: 24, y: 96, w: 172, h: 96 },
   controller: { x: 24, y: 264, w: 172, h: 84 },
-  server: { x: 262, y: 80, w: 616, h: 452 },
-  header: { x: 262, y: 80, w: 616, h: 54 },
+  server: { x: 262, y: 80, w: 640, h: 452 },
+  header: { x: 262, y: 80, w: 640, h: 54 },
   private: { x: 566, y: 206, w: 292, h: 170 },
   shelf: { x: 290, y: 398, w: 568, h: 114 },
   // Wider than the original 196: `paperless-webserver` is an ordinary
@@ -136,354 +116,170 @@ const BOX: Record<string, Rect> = {
 
 interface Layout {
   rects: Record<string, Rect>;
-  /** The firewall, drawn around whatever doors this map has. */
-  wall: { wall: string; jamb: string };
-  /** Ports on record the wall had no room for, so the count can say so. */
-  undrawnGates: number;
-  /** The canvas height this model needs, in the same units as the boxes. */
   height: number;
   legs: Record<JourneyId, string[][]>;
   wires: { d: string; journey: JourneyId }[];
+  labels: { x: number; y: number; text: string }[];
   stops: Record<JourneyId, string[]>;
 }
 
-/**
- * Stacks n boxes down a band, or lays them along a row, keeping the single
- * case exactly where the design put it.
- */
-function share(
-  count: number,
-  span: { start: number; end: number },
-  thickness: number,
-  gap = 12,
-) {
-  if (count < 1) return [];
-  const room = span.end - span.start;
-  // The floor is what a name and its reading-dot need, not an arbitrary
-  // small number. Below it the box stops being a box with a label in it.
-  const size = Math.min(
-    thickness,
-    Math.max(46, (room - gap * (count - 1)) / count),
-  );
-  const step = size + gap;
-  const used = size * count + gap * (count - 1);
-  const start = span.start + Math.max(0, (room - used) / 2);
-  return Array.from({ length: count }, (_, index) => ({
-    at: start + index * step,
-    size,
-  }));
-}
-
+/** Recorded routes and generous routing lanes; probes are listed separately. */
 function layoutFor(model: ArchitectureModel): Layout {
-  // Every backing service, not the first one. Paperless runs PostgreSQL *and*
-  // Valkey; Plausible runs PostgreSQL and ClickHouse. Drawing one of them and
-  // saying nothing about the other is the map claiming a shape the records
-  // contradict, which is the one thing this page must never do.
   const services = model.parts.filter((part) => part.kind === "private");
   const volumes = model.parts.filter((part) => part.kind === "volume");
+  const gateways = model.parts.filter(
+    (part) =>
+      (part.kind === "gate" || part.kind === "tls") &&
+      model.edges.some((edge) => edge.from === part.id || edge.to === part.id),
+  );
+  const appY = 190 + gateways.length * 120;
+  const shelfY = Math.max(appY + 150, appY + services.length * 108 + 48);
+  const rows = Math.ceil(volumes.length / 2);
+  const shelfHeight = Math.max(114, 36 + rows * 108);
   const rects: Record<string, Rect> = {
-    source: BOX.source,
-    controller: BOX.controller,
+    source: { ...BOX.source, y: 176 },
+    controller: { ...BOX.controller, y: appY },
     host: BOX.header,
-    app: BOX.app,
-    offsite: BOX.offsite,
-    "gate:http": BOX.http,
-    "gate:ssh": BOX.ssh,
-    tls: { x: 222, y: 315, w: 80, h: 17 },
+    app: { ...BOX.app, y: appY },
+    private: {
+      x: 596,
+      y: appY - 34,
+      w: 262,
+      h: Math.max(126, services.length * 108 + 22),
+    },
+    shelf: { ...BOX.shelf, y: shelfY, h: shelfHeight },
+    offsite: { ...BOX.offsite, y: shelfY + 36 },
+    server: { ...BOX.server, h: shelfY + shelfHeight + 20 - BOX.server.y },
   };
-  // One service sits exactly where the design drew it; several share the
-  // zone, which reaches down to just above the disk shelf to make room —
-  // two full-height cards fit in it exactly.
-  rects.private =
-    services.length > 1 ? { ...BOX.private, h: 186 } : BOX.private;
-  const serviceRows =
-    services.length === 1
-      ? [{ at: BOX.svc.y, size: BOX.svc.h }]
-      : share(
-          services.length,
-          // Below the zone's own label, down to just inside its bottom edge.
-          { start: 236, end: rects.private.y + rects.private.h - 4 },
-          BOX.svc.h,
-          6,
-        );
-  services.forEach((service, index) => {
-    rects[service.id] = {
-      // Wider than the design's single-service slot, because three of them
-      // share the zone and a name that wraps is a name that leaves its box.
-      // The zone runs 566..858; this leaves the same margin on both sides.
-      x: services.length > 1 ? BOX.private.x + 14 : BOX.svc.x,
-      y: serviceRows[index].at,
-      w: services.length > 1 ? BOX.private.w - 28 : BOX.svc.w,
-      h: serviceRows[index].size,
+  gateways.forEach((part, index) => {
+    rects[part.id] = {
+      x: BOX.app.x,
+      y: 166 + index * 120,
+      w: BOX.app.w,
+      h: 76,
     };
   });
-  // Every door on record gets a place on the wall.
-  //
-  // Two of them keep the slots the design drew, because the journeys pass
-  // through them: the way a visit comes in, and the way Hallvi delivers. The
-  // rest stack up the wall above those, rather than landing on top of the
-  // first one and leaving React to report the duplicate key instead of the
-  // hidden port — which is what happened to `postgres` on 5432.
-  const gates = model.parts.filter(
-    (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
+  services.forEach((part, index) => {
+    rects[part.id] = { x: 610, y: appY + index * 108, w: 234, h: 76 };
+  });
+  const ordered = [...volumes].sort(
+    (a, b) => Number(b.owner === "app") - Number(a.owner === "app"),
   );
-  // Every port on record is drawn, including one that refuses.
-  //
-  // This page is the overview, and a port it leaves out is a port the reader
-  // has no way to know about — which is the same fault as the unnamed server
-  // and the missing watcher. A refused port was briefly dropped here on the
-  // grounds that nothing travels through it, and that left the firewall's own
-  // label counting a thing the picture could not account for.
-  //
-  // What was actually wrong is that it was drawn as a peer of a port that
-  // answers, and the only thing telling the two apart was a missing gap in a
-  // dashed line. So it is drawn and it says `refused` in as many words, with
-  // its number struck through and the wall solid behind it.
-  const spare = gates.filter(
-    (gate) => gate.id !== "gate:http" && gate.id !== "gate:ssh",
-  );
-  // Stacked up the wall above the visit's door, in the clear band between the
-  // server's header and the application. They share the band rather than
-  // marching off the top of it: a port that does not fit is a port silently
-  // dropped, and the count below says so when one is.
-  // Stops short of the application, whose card begins at 262: at 268 the
-  // lowest of them overlapped its top-left corner, and the wire leaving it
-  // ran across the card's own edge.
-  const band = { start: WALL_TOP + 6, end: BOX.app.y - 2 };
-  const step = BOX.http.h + 10;
-  const room = Math.max(0, Math.floor((band.end - band.start + 10) / step));
-  const placed = spare.slice(0, room);
-  const undrawn = spare.length - placed.length;
-  placed.forEach((gate, index) => {
-    rects[gate.id] = {
-      ...BOX.http,
-      y: band.end - BOX.http.h - index * step,
-      h: BOX.http.h,
+  ordered.forEach((part, index) => {
+    const lastAlone = index === ordered.length - 1 && index % 2 === 0;
+    rects[part.id] = {
+      x: lastAlone ? 444 : 302 + (index % 2) * 280,
+      y: shelfY + 36 + Math.floor(index / 2) * 108,
+      w: 264,
+      h: 68,
     };
   });
-  for (const gate of spare.slice(room)) delete rects[gate.id];
-  // A monitor Pi recorded takes the place the placeholder would have had, so
-  // "something is watching this" is visible rather than merely not-missing.
   const monitor = model.parts.find(
     (part) => part.kind === "monitor" && !part.id.startsWith("gap:"),
   );
   if (monitor) rects[monitor.id] = BOX.watch;
-
-  // Volumes keep the design's two slots while they fit it: the application's
-  // data under the application, its service's under the service. Beyond that
-  // they share the shelf in owner order, and the wire says whose each is.
-  const ownerOf = (volume: Part) =>
-    volume.owner && rects[volume.owner] ? volume.owner : undefined;
-  const appVolumes = volumes.filter(
-    (volume) =>
-      ownerOf(volume) === "app" || (!ownerOf(volume) && volumes.length === 1),
-  );
-  const rest = volumes.filter((volume) => !appVolumes.includes(volume));
-  const ordered = [...appVolumes, ...rest];
-  const classic =
-    appVolumes.length <= 1 &&
-    rest.length <= 1 &&
-    rest.every((volume) => ownerOf(volume) === services[0]?.id);
-  if (classic) {
-    if (appVolumes[0]) rects[appVolumes[0].id] = BOX.appVol;
-    if (rest[0]) rects[rest[0].id] = BOX.svcVol;
-  } else {
-    // Wrapped, not squeezed.
-    //
-    // Four data locations in one row made each box 124 wide in a 1120-wide
-    // space — about 105px on a 1280 screen — and the names an upstream
-    // Compose file uses are longer than that. The box shrank, the text did
-    // not, and every one of them rendered as `paperless…`.
-    //
-    // Two rows of two beats one row of four for the same reason: a name that
-    // has to be read whole needs width, and there is more width in the shelf
-    // than there is room for a fifth column.
-    const perRow = Math.min(3, Math.max(1, Math.ceil(ordered.length / 2)));
-    const rows = Math.ceil(ordered.length / perRow);
-    // Above the threshold that drops a card to one clamped line: these
-    // names are long and a wrapped one is worth more vertical space than a
-    // cut one is worth saving.
-    const rowHeight = rows > 1 ? 68 : BOX.appVol.h;
-    const rowGap = 10;
-    // The shelf grows to hold its rows rather than letting them out of it.
-    const label = 36;
-    const needed = label + rows * rowHeight + (rows - 1) * rowGap + 12;
-    rects.shelf =
-      needed > BOX.shelf.h ? { ...BOX.shelf, h: needed } : BOX.shelf;
-    ordered.forEach((volume, index) => {
-      const row = Math.floor(index / perRow);
-      const inRow = Math.min(perRow, ordered.length - row * perRow);
-      const columns = share(inRow, { start: 302, end: 846 }, 268, 16);
-      rects[volume.id] = {
-        x: columns[index % perRow].at,
-        y: rects.shelf.y + label + row * (rowHeight + rowGap),
-        w: columns[index % perRow].size,
-        h: rowHeight,
-      };
-    });
-  }
-  rects.shelf = rects.shelf ?? BOX.shelf;
-  // The server card contains the shelf, and the canvas contains the server.
-  // Both follow it down rather than clipping it.
-  const grew = Math.max(
-    0,
-    rects.shelf.y + rects.shelf.h + 20 - (BOX.server.y + BOX.server.h),
-  );
-  rects.server = { ...BOX.server, h: BOX.server.h + grew };
-  rects.host = BOX.header;
-  const height = H + grew;
-
-  // A wire from a port to what it leads to, when a record says which.
-  //
-  // Only for the doors stacked up the wall: the two the design gives slots to
-  // already sit on a journey line — the visit runs through the http door at
-  // y=300, the release through the ssh one — so wiring those again would draw
-  // the same path twice.
-  //
-  // And only for a port that admits. What a refused port would have reached
-  // is in its inspector; a line from it would draw a route nothing has ever
-  // travelled, which is the opposite of what its own check says.
-  const served = placed
-    .filter(
-      (gate) =>
-        gate.admits !== "refused" &&
-        gate.serves &&
-        rects[gate.id] &&
-        rects[gate.serves],
+  const centre = (r: Rect) => r.x + r.w / 2;
+  const middle = (r: Rect) => r.y + r.h / 2;
+  const visit: string[] = [];
+  const labels: Layout["labels"] = [];
+  const stops = new Set<string>();
+  for (const edge of model.edges) {
+    if (edge.network === "disk") continue;
+    const from = rects[edge.from];
+    const to = rects[edge.to];
+    if (!from || !to || edge.to === "host") continue;
+    const origin = model.byId[edge.from];
+    if (origin?.kind === "gate" && origin.admits === "refused") continue;
+    if (
+      origin?.kind === "source" &&
+      origin.facts.some((fact) => fact.label === "Revision")
     )
-    .map((gate) => {
-      const from = rects[gate.id];
-      const to = rects[gate.serves!];
-      const y = from.y + from.h / 2;
-      return `M${from.x + from.w} ${y}H${to.x + to.w / 2}V${to.y}`;
-    });
-
-  const visitEnd = services.length ? BOX.svc.x : BOX.app.x;
-  // Where a journey in from outside begins.
-  //
-  // It used to begin at 196 — the right edge of the left-hand column —
-  // whether or not anything had been drawn in that column. A map whose
-  // records name no controller therefore had a line arriving out of blank
-  // canvas, which reads as a piece the page forgot to draw rather than as
-  // traffic from elsewhere. When nothing is drawn out there, the journey
-  // starts at the boundary it actually crosses: the firewall, at the server's
-  // own edge, where the wall already has a door drawn in it.
-  const column = BOX.controller.x + BOX.controller.w;
-  const outside = BOX.server.x;
-  const visitMain = `M${model.byId.controller ? column : outside} 300H${visitEnd}`;
-  // A volume's wire starts at whatever mounts it and ends at wherever it was
-  // placed, so ownership survives the shelf being shared.
-  const centre = (rect: Rect) => rect.x + rect.w / 2;
-  const visitBranches = ordered
-    .map((volume) => {
-      const owner = rects[ownerOf(volume) ?? "app"] ?? BOX.app;
-      const from = centre(owner);
-      const to = centre(rects[volume.id]);
-      const top = owner.y + owner.h;
-      const landing = rects[volume.id].y;
-      // The elbow sits just above whatever row the volume ended up on.
-      const elbow = rects.shelf.y - 6;
-      return Math.abs(from - to) < 2
-        ? `M${from} ${top}V${landing}`
-        : `M${from} ${top}V${elbow}H${to}V${landing}`;
-    })
-    .filter((d): d is string => Boolean(d));
-  const dataStart = ordered.length ? centre(rects[ordered[0].id]) : 710;
-  // Out of the first row, at its middle, rather than at a y the shelf may
-  // no longer occupy.
-  const dataY = ordered.length
-    ? rects[ordered[0].id].y + rects[ordered[0].id].h / 2
-    : 464;
-  const dataMain =
-    model.byId.offsite && ordered.length
-      ? `M${dataStart} ${dataY}H${rects.offsite.x}`
-      : null;
-  const releaseMain = !model.byId.app
-    ? null
-    : model.byId.source || model.byId.controller
-      ? `M110 ${model.byId.source ? BOX.source.y + BOX.source.h : BOX.controller.y + BOX.controller.h}V368Q110 382 124 382H372Q386 382 386 368V346`
-      : // Same rule as the visit: with nothing drawn in the left column, the
-        // release comes in through the boundary rather than out of nowhere.
-        `M${outside} 382H372Q386 382 386 368V346`;
-  // The fork leaves the release's own run along y=382 to reach a backing
-  // service. Without that run there is nothing to leave, and drawing it
-  // anyway left an elbow on the canvas joined to nothing at either end.
-  const releaseFork =
-    releaseMain && services.length ? "M386 382H652Q666 382 666 368V338" : null;
-  const legs: Record<JourneyId, string[][]> = {
-    visit: [[visitMain], served, visitBranches].filter((leg) => leg.length),
-    data: dataMain ? [[dataMain]] : [],
-    release: [
-      releaseMain ? [releaseMain] : [],
-      releaseFork ? [releaseFork] : [],
-    ].filter((leg) => leg.length),
-  };
-  const wires = (Object.keys(legs) as JourneyId[]).flatMap((journey) =>
-    legs[journey].flat().map((d) => ({ d, journey })),
-  );
-  // The wall is solid except where a drawn door opens it.
-  // The wall opens where a door admits and stays shut behind one that
-  // refuses, which is the structural half of the distinction — the word on
-  // the card is the other half. A port nobody has checked still opens it:
-  // leaving it shut would say it refuses, which is a claim no record made.
-  const openings = [
-    ...JOURNEY_DOORS,
-    ...placed
-      .filter((gate) => gate.admits !== "refused" && rects[gate.id])
-      .map(
-        (gate) =>
-          [rects[gate.id].y - 4, rects[gate.id].y + rects[gate.id].h + 4] as [
-            number,
-            number,
-          ],
-      ),
-  ].sort((a, b) => a[0] - b[0]);
-  const bottom = Math.max(WALL_BOTTOM, rects.server.y + rects.server.h - 22);
-  let cursor = WALL_TOP;
-  const segments: string[] = [];
-  for (const [from, to] of openings) {
-    if (from > cursor) segments.push(`M262 ${cursor}V${from}`);
-    cursor = Math.max(cursor, to);
+      continue;
+    // A host-to-service private edge describes placement, not traffic.
+    if (
+      edge.from === "host" &&
+      edge.network !== "loopback" &&
+      edge.network !== "public"
+    )
+      continue;
+    let d: string;
+    let label: { x: number; y: number };
+    if (edge.from === "host") {
+      d = `M${BOX.server.x} ${middle(to)}H${to.x}`;
+      label = { x: BOX.server.x + 4, y: middle(to) - 12 };
+    } else if (from.x === to.x && to.y >= from.y + from.h) {
+      d = `M${centre(from)} ${from.y + from.h}V${to.y}`;
+      label = { x: centre(from) + 12, y: (from.y + from.h + to.y) / 2 };
+    } else if (to.x >= from.x + from.w) {
+      const lane = (from.x + from.w + to.x) / 2;
+      d = `M${from.x + from.w} ${middle(from)}H${lane}V${middle(to)}H${to.x}`;
+      label = { x: from.x + from.w + 8, y: middle(from) - 12 };
+    } else {
+      const lane = Math.min(from.x, to.x) - 18;
+      d = `M${from.x} ${middle(from)}H${lane}V${middle(to)}H${to.x}`;
+      label = { x: lane + 8, y: (middle(from) + middle(to)) / 2 };
+    }
+    visit.push(d);
+    stops.add(edge.from);
+    stops.add(edge.to);
+    // Detailed labels on short service links belong in the connection list.
+    if (edge.label && (edge.from === "source" || from.x === to.x))
+      labels.push({ ...label, text: edge.label });
   }
-  if (bottom > cursor) segments.push(`M262 ${cursor}V${bottom}`);
-  const wall = {
-    wall: segments.join(""),
-    jamb: openings
-      .flatMap(([from, to]) => [`M255 ${from}H269`, `M255 ${to}H269`])
-      .join(""),
+  const disk = ordered.flatMap((volume) => {
+    const owner = volume.owner && rects[volume.owner];
+    if (!owner) return [];
+    const target = rects[volume.id];
+    const row = Math.floor(ordered.indexOf(volume) / 2);
+    const laneY = row === 0 ? shelfY - 20 : shelfY + row * 108 + 16;
+    if (volume.owner === "app")
+      return [
+        `M${centre(owner)} ${owner.y + owner.h}V${laneY}H${centre(target)}V${target.y}`,
+      ];
+    // Leave a backing service sideways: dropping out of PostgreSQL would
+    // cut through Redis below it. Enter each storage row through its gap.
+    return [
+      `M${owner.x + owner.w} ${middle(owner)}H880V${laneY}H${centre(target)}V${target.y}`,
+    ];
+  });
+  const copies =
+    model.byId.offsite && ordered.length
+      ? ordered.map((volume) => {
+          const r = rects[volume.id];
+          return `M${centre(r)} ${r.y + r.h}V${r.y + r.h + 16}H894V${middle(rects.offsite)}H${rects.offsite.x}`;
+        })
+      : [];
+  const release =
+    model.byId.source?.facts.some((fact) => fact.label === "Revision") &&
+    model.byId.app
+      ? [
+          `M${rects.source.x + rects.source.w / 2} ${rects.source.y + rects.source.h}V${appY + 126}H286V${middle(rects.app)}H${rects.app.x}`,
+        ]
+      : [];
+  const legs: Layout["legs"] = {
+    visit: visit.map((path) => [path]),
+    data: [...disk, ...copies].map((path) => [path]),
+    release: release.map((path) => [path]),
   };
-  const ids = (...values: (string | undefined)[]) =>
-    values.filter((value): value is string => Boolean(value));
   return {
     rects,
-    wall,
-    undrawnGates: undrawn,
-    height,
+    height: rects.server.y + rects.server.h - TOP + 24,
+    labels,
     legs,
-    wires,
+    wires: (Object.keys(legs) as JourneyId[]).flatMap((journey) =>
+      legs[journey].flat().map((d) => ({ d, journey })),
+    ),
     stops: {
-      visit: ids(
-        "controller",
-        // A port that refuses is drawn, because it is part of what is let in
-        // — but a visit does not come through it, so it is not a stop on the
-        // way. Nobody having looked is not a refusal and stays on the path.
-        ...gates
-          .filter((gate) => gate.admits !== "refused")
-          .map((gate) => gate.id),
-        "tls",
-        "app",
-        ...services.map((service) => service.id),
-        ...ordered.map((volume) => volume.id),
-      ),
-      data: ids(...ordered.map((volume) => volume.id), "offsite"),
-      release: ids(
-        "source",
-        "controller",
-        ...gates.filter((gate) => gate.id === "gate:ssh").map((g) => g.id),
-        "host",
-        "app",
-        ...services.map((service) => service.id),
-      ),
+      visit: [...stops],
+      data: [
+        ...new Set(
+          ordered.flatMap((part) =>
+            part.owner ? [part.owner, part.id] : [part.id],
+          ),
+        ),
+        ...(model.byId.offsite ? ["offsite"] : []),
+      ],
+      release: release.length ? ["source", "app"] : [],
     },
   };
 }
@@ -545,6 +341,8 @@ function iconFor(
     case "controller":
       return <HallviFace />;
     case "source":
+      if (!part.facts.some((fact) => fact.label === "Revision"))
+        return <Globe weight="duotone" />;
       return <GithubLogo weight="duotone" />;
     case "host":
       return <HardDrives weight="duotone" />;
@@ -603,14 +401,16 @@ function subtitleFor(part: Part, model: ArchitectureModel) {
     case "controller":
       return "your network";
     case "source":
-      return `${part.name.split("/")[0]} · ${fact("Revision")?.slice(0, 7) ?? "no revision on record"}`;
+      return fact("Revision")
+        ? `${part.name.split("/")[0]} · ${fact("Revision")?.slice(0, 7)}`
+        : part.role;
     case "web":
       // Only an established public reach says so; silence says nothing.
       return model.openness === "public"
         ? "your application, public"
         : "your application";
     case "private":
-      return "private, no way in";
+      return part.role;
     case "volume":
       return part.role;
     case "offsite":
@@ -647,7 +447,7 @@ function Card({
   /** The box is too short for a sentence; show the dot and the name only. */
   tight?: boolean;
   /** The canvas's own placer, since its height depends on the model. */
-  placeAt?: (r: Rect) => CSSProperties;
+  placeAt: (r: Rect) => CSSProperties;
   ghost?: boolean;
   onSelect: (id: string) => void;
 }) {
@@ -657,7 +457,7 @@ function Card({
       type="button"
       className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${tight ? " is-tight" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${part.checking ? " is-checking" : ""}`}
       data-c={certainty}
-      style={{ ...(placeAt ?? place)(rect), ["--i" as string]: index }}
+      style={{ ...placeAt(rect), ["--i" as string]: index }}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(part.id);
@@ -698,91 +498,6 @@ function Card({
   );
 }
 
-function Port({
-  part,
-  rect,
-  model,
-  selected,
-  dim,
-  lit,
-  onSelect,
-}: {
-  part: Part;
-  rect: Rect;
-  model: ArchitectureModel;
-  selected: boolean;
-  dim: boolean;
-  lit: boolean;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`axj2-port${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${part.checking ? " is-checking" : ""}`}
-      data-c={part.evidence.certainty}
-      data-refused={part.admits === "refused" || undefined}
-      style={{
-        ...place(rect),
-        // The slot is the floor, not the ceiling: the pill grows to hold
-        // Pi's phrase — "anywhere", "the container network" — and stops
-        // short of whatever is actually beside it at that height, which is
-        // the application for the door a visit comes through and open
-        // canvas for the doors stacked above it.
-        width: undefined,
-        minWidth: pct(rect.w, W),
-        maxWidth: pct(
-          (rect.y < BOX.app.y + BOX.app.h && rect.y + rect.h > BOX.app.y
-            ? BOX.app.x
-            : BOX.private.x) -
-            rect.x -
-            8,
-          W,
-        ),
-      }}
-      onClick={(event) => {
-        event.stopPropagation();
-        onSelect(part.id);
-      }}
-      aria-expanded={selected}
-      aria-label={`${part.name}, ${part.role}. ${part.evidence.short}.`}
-      title={part.role}
-    >
-      {iconFor(part, model.openness)}
-      <span className="axj2-port-text">
-        <b>
-          {part.name.replace("Port ", "")}
-          {/* The protocol only when the slot establishes it. It used to read
-              "HTTP" for every door that was not the SSH one, which labelled
-              443 and 5432 as HTTP because there were only ever two. */}
-          {part.id === "gate:ssh" && <small> · SSH</small>}
-        </b>
-        <em>
-          {/* A port that refuses says so, in the word its own check used.
-              It used to show where it admits from — "the container network"
-              — which is what an open port says, so the two read alike and
-              only a missing gap in the wall behind them told them apart.
-              Where it would admit from is in the inspector.
-
-              Otherwise: where this port admits from, in Pi's words. The
-              application's own reach answers a different question, and
-              answering with it had a refused database port reading
-              "anyone". */}
-          {part.admits === "refused"
-            ? "refused"
-            : (part.sources ??
-              (part.id === "gate:ssh"
-                ? "Hallvi"
-                : model.openness === "restricted"
-                  ? "your network"
-                  : model.openness === "public"
-                    ? "anyone"
-                    : "not read back"))}
-        </em>
-      </span>
-    </button>
-  );
-}
-
 function Popover({
   part,
   rect,
@@ -790,9 +505,11 @@ function Popover({
   onClose,
   onOpenDestination,
   onAsk,
+  height,
 }: {
   part: Part;
   rect: Rect;
+  height: number;
   model: ArchitectureModel;
   onClose: () => void;
   onOpenDestination: DirectionProps["onOpenDestination"];
@@ -806,18 +523,21 @@ function Popover({
     const stage = pop?.parentElement;
     if (!pop || !stage) return;
     const stageHeight = stage.clientHeight;
-    const wanted = (Math.max(0, rect.y - TOP - 8) / H) * stageHeight;
+    const wanted = (Math.max(0, rect.y - TOP - 8) / height) * stageHeight;
     const top = Math.max(
       -8,
       Math.min(wanted, stageHeight - pop.offsetHeight + 24),
     );
     pop.style.top = `${top}px`;
-  }, [rect]);
+  }, [rect, height]);
   return (
     <div
       ref={element}
       className={`axj2-pop${right ? " is-right" : " is-left"}`}
-      style={point(right ? rect.x + rect.w + 14 : rect.x - 14, rect.y)}
+      style={placer(height).point(
+        right ? rect.x + rect.w + 14 : rect.x - 14,
+        rect.y,
+      )}
       role="dialog"
       aria-label={part.name}
       onClick={(event) => event.stopPropagation()}
@@ -1070,7 +790,7 @@ export function JourneyDirection({
       await wait(delay);
       for (const leg of legs[journey]) {
         if (!alive()) return;
-        await travel(leg, 0.42);
+        await travel(leg, 0.18);
         if (!alive()) return;
         hide();
         await wait(90);
@@ -1080,7 +800,7 @@ export function JourneyDirection({
       setTouring(false);
     })();
     return () => {
-      tourId.current++;
+      tourId.current = id + 1;
       local.forEach((timer) => window.clearTimeout(timer));
       cancelAnimationFrame(raf);
       hide();
@@ -1114,9 +834,13 @@ export function JourneyDirection({
 
   const onPath = new Set(layout.stops[journey]);
   const services = model.parts.filter((part) => part.kind === "private");
-  const gates = model.parts.filter(
-    (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
-  );
+  const gates = model.parts
+    .filter(
+      (part) =>
+        part.kind === "gate" &&
+        (part.port || part.admits === "open" || part.admits === "refused"),
+    )
+    .sort((a, b) => Number(b.admits === "open") - Number(a.admits === "open"));
   const volumes = model.parts.filter((part) => part.kind === "volume");
   const monitoringGap = model.gaps.find((gap) => gap.id === "monitoring");
   // The model owns what the ghost's state is — unassessed is not absent —
@@ -1199,7 +923,9 @@ export function JourneyDirection({
           <ArrowsClockwise weight="bold" />
         </button>
         <p className="axj2-caption" key={`${journey}:${replay}`}>
-          {current?.summary}
+          {journey === "release" && !layout.legs.release.length
+            ? "The release route has not been mapped. See Deployment for recorded releases."
+            : current?.summary}
         </p>
       </div>
 
@@ -1259,7 +985,7 @@ export function JourneyDirection({
               className="axj2-region axj2-private"
               style={place(layout.rects.private ?? BOX.private)}
             >
-              <span>Private network · no ports open</span>
+              <span>Private services</span>
             </div>
           )}
           {volumes.length > 0 && (
@@ -1271,7 +997,10 @@ export function JourneyDirection({
             </div>
           )}
           {model.byId.offsite && (
-            <span className="axj2-zone" style={point(924, 404)}>
+            <span
+              className="axj2-zone"
+              style={point(layout.rects.offsite.x, layout.rects.offsite.y - 24)}
+            >
               Off the server
             </span>
           )}
@@ -1307,9 +1036,6 @@ export function JourneyDirection({
                 <feGaussianBlur stdDeviation="3" />
               </filter>
             </defs>
-            {/* The firewall: a wall of blocks, open only where a door is. */}
-            <path className="axj2-wall" d={layout.wall.wall} />
-            <path className="axj2-jamb" d={layout.wall.jamb} />
             {layout.wires.map((wire) => (
               <path
                 key={`base:${wire.d}`}
@@ -1320,17 +1046,11 @@ export function JourneyDirection({
                 className={`axj2-wire j-${wire.journey}${wire.journey === journey ? " is-on" : ""}`}
               />
             ))}
-            {model.byId.controller && model.byId["gate:ssh"] && (
-              <path
-                className="axj2-wire-ssh"
-                d="M110 336V368Q110 382 124 382H204"
-              />
-            )}
             {(ghostPart ||
               model.parts.some(
                 (part) =>
                   part.kind === "monitor" && !part.id.startsWith("gap:"),
-              )) && <path d="M878 132H924" className="axj2-wire-ghost" />}
+              )) && <path d="M902 132H918" className="axj2-wire-ghost" />}
             {!planned &&
               layout.legs[journey].flat().map((d) => (
                 <g
@@ -1350,10 +1070,10 @@ export function JourneyDirection({
               !touring &&
               !reduced &&
               layout.legs[journey].flat().map((d) =>
-                [0, 1, 2].map((i) => (
-                  <circle key={`p:${d}:${i}`} r="2.4" className="axj2-particle">
+                [0].map((i) => (
+                  <circle key={`p:${d}:${i}`} r="1.8" className="axj2-particle">
                     <animateMotion
-                      dur={`${Math.max(1.6, d.length / 12)}s`}
+                      dur="12s"
                       begin={`${i * 1.1}s`}
                       repeatCount="indefinite"
                       path={d}
@@ -1370,10 +1090,10 @@ export function JourneyDirection({
                 className="axj2-comet"
                 style={{ opacity: 0 }}
               >
-                {Array.from({ length: 8 }, (_, k) => (
+                {Array.from({ length: 3 }, (_, k) => (
                   <circle
                     key={k}
-                    r={Math.max(1.1, 5 - k * 0.55)}
+                    r={Math.max(1, 2.5 - k * 0.5)}
                     style={{ opacity: 1 - k * 0.12 }}
                   />
                 ))}
@@ -1381,74 +1101,15 @@ export function JourneyDirection({
             ))}
           </svg>
 
-          {/* The ways in. */}
-          {/* The firewall is named where its wall begins. */}
-          <span className="axj2-wall-label" style={point(276, 151)}>
-            Firewall ·{" "}
-            {(() => {
-              // No door drawn is not a count of zero: it means the rules
-              // have not been drawn, which is a different thing from none.
-              if (!gates.length) return "rules not drawn";
-              // Each door's own check, never the application's reach. A
-              // database port that refuses from outside was being counted
-              // among the doors that are open, which is the map saying the
-              // opposite of the check printed on the card beside it.
-              const shut = gates.filter(
-                (gate) => gate.admits === "refused",
-              ).length;
-              const open = gates.filter(
-                (gate) => gate.admits === "open",
-              ).length;
-              const unknown = gates.length - open - shut;
-              // A port the map had no room for is a port the reader cannot
-              // see, so the count is where it gets said rather than nowhere.
-              const over = layout.undrawnGates
-                ? ` · ${layout.undrawnGates} more on record`
-                : "";
-              return (
-                [
-                  open ? `${open} open` : null,
-                  shut ? `${shut} refused` : null,
-                  unknown ? `${unknown} unconfirmed` : null,
-                ]
-                  .filter(Boolean)
-                  .join(", ") + over
-              );
-            })()}
-          </span>
-          {gates.map(({ id }) =>
-            layout.rects[id] ? (
-              <Port
-                key={id}
-                part={model.byId[id]}
-                rect={layout.rects[id]}
-                model={model}
-                selected={selected === id}
-                dim={!onPath.has(id) && !touring}
-                lit={lit.has(id)}
-                onSelect={(value) =>
-                  setSelected((currentId) =>
-                    currentId === value ? null : value,
-                  )
-                }
-              />
-            ) : null,
-          )}
-          {model.byId.tls && model.byId.tls.evidence.certainty === "absent" && (
-            <button
-              type="button"
-              className={`axj2-ghost axj2-ghost-tls${selected === "tls" ? " is-selected" : ""}${!onPath.has("tls") && !touring ? " is-dim" : ""}`}
-              style={place(layout.rects.tls)}
-              onClick={(event) => {
-                event.stopPropagation();
-                setSelected((currentId) =>
-                  currentId === "tls" ? null : "tls",
-                );
-              }}
+          {layout.labels.map((label, index) => (
+            <span
+              key={index}
+              className="axj2-edge-label"
+              style={point(label.x, label.y)}
             >
-              <LockOpen weight="bold" /> no HTTPS
-            </button>
-          )}
+              {label.text}
+            </span>
+          ))}
 
           {/* The stops. */}
           {(
@@ -1456,6 +1117,13 @@ export function JourneyDirection({
               "source",
               "controller",
               "app",
+              ...model.parts
+                .filter(
+                  (part) =>
+                    (part.kind === "gate" || part.kind === "tls") &&
+                    layout.rects[part.id],
+                )
+                .map((part) => part.id),
               ...services.map((service) => service.id),
               ...volumes.map((volume) => volume.id),
               ...model.parts
@@ -1513,6 +1181,7 @@ export function JourneyDirection({
 
           {selectedPart && selectedRect && (
             <Popover
+              height={layout.height}
               key={selectedPart.id}
               part={selectedPart}
               rect={selectedRect}
@@ -1524,6 +1193,75 @@ export function JourneyDirection({
           )}
         </div>
       </div>
+      <section className="axj2-connections" aria-label="Recorded connections">
+        <h3>Connections</h3>
+        {model.edges
+          .filter(
+            (edge) =>
+              edge.network !== "disk" &&
+              model.byId[edge.from] &&
+              model.byId[edge.to],
+          )
+          .map((edge, index) => (
+            <div className="axj2-connection" key={index}>
+              <span>
+                {model.byId[edge.from].name} <ArrowRight aria-hidden="true" />{" "}
+                {model.byId[edge.to].name}
+              </span>
+              <span>{edge.label ?? "Endpoint not recorded"}</span>
+              <small>
+                {edge.network === "loopback"
+                  ? "Host loopback"
+                  : edge.network === "private"
+                    ? "Private network"
+                    : "Public network"}
+              </small>
+            </div>
+          ))}
+        <h3>Connection checks</h3>
+        <p>
+          Recorded results, not firewall rules. A connection that did not
+          succeed does not establish what blocked it.
+        </p>
+        {gates.length ? (
+          gates.map((part) => (
+            <details className="axj2-connection-check" key={part.id}>
+              <summary>
+                <b>
+                  {part.port ?? part.name.replace("Port ", "")}
+                  <small>{part.role}</small>
+                </b>
+                <span>
+                  {part.admits === "open"
+                    ? "Open when checked"
+                    : part.admits === "refused"
+                      ? "Did not connect when checked"
+                      : "Not confirmed"}
+                </span>
+                <span>
+                  {part.serves
+                    ? (model.byId[part.serves]?.name ??
+                      "Destination not recorded")
+                    : "Destination not recorded"}
+                </span>
+                <small>{part.evidence.short}</small>
+              </summary>
+              <p>{part.role}</p>
+              {part.sources && <p>Recorded scope: {part.sources}</p>}
+              <p>{part.evidence.detail}</p>
+              <button
+                type="button"
+                className="ax-textlink"
+                onClick={() => onOpenDestination("security")}
+              >
+                Open Security <ArrowRight />
+              </button>
+            </details>
+          ))
+        ) : (
+          <p>No connection checks recorded.</p>
+        )}
+      </section>
     </section>
   );
 }

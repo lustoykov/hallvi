@@ -17,7 +17,6 @@ import { describe, expect, it } from "vitest";
 
 import { architectureFromRecords } from "@/components/hallvi/architecture-records";
 import {
-  BOX,
   JourneyDirection,
   layoutFor,
 } from "@/components/hallvi/architecture-prototype/journey-v2";
@@ -72,7 +71,7 @@ const part = (id: string, kind: string, name: string) =>
 /** A map of exactly the parts named, and nothing else. */
 function topology(
   parts: never[],
-  edges: { from: string; to: string; network: string }[] = [],
+  edges: { from: string; to: string; network: string; label?: string }[] = [],
 ): SavedInformation {
   return {
     id: `rec-${++counter}`,
@@ -115,12 +114,6 @@ const draw = (records: SavedInformation[]) =>
     />,
   );
 
-/** Where a wire begins: the `M x y` every one of these paths opens with. */
-const startOf = (d: string) => {
-  const [, x, y] = /^M(-?[\d.]+) (-?[\d.]+)/.exec(d)!;
-  return { x: Number(x), y: Number(y) };
-};
-
 const door = (id: string, port: string, sources: string, open: boolean) =>
   states(
     { kind: "door", id },
@@ -138,44 +131,48 @@ const volume = part("shop-data", "volume", "Shop data");
 const service = part("shop-db", "private", "PostgreSQL");
 const disk = { from: "shop-web", to: "shop-data", network: "disk" };
 
-describe("every wire on the map joins two things that are drawn", () => {
-  it("brings a visit in at the boundary it crosses when nothing is drawn outside", () => {
+describe("recorded routes", () => {
+  it("does not invent an inbound or release route when none was recorded", () => {
     const layout = layoutFor(
       modelOf([topology([web, volume] as never[], [disk])]),
     );
-    // The server's own left edge, where the firewall wall has a door in it —
-    // not the empty column to the left of it, which nothing has been drawn in.
-    for (const leg of layout.legs.visit)
-      for (const d of leg) expect(startOf(d).x).toBeGreaterThanOrEqual(262);
-    expect(startOf(layout.legs.visit[0][0]).x).toBe(262);
+    expect(layout.legs.visit).toEqual([]);
+    expect(layout.legs.release).toEqual([]);
+    expect(layout.legs.data.flat()).toHaveLength(1);
   });
 
-  it("still brings it in from the controller when one is on the map", () => {
-    const layout = layoutFor(
-      modelOf([
-        topology(
-          [part("hallvi", "controller", "Hallvi"), web, volume] as never[],
-          [disk],
-        ),
-      ]),
-    );
-    expect(startOf(layout.legs.visit[0][0]).x).toBe(196);
-  });
-
-  it("draws no fork off a release that is not itself drawn", () => {
-    // A map of backing services and no application: there is no release run
-    // along the bottom of the server for a fork to leave, and drawing one
-    // anyway left an elbow joined to nothing at either end.
-    const layout = layoutFor(modelOf([topology([service] as never[])]));
-    expect(layout.legs.release.flat()).toEqual([]);
-    expect(layout.wires.filter((wire) => wire.journey === "release")).toEqual(
-      [],
-    );
-  });
-
-  it("forks the release once there is a release to fork from", () => {
-    const layout = layoutFor(modelOf([topology([web, service] as never[])]));
-    expect(layout.legs.release.flat().length).toBe(2);
+  it("draws the gateway and preserves both public and loopback endpoint labels", () => {
+    const records = [
+      topology(
+        [
+          part("internet", "source", "Internet"),
+          part("caddy", "tls", "Caddy"),
+          web,
+        ] as never[],
+        [
+          {
+            from: "internet",
+            to: "caddy",
+            network: "public",
+            label: "HTTPS 443",
+          },
+          {
+            from: "caddy",
+            to: "shop-web",
+            network: "loopback",
+            label: "127.0.0.1:8000",
+          },
+        ],
+      ),
+    ];
+    const model = modelOf(records);
+    expect(layoutFor(model).rects.caddy).toBeDefined();
+    expect(layoutFor(model).legs.visit.flat()).toHaveLength(2);
+    const html = draw(records);
+    expect(html).toContain("HTTPS 443");
+    expect(html).toContain("127.0.0.1:8000");
+    expect(html).not.toContain("Where the code came from");
+    expect(html).not.toContain('class="axj2-wall"');
   });
 });
 
@@ -236,7 +233,7 @@ describe("whether anything is watching", () => {
   });
 });
 
-describe("the doors in the firewall", () => {
+describe("connection observations, separate from firewall policy", () => {
   it("draws every way in on record, not only the first", () => {
     // The map had two slots and put every non-SSH door in the first of them,
     // so a second one kept its own id, got no place, and was never drawn.
@@ -263,11 +260,12 @@ describe("the doors in the firewall", () => {
     ]);
     expect(html).toContain("443");
     expect(html).toContain("5432");
-    expect(html).toContain("1 open, 1 refused");
+    expect(html).toContain("Open when checked");
+    expect(html).toContain("Did not connect when checked");
     // It says "refused" rather than where it would admit from, which is what
     // an open port says and is how the two came to read alike.
     expect(html).toContain("refused");
-    expect(html).not.toContain("the container network");
+    expect(html).toContain("Recorded scope: ");
   });
 
   it("says so when every port on record refuses", () => {
@@ -278,7 +276,7 @@ describe("the doors in the firewall", () => {
     expect(html).toContain("5432");
     // A finding, not the same as "rules not drawn", which reads as nobody
     // having looked.
-    expect(html).toContain("1 refused");
+    expect(html).toContain("Did not connect when checked");
   });
 
   it("does not count an unsuccessful check as an open or refused port", () => {
@@ -296,7 +294,7 @@ describe("the doors in the firewall", () => {
     expect(
       modelOf(records).parts.find((part) => part.kind === "gate")?.admits,
     ).toBe("unknown");
-    expect(draw(records)).toContain("1 unconfirmed");
+    expect(draw(records)).toContain("Not confirmed");
   });
 
   it("uses the latest connection result when a door changes state", () => {
@@ -323,23 +321,14 @@ describe("the doors in the firewall", () => {
     ).toBe("open");
   });
 
-  it("counts a port it had no room to draw rather than dropping it", () => {
-    // Eight doors is more than the wall's band can hold. A port the map
-    // cannot show is a port the reader cannot know about, so the count says
-    // how many are missing.
+  it("shows every check even when there are more than fit on a diagram boundary", () => {
     const many = Array.from({ length: 8 }, (_, index) =>
       door(`d${index}`, `${9000 + index}`, "anywhere", true),
     );
-    const model = modelOf([topology([web] as never[]), ...many]);
-    const layout = layoutFor(model);
-    expect(layout.undrawnGates).toBeGreaterThan(0);
-    const drawn = model.parts.filter(
-      (part) => part.kind === "gate" && layout.rects[part.id],
-    ).length;
-    expect(drawn + layout.undrawnGates).toBe(8);
-    expect(draw([topology([web] as never[]), ...many])).toContain(
-      `${layout.undrawnGates} more on record`,
-    );
+    const html = draw([topology([web] as never[]), ...many]);
+    for (let port = 9000; port < 9008; port++)
+      expect(html).toContain(String(port));
+    expect(html).not.toContain("more on record");
   });
 
   it("counts a port that refuses as refused, not as a door that is open", () => {
@@ -348,28 +337,19 @@ describe("the doors in the firewall", () => {
       door("https", "443", "anywhere", true),
       door("postgres", "5432", "the container network", false),
     ]);
-    expect(html).toContain("1 open, 1 refused");
+    expect(html).toContain("Open when checked");
+    expect(html).toContain("Did not connect when checked");
   });
 
-  it("cuts the wall open for a door that admits and not for one that refuses", () => {
-    const shut = layoutFor(
-      modelOf([
-        topology([web] as never[]),
-        door("https", "443", "anywhere", true),
-        door("postgres", "5432", "the container network", false),
-      ]),
-    ).wall;
-    const openToo = layoutFor(
-      modelOf([
-        topology([web] as never[]),
-        door("https", "443", "anywhere", true),
-        door("alt", "8443", "anywhere", true),
-      ]),
-    ).wall;
-    // The two doorways the journeys cross are drawn either way; an extra
-    // door earns a third gap only by being open.
-    expect(shut.wall.split("M").length - 1).toBe(3);
-    expect(openToo.wall.split("M").length - 1).toBe(4);
+  it("does not turn connection results into firewall claims or assume a private service has no open ports", () => {
+    const html = draw([
+      topology([web, service] as never[]),
+      door("postgres", "5432", "container network", false),
+    ]);
+    expect(html).toContain("Recorded results, not firewall rules");
+    expect(html).not.toContain('class="axj2-wall"');
+    expect(html).not.toContain("no ports open");
+    expect(html).toContain("Destination not recorded");
   });
 
   it("reads a way in Pi called access, when that is what it wrote", () => {
@@ -433,21 +413,21 @@ describe("the doors in the firewall", () => {
     expect(draw(records)).toContain("the office network");
   });
 
-  it("keeps a port that refuses off the path a visit travels", () => {
+  it("keeps unattached checks off the animated route regardless of result", () => {
     const layout = layoutFor(
       modelOf([
         topology([web] as never[]),
         door("https", "443", "anywhere", true),
-        door("postgres", "5432", "the container network", false),
+        door("postgres", "5432", "container network", false),
       ]),
     );
-    expect(layout.stops.visit).toContain("gate:http");
+    expect(layout.stops.visit).not.toContain("gate:http");
     expect(layout.stops.visit).not.toContain("postgres");
   });
 
   it("says the rules are not drawn rather than counting zero", () => {
     const html = draw([topology([web] as never[])]);
-    expect(html).toContain("rules not drawn");
+    expect(html).toContain("No connection checks recorded.");
   });
 });
 
@@ -456,26 +436,17 @@ describe("what a port leads to", () => {
     ({ id, kind: "gate", name, role: "a way in", plain: "a way in" }) as never;
   const service = part("db", "private", "PostgreSQL");
 
-  it("draws a wire to what a record says is behind the port", () => {
-    const layout = layoutFor(
-      modelOf([
-        topology(
-          [
-            web,
-            service,
-            gate("front", "Port 443"),
-            gate("dbp", "Port 5432"),
-          ] as never[],
-          [{ from: "dbp", to: "db", network: "private" }],
-        ),
-        door("front", "443", "anywhere", true),
-        door("dbp", "5432", "the office network", true),
+  it("shows the recorded destination beside its connection result", () => {
+    const records = [
+      topology([web, service, gate("dbp", "Port 5432")] as never[], [
+        { from: "dbp", to: "db", network: "private" },
       ]),
-    );
-    const wire = layout.legs.visit
-      .flat()
-      .find((d) => d.startsWith(`M${BOX.http.x + BOX.http.w} `));
-    expect(wire, "a wire leaves the port that has an edge").toBeTruthy();
+      door("dbp", "5432", "the office", true),
+    ];
+    expect(
+      modelOf(records).parts.find((part) => part.kind === "gate")?.serves,
+    ).toBe("db");
+    expect(draw(records)).toMatch(/Open when checked<\/span><span>PostgreSQL/);
   });
 
   it("never infers it from the port's name", () => {
@@ -487,7 +458,7 @@ describe("what a port leads to", () => {
     ]);
     const port = model.parts.find((one) => one.kind === "gate")!;
     expect(port.serves).toBeUndefined();
-    expect(layoutFor(model).legs.visit.flat()).toHaveLength(1);
+    expect(layoutFor(model).legs.visit.flat()).toHaveLength(0);
   });
 
   it("draws no wire out of a port that refuses", () => {
@@ -508,11 +479,7 @@ describe("what a port leads to", () => {
     ]);
     const port = model.parts.find((one) => one.id === "dbp")!;
     expect(port.serves).toBe("db");
-    expect(
-      layoutFor(model)
-        .legs.visit.flat()
-        .some((d) => d.startsWith(`M${BOX.http.x + BOX.http.w} `)),
-    ).toBe(false);
+    expect(layoutFor(model).legs.visit.flat()).toEqual([]);
   });
 
   it("still draws a door on record that the map did not name", () => {
@@ -554,7 +521,7 @@ describe("the place off the server that copies reach", () => {
     const html = draw(records);
     expect(html).toContain("Off the server");
     expect(html).toContain("Cloudflare R2");
-    expect(layoutFor(model).legs.data.flat().length).toBe(1);
+    expect(layoutFor(model).legs.data.flat().length).toBe(2);
   });
 
   it("is not drawn when the newest copy stayed on the server", () => {
@@ -567,7 +534,7 @@ describe("the place off the server that copies reach", () => {
     ];
     const model = modelOf(records);
     expect(model.byId.offsite).toBeUndefined();
-    expect(layoutFor(model).legs.data).toEqual([]);
+    expect(layoutFor(model).legs.data.flat()).toHaveLength(1);
     const html = draw(records);
     expect(html).not.toContain("Off the server");
     expect(html).not.toContain("s3://shop-backups");

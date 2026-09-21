@@ -112,9 +112,42 @@ describe("a map with two backing services and three volumes", () => {
     );
     expect(html).toContain(`viewBox="0 ${MAP_TOP} ${MAP_W} ${layout.height}"`);
     expect(model.byId.offsite).toBeUndefined();
-    expect(layout.legs.data).toEqual([]);
+    expect(layout.legs.data.flat()).toHaveLength(3);
     expect(html).not.toContain('class="axj2-wire-ssh"');
     expect(html).not.toContain('class="axj2-zone"');
+  });
+
+  it("routes around service and storage cards instead of through their interiors", () => {
+    const layout = layoutFor(model);
+    const cards = model.parts
+      .filter((part) => ["web", "private", "volume"].includes(part.kind))
+      .map((part) => layout.rects[part.id]);
+    for (const { d } of layout.wires) {
+      let x = 0,
+        y = 0;
+      for (const match of d.matchAll(/([MHV])([\d.]+)(?: ([\d.]+))?/g)) {
+        const nextX = match[1] === "V" ? x : Number(match[2]);
+        const nextY =
+          match[1] === "H" ? y : Number(match[1] === "M" ? match[3] : match[2]);
+        if (match[1] !== "M") {
+          for (const r of cards) {
+            const intersects =
+              x === nextX
+                ? x > r.x &&
+                  x < r.x + r.w &&
+                  Math.max(y, nextY) > r.y &&
+                  Math.min(y, nextY) < r.y + r.h
+                : y > r.y &&
+                  y < r.y + r.h &&
+                  Math.max(x, nextX) > r.x &&
+                  Math.min(x, nextX) < r.x + r.w;
+            expect(intersects, `${d} crosses a card`).toBe(false);
+          }
+        }
+        x = nextX;
+        y = nextY;
+      }
+    }
   });
 
   it("gives every part its own place", () => {

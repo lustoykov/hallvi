@@ -159,12 +159,12 @@ function evidenceFor(
         ? "In the plan"
         : part.kind === "controller"
           ? "Hallvi itself"
-          : "Where the code came from",
+          : "Recorded in the topology",
       detail: planned
         ? "Part of the intended shape; nothing has run yet."
         : part.kind === "controller"
           ? "This is Hallvi, not something it observes."
-          : "The repository the deployment was built from; what was built is on Deployment.",
+          : "The source named in the recorded topology; its connections are shown as recorded.",
       at: null,
     };
   // Established absence outranks everything: a record spoke for this and
@@ -562,7 +562,14 @@ export function architectureFromRecords({
     const evidence = evidenceFor(records, part, planned, now);
     const facts =
       part.kind === "source"
-        ? revision?.kind === "deployment"
+        ? revision?.kind === "deployment" &&
+          !edges.some(
+            (edge) =>
+              edge.from === slots.get(part.id) &&
+              ["gate", "tls"].includes(
+                mapParts.find((p) => slots.get(p.id) === edge.to)?.kind ?? "",
+              ),
+          )
           ? [
               {
                 label: "Revision",
@@ -572,9 +579,6 @@ export function architectureFromRecords({
             ]
           : []
         : factsFor(records, part);
-    const sshLike =
-      /\bssh\b/i.test(`${part.name} ${part.role}`) ||
-      facts.some((fact) => fact.value === "22");
     return {
       id: slots.get(part.id)!,
       kind: part.kind as Part["kind"],
@@ -596,6 +600,10 @@ export function architectureFromRecords({
       // described the thing that is gone; it is in the series, not here.
       facts: evidence.certainty === "absent" ? [] : facts,
       evidence,
+      port:
+        part.kind === "gate"
+          ? (factOf(records, part, "port") ?? undefined)
+          : undefined,
       admits: part.kind === "gate" ? admitsOf(records, part) : undefined,
       sources:
         part.kind === "gate"
@@ -611,7 +619,7 @@ export function architectureFromRecords({
           : undefined,
       destination: destinations[part.kind as Part["kind"]],
       // Hallvi and the repository have no state of their own to tag.
-      quiet: part.kind === "controller",
+      quiet: part.kind === "controller" || part.kind === "source",
     };
   });
 
@@ -794,6 +802,7 @@ export function architectureFromRecords({
     applicationName,
     headline,
     parts: all,
+    edges,
     byId,
     journeys,
     condition,

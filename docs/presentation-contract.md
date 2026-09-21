@@ -207,6 +207,32 @@ know the other's naming.
 
 ## 5. Architecture: the state the page needs
 
+The diagram draws recorded topology relationships and keeps their endpoint
+labels: for example, `Internet → Caddy` labelled `HTTPS 443`, then
+`Caddy → Paperless` labelled `127.0.0.1:8000`. A gateway or TLS part is a
+visible stop, not a port badge attached to a firewall. Private services may
+listen on ports internally; their kind alone never establishes “no ports open”.
+
+Connection checks and firewall policy answer different questions. A door's
+`open` or `refused` check reports what happened when connecting, with its
+original scope and evidence time. It does not identify which firewall rule,
+listener or binding caused the result. Architecture lists every recorded port
+check separately and names its destination only when a topology edge supplies
+that link. The record's own title remains visible when the structural link is
+missing. Firewall configuration belongs to the firewall subject and Security.
+
+```mermaid
+flowchart LR
+  topology["Topology parts and labelled edges"] --> routes["Diagram routes and endpoints"]
+  door["Door connection checks, scope and time"] --> results["Connection results"]
+  firewall["Firewall configuration records"] --> security["Security policy details"]
+```
+
+These are projections of the existing record contract. No schema migration or
+rewrite of retained development/installed records is needed; missing links stay
+unknown until an observation establishes them. Rendering an old observation
+never changes its establishment time or makes it a fresh check.
+
 Built by `architectureFromRecords`, drawn by the accepted Journeys design.
 
 | Field | Source | Refreshed when |
