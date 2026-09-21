@@ -212,12 +212,17 @@ test("records render in chat and their views, survive refresh, and update by rec
     // It says so in its own words rather than by reprinting the record's
     // title: the lead names the revision that is serving, and the line under
     // it names the source and the machine.
-    await expect(view.getByText("Running abcdef0.")).toBeVisible();
     await expect(
-      view.getByText(/abcdef012345 on fixture-server/),
+      view.getByText("Running abcdef0", { exact: true }),
     ).toBeVisible();
     await expect(
-      view.getByRole("button", { name: /Added container packaging/ }),
+      view.getByText(/Added container packaging · on fixture-server/),
+    ).toBeVisible();
+    const releaseRow = view.getByRole("row", {
+      name: /abcdef0 serving now Added container packaging/,
+    });
+    await expect(
+      releaseRow.getByRole("button", { name: "Open" }),
     ).toBeVisible();
     // The address is named, and named as not answering, rather than offered.
     await expect(view.getByText(/The tunnel is closed, so/)).toBeVisible();
@@ -230,9 +235,7 @@ test("records render in chat and their views, survive refresh, and update by rec
     // What was checked belongs to the release that was checked, so it is
     // inside that release rather than loose on the page. It still has to be
     // reachable, and it still has to be the record's own words.
-    await view
-      .getByRole("button", { name: /Added container packaging/ })
-      .click();
+    await releaseRow.getByRole("button", { name: "Open" }).click();
     await expect(view.getByText("Data survived restart")).toBeVisible();
     await expect(view.getByText("app:candidate")).toBeVisible();
 
@@ -256,19 +259,21 @@ test("records render in chat and their views, survive refresh, and update by rec
     // The idle page polls every 15 seconds. Observe the update without
     // a reload.
     await expect(
-      view.getByRole("button", { name: /Rebuilt from the same source/ }),
+      view.getByRole("row", {
+        name: /^abcdef0 serving now Rebuilt from the same source/,
+      }),
     ).toBeVisible({ timeout: 20_000 });
     await page.reload();
-    const rebuilt = view.getByRole("button", {
-      name: /Rebuilt from the same source/,
+    const rebuilt = view.getByRole("row", {
+      name: /^abcdef0 serving now Rebuilt from the same source/,
     });
     await expect(rebuilt).toBeVisible();
     await expect(
-      view.getByRole("button", { name: /Added container packaging/ }),
+      view.getByRole("row", { name: /Added container packaging/ }),
     ).toHaveCount(0);
     // The record changed by its id, so the release opens on the new image
     // rather than on the one it replaced.
-    await rebuilt.click();
+    await rebuilt.getByRole("button", { name: "Open" }).click();
     await expect(view.getByText("app:rebuilt")).toBeVisible();
     await expect(view.getByText("app:candidate")).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 844 });
