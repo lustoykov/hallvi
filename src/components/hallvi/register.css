@@ -491,6 +491,7 @@
 }
 .hv-rg-none {
   color: #9aa5b9;
+  white-space: nowrap;
 }
 .hv-rg-clip {
   display: block;

@@ -2,23 +2,81 @@
 
 // Processes, on real records.
 //
-// The accepted Line design, fed by the `process` subjects Pi stated. Its
-// empty state is the one that matters: nothing recorded is not "no
+// The selected design (the register), fed by the `process` subjects Pi
+// stated: one row per process with what it runs, how it is reached, the
+// readings a record carries and every check that touched it. A row opens in
+// place onto its command and onto what proves it — each check with what it
+// looked at, from where, and when.
+//
+// Its empty state is the one that matters: nothing recorded is not "no
 // processes", it is nobody looked, and the page says so and offers the one
-// question that would change it.
+// question that would change it. The same rule holds cell by cell: a reading
+// nobody recorded is grey and says "not recorded", never a zero.
 
 import { useMemo } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./deployment-prototype/page-head";
 import type { ApplicationSection } from "./application-sections";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
-import { processesFromRecords } from "./processes-records";
-import { LineDirection } from "./stack-prototype/line";
-import "./deployment-prototype/transit.css";
-import "./stack-prototype/line.css";
 import { EmptySketch } from "./empty-sketch";
+import { processesFromRecords } from "./processes-records";
+import {
+  Ask,
+  Bar,
+  Board,
+  Clip,
+  Facts,
+  Figure,
+  Foot,
+  Go,
+  Lede,
+  Name,
+  None,
+  Note,
+  Num,
+  Opened,
+  Pips,
+  Register,
+  Strip,
+  Sub,
+  Tag,
+  ago,
+  type Column,
+  type Tone,
+} from "./register";
+import type { ProcessCard, Probe } from "./stack-prototype/line-story";
+
+const ROLE_WORD: Record<ProcessCard["role"], string> = {
+  web: "web app",
+  private: "private",
+  worker: "worker",
+  service: "service",
+};
+
+/** "661.8 MiB", "3.73 GiB", "1,484 MB" → MiB. Null when it does not parse. */
+export function mebibytes(text: string | null | undefined) {
+  const match = text?.replace(/,/g, "").match(/([\d.]+)\s*([KMGT])i?B/i);
+  if (!match) return null;
+  const scale = { K: 1 / 1024, M: 1, G: 1024, T: 1024 * 1024 }[
+    match[2].toUpperCase() as "K" | "M" | "G" | "T"
+  ];
+  return Number(match[1]) * scale;
+}
+
+function probeTone(probe: Probe): Tone {
+  if (probe.passed === false) return "bad";
+  // A pass that has aged out is amber: it may have changed, it did not fail.
+  return probe.fresh ? "good" : "warn";
+}
+
+function probeWord(probe: Probe) {
+  if (probe.passed === false) return "failed";
+  return probe.fresh ? "passed" : "passed, too long ago to count";
+}
+
+type Row = ProcessCard & { id: string };
 
 export function ProcessesPage({
   records,
@@ -28,7 +86,6 @@ export function ProcessesPage({
   reachable = "checking",
   onReopen,
   chrome,
-  onOpenConversation,
   onOpenDestination,
   onAsk,
 }: {
@@ -41,7 +98,7 @@ export function ProcessesPage({
   /** Asks Pi to reopen private access when it is closed. */
   onReopen?: () => void;
   chrome: PageChrome;
-  onOpenConversation: (chatId: string, messageId: string | null) => void;
+  onOpenConversation?: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
 }) {
@@ -71,7 +128,7 @@ export function ProcessesPage({
 
   if (story.state === "none")
     return (
-      <div className="ax-root" data-variant="line">
+      <div className="ax-root" data-variant="register">
         {head}
         <div className="hv-deploy-none">
           <h2>Nothing here has been looked at yet.</h2>
@@ -100,16 +157,373 @@ export function ProcessesPage({
       </div>
     );
 
+  const rows: Row[] = story.processes.map((item) => ({
+    ...item,
+    id: item.name,
+  }));
+  const probes = rows.flatMap((row) => row.probes);
+  const failed = probes.filter((probe) => probe.passed === false);
+  const stale = probes.filter(
+    (probe) => probe.passed !== false && !probe.fresh,
+  );
+  const unchecked = rows.filter((row) => !row.probes.length);
+
+  const capacity = mebibytes(story.host?.memory);
+  const measured = rows
+    .map((row) => mebibytes(row.memoryUsed))
+    .filter((value): value is number => value !== null);
+  const memory = measured.reduce((sum, value) => sum + value, 0);
+
+  const counted = rows
+    .map((row) =>
+      row.restarts === null || row.restarts === undefined
+        ? null
+        : Number(row.restarts),
+    )
+    .filter(
+      (value): value is number => value !== null && Number.isFinite(value),
+    );
+  const restarts = counted.reduce((sum, value) => sum + value, 0);
+
+  const columns: Column<Row>[] = [
+    {
+      key: "name",
+      head: "Process",
+      sort: (row) => row.product,
+      cell: (row) => (
+        <Name
+          title={row.product}
+          note={row.product === row.name ? undefined : row.name}
+        />
+      ),
+    },
+    {
+      key: "role",
+      head: "Role",
+      width: 92,
+      sort: (row) => row.role,
+      cell: (row) => <Tag>{ROLE_WORD[row.role]}</Tag>,
+    },
+    {
+      key: "image",
+      head: "Runs",
+      width: 210,
+      cell: (row) =>
+        row.image === "Not recorded" ? (
+          <None />
+        ) : (
+          <Clip text={row.imageShort} mono />
+        ),
+    },
+    {
+      key: "memory",
+      head: "Memory",
+      width: 150,
+      sort: (row) => mebibytes(row.memoryUsed) ?? -1,
+      cell: (row) => {
+        const used = mebibytes(row.memoryUsed);
+        if (!row.memoryUsed) return <None />;
+        return used !== null && capacity ? (
+          <Bar
+            value={used}
+            max={capacity}
+            tone={used / capacity > 0.8 ? "bad" : "plain"}
+            label={row.memoryUsed}
+          />
+        ) : (
+          <Num>{row.memoryUsed}</Num>
+        );
+      },
+    },
+    {
+      key: "restarts",
+      head: "Restarts",
+      width: 112,
+      align: "end",
+      sort: (row) => Number(row.restarts ?? -1),
+      cell: (row) =>
+        row.restarts === null || row.restarts === undefined ? (
+          <None />
+        ) : Number(row.restarts) === 0 ? (
+          <None>none</None>
+        ) : (
+          <Num>{row.restarts}</Num>
+        ),
+    },
+    {
+      key: "checks",
+      head: "Checks",
+      width: 96,
+      cell: (row) => (
+        <Pips
+          empty="never checked"
+          items={row.probes.map((probe) => ({
+            id: probe.name,
+            tone: probeTone(probe),
+            title: `${probe.name}: ${probeWord(probe)}`,
+          }))}
+        />
+      ),
+    },
+    {
+      key: "passed",
+      head: "Last passed",
+      width: 110,
+      align: "end",
+      sort: (row) => Date.parse(row.lastPassed ?? "") || 0,
+      cell: (row) =>
+        row.lastPassed ? <Num>{ago(row.lastPassed, now)}</Num> : <None>—</None>,
+    },
+  ];
+
   return (
-    <div className="ax-root" data-variant="line">
-      <LineDirection
-        story={story}
-        head={head}
-        activity={null}
-        onAsk={onAsk}
-        onOpenConversation={onOpenConversation}
-        onOpenDestination={onOpenDestination}
-      />
+    <div className="ax-root" data-variant="register">
+      {head}
+      <div className="hv-rg-sheet">
+        <Lede
+          holds={`${rows.length} ${rows.length === 1 ? "process" : "processes"}${story.host ? ` on ${story.host.name}` : ""}`}
+        >
+          Everything long-running that a record names: what it runs, how it is
+          reached, and every check that touched it.
+        </Lede>
+
+        <Strip>
+          <Figure
+            label="Processes"
+            value={rows.length}
+            tone={story.state === "failed" ? "bad" : "plain"}
+            note={rows.map((row) => row.product).join(", ")}
+          />
+          <Figure
+            label="Checks"
+            value={
+              probes.length
+                ? `${probes.length - failed.length} of ${probes.length} passed`
+                : "None run"
+            }
+            tone={
+              failed.length
+                ? "bad"
+                : !probes.length || stale.length
+                  ? "warn"
+                  : "good"
+            }
+            note={
+              failed.length
+                ? failed.map((probe) => probe.name).join(", ")
+                : stale.length
+                  ? // Ageing never turns a pass into a failure. It is a pass
+                    // nobody has repeated, and the word for that is this one.
+                    `${stale.length} passed too long ago to count${story.verifiedAt ? ` · last ${ago(story.verifiedAt, now)}` : ""}`
+                  : story.verifiedAt
+                    ? `Last passed ${ago(story.verifiedAt, now)}`
+                    : "Checked by the deployment, not continuously"
+            }
+          />
+          <Figure
+            label="Memory"
+            value={measured.length ? `${Math.round(memory)} MiB` : "—"}
+            bar={
+              measured.length && capacity
+                ? { value: memory, max: capacity }
+                : undefined
+            }
+            note={
+              measured.length
+                ? `Recorded for ${measured.length} of ${rows.length}${story.host?.memory ? ` · the server has ${story.host.memory}` : ""}`
+                : "No record carries a memory reading"
+            }
+          />
+          <Figure
+            label="Restarts"
+            value={counted.length ? restarts : "—"}
+            tone={counted.length && restarts > 4 ? "bad" : "plain"}
+            note={
+              counted.length
+                ? `Counted for ${counted.length} of ${rows.length}`
+                : "No record counts restarts"
+            }
+          />
+        </Strip>
+
+        <Board
+          title="Processes"
+          note="A row opens its command and what proves it."
+          tools={
+            <Ask
+              onAsk={onAsk}
+              prompt="Check every process of this application now: is each one running, healthy and answering? Record memory use and restarts for each."
+            >
+              Check them all now
+            </Ask>
+          }
+        >
+          <Register
+            rows={rows}
+            columns={columns}
+            tone={(row) =>
+              row.probes.some((probe) => probe.passed === false)
+                ? "bad"
+                : !row.probes.length
+                  ? "idle"
+                  : "plain"
+            }
+            defaultOpen={
+              rows.find((row) =>
+                row.probes.some((probe) => probe.passed === false),
+              )?.id ?? null
+            }
+            detail={(row) => {
+              const broken = row.probes.find((probe) => probe.passed === false);
+              return (
+                <Opened
+                  asks={
+                    <>
+                      <Ask
+                        onAsk={onAsk}
+                        tone={broken ? "bad" : "plain"}
+                        prompt={
+                          broken
+                            ? `The check "${broken.name}" on ${row.name} failed. What is wrong, and what would fix it?`
+                            : `Is ${row.name} healthy right now? Check it, and record its memory use and restarts.`
+                        }
+                      >
+                        {broken ? "Why did it fail?" : `Check ${row.name} now`}
+                      </Ask>
+                      <Ask
+                        onAsk={onAsk}
+                        prompt={`Restart ${row.name} and tell me what changes.`}
+                      >
+                        Restart {row.name}
+                      </Ask>
+                    </>
+                  }
+                >
+                  <Note>
+                    {row.roleWords}. {row.reach}.
+                  </Note>
+                  {row.command && (
+                    <pre className="hv-rg-out">{row.command}</pre>
+                  )}
+                  {row.probes.length ? (
+                    <div>
+                      <span className="hv-rg-label">What proves it</span>
+                      <Sub
+                        heads={[
+                          "Check",
+                          "What was looked at",
+                          "From",
+                          "When",
+                          "Result",
+                        ]}
+                        rows={row.probes.map((probe) => ({
+                          id: probe.name,
+                          tone: probeTone(probe),
+                          cells: [
+                            probe.name,
+                            probe.probe === probe.name ? (
+                              <None key="probe">no detail written down</None>
+                            ) : (
+                              probe.probe
+                            ),
+                            probe.inside ? (
+                              "inside the server"
+                            ) : (
+                              <None key="from">—</None>
+                            ),
+                            <Num key="when">{ago(probe.at, now)}</Num>,
+                            <Tag key="result" tone={probeTone(probe)}>
+                              {probeWord(probe)}
+                            </Tag>,
+                          ],
+                        }))}
+                      />
+                    </div>
+                  ) : (
+                    <Note>
+                      No check has touched this process. It is on record, and
+                      nothing says whether it is running.
+                    </Note>
+                  )}
+                  <Facts
+                    items={[
+                      {
+                        label: "Image",
+                        value:
+                          row.image === "Not recorded" ? (
+                            <None />
+                          ) : (
+                            <span className="hv-rg-mono">{row.image}</span>
+                          ),
+                      },
+                      { label: "Port", value: row.port ?? <None /> },
+                      { label: "Health", value: row.health ?? <None /> },
+                      { label: "CPU", value: row.cpuUsed ?? <None /> },
+                      { label: "Memory", value: row.memoryUsed ?? <None /> },
+                      { label: "Restarts", value: row.restarts ?? <None /> },
+                    ]}
+                  />
+                </Opened>
+              );
+            }}
+          />
+          <Foot>
+            <span>
+              {story.entry
+                ? `${story.entry.title}. ${story.entry.detail} `
+                : ""}
+              {unchecked.length ? `${unchecked.length} never checked. ` : ""}
+              {/* A gap, not a reading: nothing here watches between visits. */}
+              Nothing restarts a process that stops, and only the checks Hallvi
+              ran are recorded.
+            </span>
+          </Foot>
+        </Board>
+
+        {story.processChanges.length > 0 && (
+          <Board title="Recent changes" note="Records that touched a process.">
+            <Register
+              rows={story.processChanges}
+              columns={[
+                {
+                  key: "title",
+                  head: "What happened",
+                  cell: (row) => <Clip text={row.title} />,
+                },
+                {
+                  key: "state",
+                  head: "Outcome",
+                  width: 110,
+                  cell: (row) => (
+                    <Tag
+                      tone={
+                        row.state === "failed"
+                          ? "bad"
+                          : row.state === "verified"
+                            ? "good"
+                            : "plain"
+                      }
+                    >
+                      {row.state === "queued" ? "recorded" : row.state}
+                    </Tag>
+                  ),
+                },
+                {
+                  key: "at",
+                  head: "When",
+                  width: 110,
+                  align: "end",
+                  cell: (row) => <Num>{ago(row.at, now)}</Num>,
+                },
+              ]}
+            />
+            <Foot>
+              <span>The newest five.</span>
+              <Go onGo={() => onOpenDestination("history")}>Open History</Go>
+            </Foot>
+          </Board>
+        )}
+      </div>
     </div>
   );
 }
