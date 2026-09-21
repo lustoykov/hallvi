@@ -410,6 +410,7 @@ export function Register<R extends { id: string }>({
   tone,
   detail,
   defaultOpen = null,
+  label,
   empty,
 }: {
   columns: Column<R>[];
@@ -422,6 +423,12 @@ export function Register<R extends { id: string }>({
   detail?: (row: R) => ReactNode;
   /** The row that starts open: the one the reader most likely came for. */
   defaultOpen?: string | null;
+  /**
+   * What a row is called, for the control that opens it. Clicking anywhere
+   * on a row opens it, but a row is not a control: the button is, and "Open"
+   * alone tells a keyboard or screen-reader user nothing about which one.
+   */
+  label?: (row: R) => string;
   empty?: ReactNode;
 }) {
   const [sortKey, setSortKey] = useState<string | null>(
@@ -561,7 +568,7 @@ export function Register<R extends { id: string }>({
                           <button
                             type="button"
                             aria-expanded={isOpen}
-                            aria-label={isOpen ? "Close" : "Open"}
+                            aria-label={`${isOpen ? "Close" : "Open"}${label ? ` ${label(row)}` : ""}`}
                           >
                             <svg viewBox="0 0 10 10" aria-hidden="true">
                               <path

@@ -352,9 +352,11 @@ export function ReleasesPanel({
           note={
             running ? (
               <>
-                {running.changes[0] ? `${running.changes[0]} · ` : ""}
-                on {running.server} ·{" "}
-                <LocalTime value={running.at} variant="compact" />
+                {/* The source it was built from, exactly, beside the machine
+                    it runs on. The short form above is for reading; this is
+                    for matching against a repository. */}
+                <code>{running.revision.slice(0, 12)}</code> on {running.server}{" "}
+                · <LocalTime value={running.at} variant="compact" />
               </>
             ) : (
               said.says
@@ -483,6 +485,9 @@ export function ReleasesPanel({
         <Register
           rows={shown}
           columns={columns}
+          label={(row) =>
+            [row.short, row.changes[0]].filter(Boolean).join(" · ")
+          }
           tone={(row) =>
             row.tone === "good" ? (row.broke ? "warn" : "plain") : row.tone
           }

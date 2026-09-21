@@ -209,12 +209,14 @@ test("records render in chat and their views, survive refresh, and update by rec
     // a page composed from the same records. What it owes the reader is the
     // release that is running and an honest account of the way in.
     //
-    // The live strip names the running revision and host. Source and image
-    // evidence belong to the release's expandable register row.
+    // The live strip names the running revision and host. Image evidence
+    // belongs to the release's expandable register row.
     await expect(
       view.getByText("Running abcdef0", { exact: true }),
     ).toBeVisible();
-    await expect(view.getByText(/on fixture-server/)).toBeVisible();
+    await expect(
+      view.getByText(/abcdef012345 on fixture-server/),
+    ).toBeVisible();
     const releaseRow = (change: string) =>
       view.getByRole("row").filter({
         has: page.getByRole("cell", { name: change, exact: true }),
@@ -232,9 +234,14 @@ test("records render in chat and their views, survive refresh, and update by rec
     // inside that release rather than loose on the page. It still has to be
     // reachable, and it still has to be the record's own words.
     await releaseRow("Added container packaging")
-      .getByRole("button", { name: "Open", exact: true })
+      .getByRole("button", {
+        name: "Open abcdef0 · Added container packaging",
+        exact: true,
+      })
       .click();
-    await expect(view.getByText("abcdef012345", { exact: true })).toBeVisible();
+    await expect(
+      view.getByRole("table").getByText("abcdef012345", { exact: true }),
+    ).toBeVisible();
     await expect(
       view.getByText("fixture-server", { exact: true }),
     ).toBeVisible();
@@ -269,7 +276,12 @@ test("records render in chat and their views, survive refresh, and update by rec
     await expect(releaseRow("Added container packaging")).toHaveCount(0);
     // The record changed by its id, so the release opens on the new image
     // rather than on the one it replaced.
-    await rebuilt.getByRole("button", { name: "Open", exact: true }).click();
+    await rebuilt
+      .getByRole("button", {
+        name: "Open abcdef0 · Rebuilt from the same source",
+        exact: true,
+      })
+      .click();
     await expect(view.getByText("app:rebuilt")).toBeVisible();
     await expect(view.getByText("app:candidate")).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 844 });

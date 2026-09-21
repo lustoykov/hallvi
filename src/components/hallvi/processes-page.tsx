@@ -346,6 +346,7 @@ export function ProcessesPage({
           <Register
             rows={rows}
             columns={columns}
+            label={(row) => row.product}
             tone={(row) =>
               row.probes.some(broke)
                 ? "bad"

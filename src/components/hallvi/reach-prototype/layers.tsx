@@ -431,6 +431,7 @@ export function LayersDirection({
                     row.at ? <Num>{ago(row.at, now)}</Num> : <None>—</None>,
                 },
               ]}
+              label={(row) => row.port || row.title}
               tone={(row) => (probed(row) ? "plain" : "idle")}
               detail={(row) => (
                 <Opened
