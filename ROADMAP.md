@@ -49,7 +49,7 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 ## Private repository deployment
 
-- [ ] **Reuse GitHub App access for source deployment — in review.** A controller-owned source transfer resolves `main` (or another requested ref) to an exact commit and copies the full validated source to a fresh directory on the connected server. Pi deploys from it without asking for a second GitHub token; later requests fetch the new branch tip. Unfilled obsolete token requests can be withdrawn without deleting saved credentials. [21 September verification](docs/testing/2026-09-21-private-repository-deployment.md) covers two private revisions through the real App connection and a real Linux host. Automatic deployment on push remains deferred.
+- [x] **Reuse GitHub App access for source deployment — [PR #206](https://github.com/lustoykov/hallvi/pull/206).** A controller-owned source transfer resolves `main` (or another requested ref) to an exact commit and copies the full validated source to a fresh directory on the connected server. Pi deploys from it without asking for a second GitHub token; later requests fetch the new branch tip. Unfilled obsolete token requests can be withdrawn without deleting saved credentials. [21 September verification](docs/testing/2026-09-21-private-repository-deployment.md) covers two private revisions through the real App connection and a real Linux host. Automatic deployment on push remains deferred.
 
 ## First-use experience
 
