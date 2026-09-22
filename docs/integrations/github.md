@@ -191,6 +191,9 @@ read is refused rather than saved. Pause holds deployments and keeps looking,
 so the page still shows what is waiting. In Always ask, automatic deployment
 still asks before each command; the card says so.
 
+[22 September 2026 verification](../testing/2026-09-22-automatic-deployment.md):
+five pushes to a private repository reached a real host with no chat message.
+
 ## Proposing a change
 
 `open_pull_request` publishes files Pi changed in the repository workspace and

@@ -141,7 +141,7 @@ afterAll(() => {
 it("refuses a branch GitHub does not have, and saves nothing", async () => {
   await expect(
     chooseDeployment(applicationId, { mode: "automatic", branch: "gone" }),
-  ).rejects.toThrow("No such branch.");
+  ).rejects.toThrow(/no branch “gone”/);
   expect(deploymentState(applicationId).mode).toBeNull();
 });
 
