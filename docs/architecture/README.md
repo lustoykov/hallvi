@@ -18,6 +18,8 @@ Each of these is linked from the document that owns its decision.
 | --- | --- |
 | [Architecture routes and connection evidence](../presentation-contract.md#5-architecture-the-state-the-page-needs) | [Presentation contract](../presentation-contract.md) |
 | [Repository workspace boundary](../architecture.md#repository-workspace-architecture) | [Architecture](../architecture.md) |
+| [Private repository source deployment](../integrations/github.md#deploying-private-source-and-later-revisions) | [GitHub](../integrations/github.md) |
+| [Automatic deployment: the branch watch](../integrations/github.md#deploying-automatically-when-a-branch-changes) | [GitHub](../integrations/github.md) |
 | [Proposing a repository change](../integrations/github.md#proposing-a-change) | [GitHub](../integrations/github.md) |
 | [Development cleanup decision flow](development-cleanup-decision.html) | [Development resources](../development-resources.md) |
 | [Where the records live, and which of them travel](development-environment.md) | [Development environment](../development-environment.md) |

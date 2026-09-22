@@ -78,6 +78,10 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Deployment attempt**: One execution to put a specific release onto an application host and verify it. A retry or container recreation is another attempt, even when its release and host stay the same. It is recorded as saved information about the release, not as an attempt row.
 
+**Deployment configuration** (`deployment-automation.ts`): The owner's choice of how an Application deploys — automatically when a tracked branch changes, or only when asked — with the branch and whether it is paused. One record per application, written only by the worker; Pi, the choice card and the Deployment page read and change the same one. Choosing automatic is a standing authorization for that branch, not a claim that anything is watching.
+
+**Branch watch** (`deployment-watch.ts`): The worker looking at GitHub about once a minute for the tracked branch's newest commit, and waking the main conversation to deploy one exact commit when it differs from the last verified release. It looks because GitHub cannot reach a controller behind a home router. **Watching** means GitHub answered recently, never that automatic was chosen. It starts one attempt at a time and one per commit, and says of each whether a release record proved it (deployed), disproved it or never established it (failed), or a restart cut it short (interrupted).
+
 **Last verified runtime**: The release, host and running images established by a completed verification at a recorded time. A later possible remote change makes the current runtime unknown without erasing this historical observation.
 
 **Operational inventory**: An application's identifiable services, storage and network resources, with their source and observation time. Intended configuration and observed runtime are distinct inventory facts.

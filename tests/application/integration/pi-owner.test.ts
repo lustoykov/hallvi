@@ -947,3 +947,35 @@ it("an update's hold stops new work, counts an approval wait as work, and lets g
   await a.send("hello");
   await until(async () => expect(await a.status()).toBe("idle"));
 });
+
+it("a deployment wakeup cannot queue behind an owner message that is still opening", async () => {
+  const app = application("wakeup-race");
+  const outcomes = await Promise.allSettled([
+    worker!.owner.handle("send", {
+      scope: { applicationId: app.id, chatId: app.chat },
+      message: {
+        id: randomUUID(),
+        body: "[slow] owner work",
+        delivery: "next",
+      },
+    }),
+    worker!.owner.conversations.send(
+      { applicationId: app.id, chatId: app.chat },
+      {
+        id: `wakeup:${randomUUID()}`,
+        body: "Deploy the new commit",
+        delivery: "next",
+      },
+    ),
+  ]);
+  expect(outcomes[0].status).toBe("fulfilled");
+  expect(outcomes[1]).toMatchObject({
+    status: "rejected",
+    reason: { code: "busy" },
+  });
+  expect(
+    (await app.snapshot()).messages.some(
+      (message) => message.body === "Deploy the new commit",
+    ),
+  ).toBe(false);
+});
