@@ -1164,15 +1164,21 @@ function renderDevelopment(state) {
           state.paired ? "not created yet" : "none registered",
           state.paired
             ? "run npm run db:push in this checkout"
-            : "no development environment on this machine",
+            : "start npm run dev, or attach a retained application",
         ],
       ]);
 
   const apps = applications.length
-    ? `<section class="surface"><h2>Retained sample applications</h2><p class="footnote">Registered in the persistent development environment and deployed on ${escape(state.host?.address ?? "a shared host")}. They may not be present in this checkout's controller. Each keeps its own database there; Hallvi's records above are separate and local.</p><ul class="plain">${applications
+    ? `<section class="surface"><h2>Retained applications</h2><p class="footnote">Each keeps its own Hallvi records outside every checkout and is deployed on ${escape(state.host?.address ?? "a shared host")}. One checkout at a time attaches one; this list links to whoever has it and opens none of their records.</p><ul class="plain">${applications
         .map(
           (application) =>
-            `<li><strong>${escape(application.name)}</strong> <code>${escape(application.id.slice(0, 8))}</code><br><span class="footnote">${escape(application.exercises ?? "")}</span>${application.url ? `<br><a href="${escape(application.url)}" target="_blank" rel="noreferrer">${escape(application.url)}</a>` : ""}</li>`,
+            `<li><strong>${escape(application.directory)}</strong> <code>${escape(application.id.slice(0, 8))}</code> · ${
+              application.owner
+                ? `attached from <code>${escape(application.owner.worktree ?? "")}</code> on <strong>${escape(application.owner.branch ?? "detached")}</strong> — <a href="${escape(application.owner.address)}" target="_blank" rel="noreferrer">${escape(application.owner.address)}</a>`
+                : application.lastStop
+                  ? `free; its last runtime ${application.lastStop === "forced" ? "was stopped while Pi still had work" : "did not detach"}`
+                  : "free"
+            }<br><span class="footnote">${escape(application.exercises ?? "")} · schema ${escape(String(application.schema))}, Pi ${escape(application.pi)}</span>${application.url ? `<br><a href="${escape(application.url)}" target="_blank" rel="noreferrer">${escape(application.url)}</a>` : ""}</li>`,
         )
         .join("")}</ul></section>`
     : "";

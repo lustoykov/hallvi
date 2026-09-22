@@ -2,6 +2,7 @@
 // worker, the installed command and the upgrade.
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
+import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -24,4 +25,42 @@ export function workerSocketPath(databasePath) {
     .digest("hex")
     .slice(0, 16);
   return join(tmpdir(), `hallvi-worker-${name}.sock`);
+}
+
+/**
+ * Ask the worker serving this database to stop taking new work, and learn
+ * how much it still has in hand. `null` when no worker answers: there is
+ * nothing to wait for. The worker's own `hold` answers this — the same one an
+ * update uses — so a detach and an update agree on what "busy" means.
+ */
+export function holdWorker(databasePath, minutes = 20) {
+  return new Promise((resolve, reject) => {
+    const asked = request(
+      {
+        socketPath: workerSocketPath(databasePath),
+        agent: false,
+        path: "/hold",
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+      (response) => {
+        let text = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => (text += chunk));
+        response.on("end", () => {
+          try {
+            resolve(response.statusCode === 200 ? JSON.parse(text) : null);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+    asked.on("error", (error) =>
+      ["ENOENT", "ECONNREFUSED"].includes(error.code ?? "")
+        ? resolve(null)
+        : reject(error),
+    );
+    asked.end(JSON.stringify({ scope: null, message: { minutes } }));
+  });
 }

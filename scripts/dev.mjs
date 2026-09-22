@@ -19,15 +19,36 @@
 // open the rows the application is using.
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { setTimeout as delay } from "node:timers/promises";
 
 import {
   environmentVariables,
   resolveEnvironment,
   WORKER_BUSY_EXIT,
 } from "./dev-environment.mjs";
+import { DETACH_FORCED_EXIT, retainedRefusal } from "./retained-state.mjs";
+import { holdWorker } from "./worker-socket.mjs";
 const resolved = resolveEnvironment();
+// A retained application's records are opened by the runtime attached to them
+// and by nothing else; the studio below would open them writable, so this is
+// decided before any child starts.
+const refusal = retainedRefusal(resolved.database);
+if (refusal) {
+  console.error(refusal);
+  process.exit(2);
+}
 const shared = environmentVariables(resolved);
 const nextArgs = process.argv.slice(2);
+/**
+ * Started by `retained-application.mjs attach`: this pair is a retained
+ * application's runtime, and stopping it is a detach. The children then get
+ * their own process group, so the terminal's Ctrl-C reaches the attach
+ * command and this launcher, which stop them in order, rather than every
+ * process at once.
+ */
+const attached = Boolean(process.env.HALLVI_RUNTIME_ID);
+/** How long a detach waits for Pi to finish what it is doing. */
+const DETACH_LIMIT_MS = 5 * 60_000;
 
 function portNumber(value, label) {
   const port = Number(value);
@@ -101,6 +122,7 @@ function start(args, extra = {}) {
   const child = spawn(process.execPath, args, {
     stdio: "inherit",
     env: { ...process.env, ...shared, ...extra },
+    detached: attached,
   });
   children.add(child);
   child.on("exit", () => children.delete(child));
@@ -112,8 +134,54 @@ function stop(signal) {
   stopping = true;
   for (const child of children) child.kill(signal);
 }
+
+/**
+ * Detaching, in order: the interface stops first, so nothing new is accepted;
+ * the worker is asked to hold — it refuses new work and says how much it has
+ * in hand — and is stopped once that is nothing, or once the wait has gone on
+ * long enough that the person asking has presumably given up on it. A second
+ * signal stops it at once. Pi keeps whatever a stopped worker was doing, and
+ * the exit code says whether anything was still going on.
+ */
+let forced = false;
+let detaching;
+function detach() {
+  if (detaching) {
+    console.warn("Stopping the worker without waiting for its work to end.");
+    forced = true;
+    for (const child of children) child.kill("SIGTERM");
+    return;
+  }
+  stopping = true;
+  detaching = (async () => {
+    for (const child of children) if (child !== worker) child.kill("SIGTERM");
+    const started = Date.now();
+    let said = 0;
+    while (!forced) {
+      const held = await holdWorker(resolved.database).catch(() => null);
+      if (!held || held.busy === 0) break;
+      if (Date.now() - started > DETACH_LIMIT_MS) {
+        console.warn(
+          `Still ${held.busy} conversation${held.busy === 1 ? "" : "s"} working after ${Math.round(DETACH_LIMIT_MS / 60_000)} minutes; stopping the worker anyway.`,
+        );
+        forced = true;
+        break;
+      }
+      if (Date.now() - said > 10_000) {
+        said = Date.now();
+        console.warn(
+          `Detaching: waiting for ${held.busy} conversation${held.busy === 1 ? "" : "s"} still working. Ctrl-C again stops without waiting.`,
+        );
+      }
+      await delay(2_000);
+    }
+    worker?.kill("SIGTERM");
+    while (children.size) await delay(100);
+    process.exitCode = forced ? DETACH_FORCED_EXIT : 0;
+  })();
+}
 for (const signal of ["SIGINT", "SIGTERM"])
-  process.on(signal, () => stop(signal));
+  process.on(signal, () => (attached ? detach() : stop(signal)));
 
 const next = start(
   [
@@ -179,8 +247,9 @@ if (port) {
  * launcher stops the children it started and exits non-zero.
  */
 let restarted = false;
+let worker;
 function startWorker() {
-  const worker = start(["--import", "tsx", "src/worker.ts"]);
+  worker = start(["--import", "tsx", "src/worker.ts"]);
   worker.on("exit", (code, signal) => {
     if (stopping) return;
     if (code === WORKER_BUSY_EXIT) {

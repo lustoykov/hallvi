@@ -34,6 +34,7 @@ import {
   STORES,
   UnsupportedMigration,
 } from "./migrations.mjs";
+import { readMark, runtimeHeld } from "./retained-state.mjs";
 import { stateFiles, stateLocation } from "./state-location.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -93,6 +94,12 @@ function currentVersion(database) {
  * than the first.
  */
 async function withoutWriters(database, work) {
+  // A retained development application is written by the runtime attached to
+  // it, whose worker may be between two writes; its owner detaches first.
+  if (readMark(dirname(database)) && runtimeHeld(dirname(database)))
+    throw new Error(
+      "This retained state is attached to a runtime. Detach it first; nothing was changed.",
+    );
   // The lock is named from the canonical directory rather than the database,
   // because restoring is also what you do when the database is not there any
   // more, and resolving a file that is gone would refuse exactly then.

@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
+import { retainedRefusal } from "../../scripts/retained-state.mjs";
 import { stateLocation } from "../../scripts/state-location.mjs";
 
 import { applications, chats, savedInformation } from "./db-schema";
@@ -32,6 +33,11 @@ export function db(): HallviDatabase {
 
 function createDatabase(): HallviDatabase {
   const path = databasePath();
+  // A retained application's records are opened by the runtime that attached
+  // them and by nothing else. Checked before the file is opened: opening it
+  // would already write a log beside it.
+  const refusal = retainedRefusal(path);
+  if (refusal) throw new Error(refusal);
   mkdirSync(dirname(path), { recursive: true });
   const client = new Database(path);
   try {

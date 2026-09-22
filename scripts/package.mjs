@@ -122,6 +122,7 @@ try {
     "scripts/cli.mjs",
     "scripts/dev-environment.mjs",
     "scripts/state-location.mjs",
+    "scripts/retained-state.mjs",
     "scripts/installed-ports.mjs",
     "scripts/service-owner.mjs",
     "scripts/worker-socket.mjs",
