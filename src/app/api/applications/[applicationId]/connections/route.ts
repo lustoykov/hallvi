@@ -18,6 +18,7 @@ import {
   settleDomain,
   settleHost,
 } from "@/server/connection-requests";
+import { deploymentStatus } from "@/server/deployment-automation";
 import { hetznerConnectionId } from "@/server/hetzner";
 import { handle } from "@/server/http";
 import { operatorSettings } from "@/server/operator-execution";
@@ -96,6 +97,7 @@ export async function GET(
       hostAddress: settings.host?.address ?? null,
       hetznerConnected: Boolean(hetznerConnectionId()),
       publicKey: (await serverPublicKey(applicationId)).publicKey,
+      deployment: deploymentStatus(applicationId),
     };
   });
 }

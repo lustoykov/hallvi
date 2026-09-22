@@ -1,0 +1,121 @@
+/* How it deploys: the band above the releases on Deployment. */
+
+.ds {
+  margin-bottom: 18px;
+}
+.ds .hv-rg-value a,
+.ds-attempts a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.ds .hv-rg-value a:hover,
+.ds-attempts a:hover {
+  text-decoration-color: currentColor;
+}
+.ds .rp-open:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ds-error {
+  margin: 10px 0 0;
+  color: var(--red, #b42318);
+  font-size: 13px;
+}
+
+.ds-settings {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.ds-settings > summary {
+  width: fit-content;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ds-settings > summary:hover {
+  color: var(--ink);
+}
+.ds-settings form {
+  display: grid;
+  gap: 12px;
+  max-width: 520px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.ds-settings fieldset {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ds-settings legend,
+.ds-branch {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ds-settings fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.ds-branch {
+  display: grid;
+  gap: 4px;
+}
+.ds-branch input {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  font: 13px var(--mono, ui-monospace, monospace);
+}
+.ds-fine {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.ds-settings .rp-open {
+  margin-top: 0;
+}
+
+.ds-attempts {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ds-attempts li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 14px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.ds-attempts li:first-child {
+  border-top: 0;
+}
+.ds-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ds-title small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.ds-when {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}

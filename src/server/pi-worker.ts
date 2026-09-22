@@ -1,6 +1,7 @@
 import { cleanupPiWorkspaces } from "./pi-workspace";
 import { copyDue, protectController } from "./controller-protection";
 import { databasePath } from "./db";
+import { deploymentWatch } from "./deployment-watch";
 import { dirname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ownSessions } from "./pi-owner";
@@ -62,6 +63,8 @@ export async function runPiWorker(signal: AbortSignal) {
     // not also wait for the SDK to load.
     void import("@earendil-works/pi-coding-agent").catch(() => undefined);
     await cleanupPiWorkspaces().catch(() => undefined);
+    const watch = deploymentWatch(owner.conversations, signal);
+    owner.also.deployment = watch.handle;
     console.info("Pi worker ready.");
     let nextProtectionCheck = 0;
     // Deliberately not another branch of the chain below: a controller with
@@ -69,7 +72,19 @@ export async function runPiWorker(signal: AbortSignal) {
     // would quietly mean "hourly while idle".
     let nextReleaseCheck = Date.now() + 60_000;
     let worked = false;
+    // Looking at GitHub waits on the network, so it never holds this loop:
+    // one round at a time, started again a few seconds after it ends. Each
+    // application decides inside whether its own minute has passed.
+    let watching = false;
+    let nextWatch = 0;
     while (!signal.aborted) {
+      if (!watching && Date.now() >= nextWatch) {
+        watching = true;
+        void watch.tick().finally(() => {
+          watching = false;
+          nextWatch = Date.now() + 5_000;
+        });
+      }
       if (owner.live()) worked = true;
       else if (worked) {
         worked = false;

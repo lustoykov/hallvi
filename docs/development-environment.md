@@ -16,7 +16,8 @@ quietly drops one of them is visible rather than theoretical.
 | Open it | <http://127.0.0.1:5147> |
 | Its records | `~/.local/share/hallvi-dev/state` |
 | Backups | `~/.local/share/hallvi-dev/backups` |
-| What it costs | EUR 5.99/month, one Hetzner cx23 shared by every application |
+| The host | `hallvi-dev`, one Hetzner cx23 at 46.62.253.6, shared by every application |
+| What it costs | EUR 5.99/month |
 
 [Where the records live, and which of them travel](architecture/development-environment.md).
 

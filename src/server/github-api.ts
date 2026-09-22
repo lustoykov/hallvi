@@ -27,8 +27,19 @@ export async function githubJson(
     body?: unknown;
     /** Return `data: null` for 404 instead of an access error. */
     allowNotFound?: boolean;
+    /**
+     * The ETag of an earlier answer. GitHub answers 304 when nothing moved,
+     * which a login's rate limit does not count: what makes a look every
+     * minute affordable.
+     */
+    ifNoneMatch?: string;
   } = {},
-): Promise<{ data: unknown; scopes: string[] }> {
+): Promise<{
+  data: unknown;
+  scopes: string[];
+  etag?: string | null;
+  unchanged?: boolean;
+}> {
   const timeout = AbortSignal.timeout(20_000);
   try {
     const response = await fetch(`https://api.github.com${path}`, {
@@ -39,6 +50,9 @@ export async function githubJson(
         "X-GitHub-Api-Version": "2022-11-28",
         ...(options.body !== undefined
           ? { "Content-Type": "application/json" }
+          : {}),
+        ...(options.ifNoneMatch
+          ? { "If-None-Match": options.ifNoneMatch }
           : {}),
       },
       ...(options.body !== undefined
@@ -51,6 +65,13 @@ export async function githubJson(
       cache: "no-store",
       redirect: "error",
     });
+    if (response.status === 304 && options.ifNoneMatch)
+      return {
+        data: null,
+        scopes: [],
+        etag: options.ifNoneMatch,
+        unchanged: true,
+      };
     if (response.status === 404 && options.allowNotFound)
       return { data: null, scopes: [] };
     if (response.status === 401)
@@ -89,6 +110,9 @@ export async function githubJson(
       throw new GithubAccessError("GitHub is unavailable. Try again later.");
     return {
       data: response.status === 204 ? null : await response.json(),
+      ...(response.headers.get("etag")
+        ? { etag: response.headers.get("etag") }
+        : {}),
       scopes: (response.headers.get("x-oauth-scopes") ?? "")
         .split(",")
         .map((scope) => scope.trim())
