@@ -29,9 +29,11 @@ export function workerSocketPath(databasePath) {
 
 /**
  * Ask the worker serving this database to stop taking new work, and learn
- * how much it still has in hand. `null` when no worker answers: there is
- * nothing to wait for. The worker's own `hold` answers this — the same one an
- * update uses — so a detach and an update agree on what "busy" means.
+ * how much it still has in hand. `null` when there is no worker to ask —
+ * nothing listens on the socket — and nothing else: a worker that answers
+ * badly, or a connection that breaks, is an error, because "not known" must
+ * never be read as "nothing in hand". The worker's own `hold` answers this —
+ * the same one an update uses — so a detach and an update agree on "busy".
  */
 export function holdWorker(databasePath, minutes = 20) {
   return new Promise((resolve, reject) => {
@@ -48,8 +50,15 @@ export function holdWorker(databasePath, minutes = 20) {
         response.setEncoding("utf8");
         response.on("data", (chunk) => (text += chunk));
         response.on("end", () => {
+          if (response.statusCode !== 200)
+            return reject(
+              new Error(`The worker answered ${response.statusCode}: ${text}`),
+            );
           try {
-            resolve(response.statusCode === 200 ? JSON.parse(text) : null);
+            const answer = JSON.parse(text);
+            if (!Number.isInteger(answer?.busy))
+              throw new Error("The worker did not say how busy it is.");
+            resolve(answer);
           } catch (error) {
             reject(error);
           }
@@ -60,6 +69,10 @@ export function holdWorker(databasePath, minutes = 20) {
       ["ENOENT", "ECONNREFUSED"].includes(error.code ?? "")
         ? resolve(null)
         : reject(error),
+    );
+    // A worker that does not answer is not known to be idle either.
+    asked.setTimeout(10_000, () =>
+      asked.destroy(new Error("The worker did not answer in time.")),
     );
     asked.end(JSON.stringify({ scope: null, message: { minutes } }));
   });

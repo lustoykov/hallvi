@@ -156,6 +156,24 @@ function inspectDatabase(path) {
   }
 }
 
+/** Who has the database open, as ` (pids …)`, where `lsof` can say; else "". */
+function openedBy(state) {
+  try {
+    const pids = execFileSync(
+      "lsof",
+      ["-t", join(state, "hallvi.db"), join(state, "runtime.lock")],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    )
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((pid) => pid && Number(pid) !== process.pid);
+    return pids.length ? ` (pid ${[...new Set(pids)].join(", ")})` : "";
+  } catch {
+    // Nothing listed, or no lsof: the lock above is the answer that counts.
+    return "";
+  }
+}
+
 /** Whether a Pi worker — anyone's — is serving this database right now. */
 function workerHeld(state) {
   const lock = new Database(
@@ -353,7 +371,7 @@ export function status() {
       const where = attached
         ? `attached from ${runtime?.worktree} on ${runtime?.branch ?? "a detached HEAD"} (pid ${runtime?.pid}, since ${runtime?.attachedAt}) — http://127.0.0.1:${runtime?.ports?.app ?? mark.port}`
         : runtime
-          ? `free, but its last runtime ${runtime.outcome === "forced" ? "was stopped while Pi still had work" : "did not detach"} (${runtime.worktree} on ${runtime.branch}, ${runtime.stoppedAt ?? runtime.attachedAt})`
+          ? `free, but its last runtime ${runtime.outcome === "forced" ? "was stopped before Pi was known to be idle" : "did not detach"} (${runtime.worktree} on ${runtime.branch}, ${runtime.stoppedAt ?? runtime.attachedAt})`
           : "free";
       return `${directory.padEnd(13)} ${mark.application.name} · ${where}\n${"".padEnd(14)}schema ${mark.format.schema}, Pi ${mark.format.pi} · ${state}`;
     })
@@ -375,22 +393,33 @@ async function attach(name, flags) {
       `This checkout already holds ${holding.directory} (pid ${holding.runtime?.pid}, at http://127.0.0.1:${holding.runtime?.ports?.app}). One checkout runs one application; detach it first, or attach ${directory} from another worktree.`,
     );
   const held = holdRuntime(state);
-  if (!held) {
+  if (held.refused === "attached") {
     const owner = readRuntime(state);
     throw new Refused(
       `${directory} is attached from ${owner?.worktree ?? "another checkout"} on ${owner?.branch ?? "a detached HEAD"} (pid ${owner?.pid}, since ${owner?.attachedAt}), at http://127.0.0.1:${owner?.ports?.app ?? mark.port}. Detach it there first: node scripts/retained-application.mjs detach ${directory}`,
     );
   }
+  if (held.refused === "open")
+    throw new Refused(
+      `An app or worker from an earlier runtime of ${directory} still has its records open${openedBy(state)}. Stop it before attaching; an old process must not keep writing under a new owner.`,
+    );
   try {
     if (workerHeld(state))
       throw new Refused(
         `A Pi worker is still serving ${join(state, "hallvi.db")}, so no runtime can take it. Stop that worker first.`,
       );
+    // A studio, or a shell, opens the database without passing through the
+    // rule above. Where the system can list who has the file open, ask it.
+    const others = openedBy(state);
+    if (others)
+      throw new Refused(
+        `Something still has ${join(state, "hallvi.db")} open${others}. Stop it before attaching.`,
+      );
 
     const previous = readRuntime(state);
     if (previous) {
       console.warn(
-        `The last runtime of ${directory} — ${previous.worktree} on ${previous.branch}, attached ${previous.attachedAt} — ${previous.outcome === "forced" ? "was stopped while Pi still had work in hand" : "ended without detaching"}.`,
+        `The last runtime of ${directory} — ${previous.worktree} on ${previous.branch}, attached ${previous.attachedAt} — ${previous.outcome === "forced" ? "was stopped before Pi was known to be idle" : "ended without detaching"}.`,
       );
       const running = executionsStillRunning(state, mark.application.id);
       if (running.length) {
@@ -491,8 +520,11 @@ async function attach(name, flags) {
         },
       },
     );
-    for (const signal of ["SIGINT", "SIGTERM"])
-      process.on(signal, () => child.kill("SIGTERM"));
+    // Ctrl-C reaches the launcher directly; forwarding it too would read as
+    // a second request there. A `detach` from elsewhere arrives as SIGTERM
+    // to this process alone, and that one is passed on.
+    process.on("SIGINT", () => {});
+    process.on("SIGTERM", () => child.kill("SIGTERM"));
     const [code, signal] = await once(child, "exit");
     if (code === 0) {
       rmSync(join(state, RUNTIME_FILE), { force: true });
@@ -508,7 +540,7 @@ async function attach(name, flags) {
     });
     console.warn(
       outcome === "forced"
-        ? `Detached ${directory} while Pi still had work in hand. The next attach accounts for it.`
+        ? `Detached ${directory} before Pi was known to be idle. The next attach accounts for it.`
         : `The runtime of ${directory} stopped on its own (${code ?? signal}). The next attach accounts for it.`,
     );
     process.exitCode = 1;
@@ -523,7 +555,7 @@ async function detach(name) {
   if (!runtimeHeld(state)) {
     console.log(
       runtime
-        ? `${directory} is not attached; its last runtime (${runtime.worktree} on ${runtime.branch}) ${runtime.outcome === "forced" ? "was stopped while Pi still had work" : "ended without detaching"}.`
+        ? `${directory} is not attached; its last runtime (${runtime.worktree} on ${runtime.branch}) ${runtime.outcome === "forced" ? "was stopped before Pi was known to be idle" : "ended without detaching"}.`
         : `${directory} is not attached.`,
     );
     return;
@@ -543,7 +575,7 @@ async function detach(name) {
   const after = readRuntime(state);
   console.log(
     after
-      ? `Detached, but ${after.outcome === "forced" ? "Pi still had work in hand" : "the runtime did not end cleanly"}; the next attach accounts for it.`
+      ? `Detached, but ${after.outcome === "forced" ? "before Pi was known to be idle" : "the runtime did not end cleanly"}; the next attach accounts for it.`
       : `Detached ${directory}; its records are free.`,
   );
 }
@@ -634,11 +666,10 @@ export async function snapshot(into, names) {
   }
   for (const companion of ["-wal", "-shm"])
     rmSync(`${target}${companion}`, { force: true });
-  const port = 3730;
   return [
     `Snapshot of ${chosen.map((each) => each.directory).join(", ")} in ${into}: records only, no keys, no secrets, no logins.`,
-    "Look at it with the interface alone, no worker:",
-    `  HALLVI_DB_PATH=${target} HALLVI_CONFIG_DIR=${join(state, "config")} HALLVI_PI_CONFIG_DIR=${account} HALLVI_LOG_DIR=${join(state, "diagnostics")} node node_modules/next/dist/bin/next dev --port ${port} --hostname 127.0.0.1`,
+    "Look at it with the pair, on ports of its own. Its worker can read the copied histories and nothing more: with no login it cannot start a turn, and with no connections it cannot reach a provider or the host.",
+    `  HALLVI_DB_PATH=${target} HALLVI_CONFIG_DIR=${join(state, "config")} HALLVI_PI_CONFIG_DIR=${account} HALLVI_LOG_DIR=${join(state, "diagnostics")} npm run dev -- --port 3730`,
   ].join("\n");
 }
 

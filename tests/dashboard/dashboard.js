@@ -1176,7 +1176,7 @@ function renderDevelopment(state) {
               application.owner
                 ? `attached from <code>${escape(application.owner.worktree ?? "")}</code> on <strong>${escape(application.owner.branch ?? "detached")}</strong> — <a href="${escape(application.owner.address)}" target="_blank" rel="noreferrer">${escape(application.owner.address)}</a>`
                 : application.lastStop
-                  ? `free; its last runtime ${application.lastStop === "forced" ? "was stopped while Pi still had work" : "did not detach"}`
+                  ? `free; its last runtime ${application.lastStop === "forced" ? "was stopped before Pi was known to be idle" : "did not detach"}`
                   : "free"
             }<br><span class="footnote">${escape(application.exercises ?? "")} · schema ${escape(String(application.schema))}, Pi ${escape(application.pi)}</span>${application.url ? `<br><a href="${escape(application.url)}" target="_blank" rel="noreferrer">${escape(application.url)}</a>` : ""}</li>`,
         )

@@ -5,7 +5,11 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { retainedRefusal } from "../../scripts/retained-state.mjs";
+import {
+  keepRuntimeOpen,
+  readMark,
+  retainedRefusal,
+} from "../../scripts/retained-state.mjs";
 import { stateLocation } from "../../scripts/state-location.mjs";
 
 import { applications, chats, savedInformation } from "./db-schema";
@@ -17,6 +21,7 @@ type HallviDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
   var __hallviDb: HallviDatabase | undefined;
+  var __hallviRuntimeHold: { release: () => void } | undefined;
 }
 
 export function databasePath() {
@@ -38,6 +43,10 @@ function createDatabase(): HallviDatabase {
   // would already write a log beside it.
   const refusal = retainedRefusal(path);
   if (refusal) throw new Error(refusal);
+  // Allowed in: say so for as long as this process lives, so that the next
+  // attach cannot begin under an app or worker that outlived its runtime.
+  if (readMark(dirname(path)))
+    globalThis.__hallviRuntimeHold ??= keepRuntimeOpen(dirname(path));
   mkdirSync(dirname(path), { recursive: true });
   const client = new Database(path);
   try {

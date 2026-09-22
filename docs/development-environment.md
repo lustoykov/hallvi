@@ -33,16 +33,20 @@ beside the database marks the directory as retained and names the directory it
 protects, and that mark is what every program checks.
 
 **A marked directory is opened by the runtime that attached it, and by nothing
-else.** `attach` holds an exclusive lock on the directory for as long as it
-runs, writes down who is attaching in `runtime.json`, and starts `npm run dev`
-on that state with its runtime id in the environment. The app, the worker,
+else.** `attach` holds a lock on the directory for as long as it runs, writes
+down who is attaching in `runtime.json`, and starts `npm run dev` on that
+state with its runtime id in the environment. The app, the worker,
 `db:push`, the migration and the launcher all ask the same rule
 ([`scripts/retained-state.mjs`](../scripts/retained-state.mjs)) before opening
 the database: a process that is not inside the runtime holding the lock is
 refused, whether it was started by hand with `HALLVI_DB_PATH` pointing there
-or by a second `npm run dev`. The worker's own lock still stops a second
-worker; this stops a second interface, a second studio and a stray script as
-well, because the interface writes records too.
+or by a second `npm run dev`. Each process that is let in then keeps the
+directory marked open for as long as it lives, so an app or worker that
+outlived its runtime blocks the next attach instead of writing under it; a
+studio or a shell that opened the database is found through `lsof` where the
+system has it. The worker's own lock still stops a second worker; this stops
+a second interface, a second studio and a stray script as well, because the
+interface writes records too.
 
 The state stays where it is whoever attaches it. Nothing is copied out to a
 worktree or copied back; the worktree runs against the directory, and the
@@ -66,8 +70,9 @@ In order, and each one a refusal on its own:
    which branch, since when and at which address, and stops. It never takes an
    application from a runtime that is still running, however long ago it
    attached.
-2. **A worker is still serving it** — a runtime that crashed but whose worker
-   survived. Stop that worker first.
+2. **Something from an earlier runtime still has it open** — an app or worker
+   that survived a crashed attach, a studio, a shell on the database. Stop it
+   first; the command names the process where it can.
 3. **The last runtime did not detach.** Its `runtime.json` is still there. The
    command says so, lists every command still recorded as running, and asks
    the host what has been running since the earliest of them began — a command
@@ -102,9 +107,13 @@ hold — the same hold an update uses — and says how many conversations still
 have work in hand; the launcher waits for that to be nothing, up to five
 minutes, saying so every ten seconds. Then the worker stops, Pi keeping
 whatever it had, the lock is released and `runtime.json` is removed. A second
-Ctrl-C stops the worker without waiting; so does the five-minute limit. Either
-leaves `runtime.json` behind with `outcome: forced`, and the next attach reads
-it as an unclean stop and accounts for it as above.
+Ctrl-C stops the worker without waiting; so does the five-minute limit; and a
+worker whose status cannot be read — it answers badly, or not at all — is
+stopped without being called idle. Each of those leaves `runtime.json`
+behind with `outcome: forced`, and the next attach reads it as an unclean
+stop and accounts for it as above. Only the terminal's own second Ctrl-C
+counts as a second request: the attach command passes a `detach` on as one
+signal, never two.
 
 Ownership never lapses on its own. A stale-looking attachment is a runtime
 that is still holding the lock, and the way to take its application is to
@@ -185,18 +194,18 @@ A snapshot is a copy for looking at: the chosen applications' databases merged
 into one, their execution, activity and workspace records and Pi's histories —
 and none of their SSH keys, secrets or connection requests. The recorded key
 paths point inside the snapshot, where no key is, and the command prints the
-one line that runs the interface alone against it, with an empty account
-directory so there is no ChatGPT login for a worker and no provider token for
-the interface. It cannot reach the host or the providers, which is what makes
-it safe to point any branch at. It is also **the way to see one controller
-holding several real applications** when a change is about the list, the
-homepage or anything cross-application: the shipping code keeps working with
-many applications in one database, and the synthetic multi-application
-fixtures (`npm run scenarios`, the browser journeys) remain the coverage for
-that behaviour.
+one line that runs the pair against it with an empty account directory. The
+worker is what reads a conversation's history, so it runs; with no ChatGPT
+login it cannot start a turn (a send is refused before any tool exists), and
+with no connections it cannot reach a provider or the host. That is what
+makes a snapshot safe to point any branch at. It is also **the way to see one
+controller holding several real applications** when a change is about the
+list, the homepage or anything cross-application: the shipping code keeps
+working with many applications in one database, and the synthetic
+multi-application fixtures (`npm run scenarios`, the browser journeys) remain
+the coverage for that behaviour.
 
-A snapshot is not attached and not marked: running a worker on it would start
-nothing useful (no login) and is not the point. Delete it when done.
+A snapshot is not attached and not marked. Delete it when done.
 
 ## When a disposable fixture is still the right thing
 

@@ -143,6 +143,57 @@ sign-in; Miniflux 200); Uptime Kuma's three monitors in `kuma.db`; Miniflux's
 two feeds, 182 entries and one starred entry; Paperless's two documents and
 their two originals.
 
+## Four faults a review found, and their fixes
+
+A review of the first version (commit `4cf6129`) reproduced four faults on
+disposable state. Each is fixed on the same branch, reproduced by a test in
+[unit/retained-state.test.ts](../../tests/application/unit/retained-state.test.ts),
+and then reproduced and re-run live on a synthetic retained application under
+a scratch root (`HALLVI_DEV_ROOT`), never on the four.
+
+1. **An old process kept writing after ownership changed.** Ownership was
+   checked once, when the database was opened, and the connection cached; an
+   app that outlived a crashed attach wrote under the next owner. Now every
+   process that is let in keeps a shared read on `runtime.lock` for as long
+   as it lives (`keepRuntimeOpen`, taken by `db.ts`), and an attach holds a
+   reserved lock only after a write to that file commits — which it cannot
+   past a reader. `holdRuntime` answers `refused: "open"` and attach names
+   the processes where `lsof` can. Live: attach, `kill -9` the attach process,
+   old interface still answering 200; the next attach was refused naming pids
+   6834 and 6835; with the survivors stopped it proceeded. The migration
+   refuses the same way.
+2. **One Ctrl-C force-stopped active work.** The terminal's Ctrl-C reached
+   the attach command and the launcher together, and the attach command
+   forwarded a SIGTERM on top, which the launcher read as the second request.
+   Now the attach command forwards only a `detach` (SIGTERM) and ignores its
+   own SIGINT, and the launcher's `stopRequest` treats only a second SIGINT
+   as force. Live: SIGINT to both at once — no "without waiting" line, clean
+   detach, `runtime.json` removed.
+3. **A failed status request became a clean detach.** A worker answering
+   500 was read as no worker, so the launcher stopped it and called the stop
+   clean. Now `holdWorker` answers `null` only when nothing listens, throws on
+   any other outcome (a bad status, a bad body, no answer within ten
+   seconds), and `drainWorker` returns `unknown` after three failures; only
+   `idle` is a clean stop, and a worker that then ignores SIGTERM is killed
+   after fifteen seconds rather than holding the records for ever. Live: the
+   worker frozen with SIGSTOP, `detach` from another shell — "could not be
+   read … stopping it without knowing", `runtime.json` kept with
+   `outcome: forced`.
+4. **Snapshots showed no conversations.** Histories are read through the
+   worker, and the printed command started the interface alone. The command
+   now starts the pair with the empty account directory: the worker reads
+   the copied histories, and with no ChatGPT login a send is refused before
+   any tool exists; with no connections nothing can reach a provider or the
+   host, and the recorded key paths point inside the snapshot, where no key
+   is. Live, on a read-only snapshot of whoami: the conversation's nine
+   messages served, a send answered 400, the key path
+   `<snapshot>/state/config/operator/…/ssh/id_ed25519` absent, the four
+   applications free throughout.
+
+During this work an edit to the launcher swallowed the interface, dashboard
+and studio starts for a while; the live runs above were made after that was
+noticed and put back, and the diff against the first version was read whole.
+
 ## Not done, and limitations
 
 - **One host, four root keys.** State ownership isolates Hallvi's records
@@ -153,9 +204,10 @@ their two originals.
 - **JSON record formats have no version**; attach compares the schema and
   the Pi version only, and a change to the records under `config/` is tested
   on a copy by hand.
-- **The forced-stop path** and the host process listing after a crash were
-  exercised only on synthetic state and by reading, not against real work in
-  flight.
+- **The forced-stop paths** — a second Ctrl-C, the five-minute limit, an
+  unreadable worker — and the host process listing after a crash were
+  exercised on synthetic state (the unreadable worker live, the others by
+  test), not against real work in flight.
 - **Attach copies grow**: paperless's state is 170 MB because of two captured
   workspaces, and every attach copies it. The five newest attach copies are
   kept per application; older ones the tool made are removed.

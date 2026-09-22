@@ -26,7 +26,12 @@ import {
   resolveEnvironment,
   WORKER_BUSY_EXIT,
 } from "./dev-environment.mjs";
-import { DETACH_FORCED_EXIT, retainedRefusal } from "./retained-state.mjs";
+import {
+  DETACH_FORCED_EXIT,
+  drainWorker,
+  retainedRefusal,
+  stopRequest,
+} from "./retained-state.mjs";
 import { holdWorker } from "./worker-socket.mjs";
 const resolved = resolveEnvironment();
 // A retained application's records are opened by the runtime attached to them
@@ -125,7 +130,13 @@ function start(args, extra = {}) {
     detached: attached,
   });
   children.add(child);
-  child.on("exit", () => children.delete(child));
+  child.on("exit", (code, signal) => {
+    children.delete(child);
+    if (attached && !stopping)
+      console.warn(
+        `${args.at(-1)?.endsWith("worker.ts") ? "The worker" : `${args[0]}`} exited ${signal ? `on ${signal}` : `with code ${code}`}.`,
+      );
+  });
   return child;
 }
 
@@ -139,49 +150,55 @@ function stop(signal) {
  * Detaching, in order: the interface stops first, so nothing new is accepted;
  * the worker is asked to hold — it refuses new work and says how much it has
  * in hand — and is stopped once that is nothing, or once the wait has gone on
- * long enough that the person asking has presumably given up on it. A second
- * signal stops it at once. Pi keeps whatever a stopped worker was doing, and
- * the exit code says whether anything was still going on.
+ * long enough that the person asking has presumably given up on it. Pi keeps
+ * whatever a stopped worker was doing, and the exit code says whether the
+ * stop was clean: it is not when work was still going on, and not when the
+ * worker's status could not be read, because "not known" is not "nothing".
+ *
+ * A second Ctrl-C stops the worker at once. Only the terminal's own signal
+ * counts as that: the attach command forwards a SIGTERM to this launcher on
+ * the same Ctrl-C, and a forwarded copy of the first request is not a
+ * second one.
  */
 let forced = false;
 let detaching;
-function detach() {
-  if (detaching) {
+function detach(signal) {
+  const request = stopRequest(Boolean(detaching), signal);
+  if (request === "ignore") return;
+  if (request === "force") {
     console.warn("Stopping the worker without waiting for its work to end.");
     forced = true;
     for (const child of children) child.kill("SIGTERM");
     return;
   }
   stopping = true;
+  console.warn(
+    `Detaching on ${signal}: the interface stops now, the worker once it is idle.`,
+  );
   detaching = (async () => {
     for (const child of children) if (child !== worker) child.kill("SIGTERM");
-    const started = Date.now();
-    let said = 0;
-    while (!forced) {
-      const held = await holdWorker(resolved.database).catch(() => null);
-      if (!held || held.busy === 0) break;
-      if (Date.now() - started > DETACH_LIMIT_MS) {
-        console.warn(
-          `Still ${held.busy} conversation${held.busy === 1 ? "" : "s"} working after ${Math.round(DETACH_LIMIT_MS / 60_000)} minutes; stopping the worker anyway.`,
-        );
-        forced = true;
-        break;
-      }
-      if (Date.now() - said > 10_000) {
-        said = Date.now();
-        console.warn(
-          `Detaching: waiting for ${held.busy} conversation${held.busy === 1 ? "" : "s"} still working. Ctrl-C again stops without waiting.`,
-        );
-      }
-      await delay(2_000);
-    }
+    const outcome = await drainWorker(() => holdWorker(resolved.database), {
+      limitMs: DETACH_LIMIT_MS,
+      forced: () => forced,
+      say: (line) => console.warn(line),
+      wait: (ms) => delay(ms),
+    });
+    if (outcome !== "idle") forced = true;
     worker?.kill("SIGTERM");
-    while (children.size) await delay(100);
+    // A worker whose status could not be read may not be answering signals
+    // either; the stop is already recorded as unclean, so it is not left to
+    // hold the records for ever.
+    const grace = Date.now() + 15_000;
+    while (children.size) {
+      if (Date.now() > grace)
+        for (const child of children) child.kill("SIGKILL");
+      await delay(100);
+    }
     process.exitCode = forced ? DETACH_FORCED_EXIT : 0;
   })();
 }
 for (const signal of ["SIGINT", "SIGTERM"])
-  process.on(signal, () => (attached ? detach() : stop(signal)));
+  process.on(signal, () => (attached ? detach(signal) : stop(signal)));
 
 const next = start(
   [

@@ -33,10 +33,28 @@ export const MARK_FILE: string;
 export const RUNTIME_FILE: string;
 export function readMark(directory: string): RetainedMark | null;
 export function readRuntime(directory: string): RetainedRuntime | null;
-export function holdRuntime(directory: string): { release: () => void } | null;
+export type RuntimeHold =
+  | { release: () => void; refused?: undefined }
+  | { refused: "attached" | "open"; release?: undefined };
+export function holdRuntime(directory: string): RuntimeHold;
+export function keepRuntimeOpen(directory: string): { release: () => void };
+export function drainWorker(
+  ask: () => Promise<{ busy: number } | null>,
+  options: {
+    limitMs: number;
+    forced?: () => boolean;
+    say?: (line: string) => void;
+    wait: (ms: number) => Promise<unknown>;
+    intervalMs?: number;
+  },
+): Promise<"idle" | "busy" | "unknown">;
 export function runtimeHeld(directory: string): boolean;
 export function retainedRefusal(
   databasePath: string,
   env?: Record<string, string | undefined>,
 ): string | null;
 export const DETACH_FORCED_EXIT: number;
+export function stopRequest(
+  detaching: boolean,
+  signal: string,
+): "detach" | "force" | "ignore";

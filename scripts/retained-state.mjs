@@ -53,34 +53,83 @@ function lockPath(directory) {
 }
 
 /**
- * Become the runtime for this directory, or learn that there already is one.
- * The lock is a SQLite exclusive transaction, as the worker's is: held by
- * this process, released by the operating system when the process ends.
+ * Become the runtime for this directory, or learn why not.
+ *
+ * Two things can stand in the way, and they are told apart. Another attach
+ * holds the reserved lock — `refused: "attached"`. Or an app or worker from
+ * an earlier runtime still has the records open: each of them keeps a shared
+ * read on this file for as long as it lives (`keepRuntimeOpen`), and a write
+ * cannot commit past a reader — `refused: "open"`. The lock this returns is
+ * reserved, not exclusive, so that the runtime's own children can take their
+ * shared read beside it; it is held by this process and released by the
+ * operating system when the process ends, however it ends.
  */
 export function holdRuntime(directory) {
   const lock = new Database(lockPath(directory), { timeout: 0 });
-  try {
-    lock.exec("BEGIN EXCLUSIVE");
-  } catch {
+  const reserve = () => {
+    try {
+      lock.exec("BEGIN IMMEDIATE");
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!reserve()) {
     lock.close();
-    return null;
+    return { refused: "attached" };
   }
+  try {
+    lock.exec("CREATE TABLE IF NOT EXISTS runtime (attached_at TEXT)");
+    lock.exec("DELETE FROM runtime");
+    lock
+      .prepare("INSERT INTO runtime VALUES (?)")
+      .run(new Date().toISOString());
+    lock.exec("COMMIT");
+  } catch {
+    try {
+      lock.exec("ROLLBACK");
+    } catch {
+      // Nothing was committed either way.
+    }
+    lock.close();
+    return { refused: "open" };
+  }
+  if (!reserve()) {
+    lock.close();
+    return { refused: "attached" };
+  }
+  return { release: () => lock.close() };
+}
+
+/**
+ * Keep this directory's records marked as open for as long as this process
+ * lives: a shared read on the lock file that no later attach can commit past.
+ * The app and the worker take it once their ownership check has passed, so an
+ * old one that outlived its runtime blocks the next attach instead of writing
+ * under it.
+ */
+export function keepRuntimeOpen(directory) {
+  const lock = new Database(lockPath(directory), { timeout: 5_000 });
+  lock.exec("BEGIN");
+  lock.prepare("SELECT count(*) FROM sqlite_master").get();
   return { release: () => lock.close() };
 }
 
 /** Whether some process holds this directory's runtime lock right now. */
 export function runtimeHeld(directory) {
   if (!existsSync(lockPath(directory))) return false;
-  let held;
+  let lock;
   try {
-    held = holdRuntime(directory);
-  } catch {
-    // A lock that cannot be opened — a read-only copy — is nobody's.
+    lock = new Database(lockPath(directory), { timeout: 0 });
+    lock.exec("BEGIN IMMEDIATE");
+    lock.exec("ROLLBACK");
     return false;
+  } catch (error) {
+    // Reserved by an attach. Anything else — a read-only copy — is nobody's.
+    return error?.code === "SQLITE_BUSY";
+  } finally {
+    lock?.close();
   }
-  if (!held) return true;
-  held.release();
-  return false;
 }
 
 /**
@@ -118,3 +167,63 @@ export function retainedRefusal(databasePath, env = process.env) {
  * had work in hand. The next attach reads it as an unclean stop.
  */
 export const DETACH_FORCED_EXIT = 4;
+
+/**
+ * Wait for the worker to have nothing in hand, asking it to hold in the
+ * meantime. `ask` answers `{ busy }` from the worker, `null` when there is no
+ * worker to ask, and throws when the worker could not be asked properly. The
+ * answer is one of three: `idle` — safe to stop; `busy` — work was still
+ * going on when the wait ended (the limit, or `forced()`); `unknown` — the
+ * worker's status could not be read. Only `idle` is a clean stop.
+ */
+export async function drainWorker(
+  ask,
+  { limitMs, forced = () => false, say = () => {}, wait, intervalMs = 2_000 },
+) {
+  const started = Date.now();
+  let failures = 0;
+  let said = 0;
+  while (!forced()) {
+    let held;
+    try {
+      held = await ask();
+      failures = 0;
+    } catch (error) {
+      if (++failures >= 3) {
+        say(
+          `The worker's status could not be read (${error instanceof Error ? error.message : error}); stopping it without knowing.`,
+        );
+        return "unknown";
+      }
+      await wait(intervalMs);
+      continue;
+    }
+    if (!held || held.busy === 0) return "idle";
+    if (Date.now() - started > limitMs) {
+      say(
+        `Still ${held.busy} conversation${held.busy === 1 ? "" : "s"} working after ${Math.round(limitMs / 60_000)} minutes; stopping the worker anyway.`,
+      );
+      return "busy";
+    }
+    if (Date.now() - said > 10_000) {
+      said = Date.now();
+      say(
+        `Detaching: waiting for ${held.busy} conversation${held.busy === 1 ? "" : "s"} still working. Ctrl-C again stops without waiting.`,
+      );
+    }
+    await wait(intervalMs);
+  }
+  return "busy";
+}
+
+/**
+ * What a signal to an attached launcher means. The first is a detach. While
+ * one is under way, only the terminal's own Ctrl-C (SIGINT) is the second
+ * request that forces the worker to stop: the attach command forwards a
+ * SIGTERM for the same Ctrl-C, and a forwarded copy of the first request is
+ * not a second one.
+ */
+export function stopRequest(detaching, signal) {
+  if (!detaching) return "detach";
+  return signal === "SIGINT" ? "force" : "ignore";
+}
