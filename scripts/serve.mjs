@@ -13,6 +13,7 @@
 // stepping aside for a live one: something is reading the queue, so the
 // interface stays up.
 import Database from "better-sqlite3";
+import { migrateAccountConnections } from "./migrate-account-connections.mjs";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -163,6 +164,8 @@ if (checkingInstalled) {
   console.log("Hallvi can open this controller database.");
   process.exit(0);
 }
+
+migrateAccountConnections(resolved.config, resolved.piAccount);
 
 const children = new Set();
 let stopping = false;

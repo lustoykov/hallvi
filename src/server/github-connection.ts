@@ -8,8 +8,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
-
-import { stateLocation } from "../../scripts/state-location.mjs";
+import { lock } from "proper-lockfile";
 
 import {
   GithubAccessError,
@@ -17,6 +16,7 @@ import {
   githubJson,
   readGithubCliCredential,
 } from "./github-api";
+import { accountFile } from "./pi-configuration";
 
 export const githubAccountSchema = z.object({
   id: z.number().int().positive(),
@@ -121,13 +121,7 @@ export function canRefreshGithubConnection(connection: GithubConnection) {
 }
 
 export function githubConnectionPath() {
-  return join(
-    resolve(
-      /* turbopackIgnore: true */ process.env.HALLVI_CONFIG_DIR ??
-        stateLocation(process.cwd(), { hidden: true }).directory,
-    ),
-    "github-connection.json",
-  );
+  return accountFile("github-connection.json");
 }
 
 export function readGithubConnection(): GithubConnection | null {
@@ -282,7 +276,28 @@ async function refreshGithubConnection(
   if (pending?.id === connection.id && pending.token === connection.token)
     return pending.promise;
   const promise = (async () => {
+    // Route bundles share the promise; different controllers/processes share
+    // a file lock. Only one request may spend the single-use refresh grant.
+    const release = await lock(path, {
+      realpath: false,
+      stale: 60_000,
+      retries: { retries: 100, factor: 1, minTimeout: 250, maxTimeout: 250 },
+    }).catch(() => {
+      throw new GithubAccessError(
+        "GitHub access is being renewed elsewhere. Try again.",
+      );
+    });
     try {
+      const latest = readGithubConnection();
+      if (
+        latest?.id !== connection.id ||
+        latest.mode !== "app" ||
+        latest.invalidReason
+      )
+        throw new GithubAccessError(
+          "The GitHub connection changed during renewal. Try again.",
+        );
+      if (latest.token !== connection.token) return latest;
       const data = await githubDeviceRequest("/login/oauth/access_token", {
         client_id: connection.clientId,
         grant_type: "refresh_token",
@@ -340,12 +355,25 @@ async function refreshGithubConnection(
       saveGithubConnection(refreshed);
       return refreshed;
     } catch (error) {
+      // Another controller sharing this login may have renewed it while this
+      // request was refused: the file then holds the rotated login, which is
+      // the one to use, and nothing is wrong with it.
+      const current = readGithubConnection();
+      if (
+        current?.mode === "app" &&
+        current.id === connection.id &&
+        current.token !== connection.token &&
+        !current.invalidReason
+      )
+        return current;
       if (error instanceof GithubAccessError && error.kind === "auth")
         invalidateGithubConnection(connection, error.message);
       if (error instanceof GithubAccessError) throw error;
       throw new GithubAccessError(
         "GitHub access could not be renewed. Try again.",
       );
+    } finally {
+      await release();
     }
   })();
   all.set(path, { token: connection.token, id: connection.id, promise });

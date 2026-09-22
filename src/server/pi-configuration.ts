@@ -82,6 +82,16 @@ export function piAccountDir() {
   );
 }
 
+/**
+ * A connection to one of the owner's accounts — GitHub, Hetzner, Cloudflare —
+ * is account settings too, so it lives beside the ChatGPT login and travels
+ * with it. Copying one between checkouts is what this exists to end: renewing
+ * the GitHub login rotates its refresh token, and the copy left behind dies.
+ */
+export function accountFile(name: string) {
+  return join(piAccountDir(), name);
+}
+
 function readJsonFile(path: string): unknown {
   try {
     return JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));

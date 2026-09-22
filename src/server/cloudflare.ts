@@ -15,8 +15,8 @@
 import { isIPv4, isIPv6 } from "node:net";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { piConfigDir } from "./pi-configuration";
+import { dirname } from "node:path";
+import { accountFile } from "./pi-configuration";
 
 const BASE = "https://api.cloudflare.com/client/v4";
 
@@ -32,7 +32,7 @@ export interface CloudflareConnection {
 }
 
 function connectionPath() {
-  return join(piConfigDir(), "cloudflare-connection.json");
+  return accountFile("cloudflare-connection.json");
 }
 
 /**
@@ -102,8 +102,8 @@ export async function connectCloudflare(input: {
       );
   const chosen =
     given ?? (discovered?.length === 1 ? (discovered[0]?.id ?? null) : null);
-  mkdirSync(piConfigDir(), { recursive: true, mode: 0o700 });
-  const temporary = join(piConfigDir(), `cloudflare-${randomUUID()}.tmp`);
+  mkdirSync(dirname(connectionPath()), { recursive: true, mode: 0o700 });
+  const temporary = accountFile(`cloudflare-${randomUUID()}.tmp`);
   writeFileSync(
     temporary,
     JSON.stringify({ token: value, accountId: chosen }),

@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import {
   mkdtempSync,
   readFileSync,
@@ -411,7 +412,7 @@ describe("GitHub access renewal", () => {
     );
     const first = connectedGithubCredential();
     const second = connectedGithubCredential();
-    expect(device).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(device).toHaveBeenCalledTimes(1));
     resolve(renewedResponse);
     const results = await Promise.all([first, second]);
     expect(results[0]).toEqual(results[1]);
@@ -420,6 +421,76 @@ describe("GitHub access renewal", () => {
       globalThis.__hallviGithubRefreshes?.has(githubConnectionPath()),
     ).toBe(false);
   });
+
+  it("serializes a single-use refresh across two controller processes", async () => {
+    await expiringLogin();
+    const script = `
+      import { connectedGithubCredential } from ${JSON.stringify(new URL("../../../src/server/github-connection.ts", import.meta.url).href)};
+      Date.now = () => ${now};
+      globalThis.fetch = async () => {
+        process.send({ type: "exchange" });
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return new Response(JSON.stringify(${JSON.stringify(renewedResponse)}), { status: 200 });
+      };
+      process.once("message", async () => {
+        try {
+          const result = await connectedGithubCredential();
+          process.send({ type: "done", renewed: result.token === ${JSON.stringify(renewedResponse.access_token)} });
+        } catch { process.send({ type: "done", renewed: false }); }
+        process.disconnect();
+      });
+      process.send({ type: "ready" });
+    `;
+    let exchanges = 0;
+    const workers = [0, 1].map(() =>
+      spawn(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "-e", script],
+        {
+          env: {
+            ...process.env,
+            HALLVI_CONFIG_DIR: directory,
+            HALLVI_PI_CONFIG_DIR: directory,
+          },
+          stdio: ["ignore", "ignore", "ignore", "ipc"],
+        },
+      ),
+    );
+    try {
+      const done = workers.map(
+        (worker) =>
+          new Promise<boolean>((resolve, reject) => {
+            worker.on(
+              "message",
+              (message: { type: string; renewed?: boolean }) => {
+                if (message.type === "exchange") exchanges++;
+                if (message.type === "done") resolve(message.renewed === true);
+              },
+            );
+            worker.on("error", reject);
+            worker.on("exit", (code) => {
+              if (code !== 0) reject(new Error("Controller fixture failed"));
+            });
+          }),
+      );
+      await Promise.all(
+        workers.map(
+          (worker) =>
+            new Promise<void>((resolve) => {
+              worker.on("message", (message: { type: string }) => {
+                if (message.type === "ready") resolve();
+              });
+            }),
+        ),
+      );
+      workers.forEach((worker) => worker.send("start"));
+      expect(await Promise.all(done)).toEqual([true, true]);
+      expect(exchanges).toBe(1);
+      expect(readGithubConnection()?.invalidReason).toBeUndefined();
+    } finally {
+      workers.forEach((worker) => worker.kill());
+    }
+  }, 15_000);
 
   it.each(["disconnect", "replace", "invalidate"])(
     "a pending refresh cannot undo %s",
@@ -433,6 +504,7 @@ describe("GitHub access renewal", () => {
           }),
       );
       const request = connectedGithubCredential();
+      await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
       const rejected = expect(request).rejects.toThrow(
         "changed during renewal",
       );
@@ -480,6 +552,7 @@ describe("GitHub access renewal", () => {
         }),
     );
     const request = connectedGithubCredential();
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
     const rejected = expect(request).rejects.toThrow("Sign in again");
     const replacement = await reuse();
     resolve({

@@ -118,6 +118,7 @@ try {
     "package-lock.json",
     "next.config.ts",
     "scripts/serve.mjs",
+    "scripts/migrate-account-connections.mjs",
     "scripts/cli.mjs",
     "scripts/dev-environment.mjs",
     "scripts/state-location.mjs",

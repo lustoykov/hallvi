@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { piConfigDir } from "./pi-configuration";
+import { dirname } from "node:path";
+import { accountFile } from "./pi-configuration";
 import { redactSecrets } from "./secrets";
 
 function connectionPath() {
-  return join(piConfigDir(), "hetzner-connection.json");
+  return accountFile("hetzner-connection.json");
 }
 function connection(): { token: string; id: string } {
   try {
@@ -99,8 +99,8 @@ export async function connectHetzner(token: string) {
   if (!/^[A-Za-z0-9_+\/=-]{48,200}$/.test(token))
     throw new Error("Enter a valid Hetzner Cloud API token.");
   await hetzner("/servers?per_page=1", undefined, token);
-  mkdirSync(piConfigDir(), { recursive: true, mode: 0o700 });
-  const temporary = join(piConfigDir(), `hetzner-${randomUUID()}.tmp`);
+  mkdirSync(dirname(connectionPath()), { recursive: true, mode: 0o700 });
+  const temporary = accountFile(`hetzner-${randomUUID()}.tmp`);
   writeFileSync(
     temporary,
     JSON.stringify({
