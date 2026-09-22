@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
+import { lock } from "proper-lockfile";
 
 import {
   GithubAccessError,
@@ -275,7 +276,28 @@ async function refreshGithubConnection(
   if (pending?.id === connection.id && pending.token === connection.token)
     return pending.promise;
   const promise = (async () => {
+    // Route bundles share the promise; different controllers/processes share
+    // a file lock. Only one request may spend the single-use refresh grant.
+    const release = await lock(path, {
+      realpath: false,
+      stale: 60_000,
+      retries: { retries: 100, factor: 1, minTimeout: 250, maxTimeout: 250 },
+    }).catch(() => {
+      throw new GithubAccessError(
+        "GitHub access is being renewed elsewhere. Try again.",
+      );
+    });
     try {
+      const latest = readGithubConnection();
+      if (
+        latest?.id !== connection.id ||
+        latest.mode !== "app" ||
+        latest.invalidReason
+      )
+        throw new GithubAccessError(
+          "The GitHub connection changed during renewal. Try again.",
+        );
+      if (latest.token !== connection.token) return latest;
       const data = await githubDeviceRequest("/login/oauth/access_token", {
         client_id: connection.clientId,
         grant_type: "refresh_token",
@@ -350,6 +372,8 @@ async function refreshGithubConnection(
       throw new GithubAccessError(
         "GitHub access could not be renewed. Try again.",
       );
+    } finally {
+      await release();
     }
   })();
   all.set(path, { token: connection.token, id: connection.id, promise });

@@ -26,6 +26,27 @@ recording the result before its branch or worktree is retired.
 
 Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, the account level — the ChatGPT login and model preferences, and the GitHub, Hetzner and Cloudflare connections — lives in `~/.config/hallvi/pi`, so every checkout and preview port on this machine reuses the same logins and none of them copies one (a copied GitHub login dies when either copy renews). Application databases, executions, SSH keys and secrets remain local to each controller. Set `HALLVI_PI_CONFIG_DIR` to choose another account directory. An explicit `HALLVI_CONFIG_DIR` isolates the account level too unless `HALLVI_PI_CONFIG_DIR` is also supplied, which is what keeps test fixtures apart. Disconnecting or changing anything at the account level affects every controller using that directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](integrations/github.md).
 
+On an installed controller's next start, legacy GitHub, Hetzner and Cloudflare
+connections move from its config directory into the selected account directory,
+only where no account file already exists. A saved disconnect (`null`) counts
+as existing. The launcher finishes this before starting the interface or worker;
+`--check-installed` changes no credentials. Existing shared files win and any
+conflicting legacy files remain untouched. Development checkouts do not import
+legacy connections automatically.
+
+GitHub renewal takes a file lock in that account directory. A second controller
+waits, then reads the rotated token instead of spending the same refresh grant.
+Recovery copies include the authoritative shared files once, under the restored
+controller's config directory, and exclude stale controller copies.
+
+```mermaid
+flowchart LR
+    A[Controller A: own database and application secrets] --> S[Shared account directory]
+    B[Controller B: own database and application secrets] --> S
+    S --> L[GitHub renewal file lock]
+    S --> R[Recovery copy: one current file per account]
+```
+
 ```sh
 npm ci
 npm run db:push

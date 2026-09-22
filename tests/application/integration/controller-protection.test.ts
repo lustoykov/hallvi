@@ -404,3 +404,48 @@ it("carries the application secret store, and the values resolve after restore",
     opened.entries.some((entry) => entry.path.includes("recovery-key.json")),
   ).toBe(false);
 });
+
+it("archives only the authoritative account files when a legacy controller copy remains", async () => {
+  const shared = join(root, "shared-account");
+  mkdirSync(shared, { recursive: true });
+  vi.stubEnv("HALLVI_PI_CONFIG_DIR", shared);
+  const names = [
+    "github-connection.json",
+    "hetzner-connection.json",
+    "cloudflare-connection.json",
+    "pi-settings.json",
+  ];
+  try {
+    for (const name of names) {
+      writeFileSync(
+        join(root, "state", name),
+        JSON.stringify({ legacy: true }),
+      );
+      writeFileSync(join(shared, name), "null");
+    }
+    // An absent account must not resurrect an ignored old controller token.
+    rmSync(join(shared, "cloudflare-connection.json"));
+    rmSync(join(shared, "pi-settings.json"));
+    const { entries: files } = await captureControllerPayload();
+    expect(new Set(files.map((file) => file.path)).size).toBe(files.length);
+    for (const name of names.slice(0, 2)) {
+      expect(
+        files
+          .find((file) => file.path === `payload/config/${name}`)
+          ?.content.toString(),
+      ).toBe("null");
+    }
+    expect(
+      files.some(
+        (file) => file.path === "payload/config/cloudflare-connection.json",
+      ),
+    ).toBe(false);
+    expect(
+      files.some((file) => file.path === "payload/config/pi-settings.json"),
+    ).toBe(false);
+  } finally {
+    vi.stubEnv("HALLVI_PI_CONFIG_DIR", join(root, "state"));
+    for (const name of names)
+      rmSync(join(root, "state", name), { force: true });
+  }
+});

@@ -262,8 +262,18 @@ export async function captureControllerPayload(): Promise<{
   if (existsSync(sessions))
     walk(sessions, "payload/database/pi-sessions", entries);
   const config = piConfigDir();
+  const accountNames = [
+    "github-connection.json",
+    "hetzner-connection.json",
+    "cloudflare-connection.json",
+    "pi-settings.json",
+  ];
   for (const name of readdirSync(config).sort())
-    if (name.endsWith(".json") && lstatSync(join(config, name)).isFile())
+    if (
+      !accountNames.includes(name) &&
+      name.endsWith(".json") &&
+      lstatSync(join(config, name)).isFile()
+    )
       entries.push({
         path: `payload/config/${name}`,
         content: readFileSync(join(config, name)),
@@ -304,7 +314,7 @@ export async function captureControllerPayload(): Promise<{
     "cloudflare-connection.json",
   ]) {
     const path = join(piAccountDir(), name);
-    if (path !== join(config, name) && existsSync(path))
+    if (existsSync(path))
       entries.push({
         path: `payload/config/${name}`,
         content: readFileSync(path),
@@ -318,14 +328,11 @@ export async function captureControllerPayload(): Promise<{
       providerId?: string;
       authPath?: string;
     };
-    // The account directory is usually the config directory, whose *.json
-    // sweep has already taken this file. Do not put it in twice.
-    if (settingsPath !== join(config, "pi-settings.json"))
-      entries.push({
-        path: "payload/config/pi-settings.json",
-        content: readFileSync(settingsPath),
-        mode: 0o600,
-      });
+    entries.push({
+      path: "payload/config/pi-settings.json",
+      content: readFileSync(settingsPath),
+      mode: 0o600,
+    });
     const auth = settings.authPath ?? "";
     if (auth && existsSync(auth) && !lstatSync(auth).isSymbolicLink()) {
       const credential = (

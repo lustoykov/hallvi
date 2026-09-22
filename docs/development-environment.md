@@ -123,9 +123,13 @@ application — where its Pi could reach the other projects and is kept off them
 by its scope rules alone.
 
 To look at a view against the four applications' real records from a
-worktree, take a read-only copy (`sqlite3 "file:…/hallvi.db?mode=ro" .backup`,
-plus the `executions` folders, no `ssh` or `secrets`) and run Next alone on it.
-It shows the records; nothing in it can write or reach a server.
+worktree, copy the database through a read-only source connection
+(`sqlite3 "file:…/hallvi.db?mode=ro" .backup`) and the `executions` folders,
+without `ssh` or `secrets`. Point `HALLVI_DB_PATH` at that copy and set both
+`HALLVI_CONFIG_DIR` and `HALLVI_PI_CONFIG_DIR` to disposable, credential-free
+directories before running Next alone. The copy is writable. Running without
+the worker does not disable API actions or isolate shared provider credentials
+on its own.
 
 The designated checkout is the acceptance bench, whichever branch it is on:
 check the branch out there and `npm run dev` runs it against the real four.
