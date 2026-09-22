@@ -16,6 +16,12 @@ Before building a fixture, check whether the
 applications with their conversations and data. Say which one you are
 changing, and say when you are done; use a disposable fixture for deletion,
 failure and recovery work.
+Work happens in a worktree, which runs its own Hallvi on its own state with
+its own fixtures and shares only the account-level logins; it never opens the
+retained state, and never copies a connection between checkouts. The
+designated checkout is the acceptance bench: check a branch out there to see
+it against the real four. One controller owns those records at a time. See
+[working from a worktree](docs/development-environment.md#working-from-a-worktree).
 This file is for agents developing Hallvi, never the product operator Pi.
 Pi has separate runtime instructions; do not inject contributor instructions,
 local agent skills or development automation prompts into product sessions.

@@ -177,11 +177,12 @@ access. The form also asks for R2 and an account id, which pointing a name at a
 server does not need.
 
 **Where tokens are kept.** `hetzner-connection.json` and
-`cloudflare-connection.json` are plaintext, mode 0600, in the controller's
-config directory. Pi and the remote host never receive them. "Stored on this
-controller only" is not accurate: `controller-protection.ts` copies every
-`*.json` in that directory into Hallvi's encrypted self-backup once backup
-storage is connected. The cards say exactly this.
+`cloudflare-connection.json` are plaintext, mode 0600, in the account
+directory beside the ChatGPT login (`~/.config/hallvi/pi` by default), shared
+by every controller on the machine that uses that directory. Pi and the remote
+host never receive them. "Stored on this controller only" is not accurate:
+`controller-protection.ts` copies the connections into Hallvi's encrypted
+self-backup once backup storage is connected. The cards say exactly this.
 
 **HTTPS without a domain.** Let's Encrypt IP-address certificates are generally
 available ([January 2026](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability)),

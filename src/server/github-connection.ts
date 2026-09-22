@@ -9,14 +9,13 @@ import {
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
-import { stateLocation } from "../../scripts/state-location.mjs";
-
 import {
   GithubAccessError,
   githubDeviceRequest,
   githubJson,
   readGithubCliCredential,
 } from "./github-api";
+import { accountFile } from "./pi-configuration";
 
 export const githubAccountSchema = z.object({
   id: z.number().int().positive(),
@@ -121,13 +120,7 @@ export function canRefreshGithubConnection(connection: GithubConnection) {
 }
 
 export function githubConnectionPath() {
-  return join(
-    resolve(
-      /* turbopackIgnore: true */ process.env.HALLVI_CONFIG_DIR ??
-        stateLocation(process.cwd(), { hidden: true }).directory,
-    ),
-    "github-connection.json",
-  );
+  return accountFile("github-connection.json");
 }
 
 export function readGithubConnection(): GithubConnection | null {
@@ -340,6 +333,17 @@ async function refreshGithubConnection(
       saveGithubConnection(refreshed);
       return refreshed;
     } catch (error) {
+      // Another controller sharing this login may have renewed it while this
+      // request was refused: the file then holds the rotated login, which is
+      // the one to use, and nothing is wrong with it.
+      const current = readGithubConnection();
+      if (
+        current?.mode === "app" &&
+        current.id === connection.id &&
+        current.token !== connection.token &&
+        !current.invalidReason
+      )
+        return current;
       if (error instanceof GithubAccessError && error.kind === "auth")
         invalidateGithubConnection(connection, error.message);
       if (error instanceof GithubAccessError) throw error;

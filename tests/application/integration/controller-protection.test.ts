@@ -117,8 +117,15 @@ it("copies the controller while it runs, including committed WAL data", async ()
     join(root, "state", "backup-destinations", "default.json"),
     JSON.stringify({ bucket: "controller-copies" }),
   );
+  // A connection to the owner's account lives with the model account; here
+  // that is the same directory, and it must still travel exactly once.
+  writeFileSync(
+    join(root, "state", "github-connection.json"),
+    JSON.stringify({ id: "fixture", mode: "app" }),
+  );
   const { entries: files, capturedAt } = await captureControllerPayload();
   const names = files.map((file) => file.path);
+  expect(names).toContain("payload/config/github-connection.json");
   expect(names).toContain("payload/database/hallvi.db");
   expect(names).toContain("payload/database/RECOVERY_QUARANTINE");
   expect(names).toContain("payload/config/RECOVERY_QUARANTINE");

@@ -39,9 +39,11 @@ PORT=5147
 ```
 
 Write the paths out in full; `~` is not expanded here. The third line is not
-optional bookkeeping: a controller directory named without it would take the
-ChatGPT connection with it and ask the owner to sign in again. The fourth is
-read by `next dev` itself, so the address stays the one people know.
+optional bookkeeping: it names the account directory — the ChatGPT login and
+the GitHub, Hetzner and Cloudflare connections — and a controller directory
+named without it would take all of those with it and ask the owner to sign in
+again. The fourth is read by `next dev` itself, so the address stays the one
+people know.
 
 `npm run dev` starts the interface, the Pi worker that carries its conversations,
 a Drizzle Studio on the same database, and the developer dashboard. It prints
@@ -99,6 +101,38 @@ Two things are enforced rather than agreed, and they stay that way:
   its key and its addresses carry `sg-lifecycle=persistent` and
   `sg-cleanup=retain` with no expiry, so the daily cleanup leaves them alone.
   See [development resources](development-resources.md).
+
+## Working from a worktree
+
+A task worktree runs its own Hallvi: an empty database beside the source, its
+own worker, its own fixtures. It never opens the retained state — that would be
+a second worker on one set of records — and it does not show the four
+applications above. What it shares with every other checkout is the account
+level and nothing below it: the ChatGPT login and the GitHub, Hetzner and
+Cloudflare connections, all in the account directory (`~/.config/hallvi/pi`
+unless `HALLVI_PI_CONFIG_DIR` says otherwise). They are shared rather than
+copied because a copy cannot work: renewing the GitHub login rotates its
+refresh token and kills every other copy.
+
+So a worktree's Pi can see the whole Hetzner project and create its own
+labelled resources in it, but has no key to `hallvi-dev` and cannot reach the
+four applications. Its fixtures go either on a disposable server of its own
+(hard isolation, for anything meant to break) or, for ordinary work, as
+separate Compose projects on `hallvi-dev`, kept private and named after the
+application — where its Pi could reach the other projects and is kept off them
+by its scope rules alone.
+
+To look at a view against the four applications' real records from a
+worktree, take a read-only copy (`sqlite3 "file:…/hallvi.db?mode=ro" .backup`,
+plus the `executions` folders, no `ssh` or `secrets`) and run Next alone on it.
+It shows the records; nothing in it can write or reach a server.
+
+The designated checkout is the acceptance bench, whichever branch it is on:
+check the branch out there and `npm run dev` runs it against the real four.
+It is one seat, so say which branch is on it. A branch that changes how Hallvi
+stores anything migrates the retained records when it runs there, and an older
+program refuses a newer database, so switching that checkout back afterwards
+means merging the branch or restoring the copy the migration made.
 
 ## When a disposable fixture is still the right thing
 

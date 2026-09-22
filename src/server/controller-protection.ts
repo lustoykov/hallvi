@@ -294,6 +294,23 @@ export async function captureControllerPayload(): Promise<{
       content: readFileSync(state),
       mode: 0o600,
     });
+  // The connections to the owner's accounts live beside the model account,
+  // which is usually not this directory. A recovered controller without them
+  // could not read a private repository or reach the provider, and would not
+  // know why.
+  for (const name of [
+    "github-connection.json",
+    "hetzner-connection.json",
+    "cloudflare-connection.json",
+  ]) {
+    const path = join(piAccountDir(), name);
+    if (path !== join(config, name) && existsSync(path))
+      entries.push({
+        path: `payload/config/${name}`,
+        content: readFileSync(path),
+        mode: 0o600,
+      });
+  }
   const dependencies: string[] = [];
   const settingsPath = join(piAccountDir(), "pi-settings.json");
   if (existsSync(settingsPath)) {

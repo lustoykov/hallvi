@@ -14,11 +14,17 @@ In the designated checkout, `npm run dev` opens four applications that are
 really deployed on a shared host, with their conversations and data intact:
 the [development environment](development-environment.md). Look there
 before building a fixture, and read that document before changing one.
+Build in a worktree, which runs its own Hallvi with its own state and fixtures
+and shares only the account-level logins; accept in the designated checkout by
+checking the branch out there. Never attach a worktree to the retained state,
+and never copy a connection between checkouts — its
+[working from a worktree](development-environment.md#working-from-a-worktree)
+section says what is shared and what is not.
 Finishing a task includes classifying its resources, preserving anything
 valuable or uncertain, cleaning up only confirmed disposable resources, and
 recording the result before its branch or worktree is retired.
 
-Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, Pi login and model preferences live in `~/.config/hallvi/pi`, so checkouts and preview ports on this machine reuse the connection. Application databases, executions and provider connections remain local to each controller. Set `HALLVI_PI_CONFIG_DIR` to choose another Pi account directory. An explicit `HALLVI_CONFIG_DIR` isolates Pi too unless `HALLVI_PI_CONFIG_DIR` is also supplied. Disconnecting or changing the Pi account/preferences affects all previews using that account directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](integrations/github.md).
+Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, the account level — the ChatGPT login and model preferences, and the GitHub, Hetzner and Cloudflare connections — lives in `~/.config/hallvi/pi`, so every checkout and preview port on this machine reuses the same logins and none of them copies one (a copied GitHub login dies when either copy renews). Application databases, executions, SSH keys and secrets remain local to each controller. Set `HALLVI_PI_CONFIG_DIR` to choose another account directory. An explicit `HALLVI_CONFIG_DIR` isolates the account level too unless `HALLVI_PI_CONFIG_DIR` is also supplied, which is what keeps test fixtures apart. Disconnecting or changing anything at the account level affects every controller using that directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](integrations/github.md).
 
 ```sh
 npm ci
