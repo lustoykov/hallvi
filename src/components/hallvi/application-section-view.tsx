@@ -192,6 +192,18 @@ export function ApplicationSectionView({
         records={information}
         executions={view.executions ?? []}
         applicationName={app.name}
+        source={
+          view.deployment && {
+            applicationId: app.id,
+            repositoryUrl: app.repositoryUrl,
+            deployment: view.deployment,
+            onChanged: onRefresh,
+            onOpenConversation: () => {
+              const main = view.chats.find((chat) => chat.kind === "main");
+              if (main) onOpenConversation(main.id, null);
+            },
+          }
+        }
         now={now}
         chrome={{
           bar,

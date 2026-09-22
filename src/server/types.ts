@@ -121,6 +121,9 @@ export interface OperatorView {
    */
   secrets?: import("./application-secrets").SecretRequest[];
 
+  /** How this application deploys, and what the branch watch has seen. */
+  deployment?: import("./deployment-automation").DeploymentStatus;
+
   /** What Pi ran in this application's conversations, in order. */
   piActivity?: import("./pi-activity").ActivityRecord[];
   application: ApplicationRecord | null;
