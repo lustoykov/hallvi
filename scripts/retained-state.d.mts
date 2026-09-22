@@ -11,6 +11,9 @@ export interface RetainedMark {
   format: { schema: number; pi: string };
   separatedAt: string;
   recoveryCopy?: string;
+  /** Set on the inactive copy the separation left behind. */
+  recovery?: boolean;
+  applications?: string;
 }
 export interface RetainedRuntime {
   runtimeId: string;

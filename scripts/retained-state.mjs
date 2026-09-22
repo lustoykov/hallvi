@@ -27,7 +27,11 @@ function readJson(path) {
   }
 }
 
-/** The mark of a retained state directory, if this is the one it protects. */
+/**
+ * The mark of a retained state directory, if this is the one it protects. A
+ * mark with `recovery` set is on the inactive copy the separation left
+ * behind, which no program opens.
+ */
 export function readMark(directory) {
   const mark = readJson(join(directory, MARK_FILE));
   if (!mark || typeof mark.state !== "string" || !mark.application) return null;
@@ -67,7 +71,13 @@ export function holdRuntime(directory) {
 /** Whether some process holds this directory's runtime lock right now. */
 export function runtimeHeld(directory) {
   if (!existsSync(lockPath(directory))) return false;
-  const held = holdRuntime(directory);
+  let held;
+  try {
+    held = holdRuntime(directory);
+  } catch {
+    // A lock that cannot be opened — a read-only copy — is nobody's.
+    return false;
+  }
   if (!held) return true;
   held.release();
   return false;
@@ -85,6 +95,8 @@ export function retainedRefusal(databasePath, env = process.env) {
   const directory = dirname(resolve(databasePath));
   const mark = readMark(directory);
   if (!mark) return null;
+  if (mark.recovery)
+    return `${directory} is the inactive recovery copy of ${mark.application.name}, kept from before their state was separated on ${mark.separatedAt}. It is not a working controller: the applications live under ${mark.applications ?? "the applications directory beside it"}.`;
   const runtime = readRuntime(directory);
   const held = runtimeHeld(directory);
   if (

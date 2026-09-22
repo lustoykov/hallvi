@@ -96,7 +96,12 @@ function currentVersion(database) {
 async function withoutWriters(database, work) {
   // A retained development application is written by the runtime attached to
   // it, whose worker may be between two writes; its owner detaches first.
-  if (readMark(dirname(database)) && runtimeHeld(dirname(database)))
+  const mark = readMark(dirname(database));
+  if (mark?.recovery)
+    throw new Error(
+      "This is an inactive recovery copy, not a working controller. Nothing was changed.",
+    );
+  if (mark && runtimeHeld(dirname(database)))
     throw new Error(
       "This retained state is attached to a runtime. Detach it first; nothing was changed.",
     );
