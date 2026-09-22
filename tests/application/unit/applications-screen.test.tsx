@@ -27,7 +27,6 @@ const item = (
   source: "one/todo",
   condition: { tone: "muted", text: "Not deployed" },
   stack: "Not deployed yet",
-  attention: 0,
   ...over,
 });
 
@@ -57,8 +56,12 @@ describe("application navigation", () => {
           item({
             id: "app-two",
             source: "two/todo",
-            condition: { tone: "warn", text: "Recommendation waiting for you" },
-            attention: 1,
+            condition: {
+              tone: "warn",
+              text: "Miniflux data has no backup plan",
+              nextStep:
+                "Configure a PostgreSQL backup copy outside this server.",
+            },
           }),
         ]}
       />,
@@ -68,8 +71,9 @@ describe("application navigation", () => {
     expect(html).toContain("one/todo");
     expect(html).toContain("two/todo");
     expect(html).toContain("Not deployed");
-    expect(html).toContain("Recommendation waiting for you");
-    expect(html).toContain("Needs me");
+    expect(html).toContain("Miniflux data has no backup plan");
+    expect(html).toContain("Next: Configure a PostgreSQL backup copy");
+    expect(html).toContain("Needs attention");
     expect(html).not.toContain("Launch Brief");
   });
 
@@ -82,7 +86,6 @@ describe("application navigation", () => {
             // What the list now says for checks that passed a while ago: an
             // old pass is a pass, and opening the application re-asks.
             condition: { tone: "live", text: "Checks held" },
-            attention: 0,
             address: "http://127.0.0.1:18000",
           }),
         ]}
@@ -91,7 +94,7 @@ describe("application navigation", () => {
     expect(html).toContain('href="http://127.0.0.1:18000"');
     expect(html).toContain("Fine");
     expect(html).not.toContain("Not checked");
-    expect(html).not.toContain("Needs me");
+    expect(html).not.toContain("Needs attention");
     expect(html).not.toContain("deployed yet");
   });
 

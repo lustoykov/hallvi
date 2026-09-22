@@ -43,11 +43,13 @@ function state(
 describe("the applications list condition", () => {
   it("does not turn a current warning green because its check passed", () => {
     const warning = state("warning", "warning", "2026-09-18T08:00:00.000Z");
+    warning.presentation!.nextStep = "Make an offsite copy.";
     expect(
       applicationListCondition([warning], APP, Date.parse(warning.createdAt)),
     ).toEqual({
       tone: "warn",
-      text: "A recorded condition has a limit",
+      text: "warning",
+      nextStep: "Make an offsite copy.",
     });
   });
 
@@ -56,7 +58,7 @@ describe("the applications list condition", () => {
     warning.presentation!.checks![0].status = "failed";
     expect(
       applicationListCondition([warning], APP, Date.parse(warning.createdAt)),
-    ).toEqual({ tone: "bad", text: "A check did not pass" });
+    ).toEqual({ tone: "bad", text: "“Homepage answered” did not pass" });
   });
 
   it("does not let an informational observation clear a failure", () => {
@@ -65,7 +67,7 @@ describe("the applications list condition", () => {
     note.presentation!.checks = [];
     expect(
       applicationListCondition([failed, note], APP, Date.parse(note.createdAt)),
-    ).toEqual({ tone: "bad", text: "A recorded condition failed" });
+    ).toEqual({ tone: "bad", text: "failed" });
   });
 
   it("lets a newer verified state replace an older failure", () => {
