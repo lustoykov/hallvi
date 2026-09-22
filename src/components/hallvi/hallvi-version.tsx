@@ -203,11 +203,7 @@ export function ThisHallvi({ className }: { className?: string }) {
   const { installed, available } = state;
   const offering = Boolean(available && !available.blocked && !running);
   const preparing = busy === "install";
-  const noticePhase = preparing
-    ? "checking"
-    : disconnected && running
-      ? "reconnecting"
-      : (attempt?.phase ?? "checking");
+  const noticePhase = preparing ? "checking" : (attempt?.phase ?? "checking");
   const currentStep = UPDATE_STEPS.findIndex(
     (step) => step.phase === noticePhase,
   );
@@ -363,7 +359,11 @@ export function ThisHallvi({ className }: { className?: string }) {
             aria-atomic="true"
           >
             <div className="hv-update-notice-heading">
-              <strong>{UPDATE_HEADINGS[noticePhase]}</strong>
+              <strong>
+                {disconnected && running
+                  ? "Reconnecting to Hallvi"
+                  : UPDATE_HEADINGS[noticePhase]}
+              </strong>
               {(preparing ? available?.version : attempt?.to?.version) ? (
                 <span>
                   {preparing ? available?.version : attempt?.to?.version}
@@ -374,7 +374,7 @@ export function ThisHallvi({ className }: { className?: string }) {
               {preparing
                 ? "Checking the release before installation begins."
                 : disconnected && running
-                  ? "Hallvi is restarting. This page will reconnect on the same address."
+                  ? "The connection to Hallvi was interrupted. Waiting for its next update; the steps show the last reported progress."
                   : attempt?.message}
             </p>
             {noticePhase === "downloading" &&

@@ -4,12 +4,13 @@ test("Hallvi update stays visible through installation, reconnect, and completio
   page,
 }) => {
   test.setTimeout(120_000);
-  let phase: "available" | "installing" | "completed" = "available";
+  let phase: "available" | "downloading" | "installing" | "completed" =
+    "available";
   let disconnectOnce = false;
   await page.route("**/api/hallvi/update", async (route) => {
     if (route.request().method() === "POST") {
       const { action } = route.request().postDataJSON();
-      if (action === "install") phase = "installing";
+      if (action === "install") phase = "downloading";
       if (action === "dismiss") phase = "available";
     } else if (disconnectOnce) {
       disconnectOnce = false;
@@ -77,7 +78,7 @@ test("Hallvi update stays visible through installation, reconnect, and completio
   await page.getByRole("button", { name: "Update", exact: true }).click();
 
   const notice = page.getByRole("status").filter({
-    has: page.getByText("Installing Hallvi", { exact: true }),
+    has: page.getByRole("list", { name: "Update steps" }),
   });
   await expect(notice).toBeVisible();
   await expect(
@@ -86,7 +87,7 @@ test("Hallvi update stays visible through installation, reconnect, and completio
   await expect(
     notice.getByRole("list", { name: "Update steps" }),
   ).toBeVisible();
-  await expect(notice.getByText("Install", { exact: true })).toHaveAttribute(
+  await expect(notice.getByText("Download", { exact: true })).toHaveAttribute(
     "aria-current",
     "step",
   );
@@ -102,6 +103,21 @@ test("Hallvi update stays visible through installation, reconnect, and completio
     }),
   ).toBeVisible({ timeout: 10_000 });
 
+  await expect(notice.getByText("Download", { exact: true })).toHaveAttribute(
+    "aria-current",
+    "step",
+  );
+  await expect(notice.getByText("Install", { exact: true })).not.toHaveClass(
+    /complete/,
+  );
+  await expect(notice).not.toContainText("Hallvi is restarting");
+
+  phase = "installing";
+  await expect(notice.getByText("Install", { exact: true })).toHaveAttribute(
+    "aria-current",
+    "step",
+    { timeout: 10_000 },
+  );
   phase = "completed";
   await expect(
     page.getByRole("status").getByText("Hallvi updated"),
