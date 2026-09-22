@@ -74,6 +74,9 @@ export function deploymentWatch(
   signal?: AbortSignal,
 ) {
   const lookedAt = new Map<string, number>();
+  // Opening a Pi session awaits I/O before it is marked driving. Reserve the
+  // application during that gap so a button and the watch cannot both send.
+  const starting = new Set<string>();
 
   /** Say what became of an attempt whose conversation is no longer running. */
   async function settle(applicationId: string, attempt: DeploymentAttempt) {
@@ -139,54 +142,64 @@ export function deploymentWatch(
     applicationId: string,
     trigger: DeploymentAttempt["trigger"],
   ) {
-    const state = deploymentState(applicationId);
-    const chat = mainChat(applicationId);
-    if (!state.latest || !chat)
-      throw new WorkerRefusal(
-        state.checkError ?? "Hallvi has not read this branch from GitHub yet.",
-        "not-ready",
+    if (starting.has(applicationId))
+      throw new WorkerRefusal("A deployment is already starting.", "busy");
+    starting.add(applicationId);
+    try {
+      const state = deploymentState(applicationId);
+      const chat = mainChat(applicationId);
+      if (state.attempts.some((one) => one.outcome === "running"))
+        throw new WorkerRefusal("A deployment is already running.", "busy");
+      if (state.checkError || !state.latest || !chat)
+        throw new WorkerRefusal(
+          state.checkError ??
+            "Hallvi has not read this branch from GitHub yet.",
+          "not-ready",
+        );
+      if (!operatorSettings(applicationId).host)
+        throw new WorkerRefusal(
+          "No server is connected for this application yet.",
+          "not-ready",
+        );
+      if (conversations.driving(chat.id))
+        throw new WorkerRefusal(
+          "Hallvi is working in the conversation. The deployment can start when that finishes.",
+          "busy",
+        );
+      const attempt: DeploymentAttempt = {
+        id: `${WAKEUP_PREFIX}${randomUUID()}`,
+        commit: state.latest.commit,
+        title: state.latest.title,
+        trigger,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        outcome: "running",
+        detail: null,
+        recordId: null,
+      };
+      // Pi takes the message before the attempt is written down: a refusal
+      // leaves no attempt behind, and an attempt always has a message.
+      await conversations.send(
+        { applicationId, chatId: chat.id },
+        {
+          id: attempt.id,
+          body: wakeup(
+            state,
+            state.latest,
+            trigger,
+            deployedRevision(applicationId),
+          ),
+          delivery: "next",
+        },
       );
-    if (!operatorSettings(applicationId).host)
-      throw new WorkerRefusal(
-        "No server is connected for this application yet.",
-        "not-ready",
-      );
-    if (conversations.driving(chat.id))
-      throw new WorkerRefusal(
-        "Hallvi is working in the conversation. The deployment can start when that finishes.",
-        "busy",
-      );
-    const attempt: DeploymentAttempt = {
-      id: `${WAKEUP_PREFIX}${randomUUID()}`,
-      commit: state.latest.commit,
-      title: state.latest.title,
-      trigger,
-      startedAt: new Date().toISOString(),
-      finishedAt: null,
-      outcome: "running",
-      detail: null,
-      recordId: null,
-    };
-    // Pi takes the message before the attempt is written down: a refusal
-    // leaves no attempt behind, and an attempt always has a message.
-    await conversations.send(
-      { applicationId, chatId: chat.id },
-      {
-        id: attempt.id,
-        body: wakeup(
-          state,
-          state.latest,
-          trigger,
-          deployedRevision(applicationId),
-        ),
-        delivery: "next",
-      },
-    );
-    changeDeploymentState(applicationId, (current) => ({
-      ...current,
-      blocked: null,
-      attempts: [attempt, ...current.attempts],
-    }));
+      changeDeploymentState(applicationId, (current) => ({
+        ...current,
+        blocked: null,
+        attempts: [attempt, ...current.attempts],
+      }));
+    } finally {
+      starting.delete(applicationId);
+    }
   }
 
   async function care(applicationId: string) {

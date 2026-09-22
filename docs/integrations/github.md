@@ -161,7 +161,10 @@ asked for, verifies the running application and saves the deployment record.
 The watch owns only what a conversation cannot:
 
 - **One at a time.** Nothing starts while the main conversation is working or
-  an attempt is running. Commits pushed meanwhile only move "latest"; when the
+  an attempt is running. Starting is reserved before Pi opens its session,
+  and the conversation checks again before accepting the wakeup, so a button
+  click or an owner message arriving at the same time cannot queue a second
+  deployment. Commits pushed meanwhile only move "latest"; when the
   attempt ends, the newest commit is the next one, and the ones between are
   skipped.
 - **Once per commit.** A commit that failed waits for the owner's **Retry** or
@@ -174,7 +177,8 @@ The watch owns only what a conversation cannot:
   as what they are.
 - **Restarts.** The choice, what GitHub last said and every attempt are in
   `operator/<application id>/deployment.json` beside the execution records;
-  what is running comes from the release records. A controller that was off
+  the newest twenty attempts are retained without blocking later deployments.
+  What is running comes from the release records. A controller that was off
   finds the commits it missed on its first look. One that stopped mid-deployment
   reports that attempt as **interrupted** — what reached the server is unknown —
   and leaves continuing or retrying to the owner, as an interrupted
@@ -187,7 +191,9 @@ The record has one writer, the worker. Pi changes it through
 and all three read the same file. **Watching** is never inferred from the
 choice: it is true only while GitHub has recently answered for that branch, and
 the page otherwise says since when it has not. Choosing a branch GitHub cannot
-read is refused rather than saved. Pause holds deployments and keeps looking,
+read is refused rather than saved, including the branch suggested by the setup
+card. **Deploy latest** refuses when its GitHub check fails, rather than deploying
+an older cached tip. Pause holds deployments and keeps looking,
 so the page still shows what is waiting. In Always ask, automatic deployment
 still asks before each command; the card says so.
 

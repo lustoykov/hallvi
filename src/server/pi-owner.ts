@@ -385,7 +385,7 @@ export function sessionOwner(
     },
 
     /** Resolves once Pi has durably taken the message, and not before. */
-    send: (scope: Scope, message: SentMessage) => (
+    send: (scope: Scope, message: SentMessage, onlyIfIdle = false) => (
       assertTaking(),
       inLine(scope.chatId, async () => {
         assertChatWritable(loadChat(scope.applicationId, scope.chatId).chat);
@@ -405,6 +405,11 @@ export function sessionOwner(
           );
         if (held) return { accepted: true };
         if (conversation?.driving) {
+          if (onlyIfIdle)
+            throw new WorkerRefusal(
+              "Hallvi is working in the conversation. The deployment can start when that finishes.",
+              "busy",
+            );
           const queued = await (message.delivery === "steer"
             ? conversation.lane.steer(toPi(message), undefined, ctx)
             : conversation.lane.followUp(toPi(message), undefined, ctx));
@@ -546,7 +551,10 @@ export function sessionOwner(
     /** What the branch watch needs of a conversation, and nothing more. */
     conversations: {
       driving: (chatId: string) => Boolean(opened.get(chatId)?.driving),
-      send: actions.send,
+      // The check belongs inside the conversation queue: an owner message
+      // may have begun opening the session before the watch checked driving.
+      send: (scope: Scope, message: SentMessage) =>
+        actions.send(scope, message, true),
       transcript: actions.transcript,
     },
     /** Requests that are not about a conversation, for whoever owns them. */

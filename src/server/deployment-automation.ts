@@ -126,8 +126,11 @@ export function changeDeploymentState(
   applicationId: string,
   change: (state: DeploymentState) => DeploymentState,
 ) {
-  const next = stateSchema.parse(change(deploymentState(applicationId)));
-  next.attempts = next.attempts.slice(0, KEPT_ATTEMPTS);
+  const changed = change(deploymentState(applicationId));
+  const next = stateSchema.parse({
+    ...changed,
+    attempts: changed.attempts.slice(0, KEPT_ATTEMPTS),
+  });
   const file = path(applicationId);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   const temporary = `${file}.${randomUUID()}.tmp`;
@@ -284,7 +287,7 @@ export async function chooseDeployment(
   const branch = choice.branch ?? before.branch;
   const mode = choice.mode ?? before.mode;
   if (mode && !branch) throw new Error("Say which branch to deploy from.");
-  if (branch && branch !== before.branch) {
+  if (branch && (branch !== before.branch || !before.mode)) {
     etags.delete(applicationId);
     try {
       await branchTip(applicationId, branch, signal);

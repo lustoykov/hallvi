@@ -81,6 +81,7 @@ export const test = base.extend<
         const missing = "00000000-0000-4000-8000-000000000000";
         for (const path of [
           `/api/applications/${missing}`,
+          `/api/applications/${missing}/access`,
           `/api/applications/${missing}/chats`,
           `/api/applications/${missing}/chats/${missing}/messages`,
           `/api/applications/${missing}/chats/${missing}/events`,

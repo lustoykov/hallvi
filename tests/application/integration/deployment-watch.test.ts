@@ -5,6 +5,8 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
 import * as api from "../../../src/server/github-api";
 import {
+  askDeploymentChoice,
+  changeDeploymentState,
   chooseDeployment,
   deploymentState,
   deploymentStatus,
@@ -138,7 +140,8 @@ afterAll(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-it("refuses a branch GitHub does not have, and saves nothing", async () => {
+it("refuses an unreadable branch suggested by the setup card without saving the choice", async () => {
+  askDeploymentChoice(applicationId, "gone");
   await expect(
     chooseDeployment(applicationId, { mode: "automatic", branch: "gone" }),
   ).rejects.toThrow(/no branch “gone”/);
@@ -233,4 +236,67 @@ it("holds pushes while paused and deploys the newest on resume", async () => {
   await watch().tick();
   expect(sent).toHaveLength(4);
   expect(sent[3].body).toContain(tip);
+});
+
+it("keeps the newest twenty attempts without refusing the next deployment", async () => {
+  driving = false;
+  changeDeploymentState(applicationId, (state) => ({
+    ...state,
+    attempts: Array.from({ length: 20 }, (_, index) => ({
+      id: `wakeup:older-${index}`,
+      commit: A,
+      title: "Earlier deployment",
+      trigger: "push" as const,
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      outcome: "deployed" as const,
+      detail: null,
+      recordId: null,
+    })),
+  }));
+  tip = "e".repeat(40);
+  await watch().handle({ applicationId }, { action: "deploy" });
+  const state = deploymentState(applicationId);
+  expect(state.attempts).toHaveLength(20);
+  expect(state.attempts[0]).toMatchObject({ commit: tip, outcome: "running" });
+  expect(state.attempts.at(-1)?.id).toBe("wakeup:older-18");
+});
+
+it("accepts only one deployment while simultaneous sends are being opened", async () => {
+  driving = false;
+  changeDeploymentState(applicationId, (state) => ({ ...state, attempts: [] }));
+  let finish!: () => void;
+  const accepted = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const send = vi.fn(async () => {
+    await accepted;
+    driving = true;
+  });
+  const watching = deploymentWatch({ ...conversations, send });
+  const results = Promise.allSettled([
+    watching.handle({ applicationId }, { action: "deploy" }),
+    watching.handle({ applicationId }, { action: "deploy" }),
+  ]);
+  await vi.waitFor(() => expect(send).toHaveBeenCalled());
+  finish();
+  const outcomes = await results;
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(outcomes.filter((one) => one.status === "fulfilled")).toHaveLength(1);
+  expect(deploymentState(applicationId).attempts).toHaveLength(1);
+});
+
+it("does not deploy a cached tip when Deploy latest cannot read GitHub", async () => {
+  driving = false;
+  changeDeploymentState(applicationId, (state) => ({ ...state, attempts: [] }));
+  const send = vi.fn(conversations.send);
+  vi.mocked(api.githubJson).mockRejectedValueOnce(
+    new api.GithubAccessError("GitHub is unavailable."),
+  );
+  const watching = deploymentWatch({ ...conversations, send });
+  await expect(
+    watching.handle({ applicationId }, { action: "deploy" }),
+  ).rejects.toThrow("GitHub is unavailable.");
+  expect(send).not.toHaveBeenCalled();
+  expect(deploymentState(applicationId).attempts).toHaveLength(0);
 });
