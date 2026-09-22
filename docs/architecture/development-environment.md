@@ -1,60 +1,70 @@
-# Where the records live, and which of them travel
+# Where the records live, and who may open them
 
-Four kinds of state, and only one of them ever leaves this machine. The thing
-worth holding in mind is that a release carries **code**: it never carries
-records, and it never fetches them. An installed user's records are made on
-their own machine the first time they run Hallvi, and are only ever changed
-there.
+Four retained applications, one state directory each, outside every checkout.
+A checkout that needs one attaches it and becomes its runtime for a while;
+the directory never moves. The thing worth holding in mind is that a release
+carries **code**: it never carries records, and it never fetches them. An
+installed user's records are made on their own machine the first time they
+run Hallvi, and are only ever changed there.
 
 ```mermaid
 flowchart LR
     subgraph mac["Owner's MacBook"]
-        subgraph src["Source"]
-            designated["the designated checkout<br/>npm run dev · .env.local"]
-            worktree["a task worktree<br/>npm run dev · its own .hallvi"]
+        subgraph src["Checkouts"]
+            a["worktree A<br/>attach whoami"]
+            b["worktree B<br/>attach uptime-kuma"]
+            c["worktree C<br/>npm run dev · its own .hallvi"]
         end
-        subgraph kept["~/.local/share/hallvi-dev"]
-            state["state/<br/>database · conversations<br/>credentials · connections"]
-            backups["backups/<br/>and migration copies"]
+        subgraph kept["~/.local/share/hallvi-dev/applications"]
+            whoami["whoami/state<br/>retained.json · runtime.lock"]
+            kuma["uptime-kuma/state"]
+            mini["miniflux/state"]
+            paper["paperless/state"]
         end
-        installed["the owner's own installation<br/>com.hallvi on 4747<br/>~/.local/share/hallvi"]
+        account["~/.config/hallvi/pi<br/>ChatGPT · GitHub · Hetzner · Cloudflare"]
+        recovery["recovery/ · backups/<br/>read-only, marked, never opened"]
+        installed["the owner's own installation<br/>com.hallvi on 4747"]
     end
     subgraph host["Hetzner cx23 — 46.62.253.6"]
-        apps["whoami · Uptime Kuma<br/>Miniflux · Paperless<br/>and their own databases"]
-    end
-    subgraph release["A release"]
-        archive["hallvi-&lt;version&gt;-&lt;platform&gt;.tgz<br/>program, Node.js, schema<br/>signed manifest"]
-    end
-    subgraph user["Somebody else's machine"]
-        theirs["their installation<br/>and their own records,<br/>made there, never sent"]
+        apps["whoami · Uptime Kuma<br/>Miniflux · Paperless<br/>one root key each, one host"]
     end
 
-    designated -->|"opens, on 5147"| state
-    worktree -.->|"never"| state
-    state -->|"managed SSH key"| apps
-    state -.->|"before any upgrade"| backups
-    designated ==>|"npm run package<br/>code only"| archive
-    archive ==>|"install-hallvi.sh"| theirs
-    archive -.->|"never carries"| state
-    installed -.->|"untouched by development"| designated
+    a ==>|"holds the lock, on 5147"| whoami
+    b ==>|"holds the lock, on 5148"| kuma
+    c -.->|"refused: not its runtime"| whoami
+    b -.->|"refused: attached elsewhere"| whoami
+    a --> account
+    b --> account
+    c --> account
+    whoami -->|"managed SSH key"| apps
+    kuma -->|"managed SSH key"| apps
+    whoami -.->|"before every attach"| recovery
+    installed -.->|"untouched by development"| a
 ```
 
 The dotted edges are the ones to remember.
 
-**A task worktree does not reach the retained state.** It has no `.env.local`,
-so it keeps a throwaway database beside its own source. Attaching every
-checkout by default is how four live applications would acquire a second
-writer nobody meant to start.
+**A marked directory is opened only by its runtime.** `attach` holds an
+exclusive lock on the directory and starts the app and worker with its runtime
+id; `db.ts`, the launcher, `db:push` and the migration all ask the same rule
+before opening the database, so a second attach, a second `npm run dev`
+pointed at the directory, or a script started by hand is refused — the
+interface writes records too, so the worker's own lock was never enough.
+A copy of the directory anywhere else is not protected: copies are for
+looking and for trying things on.
+
+**Ownership is a process, not a timestamp.** The operating system releases
+the lock when the attaching process ends, however it ends; nothing expires.
+A crash leaves `runtime.json` behind, and the next attach accounts for the
+commands that were running before it starts.
+
+**One host, four keys.** State ownership isolates Hallvi's records. Every
+application's key is root on the same server, so work stays with the
+application you hold and host-wide changes are said out loud.
 
 **A release carries no records.** `scripts/package.mjs` copies an explicit
-list of paths; `.hallvi`, the state directory, backups, secrets and every
-database are unreachable by it. An installed user's records are created by
-their own first run and migrated in place on their own machine — publishing a
-release migrates nobody.
-
-**The owner's own installation is not this.** It is a normal installed Hallvi
-on port 4747, with its own records under `~/.local/share/hallvi`, and
-development never starts, stops or upgrades it.
+list of paths; the state directories, backups, secrets and every database are
+unreachable by it.
 
 Owned by [the development environment](../development-environment.md) and
 [Installing Hallvi](../installation.md).

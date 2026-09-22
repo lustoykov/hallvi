@@ -363,6 +363,17 @@ export function status() {
 async function attach(name, flags) {
   const application = find(name);
   const { state, mark, directory } = application;
+  // One runtime per checkout: `next dev` refuses a second server from the
+  // same directory, and a checkout holding two applications would be two
+  // things at once anyway.
+  const here = realpathSync(checkout);
+  const holding = listApplications().find(
+    (each) => each.attached && each.runtime?.worktree === here,
+  );
+  if (holding && holding.directory !== directory)
+    throw new Refused(
+      `This checkout already holds ${holding.directory} (pid ${holding.runtime?.pid}, at http://127.0.0.1:${holding.runtime?.ports?.app}). One checkout runs one application; detach it first, or attach ${directory} from another worktree.`,
+    );
   const held = holdRuntime(state);
   if (!held) {
     const owner = readRuntime(state);
