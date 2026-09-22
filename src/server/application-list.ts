@@ -36,9 +36,6 @@ export function listApplicationItems(): ApplicationListItem[] {
       source: `${application.repositoryOwner}/${application.repositoryName}`,
       condition: applicationListCondition(records, application.id, now),
       stack: stackOf(records),
-      attention: records.filter(
-        (r) => r.presentation?.role === "recommendation",
-      ).length,
       address: addressOf(records),
     };
   });
@@ -67,12 +64,29 @@ export function applicationListCondition(
     applicationId,
     now,
   );
-  if (reading === "failed")
-    return judgements.some((record) => record.presentation?.status === "failed")
-      ? { tone: "bad", text: "A recorded condition failed" }
-      : { tone: "bad", text: "A check did not pass" };
-  if (reading === "warning")
-    return { tone: "warn", text: "A recorded condition has a limit" };
+  if (reading === "failed") {
+    const failed = judgements.find(
+      (record) => record.presentation?.status === "failed",
+    );
+    if (failed)
+      return {
+        tone: "bad",
+        text: failed.title,
+        nextStep: failed.presentation?.nextStep,
+      };
+    const check = checks.find((item) => item.value.status === "failed")!;
+    return { tone: "bad", text: `“${check.value.label}” did not pass` };
+  }
+  if (reading === "warning") {
+    const warning = judgements.find(
+      (record) => record.presentation?.status === "warning",
+    )!;
+    return {
+      tone: "warn",
+      text: warning.title,
+      nextStep: warning.presentation?.nextStep,
+    };
+  }
   if (!checks.length) return { tone: "muted", text: "Not checked yet" };
   // A pass that has aged is still a pass. The home page is where an owner
   // decides whether anything needs them, and "nobody has looked since

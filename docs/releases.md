@@ -86,6 +86,11 @@ version line can say when it last tried and what went wrong instead of
 quietly showing stale certainty. **Check for updates** forces one regardless.
 
 Installing stays a button. Nothing in the worker starts an update.
+After the owner starts one, the interface keeps a visible update notice in the
+viewport through download, verification, installation and reconnection. It
+shows the recorded phase and result; a completed or failed notice stays until
+the owner dismisses it. The version line remains in the sidebar, but is not
+the only place progress appears.
 
 ## What the owner has to supply
 
