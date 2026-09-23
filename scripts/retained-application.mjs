@@ -560,6 +560,12 @@ async function detach(name) {
     );
     return;
   }
+  // Held, but the record is not yet this attach's own: it is still checking
+  // and copying, and the pid on file, if any, belongs to a runtime that ended.
+  if (!runtime || runtime.outcome)
+    throw new Refused(
+      `${directory} is being attached right now; detach it once it has started.`,
+    );
   process.kill(runtime.pid, "SIGTERM");
   console.log(
     `Asked ${runtime.worktree} (pid ${runtime.pid}) to detach ${directory}; waiting for Pi to finish …`,
