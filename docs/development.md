@@ -10,16 +10,18 @@ this checkout's `.hallvi` state. This guide is for development.
 Development runs locally on the owner's MacBook; the Mac mini is retired from development.
 Before creating or retiring a branch, worktree, local runtime or cloud test resource,
 read [development resource ownership and cleanup](development-resources.md).
-In the designated checkout, `npm run dev` opens four applications that are
-really deployed on a shared host, with their conversations and data intact:
+Four applications are really deployed on a shared host, each with its
+conversation and data kept between tasks in a state directory of its own:
 the [development environment](development-environment.md). Look there
 before building a fixture, and read that document before changing one.
 Build in a worktree, which runs its own Hallvi with its own state and fixtures
-and shares only the account-level logins; accept in the designated checkout by
-checking the branch out there. Never attach a worktree to the retained state,
-and never copy a connection between checkouts — its
-[working from a worktree](development-environment.md#working-from-a-worktree)
-section says what is shared and what is not.
+and shares only the account-level logins. When a change needs a real
+application, attach one — `node scripts/retained-application.mjs attach
+whoami` — and the worktree runs that application on its own port until it
+detaches; a second checkout is refused, and so is anything else that tries to
+open the directory. Never copy a connection between checkouts; the
+[development environment](development-environment.md#one-application-one-owner)
+says what is shared and what is not.
 Finishing a task includes classifying its resources, preserving anything
 valuable or uncertain, cleaning up only confirmed disposable resources, and
 recording the result before its branch or worktree is retired.
@@ -53,7 +55,7 @@ npm run db:push
 npm run dev
 ```
 
-Open the app and developer dashboard at the two addresses printed by `npm run dev` (normally <http://127.0.0.1:3000> and <http://127.0.0.1:4317>). They link to each other. Each worktree gets its own pair on free local ports; the dashboard runs checks and reports for that checkout. An explicit `PORT`, including the retained environment's 5147, is kept exactly and must be free. `HALLVI_DASHBOARD_PORT` similarly pins a dashboard port when needed.
+Open the app and developer dashboard at the two addresses printed by `npm run dev` (normally <http://127.0.0.1:3000> and <http://127.0.0.1:4317>). They link to each other. Each worktree gets its own pair on free local ports; the dashboard runs checks and reports for that checkout. An explicit `PORT`, including a retained application's own port, is kept exactly and must be free. `HALLVI_DASHBOARD_PORT` similarly pins a dashboard port when needed.
 
 That one command starts four processes: the application, the Pi worker that carries its conversations, a Drizzle Studio on the same database, and the local developer dashboard. The launcher loads `.env` and `.env.local`, resolves the database path, controller directory, Pi account directory and diagnostics directory once, and hands the children the same values, so they cannot disagree about which database and which ChatGPT connection they are using. `HALLVI_DB_PATH` overrides the default `.hallvi/hallvi.db`. The Studio takes the first free port from 4983 or from `HALLVI_STUDIO_PORT`, and the application is told which port it chose.
 

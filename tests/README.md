@@ -52,6 +52,8 @@ counterfactual run for every test, or new test harness is needed. If a decision
 would remove the only coverage of an important behavior and its value is unclear,
 ask the owner with that concrete example; continue the unambiguous cleanup.
 
+The retained development applications are outside the suites: `unit/retained-state.test.ts` holds the rule that keeps a checkout from opening another checkout's application (the mark, the lock, the runtime id, a copy being free), and reproduces the hand-offs that went wrong once: a process from an old runtime still holding the records, one Ctrl-C read as two, a worker whose status is unknown read as idle, and a snapshot whose histories nothing could read. Everything else about them — a real attach, a drain, a crash — is proved by hand on the applications themselves and recorded as dated evidence, because a fixture cannot stand in for records older than the code. To see one controller with several real applications without taking any of them, build a snapshot (`node scripts/retained-application.mjs snapshot <dir> …`): it carries no keys, secrets or logins, so its worker can read the histories and start nothing.
+
 Two pictures of this bar: [how a check is selected](../docs/architecture/test-selection.md)
 and [where a check belongs, and where it does not](../docs/architecture/where-coverage-lives.md).
 

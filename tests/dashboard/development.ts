@@ -13,6 +13,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 
+import { listApplications } from "../../scripts/retained-application.mjs";
+
 export const DEVELOPMENT_ROOT = join(
   homedir(),
   ".local",
@@ -136,20 +138,24 @@ type Registered = {
 
 /** Copies this environment is known to have taken, newest first. */
 function backups(root: string) {
-  const places = [join(root, "backups"), join(root, "state", "migrations")];
+  const places = [
+    { place: join(root, "backups"), kind: "taken by hand" },
+    { place: join(root, "recovery"), kind: "recovery copy" },
+    ...listApplications().flatMap(({ directory, backups, state }) => [
+      { place: backups, kind: `${directory}, before an attach` },
+      {
+        place: join(state, "migrations"),
+        kind: `${directory}, before a migration`,
+      },
+    ]),
+  ];
   const found: { path: string; takenAt: string; kind: string }[] = [];
-  for (const place of places) {
+  for (const { place, kind } of places) {
     if (!existsSync(place)) continue;
     for (const name of readdirSync(place)) {
       const path = join(place, name);
       try {
-        found.push({
-          path,
-          takenAt: statSync(path).mtime.toISOString(),
-          kind: place.endsWith("migrations")
-            ? "before a migration"
-            : "taken by hand",
-        });
+        found.push({ path, takenAt: statSync(path).mtime.toISOString(), kind });
       } catch {
         // Gone between listing and reading; nothing to report.
       }
@@ -165,9 +171,10 @@ export async function developmentState(
   const register = readJsonFile<Registered>(
     join(DEVELOPMENT_ROOT, "instance.json"),
   );
-  const database =
-    paired?.database ?? join(DEVELOPMENT_ROOT, "state", "hallvi.db");
-  const port = paired?.port ?? register?.port ?? 5147;
+  // Only a paired launch has a database to report: the retained applications
+  // each have their own, listed below with whoever has attached them.
+  const database = paired?.database;
+  const port = paired?.port ?? 3000;
   const live = await running(port);
   const here = checkout(root);
   const from = live.up ? servingFrom(port) : null;
@@ -184,24 +191,50 @@ export async function developmentState(
       live.up && live.revision && here.revision
         ? live.revision === here.revision
         : null,
-    records: existsSync(database)
-      ? {
-          // Registered, not discovered: this is the database the environment
-          // says it uses, and nothing scans for others.
-          path: database,
-          schema: schemaOf(database),
-          browser: `http://127.0.0.1:${port}`,
-        }
-      : null,
-    applications: (register?.applications ?? []).map((application) => ({
-      id: application.id,
-      name: application.name,
-      exercises: application.exercises ?? null,
-      url: application.url ?? null,
-      // Hallvi's own records are local; these are the applications' own
-      // databases, on their own host.
-      dataLivesOn: (register?.host as { address?: string })?.address ?? null,
-    })),
+    records:
+      database && existsSync(database)
+        ? {
+            // Registered, not discovered: this is the database the environment
+            // says it uses, and nothing scans for others.
+            path: database,
+            schema: schemaOf(database),
+            browser: `http://127.0.0.1:${port}`,
+          }
+        : null,
+    // The four retained applications, each with its own records and, when
+    // somebody has attached it, the checkout that owns them right now. The
+    // index links to the owning controllers; it opens none of their records.
+    applications: listApplications().map(
+      ({ directory, mark, runtime, attached, state }) => {
+        const registered = register?.applications?.find(
+          (each) => each.id === mark.application.id,
+        );
+        return {
+          id: mark.application.id,
+          name: mark.application.name,
+          directory,
+          state,
+          schema: mark.format.schema,
+          pi: mark.format.pi,
+          exercises: registered?.exercises ?? null,
+          url: registered?.url ?? null,
+          owner: attached
+            ? {
+                worktree: runtime?.worktree ?? null,
+                branch: runtime?.branch ?? null,
+                since: runtime?.attachedAt ?? null,
+                address: `http://127.0.0.1:${runtime?.ports?.app ?? mark.port}`,
+              }
+            : null,
+          lastStop:
+            !attached && runtime ? (runtime.outcome ?? "unclean") : null,
+          // Hallvi's own records are local; these are the applications' own
+          // databases, on their own host.
+          dataLivesOn:
+            (register?.host as { address?: string })?.address ?? null,
+        };
+      },
+    ),
     host: register?.host ?? null,
     backups: backups(DEVELOPMENT_ROOT),
     registeredAt: existsSync(join(DEVELOPMENT_ROOT, "instance.json"))
