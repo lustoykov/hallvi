@@ -64,6 +64,25 @@ const executionState: Record<
   interrupted: "stopped",
 };
 
+/**
+ * Whether Hallvi went on working after this failed command in the same
+ * conversation. A probe that failed and was followed by more work is Hallvi
+ * finding its way, not something waiting for the owner; work that stopped on
+ * the failure is. This says nothing about which later step fixed it.
+ * (`runId` is the conversation: the executor records the chat as the run.)
+ */
+export function carriedOnAfter(
+  execution: ExecutionRecord,
+  executions: ExecutionRecord[],
+) {
+  return executions.some(
+    (other) =>
+      other.id !== execution.id &&
+      other.runId === execution.runId &&
+      other.createdAt > execution.createdAt,
+  );
+}
+
 /** A command's own name in a list of past work, by where it ran. */
 function commandTitle(execution: ExecutionRecord) {
   return executionLine(execution, 90);
@@ -199,6 +218,8 @@ export function historyFromRecords({
         execution.status === "awaiting-approval"
           ? { note: plainText(execution.input).slice(0, 300), action: "Run it" }
           : undefined,
+      carriedOn:
+        execution.status === "failed" && carriedOnAfter(execution, executions),
     }));
 
   return [...fromRecords, ...fromExecutions].sort(

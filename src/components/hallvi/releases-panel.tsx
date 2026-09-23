@@ -382,7 +382,7 @@ export function ReleasesPanel({
             !latest
               ? "None"
               : latest.outcome === "deployed"
-                ? "Held"
+                ? "Deployed"
                 : latest.outcome === "failed"
                   ? "Failed"
                   : "Not established"

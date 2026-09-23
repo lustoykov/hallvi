@@ -109,9 +109,10 @@ export function ModeLine({
           </>
         ) : mode === "pi-decides" ? (
           <>
-            You are on <b>Pi decides</b>: Hallvi chooses whether a command needs
-            approval. Connecting can be enough authority for it to {action} as
-            proposed. Choose Always ask if you want every command to wait.
+            You are on <b>Hallvi decides</b>: Hallvi chooses whether a command
+            needs approval. Connecting can be enough authority for it to{" "}
+            {action} as proposed. Choose Always ask if you want every command to
+            wait.
           </>
         ) : (
           <>

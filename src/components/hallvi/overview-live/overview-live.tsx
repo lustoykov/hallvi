@@ -29,8 +29,8 @@ import "./overview-live.css";
 
 const count = (value: number) => value.toLocaleString("en-US");
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
-const plural = (value: number, word: string) =>
-  `${count(value)} ${word}${value === 1 ? "" : "s"}`;
+const plural = (value: number, word: string, many = `${word}s`) =>
+  `${count(value)} ${value === 1 ? word : many}`;
 
 const tone = {
   verified: "verified",
@@ -281,8 +281,8 @@ export function OverviewLive({
           label={
             traffic.state === "live" && traffic.requests > 0 ? (
               <>
-                Observed · {plural(traffic.visitors, "address")} and{" "}
-                {plural(traffic.requests, "request")} in the last{" "}
+                Observed · {plural(traffic.visitors, "address", "addresses")}{" "}
+                and {plural(traffic.requests, "request")} in the last{" "}
                 {WINDOW_MINUTES} minutes
               </>
             ) : (
@@ -361,7 +361,7 @@ export function OverviewLive({
               <p className="ovl-number">
                 {count(sum(day.requests))}
                 <small>
-                  requests
+                  {sum(day.requests) === 1 ? "request" : "requests"}
                   {day.visitors !== undefined &&
                     ` · ${plural(day.visitors, "visitor")}`}
                   {sum(day.serverErrors) > 0 &&

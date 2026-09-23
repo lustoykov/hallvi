@@ -189,6 +189,10 @@ export function LayersDirection({
   const door = ways.find((one) => one.id === picked) ?? null;
 
   const outside = ways.filter((one) => placeOf(one) === "outside");
+  // Facing the internet is configuration; answering it is an observation.
+  // The figure counts only what a check saw answering.
+  const answering = outside.filter((one) => basisOf(one) === "answered");
+  const facing = outside.filter((one) => basisOf(one) !== "answered");
   const refusedWays = ways.filter((one) => placeOf(one) === "refused");
   const checked = ways.filter(probed);
   // The projection files three kinds under holes. A port being open to
@@ -233,11 +237,13 @@ export function LayersDirection({
         <Strip>
           <Figure
             label="Answers the internet"
-            value={outside.length}
+            value={answering.length}
             note={
-              outside.length
-                ? outside.map((one) => one.port || one.title).join(", ")
-                : "Nothing on record answers from outside"
+              answering.length
+                ? answering.map((one) => one.port || one.title).join(", ")
+                : facing.length
+                  ? `${facing.map((one) => one.port || one.title).join(", ")} faces it, not checked`
+                  : "Nothing on record answers from outside"
             }
           />
           <Figure

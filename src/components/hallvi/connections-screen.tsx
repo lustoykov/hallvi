@@ -314,8 +314,8 @@ export function ConnectionsScreen({
         <p className={s.hint}>
           Connecting an account changes nothing by itself. What happens next
           follows each application&rsquo;s permission mode: Always ask waits for
-          you on every command, Pi decides asks at Hallvi&rsquo;s own judgment,
-          and Bypass runs without asking.
+          you on every command, Hallvi decides asks at Hallvi&rsquo;s own
+          judgment, and Bypass runs without asking.
         </p>
       </div>
     </main>

@@ -166,7 +166,7 @@ export function connectionRows(facts: ConnectionFacts): ConnectionItem[] {
     },
     {
       id: "workspace",
-      name: "Pi’s workspace",
+      name: "Hallvi’s workspace",
       purpose: "Where Hallvi runs the commands it composes about your code.",
       state: facts.own.workspace.problem
         ? "failed"

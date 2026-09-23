@@ -143,7 +143,8 @@ export const applicationSections = [
 export type ApplicationSection = (typeof applicationSections)[number]["id"];
 export type ApplicationSectionDefinition = (typeof applicationSections)[number];
 export function sectionFromHash(hash: string): ApplicationSection | null {
-  return applicationSections.find((s) => `#${s.id}` === hash)?.id ?? null;
+  const wanted = hash.toLowerCase();
+  return applicationSections.find((s) => `#${s.id}` === wanted)?.id ?? null;
 }
 
 /**

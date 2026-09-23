@@ -323,8 +323,8 @@ describe("how a way in is described", () => {
     );
   });
 
-  it("reads anywhere and ::/0 as open to everyone, like 0.0.0.0/0", () => {
-    for (const source of ["anywhere", "::/0", "0.0.0.0/0"]) {
+  it("reads anywhere, ::/0 and Internet as open to everyone, like 0.0.0.0/0", () => {
+    for (const source of ["anywhere", "::/0", "0.0.0.0/0", "Internet"]) {
       const story = read([
         states(
           { kind: "door", id: "http" },
@@ -873,5 +873,57 @@ describe("a published name whose reading has aged", () => {
     expect(story.domain?.lastServedAt).toBeNull();
     expect(story.domain?.state).toBe(state);
     expect(publishOffer(story).label).toBe("Finish publishing it");
+  });
+});
+
+describe("a published address", () => {
+  const published = (url: string) =>
+    record({
+      about: [{ kind: "application", id: APP }],
+      url,
+      content: { kind: "application-access", mode: "public", server: "host-1" },
+    });
+  const address = (checks: ReturnType<typeof check>[]) =>
+    states({ kind: "access", id: "site" }, { checks });
+
+  it("faces the internet, but answers only when a check saw it answer", () => {
+    const unchecked = read([
+      published("https://shop.example"),
+      address([check("login", "passed", "identity")]),
+    ]);
+    expect(unchecked.doors[0]).toMatchObject({
+      port: "443/tcp",
+      reach: "internet",
+      established: "looked",
+    });
+
+    const answered = read([
+      published("https://shop.example"),
+      address([check("https", "passed", "reachability")]),
+    ]);
+    expect(answered.doors[0].established).toBe("answered");
+  });
+
+  it("takes the port written in the address over the scheme's", () => {
+    const story = read([
+      published("https://shop.example:8443"),
+      address([check("https", "passed")]),
+    ]);
+    expect(story.doors[0].port).toBe("8443/tcp");
+  });
+
+  it("is one way in with the door it arrives through", () => {
+    const story = read([
+      published("https://shop.example"),
+      address([check("https", "passed")]),
+      states(
+        { kind: "door", id: "https" },
+        {
+          facts: [fact("port", "443/tcp"), fact("sources", "Internet")],
+          checks: [check("open", "passed")],
+        },
+      ),
+    ]);
+    expect(story.doors.map((door) => door.id)).toEqual(["https"]);
   });
 });

@@ -223,7 +223,7 @@ Workspace, for people deploying software they do not trust. When it is chosen
 and unavailable, the workspace tools are withdrawn with a plain reason, never a
 silent fallback. Hallvi itself never runs inside that container; a container
 image stays a possible packaging format for the virtual machine rung.
-[Installing Hallvi](../installation.md#pis-workspace) describes both modes,
+[Installing Hallvi](../installation.md#hallvis-workspace) describes both modes,
 and [Architecture](../architecture.md#repository-workspace-architecture) draws
 the boundary. Application servers keep their own Docker and Compose
 requirement; only the machine running Hallvi dropped it.

@@ -67,6 +67,11 @@ export interface ApplicationOperation {
   next?: string;
   /** A later operation that addressed this failure. */
   resolvedById?: string;
+  /**
+   * Hallvi kept working after this failure in the same conversation. It
+   * stays on record, but it is not waiting for the owner.
+   */
+  carriedOn?: boolean;
   waitingForId?: string | null;
   waitingForTitle?: string | null;
 }

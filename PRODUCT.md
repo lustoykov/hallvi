@@ -23,7 +23,7 @@ This is the rule; everywhere else links here rather than restating it.
 | Mode | Behavior |
 | --- | --- |
 | **Always ask** | Every code execution waits for approval through the UI. |
-| **Pi decides** | Pi judges when permission is needed and asks through a tool. |
+| **Hallvi decides** | Pi judges when permission is needed and asks through a tool. |
 | **Bypass** | Commands execute without approval prompts. |
 
 Exactly three modes, governing execution independently of workflows. The tool
