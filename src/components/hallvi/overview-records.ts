@@ -13,7 +13,13 @@
 // every subject the records mention.
 
 import { allAsk } from "./pulse-asks";
-import { clip, commandOf, essence, executionLine } from "./execution-text";
+import {
+  clip,
+  commandOf,
+  essence,
+  executionTitle,
+  intentOf,
+} from "./execution-text";
 import { carriedOnAfter } from "./history-records";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { Ref, SavedInformation } from "@/server/operator-data";
@@ -279,6 +285,8 @@ export function logFromRecords(records: SavedInformation[]) {
  * most needs to tell apart.
  */
 function titleOf(execution: ExecutionRecord) {
+  const intent = intentOf(execution.input);
+  if (intent) return intent;
   switch (execution.tool) {
     case "server_bash":
       return `Ran on the server${execution.target ? ` · ${execution.target.split("@").at(-1)?.split(":")[0]}` : ""}`;
@@ -393,7 +401,7 @@ export function overviewFromRecords({
         id: `failed:${execution.id}`,
         tone: "failed",
         title: "The work stopped on a failed command",
-        detail: executionLine(execution, 200),
+        detail: executionTitle(execution, 200),
         primary: {
           label: "Open the conversation",
           open: () => onOpenConversation(execution.chatId, null),
@@ -404,7 +412,7 @@ export function overviewFromRecords({
       needs.push({
         id: `approval:${execution.id}`,
         tone: "waiting",
-        title: "A decision is waiting",
+        title: intentOf(execution.input) ?? "A decision is waiting",
         detail: clip(essence(commandOf(execution.input)), 200),
         primary: {
           label: "Open the conversation",

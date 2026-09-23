@@ -1,7 +1,7 @@
 "use client";
 import { CaretUpDown, ShieldCheck, Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
-import { plainText, whereItRan } from "./execution-text";
+import { intentOf, plainText, whereItRan } from "./execution-text";
 import type {
   ExecutionRecord,
   OperatorSettings,
@@ -260,9 +260,10 @@ export function OperatorConsole({
                   <strong>
                     {item.tool === "request_approval"
                       ? "Approval requested"
-                      : item.tool === "server_bash"
-                        ? "Run on server"
-                        : item.tool}
+                      : (intentOf(item.input) ??
+                        (item.tool === "server_bash"
+                          ? "Run on server"
+                          : item.tool))}
                   </strong>
                   {/* Which machine, said as a machine.
                     "on your server" was printed over `server_bash` and the
