@@ -87,7 +87,12 @@ function urlPort(url: string | null) {
   return port ? `${port}/tcp` : null;
 }
 
-const portNumber = (port: string) => port.match(/^\d+/)?.[0] ?? null;
+/** A TCP port number, or null for UDP, a range or no port on record. */
+function tcpPort(port: string) {
+  const match = port.trim().match(/^(\d+)(?:\/(tcp|udp))?$/i);
+  if (!match || match[2]?.toLowerCase() === "udp") return null;
+  return match[1];
+}
 
 function portOf(fact: (key: string) => string | null) {
   const local = fact("local-port");
@@ -233,19 +238,31 @@ export function reachFromRecords({
           detail: refused.value.detail ?? refused.value.label,
         });
     }
-  // A published address and the door it arrives through are one way in.
-  // Keep the door: its checks are about the port itself.
-  const doorPorts = new Set(
-    doors
-      .filter((door) => !addresses.has(door.id))
-      .map((door) => portNumber(door.port)),
-  );
-  for (let at = doors.length - 1; at >= 0; at--)
-    if (
-      addresses.has(doors[at].id) &&
-      doorPorts.has(portNumber(doors[at].port))
-    )
-      doors.splice(at, 1);
+  // A published address and the door it arrives through are one way in, but
+  // only when they are the same endpoint: a door that faces the internet on
+  // the same TCP port. A loopback-only door that also uses 443 is a
+  // different endpoint and stays, as does anything without a port on record.
+  // The door is kept, since its checks are about the port itself, and it
+  // takes over the address's observed answer if it has none of its own.
+  for (let at = doors.length - 1; at >= 0; at--) {
+    const address = doors[at];
+    if (!addresses.has(address.id)) continue;
+    const port = tcpPort(address.port);
+    if (!port) continue;
+    const door = doors.find(
+      (one) =>
+        !addresses.has(one.id) &&
+        one.reach === "internet" &&
+        tcpPort(one.port) === port,
+    );
+    if (!door) continue;
+    if (address.established === "answered" && door.established !== "answered") {
+      door.established = "answered";
+      door.at = address.at;
+      door.unasked = undefined;
+    }
+    doors.splice(at, 1);
+  }
 
   // ---- The firewall. Its absence is a hole, never a tick.
   const firewallRef = subjectsOfKind(live, "firewall")[0] ?? null;

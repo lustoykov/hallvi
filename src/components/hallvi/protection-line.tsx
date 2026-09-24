@@ -63,22 +63,24 @@ export function protectionOneLine(
         tone: "plain",
         detail: "Hallvi looked, and no backup plan exists.",
       };
+    // A plan and a missing copy record are two facts. Neither establishes
+    // that no copy was ever taken, so neither is worded as a history.
     if (protection.summary.schedule)
       return {
-        word: "Scheduled, no copy yet",
+        word: "Scheduled, no copy on record",
         tone: "warn",
         detail: protection.summary.schedule.words,
       };
     if (protection.planned)
       return {
-        word: "A plan, no copy yet",
+        word: "A plan, no copy on record",
         tone: "warn",
-        detail: "A plan is on record and nothing has run it.",
+        detail: "A plan is on record, and no copy is.",
       };
     return {
       word: "No copy on record",
       tone: "plain",
-      detail: "Nothing has copied this data.",
+      detail: "No record names a copy of this data.",
     };
   }
 
