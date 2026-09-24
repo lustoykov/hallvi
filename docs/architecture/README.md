@@ -21,7 +21,6 @@ Each of these is linked from the document that owns its decision.
 | [Private repository source deployment](../integrations/github.md#deploying-private-source-and-later-revisions) | [GitHub](../integrations/github.md) |
 | [Automatic deployment: the branch watch](../integrations/github.md#deploying-automatically-when-a-branch-changes) | [GitHub](../integrations/github.md) |
 | [Proposing a repository change](../integrations/github.md#proposing-a-change) | [GitHub](../integrations/github.md) |
-| [Development cleanup decision flow](development-cleanup-decision.html) | [Development resources](../development-resources.md) |
 | [Where the records live, and who may open them](development-environment.md) | [Development environment](../development-environment.md) |
 | [Upgrading records, and getting them back](schema-migrations.md) | [Installing Hallvi](../installation.md#update) |
 | [Cleanup scope](cleanup-scope.md) | [Development resources](../development-resources.md#discarding-development-data) |

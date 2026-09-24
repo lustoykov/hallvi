@@ -7,51 +7,38 @@ Read [README.md](README.md), [PRODUCT.md](PRODUCT.md),
 
 ## Development and cleanup
 
-Development runs locally on the owner's MacBook, not on the Mac mini.
-Before creating or retiring development resources, read and follow
-[development resource ownership and cleanup](docs/development-resources.md).
-Before building a fixture, check whether the
-[development environment](docs/development-environment.md) already has one:
-four really deployed applications, each with its conversation and data kept
-in a state directory of its own outside every checkout. Say which one you are
-taking, take it with `node scripts/retained-application.mjs attach <name>`,
-and detach when you are done; use a disposable fixture for deletion, failure
-and recovery work. Work happens in a worktree, which runs its own Hallvi on
-its own state by default and shares only the account-level logins; it never
-copies a connection between checkouts. One runtime owns an application's
-records at a time — the lock refuses everyone else, including a second
-`npm run dev` pointed at the directory. See
-[one application, one owner](docs/development-environment.md#one-application-one-owner).
-This file is for agents developing Hallvi, never the product operator Pi.
-Pi has separate runtime instructions; do not inject contributor instructions,
-local agent skills or development automation prompts into product sessions.
-Cleanup is limited to exact Hallvi development resources with verified
-ownership and disposable contents; a project folder is not blanket permission
-to remove user data. Never extend cleanup to unrelated folders or resources.
-Record ownership and retention outside worktrees. Task completion includes
-verified cleanup or an explicit retained-resource handoff. After your work
-merges, give the owner the GO/NO-GO list described in
-[after your work merges](docs/development-resources.md#after-your-work-merges)
-and wait for fresh approval before deleting anything under `~/biz/` or in
-Docker. No scheduled task deletes development resources: the daily Disk Audit
-only reports, and Hetzner is audited when the owner asks.
+Development runs locally on the owner's MacBook, not on the Mac mini. Work in a
+worktree: it runs its own Hallvi on its own state and shares only the
+account-level logins, never copying a connection between checkouts. Worktrees
+go when their session is archived, in Claude Code and Codex alike; never remove
+one by hand.
 
-Use the existing authorized Default Hetzner project. On 14 September 2026 the
-owner standing-authorized creating billed development resources there whenever
-the work needs them; prefer a real host over a stand-in when the step is about
-deployment itself. That covers creation and use, never deletion of anything you
-did not create: label it, register it, and retire it when the task ends.
+Before building a fixture, check the
+[development environment](docs/development-environment.md): four really
+deployed applications kept between tasks. Say which one you are taking, take it
+with `node scripts/retained-application.mjs attach <name>`, and detach when you
+are done; the lock refuses any second owner. Use a disposable fixture for
+deletion, failure and recovery work.
 
+Before creating or removing development resources, read
+[development resources](docs/development-resources.md). Create billed fixtures
+in the Default Hetzner project whenever the work needs them; label and register
+them, and delete them when the task ends. After your work merges, give the owner
+the [GO/NO-GO list](docs/development-resources.md#after-your-work-merges) and
+wait for fresh approval before deleting anything under `~/biz/` or in Docker.
+Never delete what you did not create, never broadly prune Docker, and preserve
+dirty work, unique data, credentials, retained evidence and anything uncertain.
 Never print credentials or copy them into code, artifacts, commits or pull
-requests. Preserve dirty work, unique data, credentials, retained evidence and
-uncertain resources. Never broadly prune Docker volumes. Worktrees go when
-their session is archived, not by hand.
+requests.
 
 Leave the preview the owner will review running and give its link in the
 handoff. Stop it by PID when that review ends, at the latest once the work
-merges, then run `node scripts/check-preview-processes.mjs`. Preserve
-intentional tunnels and retained services. See
+merges, then run `node scripts/check-preview-processes.mjs`. See
 [local preview processes](docs/development-resources.md#local-preview-processes).
+
+This file is for agents developing Hallvi, never the product operator Pi. Pi
+has separate runtime instructions; do not inject contributor instructions,
+local agent skills or development automation prompts into product sessions.
 
 ## Changes and checks
 

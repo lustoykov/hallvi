@@ -8,7 +8,7 @@ archive, and `npm start` runs the same production pair in the foreground against
 this checkout's `.hallvi` state. This guide is for development.
 
 Development runs locally on the owner's MacBook; the Mac mini is retired from development.
-Before creating or retiring a branch, worktree, local runtime or cloud test resource,
+Before creating or removing a branch, local runtime or cloud test resource,
 read [development resource ownership and cleanup](development-resources.md).
 Four applications are really deployed on a shared host, each with its
 conversation and data kept between tasks in a state directory of its own:
@@ -22,9 +22,6 @@ detaches; a second checkout is refused, and so is anything else that tries to
 open the directory. Never copy a connection between checkouts; the
 [development environment](development-environment.md#one-application-one-owner)
 says what is shared and what is not.
-Finishing a task includes classifying its resources, preserving anything
-valuable or uncertain, cleaning up only confirmed disposable resources, and
-recording the result before its branch or worktree is retired.
 
 Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, the account level — the ChatGPT login and model preferences, and the GitHub, Hetzner and Cloudflare connections — lives in `~/.config/hallvi/pi`, so every checkout and preview port on this machine reuses the same logins and none of them copies one (a copied GitHub login dies when either copy renews). Application databases, executions, SSH keys and secrets remain local to each controller. Set `HALLVI_PI_CONFIG_DIR` to choose another account directory. An explicit `HALLVI_CONFIG_DIR` isolates the account level too unless `HALLVI_PI_CONFIG_DIR` is also supplied, which is what keeps test fixtures apart. Disconnecting or changing anything at the account level affects every controller using that directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](integrations/github.md).
 

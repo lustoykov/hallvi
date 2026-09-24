@@ -2,7 +2,7 @@
 
 Hallvi was called Server Guy, then Haldur, before it was named Hallvi on 18 September 2026. Dated records here keep the name, commands, paths and labels that existed when they were written; current names are in [Installing Hallvi](../installation.md).
 
-For local or cloud fixtures, follow the [development resource policy](../development-resources.md): record ownership, renew temporary leases while active, and verify cleanup or explicit retention before retiring the task.
+For local or cloud fixtures, follow the [development resource policy](../development-resources.md).
 
 [Requirements](../requirements.md) define user outcomes; [Roadmap](../../ROADMAP.md) distinguishes shipped work from gaps. [Test runners](../../tests/README.md) owns commands, fixtures and opt-in Docker/model runs. The small [acceptance guide](phase-one-acceptance.md) stays at its existing path because the local test dashboard loads it.
 
