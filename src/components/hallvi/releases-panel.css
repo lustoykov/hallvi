@@ -1,14 +1,91 @@
 /* Deployment's own pieces. Everything else is the register's. */
 
-.rp-live {
-  font-family: var(--mono);
-  font-size: 17px;
-  letter-spacing: -0.02em;
+/* What is serving, in one line; a second only when something differs. */
+.rp-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 2px 0 26px;
+  font-size: 13.5px;
 }
-.rp .hv-rg-figure code {
+.rp-status code {
   font-family: var(--mono);
-  font-size: 11px;
-  overflow-wrap: anywhere;
+  font-size: 0.93em;
+}
+.rp-status-say {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-weight: 560;
+}
+.rp-status-say .rp-muted {
+  margin-left: -4px;
+  font-weight: 400;
+}
+.rp-status-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 5px;
+  margin: 3px 0 0 15px;
+  font-size: 12.5px;
+}
+.rp-status-sub[data-tone="working"] {
+  color: var(--blue-text);
+}
+.rp-status-sub[data-tone="bad"] {
+  color: var(--red);
+}
+.rp-status-sub[data-tone="warn"] {
+  color: var(--amber-text);
+}
+.rp-muted {
+  color: var(--muted);
+}
+.rp-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.rp-way {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.rp-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rp-status-sub .rp-link {
+  color: inherit;
+}
+.rp-link:hover {
+  color: var(--blue-text);
+  text-decoration-color: currentColor;
+}
+.rp-link svg {
+  width: 11px;
+  height: 11px;
+  color: var(--muted);
 }
 .rp-open {
   justify-self: start;
@@ -66,4 +143,18 @@
   content: "✓";
   left: 0;
   color: var(--green);
+}
+
+/* A deployment in flight: a small spinner beside the word, nothing louder. */
+.rp-spin {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  animation: rp-spin 1s linear infinite;
+}
+@keyframes rp-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -521,6 +521,15 @@ table around the visual it already had. It lives in `register.tsx` and
   and the verdict; one table carries the inventory with the columns that
   subject deserves. The strip is the page's hierarchy: a reader who stops there
   has the answer.
+- **Or one status line, where a strip would repeat the table.** Chosen
+  24 September 2026, when the owner found Deployment's four figures loud and
+  text heavy: they named the serving release three times. Deployment opens on
+  "● Running c74379a · for 4 days" with the address as a plain link at the
+  right, and a second line only when the newest attempt is not what serves
+  (red when it failed) or while one is deploying. A deployment in flight is
+  also the newest row, open on its commands as they run. How releases arrive
+  (automatic or on request, the branch, the watch) sits under the table, and
+  its form preselects automatic on the default branch without saving it.
 - **Rows open in place.** What a row has to say sits directly under it, in one
   column. Nothing opens beside the table: a side panel sends the eye away from
   the row that was clicked. The questions worth taking to the conversation

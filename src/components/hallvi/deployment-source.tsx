@@ -59,8 +59,11 @@ export function DeploymentSource({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState(deployment.mode ?? "manual");
-  const [branch, setBranch] = useState(deployment.branch ?? "");
+  // Automatic unless the owner chose otherwise, as the first-deployment card
+  // offers it. Preselected, never saved on the owner's behalf: it is a
+  // standing authorization, so it takes their Save.
+  const [mode, setMode] = useState(deployment.mode ?? "automatic");
+  const [branch, setBranch] = useState(deployment.branch ?? "main");
 
   async function ask(name: string, body: Record<string, unknown>) {
     setBusy(name);
@@ -179,6 +182,9 @@ export function DeploymentSource({
   if (!deployment.mode)
     return (
       <section className="hv-rg-sheet ds" aria-label="How it deploys">
+        <div className="hv-rg-board-head">
+          <h2>How it deploys</h2>
+        </div>
         <Strip>
           <Figure
             label="Deploys"
@@ -194,6 +200,9 @@ export function DeploymentSource({
 
   return (
     <section className="hv-rg-sheet ds" aria-label="How it deploys">
+      <div className="hv-rg-board-head">
+        <h2>How it deploys</h2>
+      </div>
       <Strip>
         <Figure
           label="Deploys"

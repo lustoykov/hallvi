@@ -31,6 +31,9 @@ const release = (id: string, short: string): Release => ({
   checks: [],
 });
 
+/** What a reader sees, without the markup around each word. */
+const text = (html: string) => html.replace(/<[^>]+>/g, "");
+
 const view = (running: Release, latest: Release): ReleaseView => ({
   running,
   latest,
@@ -53,8 +56,8 @@ describe("one current-release lead", () => {
     );
     // The Transit story that used to name the release below this panel is
     // gone, so the lead is the one place the page says what is serving.
-    expect(html).toContain("Running 9cea081");
-    expect(html.split("Running 9cea081")).toHaveLength(2);
+    expect(text(html)).toContain("Running 9cea081");
+    expect(text(html).split("Running 9cea081")).toHaveLength(2);
     // Its row in the list is marked rather than carrying a second headline.
     expect(html).toContain("serving now");
   });
@@ -69,7 +72,8 @@ describe("one current-release lead", () => {
         onAsk={() => undefined}
       />,
     );
-    expect(html).toContain("Last verified release: 9cea081");
+    expect(text(html)).toContain("Last verified release: 9cea081");
+    expect(text(html)).not.toContain("Running 9cea081");
     expect(html).toContain("failed");
   });
 });
