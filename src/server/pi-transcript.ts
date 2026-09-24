@@ -87,6 +87,17 @@ function textOf(content: unknown) {
     .join("");
 }
 
+/** The images in a message, in the order the owner attached them. */
+function imagesOf(content: unknown) {
+  return Array.isArray(content)
+    ? (content as { type: string; data?: string; mimeType?: string }[]).filter(
+        (part): part is { type: "image"; data: string; mimeType: string } =>
+          part.type === "image",
+      )
+    : [];
+}
+const imageCount = (content: unknown) => imagesOf(content).length || undefined;
+
 /**
  * What to do about a model failure. Pi keeps the provider's own words; the
  * page gets advice, never those words.
@@ -273,6 +284,7 @@ export function projectTranscript(
         chatId,
         role: "user",
         body: textOf(message.content),
+        images: imageCount(message.content),
         source: sourceOf(message),
         status: "delivered",
         createdAt: at(message.timestamp ?? entry.timestamp),
@@ -337,6 +349,7 @@ export function projectTranscript(
       chatId,
       role: "user",
       body: textOf((item.message as { content: unknown }).content),
+      images: imageCount((item.message as { content: unknown }).content),
       source: sourceOf(item.message),
       status: "waiting",
       delivery: item.kind === "steer" ? "steer" : "next",
@@ -347,16 +360,41 @@ export function projectTranscript(
   return { status, messages, calls, said };
 }
 
-/** The text of the message Pi holds under this id, read or still queued. */
-export function holds(history: Entry[], lane: LaneView, id: string) {
-  const held =
+/** The owner's message Pi holds under this id, read or still queued. */
+function held(history: Entry[], lane: LaneView, id: string) {
+  const found =
     lane.queues.find(
-      (item) => item.type === "message" && tagOf(item.message) === id,
+      (item) =>
+        item.type === "message" && (tagOf(item.message) ?? item.entryId) === id,
     ) ??
     history.find(
-      (entry) => entry.type === "message" && tagOf(entry.message) === id,
+      (entry) =>
+        entry.type === "message" &&
+        entry.message.role === "user" &&
+        (tagOf(entry.message) ?? entry.id) === id,
     );
-  return held?.type === "message"
-    ? textOf((held.message as { content: unknown }).content)
+  return found?.type === "message"
+    ? (found.message as { content: unknown })
     : undefined;
+}
+
+/**
+ * The text of the message Pi holds under this id, read or still queued. An
+ * image-only message holds an empty text, which is still a message.
+ */
+export function holds(history: Entry[], lane: LaneView, id: string) {
+  const message = held(history, lane, id);
+  return message && textOf(message.content);
+}
+
+/** One image of a message Pi holds, by the order it was attached in. */
+export function imageOf(
+  history: Entry[],
+  lane: LaneView,
+  id: string,
+  index: number,
+) {
+  const message = held(history, lane, id);
+  const image = message && imagesOf(message.content)[index];
+  return image ? { mimeType: image.mimeType, data: image.data } : undefined;
 }

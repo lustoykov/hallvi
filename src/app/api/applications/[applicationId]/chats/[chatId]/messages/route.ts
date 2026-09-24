@@ -6,6 +6,7 @@ import {
   parseJsonRequest,
   sendChatMessageRequestSchema,
   assertSameOrigin,
+  MAX_MESSAGE_REQUEST_CHARACTERS,
 } from "@/server/schemas";
 
 export const runtime = "nodejs";
@@ -16,7 +17,11 @@ export async function POST(
 ) {
   return handle(async () => {
     const { applicationId, chatId } = await context.params;
-    const body = await parseJsonRequest(request, sendChatMessageRequestSchema);
+    const body = await parseJsonRequest(
+      request,
+      sendChatMessageRequestSchema,
+      MAX_MESSAGE_REQUEST_CHARACTERS,
+    );
     return Response.json(
       await sendChatMessage(
         applicationId,
@@ -24,6 +29,7 @@ export async function POST(
         body.message,
         body.requestKey,
         body.delivery,
+        body.images,
       ),
       // Accepted means Pi has durably taken it; its answer is still to come.
       { status: 202 },

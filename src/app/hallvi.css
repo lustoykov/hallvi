@@ -860,6 +860,105 @@
   font-weight: 600;
   cursor: pointer;
 }
+.hv-composer-box.dropping {
+  border-color: var(--blue);
+  border-style: dashed;
+  background: #f7faff;
+}
+/* Attached images: small in the composer, readable in the transcript. */
+.hv-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.hv-images.editable {
+  margin: 10px 12px 0;
+}
+.hv-image {
+  position: relative;
+  display: block;
+}
+.hv-image img {
+  display: block;
+  max-width: min(240px, 100%);
+  max-height: 180px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  object-fit: cover;
+}
+.hv-images.editable img {
+  width: 56px;
+  height: 56px;
+}
+.hv-image a:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.hv-image button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.hv-image button:hover {
+  color: var(--ink);
+  border-color: var(--ink-2);
+}
+.hv-image button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.hv-image button svg {
+  width: 10px;
+  height: 10px;
+}
+.hv-attach-error {
+  margin: 6px 14px 0;
+  color: var(--red);
+  font-size: 12px;
+}
+.hv-attach {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-left: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.hv-attach:hover:not(:disabled) {
+  background: var(--panel);
+  color: var(--ink);
+}
+.hv-attach:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.hv-attach:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.hv-attach svg {
+  width: 16px;
+  height: 16px;
+}
 .hv-composer textarea {
   display: block;
   width: 100%;

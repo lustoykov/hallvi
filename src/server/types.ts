@@ -35,6 +35,8 @@ export interface ChatMessage {
   chatId: string;
   role: "user" | "assistant";
   body: string;
+  /** How many images the owner attached; each is read by its index. */
+  images?: number;
   blocks?: import("./operator-data").MessageBlock[];
   /**
    * `user` is the engineer's own message. `hallvi` marks a recorded

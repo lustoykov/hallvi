@@ -91,7 +91,9 @@ vi.mock("../../../src/server/cloudflare", async (original) => ({
 }));
 
 import * as store from "../../../src/server/db";
+import { NotFoundError } from "../../../src/server/applications";
 import {
+  chatImage,
   chatSnapshot,
   continueConversation,
   sendChatMessage,
@@ -174,7 +176,14 @@ beforeAll(async () => {
       const stream = createAssistantMessageEventStream();
       const last = context.messages.at(-1)!;
       const text = last.role === "user" ? said(last.content) : "";
-      requests.push(last.role === "user" ? text : `<${last.role}>`);
+      const images = Array.isArray(last.content)
+        ? last.content.filter((part) => part.type === "image").length
+        : 0;
+      requests.push(
+        last.role === "user"
+          ? `${text}${" [image]".repeat(images)}`
+          : `<${last.role}>`,
+      );
       // A provider mid-answer when Stop arrives, as a real one is.
       if (text.includes("[slow]")) {
         const partial = assistant(model, [{ type: "text", text: "" }], "stop");
@@ -264,7 +273,7 @@ beforeAll(async () => {
         id: "synthetic",
         name: "Synthetic",
         reasoning: false,
-        input: ["text"],
+        input: ["text", "image"],
         // Room for Hallvi's real system prompt, as a real model has.
         contextWindow: 272_000,
         maxTokens: 32_000,
@@ -408,6 +417,47 @@ it("a send repeated after a lost answer is one instruction, read once", async ()
     "<toolResult>",
     "and then check it",
   ]);
+});
+
+it("hands Pi the images a message carries, and reads them back by message", async () => {
+  const a = application("shop");
+  const image = (text: string) => ({
+    mimeType: "image/png",
+    data: Buffer.from(text).toString("base64"),
+  });
+  const described = randomUUID();
+  await sendChatMessage(
+    a.id,
+    a.chat,
+    "what is this error?",
+    described,
+    "next",
+    [image("screenshot")],
+  );
+  await until(async () => expect(await a.status()).toBe("idle"));
+  // Pictures alone are a message too, and sending them twice is still one.
+  const alone = randomUUID();
+  const pictures = [image("first"), image("second")];
+  await sendChatMessage(a.id, a.chat, "", alone, "next", pictures);
+  await sendChatMessage(a.id, a.chat, "", alone, "next", pictures);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(requests).toEqual(["what is this error? [image]", " [image] [image]"]);
+  const sent = (await a.snapshot()).messages.filter((m) => m.role === "user");
+  expect(sent.map((m) => [m.id, m.images])).toEqual([
+    [described, 1],
+    [alone, 2],
+  ]);
+
+  // Read from the open session, and from Pi's stored one after a restart.
+  const read = async () =>
+    (await chatImage(a.id, a.chat, alone, 1)).bytes.toString();
+  expect(await read()).toBe("second");
+  await loseWorker();
+  await startWorker();
+  expect(await read()).toBe("second");
+  await expect(chatImage(a.id, a.chat, described, 1)).rejects.toBeInstanceOf(
+    NotFoundError,
+  );
 });
 
 it("asks before it executes, places the evidence in Pi's transcript, and runs two applications on one server at once", async () => {

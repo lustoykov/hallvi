@@ -25,6 +25,7 @@ import {
 import {
   abortedTips,
   holds,
+  imageOf,
   laneView,
   MESSAGE_TAG,
   projectTranscript,
@@ -47,6 +48,8 @@ export interface SentMessage {
   id: string;
   body: string;
   delivery: "next" | "steer";
+  /** Attached for the model to see, after the words. */
+  images?: { mimeType: string; data: string }[];
 }
 
 interface Opened extends Scope {
@@ -92,7 +95,13 @@ function partialText(partial: unknown): string {
 const toPi = (message: SentMessage): AgentMessage =>
   ({
     role: "user",
-    content: [{ type: "text", text: message.body }],
+    content: [
+      ...(message.body ? [{ type: "text", text: message.body }] : []),
+      ...(message.images ?? []).map((image) => ({
+        type: "image",
+        ...image,
+      })),
+    ],
     timestamp: Date.now(),
     [MESSAGE_TAG]: message.id,
   }) as AgentMessage;
@@ -384,6 +393,29 @@ export function sessionOwner(
       }));
     },
 
+    /** One image the owner attached to a message, as Pi keeps it. */
+    async image(scope: Scope, message: unknown) {
+      const { id, index } = message as { id: string; index: number };
+      const open = opened.get(scope.chatId);
+      const image = open
+        ? imageOf((await open.history()).entries, open.snapshot(), id, index)
+        : hasHistory(scope)
+          ? await inLine(scope.chatId, async () => {
+              const stored = await readNativeConversation(
+                scope.applicationId,
+                scope.chatId,
+              );
+              return imageOf(stored.entries, stored.lane, id, index);
+            })
+          : undefined;
+      if (!image)
+        throw new WorkerRefusal(
+          "This image is not in the conversation.",
+          "missing",
+        );
+      return image;
+    },
+
     /** Resolves once Pi has durably taken the message, and not before. */
     send: (scope: Scope, message: SentMessage, onlyIfIdle = false) => (
       assertTaking(),
@@ -398,12 +430,12 @@ export function sessionOwner(
           conversation &&
           snapshot &&
           holds((await conversation.history()).entries, snapshot, message.id);
-        if (held && held !== message.body)
+        if (held !== undefined && held !== message.body)
           throw new WorkerRefusal(
             "This request key was already used for a different message.",
             "conflict",
           );
-        if (held) return { accepted: true };
+        if (held !== undefined) return { accepted: true };
         if (conversation?.driving) {
           if (onlyIfIdle)
             throw new WorkerRefusal(
