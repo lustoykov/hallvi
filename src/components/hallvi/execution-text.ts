@@ -19,6 +19,34 @@ const PREAMBLE =
   /^(#|set\s+[-+][a-zA-Z]|shopt\s|umask\s|export\s+(PATH|LC_|LANG)|cd\s|PS4=|IFS=)/;
 
 /**
+ * What a command is for, in the few words Pi gave it. It travels in the same
+ * payload as the command and is never the command: a reader sees it as the
+ * title, and the command stays beneath it to be read.
+ */
+const INTENT = "intent";
+
+/** The intent Pi wrote for a command, when the payload carries one. */
+export function intentOf(stored: string | null | undefined): string | null {
+  const trimmed = (stored ?? "").trim();
+  if (trimmed[0] !== "{") return null;
+  try {
+    const value = JSON.parse(trimmed) as Record<string, unknown>;
+    const intent = value?.[INTENT];
+    return typeof intent === "string" && intent.trim()
+      ? intent.replace(/\s+/g, " ").trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The payload's entries, without the intent that describes them. */
+const payload = (value: object) =>
+  Object.entries(value as Record<string, unknown>).filter(
+    ([key]) => key !== INTENT,
+  );
+
+/**
  * The command inside the envelope. Handles a bare string, `{command}`, and
  * the general object, where the longest string value is the payload and the
  * small scalars beside it are its settings.
@@ -37,7 +65,7 @@ export function commandOf(stored: string): string {
   if (typeof value === "string") return value;
   if (!value || typeof value !== "object" || Array.isArray(value))
     return trimmed;
-  const entries = Object.entries(value as Record<string, unknown>);
+  const entries = payload(value);
   const strings = entries.filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",
   );
@@ -170,6 +198,21 @@ export function whereItRan(execution: { tool: string; target: string }) {
 }
 
 /**
+ * An execution's title: the intent Pi gave it, where it ran, and otherwise
+ * the line that says what it did.
+ */
+export function executionTitle(
+  execution: { tool: string; input: string },
+  limit = 90,
+): string {
+  const intent = intentOf(execution.input);
+  if (!intent) return executionLine(execution, limit);
+  const place = placeOf(execution.tool);
+  const said = clip(intent, limit);
+  return place ? `${place} · ${said}` : said;
+}
+
+/**
  * One readable line for an execution: where it ran, and the first thing it
  * actually did. Used for list titles and step descriptions, so it stays short
  * and never carries an envelope.
@@ -200,7 +243,7 @@ export function plainText(stored: string): string {
   if (typeof value === "string") return value;
   if (!value || typeof value !== "object" || Array.isArray(value))
     return stored;
-  const entries = Object.entries(value as Record<string, unknown>);
+  const entries = payload(value);
   const strings = entries.filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",
   );

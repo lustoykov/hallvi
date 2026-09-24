@@ -37,7 +37,12 @@ import { useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
-import { hostOf, placeOf as placeOfTool, plainText } from "./execution-text";
+import {
+  hostOf,
+  intentOf,
+  placeOf as placeOfTool,
+  plainText,
+} from "./execution-text";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
@@ -452,7 +457,7 @@ function Row({ record }: { record: ActivityRecord }) {
         <span
           className={`hv-did-verb${record.status === "running" ? " hv-sheen" : ""}`}
         >
-          {verb}
+          {intentOf(record.args) ?? verb}
         </span>
         {detail && <span className="hv-did-subject">{detail}</span>}
         <span className="hv-did-state">

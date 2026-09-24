@@ -23,6 +23,7 @@ import {
   clip,
   commandOf,
   essence,
+  intentOf,
   placeOf as sharedPlaceOf,
 } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
@@ -202,7 +203,9 @@ export function LogsPage({
           return (
             <section className="hv-captured" key={execution.id}>
               <header>
-                <strong>{placeOf(execution.tool)}</strong>
+                <strong>
+                  {intentOf(execution.input) ?? placeOf(execution.tool)}
+                </strong>
                 <code>{clip(essence(commandOf(execution.input)), 96)}</code>
                 <span>
                   Captured <LocalTime value={at} variant="compact" />
