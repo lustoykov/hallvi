@@ -116,7 +116,13 @@ export interface Protection {
    * nothing has ever opened it. A restore proves the copy it restored.
    */
   verifiedCopies: Map<string, Dated & { covers: string[] }>;
-  /** What is on record as being on this application's disk, with its label. */
+  /**
+   * What is on record as holding this application's bytes, with its label.
+   *
+   * Every stated volume, plus every stated database whose files no stated
+   * volume already accounts for. One entry per set of bytes, so a page can
+   * count coverage over it without asking about the same data twice.
+   */
   requiredData: { id: string; label: string }[];
   /**
    * Subject id → the owner's words for it, where a record gives any.
@@ -442,7 +448,11 @@ export function protectionFromRecords(
   const map = applicationId
     ? (topologyOf(live, applicationId)?.value ?? null)
     : null;
-  if (applicationId)
+  /** The volume this subject's files live in, where the map draws one. */
+  const diskOf = (id: string) =>
+    map?.edges.find((edge) => edge.network === "disk" && edge.from === id)
+      ?.to ?? null;
+  if (applicationId) {
     for (const ref of subjectsMentioned(live, "volume")) {
       const presence = presenceOf(live, ref);
       if (!(presence.known && presence.presence === "present")) continue;
@@ -452,6 +462,25 @@ export function protectionFromRecords(
           ?.name ?? null;
       required.push({ id: ref.id, label: holds ?? drawn ?? ref.id });
     }
+    // A database whose files live in a volume above is those bytes under a
+    // second name, and counting it again would say a copy holds half of one
+    // thing. A database with no volume on record is its own bytes, and
+    // leaving it out said "0 of 0" about an application that has data.
+    for (const ref of subjectsMentioned(live, "database")) {
+      const presence = presenceOf(live, ref);
+      if (!(presence.known && presence.presence === "present")) continue;
+      const volume = diskOf(ref.id);
+      if (volume && required.some((item) => item.id === volume)) continue;
+      const facts = currentFacts(live, ref);
+      const named =
+        facts.get("holds")?.value.value ??
+        facts.get("product")?.value.value ??
+        facts.get("engine")?.value.value ??
+        null;
+      const drawn = map?.parts.find((part) => part.id === ref.id)?.name ?? null;
+      required.push({ id: ref.id, label: named ?? drawn ?? ref.id });
+    }
+  }
 
   /**
    * What a list of covered ids leaves out.
@@ -463,10 +492,8 @@ export function protectionFromRecords(
   const missingFrom = (named: string[]) => {
     const reach = new Set(named);
     for (const item of named) {
-      const edge = map?.edges.find(
-        (edge) => edge.network === "disk" && edge.from === item,
-      );
-      if (edge) reach.add(edge.to);
+      const volume = diskOf(item);
+      if (volume) reach.add(volume);
     }
     return required.filter((item) => !reach.has(item.id));
   };

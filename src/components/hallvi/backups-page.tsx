@@ -34,10 +34,9 @@ import {
 } from "./backups-records";
 import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";
-import { databasesFromRecords } from "./database-records";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { Figure, Lede, Strip, ago } from "./register";
-import { storageFromRecords, volumeName } from "./storage-records";
+import { storageFromRecords } from "./storage-records";
 
 export function BackupsPage({
   records,
@@ -93,26 +92,23 @@ export function BackupsPage({
     () => protectionVerdict(protection, now),
     [protection, now],
   );
-  // Everything on record that holds data, however it is stored. A volume and
-  // a database are two answers to one question, and only because of how the
-  // bytes sit on disk.
-  const holders = useMemo(() => {
-    const databases = databasesFromRecords({ records, now });
-    return [
-      ...story.volumes.map((volume) => ({
-        id: volume.name,
-        name: volumeName(volume),
-      })),
-      ...databases
-        .filter((row) => !row.absent)
-        .map((row) => ({ id: row.id, name: row.label })),
-    ];
-  }, [records, story.volumes, now]);
+  // Everything on record that holds data, however it is stored, counted
+  // once. The projection owns that set (`requiredData`) and the same rule
+  // answers coverage over it, so the numerator and the denominator cannot
+  // be asking about different things.
+  const holders = protection.requiredData;
   const copied = holders.filter(
     (one) => inNewestCopy(protection, one.id) === true,
   );
   const newest = protection.copies[0] ?? null;
   const proved = newest ? protection.verifiedCopies.get(newest.id) : null;
+  // The newest restore of any copy. A restore of an older copy proves that
+  // recovery has worked without vouching for the copy taken since.
+  const restored = protection.restores[0] ?? null;
+  // A copy exists and no record says what went into it. "0 of 2" would be an
+  // established zero read out of a record nobody wrote.
+  const unsaid =
+    Boolean(newest) && protection.newestCopyCoverage.basis === "unrecorded";
   const { schedule } = protection.summary;
 
   const head = (
@@ -143,10 +139,12 @@ export function BackupsPage({
             value={
               !holders.length || !protection.assessed
                 ? "Not checked"
-                : `${copied.length} of ${holders.length} in a copy`
+                : unsaid
+                  ? "The copy did not say"
+                  : `${copied.length} of ${holders.length} in a copy`
             }
             tone={
-              !holders.length || !protection.assessed
+              !holders.length || !protection.assessed || unsaid
                 ? "plain"
                 : copied.length === holders.length
                   ? "good"
@@ -157,35 +155,45 @@ export function BackupsPage({
                 ? "No record names a volume or a database."
                 : !protection.assessed
                   ? "Nobody has looked at whether any of it is copied."
-                  : holders.map((one) => one.name).join(", ")
+                  : unsaid
+                    ? `No record says what the newest copy holds. On disk: ${holders.map((one) => one.label).join(", ")}.`
+                    : holders.map((one) => one.label).join(", ")
             }
           />
           <Figure
             label="Newest copy"
             value={newest ? ago(newest.at, now) : "None on record"}
+            // Without a copy record the page knows one thing: it has no
+            // copy record. "Nothing has copied this" is a history, and an
+            // absent record does not establish one.
             note={
               newest
                 ? (newest.destination ?? "Where it went is not recorded.")
-                : "Nothing has copied this application's data."
+                : "No record names a copy."
             }
           />
           <Figure
             label="Restore"
-            // "Never tested" is a claim about what has happened. Only a page
-            // that has looked may make it.
+            // `proved` is about the newest copy alone. A restore of an older
+            // copy proves recovery has worked, so "never tested" would be
+            // wrong; what is untested is the copy taken since.
             value={
               proved
                 ? `Tested ${ago(proved.at, now)}`
-                : protection.assessed
-                  ? "Never tested"
-                  : "Not checked"
+                : restored
+                  ? "Newest copy untested"
+                  : protection.assessed
+                    ? "None on record"
+                    : "Not checked"
             }
             // Worth amber only once there is a copy to be unsure about.
             tone={proved ? "good" : newest ? "warn" : "plain"}
             note={
               proved
                 ? proved.detail
-                : "A copy counts once one has been opened and loaded."
+                : restored
+                  ? `An earlier copy was restored and checked ${ago(restored.at, now)}.`
+                  : "A copy counts once one has been opened and loaded."
             }
           />
           <Figure

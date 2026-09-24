@@ -134,12 +134,17 @@ export function StoragePage({
     id: volume.name,
   }));
   const measured = rows.filter((row) => size(row));
-  const kept = rows
-    .map((row) => row.keptAt)
-    .filter(Boolean)
-    .sort()
-    .at(-1);
-  const lost = rows.some((row) => row.lostAt);
+  // One volume that came through a replacement says nothing about the one
+  // beside it that has never been through one. The figure reports the
+  // subset that was tested rather than a blanket yes.
+  const lost = rows.filter((row) => row.lostAt);
+  const kept = rows.filter((row) => row.keptAt && !row.lostAt);
+  const untested = rows.filter((row) => !row.keptAt && !row.lostAt);
+  const newestKept =
+    kept
+      .map((row) => row.keptAt!)
+      .sort()
+      .at(-1) ?? null;
 
   const columns: Column<Row>[] = [
     {
@@ -215,12 +220,30 @@ export function StoragePage({
           />
           <Figure
             label="Survives replacement"
-            value={lost ? "One did not" : kept ? "Yes" : "Not checked"}
-            tone={lost ? "bad" : kept ? "good" : "plain"}
+            value={
+              lost.length
+                ? `${lost.length} of ${rows.length} did not`
+                : !kept.length
+                  ? "Not checked"
+                  : untested.length
+                    ? `${kept.length} of ${rows.length} kept`
+                    : "Yes"
+            }
+            tone={
+              lost.length
+                ? "bad"
+                : untested.length || !kept.length
+                  ? "plain"
+                  : "good"
+            }
             note={
-              kept
-                ? `Came through a replacement ${ago(kept, now)}`
-                : "Nothing has replaced a container and looked afterwards."
+              lost.length
+                ? `${lost.map(volumeName).join(", ")} did not come through one.`
+                : !kept.length
+                  ? "Nothing has replaced a container and looked afterwards."
+                  : untested.length
+                    ? `Came through a replacement ${ago(newestKept, now)}. Not tested: ${untested.map(volumeName).join(", ")}.`
+                    : `Came through a replacement ${ago(newestKept, now)}`
             }
           />
         </Strip>
