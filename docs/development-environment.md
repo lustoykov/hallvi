@@ -1,10 +1,11 @@
 # The development environment
 
-Development is `npm ci` and `npm run dev`, like any other project. What this
-machine keeps beside that is four applications that are really deployed, with
-the conversations, records, credentials and connections they were deployed
-with, kept between tasks — one Hallvi state directory each, outside every
-checkout, that any checkout can take for a while.
+Development is `npm ci` and `npm run dev`, like any other project. A
+development environment keeps, beside that, a few applications that are really
+deployed, with the conversations, records, credentials and connections they
+were deployed with, kept between tasks — one Hallvi state directory each,
+outside every checkout, that any checkout can take for a while. It is optional:
+without one, every checkout runs its own empty Hallvi.
 
 Fixtures made and thrown away inside a single task can only ever show that a
 new database works. This keeps the other half — an application whose identity,
@@ -13,13 +14,13 @@ quietly drops one of them is visible rather than theoretical.
 
 |  |  |
 | --- | --- |
-| Take one | `node scripts/retained-application.mjs attach whoami` (or `npm run retained -- attach whoami`) in any checkout |
-| See who has what | `node scripts/retained-application.mjs status` |
+| Take one | `node scripts/retained-application.mjs attach <name>` (or `npm run retained -- attach <name>`) in any checkout |
+| See what exists and who has what | `node scripts/retained-application.mjs status` |
+| The register | `~/.local/share/hallvi-dev/instance.json`: each application, what it exercises, its port and address, and the data to check after a change |
 | Their records | `~/.local/share/hallvi-dev/applications/<name>/state`, one directory per application |
-| Their addresses | whoami 5147 · uptime-kuma 5148 · miniflux 5149 · paperless 5150, on 127.0.0.1 |
 | Copies | `~/.local/share/hallvi-dev/applications/<name>/backups`, taken by every attach |
-| The host | `hallvi-dev`, one Hetzner cx23 at 46.62.253.6, shared by every application |
-| What it costs | EUR 5.99/month |
+
+`HALLVI_DEV_ROOT` moves the whole environment from `~/.local/share/hallvi-dev`.
 
 [Where the records live, and who may open them](architecture/development-environment.md).
 
@@ -61,7 +62,7 @@ every other copy.
 ### Attaching
 
 ```sh
-node scripts/retained-application.mjs attach uptime-kuma
+node scripts/retained-application.mjs attach <name>
 ```
 
 In order, and each one a refusal on its own:
@@ -99,7 +100,7 @@ In order, and each one a refusal on its own:
 Ctrl-C in that terminal, or from anywhere:
 
 ```sh
-node scripts/retained-application.mjs detach uptime-kuma
+node scripts/retained-application.mjs detach <name>
 ```
 
 The interface stops first, so nothing new is accepted. The worker is asked to
@@ -122,53 +123,43 @@ detach it there.
 ### Working on it with other people
 
 Assignments are coordinated in a sentence — say which application you are
-taking and when you are done — and enforced by the lock. Four applications
-means up to four checkouts working at once, each on its own. Two things are
+taking and when you are done — and enforced by the lock. Each application
+can have one checkout working on it at a time. Two things are
 enforced rather than agreed, and they stay that way:
 
 - **One runtime owns an application's records**, the interface and the worker
   together, as above.
-- **The applications are registered as retained.** The server, its firewall,
-  its key and its addresses carry `sg-lifecycle=persistent` and
+- **The applications are registered as retained.** Their server, firewall,
+  keys and addresses carry `sg-lifecycle=persistent` and
   `sg-cleanup=retain` with no expiry, so no cleanup removes them.
   See [development resources](development-resources.md).
 
-State ownership isolates Hallvi's records, not the host. All four applications
-share one server and every application's SSH key is root on it, so an
-attached whoami can reach Paperless's containers. Keep work to the application
+State ownership isolates Hallvi's records, not the host. When applications
+share one server and every application's SSH key is root on it, an attached
+application can reach its neighbours' containers. Keep work to the application
 you hold — its Compose project, its data, its records — and treat anything
 host-wide (Caddy, Docker, the firewall, packages) as a change to say out loud
 before making, whoever holds what. This does not provision separate servers
 and does not claim host isolation.
 
-## What is deployed, and what each one is for
+## What to deploy
 
-All four share one host, each with its own Compose project, its own data and
-its own port, behind the Caddy already on that host.
+A useful set climbs in difficulty, each application with its own Compose
+project, data and port:
 
-| Application | State directory | Exercises | Data to check after a change | At |
-| --- | --- | --- | --- | --- |
-| **whoami** | `whoami` | A stateless site. Nothing to preserve, so a redeployment has nothing to lose — which is the point of having one | none, deliberately | <https://whoami.46-62-253-6.sslip.io/> |
-| **uptime-kuma** | `uptime-kuma` | A stateful application keeping its own SQLite database on the host | three monitors named `hallvi-dev …`, in `/opt/uptime-kuma/data/kuma.db` | <https://46-62-253-6.sslip.io/> |
-| **v2** (Miniflux) | `miniflux` | An application with a separate PostgreSQL database beside it | two feeds, 182 entries, and one starred entry, `#26` | <https://miniflux.46-62-253-6.sslip.io/> |
-| **paperless-ngx** | `paperless` | The complicated tier: PostgreSQL *and* Redis *and* background workers *and* documents on disk | two documents tagged `hallvi-dev`, with originals under `/opt/paperless/media` | <https://paperless.46-62-253-6.sslip.io/> |
+| Tier | Exercises | For example |
+| --- | --- | --- |
+| Stateless | Nothing to preserve, so a redeployment has nothing to lose — which is the point of having one | whoami |
+| Own database file | A stateful application keeping its own SQLite database on the host | Uptime Kuma |
+| Database beside it | An application with a separate PostgreSQL database | Miniflux |
+| Everything | PostgreSQL _and_ Redis _and_ background workers _and_ documents on disk | Paperless-ngx |
 
-They are also a scenario rather than four unrelated deployments: Uptime Kuma
-watches whoami and Miniflux, so its monitor list is itself a statement about
-whether the environment is up.
-
-Each row's middle column is the specific thing to look at after an upgrade, a
-redeployment or a restore. A record that survived and data that survived are
-different claims, and this environment exists to keep them apart.
-
-Paperless is deliberately restrained to fit this host: one task worker, one
-thread, and no Tika or Gotenberg. Sign-in details were generated by Pi rather
-than typed in, which is what lets them be read back: open the application and
-look under **Environment Variables**.
-
-`~/.local/share/hallvi-dev/instance.json` registers which applications belong
-to this environment, what each exercises, where it answers and where its state
-is.
+Record in the register, for each one, the specific data to look at after an
+upgrade, a redeployment or a restore — a named monitor, a starred entry, a
+tagged document. A record that survived and data that survived are different
+claims, and this environment exists to keep them apart. A monitoring
+application that watches the others turns its monitor list into a statement
+about whether the environment is up.
 
 ## Working from a worktree
 
@@ -179,15 +170,15 @@ a change needs a real application with real history, attach one; the worktree
 then runs *that* application, on that application's port, and nothing else
 retained.
 
-Its Pi can see the whole Hetzner project and create its own labelled resources
-in it. Fixtures of its own go either on a disposable server (hard isolation,
-for anything meant to break) or, for ordinary work, as separate Compose
-projects on `hallvi-dev`, kept private and named after the application.
+Its Pi can create its own labelled resources in the provider project. Fixtures
+of its own go either on a disposable server (hard isolation, for anything meant
+to break) or, for ordinary work, as separate Compose projects on the
+environment's host, kept private and named after the application.
 
 ### Looking at real records without taking an application
 
 ```sh
-node scripts/retained-application.mjs snapshot /tmp/hv-look uptime-kuma miniflux
+node scripts/retained-application.mjs snapshot /tmp/hv-look <name> [<name> …]
 ```
 
 A snapshot is a copy for looking at: the chosen applications' databases merged
@@ -231,7 +222,7 @@ retained directory it does not own, so running it twice is safe and running it
 over somebody's records is not possible.
 
 **This environment has no seed command**, deliberately. The retained data is
-the starting point, and a command that wrote sample rows into four live
+the starting point, and a command that wrote sample rows into live
 applications would be manufacturing history.
 
 `npm run scenarios` remains what it was: it builds its **own** database from
@@ -253,13 +244,13 @@ disk, so state is never handed to code that cannot open it; the one thing it
 cannot see is a change to the JSON records, which have no version of their
 own, and that is what the copy is for.
 
-When a change alters the schema, these four applications are the acceptance
+When a change alters the schema, the retained applications are the acceptance
 test. Each runs the same migration an installation would — the same list, the
 same code, the same verified copy taken first — while detached:
 
 ```sh
-node scripts/migrate-state.mjs --plan  --data ~/.local/share/hallvi-dev/applications/whoami/state
-node scripts/migrate-state.mjs --apply --data ~/.local/share/hallvi-dev/applications/whoami/state
+node scripts/migrate-state.mjs --plan  --data ~/.local/share/hallvi-dev/applications/<name>/state
+node scripts/migrate-state.mjs --apply --data ~/.local/share/hallvi-dev/applications/<name>/state
 ```
 
 `--plan` changes nothing and says which stores the transition rewrites.
@@ -293,23 +284,18 @@ around a migration is made by `migrate-state.mjs --apply` and restored by
 
 What a copy covers, and what it deliberately does not: it holds Hallvi's own
 records — the database, the conversation, the credentials and the connection
-configuration. **It does not hold the application's own data.** Uptime Kuma's
-monitors and Miniflux's articles live on the host; restoring this copy would
+configuration. **It does not hold the application's own data.** A monitor list
+or a feed's articles live on the host; restoring this copy would
 bring back a controller describing data that is still, or no longer, there.
-
-`~/.local/share/hallvi-dev/recovery/` holds the four-application state as it
-was before the separation of 22 September 2026, read-only and marked as a
-recovery copy so that no program opens it, and `backups/` beside it the
-verified copy taken just before. They are the record of where the four came
-from, not working controllers.
 
 ## Retention
 
-Registered as **persistent**, cleanup **retain**, in the canonical development
-inventory that [development resources](development-resources.md) describes. It
-does not inherit the 72-hour disposable lease, and no cleanup removes it. Retiring it is a deliberate act with its own evidence, not
-something an expiry does.
+Label the environment's server, firewall, keys and addresses
+`sg-lifecycle=persistent` and `sg-cleanup=retain` with no expiry, as
+[development resources](development-resources.md) describes, so no cleanup
+removes them. Retiring the environment is a deliberate act, not something an
+expiry does.
 
 "Persistent" means retained until somebody retires it deliberately — not
 monitored, and not guaranteed to be up. If it matters that everything is
-answering, open the four addresses above.
+answering, open each application's address from the register.

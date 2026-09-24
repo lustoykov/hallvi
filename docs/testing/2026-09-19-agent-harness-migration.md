@@ -23,7 +23,7 @@ was used, the listening Next server and the worker were each checked to have
 this worktree as their working directory and the worker to be running under
 Node 22. Model: the configured ChatGPT subscription account
 (`openai-codex`), through Pi's own `ModelRuntime`; workspace: the real Docker
-repository workspace; provider: the authorized Default Hetzner project; a
+repository workspace; provider: an authorized Hetzner project; a
 fresh schema-17 database in this worktree's own `.hallvi/`.
 
 | Step | What happened |

@@ -152,7 +152,7 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
           {step && (
             <small>
               {[
-                // "On the server · 46.62.253.6" under a title that already
+                // "On the server · 203.0.113.60" under a title that already
                 // says "On the server" is the same words twice.
                 step.where?.replace(`${step.title} · `, ""),
                 STEP_STATE[step.outcome],

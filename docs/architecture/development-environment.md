@@ -1,6 +1,6 @@
 # Where the records live, and who may open them
 
-Four retained applications, one state directory each, outside every checkout.
+Retained applications, one state directory each, outside every checkout.
 A checkout that needs one attaches it and becomes its runtime for a while;
 the directory never moves. The thing worth holding in mind is that a release
 carries **code**: it never carries records, and it never fetches them. An
@@ -9,7 +9,7 @@ run Hallvi, and are only ever changed there.
 
 ```mermaid
 flowchart LR
-    subgraph mac["Owner's MacBook"]
+    subgraph mac["Development machine"]
         subgraph src["Checkouts"]
             a["worktree A<br/>attach whoami"]
             b["worktree B<br/>attach uptime-kuma"]
@@ -22,15 +22,15 @@ flowchart LR
             paper["paperless/state"]
         end
         account["~/.config/hallvi/pi<br/>ChatGPT · GitHub · Hetzner · Cloudflare"]
-        recovery["recovery/ · backups/<br/>read-only, marked, never opened"]
-        installed["the owner's own installation<br/>com.hallvi on 4747"]
+        recovery["backups/<br/>a verified copy per attach"]
+        installed["an installed Hallvi"]
     end
-    subgraph host["Hetzner cx23 — 46.62.253.6"]
+    subgraph host["Development host"]
         apps["whoami · Uptime Kuma<br/>Miniflux · Paperless<br/>one root key each, one host"]
     end
 
-    a ==>|"holds the lock, on 5147"| whoami
-    b ==>|"holds the lock, on 5148"| kuma
+    a ==>|"holds the lock, on its own port"| whoami
+    b ==>|"holds the lock, on its own port"| kuma
     c -.->|"refused: not its runtime"| whoami
     b -.->|"refused: attached elsewhere"| whoami
     a --> account
@@ -58,8 +58,8 @@ the lock when the attaching process ends, however it ends; nothing expires.
 A crash leaves `runtime.json` behind, and the next attach accounts for the
 commands that were running before it starts.
 
-**One host, four keys.** State ownership isolates Hallvi's records. Every
-application's key is root on the same server, so work stays with the
+**One host, several keys.** State ownership isolates Hallvi's records. When
+every application's key is root on the same server, so work stays with the
 application you hold and host-wide changes are said out loud.
 
 **A release carries no records.** `scripts/package.mjs` copies an explicit

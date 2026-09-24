@@ -41,7 +41,7 @@ The Mac mini test service and its empty controller state were removed after
 verification. Its installer archive, checksum and script were left in
 `~/Downloads/Hallvi-install-candidate-2026-09-19/` for the owner's own later
 installation. The same files, plus the Linux archive and checksum, are retained
-in that named Downloads folder on the MacBook. The owner's existing MacBook
+in that named Downloads folder on the MacBook. An existing MacBook
 Hallvi service and state were not changed.
 
 The two temporary Hetzner VPSs, their four attached primary IPs and the task

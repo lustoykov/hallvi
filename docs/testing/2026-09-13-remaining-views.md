@@ -512,8 +512,8 @@ No scenario data is involved in any of it.
 
 ## Journey 4 · a real name, and the distinction it forces
 
-The owner created `server-guy-getting-started-b2184a72.accountant-agent.com`
-as an `A` record to `46.62.253.6`, proxied through Cloudflare, and asked for
+The owner created `server-guy-getting-started-b2184a72.example.org`
+as an `A` record to `203.0.113.60`, proxied through Cloudflare, and asked for
 the record path to be proved against it without exposing the origin.
 
 Asked only *"find out what is actually configured for that name and whether
@@ -541,7 +541,7 @@ Three defects only a real name could have found:
 2. **"There is still no certificate."** Printed whenever no certificate record
    existed — false here, since Cloudflare serves one and HTTPS reached a 522
    through it. An unread certificate is now `unknown`.
-3. **Two machines read as one.** CDN put "The cache forwards to 46.62.253.6"
+3. **Two machines read as one.** CDN put "The cache forwards to 203.0.113.60"
    under a card titled `hetzner-4201`. Both pages now name the gap.
 
 Two earlier turns are worth keeping as evidence of the rules holding. When SSH

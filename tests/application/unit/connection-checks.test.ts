@@ -268,71 +268,71 @@ const CLOUDFLARE = ["annalise.ns.cloudflare.com", "pranab.ns.cloudflare.com"];
 it("walks up to the parent zone when the configured resolver drops the subdomain", async () => {
   const asked = scriptDns({
     // The reproduced Mac mini: silent for the new name, right for the root.
-    configured: { "accountant-agent.com": CLOUDFLARE },
-    public: { "test.accountant-agent.com": NOTHING_THERE },
+    configured: { "example.org": CLOUDFLARE },
+    public: { "test.example.org": NOTHING_THERE },
   });
   const { whoHostsDns } = await import("../../../src/server/connection-checks");
-  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+  expect(await whoHostsDns("test.example.org")).toEqual({
     kind: "cloudflare",
-    zone: "accountant-agent.com",
+    zone: "example.org",
   });
   // Public DNS is asked for exactly the query the configured resolver lost.
   expect(asked).toEqual([
-    "configured test.accountant-agent.com",
-    "public test.accountant-agent.com",
-    "configured accountant-agent.com",
+    "configured test.example.org",
+    "public test.example.org",
+    "configured example.org",
   ]);
 });
 
 it("finds the zone for a subdomain that has no DNS records yet", async () => {
   const asked = scriptDns({
     configured: {
-      "test.accountant-agent.com": NOTHING_THERE,
-      "accountant-agent.com": CLOUDFLARE,
+      "test.example.org": NOTHING_THERE,
+      "example.org": CLOUDFLARE,
     },
   });
   const { whoHostsDns } = await import("../../../src/server/connection-checks");
-  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+  expect(await whoHostsDns("test.example.org")).toEqual({
     kind: "cloudflare",
-    zone: "accountant-agent.com",
+    zone: "example.org",
   });
   // A resolver that answered settles it; public DNS is never troubled.
   expect(asked).toEqual([
-    "configured test.accountant-agent.com",
-    "configured accountant-agent.com",
+    "configured test.example.org",
+    "configured example.org",
   ]);
 });
 
 it("keeps a delegated subdomain as its own zone instead of stripping a label", async () => {
   const asked = scriptDns({
     configured: {
-      "test.accountant-agent.com": ["ns-1.awsdns-01.org"],
-      "accountant-agent.com": CLOUDFLARE,
+      "test.example.org": ["ns-1.awsdns-01.org"],
+      "example.org": CLOUDFLARE,
     },
   });
   const { whoHostsDns } = await import("../../../src/server/connection-checks");
-  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+  expect(await whoHostsDns("test.example.org")).toEqual({
     kind: "other",
-    zone: "test.accountant-agent.com",
+    zone: "test.example.org",
     nameservers: ["ns-1.awsdns-01.org"],
     who: "Amazon Route 53",
   });
-  expect(asked).toEqual(["configured test.accountant-agent.com"]);
+  expect(asked).toEqual(["configured test.example.org"]);
 });
 
 it("does not hand a name to its parent when no resolver answered for it", async () => {
   // A name delegated to name servers that are down is not the parent's to
   // write in, so a silent level is reported rather than climbed past.
   const asked = scriptDns({
-    configured: { "accountant-agent.com": CLOUDFLARE },
+    configured: { "example.org": CLOUDFLARE },
   });
   const { whoHostsDns } = await import("../../../src/server/connection-checks");
-  expect(await whoHostsDns("test.accountant-agent.com")).toEqual({
+  expect(await whoHostsDns("test.example.org")).toEqual({
     kind: "unreachable",
   });
   expect(asked).toEqual([
-    "configured test.accountant-agent.com",
-    "public test.accountant-agent.com",
+    "configured test.example.org",
+    "public test.example.org",
   ]);
 });
 
@@ -365,9 +365,7 @@ it("watches for a manual record through public DNS when the configured resolver 
   });
   const { recordResolves } =
     await import("../../../src/server/connection-checks");
-  expect(await recordResolves("test.accountant-agent.com", "203.0.113.7")).toBe(
-    true,
-  );
+  expect(await recordResolves("test.example.org", "203.0.113.7")).toBe(true);
 });
 
 it("stops an unanswered DNS lookup without calling the domain unregistered", async () => {

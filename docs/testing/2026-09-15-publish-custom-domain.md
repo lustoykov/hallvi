@@ -14,7 +14,7 @@ MacBook rather than from the server it is about.
 ## What was authorized
 
 The owner authorized exactly one hostname —
-`sg-publish-test.accountant-agent.com` — in the `accountant-agent.com` zone, and
+`sg-publish-test.example.org` — in the `example.org` zone, and
 one small Hetzner server for a few hours, to be deleted at the end. Both are
 recorded in the durable inventory under owner UUID
 `d6bbf454-0d68-4a12-a8b0-536960fecfff`. Nothing else in that zone was touched;
@@ -30,7 +30,7 @@ that must stay private. The repository also ships its own Caddy edge, so
 "reuse an existing appropriate proxy" is a real decision rather than a
 hypothetical one.
 
-Server: Hetzner CX23 in Nuremberg, `2.28.78.41`, €5.99/month including IPv4.
+Server: Hetzner CX23 in Nuremberg, `203.0.113.80`, €5.99/month including IPv4.
 
 ## Private deployment first
 
@@ -71,7 +71,7 @@ The plan it stated before acting was the intended one:
   already has persistent named volumes for `/data` and `/config`";
 - keep Ghost on `127.0.0.1:2368` and MySQL private;
 - update Ghost's canonical URL;
-- add an **unproxied** A record to `2.28.78.41`;
+- add an **unproxied** A record to `203.0.113.80`;
 - open only 80 and 443 alongside SSH.
 
 One approval was requested and granted during the run — disabling Ghost's staff
@@ -88,10 +88,10 @@ product's own `check_public_access`.
 
 | Check | Result |
 | --- | --- |
-| Public DNS (1.1.1.1) | `A → 2.28.78.41`. **No AAAA**, and Pi recorded that absence explicitly (`records = A 2.28.78.41; no AAAA or CNAME`). |
-| HTTPS by name | `200`, `remote_ip 2.28.78.41` — the origin itself answered, not an edge. |
-| Certificate | Let's Encrypt, `CN=sg-publish-test.accountant-agent.com`, serial `05F314839BB064C5EF8234DC79714E35DE33`, valid 15 Sep – 14 Dec 2026, chain trusted (`ssl_verify_result=0`). |
-| Plain HTTP | `308 → https://sg-publish-test.accountant-agent.com/`. |
+| Public DNS (1.1.1.1) | `A → 203.0.113.80`. **No AAAA**, and Pi recorded that absence explicitly (`records = A 203.0.113.80; no AAAA or CNAME`). |
+| HTTPS by name | `200`, `remote_ip 203.0.113.80` — the origin itself answered, not an edge. |
+| Certificate | Let's Encrypt, `CN=sg-publish-test.example.org`, valid 15 Sep – 14 Dec 2026, chain trusted (`ssl_verify_result=0`). |
+| Plain HTTP | `308 → https://sg-publish-test.example.org/`. |
 | Sign-in through the public URL | `POST /ghost/api/admin/session/` → `201`; `GET /users/me/` → `200`, Owner "Quokka Editor". |
 | Upload through the public URL | A 4.6 MB PNG accepted (`201`), returned at its **public** URL — Ghost's canonical URL was correctly set. |
 | Derived processing | `/content/images/size/w600/…` served an 857 KB variant of the 4.6 MB original: the sizing pipeline really ran. |
@@ -125,7 +125,7 @@ and tunnels on this machine were left running and verified still running.
 
 With nothing of ours alive — `127.0.0.1:3510` and `127.0.0.1:2368` both refusing
 — the site returned `200`, the post returned `200` and the image returned `200`,
-all from `2.28.78.41`.
+all from `203.0.113.80`.
 
 ## Restart, and what renewal actually rests on
 
@@ -155,7 +155,7 @@ Asked only *"my blog looks broken"*, Pi checked from outside first and recorded:
 > `configured=passed  resolves=passed  serves=failed`
 
 The Domains page changed accordingly, without being told what to say: the
-headline tag became "sg-publish-test.accountant-agent.com **does not answer**",
+headline tag became "sg-publish-test.example.org **does not answer**",
 the visitor's window read "This page isn't working — The name resolved and the
 connection was made. Nothing came back from the application", and the page's
 action changed from "Make it private again" to "Finish publishing it".
@@ -172,8 +172,8 @@ also says what not to touch: *"leave SSH and anything you did not create alone"*
 
 Verified from the MacBook afterwards:
 
-- `sg-publish-test.accountant-agent.com` no longer resolves at 1.1.1.1 or 8.8.8.8.
-- `https://2.28.78.41/` and `http://2.28.78.41/` no longer connect at all.
+- `sg-publish-test.example.org` no longer resolves at 1.1.1.1 or 8.8.8.8.
+- `https://203.0.113.80/` and `http://203.0.113.80/` no longer connect at all.
 - `http://127.0.0.1:2368` returns `200` — the private way in is back.
 - **The zone's nine other records are exactly as they were**, each keeping its
   own owner comment. Only the record this application created was removed, and
@@ -269,7 +269,7 @@ fixed with a regression test.
 
 Every resource created for this run is recorded under owner UUID
 `d6bbf454-0d68-4a12-a8b0-536960fecfff` in the local inventory at
-`~/Library/Application Support/Server Guy/development-cleanup/`, with the
+the local development inventory, with the
 `sg-*` development labels applied to each Hetzner resource.
 
 Disposition, verified at the end of the task: server 166041471, firewall

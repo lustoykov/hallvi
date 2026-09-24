@@ -82,12 +82,12 @@ audit](2026-09-15-backup-protection.md).
 
 ## Standing state
 
-The Hetzner Default project now holds **zero resources of every kind** —
+The Hetzner project now holds **zero resources of every kind** —
 servers, primary IPs, floating IPs, volumes, snapshots, firewalls and SSH keys
 all read 0, verified read-only after the owner's instruction to stop.
 
 Records kept outside every worktree, at
-`~/Library/Application Support/Server Guy/development-cleanup/`:
+the local development inventory:
 
 - `2026-09-14-pre-deletion-hetzner-snapshot.json` — the pre-deletion state, SSH
   keys excluded, which is the gap above.

@@ -100,13 +100,12 @@ One secret, once.
 | --- | --- | --- |
 | `HALLVI_RELEASE_SIGNING_KEY` | Repository secret, `lustoykov/hallvi` → Settings → Secrets → Actions | The alpha channel's Ed25519 private key, as a PKCS#8 PEM (or that PEM base64-encoded). Its public half is already in [`scripts/release-trust.mjs`](../scripts/release-trust.mjs). |
 
-The private key was generated for this work and is on the owner's MacBook at
-`~/.config/hallvi-release/alpha-signing-key.pem`, owner-only. It is in no
-repository, no archive and no installation. It was added to the repository as
+The private key is kept offline by the maintainer, readable only by them. It
+is in no repository, no archive and no installation. It was added to the repository as
 `HALLVI_RELEASE_SIGNING_KEY` on 20 September 2026, with:
 
 ```bash
-gh secret set HALLVI_RELEASE_SIGNING_KEY --repo lustoykov/hallvi < ~/.config/hallvi-release/alpha-signing-key.pem
+gh secret set HALLVI_RELEASE_SIGNING_KEY --repo lustoykov/hallvi < path/to/alpha-signing-key.pem
 ```
 
 The same command replaces it.

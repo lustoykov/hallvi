@@ -14,7 +14,7 @@ connection to a socket named `docker.sock`. Docker Desktop kept running for
 other work; from inside the controller and everything it started, `docker ps`
 and a direct socket request both failed with a permission error. The model was
 the owner's real ChatGPT account (GPT-5.6 Sol); the host was a real Hetzner
-CX23 in `hel1`, Ubuntu 24.04, created by Pi in the authorized Default project.
+CX23 in `hel1`, Ubuntu 24.04, created by Pi in an authorized Hetzner project.
 
 | Step | Observed |
 | --- | --- |

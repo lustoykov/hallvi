@@ -16,8 +16,8 @@ import {
 } from "@/components/hallvi/onboarding/domain-connect";
 import type { OnboardingTransport } from "@/components/hallvi/onboarding/types";
 
-const NAME = "test.accountant-agent.com";
-const ZONE = "accountant-agent.com";
+const NAME = "test.example.org";
+const ZONE = "example.org";
 
 const asleep: OnboardingTransport = {
   checkHetzner: async () => ({ kind: "unreachable" }),
@@ -95,8 +95,8 @@ it("says which name an unregistered answer was about, rather than its parent", (
 });
 
 it("reads a typed box the same way the lookup does, so an edit is seen as one", () => {
-  expect(wantedName(" HTTPS://Test.Accountant-Agent.com/app ")).toBe(NAME);
-  expect(wantedName("test.accountant-agent.com.")).toBe(NAME);
-  expect(wantedName("other.accountant-agent.com")).not.toBe(NAME);
+  expect(wantedName(" HTTPS://Test.Example.org/app ")).toBe(NAME);
+  expect(wantedName("test.example.org.")).toBe(NAME);
+  expect(wantedName("other.example.org")).not.toBe(NAME);
   expect(wantedName("not a domain")).toBe("");
 });

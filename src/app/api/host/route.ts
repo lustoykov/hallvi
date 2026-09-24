@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * prints: nothing secret, nothing the person who can already open this page
  * could not read in a terminal.
  *
- * On the owner's MacBook the installed Hallvi and every checkout share that
+ * On a development machine the installed Hallvi and every checkout share that
  * name, so a checkout also says which checkout it is and which retained
  * application it is attached to.
  *

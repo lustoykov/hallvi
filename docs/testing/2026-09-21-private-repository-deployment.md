@@ -21,7 +21,7 @@ for deployment on its connected host.
   transferred to the registered development Linux host. A temporary static
   HTTP server bound to loopback served each revision; `curl` output matched
   its exact source file. The four retained development applications were not
-  changed. The owner's Mac mini installation was not updated by this test.
+  changed. An existing Mac mini installation was not updated by this test.
 - Focused regression coverage runs the real checksum/extraction script with
   only SSH transport and GitHub substituted: repeated `main` resolution,
   binary bytes and executable permissions, preserving the earlier directory,

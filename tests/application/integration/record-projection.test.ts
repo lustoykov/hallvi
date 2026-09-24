@@ -152,7 +152,7 @@ const hostFirst = record({
     {
       key: "address",
       label: "Address",
-      value: "46.62.253.6",
+      value: "203.0.113.60",
       claim: "configuration",
       basis: "observed",
     },
@@ -255,7 +255,7 @@ describe("2 · a later SSH-only observation keeps the configuration and its time
   it("keeps the facts the newer record never mentioned", () => {
     const facts = currentFacts(records, HOST);
     expect(facts.get("region")!.value.value).toBe("Helsinki");
-    expect(facts.get("address")!.value.value).toBe("46.62.253.6");
+    expect(facts.get("address")!.value.value).toBe("203.0.113.60");
   });
 
   it("keeps each value's own observation time, not the newest record's", () => {
@@ -317,7 +317,7 @@ describe("3 · a replacement machine inherits nothing", () => {
       {
         key: "address",
         label: "Address",
-        value: "46.62.99.9",
+        value: "203.0.113.99",
         claim: "configuration",
         basis: "observed",
       },
@@ -327,11 +327,11 @@ describe("3 · a replacement machine inherits nothing", () => {
 
   it("keeps the two machines' facts apart, because they are two subjects", () => {
     expect(currentFacts(records, replacement).get("address")!.value.value).toBe(
-      "46.62.99.9",
+      "203.0.113.99",
     );
     expect(currentFacts(records, replacement).has("region")).toBe(false);
     expect(currentFacts(records, HOST).get("address")!.value.value).toBe(
-      "46.62.253.6",
+      "203.0.113.60",
     );
   });
 

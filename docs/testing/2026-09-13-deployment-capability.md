@@ -473,7 +473,7 @@ happened to the records already written.
 | Server | Application | Address | Fate |
 |---|---|---|---|
 | `todo-baseline-ca4e43b0` (165694537) | Todo baseline | 204.168.248.155 | disposable |
-| `paper-26820a4b` (165697333) | Paper | 2.28.78.41 | disposable |
+| `paper-26820a4b` (165697333) | Paper | 203.0.113.80 | disposable |
 | `blog-2080decc` (165702693) | Blog | 2.29.46.226 | disposable |
 | `counter-bd2e9028` (165706272) | Counter | 89.167.84.129 | disposable |
 

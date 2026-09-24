@@ -21,7 +21,7 @@ or escaping symlinks.
 
 ## Installation and lifecycle
 
-A task-owned Hetzner CX23 in the authorized Default project ran Ubuntu 24.04
+A task-owned Hetzner CX23 in an authorized Hetzner project ran Ubuntu 24.04
 x64 with systemd 255. A fresh unprivileged user installed the archive using its
 normal `install.sh`; the installer downloaded Node 24.21.0 and installed the
 locked dependencies. The first install took about 40 seconds for dependencies.
