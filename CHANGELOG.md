@@ -4,6 +4,12 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.7 — 24 September 2026
+
+Hallvi now tells you what changed when it updates.
+
+- **What's new.** Every release's notes are one click from the version at the bottom of the sidebar, and from the notice after an update finishes. They come with the version you installed, so they read the same with or without a connection.
+
 ## 0.1.1-alpha.6 — 24 September 2026
 
 Hallvi now starts on GPT-6 Sol, and an application's pages tell one consistent story about what was actually observed.
