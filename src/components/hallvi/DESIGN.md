@@ -543,6 +543,12 @@ container advertised a storage page and a backups page about nothing.
   that nobody read one. Overview, Architecture, Deployment, History and
   Command output are always listed too: they describe every application, or
   record what was done to it.
+- **Backups is listed as soon as anything on record holds data**, a volume or
+  a database, rather than once a copy exists. The page is about what there is
+  to lose, and an application with documents and no copy is exactly the one
+  that must not be quiet. A stateless container whose volume record says it
+  keeps nothing reads "not set up" under Show more. See [proportionate
+  care](../../../docs/operator-design.md#proportionate-care).
 - **Everything else waits under "Show more" with a quiet reason**, and the
   reasons are kept apart: "not checked" is silence, "checked · none here" is
   an established absence, and "not set up" is a decision nobody has made. A

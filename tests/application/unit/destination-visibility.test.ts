@@ -105,6 +105,16 @@ describe("what an application lists", () => {
     expect(ids([states("monitor")])).toContain("monitoring");
   });
 
+  // What there is to lose is what decides it, not whether a copy exists. An
+  // application with documents and no copy is the case that must not be
+  // quiet; a stateless one whose volume record says it keeps nothing is not.
+  it("lists Backups as soon as something on record holds data", () => {
+    expect(ids([states("volume")])).toContain("backups");
+    expect(ids([states("database")])).toContain("backups");
+    expect(ids([states("volume", "absent")])).not.toContain("backups");
+    expect(why([states("volume", "absent")]).backups).toBe("not set up");
+  });
+
   it("keeps the destination being viewed listed even with nothing recorded", () => {
     expect(ids([], "jobs" as never)).toContain("jobs");
   });

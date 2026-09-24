@@ -179,12 +179,31 @@ const always = new Set<ApplicationSection>([
  */
 const NEVER_HIDDEN: ApplicationSection = "access";
 
+/**
+ * Whether anything on record holds data this application would lose.
+ *
+ * Backups is listed from this rather than from a copy existing, because the
+ * page is about what there is to lose and the moment there is something is
+ * the moment it is worth reading. An application with documents and no copy
+ * is exactly the case that must not be quiet.
+ */
+const holdsData = (records: SavedInformation[]) =>
+  records.some(
+    (record) =>
+      !record.retiredAt &&
+      ["volume", "database"].includes(
+        record.presentation?.states?.ref.kind ?? "",
+      ) &&
+      record.presentation?.states?.presence !== "absent",
+  );
+
 export function standingOf(
   section: ApplicationSectionDefinition,
   records: SavedInformation[],
   waiting = false,
 ): Standing {
   if (always.has(section.id)) return "recorded";
+  if (section.id === "backups" && holdsData(records)) return "recorded";
   // A value Pi has asked the owner for and not been given is content for
   // Environment Variables: the page is where the answer goes.
   if (section.id === "variables" && waiting) return "recorded";
