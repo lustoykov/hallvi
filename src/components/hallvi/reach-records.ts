@@ -506,7 +506,14 @@ export function reachFromRecords({
                 servesRead === "stale"
                 ? "loads"
                 : "no-answer",
-      secure: validRead === "verified",
+      // A certificate that checked out stays the reading until one fails;
+      // the window dates it. No certificate reading is no claim either way.
+      secure:
+        validRead === "verified" || validRead === "stale"
+          ? true
+          : validRead === "failed"
+            ? false
+            : null,
       headline:
         domainState === "failed"
           ? "The name does not resolve"

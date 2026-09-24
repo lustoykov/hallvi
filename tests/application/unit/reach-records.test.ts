@@ -214,7 +214,7 @@ describe("domains", () => {
     expect(story.domain?.provider).toBe("cloudflare");
     // No certificate subject, so no claim about HTTPS either way.
     expect(story.tls.state).toBe("unknown");
-    expect(story.callers.at(-1)?.secure).toBe(false);
+    expect(story.callers.at(-1)?.secure).toBeNull();
   });
 
   it("separates resolving from serving", () => {
@@ -253,6 +253,25 @@ describe("domains", () => {
       detail: null,
     });
     expect(story.callers.at(-1)?.outcome).toBe("loads");
+  });
+
+  it("keeps a certificate that checked out as encrypted once it ages", () => {
+    const aged = "2026-09-09T12:00:00.000Z";
+    const story = read([
+      states(
+        { kind: "domain", id: "shop.example" },
+        {
+          at: aged,
+          checks: [check("resolves", "passed"), check("serves", "passed")],
+        },
+      ),
+      states(
+        { kind: "certificate", id: "shop.example" },
+        { at: aged, checks: [check("valid", "passed")] },
+      ),
+    ]);
+    // Four days old is not "plain HTTP": the window dates the reading.
+    expect(story.callers.at(-1)?.secure).toBe(true);
   });
 
   it("never invents a caller", () => {
