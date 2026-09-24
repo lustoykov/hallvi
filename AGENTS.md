@@ -45,9 +45,11 @@ did not create: label it, register it, and retire it when the task ends.
 Never print credentials or copy them into code, artifacts, commits or pull
 requests. Preserve dirty work, unique data, credentials, retained evidence and
 uncertain resources. Never broadly prune Docker volumes. Worktrees go when
-their session is archived, not by hand. If you start a local preview, stop it
-when its review ends and run `node scripts/check-preview-processes.mjs` before
-the task handoff. Preserve intentional tunnels and retained services.
+their session is archived, not by hand.
+
+If you start a local preview, stop it when its review ends and run
+`node scripts/check-preview-processes.mjs` before the task handoff. Preserve
+intentional tunnels and retained services.
 
 ## Changes and checks
 
