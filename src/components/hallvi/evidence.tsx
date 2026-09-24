@@ -10,8 +10,9 @@
 //
 // Three answers, and a reader has to be able to tell them apart:
 //
-//   unchecked  nobody has looked. Grey, labelled, and the reason is on
-//              hover, so the grey is never mute.
+//   unchecked  nothing has settled it. Nobody looked, or what was written
+//              down was neither outcome. Grey, labelled, and the reason is
+//              on hover, so the grey is never mute.
 //   na         there is nothing here to read and a check would not change
 //              that. A recorded fact about the thing, not a gap in it.
 //   absent     somebody looked and the answer was none. A reading, so it is
@@ -262,6 +263,7 @@ export function processFacts(row: ProcessCard): Fact[] {
  */
 export function databaseFacts(row: DatabaseRow, now: number): Fact[] {
   const stated = "A record states this application has no such database.";
+  const answering = row.answering;
   const state = (known: boolean): FactState =>
     row.absent ? "na" : known ? "known" : "unchecked";
   return [
@@ -307,21 +309,27 @@ export function databaseFacts(row: DatabaseRow, now: number): Fact[] {
     {
       key: "answering",
       label: "Answering",
-      // A check that ran and came back no is a reading, and reads as one.
+      // A query that ran and came back no is a reading, and reads as one.
+      // A note (`info`) is neither outcome: it settles nothing, so it leaves
+      // the question open instead of turning into a red "no".
       state: row.absent
         ? "na"
-        : row.answering?.passed && row.answering.at
-          ? "known"
-          : row.answering
-            ? "absent"
-            : "unchecked",
+        : !answering || answering.noted
+          ? "unchecked"
+          : answering.passed
+            ? "known"
+            : "absent",
       value:
-        row.answering?.passed && row.answering.at
-          ? `yes, ${ago(row.answering.at, now)}`
+        answering?.passed && !answering.noted
+          ? answering.at
+            ? `yes, ${ago(answering.at, now)}`
+            : "yes"
           : "no",
       reason: row.absent
         ? stated
-        : "Nothing has connected to it and run a query.",
+        : answering?.noted
+          ? "A record notes this database without saying whether a query answered."
+          : "Nothing has connected to it and run a query.",
     },
   ];
 }

@@ -182,13 +182,15 @@ export function DatabasePage({
       width: 150,
       cell: (row) => {
         const fact = factOf(row, "answering");
-        return fact.state === "known" ? (
-          <Tag tone="good">{fact.value}</Tag>
-        ) : fact.state === "absent" ? (
-          <Tag tone="bad">no</Tag>
-        ) : (
-          <FactCell fact={fact} />
-        );
+        // The answer and its date stay whatever the record said; the colour
+        // comes from the same reading the Checks column uses, so a pass too
+        // old to vouch for now is not drawn as one that is.
+        if (
+          !row.answering ||
+          (fact.state !== "known" && fact.state !== "absent")
+        )
+          return <FactCell fact={fact} />;
+        return <Tag tone={probeTone(row.answering)}>{fact.value}</Tag>;
       },
     },
     {

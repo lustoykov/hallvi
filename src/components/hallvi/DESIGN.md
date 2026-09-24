@@ -527,7 +527,9 @@ and table around the visual they already had. It lives in `register.tsx` and
   four processes could be half grey and said "not recorded", "never checked",
   "no detail written down" and a bare dash for the same thing. `evidence.tsx`
   settles it. **Not checked** is a dashed grey pill (`hv-rg-unchecked`) with
-  the reason on hover. **Not applicable** is a solid grey "n/a"
+  the reason on hover; a record that was written down and settled nothing,
+  such as Pi's `info`, is grey too, because it is neither outcome. **Not
+  applicable** is a solid grey "n/a"
   (`data-kind="na"`): a worker has no public address, and a check would not
   produce one, so it is a recorded fact about the thing and never a gap in it.
   **Checked and absent** is a reading, drawn in ink like every other reading
