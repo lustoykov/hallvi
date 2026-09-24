@@ -91,7 +91,9 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 0 0 22px;
+  /* The top is the sheet's own offset under the page head, because on
+     Storage this line is what the head opens onto. */
+  margin: 8px 0 22px;
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-l);
