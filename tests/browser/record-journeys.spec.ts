@@ -58,9 +58,12 @@ test.describe("what the pages must never stop saying", () => {
       // were written against; what must hold is that an absence somebody
       // established reads as an absence rather than as "nobody looked".
       expect(backups).toMatch(/nothing copies this application's data yet/i);
-      const security = await open(page, SCENARIOS, SCENARIO.absent, "security");
-      expect(security).toMatch(/no firewall in front of this server/i);
-      expect(security).toMatch(/established as absent/i);
+      const access = await open(page, SCENARIOS, SCENARIO.absent, "access");
+      // Records exist here, so Access draws its boards rather than its empty
+      // state, and the established absence reads as an absence.
+      expect(access).toMatch(/what a visitor sees/i);
+      expect(access).toMatch(/this server has no firewall/i);
+      expect(access).not.toMatch(/nobody has checked the firewall/i);
     },
   );
 
@@ -141,7 +144,7 @@ test.describe("what the pages must never stop saying", () => {
     journey("record-destinations"),
     async ({ page }) => {
       test.skip(!(await up(page, SCENARIOS)), "no scenario server");
-      for (const view of ["monitoring", "domains", "security", "overview"]) {
+      for (const view of ["monitoring", "access", "overview"]) {
         const said = await open(page, SCENARIOS, SCENARIO.everything, view);
         expect(said, view).not.toContain("invented");
       }
@@ -281,7 +284,7 @@ test.describe("what the pages must never stop saying", () => {
         ),
       ]);
       for (const id of ids)
-        for (const view of ["overview", "processes", "storage", "security"])
+        for (const view of ["overview", "processes", "storage", "access"])
           await open(page, ACCEPTANCE, id, view);
       expect(errors).toEqual([]);
     },
@@ -336,13 +339,12 @@ test.describe("a name that is set up, and an application that does not answer", 
       );
       test.skip(serves?.status !== "failed", "the name does serve");
 
-      const said = await open(page, ACCEPTANCE, found!.id, "domains");
-      expect(said).toMatch(/does not answer/i);
+      const said = await open(page, ACCEPTANCE, found!.id, "access");
+      // Either the path says the name does not answer, or no window is
+      // drawn at all because nothing on record answered.
+      expect(said).toMatch(/doesn’t answer|doesn't answer|none answered/i);
       // The sentence that would be the lie.
       expect(said).not.toMatch(/answering on/i);
-      // And the browser window a visitor would actually get.
-      expect(said).toMatch(/isn’t working|isn't working/i);
-      expect(said).toMatch(/nothing came back from the application/i);
     },
   );
 
@@ -372,29 +374,6 @@ test.describe("a name that is set up, and an application that does not answer", 
       expect(said).toMatch(/the machine behind it does not/i);
       // The cache is genuinely in front; the page must not deny that either.
       expect(said).not.toMatch(/no cache in front/i);
-    },
-  );
-
-  test(
-    "an unread certificate is not called a missing one",
-    journey("record-destinations"),
-    async ({ page }) => {
-      test.skip(!(await up(page, ACCEPTANCE)), "no acceptance server");
-      const found = await named(page);
-      test.skip(!found, "no application has had a name checked");
-      const response = await page.request.get(
-        `${ACCEPTANCE}/api/applications/${found!.id}`,
-      );
-      const view = await response.json();
-      const certificate = (view.information ?? []).find(
-        (record: { presentation?: { states?: { ref: { kind: string } } } }) =>
-          record.presentation?.states?.ref.kind === "certificate",
-      );
-      test.skip(Boolean(certificate), "a certificate has been recorded");
-
-      const said = await open(page, ACCEPTANCE, found!.id, "domains");
-      expect(said).toMatch(/nothing has read a certificate/i);
-      expect(said).not.toMatch(/there is (still )?no certificate/i);
     },
   );
 });

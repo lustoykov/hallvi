@@ -1,8 +1,8 @@
 // Every destination, on every acceptance application.
 //
-// This is the sweep, not a unit test: it walks all sixteen views on each
+// This is the sweep, not a unit test: it walks all fifteen views on each
 // running application and reports what it found in one pass, because
-// sixteen separate failures are one afternoon and one list is ten minutes.
+// fifteen separate failures are one afternoon and one list is ten minutes.
 //
 // It runs against servers that are already up — the acceptance UI on 3410 and
 // the isolated scenarios on 3411 — so it is skipped when they are not.
@@ -27,10 +27,9 @@ const DESTINATIONS = [
   "backups",
   "logs",
   "monitoring",
-  "domains",
+  "access",
   "variables",
   "cdn",
-  "security",
 ] as const;
 
 /** Noise the product does not own and cannot fix from here. */

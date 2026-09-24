@@ -149,35 +149,14 @@ collected logs…" input that the smoke journey uses.
   there is only static. The tuned station reads what was heard and when,
   then the silence since, and the lamp lights only while something listens.
 
-## Domains: Callers, and Security: Rings (`reach-prototype/`)
+## Domains: Callers, and Security: Rings (retired)
 
-Chosen from two sets of three, because the two pages ask different
-questions: what name this answers on and what is missing in front of it,
-and who can reach it at all. Both read the same record — the address, the
-name and certificate if any, the ports the deployment asked the provider
-to open and who they were opened to, what listens behind them, and what
-protects the server without being a way in. Nothing contacts a host: the
-firewall read is the one the shipped Security view already makes, and the
-page says plainly when the rules are only what was asked for. With nothing
-recorded, the shipped page stands in.
-
-- **Domains · Callers.** The page from the other side of the wire. Four
-  visitors knock — you on your network, a stranger, someone typing a name,
-  a browser asking for https — and each window shows what the record says
-  they meet, with how sure that is: a check proved it, the deployment asked
-  for it, or nothing is set up. Picking a window reads out what makes it
-  true. Nothing is tried now; the only knocks on record are the
-  deployment's own checks.
-- **Security · Rings.** Reach as territory: the internet, your network, the
-  server, the private network the processes share, each ring inside the
-  last, with the wall you must pass written on the border between them.
-  Every way in sits in the ring it is reachable from, with the sources
-  exactly as they are stated; picking a ring says what someone standing
-  there can reach and dims everything they cannot. A rule that opens a
-  private service to the internet is drawn as a hole through every wall,
-  and a provider read that reports no firewall at all says so where the
-  walls would be. The shipped page's own "Check now" and its status note
-  stay, so a provider read is still one click.
+Two pages for one question. Callers drew what each kind of visitor meets;
+Rings drew reach as territory, ring inside ring. On 24 September 2026 the
+two destinations became one, **Access**, and both directions were retired
+with them. What survives is the projection they shared,
+`reach-records.ts`, now read by `access-page.tsx`; the design the owner
+chose is written up in the [component design](../DESIGN.md#access).
 
 ## The four remaining destinations (`supply-prototype/`)
 

@@ -87,7 +87,7 @@ export interface Recurring {
   words: string;
   detail: string;
   at: string | null;
-  where: "backups" | "deployment" | "domains";
+  where: "backups" | "deployment" | "access";
 }
 
 export interface SupplyView {

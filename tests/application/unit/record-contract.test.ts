@@ -336,7 +336,7 @@ describe("the record that says how the application is reached", () => {
       establishedAt: "2026-09-15T09:00:00.000Z",
       presentation: {
         states: { ref: app, presence: "present" },
-        views: ["domains"],
+        views: ["access"],
         role: "status",
         status: "verified",
         checks: [],
@@ -386,7 +386,7 @@ describe("a record that says a thing is not there", () => {
       establishedAt: "2026-09-15T12:55:00.000Z",
       presentation: {
         states: { ref: domain, presence: "absent" },
-        views: ["domains"],
+        views: ["access"],
         role: "outcome",
         status: "verified",
         checks,

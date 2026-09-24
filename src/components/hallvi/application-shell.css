@@ -689,8 +689,7 @@
     .bs-modes,
     .axmu-card,
     .axmw-card,
-    .axca-win,
-    .axca-read,
+    .hv-ac-visit,
     .pm-detail
   ) {
   box-shadow: var(--lift);

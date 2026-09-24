@@ -513,8 +513,8 @@ application with nothing wrong.
 
 Chosen 21 September 2026 from the ten-directions exploration (direction F), and
 the shared vocabulary of the inventory destinations: Deployment, Processes,
-Database and Storage are registers; Security and Monitoring borrow its strip
-and table around the visual they already had. It lives in `register.tsx` and
+Database, Storage and Access are registers; Monitoring borrows its strip and
+table around the visual it already had. It lives in `register.tsx` and
 `register.css`, every class prefixed `hv-rg-`.
 
 - **Strip, then table.** A strip of three or four figures states the totals
@@ -548,6 +548,51 @@ and table around the visual they already had. It lives in `register.tsx` and
   Backups"), and say nothing else about it. Every telling reads the same
   projection, and coverage is answered in one place (`inNewestCopy` in
   `backups-records.ts`), so the pages cannot disagree.
+
+### Access
+
+Decided 24 September 2026, from a five-direction exploration the owner narrowed
+over three rounds. Domains and Security were one question asked twice — "who
+can reach it" — and a reader who wanted the answer had to hold two pages in
+their head. They are now one destination, `access`, drawn by `access-page.tsx`
+on the `reach-records.ts` projection, with its own classes prefixed `hv-ac-`.
+
+- **No title, and no verdict above the boards.** The page opens on "What a
+  visitor sees". A line that grades the page before the boards say anything
+  is the same answer twice, and the second one is always vaguer.
+- **The window says what was seen, in the checks' own words.** One browser per
+  host, the address record's passing observed checks as a checklist, and a
+  footer that dates the reading. The page sketch beside it is a picture of "a
+  page" and never carries a fact. Where a published address and the name in
+  front of it are the same host, that is one window, not two.
+- **No window is three answers, not one.** "Hallvi asked every address on
+  record, and none answered" is a claim that somebody asked for a page, so a
+  name that only resolves and a port that refused a connection do not make
+  it: those say the internet can find the provider and that a port is shut.
+  No address on record says so, an address nobody asked says so, and only
+  every address having been asked earns the first sentence. In the same way,
+  only an access record can say the way in is private; silence about access
+  leaves the path's first node saying nothing says who can reach it.
+- **Ports are a register, most public first.** The order is the exposure
+  ranking in `reach-records.ts`: answering the internet, facing it untested,
+  named networks, a private network, not stated, the host's own loopback. A
+  small grey meter carries the same ranking in the row, and the outside test
+  says answered, refused, inconclusive or not tested. Opening a row says what
+  the test found and offers to run it again.
+- **The firewall is the ports' footer, not a board.** An unread policy says so
+  in one sentence and offers the read; it never colours the table it sits
+  under.
+- **The path is lit only where a check saw it work.** The internet, the name,
+  the port, the application. A green dot is a reading, and the line between
+  two nodes is grey until one exists. The port it names is the one the
+  published address arrives on, so the path and the window above it agree.
+- **Publishing is the one thing the page offers to change**, in whichever of
+  its three states the records put it (`publishOffer`): publish at a name,
+  finish publishing one, or make it private again. Each drafts the request in
+  the conversation rather than opening a form, because there are decisions in
+  it. It is a quiet control beside the Open link, except on an application no
+  name reaches, where the invitation is what the board is for and leads under
+  the window.
 
 ### Buttons and fields
 

@@ -59,10 +59,10 @@ export const subjectKinds = [
   // be recorded. It carries where the value came from and whether one is
   // established, and the contract refuses a `value` key on it.
   "variable",
-  // Earned by Domains, CDN and Security. A name resolves and is delegated,
-  // which a certificate only proves; caching is a claim about somebody
-  // else's edge; one firewall policy governs many doors and can itself be
-  // absent while the doors are known.
+  // Earned by Access and CDN. A name resolves and is delegated, which a
+  // certificate only proves; caching is a claim about somebody else's edge;
+  // one firewall policy governs many doors and can itself be absent while
+  // the doors are known.
   "domain",
   "cdn",
   "firewall",
@@ -331,9 +331,8 @@ export const informationInputSchema = z.object({
             "backups",
             "logs",
             "monitoring",
-            "domains",
+            "access",
             "cdn",
-            "security",
             "variables",
           ]),
         )

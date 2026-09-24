@@ -1,4 +1,4 @@
-// Domains and Security, read from records.
+// Access, read from records.
 //
 // The sign of a refusal is the thing to get right. A port that refused a
 // connection is the door doing its job; a page that coloured every failed
@@ -7,8 +7,14 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { reachFromRecords } from "@/components/hallvi/reach-records";
-import { publishOffer } from "@/components/hallvi/reach-prototype/reach-story";
+import {
+  byExposure,
+  exposure,
+  frontDoor,
+  reachFromRecords,
+  visitorSilence,
+  visitorsOf,
+} from "@/components/hallvi/reach-records";
 import {
   APP,
   NOW,
@@ -42,7 +48,7 @@ const privateAccess = () =>
     },
   });
 
-describe("security", () => {
+describe("ports and the firewall", () => {
   it("says nothing has been established, not that nothing can reach in", () => {
     const story = read([]);
     expect(story.doors).toEqual([]);
@@ -188,12 +194,12 @@ describe("security", () => {
   });
 });
 
-describe("domains", () => {
+describe("the name and what a visitor gets", () => {
   it("shows the address in use when no name is recorded", () => {
     const story = read([privateAccess()]);
     expect(story.domain).toBeNull();
     expect(story.address).toBe("http://127.0.0.1:8080");
-    expect(story.audience).toBe("controller");
+    expect(story.audience).toBe("private");
     expect(story.callers[0].headline).toBe("It answers through the tunnel");
   });
 
@@ -276,7 +282,6 @@ describe("domains", () => {
 
   it("never invents a caller", () => {
     expect(read([]).callers).toEqual([]);
-    expect(read([]).invented).toBeNull();
   });
 });
 
@@ -727,7 +732,7 @@ describe("an application published at its own name", () => {
 
   it("still reads a private record as reaching only this computer", () => {
     const story = read([privateAccess()]);
-    expect(story.audience).toBe("controller");
+    expect(story.audience).toBe("private");
     expect(story.callers.find((item) => item.id === "access")?.secure).toBe(
       false,
     );
@@ -860,17 +865,12 @@ describe("a published name whose reading has aged", () => {
     // What was seen is what the window draws; the row carries the date.
     expect(caller?.outcome).toBe("loads");
     expect(caller?.at).toBe(AGED);
-    const offer = publishOffer(story);
-    expect(offer.label).toBe("Check it from outside");
-    expect(offer.draft).toContain("answered when it was last checked");
-    expect(offer.draft).not.toContain("is not serving");
   });
 
   it("sets nothing of the sort while the reading is fresh", () => {
     const story = read([served("2026-09-13T11:55:00.000Z")]);
     expect(story.domain?.state).toBe("serving");
     expect(story.domain?.lastServedAt).toBeNull();
-    expect(publishOffer(story).label).toBe("Make it private again");
   });
 
   // A working past is only a check that passed and then aged. Neither a
@@ -891,7 +891,6 @@ describe("a published name whose reading has aged", () => {
     ]);
     expect(story.domain?.lastServedAt).toBeNull();
     expect(story.domain?.state).toBe(state);
-    expect(publishOffer(story).label).toBe("Finish publishing it");
   });
 });
 
@@ -985,5 +984,198 @@ describe("a published address", () => {
       id: "https",
       established: "answered",
     });
+  });
+});
+
+// What the Access page reads off the projection: the order of the ports, the
+// checklist inside the window, and one window per host.
+describe("what the Access page puts in order", () => {
+  const door = (
+    id: string,
+    port: string,
+    sources: string,
+    checks: ReturnType<typeof check>[] = [],
+  ) =>
+    states(
+      { kind: "door", id },
+      { facts: [fact("port", port), fact("sources", sources)], checks },
+    );
+
+  const published = (checks: ReturnType<typeof check>[] = []) =>
+    record({
+      about: [{ kind: "application", id: APP }],
+      url: "https://shop.example.com",
+      content: {
+        kind: "application-access",
+        mode: "public",
+        server: "host-1",
+      },
+      checks,
+    });
+
+  const name = () =>
+    states(
+      { kind: "domain", id: "shop-example-com" },
+      {
+        facts: [fact("name", "shop.example.com")],
+        checks: [check("resolves", "passed"), check("serves", "passed")],
+      },
+    );
+
+  it("puts the most public port first, and the host's own loopback last", () => {
+    const story = read([
+      door("loopback", "8000/tcp", "Host loopback only", [
+        check("refused", "passed"),
+      ]),
+      door("compose", "5432/tcp", "Compose network only", [
+        check("refused", "passed"),
+      ]),
+      door("http", "80/tcp", "Internet"),
+      door("https", "443/tcp", "Internet", [check("open", "passed")]),
+    ]);
+    // Answering the internet, then facing it untested, then the two that
+    // refused — the one with a network named before the loopback.
+    expect([...story.doors].sort(byExposure).map((item) => item.id)).toEqual([
+      "https",
+      "http",
+      "compose",
+      "loopback",
+    ]);
+  });
+
+  it("ranks a closed port nobody stated an audience for above the loopback", () => {
+    const refused = [check("refused", "passed")];
+    const quiet = read([door("quiet", "9000/tcp", "", refused)]).doors[0];
+    const home = read([door("home", "9001/tcp", "127.0.0.1 only", refused)])
+      .doors[0];
+    expect(exposure(quiet)).toBeLessThan(exposure(home));
+  });
+
+  it("lists what the address's own passing checks saw, and nothing planned", () => {
+    const story = read([
+      published([
+        check("https", "passed", "reachability", {
+          label: "Public HTTPS returned the sign-in page",
+        }),
+        check("redirect", "failed", "reachability", {
+          label: "Plain HTTP redirected to HTTPS",
+        }),
+        check("cert", "passed", "reachability", {
+          label: "A certificate will be issued",
+          basis: "planned",
+        }),
+      ]),
+    ]);
+    expect(story.callers[0].saw).toEqual([
+      "Public HTTPS returned the sign-in page",
+    ]);
+  });
+
+  it("draws one window per host when the address and the name agree", () => {
+    const story = read([
+      published([
+        check("https", "passed", "reachability", {
+          label: "Public HTTPS returned the sign-in page",
+        }),
+      ]),
+      name(),
+    ]);
+    // Both callers answer, and they are the same site.
+    expect(
+      story.callers.filter((item) => item.outcome === "loads"),
+    ).toHaveLength(2);
+    const shown = visitorsOf(story.callers);
+    expect(shown).toHaveLength(1);
+    // The one that says more wins.
+    expect(shown[0].id).toBe("access");
+  });
+
+  it("keeps a second window for a genuinely different host", () => {
+    const story = read([privateAccess(), name()]);
+    expect(
+      visitorsOf(story.callers)
+        .map((item) => item.id)
+        .sort(),
+    ).toEqual(["access", "domain"]);
+  });
+
+  // An application that opens both 80 and 443 used to draw "Port 80" under a
+  // window showing an https address, which sends the reader to the wrong
+  // door. The path takes the port the address itself uses.
+  it("puts the door the published address arrives on at the front of the path", () => {
+    const story = read([
+      published(),
+      door("http", "80/tcp", "Internet", [check("open", "passed")]),
+      door("https", "443/tcp", "Internet", [check("open", "passed")]),
+    ]);
+    expect(frontDoor(story.doors, story.address)?.port).toBe("443/tcp");
+    // Nothing matching the address leaves the door that answered in front.
+    expect(
+      frontDoor(
+        read([door("http", "80/tcp", "Internet", [check("open", "passed")])])
+          .doors,
+        "https://shop.example.com",
+      )?.port,
+    ).toBe("80/tcp");
+  });
+});
+
+// What the visitor board is allowed to say when it draws no window. Saying
+// "Hallvi asked every address" is a claim about somebody asking for a page,
+// and a name that only resolves is not one.
+describe("why the visitor board is empty", () => {
+  it("does not call a name that only resolves an address that was asked", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop.example" },
+        {
+          facts: [fact("name", "shop.example")],
+          checks: [check("resolves", "passed")],
+        },
+      ),
+    ]);
+    expect(visitorSilence(story.callers)).toBe("unasked");
+  });
+
+  it("settles on none answered once every address has been asked", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop.example" },
+        {
+          facts: [fact("name", "shop.example")],
+          checks: [check("resolves", "passed"), check("serves", "failed")],
+        },
+      ),
+    ]);
+    expect(visitorSilence(story.callers)).toBe("none-answered");
+  });
+
+  // A refused port is a port doing its job, not an address anybody typed.
+  it("does not count a refused port as an address", () => {
+    const story = read([
+      states(
+        { kind: "door", id: "closed" },
+        { facts: [fact("port", "3000")], checks: [check("refused", "passed")] },
+      ),
+    ]);
+    expect(story.callers).toHaveLength(1);
+    expect(visitorSilence(story.callers)).toBe("no-address");
+  });
+
+  // Silence about access is not a private application. Only an access record
+  // can say the way in is private, and inventing one invents a tunnel.
+  it("leaves the audience unknown when no access record says anything", () => {
+    expect(read([]).audience).toBe("unknown");
+    expect(
+      read([
+        states(
+          { kind: "door", id: "closed" },
+          {
+            facts: [fact("port", "3000")],
+            checks: [check("refused", "passed")],
+          },
+        ),
+      ]).audience,
+    ).toBe("unknown");
   });
 });

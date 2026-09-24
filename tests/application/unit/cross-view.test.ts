@@ -243,18 +243,11 @@ describe("Database and Storage agree about where the bytes are", () => {
   });
 });
 
-describe("Security and Processes agree about the way in", () => {
+describe("Access and Processes agree about the way in", () => {
   it("reads the same access mode on both", () => {
     const { processes, reach } = of(world());
     expect(processes.restricted).toBe(true);
-    expect(reach.audience).toBe("controller");
-  });
-
-  it("shows the same processes Security draws inside the wall", () => {
-    const { processes, reach } = of(world());
-    expect(reach.processes.map((item) => item.name)).toEqual(
-      processes.processes.map((item) => item.name),
-    );
+    expect(reach.audience).toBe("private");
   });
 });
 

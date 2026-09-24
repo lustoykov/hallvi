@@ -236,13 +236,13 @@ original scope and evidence time. It does not identify which firewall rule,
 listener or binding caused the result. Architecture lists every recorded port
 check separately and names its destination only when a topology edge supplies
 that link. The record's own title remains visible when the structural link is
-missing. Firewall configuration belongs to the firewall subject and Security.
+missing. Firewall configuration belongs to the firewall subject and Access.
 
 ```mermaid
 flowchart LR
   topology["Topology parts and labelled edges"] --> routes["Diagram routes and endpoints"]
   door["Door connection checks, scope and time"] --> results["Connection results"]
-  firewall["Firewall configuration records"] --> security["Security policy details"]
+  firewall["Firewall configuration records"] --> access["Firewall policy details"]
 ```
 
 These are projections of the existing record contract. No schema migration or
@@ -548,8 +548,8 @@ brings its own read rules and its own worked example.
   off-site and restored, reads verified, and a plan Pi marks `warning` reads
   limited whatever its checks say. That is the right default and it does lean
   on Pi getting the judgement right.
-- **`doors` with `complete`** — Security's walls and Domains' callers. Until
-  then a port with no rule on record is unknown, not closed.
+- **`doors` with `complete`** — Access's ports and the windows above them.
+  Until then a port with no rule on record is unknown, not closed.
 - **`inventory`** — Variables' manifest, Processes beyond what topology gives.
 - **`measurement`** — numbers with units. A number is not a pass or a fail and
   is never coloured.

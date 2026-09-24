@@ -158,14 +158,14 @@ export function OriginDirection({
         <p>
           <b>What a cache costs you.</b> A copy can be served long after the
           machine changed, which is why this is its own destination rather than
-          a line on Domains: a stale page needs somewhere to be cleared from,
-          and Hallvi would state the scope before it cleared anything. Setting
-          one up is not implemented yet.
+          a line on Access: a stale page needs somewhere to be cleared from, and
+          Hallvi would state the scope before it cleared anything. Setting one
+          up is not implemented yet.
         </p>
         <button
           type="button"
           className="ax-textlink"
-          onClick={() => onOpenDestination("domains")}
+          onClick={() => onOpenDestination("access")}
         >
           The name and certificate in front of it
         </button>

@@ -22,7 +22,7 @@ import { BackupsPage } from "./backups-page";
 import { DatabasePage } from "./database-page";
 import { MonitoringPage } from "./monitoring-page";
 import { ProcessesPage } from "./processes-page";
-import { ReachPageView } from "./reach-pages";
+import { AccessPage } from "./access-page";
 import { SupplyPageView, type SupplyPage } from "./supply-pages";
 import { StoragePage } from "./storage-page";
 
@@ -53,9 +53,9 @@ const descriptions: Record<ApplicationSection, string> = {
   logs: "What Hallvi's own commands printed, and where each of them ran.",
   monitoring:
     "Health, issues and resource usage, and how you hear about problems.",
-  domains: "The name your application answers on, and the HTTPS behind it.",
+  access:
+    "What a visitor sees, which ports are open, and how a visitor gets there.",
   cdn: "Cached copies of eligible files, served closer to your visitors.",
-  security: "What can reach this application, and over which ports.",
   variables: "Configuration your application needs to build and run.",
 };
 
@@ -244,19 +244,16 @@ export function ApplicationSectionView({
         onAsk={(draft) => onAsk(null, draft)}
       />
     );
-  if (section === "domains" || section === "security")
+  if (section === "access")
     return (
-      <ReachPageView
+      <AccessPage
         reachable={reachable}
         onReopen={onReopen}
-        page={section}
         records={information}
         applicationId={app.id}
         applicationName={app.name}
         now={now}
         chrome={{ bar, header: null, activity: null }}
-        panel={section === "security" ? children : null}
-        onOpenDestination={onOpenDestination}
         onAsk={(draft) => onAsk(null, draft)}
       />
     );

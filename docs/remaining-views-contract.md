@@ -69,9 +69,9 @@ reads it; nothing is added in advance.
 | `queue` | Cache & queue, Jobs | a queue has a depth and an age; the broker holding it does not |
 | `job` | Jobs | a schedule is a thing that succeeds or fails on its own clock |
 | `variable` | Environment Variables | the only subject whose *value* must never be recorded |
-| `domain` | Domains | a name resolves and is delegated; a `certificate` only proves it |
+| `domain` | Access | a name resolves and is delegated; a `certificate` only proves it |
 | `cdn` | CDN | caching is a claim about somebody else's edge, not about the host |
-| `firewall` | Security | one policy governs many `door`s and can itself be absent |
+| `firewall` | Access | one policy governs many `door`s and can itself be absent |
 | `backup-copy` | Backups | one dated copy, which either exists or does not |
 | `restore-test` | Backups | the only evidence that a copy is worth anything |
 
@@ -387,9 +387,11 @@ whether you would hear about a problem must not imply you would.
 "Watched" only while a `monitor` is running, and only the web part, because a
 web address is all a watcher's record says it watches.
 
-# 9 · Domains
+# 9 · Access · what a visitor sees
 
-The Callers design: who can reach this, from where, and what they get.
+Domains and Security were one question asked twice, and became one
+destination on 24 September 2026. This half is the name and what a visitor
+gets; §11 is the ports and the firewall.
 
 | field in the design | supplies it | basis | refreshed by | derived / recorded |
 |---|---|---|---|---|
@@ -422,9 +424,10 @@ repeating: **no CDN recorded reads "nobody has looked"**, and only a `cdn`
 subject stated `absent` reads "nothing caches in front". The distinction
 matters because the second is a finding and the first is a to-do.
 
-# 11 · Security
+# 11 · Access · ports and the firewall
 
-The Rings design: what can reach in, over which ports, and what is guarding.
+The second half of the destination §9 opens: what can reach in, over which
+ports, and what is guarding.
 
 | field in the design | supplies it | basis | refreshed by | derived / recorded |
 |---|---|---|---|---|
@@ -454,7 +457,7 @@ different from "nothing can reach in", which no record has said.
 
 # The external boundary, and where it stops
 
-Domains and CDN are built and tested against records. The provider path is
+Access and CDN are built and tested against records. The provider path is
 wired as far as reading, and stops there.
 
 ## What is connected
@@ -478,7 +481,7 @@ issues separately. Settings carries them as their own row, unconnected,
 because a green tick that implied otherwise would send somebody looking for a
 bug in an uploader that was never going to work.
 
-## Domains and CDN · the contract
+## Access and CDN · the contract
 
 Three checks on a `domain`, because they are three questions and only the
 third is about the application:

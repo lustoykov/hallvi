@@ -1,10 +1,9 @@
 "use client";
 
-// Domains and Security, built from what Pi recorded.
+// Access, built from what Pi recorded.
 //
-// Both ask a version of "who can reach this", so they share a projection and
-// stay two views: Domains asks what a visitor gets, Security asks what is let
-// in at all.
+// One question, asked three ways: what a visitor sees, which ports are open,
+// and how a visitor gets there. The Access page reads nothing else.
 //
 // The one thing this file has to get right is the sign of a refusal. A port
 // that refused a connection is a **pass** — the door doing its job — and a
@@ -23,17 +22,256 @@ import {
   topologyOf,
 } from "@/server/record-projection";
 
-import { processesFromRecords } from "./processes-records";
-import { databaseFromRecords } from "./database-records";
-import type {
-  Caller,
-  DomainState,
-  Door,
-  Guard,
-  Hole,
-  Reach,
-  ReachView,
-} from "./reach-prototype/reach-story";
+export type Reach = "internet" | "restricted" | "private" | "closed";
+/** Who said so: the provider read it back, the plan intends it, or a
+ * process is what tells us. */
+export type Told = "provider" | "plan" | "stack";
+
+export interface Door {
+  id: string;
+  port: string;
+  title: string;
+  serves: string | null;
+  reach: Reach;
+  sources: string[];
+  /** Worth a second look, in words. */
+  concern: string | null;
+  detail: string;
+  /** Nobody has checked this one. */
+  unasked?: boolean;
+  /**
+   * What established this door, for this door alone.
+   *
+   * `answered` and `refused` come from a check that opened a TCP connection
+   * from outside and recorded what happened. `looked` is a check that ran and
+   * did not settle it, which is neither a reading nor nobody having looked.
+   * `configured` means the port and its sources are on record and nothing has
+   * connected to it. The application-wide firewall read is never evidence
+   * about a single port, so it is not one of these.
+   */
+  established?: "answered" | "refused" | "looked" | "configured" | "unasked";
+  /** When that check ran. Null when nothing checked this door. */
+  at?: string | null;
+}
+
+export interface Guard {
+  id: string;
+  title: string;
+  at: string | null;
+  detail?: string;
+}
+
+export interface Hole {
+  id: string;
+  title: string;
+  detail: string;
+}
+
+export interface Caller {
+  id: string;
+  who: string;
+  from: string;
+  typed: string;
+  outcome: "loads" | "refused" | "no-name" | "insecure" | "no-answer";
+  /**
+   * Whether this is somewhere a visitor would type, or a port somebody
+   * connected to. Only an address can settle what a visitor gets, so a
+   * refused port must never count towards "every address was asked".
+   */
+  kind: "address" | "port";
+  /**
+   * Whether the way in is encrypted: true when it is, false when a check
+   * found it is not, null when nothing has checked. "Plain HTTP" is a claim,
+   * and a missing or aged certificate reading does not make it.
+   */
+  secure: boolean | null;
+  /**
+   * What the checks of this address saw, in their own words ("Public HTTPS
+   * returned the sign-in page"). Passing, observed checks only: the window
+   * shows this as a checklist, and a plan is not something anybody saw.
+   */
+  saw: string[];
+  headline: string;
+  detail: string;
+  /** Whether we watched it, only asked, or know it is not there. */
+  sure: "proved" | "asked" | "absent";
+  at: string | null;
+}
+
+export interface DomainState {
+  name: string;
+  provider: "cloudflare" | "external";
+  /**
+   * Five states, because a name can be wrong in four different ways and a
+   * page that collapses them tells a reader to go and look somewhere else.
+   *
+   * `serving` is the only one that says the application answers, and it is
+   * reachable only from a check that actually asked for the name over HTTP.
+   * `resolving` is the honest middle: the name works and nobody has found
+   * out what is behind it. A proxied name sits in `unreachable` while it
+   * resolves perfectly and serves a valid certificate, which is exactly the
+   * case that used to read as success.
+   */
+  state: "serving" | "unreachable" | "resolving" | "pending-dns" | "failed";
+  detail: string;
+  /** What the record points at, as the provider holds it. */
+  origin?: string | null;
+  /**
+   * Whether the provider answers for the name instead of the origin. Null
+   * when nothing recorded it: an unread field is not a direct record.
+   */
+  proxied?: boolean | null;
+  /** Something true and awkward about the record, said rather than hidden. */
+  concern?: string | null;
+  /**
+   * When the name last answered, on a `serves` check that passed and has
+   * since aged past its horizon. Set only in that case, because it is the
+   * one the other fields cannot express: the state falls back to
+   * `resolving`, which reads as "nobody has found out what is behind it"
+   * and is exactly wrong. Somebody did find out; it was a while ago.
+   */
+  lastServedAt?: string | null;
+}
+
+export interface TlsState {
+  /**
+   * `not-configured` means a record established there is no certificate.
+   * `unknown` means nobody has looked, which is a different answer and the
+   * far more common one — saying "there is no certificate" because no record
+   * mentions one is the same mistake as calling an unchecked server dead.
+   */
+  state: "valid" | "pending" | "failed" | "not-configured" | "unknown";
+  issuer?: string | null;
+  expiresAt?: string | null;
+  renewal?: string | null;
+  detail?: string | null;
+}
+
+export interface ReachView {
+  name: string;
+  address: string | null;
+  domain: DomainState | null;
+  tls: TlsState;
+  /**
+   * Who the deployment opened HTTP to, in three answers. `unknown` is no
+   * access record at all, which is not the same as a private one: saying
+   * "only this computer reaches it" off silence invents a tunnel nobody
+   * recorded.
+   */
+  audience: "public" | "private" | "unknown";
+  callers: Caller[];
+  doors: Door[];
+  ssh: {
+    word: string;
+    tone: "verified" | "stale" | "planned" | "failed" | "checking";
+    detail: string;
+    told: Told;
+  };
+  firewall: {
+    state: "read" | "asked" | "none";
+    provider: string;
+    name: string | null;
+    at: string | null;
+    detail: string;
+  };
+  guards: Guard[];
+  holes: Hole[];
+}
+
+/**
+ * What established this one door, with the two defaults spelled out: a door
+ * nothing has connected to is `unasked`, and one the deployment merely set is
+ * `configured`.
+ */
+export function basisOf(door: Door): NonNullable<Door["established"]> {
+  return door.established ?? (door.unasked ? "unasked" : "configured");
+}
+
+/** Whether a check was run on this door at all, settled or not. */
+export function probed(door: Door) {
+  const basis = basisOf(door);
+  return basis === "answered" || basis === "refused" || basis === "looked";
+}
+
+/**
+ * How exposed a port is, lowest number first, so a sort puts the most public
+ * at the top of the table: a port answering the internet, one facing it that
+ * nothing has tested, one open to named networks, one open to a private
+ * network, one whose audience nobody stated, and the host's own loopback
+ * last. Pi writes the audience in words, so the private end is read from
+ * them rather than from a field.
+ */
+export function exposure(door: Door) {
+  if (door.reach === "internet") return door.established === "answered" ? 0 : 1;
+  if (door.reach === "restricted") return 2;
+  const to = door.sources.join(" ").toLowerCase();
+  if (/loopback|localhost|127\.0\.0\.1|host only/.test(to)) return 5;
+  return to ? 3 : 4;
+}
+
+/** Most public first, then by port number, so the order is stable. */
+export function byExposure(a: Door, b: Door) {
+  return (
+    exposure(a) - exposure(b) ||
+    (Number.parseInt(a.port, 10) || 0) - (Number.parseInt(b.port, 10) || 0)
+  );
+}
+
+/** The host part of an address a visitor would type. */
+export const hostOf = (typed: string) =>
+  typed
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .toLowerCase();
+
+/**
+ * Why the visitor board has no window to draw, which is three different
+ * answers and never one.
+ *
+ * The one that must not be guessed is `none-answered`. "Hallvi asked every
+ * address, and none answered" is a claim about somebody asking for a page,
+ * and neither a name that only resolves nor a port that refused a connection
+ * is one: DNS says the internet can find the provider, and a refusal says a
+ * port is shut. Both used to produce that sentence.
+ *
+ * `unasked` covers an address nobody has asked, including the case where one
+ * address was asked and another was not, because "every address" is then
+ * untrue.
+ */
+export function visitorSilence(
+  callers: Caller[],
+): "no-address" | "unasked" | "none-answered" {
+  const addresses = callers.filter((caller) => caller.kind === "address");
+  if (!addresses.length) return "no-address";
+  return addresses.every((caller) => caller.sure === "proved")
+    ? "none-answered"
+    : "unasked";
+}
+
+/**
+ * The addresses worth drawing a window for: the ones that answered, one per
+ * host.
+ *
+ * The published address and the name in front of it are usually the same
+ * site, and two windows of the same page read as two ways in. The one that
+ * says more wins: what it saw, then whether it is encrypted, then the newest
+ * reading.
+ */
+export function visitorsOf(callers: Caller[]) {
+  return callers
+    .filter((caller) => caller.outcome === "loads")
+    .sort(
+      (a, b) =>
+        b.saw.length - a.saw.length ||
+        Number(b.secure === true) - Number(a.secure === true) ||
+        (b.at ?? "").localeCompare(a.at ?? ""),
+    )
+    .filter(
+      (caller, at, all) =>
+        all.findIndex((one) => hostOf(one.typed) === hostOf(caller.typed)) ===
+        at,
+    );
+}
 
 /**
  * Sources, as Pi wrote them. Split on commas only: "Server loopback via SSH
@@ -103,6 +341,71 @@ function portOf(fact: (key: string) => string | null) {
   return local ?? remote ?? null;
 }
 
+/**
+ * The door a visitor actually arrives on, for the path.
+ *
+ * The one whose port is the port of the published address, because that is
+ * the door the window above the path is showing. Falling straight to the
+ * first internet-facing door on record drew "Port 80" over an https address
+ * on an application that opens both, which sends the reader to the wrong
+ * door. Where nothing matches, the door that answered wins, then the first
+ * one on record.
+ */
+export function frontDoor(doors: Door[], address: string | null) {
+  const facing = doors.filter((door) => door.reach === "internet");
+  const wanted = urlPort(address);
+  return (
+    (wanted ? facing.find((door) => door.port === wanted) : undefined) ??
+    facing.find((door) => door.established === "answered") ??
+    facing[0] ??
+    null
+  );
+}
+
+/**
+ * What Access offers to do about a name, which is three different offers and
+ * never one.
+ *
+ * A name nobody has connected is an invitation. A name that is on record and
+ * not yet serving the application is unfinished work, and offering to
+ * "publish" it again reads as starting over. A name that serves is something
+ * the owner may want to take back. Each draft is a sentence they can send as
+ * it stands or finish typing; none of them invents a hostname.
+ */
+export function publishOffer(story: {
+  name: string;
+  domain: DomainState | null;
+}): { label: string; primary: boolean; draft: string } {
+  const domain = story.domain;
+  if (!domain)
+    return {
+      label: "Publish at a domain…",
+      // The only invitation on the page, so the only emphatic thing on it.
+      primary: true,
+      draft: `Publish ${story.name} at my own domain name. The hostname is: `,
+    };
+  if (domain.state === "serving")
+    return {
+      label: "Make it private again",
+      primary: false,
+      draft: `Make ${story.name} private again: withdraw ${domain.name} and the public access you set up for it, leave SSH and anything you did not create alone, and give me back a private way in.`,
+    };
+  // A name that answered, a while ago, is published. What is old is the
+  // evidence, and the work to offer is looking again — never finishing a
+  // job that was finished, which is what "Finish publishing it" claims.
+  if (domain.lastServedAt)
+    return {
+      label: "Check it from outside",
+      primary: false,
+      draft: `${domain.name} answered when it was last checked, and that reading has aged. Ask for it from outside again and tell me what ${story.name} returns now.`,
+    };
+  return {
+    label: "Finish publishing it",
+    primary: false,
+    draft: `${domain.name} is not serving ${story.name} yet. Find out which part is incomplete, finish publishing it, and check it from outside.`,
+  };
+}
+
 export function reachFromRecords({
   records,
   applicationId,
@@ -122,9 +425,11 @@ export function reachFromRecords({
   );
   const access = accessRecord?.presentation?.content;
   const audience: ReachView["audience"] =
-    access?.kind === "application-access" && access.mode === "public"
-      ? "public"
-      : "controller";
+    access?.kind !== "application-access"
+      ? "unknown"
+      : access.mode === "public"
+        ? "public"
+        : "private";
 
   /** A label only counts as something to read when it is more than a name. */
   const sentence = (said: string | undefined | null) =>
@@ -455,6 +760,7 @@ export function reachFromRecords({
   if (accessUrl)
     callers.push({
       id: "access",
+      kind: "address",
       who: audience === "public" ? "Anyone online" : "You, on this computer",
       from: audience === "public" ? "the internet" : "127.0.0.1",
       typed: accessUrl,
@@ -471,6 +777,15 @@ export function reachFromRecords({
         : audience === "public"
           ? "The address is reachable without going through this computer."
           : "Only this computer reaches it, over an SSH tunnel to the host's own loopback.",
+      // What the window lists. A failed address saw nothing, and a plan is
+      // not something anybody saw, so neither becomes a ticked line.
+      saw: accessFailed
+        ? []
+        : (accessRecord?.presentation?.checks ?? [])
+            .filter(
+              (check) => check.status === "passed" && check.basis !== "planned",
+            )
+            .map((check) => check.label),
       sure: "proved",
       at: accessFailed
         ? serves!.record.establishedAt
@@ -480,11 +795,13 @@ export function reachFromRecords({
     if (door.reach === "closed")
       callers.push({
         id: `door:${door.id}`,
+        kind: "port",
         who: "Anyone online",
         from: "the internet",
         typed: `port ${door.port}`,
         outcome: "refused",
         secure: true,
+        saw: [],
         headline: "Refused, as intended",
         detail: door.detail,
         sure: "proved",
@@ -504,6 +821,7 @@ export function reachFromRecords({
   if (domainRef && !domainGone && (resolves || serves))
     callers.push({
       id: "domain",
+      kind: "address",
       who: "Anyone typing the name",
       from: "the internet",
       typed: domainFacts?.get("name")?.value.value ?? domainRef.id,
@@ -531,6 +849,9 @@ export function reachFromRecords({
           : validRead === "failed"
             ? false
             : null,
+      // The name's own checks are the state above, already said in the
+      // headline. Nothing else was observed of it.
+      saw: [],
       headline:
         domainState === "failed"
           ? "The name does not resolve"
@@ -643,11 +964,8 @@ export function reachFromRecords({
             detail: valid?.value.detail ?? null,
           },
     audience,
-    controllerIp: null,
     callers,
     doors,
-    processes: processesFromRecords({ records, applicationId, now }).processes,
-    database: databaseFromRecords({ records, applicationId, now }).database,
     ssh: {
       word:
         sshRead === "verified"
@@ -671,6 +989,5 @@ export function reachFromRecords({
     firewall,
     guards,
     holes,
-    invented: null,
   };
 }
