@@ -10,8 +10,11 @@
 //
 // Its empty state is the one that matters: nothing recorded is not "no
 // processes", it is nobody looked, and the page says so and offers the one
-// question that would change it. The same rule holds cell by cell: a reading
-// nobody recorded is grey and says "not recorded", never a zero.
+// question that would change it.
+//
+// The same rule holds cell by cell, and the table says it once rather than
+// column by column: how much of what could be known about a process is known
+// (`evidence.tsx`), and opening the row names what is left and asks for it.
 
 import { useMemo } from "react";
 
@@ -21,11 +24,18 @@ import type { ApplicationSection } from "./application-sections";
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
+import {
+  FactCell,
+  Known,
+  MissingFacts,
+  Unchecked,
+  processFacts,
+  recorded,
+} from "./evidence";
 import { processesFromRecords } from "./processes-records";
 import { probeReading } from "./pulse";
 import {
   Ask,
-  Bar,
   Board,
   Clip,
   Facts,
@@ -34,7 +44,6 @@ import {
   Go,
   Lede,
   Name,
-  None,
   Note,
   Num,
   Opened,
@@ -178,6 +187,11 @@ export function ProcessesPage({
     );
   const restarts = counted.reduce((sum, value) => sum + value, 0);
 
+  // What a record could say about each process, and what it does say. The
+  // table carries the count; the opened row carries the names.
+  const facts = new Map(rows.map((row) => [row.id, processFacts(row)]));
+  const factsOf = (row: Row) => facts.get(row.id) ?? [];
+
   const columns: Column<Row>[] = [
     {
       key: "name",
@@ -198,74 +212,43 @@ export function ProcessesPage({
       cell: (row) => <Tag>{ROLE_WORD[row.role]}</Tag>,
     },
     {
-      key: "image",
-      head: "Runs",
-      width: 210,
-      cell: (row) =>
-        row.image === "Not recorded" ? (
-          <None />
-        ) : (
-          <Clip text={row.imageShort} mono />
-        ),
-    },
-    {
-      key: "memory",
-      head: "Memory",
-      width: 150,
-      sort: (row) => mebibytes(row.memoryUsed) ?? -1,
-      cell: (row) => {
-        const used = mebibytes(row.memoryUsed);
-        if (!row.memoryUsed) return <None />;
-        return used !== null && capacity ? (
-          <Bar
-            value={used}
-            max={capacity}
-            tone={used / capacity > 0.8 ? "bad" : "plain"}
-            label={row.memoryUsed}
-          />
-        ) : (
-          <Num>{row.memoryUsed}</Num>
-        );
-      },
-    },
-    {
-      key: "restarts",
-      head: "Restarts",
-      width: 112,
-      align: "end",
-      sort: (row) => Number(row.restarts ?? -1),
-      cell: (row) =>
-        row.restarts === null || row.restarts === undefined ? (
-          <None />
-        ) : Number(row.restarts) === 0 ? (
-          <None>none</None>
-        ) : (
-          <Num>{row.restarts}</Num>
-        ),
+      key: "known",
+      head: "Known",
+      width: 190,
+      sort: (row) =>
+        factsOf(row).filter((fact) => fact.state === "known").length,
+      cell: (row) => <Known facts={factsOf(row)} />,
     },
     {
       key: "checks",
       head: "Checks",
       width: 96,
-      cell: (row) => (
-        <Pips
-          empty="never checked"
-          items={row.probes.map((probe) => ({
-            id: probe.name,
-            tone: read(row, probe).tone,
-            title: `${probe.name}: ${read(row, probe).word}`,
-          }))}
-        />
-      ),
+      cell: (row) =>
+        row.probes.length ? (
+          <Pips
+            empty=""
+            items={row.probes.map((probe) => ({
+              id: probe.name,
+              tone: read(row, probe).tone,
+              title: `${probe.name}: ${read(row, probe).word}`,
+            }))}
+          />
+        ) : (
+          <Unchecked reason="No check has ever touched this process." />
+        ),
     },
     {
       key: "passed",
       head: "Last passed",
-      width: 110,
+      width: 124,
       align: "end",
       sort: (row) => Date.parse(row.lastPassed ?? "") || 0,
       cell: (row) =>
-        row.lastPassed ? <Num>{ago(row.lastPassed, now)}</Num> : <None>—</None>,
+        row.lastPassed ? (
+          <Num>{ago(row.lastPassed, now)}</Num>
+        ) : (
+          <Unchecked reason="No check on this process has ever passed." />
+        ),
     },
   ];
 
@@ -307,7 +290,7 @@ export function ProcessesPage({
           />
           <Figure
             label="Memory"
-            value={measured.length ? `${Math.round(memory)} MiB` : "—"}
+            value={measured.length ? `${Math.round(memory)} MiB` : "Not read"}
             bar={
               measured.length && capacity
                 ? { value: memory, max: capacity }
@@ -321,7 +304,7 @@ export function ProcessesPage({
           />
           <Figure
             label="Restarts"
-            value={counted.length ? restarts : "—"}
+            value={counted.length ? restarts : "Not counted"}
             tone={counted.length && restarts > 4 ? "bad" : "plain"}
             note={
               counted.length
@@ -357,6 +340,7 @@ export function ProcessesPage({
             defaultOpen={rows.find((row) => row.probes.some(broke))?.id ?? null}
             detail={(row) => {
               const broken = row.probes.find(broke);
+              const readings = recorded(factsOf(row));
               return (
                 <Opened
                   asks={
@@ -384,6 +368,11 @@ export function ProcessesPage({
                   <Note>
                     {row.roleWords}. {row.reach}.
                   </Note>
+                  <MissingFacts
+                    facts={factsOf(row)}
+                    subject={`the ${row.name} process`}
+                    onAsk={onAsk}
+                  />
                   {row.command && (
                     <pre className="hv-rg-out">{row.command}</pre>
                   )}
@@ -404,14 +393,22 @@ export function ProcessesPage({
                           cells: [
                             probe.name,
                             probe.probe === probe.name ? (
-                              <None key="probe">no detail written down</None>
+                              <Unchecked
+                                key="probe"
+                                reason="The check ran. Nobody wrote down what it looked at."
+                              >
+                                not written down
+                              </Unchecked>
                             ) : (
                               probe.probe
                             ),
                             probe.inside ? (
                               "inside the server"
                             ) : (
-                              <None key="from">—</None>
+                              <Unchecked
+                                key="from"
+                                reason="No record says where this check was run from."
+                              />
                             ),
                             <Num key="when">{ago(probe.at, now)}</Num>,
                             <Tag key="result" tone={read(row, probe).tone}>
@@ -427,24 +424,14 @@ export function ProcessesPage({
                       nothing says whether it is running.
                     </Note>
                   )}
-                  <Facts
-                    items={[
-                      {
-                        label: "Image",
-                        value:
-                          row.image === "Not recorded" ? (
-                            <None />
-                          ) : (
-                            <span className="hv-rg-mono">{row.image}</span>
-                          ),
-                      },
-                      { label: "Port", value: row.port ?? <None /> },
-                      { label: "Health", value: row.health ?? <None /> },
-                      { label: "CPU", value: row.cpuUsed ?? <None /> },
-                      { label: "Memory", value: row.memoryUsed ?? <None /> },
-                      { label: "Restarts", value: row.restarts ?? <None /> },
-                    ]}
-                  />
+                  {readings.length > 0 && (
+                    <Facts
+                      items={readings.map((fact) => ({
+                        label: fact.label,
+                        value: <FactCell fact={fact} />,
+                      }))}
+                    />
+                  )}
                 </Opened>
               );
             }}
