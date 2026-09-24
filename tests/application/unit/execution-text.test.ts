@@ -191,6 +191,9 @@ describe("which machine a command ran on", () => {
   it("reads the host out of a login string, and leaves prose alone", () => {
     expect(hostOf("deploy@example.test:2222")).toBe("example.test");
     expect(hostOf("Repository workspace")).toBeNull();
+    expect(
+      hostOf("What the internet gets from https://shop.example.test"),
+    ).toBeNull();
   });
 });
 

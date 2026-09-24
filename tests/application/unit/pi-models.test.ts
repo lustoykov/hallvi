@@ -22,7 +22,7 @@ describe("the bundled Pi model catalog", () => {
     const options = piModelOptions(catalog.getModels());
     expect(options.length).toBeGreaterThan(1);
     expect(
-      options.find((model) => model.id === "gpt-5.6-sol")?.reasoningEfforts,
+      options.find((model) => model.id === "gpt-6-sol")?.reasoningEfforts,
     ).toContain("high");
     for (const option of options) {
       const model = catalog.getModel("openai-codex", option.id)!;
@@ -42,8 +42,8 @@ describe("the bundled Pi model catalog", () => {
     expect(() =>
       validatePiSelection(catalog, {
         providerId: "openai-codex",
-        modelId: "gpt-5.4",
-        reasoningEffort: "max",
+        modelId: "gpt-6-astra",
+        reasoningEffort: "off",
       }),
     ).toThrow("does not support");
     expect(() =>

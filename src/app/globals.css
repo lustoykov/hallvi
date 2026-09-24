@@ -130,6 +130,19 @@ textarea:focus-visible {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+/* A checkout says so on every page; the installed Hallvi has no chip. */
+.hv-alpha-notice:has(.hv-development-label) {
+  background: var(--green-soft);
+}
+.hv-development-label {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--radius-s);
+  background: var(--green);
+  color: white;
+  font-size: 13px;
+  font-weight: 650;
+}
 .hv-alpha-notice p {
   margin: 0;
   max-width: 90ch;

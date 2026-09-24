@@ -1,9 +1,10 @@
 # The development environment
 
-Development is `npm ci` and `npm run dev`, like any other project. What makes
-this checkout worth having is what `npm run dev` opens: four applications that
-are really deployed, with the conversations, records, credentials and
-connections they were deployed with, kept between tasks.
+Development is `npm ci` and `npm run dev`, like any other project. What this
+machine keeps beside that is four applications that are really deployed, with
+the conversations, records, credentials and connections they were deployed
+with, kept between tasks — one Hallvi state directory each, outside every
+checkout, that any checkout can take for a while.
 
 Fixtures made and thrown away inside a single task can only ever show that a
 new database works. This keeps the other half — an application whose identity,
@@ -12,58 +13,145 @@ quietly drops one of them is visible rather than theoretical.
 
 |  |  |
 | --- | --- |
-| Start it | `npm ci && npm run dev` in the designated checkout |
-| Open it | <http://127.0.0.1:5147> |
-| Its records | `~/.local/share/hallvi-dev/state` |
-| Backups | `~/.local/share/hallvi-dev/backups` |
+| Take one | `node scripts/retained-application.mjs attach whoami` (or `npm run retained -- attach whoami`) in any checkout |
+| See who has what | `node scripts/retained-application.mjs status` |
+| Their records | `~/.local/share/hallvi-dev/applications/<name>/state`, one directory per application |
+| Their addresses | whoami 5147 · uptime-kuma 5148 · miniflux 5149 · paperless 5150, on 127.0.0.1 |
+| Copies | `~/.local/share/hallvi-dev/applications/<name>/backups`, taken by every attach |
 | The host | `hallvi-dev`, one Hetzner cx23 at 46.62.253.6, shared by every application |
 | What it costs | EUR 5.99/month |
 
-[Where the records live, and which of them travel](architecture/development-environment.md).
+[Where the records live, and who may open them](architecture/development-environment.md).
 
-## The designated checkout
+## One application, one owner
 
-One checkout opens the retained state, and it opens it because of four lines
-in its `.env.local` — a file git ignores, which is the point. A worktree made
-for a task has no such file and keeps its own throwaway `.hallvi` beside the
-source, which is also the point: attaching every temporary checkout to the
-shared database by default is how four live applications would acquire a
-second writer nobody meant to start.
+Each application's state directory holds everything Hallvi knows about it:
+its database (one application, its conversation, its saved records), Pi's
+history for that conversation, the execution and activity records, its sealed
+secrets, its connection request and its managed SSH key. A `retained.json`
+beside the database marks the directory as retained and names the directory it
+protects, and that mark is what every program checks.
+
+**A marked directory is opened by the runtime that attached it, and by nothing
+else.** `attach` holds a lock on the directory for as long as it runs, writes
+down who is attaching in `runtime.json`, and starts `npm run dev` on that
+state with its runtime id in the environment. The app, the worker,
+`db:push`, the migration and the launcher all ask the same rule
+([`scripts/retained-state.mjs`](../scripts/retained-state.mjs)) before opening
+the database: a process that is not inside the runtime holding the lock is
+refused, whether it was started by hand with `HALLVI_DB_PATH` pointing there
+or by a second `npm run dev`. Each process that is let in then keeps the
+directory marked open for as long as it lives, so an app or worker that
+outlived its runtime blocks the next attach instead of writing under it; a
+studio or a shell that opened the database is found through `lsof` where the
+system has it. The worker's own lock still stops a second worker; this stops
+a second interface, a second studio and a stray script as well, because the
+interface writes records too.
+
+The state stays where it is whoever attaches it. Nothing is copied out to a
+worktree or copied back; the worktree runs against the directory, and the
+next worktree runs against the same directory after it lets go.
+
+What every checkout shares is the account level and nothing below it: the
+ChatGPT login and the GitHub, Hetzner and Cloudflare connections in
+`~/.config/hallvi/pi`. They are shared rather than copied because a copy
+cannot work: renewing the GitHub login rotates its refresh token and kills
+every other copy.
+
+### Attaching
 
 ```sh
-# .env.local, in the designated checkout only
-HALLVI_DB_PATH=~/.local/share/hallvi-dev/state/hallvi.db
-HALLVI_CONFIG_DIR=~/.local/share/hallvi-dev/state/config
-HALLVI_PI_CONFIG_DIR=~/.config/hallvi/pi
-PORT=5147
+node scripts/retained-application.mjs attach uptime-kuma
 ```
 
-Write the paths out in full; `~` is not expanded here. The third line is not
-optional bookkeeping: it names the account directory — the ChatGPT login and
-the GitHub, Hetzner and Cloudflare connections — and a controller directory
-named without it would take all of those with it and ask the owner to sign in
-again. The fourth is read by `next dev` itself, so the address stays the one
-people know.
+In order, and each one a refusal on its own:
 
-`npm run dev` starts the interface, the Pi worker that carries its conversations,
-a Drizzle Studio on the same database, and the developer dashboard. It prints
-both browser addresses. The app's **Developer** link opens the dashboard for
-this checkout, and the dashboard's **Open app** link returns to this controller.
-The **Database** link in the application top bar opens the paired Studio. The
-retained controller keeps its explicit port 5147; a second launch against that
-port fails instead of starting another controller on different records.
+1. **Somebody else has it.** The lock is held: the command says which checkout,
+   which branch, since when and at which address, and stops. It never takes an
+   application from a runtime that is still running, however long ago it
+   attached.
+2. **Something from an earlier runtime still has it open** — an app or worker
+   that survived a crashed attach, a studio, a shell on the database. Stop it
+   first; the command names the process where it can.
+3. **The last runtime did not detach.** Its `runtime.json` is still there. The
+   command says so, lists every command still recorded as running, and asks
+   the host what has been running since the earliest of them began — a command
+   sent over SSH can outlive the controller that sent it. Attach again with
+   `--after-crash` once you have looked; the worker then records those commands
+   as interrupted.
+4. **This program does not read what is on disk.** The database's schema is
+   compared with `src/server/schema-version.json`, and the Pi version the
+   histories were last written with (in `retained.json`) with the one this
+   checkout bundles. A schema behind the program is migrated deliberately
+   first — `node scripts/migrate-state.mjs --plan --data <state>`, then
+   `--apply`, which keeps its own verified copy; a schema ahead of it is left
+   for a checkout that reads it. A different Pi is tried on a snapshot first,
+   then accepted with `--accept-format`, which records the new version.
+5. **A verified copy is taken** into `applications/<name>/backups/`: the
+   database through SQLite's own backup and reopened with its counts compared,
+   every other file compared by hash. The five newest attach copies are kept.
+6. **The owner is registered** — worktree, branch, revision, pid, port — and
+   the pair starts on the application's own port. The command stays in the
+   foreground; that process is the ownership.
+
+### Detaching
+
+Ctrl-C in that terminal, or from anywhere:
+
+```sh
+node scripts/retained-application.mjs detach uptime-kuma
+```
+
+The interface stops first, so nothing new is accepted. The worker is asked to
+hold — the same hold an update uses — and says how many conversations still
+have work in hand; the launcher waits for that to be nothing, up to five
+minutes, saying so every ten seconds. Then the worker stops, Pi keeping
+whatever it had, the lock is released and `runtime.json` is removed. A second
+Ctrl-C stops the worker without waiting; so does the five-minute limit; and a
+worker whose status cannot be read — it answers badly, or not at all — is
+stopped without being called idle. Each of those leaves `runtime.json`
+behind with `outcome: forced`, and the next attach reads it as an unclean
+stop and accounts for it as above. Only the terminal's own second Ctrl-C
+counts as a second request: the attach command passes a `detach` on as one
+signal, never two.
+
+Ownership never lapses on its own. A stale-looking attachment is a runtime
+that is still holding the lock, and the way to take its application is to
+detach it there.
+
+### Working on it with other people
+
+Assignments are coordinated in a sentence — say which application you are
+taking and when you are done — and enforced by the lock. Four applications
+means up to four checkouts working at once, each on its own. Two things are
+enforced rather than agreed, and they stay that way:
+
+- **One runtime owns an application's records**, the interface and the worker
+  together, as above.
+- **The applications are registered as retained.** The server, its firewall,
+  its key and its addresses carry `sg-lifecycle=persistent` and
+  `sg-cleanup=retain` with no expiry, so the daily cleanup leaves them alone.
+  See [development resources](development-resources.md).
+
+State ownership isolates Hallvi's records, not the host. All four applications
+share one server and every application's SSH key is root on it, so an
+attached whoami can reach Paperless's containers. Keep work to the application
+you hold — its Compose project, its data, its records — and treat anything
+host-wide (Caddy, Docker, the firewall, packages) as a change to say out loud
+before making, whoever holds what. This does not provision separate servers
+and does not claim host isolation.
 
 ## What is deployed, and what each one is for
 
 All four share one host, each with its own Compose project, its own data and
 its own port, behind the Caddy already on that host.
 
-| Application | Exercises | Data to check after a change | At |
-| --- | --- | --- | --- |
-| **whoami** | A stateless site. Nothing to preserve, so a redeployment has nothing to lose — which is the point of having one | none, deliberately | <https://whoami.46-62-253-6.sslip.io/> |
-| **uptime-kuma** | A stateful application keeping its own SQLite database on the host | three monitors named `hallvi-dev …`, in `/opt/uptime-kuma/data/kuma.db` | <https://46-62-253-6.sslip.io/> |
-| **v2** (Miniflux) | An application with a separate PostgreSQL database beside it | two feeds, forty entries, and one starred entry, `#26` | <https://miniflux.46-62-253-6.sslip.io/> |
-| **paperless-ngx** | The complicated tier: PostgreSQL *and* Redis *and* background workers *and* documents on disk | two documents tagged `hallvi-dev`, with originals under `/opt/paperless/media` | <https://paperless.46-62-253-6.sslip.io/> |
+| Application | State directory | Exercises | Data to check after a change | At |
+| --- | --- | --- | --- | --- |
+| **whoami** | `whoami` | A stateless site. Nothing to preserve, so a redeployment has nothing to lose — which is the point of having one | none, deliberately | <https://whoami.46-62-253-6.sslip.io/> |
+| **uptime-kuma** | `uptime-kuma` | A stateful application keeping its own SQLite database on the host | three monitors named `hallvi-dev …`, in `/opt/uptime-kuma/data/kuma.db` | <https://46-62-253-6.sslip.io/> |
+| **v2** (Miniflux) | `miniflux` | An application with a separate PostgreSQL database beside it | two feeds, 182 entries, and one starred entry, `#26` | <https://miniflux.46-62-253-6.sslip.io/> |
+| **paperless-ngx** | `paperless` | The complicated tier: PostgreSQL *and* Redis *and* background workers *and* documents on disk | two documents tagged `hallvi-dev`, with originals under `/opt/paperless/media` | <https://paperless.46-62-253-6.sslip.io/> |
 
 They are also a scenario rather than four unrelated deployments: Uptime Kuma
 watches whoami and Miniflux, so its monitor list is itself a statement about
@@ -79,64 +167,45 @@ than typed in, which is what lets them be read back: open the application and
 look under **Environment Variables**.
 
 `~/.local/share/hallvi-dev/instance.json` registers which applications belong
-to this environment, what each exercises and where it answers.
-
-## Working on it with other people
-
-There is no claim command and no lock file. These applications are mostly
-read: opening the interface, reading a conversation, clicking around, visiting
-a deployed application. Several people can do all of that at once.
-
-Changing one is worth a sentence to whoever else is working — say which
-application you are about to change, and say when you are done. That is the
-whole protocol, and it is proportionate to four sample applications on one
-host.
-
-Two things are enforced rather than agreed, and they stay that way:
-
-- **One worker owns the records.** A second `npm run dev` against the same
-  state finds the worker lock held and steps aside instead of starting a rival
-  worker. That is runtime integrity, not coordination etiquette.
-- **The applications are registered as retained.** The server, its firewall,
-  its key and its addresses carry `sg-lifecycle=persistent` and
-  `sg-cleanup=retain` with no expiry, so the daily cleanup leaves them alone.
-  See [development resources](development-resources.md).
+to this environment, what each exercises, where it answers and where its state
+is.
 
 ## Working from a worktree
 
-A task worktree runs its own Hallvi: an empty database beside the source, its
-own worker, its own fixtures. It never opens the retained state — that would be
-a second worker on one set of records — and it does not show the four
-applications above. What it shares with every other checkout is the account
-level and nothing below it: the ChatGPT login and the GitHub, Hetzner and
-Cloudflare connections, all in the account directory (`~/.config/hallvi/pi`
-unless `HALLVI_PI_CONFIG_DIR` says otherwise). They are shared rather than
-copied because a copy cannot work: renewing the GitHub login rotates its
-refresh token and kills every other copy.
+A task worktree runs its own Hallvi by default: an empty database beside the
+source, its own worker, its own fixtures, sharing only the account level. That
+is still the right thing for most work, and for anything meant to break. When
+a change needs a real application with real history, attach one; the worktree
+then runs *that* application, on that application's port, and nothing else
+retained.
 
-So a worktree's Pi can see the whole Hetzner project and create its own
-labelled resources in it, but has no key to `hallvi-dev` and cannot reach the
-four applications. Its fixtures go either on a disposable server of its own
-(hard isolation, for anything meant to break) or, for ordinary work, as
-separate Compose projects on `hallvi-dev`, kept private and named after the
-application — where its Pi could reach the other projects and is kept off them
-by its scope rules alone.
+Its Pi can see the whole Hetzner project and create its own labelled resources
+in it. Fixtures of its own go either on a disposable server (hard isolation,
+for anything meant to break) or, for ordinary work, as separate Compose
+projects on `hallvi-dev`, kept private and named after the application.
 
-To look at a view against the four applications' real records from a
-worktree, copy the database through a read-only source connection
-(`sqlite3 "file:…/hallvi.db?mode=ro" .backup`) and the `executions` folders,
-without `ssh` or `secrets`. Point `HALLVI_DB_PATH` at that copy and set both
-`HALLVI_CONFIG_DIR` and `HALLVI_PI_CONFIG_DIR` to disposable, credential-free
-directories before running Next alone. The copy is writable. Running without
-the worker does not disable API actions or isolate shared provider credentials
-on its own.
+### Looking at real records without taking an application
 
-The designated checkout is the acceptance bench, whichever branch it is on:
-check the branch out there and `npm run dev` runs it against the real four.
-It is one seat, so say which branch is on it. A branch that changes how Hallvi
-stores anything migrates the retained records when it runs there, and an older
-program refuses a newer database, so switching that checkout back afterwards
-means merging the branch or restoring the copy the migration made.
+```sh
+node scripts/retained-application.mjs snapshot /tmp/hv-look uptime-kuma miniflux
+```
+
+A snapshot is a copy for looking at: the chosen applications' databases merged
+into one, their execution, activity and workspace records and Pi's histories —
+and none of their SSH keys, secrets or connection requests. The recorded key
+paths point inside the snapshot, where no key is, and the command prints the
+one line that runs the pair against it with an empty account directory. The
+worker is what reads a conversation's history, so it runs; with no ChatGPT
+login it cannot start a turn (a send is refused before any tool exists), and
+with no connections it cannot reach a provider or the host. That is what
+makes a snapshot safe to point any branch at. It is also **the way to see one
+controller holding several real applications** when a change is about the
+list, the homepage or anything cross-application: the shipping code keeps
+working with many applications in one database, and the synthetic
+multi-application fixtures (`npm run scenarios`, the browser journeys) remain
+the coverage for that behaviour.
+
+A snapshot is not attached and not marked. Delete it when done.
 
 ## When a disposable fixture is still the right thing
 
@@ -148,18 +217,18 @@ Keep using a fresh fixture, or a local stand-in, for:
 - fault injection, firewall lockouts, filling a disk;
 - the automated suites. `npm test` and the browser tests stay deterministic
   and offline, and `.env.local` is loaded only by `npm run dev` and
-  `npm run worker`, so no test ever sees this database.
+  `npm run worker`, so no test ever sees these databases.
 
 The rule is short: if what you are proving is that something breaks, break a
 copy.
 
 ## Seeding
 
-**A fresh checkout** — one without those four lines — starts empty and stays
-explicit: `npm run db:push` creates the tables and stamps the schema. It
-refuses a database that already holds tables at another schema rather than
-rewriting it, so running it twice is safe and running it over somebody's
-records is not possible.
+**A fresh checkout** starts empty and stays explicit: `npm run db:push`
+creates the tables and stamps the schema. It refuses a database that already
+holds tables at another schema rather than rewriting it, and it refuses a
+retained directory it does not own, so running it twice is safe and running it
+over somebody's records is not possible.
 
 **This environment has no seed command**, deliberately. The retained data is
 the starting point, and a command that wrote sample rows into four live
@@ -167,22 +236,30 @@ applications would be manufacturing history.
 
 `npm run scenarios` remains what it was: it builds its **own** database from
 scratch under `tests/results/scenarios`, never reads `HALLVI_DB_PATH` and
-never opens this state. Use it for screenshots and UI work that wants invented
-records.
+never opens retained state. Use it for screenshots and UI work that wants
+invented records.
 
-Starting `npm run dev` provisions nothing. It rents no server, redeploys
-nothing, and will not recreate an application somebody deleted on purpose — if
-one is missing, it is missing, and the register says what used to be there.
+Attaching provisions nothing. It rents no server, redeploys nothing, and will
+not recreate an application somebody deleted on purpose — if one is missing,
+it is missing, and the register says what used to be there.
 
 ## Upgrading the records
 
-When a change alters how Hallvi stores anything, this environment is the
-acceptance test. It runs the same migration an installation would — the same
-list, the same code, the same verified copy taken first:
+The database schema, the JSON records under `config/` and Pi's history format
+are compatibility boundaries: a change to any of them is tested on a copy
+first — a snapshot for looking, a copy of a state directory for running — and
+only then attached. Attach refuses a program that does not read what is on
+disk, so state is never handed to code that cannot open it; the one thing it
+cannot see is a change to the JSON records, which have no version of their
+own, and that is what the copy is for.
+
+When a change alters the schema, these four applications are the acceptance
+test. Each runs the same migration an installation would — the same list, the
+same code, the same verified copy taken first — while detached:
 
 ```sh
-node scripts/migrate-state.mjs --plan  --data ~/.local/share/hallvi-dev/state
-node scripts/migrate-state.mjs --apply --data ~/.local/share/hallvi-dev/state
+node scripts/migrate-state.mjs --plan  --data ~/.local/share/hallvi-dev/applications/whoami/state
+node scripts/migrate-state.mjs --apply --data ~/.local/share/hallvi-dev/applications/whoami/state
 ```
 
 `--plan` changes nothing and says which stores the transition rewrites.
@@ -194,31 +271,37 @@ node scripts/migrate-state.mjs --restore <that directory>
 
 A transition that is not in [the list](../scripts/migrations.mjs) is refused,
 and the records are left exactly as they were. Add the transition to that
-list, run it here, and check that the four applications still open, still show
-their history and still hold their data.
+list, run it here, and check that the application still opens, still shows
+its history and still holds its data. The migration refuses an attached
+directory: detach first.
 
 An older program will not open a newer database: `src/server/db.ts` compares
-the schema it was built with against the one in the file and refuses, which is
-why reverting code is not by itself a rollback.
+the schema it was built with against the one in the file and refuses, and
+attach refuses before that, which is why reverting code is not by itself a
+rollback. A branch that migrated an application is a commitment: the next
+checkout to attach it reads the new schema or restores the copy.
 
 ## Backups, and getting back
 
-Stop `npm run dev` first — a copy taken under a running worker would not agree
-with the conversations it is writing. Then copy the state directory:
+Every attach takes a verified copy of the whole state directory before
+starting, so the copy to go back to after a bad change is the newest one
+under `applications/<name>/backups/`; `manifest.json` in it lists every file
+with its hash and the database's schema and counts. Putting one back is
+copying it over the state directory while nothing is attached. A copy taken
+around a migration is made by `migrate-state.mjs --apply` and restored by
+`--restore`, and that is the one to prefer when there is one.
 
-```sh
-cp -a ~/.local/share/hallvi-dev/state \
-      ~/.local/share/hallvi-dev/backups/$(date -u +%Y-%m-%dT%H-%M-%SZ)-<label>
-```
-
-A backup taken around a migration is made for you and verified, by
-`migrate-state.mjs --apply`, and that is the one to prefer when there is one.
-
-What a backup covers, and what it deliberately does not: it holds Hallvi's own
-records — the database, the conversations, the credentials and the connection
-configuration. **It does not hold the applications' own data.** Uptime Kuma's
-monitors and Miniflux's articles live on the host; restoring this backup would
+What a copy covers, and what it deliberately does not: it holds Hallvi's own
+records — the database, the conversation, the credentials and the connection
+configuration. **It does not hold the application's own data.** Uptime Kuma's
+monitors and Miniflux's articles live on the host; restoring this copy would
 bring back a controller describing data that is still, or no longer, there.
+
+`~/.local/share/hallvi-dev/recovery/` holds the four-application state as it
+was before the separation of 22 September 2026, read-only and marked as a
+recovery copy so that no program opens it, and `backups/` beside it the
+verified copy taken just before. They are the record of where the four came
+from, not working controllers.
 
 ## Retention
 
