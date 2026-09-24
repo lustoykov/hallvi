@@ -384,6 +384,16 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 ## Layout
 
+**One top bar, and it is white (24 September).** Settings, the four setup
+screens and Add application wear the shell's own 56px bar: white, a `line`
+hairline under it, ink on it, the mark and name at the left and one back link
+at the right in muted. Setting something up is not a different product, so it
+is not a different colour of room; the bar says where you are and nothing
+else. Add application asks its question once, in its heading, rather than
+greeting on the left and asking again over the field. Chosen from a switchable
+prototype of four framings; the options and the verdict are on the
+`prototype/ux-audit-directions` branch.
+
 The workspace shell: a 240px navigation column, a 56px top bar, and a workspace that fills the rest. Beside the column the top bar and workspace form one sheet, its top-left corner rounded 14px and set 8px down, casting a soft shadow onto the column; on a phone the navigation is a strip above it and there is no sheet edge. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
 
 A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit control is the Stop icon until something is typed, then “Send next” with a quiet “Steer” beside it. A waiting message says when Pi will read it — after its current work, or for a steer after its current step, never interrupting a running command or a pending approval — and is cancelled the way Pi cancels: Stop, which also settles every waiting message as not started, with its text kept. A message that was never run offers Send again. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.

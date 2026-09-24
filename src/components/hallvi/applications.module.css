@@ -1,6 +1,6 @@
-/* Inherit Hallvi's desktop world: navy navigation, quiet workspace list,
-   blue Add application action. Repository identity and derived checks stay
-   visible. */
+/* Inherit Hallvi's desktop world: the shared white top bar, a quiet
+   workspace list, blue Add application action. Repository identity and
+   derived checks stay visible. */
 .page {
   min-height: 100vh;
   min-width: 1060px;
@@ -13,40 +13,6 @@
 .page :is(a, button, input):focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 3px;
-}
-.topbar {
-  height: 56px;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--navy);
-  color: #e4ecf9;
-  font-size: 14px;
-}
-.topbar a {
-  color: inherit;
-}
-.topbar > a:last-child {
-  padding: 6px 8px;
-  border-radius: 6px;
-  color: #cad3e3;
-  font-size: 13px;
-  text-decoration: none;
-  transition:
-    color var(--fast) var(--ease),
-    background-color var(--fast) var(--ease);
-}
-.topbar > a:last-child:hover {
-  color: #fff;
-  background: rgb(255 255 255 / 8%);
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-  font-weight: 600;
 }
 .content {
   max-width: 1100px;

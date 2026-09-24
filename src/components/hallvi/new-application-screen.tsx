@@ -1,7 +1,7 @@
 "use client";
 
 import { HallviMark } from "./hallvi-mark";
-import { SpinnerGap } from "@phosphor-icons/react";
+import { ArrowLeft, SpinnerGap } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -170,12 +170,16 @@ export function NewApplicationScreen({
 
   return (
     <main className={`${s.page} ${w.welcomePage}`}>
-      <header className={s.topbar}>
-        <Link className={s.brand} href={applicationsHref}>
-          <HallviMark size={28} onDark />
-          Hallvi
+      <header className="hv-setup-topbar">
+        <Link className="hv-setup-brand" href={applicationsHref}>
+          <HallviMark size={22} />
+          <span>Hallvi</span>
         </Link>
-        {!first && <Link href={applicationsHref}>All applications</Link>}
+        {!first && (
+          <Link className="hv-setup-back" href={applicationsHref}>
+            <ArrowLeft aria-hidden="true" /> All applications
+          </Link>
+        )}
       </header>
       <section className={w.welcome} aria-labelledby="new-application-heading">
         <div className={w.hero}>
@@ -205,8 +209,11 @@ export function NewApplicationScreen({
                 {said}
               </p>
             </div>
+            {/* The page asks once. It used to greet on the left and ask
+                again over the field, which made two headings out of one
+                request. */}
             <h1 id="new-application-heading">
-              {first ? "Hi, I’m Hallvi." : "What shall we run next?"}
+              {first ? "Hi, I’m Hallvi." : "What do you want to run?"}
             </h1>
             <p>
               {first
@@ -223,7 +230,6 @@ export function NewApplicationScreen({
             )}
           </div>
           <div className={w.ask}>
-            <h2>What do you want to run?</h2>
             <p>
               Paste the GitHub repository of the application. It can be yours or
               someone else&rsquo;s open-source project.

@@ -4,7 +4,7 @@ description: Observed conventions inherited from the approved Pi setup prototype
 colors:
   canvas: "#f5f7fb"
   surface: "#ffffff"
-  topbar: "#172238"
+  topbar: "#ffffff"
   ink: "#192338"
   muted: "#536078"
   primary: "#285ad8"
@@ -45,7 +45,7 @@ The implementation remains the source of truth: [shared settings styles](../../s
 
 ## Colors
 
-Use the pale canvas, white card, dark topbar, and dark body text. Blue marks primary actions, text actions, and the active tab. Green accompanies successful account state; errors and disconnect actions use red. Keep supporting copy muted and section boundaries subtle.
+Use the pale canvas, white card, white topbar over the `line` hairline, and dark body text. Blue marks primary actions, text actions, and the active tab. Green accompanies successful account state; errors and disconnect actions use red. Keep supporting copy muted and section boundaries subtle.
 
 ## Typography
 
@@ -53,7 +53,7 @@ Inherit Geist Sans from the [app layout](../../src/app/layout.tsx) and [global s
 
 ## Layout
 
-Keep a single centered content column (680px maximum including 16px side padding), a full-width topbar (56px tall, shared with the workspace and applications list), settings navigation, heading, and one divided card. Account controls precede the second settings section; the footer holds the return action. Standard section padding is 26px by 30px. The existing height breakpoint at 800px reduces vertical spacing; preserve the existing narrow-width fallback without treating it as mobile acceptance evidence.
+Keep a single centered content column (680px maximum including 16px side padding), a full-width topbar (56px tall, shared with the setup screens and Add application; `hv-setup-topbar` in the [shared page shell](../../src/app/hallvi.css)), settings navigation, heading, and one divided card. Account controls precede the second settings section; the footer holds the return action. Standard section padding is 26px by 30px. The existing height breakpoint at 800px reduces vertical spacing; preserve the existing narrow-width fallback without treating it as mobile acceptance evidence.
 
 ## Elevation & Depth
 
