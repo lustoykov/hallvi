@@ -20,3 +20,6 @@ __pycache__/
 .state/
 .review/
 .state-caps/
+
+# Agent scratch output (reviews, downloads) — never committed.
+work/
