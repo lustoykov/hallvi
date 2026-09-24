@@ -13,6 +13,7 @@
 // means the new interface answers with the revision that was installed.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowClockwise } from "@phosphor-icons/react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 
 import { ExternalLink } from "./external-link";
@@ -106,7 +107,14 @@ function readState() {
   return asked;
 }
 
-export function ThisHallvi({ className }: { className?: string }) {
+export function ThisHallvi({
+  className,
+  whatsNewHref = "/whats-new",
+}: {
+  className?: string;
+  /** What's new, carrying the way back to where the reader was. */
+  whatsNewHref?: string;
+}) {
   const [state, setState] = useState<HallviVersionState | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"check" | "install" | null>(null);
@@ -260,10 +268,13 @@ export function ThisHallvi({ className }: { className?: string }) {
           {installed.kind === "installed" ? (
             <p>
               {installed.version} ({installed.revision.slice(0, 7)}) on{" "}
-              {state.machine}
+              {state.machine} · <Link href={whatsNewHref}>What&apos;s new</Link>
             </p>
           ) : (
-            <p>{installed.reason} Use git; a release does not replace it.</p>
+            <p>
+              {installed.reason} Use git; a release does not replace it.{" "}
+              <Link href={whatsNewHref}>What&apos;s new</Link>
+            </p>
           )}
 
           {installed.kind === "installed" && (
@@ -376,6 +387,12 @@ export function ThisHallvi({ className }: { className?: string }) {
                 : disconnected && running
                   ? "The connection to Hallvi was interrupted. Waiting for its next update; the steps show the last reported progress."
                   : attempt?.message}
+              {noticePhase === "completed" && (
+                <>
+                  {" "}
+                  <Link href={whatsNewHref}>What&apos;s new</Link>
+                </>
+              )}
             </p>
             {noticePhase === "downloading" &&
               typeof attempt?.progress === "number" && (

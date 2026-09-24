@@ -4,9 +4,10 @@
 // `hallvi update` command has to do exactly the same things without Next.js.
 // This file only says where this installation's program and state are, so both
 // callers ask the same questions of the same directories.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
+import { releases } from "../../scripts/changelog.mjs";
 import {
   installation,
   installedRelease,
@@ -60,6 +61,16 @@ export interface ReleaseState {
 /** What this process is, as the package that built it recorded. */
 export function runningRelease() {
   return installedRelease(program());
+}
+
+/**
+ * What changed in each release up to this one, from the CHANGELOG.md this
+ * program shipped with, so it describes the Hallvi that is running rather
+ * than whatever is newest.
+ */
+export function changelog() {
+  const file = join(program(), "CHANGELOG.md");
+  return existsSync(file) ? releases(readFileSync(file, "utf8")) : [];
 }
 
 /**

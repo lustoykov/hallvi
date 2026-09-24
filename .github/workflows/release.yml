@@ -89,6 +89,9 @@ jobs:
             echo "Raise the version in a pull request first; that is the commit a release names."
             exit 1
           }
+          # Its notes are what installations show under What's new, so a
+          # version with none stops here rather than after the build.
+          node scripts/release-notes.mjs "$RELEASE_VERSION" "$GITHUB_SHA" > /dev/null
 
       - run: npm ci
 
@@ -149,27 +152,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ inputs.version }}
-          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
           set -eu
           tag="v${RELEASE_VERSION}"
+          # The same section of CHANGELOG.md an installation shows under
+          # What's new, followed by how to install this release.
+          node scripts/release-notes.mjs "$RELEASE_VERSION" "$GITHUB_SHA" > release-notes.md
           gh release create "$tag" \
             --draft \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Hallvi $RELEASE_VERSION" \
-            --notes "Hallvi $RELEASE_VERSION ($RELEASE_CHANNEL), built from $GITHUB_SHA.
-
-          Download \`install-hallvi.sh\` and run it:
-
-          \`\`\`
-          sh ./install-hallvi.sh
-          \`\`\`
-
-          It finds this release, checks the archive against the signed manifest, and installs it.
-          To install this exact build offline, download the archive for your machine and its \`.sha256\` and pass the archive as an argument.
-
-          Installed already? Settings → This Hallvi, or \`hallvi update\`." \
+            --notes-file release-notes.md \
             dist/hallvi-${RELEASE_VERSION}-darwin-arm64.tgz \
             dist/hallvi-${RELEASE_VERSION}-darwin-arm64.tgz.sha256 \
             dist/hallvi-${RELEASE_VERSION}-linux-x64.tgz \

@@ -324,6 +324,8 @@ Hallvi updates itself. Its version sits at the bottom of the sidebar, under
 **Settings**, with a visible **Check for updates** button below it. Press it to
 check immediately and open the result. When a release is available, press
 **Update** in that panel to install it. Checking does not start installation.
+**What's new**, beside the version in that panel, lists what changed in each
+release up to the installed one; an available release links to its own notes.
 Or, in a terminal:
 
 ```bash

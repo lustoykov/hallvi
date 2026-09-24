@@ -51,4 +51,4 @@ updates, troubleshooting, and uninstalling.
 
 ## More information
 
-[Beta precautions](docs/beta-safety.md) · [Documentation map](docs/README.md) · [Development setup](docs/development.md)
+[What's new](CHANGELOG.md) · [Beta precautions](docs/beta-safety.md) · [Documentation map](docs/README.md) · [Development setup](docs/development.md)
