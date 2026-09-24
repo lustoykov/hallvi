@@ -5,9 +5,12 @@
 // This file only says where this installation's program and state are, so both
 // callers ask the same questions of the same directories.
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
-import { installedRelease } from "../../scripts/release-source.mjs";
+import {
+  installation,
+  installedRelease,
+} from "../../scripts/release-source.mjs";
 import type { UpdateAttempt } from "../../scripts/update-attempt.mjs";
 import {
   currentAttempt,
@@ -57,6 +60,19 @@ export interface ReleaseState {
 /** What this process is, as the package that built it recorded. */
 export function runningRelease() {
   return installedRelease(program());
+}
+
+/**
+ * Which checkout this is, when it is one, and the retained application it is
+ * attached to. `retained-application.mjs attach` sets the runtime id and puts
+ * the database in that application's own state directory.
+ */
+export function runningCheckout() {
+  if (installation(program()).kind !== "development") return null;
+  return {
+    checkout: basename(program()),
+    application: process.env.HALLVI_RUNTIME_ID ? basename(data()) : null,
+  };
 }
 
 /** Everything the version line shows. `check` is the owner asking. */

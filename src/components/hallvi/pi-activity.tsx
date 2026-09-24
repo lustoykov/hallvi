@@ -37,7 +37,12 @@ import { useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
-import { placeOf as placeOfTool, plainText } from "./execution-text";
+import {
+  hostOf,
+  intentOf,
+  placeOf as placeOfTool,
+  plainText,
+} from "./execution-text";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
@@ -115,13 +120,6 @@ function placeOf(record: ActivityRecord) {
   const said = placeOfTool(record.tool);
   if (!said) return null;
   return said.charAt(0).toLowerCase() + said.slice(1);
-}
-
-/** "root@46.62.253.6:22" — the reader wants the host, not the login. */
-function hostOf(target: string | undefined) {
-  if (!target) return null;
-  const host = target.split("@").at(-1)?.split(":")[0]?.trim();
-  return host || null;
 }
 
 /** How a call is named and grouped; an unknown tool keeps its own name. */
@@ -360,8 +358,12 @@ function Quiet({
   const hosts = new Set(
     records
       .map((record) =>
+        // Only a login string names a machine; a sentence such as
+        // check_public_access's "What the internet gets from https://…" is
+        // not one to cut at its first colon.
         hostOf(
-          executions?.find((item) => item.id === record.executionId)?.target,
+          executions?.find((item) => item.id === record.executionId)?.target ??
+            "",
         ),
       )
       .filter((host): host is string => host !== null),
@@ -455,7 +457,7 @@ function Row({ record }: { record: ActivityRecord }) {
         <span
           className={`hv-did-verb${record.status === "running" ? " hv-sheen" : ""}`}
         >
-          {verb}
+          {intentOf(record.args) ?? verb}
         </span>
         {detail && <span className="hv-did-subject">{detail}</span>}
         <span className="hv-did-state">

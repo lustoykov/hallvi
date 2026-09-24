@@ -5,18 +5,10 @@ import type { CSSProperties } from "react";
  * product names itself. It replaced a letter H in a circle, which said
  * nothing about who was talking.
  */
-export function HallviMark({
-  size = 22,
-  onDark = false,
-}: {
-  size?: number;
-  /** On the navy top bar the tile lightens so the face still reads. */
-  onDark?: boolean;
-}) {
+export function HallviMark({ size = 22 }: { size?: number }) {
   return (
     <span
       className="hv-mark"
-      data-on-dark={onDark ? "" : undefined}
       style={{ "--size": `${size}px` } as CSSProperties}
       aria-hidden="true"
     >

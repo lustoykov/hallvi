@@ -470,7 +470,11 @@ Node ABI and Linux C library; build and verify each advertised target.
 
 Development remains separate: `npm run dev` in a checkout, described in
 [Development](development.md). An installation and a development checkout
-do not share a database by default.
+do not share a database by default. A checkout labels itself so the two are
+not confused on one machine: its tab title starts with "Dev" and the checkout
+name, or the retained application it is attached to, its tab icon is a green
+mascot rather than the blue one, and the strip at the top of every page carries
+the same "Dev" chip. The installed Hallvi has none of these.
 
 ## Limits today
 

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { retainedRefusal } from "./retained-state.mjs";
 import { stateLocation } from "./state-location.mjs";
 const path =
   process.env.HALLVI_DB_PATH ??
@@ -11,6 +12,8 @@ const { version } = JSON.parse(
     "utf8",
   ),
 );
+const refusal = retainedRefusal(path);
+if (refusal) throw new Error(refusal);
 mkdirSync(dirname(path), { recursive: true });
 const database = new Database(path);
 try {

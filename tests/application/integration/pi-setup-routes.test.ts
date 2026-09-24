@@ -137,7 +137,7 @@ describe("Pi setup choice route", () => {
     expect(readPiConfiguration()).toMatchObject({
       mode: "separate",
       providerId: "openai-codex",
-      modelId: "gpt-5.6-sol",
+      modelId: "gpt-6-sol",
       reasoningEffort: "high",
     });
   });

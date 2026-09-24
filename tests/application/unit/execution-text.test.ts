@@ -12,7 +12,9 @@ import {
   commandOf,
   essence,
   executionLine,
+  executionTitle,
   hostOf,
+  intentOf,
   plainText,
   whereItRan,
 } from "@/components/hallvi/execution-text";
@@ -189,5 +191,40 @@ describe("which machine a command ran on", () => {
   it("reads the host out of a login string, and leaves prose alone", () => {
     expect(hostOf("deploy@example.test:2222")).toBe("example.test");
     expect(hostOf("Repository workspace")).toBeNull();
+    expect(
+      hostOf("What the internet gets from https://shop.example.test"),
+    ).toBeNull();
+  });
+});
+
+describe("what a command is for", () => {
+  // A long intent beside a short command: the longest-string rule would have
+  // shown the intent as the command, and approved text would not be the text
+  // that runs.
+  const stored = JSON.stringify({
+    intent: "Check that the database answers before the release goes out",
+    command: "pg_isready",
+  });
+
+  it("never mistakes the intent for the command", () => {
+    expect(commandOf(stored)).toBe("pg_isready");
+    expect(plainText(stored)).toBe("pg_isready");
+  });
+
+  it("titles the execution by its intent, and keeps where it ran", () => {
+    expect(intentOf(stored)).toBe(
+      "Check that the database answers before the release goes out",
+    );
+    expect(executionTitle({ tool: "server_bash", input: stored })).toBe(
+      "On the server · Check that the database answers before the release goes out",
+    );
+  });
+
+  it("falls back to the command for an execution recorded without one", () => {
+    const old = JSON.stringify({ command: "docker ps" });
+    expect(intentOf(old)).toBeNull();
+    expect(executionTitle({ tool: "server_bash", input: old })).toBe(
+      executionLine({ tool: "server_bash", input: old }),
+    );
   });
 });

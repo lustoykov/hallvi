@@ -6,13 +6,10 @@
 // where its bytes are, how big it was when somebody last read it, and every
 // check that touched it.
 //
-// Under it, the backup situation, because "is this data safe" is the second
-// question anyone arrives here with and it used to be the whole page. It is
-// the same verdict Backups prints, read from the same projection, as four
-// plain rows: is a copy scheduled, is there one off the server, has one ever
-// been restored, and what a copy holds. The three never borrow from one
-// another — a passing health check is not a copy, and a copy is not a
-// restore.
+// "Is this data safe" is the second question anyone arrives here with, and
+// this page used to answer it four times over in its own words. Backups owns
+// that story now. What is left here is one read-only line of it and the way
+// to the page that owns it.
 //
 // Its empty state has to be careful: an application may genuinely have no
 // database, and this page cannot tell that apart from nobody having looked —
@@ -33,6 +30,7 @@ import {
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
+import { ProtectionLine } from "./protection-line";
 import { probeReading } from "./pulse";
 import {
   Ask,
@@ -40,8 +38,6 @@ import {
   Clip,
   Facts,
   Figure,
-  Foot,
-  Go,
   Lede,
   Name,
   None,
@@ -55,31 +51,10 @@ import {
   Tag,
   ago,
   type Column,
-  type Tone,
 } from "./register";
 
 const probeTone = (probe: DatabaseProbe) => probeReading(probe).tone;
 const probeWord = (probe: DatabaseProbe) => probeReading(probe).word;
-
-const VERDICT_TONE: Record<string, Tone> = {
-  verified: "good",
-  warning: "warn",
-  failed: "bad",
-  // Nobody having looked, and nothing being set up, are facts about a young
-  // application. They are said plainly and offered as a next step, not
-  // coloured as something wrong.
-  unknown: "plain",
-  quiet: "plain",
-};
-
-interface ProtectionRow {
-  id: string;
-  question: string;
-  answer: string;
-  tone: Tone;
-  detail: string;
-  at: string | null;
-}
 
 export function DatabasePage({
   records,
@@ -170,93 +145,6 @@ export function DatabasePage({
       .map((probe) => probe.at!)
       .sort()
       .at(-1) ?? null;
-  const { summary, copies, newestCopyCoverage } = protection;
-  const newestCopy = copies[0] ?? null;
-  const safety: ProtectionRow[] = [
-    {
-      id: "schedule",
-      question: "Is a copy scheduled?",
-      answer: summary.schedule
-        ? "Yes"
-        : protection.declaredAbsent
-          ? "No"
-          : protection.planned
-            ? "A plan, no schedule"
-            : "Not known yet",
-      tone: summary.schedule ? "good" : "plain",
-      detail: summary.schedule
-        ? `${summary.schedule.words}${summary.keep ? ` · keeps ${summary.keep}` : ""}`
-        : protection.declaredAbsent
-          ? "Hallvi looked, and no backup plan exists."
-          : "No record says copies are meant to happen.",
-      at: summary.schedule?.at ?? null,
-    },
-    {
-      id: "copy",
-      question: "Is there a copy off the server?",
-      answer: !newestCopy
-        ? "None on record"
-        : newestCopy.kind === "same-server"
-          ? "Only beside the data"
-          : newestCopy.kind === "unclassified"
-            ? "A copy, place unstated"
-            : "Yes",
-      tone: !newestCopy
-        ? "plain"
-        : newestCopy.kind === "same-server" ||
-            newestCopy.kind === "unclassified"
-          ? "warn"
-          : "good",
-      detail: newestCopy
-        ? newestCopy.detail
-        : "A copy stored somewhere else, so losing the server does not lose the data.",
-      at: newestCopy?.at ?? null,
-    },
-    {
-      id: "restore",
-      question: "Would a copy actually restore?",
-      answer: summary.restore ? "One has been opened" : "Never tested",
-      // Worth amber only once there is a copy to be unsure about.
-      tone: summary.restore ? "good" : newestCopy ? "warn" : "plain",
-      detail:
-        summary.restore?.detail ??
-        "A backup only counts once one has been opened and loaded successfully.",
-      at: summary.restore?.at ?? null,
-    },
-    {
-      id: "holds",
-      question: "What would a copy hold?",
-      answer: !newestCopy
-        ? protection.coverLabels.length
-          ? "What the plan names"
-          : "Nothing stated"
-        : newestCopyCoverage.basis === "unrecorded"
-          ? "Not written down"
-          : newestCopyCoverage.missing.length
-            ? "Not everything"
-            : "Everything on record",
-      tone:
-        newestCopy && newestCopyCoverage.missing.length
-          ? "bad"
-          : newestCopy && newestCopyCoverage.basis !== "unrecorded"
-            ? "good"
-            : "plain",
-      detail:
-        newestCopy && newestCopyCoverage.missing.length
-          ? `Missing: ${newestCopyCoverage.missing.map((one) => one.label).join(", ")}.`
-          : protection.coverLabels.length
-            ? `The plan covers ${protection.coverLabels.join(", ")}.${
-                protection.uncovered.length
-                  ? ` Not in any plan: ${protection.uncovered.map((one) => one.label).join(", ")}.`
-                  : ""
-              }`
-            : protection.uncovered.length
-              ? `In no plan: ${protection.uncovered.map((one) => one.label).join(", ")}.`
-              : "No record says what a copy contains.",
-      at: null,
-    },
-  ];
-
   const columns: Column<DatabaseRow>[] = [
     {
       key: "database",
@@ -331,8 +219,8 @@ export function DatabasePage({
               : `${present.length} databases`
           }
         >
-          The database {applicationName} depends on: where its data lives,
-          whether it answers, and whether a copy of it exists anywhere else.
+          The database {applicationName} depends on, where its data lives, and
+          whether it answers.
         </Lede>
 
         <Strip>
@@ -393,18 +281,6 @@ export function DatabasePage({
                   ? `A query ran ${ago(queried, now)}`
                   : "Nothing has connected to it and run a query"
             }
-          />
-          <Figure
-            label="Backups"
-            value={
-              newestCopy
-                ? `Copied ${ago(newestCopy.at, now)}`
-                : summary.schedule
-                  ? "Scheduled, no copy"
-                  : "No copy"
-            }
-            tone={VERDICT_TONE[verdict.tone] ?? "plain"}
-            note={verdict.says}
           />
         </Strip>
 
@@ -508,50 +384,12 @@ export function DatabasePage({
           />
         </Board>
 
-        <Board title="Backups" note={verdict.limit ?? verdict.says}>
-          <Register
-            rows={safety}
-            columns={[
-              {
-                key: "question",
-                head: "Question",
-                width: 250,
-                cell: (row) => <strong>{row.question}</strong>,
-              },
-              {
-                key: "answer",
-                head: "Answer",
-                width: 190,
-                cell: (row) => <Tag tone={row.tone}>{row.answer}</Tag>,
-              },
-              {
-                key: "detail",
-                head: "What is on record",
-                cell: (row) => <Clip text={row.detail} />,
-              },
-              {
-                key: "at",
-                head: "When",
-                width: 110,
-                align: "end",
-                cell: (row) =>
-                  row.at ? <Num>{ago(row.at, now)}</Num> : <None>—</None>,
-              },
-            ]}
-          />
-          <Foot>
-            <span>
-              The same records Backups reads. A passing check is not a copy, and
-              a copy is not a restore.
-            </span>
-            {verdict.next && (
-              <Ask onAsk={onAsk} prompt={verdict.next.draft}>
-                {verdict.next.label}
-              </Ask>
-            )}
-            <Go onGo={() => onOpenDestination("backups")}>Open Backups</Go>
-          </Foot>
-        </Board>
+        <ProtectionLine
+          protection={protection}
+          verdict={verdict}
+          now={now}
+          onOpenBackups={() => onOpenDestination("backups")}
+        />
       </div>
     </div>
   );

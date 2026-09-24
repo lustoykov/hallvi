@@ -57,6 +57,19 @@ export function gigabytes(value: string | null) {
   return bytes / step ** 3;
 }
 
+/**
+ * The owner's words for a volume, so a reader meets one name for it.
+ *
+ * One piece means its label names the whole volume. Two would make that
+ * label a half-truth, so the volume answers for itself and its pieces are
+ * listed where there is room for them.
+ */
+export function volumeName(volume: Vol) {
+  return volume.pieces.length === 1
+    ? volume.pieces[0].label
+    : `Everything in ${volume.name}`;
+}
+
 export function storageFromRecords({
   records,
   applicationId,

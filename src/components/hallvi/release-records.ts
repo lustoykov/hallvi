@@ -28,6 +28,7 @@ import {
   clip,
   commandOf,
   essence,
+  intentOf,
   placeOf,
   whereItRan,
 } from "./execution-text";
@@ -207,7 +208,10 @@ export function workFor(
         : null;
       return {
         id: execution.id,
-        title: TITLE_OF[execution.tool] ?? execution.tool.replaceAll("_", " "),
+        title:
+          intentOf(execution.input) ??
+          TITLE_OF[execution.tool] ??
+          execution.tool.replaceAll("_", " "),
         caption: clip(essence(full), 120),
         command: full,
         where: place

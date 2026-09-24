@@ -28,7 +28,7 @@
 // adjacency would put a claim on the page that nobody made.
 
 import type { ApplicationOperation } from "@/server/operation-record";
-import { executionLine, plainText } from "./execution-text";
+import { executionTitle, plainText } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 
@@ -85,7 +85,7 @@ export function carriedOnAfter(
 
 /** A command's own name in a list of past work, by where it ran. */
 function commandTitle(execution: ExecutionRecord) {
-  return executionLine(execution, 90);
+  return executionTitle(execution, 90);
 }
 
 /**

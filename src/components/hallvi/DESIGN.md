@@ -384,6 +384,16 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 ## Layout
 
+**One top bar, and it is white (24 September).** Settings, the four setup
+screens and Add application wear the shell's own 56px bar: white, a `line`
+hairline under it, ink on it, the mark and name at the left and one back link
+at the right in muted. Setting something up is not a different product, so it
+is not a different colour of room; the bar says where you are and nothing
+else. Add application asks its question once, in its heading, rather than
+greeting on the left and asking again over the field. Chosen from a switchable
+prototype of four framings; the options and the verdict are on the
+`prototype/ux-audit-directions` branch.
+
 The workspace shell: a 240px navigation column, a 56px top bar, and a workspace that fills the rest. Beside the column the top bar and workspace form one sheet, its top-left corner rounded 14px and set 8px down, casting a soft shadow onto the column; on a phone the navigation is a strip above it and there is no sheet edge. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
 
 A destination opened from a receipt, a mark or navigation takes the full workspace width. A 41px bar sits above its header with one text button, “Back to [conversation name]”. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit control is the Stop icon until something is typed, then “Send next” with a quiet “Steer” beside it. A waiting message says when Pi will read it — after its current work, or for a steer after its current step, never interrupting a running command or a pending approval — and is cancelled the way Pi cancels: Stop, which also settles every waiting message as not started, with its text kept. A message that was never run offers Send again. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.
@@ -492,8 +502,8 @@ application with nothing wrong.
   those reads "Answering · other checks 20 h ago", not "Verified".
 - **Not set up is an offer, not an alarm.** No backups, no firewall read, no
   watcher, Hallvi's own records not copied: each is stated once, plainly, with
-  the question that would change it. Storage draws no "stays behind" wall
-  unless a plan exists and leaves that data out.
+  the question that would change it. An application with nothing on disk gets
+  no protection line at all: there is nothing there to be unprotected.
 - **Amber means somebody is needed.** Pi's own `warning` on a record, a
   decision waiting, a watch gone quiet, a backup that was promised and is
   overdue. Red is a check that ran and failed. If a page shows more than one
@@ -503,8 +513,8 @@ application with nothing wrong.
 
 Chosen 21 September 2026 from the ten-directions exploration (direction F), and
 the shared vocabulary of the inventory destinations: Deployment, Processes,
-Database and Access are registers; Monitoring borrows its strip and table
-around the visual it already had. It lives in `register.tsx` and
+Database, Storage and Access are registers; Monitoring borrows its strip and
+table around the visual it already had. It lives in `register.tsx` and
 `register.css`, every class prefixed `hv-rg-`.
 
 - **Strip, then table.** A strip of three or four figures states the totals
@@ -526,6 +536,18 @@ around the visual it already had. It lives in `register.tsx` and
 - **Pips are evidence at a glance.** One pip per step or check, in the row, so
   a release that holds with a failed command inside it shows before it is
   opened.
+- **One page owns a story; the others carry a line of it.** Chosen
+  23 September 2026, after the backup situation was told three times in three
+  wordings that drifted apart. Backups owns copies, plans and restores, and
+  opens on four figures: what holds data and how much of it is in a copy, how
+  old the newest copy is, whether a restore was tried, and what the plan says.
+  Storage owns what is on disk and whether it survives the container being
+  replaced. Database owns the engine, its files and whether it answers.
+  Storage and Database each print one read-only `hv-rg-line` that links to
+  Backups ("Not set up · Backups", "Copied 2 h ago, restore untested ·
+  Backups"), and say nothing else about it. Every telling reads the same
+  projection, and coverage is answered in one place (`inNewestCopy` in
+  `backups-records.ts`), so the pages cannot disagree.
 
 ### Access
 

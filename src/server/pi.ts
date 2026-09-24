@@ -33,7 +33,7 @@ import {
   saveInformation,
   retireInformation,
 } from "./saved-information";
-import { Type } from "typebox";
+import { Type, type TObject } from "typebox";
 import {
   PiWorkspace,
   canonicalCapturePath,
@@ -63,6 +63,27 @@ import {
   type DiagnosticFailure,
   type ExecutionSignal,
 } from "./diagnostics";
+
+/**
+ * What a command is for, in the owner's words. Every surface titles the
+ * command with it — the conversation, an approval, History, Overview — and
+ * shows the command itself beneath, so it explains the command without
+ * standing in for it.
+ */
+const COMMAND_INTENT = Type.String({
+  minLength: 1,
+  maxLength: 80,
+  description:
+    'A few words for the owner saying what this command is for, e.g. "Check the database answers" or "Restart the web process". Plain language, no shell syntax.',
+});
+
+/** A workspace tool's arguments without the intent, which is Hallvi's. */
+function withoutIntent(args: unknown) {
+  if (!args || typeof args !== "object") return args;
+  const rest = { ...(args as Record<string, unknown>) };
+  delete rest.intent;
+  return rest;
+}
 
 export class PiUnavailableError extends Error {
   constructor(
@@ -535,6 +556,7 @@ export async function openPiSession(
             description:
               'Run a Bash script on the connected application server. Use ordinary shell tools to inspect, deploy, configure or repair it. Returns output and exit code. The timeout closes SSH; a remote process may continue, so inspect when completion is uncertain. To use a secret the owner supplied, list its name in secrets and refer to it in the command as an ordinary variable — secrets:["POSTGRES_PASSWORD"] with the command using "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs. Never write a value or a {{secret:NAME}} handle into the command itself: a value spliced into a command is shell syntax rather than data, and the command is refused.',
             parameters: Type.Object({
+              intent: COMMAND_INTENT,
               command: Type.String(),
               /**
                * Names of secrets this command needs, exported for it before
@@ -1016,7 +1038,16 @@ export async function openPiSession(
         ["bash", "powershell", "write", "edit"].includes(tool.name)
           ? {
               ...tool,
+              // A shell command says what it is for, like server_bash. The
+              // record keeps the intent; the tool itself never sees it.
+              ...(["bash", "powershell"].includes(tool.name) && {
+                parameters: Type.Object({
+                  intent: COMMAND_INTENT,
+                  ...(tool.parameters as TObject).properties,
+                }),
+              }),
               async execute(id: string, args: unknown, signal?: AbortSignal) {
+                const command = withoutIntent(args);
                 const result = await execution.execute(
                   tool.name,
                   "Repository workspace",
@@ -1024,7 +1055,7 @@ export async function openPiSession(
                   // The executor's own output callback: partial results reach
                   // the execution record, so the card streams while it runs.
                   (output) =>
-                    tool.execute(id, args, signal, (partial: unknown) =>
+                    tool.execute(id, command, signal, (partial: unknown) =>
                       output(workspaceText(partial)),
                     ),
                   false,

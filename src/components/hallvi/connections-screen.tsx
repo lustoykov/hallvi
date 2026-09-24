@@ -169,7 +169,7 @@ export function ConnectionsScreen({
     <main className={`hv-setup-shell ${s.root}`}>
       <header className="hv-setup-topbar">
         <Link className="hv-setup-brand" href="/applications">
-          <HallviMark size={28} onDark />
+          <HallviMark size={22} />
           <span>Hallvi</span>
         </Link>
         <Link
