@@ -44,8 +44,8 @@ did not create: label it, register it, and retire it when the task ends.
 
 Never print credentials or copy them into code, artifacts, commits or pull
 requests. Preserve dirty work, unique data, credentials, retained evidence and
-uncertain resources. Never broadly prune Docker volumes or force-remove
-worktrees.
+uncertain resources. Never broadly prune Docker volumes. Worktrees go when
+their session is archived, not by hand.
 
 ## Changes and checks
 
