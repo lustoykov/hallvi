@@ -155,9 +155,9 @@ before long tests. Do not relabel persistent or shared resources as temporary. F
 Never use these disposable labels on existing resources based only on their name
 or age. Existing resources need evidence of ownership and disposable purpose.
 
-## Completion and branch/worktree removal
+## Completion
 
-Before finishing a task or removing its branch/worktree, inventory the owner's
+Before finishing a task or removing its branch, inventory the owner's
 resources. For disposable fixtures with the full label contract, verify ownership,
 check that no other task/deployment depends on them, then delete them by exact ID.
 Immediate task-owned cleanup need not wait for expiry. Retain useful test evidence
@@ -168,14 +168,15 @@ cleanup or that attached resources are disposable.
 Check provider completion and re-list resources to verify absence. Record UTC time,
 deleted IDs, retained IDs/reasons and failures in the registry and task handoff.
 Do not mark an uncertain deletion complete. If blocked, leave labels and records
-intact and report the remaining resource to the owner. Removing a worktree is not
-itself proof that a cloud resource is unused.
+intact and report the remaining resource to the owner. Archiving a session
+removes its worktree, which is not proof that a cloud resource is unused.
 
 ## After your work merges
 
 When a task's pull request merges into `main`, check every resource the task
-created: Git worktrees, local and GitHub branches, Docker containers, images and
-volumes, and temporary outputs.
+created: local and GitHub branches, Docker containers, images and volumes, and
+temporary outputs. Worktrees are not on the list: archiving the session deletes
+its worktree, in both Claude Code and Codex, and Codex keeps a snapshot first.
 
 For each exact resource, establish that the task owns it and that nothing still
 depends on it. Check running processes, open files and ports, `git status`
@@ -191,7 +192,6 @@ for a different target.
 
 Once the owner approves:
 
-- Remove a worktree with plain `git worktree remove`, never with `--force`.
 - Delete a GitHub branch only after verifying that its exact tip is in `main`,
   that it is not protected, that no open pull request uses it as head or base,
   and that the remote tip has not moved. Delete it with an expected-SHA lease,
@@ -199,7 +199,7 @@ Once the owner approves:
 - Remove only task-owned Docker containers and images that nothing else depends
   on. A volume is persistent data: ask for separate, explicit approval for each
   one.
-- Never prune worktrees, Docker resources or branches in bulk.
+- Never prune Docker resources or branches in bulk.
 
 Verify each removal, then report what you removed and what you kept, with the
 reason for each. Keep task histories, the owner's outputs and evidence.
@@ -238,7 +238,7 @@ Keep a dated audit record in the canonical local inventory.
 
 ## Local development resources
 
-The same care covers Hallvi worktrees, local and GitHub branches, Docker
+The same care covers local and GitHub branches, Docker
 containers/images/networks/volumes/build cache, development databases, build
 outputs, logs and temporary artifacts, whether a task is cleaning up after
 itself or the owner asked for an audit. Deleting any of them under `~/biz/` or
@@ -248,21 +248,10 @@ personal files or other projects.
 Record exact paths/IDs, machine, task, branch, purpose, expiry and cleanup permission
 in the same durable registry. For Docker, apply the same labels where supported;
 for Git and files, use registry entries. Renew the default 72-hour lease during
-active work. Completion cleanup precedes worktree and branch removal.
+active work. Completion cleanup precedes branch removal and archiving the session.
 
-- Worktrees: require confirmed task completion, no active agent/process using the
-  path, and no modified, staged, untracked or valuable ignored files. Inspect
-  ignored databases/configuration before removal. Preserve the main checkout and
-  locked worktrees. Use normal `git worktree remove`, never force removal.
-  Include Claude-created worktrees, including `.claude/worktrees/` and custom
-  locations registered with this repository's `git worktree list`. Check Claude
-  session/task evidence and running processes as well as Codex activity; an idle
-  or absent process alone does not establish task completion. Apply the same
-  dirty/untracked/ignored-file, data-retention and branch-preservation checks.
-  Legacy Claude worktrees without ownership records need evidence-based adoption
-  before removal. Do not delete Claude settings, credentials, session history or
-  other repositories' worktrees. Unregistered directories are report-only unless
-  their ownership and disposable contents can be independently established.
+- Worktrees: archiving the session removes them. Do not remove them by hand;
+  a worktree no session manages is report-only.
 - Local branches: require confirmed task completion, no checked-out worktree and
   proof all commits are preserved in the intended integration branch. Keep default,
   protected and unmerged branches. Use `git branch -d`; do not force-delete.
