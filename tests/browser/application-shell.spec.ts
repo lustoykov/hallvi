@@ -152,10 +152,21 @@ test(
         page.getByRole("heading", { name: section, exact: true }),
       ).toBeVisible();
     }
-    // Access carries no title of its own: the first board is the answer.
+    // Access is listed whatever the records say, and on an application
+    // nothing has looked at it says exactly that rather than drawing boards
+    // about nothing. The question that would change it is on the page.
     await nav.getByRole("button", { name: "Access", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "What a visitor sees", exact: true }),
+      page.getByRole("heading", {
+        name: "Nothing here has been looked at yet.",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Ask Hallvi what can reach it",
+        exact: true,
+      }),
     ).toBeVisible();
     // Configuration is gated too now: nothing has named a variable, so it
     // waits in the quiet row with its reason rather than being listed.

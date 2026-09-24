@@ -30,6 +30,7 @@ import {
   probed,
   publishOffer,
   reachFromRecords,
+  visitorSilence,
   visitorsOf,
   type Caller,
   type Door,
@@ -75,6 +76,23 @@ function Meter({ door }: { door: Door }) {
     </span>
   );
 }
+
+/**
+ * What the board says when it has no window to draw. Each sentence is about
+ * what somebody asked, never about what a name resolved to or what a port
+ * refused.
+ */
+const SILENCE: Record<
+  ReturnType<typeof visitorSilence>,
+  (name: string) => string
+> = {
+  "no-address": (name) =>
+    `No address is on record for ${name}. Nothing says where a visitor would go.`,
+  unasked: () =>
+    "Nothing has answered yet, and not every address on record has been asked.",
+  "none-answered": () =>
+    "Hallvi asked every address on record, and none answered.",
+};
 
 /** What the outside test found, as a short tag. */
 const TESTED: Record<string, string> = {
@@ -296,7 +314,7 @@ export function AccessPage({
     <AccessLink
       openUrl={story.address}
       name={applicationName}
-      restricted={story.audience === "controller"}
+      restricted={story.audience === "private"}
       reachable={reachable}
       onReopen={onReopen}
     />
@@ -345,6 +363,7 @@ export function AccessPage({
     );
 
   const visitors = visitorsOf(story.callers);
+  const silence = visitorSilence(story.callers);
   const doors = [...ways].sort(byExposure);
   const front = frontDoor(ways, story.address);
   const address =
@@ -353,10 +372,11 @@ export function AccessPage({
   // Publishing is the one thing this board can offer to change, and it drafts
   // the request rather than starting a form: there are decisions in it, and
   // the decisions belong in the conversation. It sits quietly beside the Open
-  // link, except on an application no name reaches, where it is what the
-  // board is for.
+  // link, except on an application a record says only this computer reaches,
+  // where it is what the board is for. Silence about access is not that
+  // application, so it keeps the quiet control.
   const offer = publishOffer(story);
-  const unpublished = !published && !story.domain;
+  const unpublished = story.audience === "private" && !story.domain;
 
   return (
     <div className="ax-root" data-variant="access">
@@ -382,11 +402,7 @@ export function AccessPage({
               ))}
             </div>
           ) : (
-            <p className="hv-ac-nothing">
-              {story.callers.length
-                ? "Hallvi tested every address on record, and none answered."
-                : "Hallvi hasn't tested any address yet."}
-            </p>
+            <p className="hv-ac-nothing">{SILENCE[silence](applicationName)}</p>
           )}
           {unpublished && (
             <div className="hv-ac-offer">
@@ -434,9 +450,23 @@ export function AccessPage({
 
         <Board title="How a visitor gets there">
           <div className="hv-ac-path">
+            {/* Where a visit starts. With no access record nothing says,
+                and drawing a private tunnel there invents one. */}
             <Node
-              title={published ? "The internet" : "This computer"}
-              caption={published ? "anyone" : "through a private tunnel"}
+              title={
+                published
+                  ? "The internet"
+                  : story.audience === "private"
+                    ? "This computer"
+                    : "Not on record"
+              }
+              caption={
+                published
+                  ? "anyone"
+                  : story.audience === "private"
+                    ? "through a private tunnel"
+                    : "nothing says who can reach it"
+              }
               live={published}
             />
             <i className="hv-ac-link" data-live={published || undefined} />

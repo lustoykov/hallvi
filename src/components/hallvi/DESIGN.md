@@ -543,6 +543,14 @@ on the `reach-records.ts` projection, with its own classes prefixed `hv-ac-`.
   footer that dates the reading. The page sketch beside it is a picture of "a
   page" and never carries a fact. Where a published address and the name in
   front of it are the same host, that is one window, not two.
+- **No window is three answers, not one.** "Hallvi asked every address on
+  record, and none answered" is a claim that somebody asked for a page, so a
+  name that only resolves and a port that refused a connection do not make
+  it: those say the internet can find the provider and that a port is shut.
+  No address on record says so, an address nobody asked says so, and only
+  every address having been asked earns the first sentence. In the same way,
+  only an access record can say the way in is private; silence about access
+  leaves the path's first node saying nothing says who can reach it.
 - **Ports are a register, most public first.** The order is the exposure
   ranking in `reach-records.ts`: answering the internet, facing it untested,
   named networks, a private network, not stated, the host's own loopback. A

@@ -12,6 +12,7 @@ import {
   exposure,
   frontDoor,
   reachFromRecords,
+  visitorSilence,
   visitorsOf,
 } from "@/components/hallvi/reach-records";
 import {
@@ -198,7 +199,7 @@ describe("the name and what a visitor gets", () => {
     const story = read([privateAccess()]);
     expect(story.domain).toBeNull();
     expect(story.address).toBe("http://127.0.0.1:8080");
-    expect(story.audience).toBe("controller");
+    expect(story.audience).toBe("private");
     expect(story.callers[0].headline).toBe("It answers through the tunnel");
   });
 
@@ -731,7 +732,7 @@ describe("an application published at its own name", () => {
 
   it("still reads a private record as reaching only this computer", () => {
     const story = read([privateAccess()]);
-    expect(story.audience).toBe("controller");
+    expect(story.audience).toBe("private");
     expect(story.callers.find((item) => item.id === "access")?.secure).toBe(
       false,
     );
@@ -1116,5 +1117,65 @@ describe("what the Access page puts in order", () => {
         "https://shop.example.com",
       )?.port,
     ).toBe("80/tcp");
+  });
+});
+
+// What the visitor board is allowed to say when it draws no window. Saying
+// "Hallvi asked every address" is a claim about somebody asking for a page,
+// and a name that only resolves is not one.
+describe("why the visitor board is empty", () => {
+  it("does not call a name that only resolves an address that was asked", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop.example" },
+        {
+          facts: [fact("name", "shop.example")],
+          checks: [check("resolves", "passed")],
+        },
+      ),
+    ]);
+    expect(visitorSilence(story.callers)).toBe("unasked");
+  });
+
+  it("settles on none answered once every address has been asked", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop.example" },
+        {
+          facts: [fact("name", "shop.example")],
+          checks: [check("resolves", "passed"), check("serves", "failed")],
+        },
+      ),
+    ]);
+    expect(visitorSilence(story.callers)).toBe("none-answered");
+  });
+
+  // A refused port is a port doing its job, not an address anybody typed.
+  it("does not count a refused port as an address", () => {
+    const story = read([
+      states(
+        { kind: "door", id: "closed" },
+        { facts: [fact("port", "3000")], checks: [check("refused", "passed")] },
+      ),
+    ]);
+    expect(story.callers).toHaveLength(1);
+    expect(visitorSilence(story.callers)).toBe("no-address");
+  });
+
+  // Silence about access is not a private application. Only an access record
+  // can say the way in is private, and inventing one invents a tunnel.
+  it("leaves the audience unknown when no access record says anything", () => {
+    expect(read([]).audience).toBe("unknown");
+    expect(
+      read([
+        states(
+          { kind: "door", id: "closed" },
+          {
+            facts: [fact("port", "3000")],
+            checks: [check("refused", "passed")],
+          },
+        ),
+      ]).audience,
+    ).toBe("unknown");
   });
 });
