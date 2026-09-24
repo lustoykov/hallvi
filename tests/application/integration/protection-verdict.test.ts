@@ -13,6 +13,7 @@ import {
   protectionFromRecords,
   protectionVerdict,
 } from "@/components/hallvi/backups-records";
+import { protectionOneLine } from "@/components/hallvi/protection-line";
 
 const APP = "11111111-2222-4333-8444-555555555555";
 const AT = "2026-09-15T10:00:00.000Z";
@@ -799,5 +800,50 @@ describe("a failed check on a plan is not a failed backup attempt", () => {
     ]);
     expect(said.limit).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
     expect(said.limit).toContain("ago");
+  });
+});
+
+// Storage and Database no longer tell this story. Each prints one line of it
+// and points at Backups, from this same projection, so the only thing worth
+// proving is that the line neither softens nor overstates the verdict.
+describe("the one line Storage and Database carry", () => {
+  const line = (records: SavedInformation[], now = NOW) => {
+    const protection = protectionFromRecords(records, now, APP);
+    const said = protectionVerdict(protection, now);
+    return protectionOneLine(protection, said, now);
+  };
+  const absent = record({
+    id: "none",
+    ref: { kind: "backup-plan", id: "daily" },
+    presence: "absent",
+    title: "Nothing backs this up",
+  });
+
+  it("separates nobody having looked from nothing being set up", () => {
+    // The distinction PRODUCT.md is built on, in the two words a reader
+    // meets. Both are calm: neither is a thing that has gone wrong.
+    expect(line([])).toMatchObject({ word: "Not checked", tone: "plain" });
+    expect(line([absent])).toMatchObject({ word: "Not set up", tone: "plain" });
+  });
+
+  it("a copy nobody opened is untested, and one that was opened is not", () => {
+    expect(line([plan("off-site"), copy("off-site")])).toMatchObject({
+      word: expect.stringContaining("restore untested"),
+      tone: "warn",
+    });
+    expect(line([plan("off-site"), copy("off-site"), restore()])).toMatchObject(
+      {
+        word: expect.stringContaining("restore tested"),
+        tone: "good",
+      },
+    );
+  });
+
+  it("never reads green over a copy that dies with the server", () => {
+    // A restore proves a copy can be opened. It does not move that copy off
+    // the machine, and one line must not let the two run together.
+    const said = line([plan("same-server"), copy("same-server"), restore()]);
+    expect(said.tone).toBe("warn");
+    expect(said.detail).toContain("beside the data");
   });
 });

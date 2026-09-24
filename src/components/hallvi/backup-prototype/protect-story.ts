@@ -1,12 +1,7 @@
-// What the Flow and Calendar designs draw, and nothing else.
+// What Storage and Backups read, and nothing else.
 //
-// The prototype's ProtectStory extends StackStory, which carries Processes
-// and Database too because one builder produced all four from the old
-// deployment model. Storage and Backups are separate questions with separate
-// records, so each gets its own projection and this is the list they share.
-//
-// ProtectStory still satisfies it structurally, so the isolated visual
-// reference keeps working untouched.
+// Storage and Backups are separate questions over the same subjects, so each
+// gets its own projection and this is the list of shapes they share.
 
 /** One thing that lives in a volume, and how (or whether) it is copied. */
 export interface Piece {
@@ -75,31 +70,4 @@ export interface ProtectView {
     restore: { at: string; detail: string } | null;
     keep: number | null;
   };
-}
-
-export interface ProtectProps {
-  story: ProtectView;
-  now: number;
-  head: import("react").ReactNode;
-  /** Work in progress on this destination, as the shell shows it. */
-  activity: import("react").ReactNode;
-  /** The server it all lives on. */
-  server: { label: string; city: string | null } | null;
-  /**
-   * Hallvi's own protection. It is not this application's data, but it is
-   * the same question — would this survive losing the machine — so it is one
-   * more row rather than a page of its own.
-   */
-  controller?: import("@/server/application-facts").ControllerProtectionFacts;
-  /** What that row needs the owner to know or do, drawn under the board. */
-  controllerBand?: import("react").ReactNode;
-  /**
-   * Whether this draws the page's summary and its primary action.
-   *
-   * False where something above it already answers "are we backed up" and
-   * offers the one thing to do about it. The board then keeps only what is
-   * its own: which days hold a copy, and which are unaccounted for.
-   */
-  lede?: boolean;
-  onAsk: (draft: string) => void;
 }

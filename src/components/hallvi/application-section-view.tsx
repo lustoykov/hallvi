@@ -240,6 +240,7 @@ export function ApplicationSectionView({
         applicationName={app.name}
         now={now}
         chrome={{ bar, header: null, activity: null }}
+        onOpenDestination={onOpenDestination}
         onAsk={(draft) => onAsk(null, draft)}
       />
     );

@@ -84,6 +84,35 @@
   text-transform: uppercase;
   line-height: 1.4;
 }
+/* One read-only line of a story another destination owns, and the way to
+   it. A line and not a card: a card would be a second telling. */
+.hv-rg-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  /* The top is the sheet's own offset under the page head, because on
+     Storage this line is what the head opens onto. */
+  margin: 8px 0 22px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: #fff;
+  box-shadow: var(--shadow-s);
+  font-size: 13px;
+}
+.hv-rg-line-detail {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.hv-rg-line .hv-rg-ask {
+  flex: none;
+  margin-left: auto;
+}
 /* -------------------------------------------------------------- controls */
 .hv-rg-chips {
   display: flex;

@@ -16,6 +16,7 @@ import { useState, type ReactNode } from "react";
 import type { Piece, Vol } from "./backup-prototype/protect-story";
 import {
   CLASS_MEANING,
+  inNewestCopy,
   type BackupCopy,
   type Protection,
   type ProtectionVerdict,
@@ -72,28 +73,22 @@ function sizeOf(volume: Vol | undefined) {
   return volume.sizeGb === null ? null : `${volume.sizeGb} GB`;
 }
 
-function inNewestCopy(protection: Protection, id: string) {
-  const { basis, missing } = protection.newestCopyCoverage;
-  // The missing list only compares presence-confirmed volumes. A volume
-  // merely mentioned by another record is outside that comparison.
-  if (
-    basis === "unrecorded" ||
-    !protection.requiredData.some((item) => item.id === id)
-  )
-    return {
-      held: null,
-      says: "The latest copy does not say whether it contains this.",
-    };
-  const missingItem = missing.some((item) => item.id === id);
+/** The shared coverage answer, in the words the stages use for it. */
+function heldSays(protection: Protection, id: string) {
+  const held = inNewestCopy(protection, id);
+  const restored = protection.newestCopyCoverage.basis === "restore";
   return {
-    held: !missingItem,
-    says: missingItem
-      ? basis === "restore"
-        ? "The restore did not bring this back."
-        : "The latest copy does not list this."
-      : basis === "restore"
-        ? "The restore brought this back."
-        : "The latest copy lists this.",
+    held,
+    says:
+      held === null
+        ? "The latest copy does not say whether it contains this."
+        : held
+          ? restored
+            ? "The restore brought this back."
+            : "The latest copy lists this."
+          : restored
+            ? "The restore did not bring this back."
+            : "The latest copy does not list this.",
   };
 }
 
@@ -128,7 +123,7 @@ function itemState(
               label: "Backup status not established",
               detail: "Hallvi has not established whether a plan covers this.",
             };
-  const held = inNewestCopy(protection, piece.volume);
+  const held = heldSays(protection, piece.volume);
   if (held.held === true)
     return { tone: "included", label: "In the latest copy", detail: held.says };
   if (held.held === false)
