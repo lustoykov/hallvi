@@ -124,6 +124,14 @@ and the public key in the program has to be replaced, which is itself a release.
 **Version.** Raise `version` in `package.json` in a pull request and merge it.
 That commit is what a release names. Merging it publishes nothing.
 
+The same pull request writes the release's notes at the top of
+[CHANGELOG.md](../CHANGELOG.md), as a `## <version> — <date>` section: a lead
+sentence and a bullet per change, in the words an owner would use. They are
+what an installation shows under **What's new**, from the `CHANGELOG.md` it
+shipped with, and the workflow drafts the release's GitHub notes from the same
+section with [`release-notes.mjs`](../scripts/release-notes.mjs). A version
+with no notes is refused before anything is built.
+
 ```
 0.1.0  →  0.1.1-alpha.1  →  0.1.1-alpha.2  …
 ```

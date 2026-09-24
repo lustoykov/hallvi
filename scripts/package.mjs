@@ -116,6 +116,8 @@ try {
   for (const path of [
     "package.json",
     "package-lock.json",
+    // What's new reads the notes this program shipped with.
+    "CHANGELOG.md",
     "next.config.ts",
     "scripts/serve.mjs",
     "scripts/migrate-account-connections.mjs",

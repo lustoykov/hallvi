@@ -285,7 +285,10 @@ export function ApplicationNavigation({
         <Link className="hv-navigation-settings" href={settingsHref}>
           <GearSix /> Settings
         </Link>
-        <ThisHallvi />
+        {/* What's new leads back to the same conversation Settings does. */}
+        <ThisHallvi
+          whatsNewHref={settingsHref.replace(/^[^?]*/, "/whats-new")}
+        />
       </div>
     </aside>
   );

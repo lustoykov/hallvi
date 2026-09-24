@@ -15,6 +15,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Beta precautions](beta-safety.md) | Practical risks and safeguards for the current alpha when granting server and repository access. |
 | [Development setup](development.md) | Run a checkout locally, open its paired dashboard and database viewer, inspect diagnostics and choose proportionate checks. |
 | [Publishing a release](releases.md) | The maintainer's side: the signed release manifest and what trusts it, the one secret the owner supplies, and the version → build → verify → publish → discover sequence. |
+| [Changelog](../CHANGELOG.md) | What changed in each release, newest first. Installations show it under What's new, and each release's GitHub notes come from it. |
 | [Beta walkthrough](beta-walkthrough.md) | Fresh-user acceptance: install the exact candidate, inspect a repository, connect a test server, use the app and return after restart. |
 | [Always-on concept](design/always-on-concept.md) | Where Hallvi itself runs, as a ladder the user climbs: their own Mac or Linux PC first, then a virtual machine they provide and reach through their own SSH connection, later a hosted service; the failure table behind each rung and the packaging decisions. The first two rungs are implemented. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
