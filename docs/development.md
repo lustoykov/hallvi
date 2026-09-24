@@ -7,23 +7,16 @@ To use Hallvi rather than develop it, install it as a background service:
 archive, and `npm start` runs the same production pair in the foreground against
 this checkout's `.hallvi` state. This guide is for development.
 
-Development runs locally on the owner's MacBook; the Mac mini is retired from development.
-Before creating or removing a branch, local runtime or cloud test resource,
-read [development resource ownership and cleanup](development-resources.md).
-Four applications are really deployed on a shared host, each with its
-conversation and data kept between tasks in a state directory of its own:
-the [development environment](development-environment.md). Look there
-before building a fixture, and read that document before changing one.
 Build in a worktree, which runs its own Hallvi with its own state and fixtures
-and shares only the account-level logins. When a change needs a real
-application, attach one — `node scripts/retained-application.mjs attach
-whoami` — and the worktree runs that application on its own port until it
-detaches; a second checkout is refused, and so is anything else that tries to
-open the directory. Never copy a connection between checkouts; the
-[development environment](development-environment.md#one-application-one-owner)
-says what is shared and what is not.
+and shares only the account-level logins; never copy a connection between
+checkouts. If you keep a [development environment](development-environment.md)
+— applications really deployed and kept between tasks — look there before
+building a fixture: `node scripts/retained-application.mjs attach <name>` runs
+that application in your worktree until it detaches, and a second checkout is
+refused. Clean up what a task creates as
+[development resources](development-resources.md) describes.
 
-Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, the account level — the ChatGPT login and model preferences, and the GitHub, Hetzner and Cloudflare connections — lives in `~/.config/hallvi/pi`, so every checkout and preview port on this machine reuses the same logins and none of them copies one (a copied GitHub login dies when either copy renews). Application databases, executions, SSH keys and secrets remain local to each controller. Set `HALLVI_PI_CONFIG_DIR` to choose another account directory. An explicit `HALLVI_CONFIG_DIR` isolates the account level too unless `HALLVI_PI_CONFIG_DIR` is also supplied, which is what keeps test fixtures apart. Disconnecting or changing anything at the account level affects every controller using that directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](integrations/github.md).
+Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, the account level — the ChatGPT login and model preferences, and the GitHub, Hetzner and Cloudflare connections — lives in `~/.config/hallvi/pi`, so every checkout and preview port on the machine reuses the same logins and none of them copies one (a copied GitHub login dies when either copy renews). Application databases, executions, SSH keys and secrets remain local to each controller. Set `HALLVI_PI_CONFIG_DIR` to choose another account directory. An explicit `HALLVI_CONFIG_DIR` isolates the account level too unless `HALLVI_PI_CONFIG_DIR` is also supplied, which is what keeps test fixtures apart. Disconnecting or changing anything at the account level affects every controller using that directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](integrations/github.md).
 
 On an installed controller's next start, legacy GitHub, Hetzner and Cloudflare
 connections move from its config directory into the selected account directory,
