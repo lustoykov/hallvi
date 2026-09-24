@@ -1,0 +1,160 @@
+/* Jobs. The table is the register's; these are the pieces it holds. */
+
+.jb {
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.jb > .hv-rg-panel {
+  max-width: 980px;
+}
+.jb-muted {
+  color: var(--muted);
+}
+.jb-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.jb-dot[data-bad],
+.jb-runs li[data-failed] .jb-dot {
+  background: var(--red);
+}
+.jb-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 22px;
+  font-weight: 560;
+}
+
+/* Recent runs: one tick each, oldest to newest. */
+.jb-ticks {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+.jb-ticks i {
+  width: 4px;
+  height: 12px;
+  border-radius: 2px;
+  background: #9fdcc0;
+}
+.jb-ticks i[data-last] {
+  height: 16px;
+  background: var(--green);
+}
+.jb-ticks i[data-failed] {
+  background: var(--red);
+}
+.jb-last {
+  white-space: nowrap;
+}
+.jb-last[data-failed] {
+  color: var(--red);
+}
+
+/* An opened row: the command, then the cron line beside the runs. */
+.jb-command {
+  display: block;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.jb-split {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.jb-split .hv-rg-facts {
+  grid-template-columns: 1fr;
+}
+.jb-runs {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+.jb-runs li {
+  display: grid;
+  grid-template-columns: 7px 150px auto;
+  align-items: center;
+  gap: 10px;
+}
+.jb-runs li[data-failed] > span:last-child {
+  color: var(--red);
+}
+
+/* Hallvi's own recurring work: a link to the page that owns it. */
+.jb-theirs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  max-width: 980px;
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-2);
+  font-size: 12.5px;
+}
+.jb-theirs-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  font: inherit;
+  cursor: pointer;
+}
+.jb-theirs-item:hover {
+  border-color: #c2cde0;
+  color: var(--ink);
+}
+.jb-theirs-item svg {
+  width: 10px;
+  height: 10px;
+  color: var(--muted);
+}
+
+.jb-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 8px 0;
+}
+.jb-empty p {
+  margin: 0;
+  color: var(--ink-2);
+}
+.jb-button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.jb-button:hover {
+  border-color: #c2cde0;
+  color: var(--ink);
+}

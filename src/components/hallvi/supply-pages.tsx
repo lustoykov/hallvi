@@ -20,11 +20,10 @@ import { supplyFromRecords } from "./supply-records";
 import { ManifestDirection } from "./supply-prototype/manifest";
 import { OriginDirection } from "./supply-prototype/origin";
 import { QueueDirection } from "./supply-prototype/queue";
-import { RotaDirection } from "./supply-prototype/rota";
+import { JobsPage } from "./jobs-page";
 import "./supply-prototype/manifest.css";
 import "./supply-prototype/origin.css";
 import "./supply-prototype/queue.css";
-import "./supply-prototype/rota.css";
 import { EmptySketch } from "./empty-sketch";
 
 const titles: Record<SupplyPage, string> = {
@@ -116,7 +115,15 @@ export function SupplyPageView({
   return (
     <div className="ax-root" data-variant={page}>
       {page === "cache" && <QueueDirection {...props} />}
-      {page === "jobs" && <RotaDirection {...props} />}
+      {page === "jobs" && (
+        <JobsPage
+          story={story}
+          now={now}
+          head={head}
+          onAsk={onAsk}
+          onOpenDestination={onOpenDestination}
+        />
+      )}
       {page === "variables" && <ManifestDirection {...props} />}
       {page === "cdn" && <OriginDirection {...props} />}
     </div>

@@ -530,6 +530,13 @@ table around the visual it already had. It lives in `register.tsx` and
   also the newest row, open on its commands as they run. How releases arrive
   (automatic or on request, the branch, the watch) sits under the table, and
   its form preselects automatic on the default branch without saving it.
+- **Jobs is a register too.** Chosen 24 September 2026 over a week chart and
+  per-job cards. One line says how the jobs are doing ("sitemap failed its
+  last run"); the table carries the schedule in words under the job's name,
+  its recent runs as ticks, the last run and the recorded next one. A job whose
+  last run failed opens itself onto its command, cron line and runs. Hallvi's
+  own recurring work is one link underneath to the page that owns it
+  ("Hallvi also runs Backups every day at 03:00 →"), never a second column.
 - **Rows open in place.** What a row has to say sits directly under it, in one
   column. Nothing opens beside the table: a side panel sends the eye away from
   the row that was clicked. The questions worth taking to the conversation
