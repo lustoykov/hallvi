@@ -130,7 +130,7 @@ enforced rather than agreed, and they stay that way:
   together, as above.
 - **The applications are registered as retained.** The server, its firewall,
   its key and its addresses carry `sg-lifecycle=persistent` and
-  `sg-cleanup=retain` with no expiry, so the daily cleanup leaves them alone.
+  `sg-cleanup=retain` with no expiry, so no cleanup removes them.
   See [development resources](development-resources.md).
 
 State ownership isolates Hallvi's records, not the host. All four applications
@@ -307,8 +307,7 @@ from, not working controllers.
 
 Registered as **persistent**, cleanup **retain**, in the canonical development
 inventory that [development resources](development-resources.md) describes. It
-does not inherit the 72-hour disposable lease, and the daily Dev Cleanup task
-leaves it alone. Retiring it is a deliberate act with its own evidence, not
+does not inherit the 72-hour disposable lease, and no cleanup removes it. Retiring it is a deliberate act with its own evidence, not
 something an expiry does.
 
 "Persistent" means retained until somebody retires it deliberately — not
