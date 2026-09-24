@@ -25,7 +25,7 @@ test(
       page.getByRole("list", { name: "How Hallvi works" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "What do you want to run?" }),
+      page.getByRole("textbox", { name: "GitHub repository" }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Add application", exact: true }),
