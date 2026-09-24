@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   byExposure,
   exposure,
+  frontDoor,
   reachFromRecords,
   visitorsOf,
 } from "@/components/hallvi/reach-records";
@@ -1054,5 +1055,25 @@ describe("what the Access page puts in order", () => {
         .map((item) => item.id)
         .sort(),
     ).toEqual(["access", "domain"]);
+  });
+
+  // An application that opens both 80 and 443 used to draw "Port 80" under a
+  // window showing an https address, which sends the reader to the wrong
+  // door. The path takes the port the address itself uses.
+  it("puts the door the published address arrives on at the front of the path", () => {
+    const story = read([
+      published(),
+      door("http", "80/tcp", "Internet", [check("open", "passed")]),
+      door("https", "443/tcp", "Internet", [check("open", "passed")]),
+    ]);
+    expect(frontDoor(story.doors, story.address)?.port).toBe("443/tcp");
+    // Nothing matching the address leaves the door that answered in front.
+    expect(
+      frontDoor(
+        read([door("http", "80/tcp", "Internet", [check("open", "passed")])])
+          .doors,
+        "https://shop.example.com",
+      )?.port,
+    ).toBe("80/tcp");
   });
 });

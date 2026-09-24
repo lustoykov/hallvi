@@ -554,7 +554,15 @@ on the `reach-records.ts` projection, with its own classes prefixed `hv-ac-`.
   under.
 - **The path is lit only where a check saw it work.** The internet, the name,
   the port, the application. A green dot is a reading, and the line between
-  two nodes is grey until one exists.
+  two nodes is grey until one exists. The port it names is the one the
+  published address arrives on, so the path and the window above it agree.
+- **Publishing is the one thing the page offers to change**, in whichever of
+  its three states the records put it (`publishOffer`): publish at a name,
+  finish publishing one, or make it private again. Each drafts the request in
+  the conversation rather than opening a form, because there are decisions in
+  it. It is a quiet control beside the Open link, except on an application no
+  name reaches, where the invitation is what the board is for and leads under
+  the window.
 
 ### Buttons and fields
 

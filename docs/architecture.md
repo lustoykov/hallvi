@@ -287,10 +287,10 @@ The records are the existing vocabulary: a `domain` subject whose `configured`,
 `application-access` record updated in place to `mode: "public"`. The contract
 refuses a public access record that still carries tunnel ports or a loopback
 address, and refuses any record that says a subject is absent and then carries a
-passing check about it. Access reads all of it on one page, and a published
-address is asked whether it answers rather than assumed open because it is
-public. Publishing a name, finishing a half-published one and withdrawing it
-are asked for in the conversation; no page offers them as buttons.
+passing check about it. Access reads all of it on one page, offers the work in
+whichever of its three states the records establish — publish, finish
+publishing, or make it private again — and asks a published address whether it
+answers rather than assuming it is open because it is public.
 
 Automatic renewal is verified as configuration plus persistent certificate
 storage. An issued certificate is not a renewed one, and nothing in this path

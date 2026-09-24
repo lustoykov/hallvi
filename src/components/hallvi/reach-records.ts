@@ -301,6 +301,71 @@ function portOf(fact: (key: string) => string | null) {
   return local ?? remote ?? null;
 }
 
+/**
+ * The door a visitor actually arrives on, for the path.
+ *
+ * The one whose port is the port of the published address, because that is
+ * the door the window above the path is showing. Falling straight to the
+ * first internet-facing door on record drew "Port 80" over an https address
+ * on an application that opens both, which sends the reader to the wrong
+ * door. Where nothing matches, the door that answered wins, then the first
+ * one on record.
+ */
+export function frontDoor(doors: Door[], address: string | null) {
+  const facing = doors.filter((door) => door.reach === "internet");
+  const wanted = urlPort(address);
+  return (
+    (wanted ? facing.find((door) => door.port === wanted) : undefined) ??
+    facing.find((door) => door.established === "answered") ??
+    facing[0] ??
+    null
+  );
+}
+
+/**
+ * What Access offers to do about a name, which is three different offers and
+ * never one.
+ *
+ * A name nobody has connected is an invitation. A name that is on record and
+ * not yet serving the application is unfinished work, and offering to
+ * "publish" it again reads as starting over. A name that serves is something
+ * the owner may want to take back. Each draft is a sentence they can send as
+ * it stands or finish typing; none of them invents a hostname.
+ */
+export function publishOffer(story: {
+  name: string;
+  domain: DomainState | null;
+}): { label: string; primary: boolean; draft: string } {
+  const domain = story.domain;
+  if (!domain)
+    return {
+      label: "Publish at a domain…",
+      // The only invitation on the page, so the only emphatic thing on it.
+      primary: true,
+      draft: `Publish ${story.name} at my own domain name. The hostname is: `,
+    };
+  if (domain.state === "serving")
+    return {
+      label: "Make it private again",
+      primary: false,
+      draft: `Make ${story.name} private again: withdraw ${domain.name} and the public access you set up for it, leave SSH and anything you did not create alone, and give me back a private way in.`,
+    };
+  // A name that answered, a while ago, is published. What is old is the
+  // evidence, and the work to offer is looking again — never finishing a
+  // job that was finished, which is what "Finish publishing it" claims.
+  if (domain.lastServedAt)
+    return {
+      label: "Check it from outside",
+      primary: false,
+      draft: `${domain.name} answered when it was last checked, and that reading has aged. Ask for it from outside again and tell me what ${story.name} returns now.`,
+    };
+  return {
+    label: "Finish publishing it",
+    primary: false,
+    draft: `${domain.name} is not serving ${story.name} yet. Find out which part is incomplete, finish publishing it, and check it from outside.`,
+  };
+}
+
 export function reachFromRecords({
   records,
   applicationId,

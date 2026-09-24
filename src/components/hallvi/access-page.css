@@ -8,6 +8,22 @@
   margin-bottom: 16px;
 }
 
+/* Publishing, where no name reaches the application: one sentence and the
+   offer, under what a visitor gets today. */
+.hv-ac-offer {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin-top: 16px;
+}
+.hv-ac-offer p {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
 .hv-ac-nothing {
   margin: 0;
   padding: 18px 20px;

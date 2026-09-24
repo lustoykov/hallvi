@@ -25,8 +25,10 @@ import {
   basisOf,
   byExposure,
   exposure,
+  frontDoor,
   hostOf,
   probed,
+  publishOffer,
   reachFromRecords,
   visitorsOf,
   type Caller,
@@ -344,17 +346,35 @@ export function AccessPage({
 
   const visitors = visitorsOf(story.callers);
   const doors = [...ways].sort(byExposure);
-  const facing = ways.filter((door) => door.reach === "internet");
-  const front =
-    facing.find((door) => door.established === "answered") ?? facing[0] ?? null;
+  const front = frontDoor(ways, story.address);
   const address =
     story.domain?.name ?? (answering[0] ? hostOf(answering[0].typed) : null);
+
+  // Publishing is the one thing this board can offer to change, and it drafts
+  // the request rather than starting a form: there are decisions in it, and
+  // the decisions belong in the conversation. It sits quietly beside the Open
+  // link, except on an application no name reaches, where it is what the
+  // board is for.
+  const offer = publishOffer(story);
+  const unpublished = !published && !story.domain;
 
   return (
     <div className="ax-root" data-variant="access">
       {head}
       <div className="hv-rg-sheet hv-ac">
-        <Board title="What a visitor sees" tools={open}>
+        <Board
+          title="What a visitor sees"
+          tools={
+            <>
+              {!unpublished && (
+                <Ask onAsk={onAsk} prompt={offer.draft}>
+                  {offer.label}
+                </Ask>
+              )}
+              {open}
+            </>
+          }
+        >
           {visitors.length ? (
             <div className="hv-ac-visits">
               {visitors.map((caller) => (
@@ -367,6 +387,21 @@ export function AccessPage({
                 ? "Hallvi tested every address on record, and none answered."
                 : "Hallvi hasn't tested any address yet."}
             </p>
+          )}
+          {unpublished && (
+            <div className="hv-ac-offer">
+              <p>
+                Only this computer reaches {applicationName}. Hallvi can publish
+                it at a name you own.
+              </p>
+              <button
+                type="button"
+                className="hv-primary-button"
+                onClick={() => onAsk(offer.draft)}
+              >
+                {offer.label}
+              </button>
+            </div>
           )}
         </Board>
 
