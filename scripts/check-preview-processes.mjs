@@ -54,6 +54,8 @@ const rows = run("ps", ["-axww", "-o", "pid=,ppid=,command="])
       : [];
   });
 const parents = new Map(rows.map(({ pid, parent }) => [pid, parent]));
+// Skip this check's own ancestors: an agent's shell carries its whole command
+// text, which may name a preview.
 const caller = new Set();
 for (
   let pid = String(process.pid);

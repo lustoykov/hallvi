@@ -47,9 +47,11 @@ requests. Preserve dirty work, unique data, credentials, retained evidence and
 uncertain resources. Never broadly prune Docker volumes. Worktrees go when
 their session is archived, not by hand.
 
-If you start a local preview, stop it when its review ends and run
-`node scripts/check-preview-processes.mjs` before the task handoff. Preserve
-intentional tunnels and retained services.
+Leave the preview the owner will review running and give its link in the
+handoff. Stop it by PID when that review ends, at the latest once the work
+merges, then run `node scripts/check-preview-processes.mjs`. Preserve
+intentional tunnels and retained services. See
+[local preview processes](docs/development-resources.md#local-preview-processes).
 
 ## Changes and checks
 

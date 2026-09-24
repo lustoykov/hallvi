@@ -173,12 +173,13 @@ removes its worktree, which is not proof that a cloud resource is unused.
 
 ### Local preview processes
 
-Run task previews in a foreground terminal. If a preview must run in the
-background, record its PID and port with the task so it can be stopped later.
-When the review ends, stop the exact preview processes the task started with
-`SIGTERM`, then run `node scripts/check-preview-processes.mjs` in that checkout
-to find any remaining Next.js or local preview processes. Confirm that their
-ports closed. This is part of finishing the task.
+Record the PID and port of every preview a task starts. Stop previews used
+only for your own checks before the handoff. Leave the preview the owner will
+review running and put its link in the handoff; stop it when the owner's review
+ends, and at the latest in the check [after your work merges](#after-your-work-merges).
+Stop the exact processes the task started with `SIGTERM`, run
+`node scripts/check-preview-processes.mjs` in that checkout to find any
+remaining Next.js or local preview processes, and confirm their ports closed.
 
 The check reports PIDs without stopping anything or printing command arguments.
 Match each PID to its owner, command and listening port before stopping it.
