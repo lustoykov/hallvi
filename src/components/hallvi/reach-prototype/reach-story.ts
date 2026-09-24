@@ -51,7 +51,12 @@ export interface Caller {
   from: string;
   typed: string;
   outcome: "loads" | "refused" | "no-name" | "insecure" | "no-answer";
-  secure: boolean;
+  /**
+   * Whether the way in is encrypted: true when it is, false when a check
+   * found it is not, null when nothing has checked. "Plain HTTP" is a claim,
+   * and a missing or aged certificate reading does not make it.
+   */
+  secure: boolean | null;
   headline: string;
   detail: string;
   /** Whether we watched it, only asked, or know it is not there. */
