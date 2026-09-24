@@ -52,8 +52,7 @@ export function WhatsNewScreen({
               aria-labelledby={`release-${release.version}`}
             >
               <h2 id={`release-${release.version}`}>
-                {release.version}{" "}
-                {release.date && <span>{release.date}</span>}
+                {release.version} {release.date && <span>{release.date}</span>}
               </h2>
               <div className={w.notes}>
                 <Markdown source={release.notes} />
