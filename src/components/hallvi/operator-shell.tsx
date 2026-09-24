@@ -26,7 +26,7 @@ import { ApplicationSectionView } from "./application-section-view";
 import {
   hiddenSections,
   sectionFromHash,
-  recordedSections,
+  standings,
   visibleSections,
   type ApplicationSection,
 } from "./application-sections";
@@ -348,9 +348,9 @@ export function OperatorShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.information, view.chats, application?.name]);
 
-  const recordedHere = useMemo(
+  const listedHere = useMemo(
     () =>
-      recordedSections(
+      standings(
         view.information ?? [],
         (view.secrets ?? []).some((secret) => !secret.establishedAt),
       ),
@@ -899,8 +899,8 @@ export function OperatorShell({
             onChat={selectChat}
             onCreate={createChat}
             onArchive={archiveChat}
-            sections={visibleSections(activeSection, recordedHere)}
-            hidden={hiddenSections(activeSection, recordedHere)}
+            sections={visibleSections(activeSection, listedHere)}
+            hidden={hiddenSections(activeSection, listedHere)}
             revealed={stackRevealed}
             onReveal={setStackRevealed}
           />

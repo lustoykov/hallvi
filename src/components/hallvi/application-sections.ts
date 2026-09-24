@@ -16,12 +16,15 @@ import {
   SlidersHorizontal,
 } from "@phosphor-icons/react";
 import type { SavedInformation } from "@/server/operator-data";
+import {
+  presenceOf,
+  subjectsOfKind,
+  type SubjectKindOf,
+} from "@/server/record-projection";
 
 /**
- * The stable destinations. The application group is always there; the
- * stack group shows only the resources this application's deployment
- * records, so a simple application never carries empty infrastructure
- * controls; the care group covers protection and delivery.
+ * The stable destinations, in the order the sidebar draws them, so a simple
+ * application never carries empty infrastructure controls.
  *
  * The activity group is History and command output, and it is drawn apart
  * from the rest: they are the record of what has been done, not parts of the
@@ -29,8 +32,8 @@ import type { SavedInformation } from "@/server/operator-data";
  * things needing attention. The sidebar closes them into one heading and
  * opens it again whenever a link lands on either.
  *
- * `hideable` says a destination drops under "Show more" until something
- * records it. `available` says whether any backend can record it today.
+ * Which of them a given application lists is decided by its records rather
+ * than by a flag here; see `standings` below.
  */
 export const applicationSections = [
   {
@@ -62,40 +65,30 @@ export const applicationSections = [
     label: "Processes",
     icon: Cpu,
     group: "stack",
-    hideable: true,
-    available: true,
   },
   {
     id: "database",
     label: "Database",
     icon: Database,
     group: "stack",
-    hideable: true,
-    available: true,
   },
   {
     id: "cache",
     label: "Cache & queue",
     icon: Lightning,
     group: "stack",
-    hideable: true,
-    available: true,
   },
   {
     id: "jobs",
     label: "Jobs",
     icon: CalendarCheck,
     group: "stack",
-    hideable: true,
-    available: true,
   },
   {
     id: "storage",
     label: "Storage",
     icon: HardDrive,
     group: "stack",
-    hideable: true,
-    available: true,
   },
   { id: "backups", label: "Backups", icon: Archive, group: "care" },
   {
@@ -118,20 +111,14 @@ export const applicationSections = [
     label: "CDN",
     icon: StackSimple,
     group: "care",
-    hideable: true,
-    available: true,
   },
+  // Listed once a variable or a pending request names one: the page is where
+  // a value Pi asked for goes.
   {
     id: "variables",
     label: "Environment Variables",
     icon: SlidersHorizontal,
     group: "care",
-    // Gated like the rest: it appears once a variable or a pending request
-    // names one. It has to be `hideable` to say so, because a gated section
-    // without it is dropped by both lists and the destination simply
-    // disappears rather than waiting under "Show more".
-    hideable: true,
-    available: true,
   },
 ] as const;
 export type ApplicationSection = (typeof applicationSections)[number]["id"];
@@ -142,114 +129,173 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
 }
 
 /**
- * What the records establish, plus whether anything has been deployed at all.
+ * What a destination has to show, in four answers that must never collapse
+ * into one word:
  *
- * A destination lights up when a record *speaks for* one of its subjects. The
- * map alone is not enough for most of them: it draws shapes, and a shape is
- * not a thing that exists. Processes and Storage are the exception, because a
- * planned map is worth navigating to before anything runs — and both pages
- * say plainly that nothing has been looked at yet.
+ *   recorded    a record gives the page content.
+ *   unchecked   nobody has looked. Silence.
+ *   absent      somebody looked and there is none. A fact.
+ *   not-set-up  nothing was arranged, and arranging it is a decision.
  *
- * `deployed` is not a destination. It is what tells a row hidden because
- * nothing names it apart from one hidden because nothing has happened yet.
+ * A destination is carried by a record that says its subject is **present**.
+ * An absent one is an answer of its own and belongs under "Show more", not in
+ * the list: whoami's one volume record says it has no persistent application
+ * data, and a sidebar that read that as "Storage" put a storage page on a
+ * stateless container, off the very record that says there is none.
+ *
+ * The map is not enough either. It draws shapes, and a shape is not a thing
+ * that exists.
  */
-export type Recorded = Partial<Record<ApplicationSection, boolean>> & {
-  deployed?: boolean;
+export type Standing = "recorded" | "absent" | "unchecked" | "not-set-up";
+
+/** The subjects that speak for each destination whose listing is earned. */
+const speaks: Partial<Record<ApplicationSection, string[]>> = {
+  processes: ["process"],
+  storage: ["volume"],
+  database: ["database"],
+  cache: ["cache", "queue"],
+  jobs: ["job"],
+  variables: ["variable"],
+  access: ["door", "access", "firewall", "domain", "certificate"],
+  backups: ["backup-plan", "backup-copy", "restore-test"],
+  monitoring: ["monitor"],
+  cdn: ["cdn"],
 };
 
-export function recordedSections(
+/** The pages whose emptiness is a decision, not a gap in looking. */
+const arranged = new Set<ApplicationSection>(["backups", "monitoring", "cdn"]);
+
+/**
+ * Pages that exist for every application, whatever it runs: the three that
+ * describe it, and the two that record what has been done to it.
+ */
+const always = new Set<ApplicationSection>([
+  "overview",
+  "architecture",
+  "deployment",
+  "history",
+  "logs",
+]);
+
+/**
+ * Access is listed whatever the records say, because its unknowns are the
+ * point. A page that appears only once a firewall has been read is a page
+ * that hides the fact that nobody read one.
+ */
+const NEVER_HIDDEN: ApplicationSection = "access";
+
+/**
+ * Each subject of these kinds, as it stands now.
+ *
+ * One subject at a time, through the same projection the pages read. Asking
+ * whether *any* record says "present" answers with a record a later one
+ * contradicted: a volume that was there on Thursday and removed on Friday
+ * kept Storage and Backups listed while the Storage page, reading the newer
+ * record, said it was gone.
+ */
+function presentSubjects(
+  records: SavedInformation[],
+  kinds: readonly string[],
+) {
+  const live = records.filter((record) => !record.retiredAt);
+  return kinds
+    .flatMap((kind) => subjectsOfKind(live, kind as SubjectKindOf))
+    .map((ref) => presenceOf(live, ref));
+}
+
+/**
+ * Whether anything on record holds data this application would lose.
+ *
+ * Backups is listed from this rather than from a copy existing, because the
+ * page is about what there is to lose and the moment there is something is
+ * the moment it is worth reading. An application with documents and no copy
+ * is exactly the case that must not be quiet.
+ */
+const holdsData = (records: SavedInformation[]) =>
+  presentSubjects(records, ["volume", "database"]).some(
+    (subject) => subject.known && subject.presence === "present",
+  );
+
+export function standingOf(
+  section: ApplicationSectionDefinition,
+  records: SavedInformation[],
+  waiting = false,
+): Standing {
+  if (always.has(section.id)) return "recorded";
+  if (section.id === "backups" && holdsData(records)) return "recorded";
+  // A value Pi has asked the owner for and not been given is content for
+  // Environment Variables: the page is where the answer goes.
+  if (section.id === "variables" && waiting) return "recorded";
+  const kinds = speaks[section.id];
+  if (!kinds) return "recorded";
+  const mine = presentSubjects(records, kinds);
+  if (mine.some((subject) => subject.known && subject.presence === "present"))
+    return "recorded";
+  // Somebody looked and said there is none. That is an answer, and it is not
+  // the same answer as silence.
+  if (mine.length) return "absent";
+  return arranged.has(section.id) ? "not-set-up" : "unchecked";
+}
+
+/** The words a row wears when it is not carrying content. */
+export function wordsFor(standing: Standing) {
+  if (standing === "absent") return "checked · none here";
+  if (standing === "not-set-up") return "not set up";
+  return "not checked";
+}
+
+export interface SectionStanding {
+  section: ApplicationSectionDefinition;
+  standing: Standing;
+}
+
+/** Every destination with what is known about it, in the sidebar's order. */
+export function standings(
   records: SavedInformation[],
   /** Whether Pi has asked the owner for a value it has not been given. */
   waiting = false,
-): Recorded {
-  const live = records.filter((record) => !record.retiredAt);
-  const states = (...kinds: string[]) =>
-    live.some((record) =>
-      kinds.includes(record.presentation?.states?.ref.kind ?? ""),
-    );
-  const map = live
-    .map((record) => record.presentation?.content)
-    .find((content) => content?.kind === "topology");
-  const parts = map?.kind === "topology" ? map.parts : [];
-  const has = (...kinds: string[]) =>
-    parts.some((part) => kinds.includes(part.kind));
-  const secrets = live.some(
-    (record) => record.presentation?.states?.ref.kind === "variable",
-  );
-  return {
-    processes: states("process") || has("web", "private"),
-    storage: states("volume") || has("volume"),
-    database: states("database"),
-    cache: states("cache", "queue"),
-    jobs: states("job"),
-    // Configuration is worth a destination the moment anything names one,
-    // including a value Pi has asked the owner for and not yet been given.
-    variables: secrets || waiting,
-    cdn: states("cdn"),
-    deployed: live.some(
-      (record) => record.presentation?.content?.kind === "deployment",
-    ),
-    // Access, Backups and Monitoring are always listed: "nothing is
-    // watching", "nothing has been established about copies" and "nobody has
-    // checked what can reach in" are the answers a reader most needs, and a
-    // destination that hides them says the opposite.
-  };
+): SectionStanding[] {
+  return applicationSections.map((section) => ({
+    section,
+    standing: standingOf(section, records, waiting),
+  }));
 }
+
+const listed = (active: ApplicationSection | null) => (row: SectionStanding) =>
+  row.standing === "recorded" ||
+  row.section.id === NEVER_HIDDEN ||
+  row.section.id === active;
+
+/** A destination as the sidebar draws it: the row, and why it is quiet. */
+export type ListedSection = ApplicationSectionDefinition & { note?: string };
+
+const withNote = (row: SectionStanding): ListedSection => ({
+  ...row.section,
+  note: row.standing === "recorded" ? undefined : wordsFor(row.standing),
+});
 
 /**
- * Whether a destination has anything recorded to show.
- *
- * Only the records answer this now. There used to be a second answer behind
- * them, read off a deployment model the product stopped writing to, and a
- * fallback that can only ever say "nothing" is worse than no fallback: it
- * reads like an answer.
+ * The destinations to list: the ones a record gives content, Access, and
+ * whichever one is open. A listed page with nothing to show still says so.
  */
-export function sectionRecorded(
-  section: ApplicationSection,
-  recorded: Recorded = {},
-) {
-  return recorded[section] ?? true;
-}
-
-/** The destinations to list: every recorded one, plus the one being viewed. */
 export function visibleSections(
   active: ApplicationSection | null,
-  recorded: Recorded = {},
-) {
-  return applicationSections.filter(
-    (section) => section.id === active || sectionRecorded(section.id, recorded),
-  );
+  rows: SectionStanding[],
+): ListedSection[] {
+  return rows.filter(listed(active)).map(withNote);
 }
 
 /**
- * The destinations this application does not show, with the reason each row
- * carries once revealed: the application does not use it, nothing can record
- * it yet, or it is known only after the first deployment.
+ * The rest, one press away under "Show more", each carrying the reason it is
+ * not listed. A page that is not listed is never gone.
  */
 export function hiddenSections(
   active: ApplicationSection | null,
-  recorded: Recorded = {},
-) {
-  return applicationSections
-    .filter(
-      (section) =>
-        "hideable" in section &&
-        section.hideable &&
-        section.id !== active &&
-        !sectionRecorded(section.id, recorded),
-    )
-    .map((section) => ({
-      ...section,
-      note: !("available" in section && section.available)
-        ? "nothing can record this yet"
-        : recorded.deployed
-          ? // Deployed, and still nothing names one. "Not used" would be a
-            // claim; "after deployment" was simply wrong, because the
-            // deployment has happened. Said the same way Overview says it,
-            // so the two surfaces describe one state in one phrase.
-            "not checked yet"
-          : "after deployment",
-    }));
+  rows: SectionStanding[],
+): (ApplicationSectionDefinition & { note: string })[] {
+  return rows
+    .filter((row) => !listed(active)(row))
+    .map((row) => ({ ...row.section, note: wordsFor(row.standing) }));
 }
 
 /**

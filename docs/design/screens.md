@@ -4,7 +4,7 @@ The [component design reference](../../src/components/hallvi/DESIGN.md) owns typ
 
 ## Redesign interaction principles
 
-[Operator design](../operator-design.md) owns the new interaction and data direction. Preserve the existing sidebar as the starting structure: it guides users on what deserves care. Pi decides how. View interiors and interactions may change while proving the main deployment journey; detailed capabilities for each view are decided afterward.
+[Operator design](../operator-design.md) owns the new interaction and data direction. The sidebar keeps its guiding purpose: it says what deserves care, and Pi decides how. What it lists grows with the application — a destination appears when a record gives it content, Access is always listed because its unknowns are the point, and the rest wait under "Show more" with the reason on the row. The [component design](../../src/components/hallvi/DESIGN.md#the-sidebar-grows-with-the-application) owns that rule. View interiors and interactions may change while proving the main deployment journey; detailed capabilities for each view are decided afterward.
 
 One main conversation owns operational work. Queue and steer use native Pi capabilities; read-only side conversations let users discuss work without starting another writer. Permission handling is independent of deployment or backup workflows.
 

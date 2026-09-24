@@ -569,6 +569,41 @@ table around the visual it already had. It lives in `register.tsx` and
   projection, and coverage is answered in one place (`inNewestCopy` in
   `backups-records.ts`), so the pages cannot disagree.
 
+### The sidebar grows with the application
+
+Decided 24 September 2026, from a four-direction exploration. The list used to
+be the same fourteen rows whatever the application was, so a stateless
+container advertised a storage page and a backups page about nothing.
+
+- **A page is listed when a record gives it content.** Content means a subject
+  whose *current* state is present, read one subject at a time through
+  `presenceOf`, the same projection the pages read. A subject that a later
+  record says is gone does not light the page, and neither does a record
+  saying there is none: whoami's one volume record exists to say it keeps
+  nothing. The map does not count either — it draws shapes, and a shape is
+  not a thing that exists.
+- **Access is always listed**, because its unknowns are the point. A page that
+  appears only once a firewall has been read is a page that hides the fact
+  that nobody read one. Overview, Architecture, Deployment, History and
+  Command output are always listed too: they describe every application, or
+  record what was done to it.
+- **Backups is listed as soon as anything on record holds data**, a volume or
+  a database, rather than once a copy exists. The page is about what there is
+  to lose, and an application with documents and no copy is exactly the one
+  that must not be quiet. A stateless container whose volume record says it
+  keeps nothing reads "not set up" under Show more. See [proportionate
+  care](../../../docs/operator-design.md#proportionate-care).
+- **Everything else waits under "Show more" with a quiet reason**, and the
+  reasons are kept apart: "not checked" is silence, "checked · none here" is
+  an established absence, and "not set up" is a decision nobody has made. A
+  page that is not listed is one press away and never gone.
+- **A listed page with nothing to show says so on its row.** Access on a fresh
+  application reads "not checked" under its name, in the same small muted type
+  the hidden rows use.
+
+`application-sections.ts` owns the rule (`standings`, `visibleSections`,
+`hiddenSections`); `application-navigation.tsx` draws it.
+
 ### Access
 
 Decided 24 September 2026, from a five-direction exploration the owner narrowed
