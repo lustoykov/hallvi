@@ -1,6 +1,6 @@
 {
   "name": "hallvi",
-  "version": "0.1.1-alpha.4",
+  "version": "0.1.1-alpha.5",
   "private": true,
   "scripts": {
     "db:upgrade": "node scripts/migrate-state.mjs --apply",
