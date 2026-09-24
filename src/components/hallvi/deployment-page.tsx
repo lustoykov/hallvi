@@ -3,7 +3,7 @@
 // Deployment, on real records and real executions.
 //
 // The selected design (the register): one inventory of releases, newest
-// first, with what is serving stated in the strip above it and the commands
+// first, with what is serving stated in one line above it and the commands
 // that produced each release, beside what they printed, inside its row.
 //
 // The Transit story that used to sit under the list is gone. It told the
@@ -26,7 +26,6 @@ import { DeploymentSource } from "./deployment-source";
 import { releasesFromRecords } from "./release-records";
 import { ReleasesPanel } from "./releases-panel";
 import { EmptySketch } from "./empty-sketch";
-import { Lede } from "./register";
 
 export function DeploymentPage({
   records,
@@ -114,6 +113,9 @@ export function DeploymentPage({
     </div>
   );
 
+  const last = source?.deployment.attempts[0];
+  const deploying = last?.outcome === "running" ? last : null;
+
   const releases = useMemo(() => releasesFromRecords(records, ""), [records]);
   const hasReleases = releases.all.length > 0;
 
@@ -133,20 +135,6 @@ export function DeploymentPage({
           reachable={reachable}
           onReopen={onReopen}
         />
-        {hasReleases && (
-          <Lede
-            holds={`${releases.all.length} ${releases.all.length === 1 ? "release" : "releases"} on record`}
-          >
-            Every release Hallvi has recorded for this application, newest
-            first, with the commands that produced it.
-          </Lede>
-        )}
-        {/* Where releases come from, above what is running. Before the first
-            release it appears only once the owner has chosen, so an empty
-            page stays one sentence and one button. */}
-        {source && (hasReleases || source.deployment.mode) && (
-          <DeploymentSource {...source} now={now} />
-        )}
         {hasReleases ? (
           <ReleasesPanel
             view={releases}
@@ -157,6 +145,8 @@ export function DeploymentPage({
             onReopen={onReopen}
             onAsk={onAsk}
             onOpenDestination={onOpenDestination}
+            deploying={deploying}
+            onFollow={source?.onOpenConversation}
           />
         ) : (
           nothing
@@ -165,6 +155,13 @@ export function DeploymentPage({
             running is a row in the list; this is the conversation's own view
             of what it is doing right now. */}
         {waiting && chrome.activity}
+        {/* How it deploys, under what it deployed. It is a setting, read
+            and changed now and then; what is running is what the page is
+            for. Before the first release it appears only once the owner has
+            chosen, so an empty page stays one sentence and one button. */}
+        {source && (hasReleases || source.deployment.mode) && (
+          <DeploymentSource {...source} now={now} />
+        )}
         {hasReleases && panel}
       </section>
     </div>

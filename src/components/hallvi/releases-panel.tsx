@@ -3,14 +3,15 @@
 // What is running, and every release since.
 //
 // The selected design (the register). An application's life is its releases,
-// so the page is one inventory of them, newest first: a strip that says what
+// so the page is one inventory of them, newest first: one line that says what
 // is serving now, and a table whose rows open onto the commands that produced
 // each release and what those commands printed.
 //
 // One list, not two. The release that is serving is a row in it, marked, and
-// the strip above is the only place the page states what is true now. Those
-// are different questions whenever the newest release is not the one running,
-// and the strip keeps them as two figures rather than one sentence.
+// the line above is the only place the page states what is true now. It was a
+// strip of four figures, and they said the same release three times over; a
+// second line appears only when the newest attempt is not what serves, or
+// while one is deploying, because those are different facts.
 //
 // The commands sit beside what they printed, in the opened row. The output
 // used to be a trip to Command output and back; it is the same executions,
@@ -21,9 +22,11 @@
 // above the list: the application is on the server, always, and only some of
 // the commands ran anywhere else.
 
+import { ArrowUpRight, SpinnerGap } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
+import type { DeploymentAttempt } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
@@ -35,7 +38,6 @@ import {
   Chips,
   Clip,
   Facts,
-  Figure,
   Go,
   Name,
   None,
@@ -44,7 +46,6 @@ import {
   Opened,
   Pips,
   Register,
-  Strip,
   Sub,
   Tag,
   ago,
@@ -55,6 +56,7 @@ import {
 import {
   releaseHeadline,
   workFor,
+  workSince,
   type Release,
   type ReleaseStep,
   type ReleaseView,
@@ -106,6 +108,8 @@ interface Row extends Release {
   /** A release its checks proved can still contain a command that failed. */
   broke: boolean;
   serving: boolean;
+  /** The deployment running right now, before any record names it. */
+  flight?: boolean;
 }
 
 /** The commands of one release, beside whatever the picked one printed. */
@@ -187,6 +191,8 @@ export function ReleasesPanel({
   onReopen,
   onAsk,
   onOpenDestination,
+  deploying = null,
+  onFollow,
 }: {
   view: ReleaseView;
   /** The records the releases came from, to reach each one's own evidence. */
@@ -197,8 +203,8 @@ export function ReleasesPanel({
   /**
    * Whether the private way in still answers, as the page header asked it.
    *
-   * The same answer, not a second opinion. This strip offered "Open app" over
-   * a live URL while the header three lines above said the tunnel was closed,
+   * The same answer, not a second opinion. The strip here offered "Open app"
+   * over a live URL while the header above said the tunnel was closed,
    * which is the page disagreeing with itself about the one thing the reader
    * is most likely to click.
    */
@@ -207,6 +213,10 @@ export function ReleasesPanel({
   onReopen?: () => void;
   onAsk: (draft: string) => void;
   onOpenDestination?: (destination: ApplicationSection) => void;
+  /** A deployment the branch watch or Deploy started, still going. */
+  deploying?: DeploymentAttempt | null;
+  /** Opens the conversation that is doing the deploying. */
+  onFollow?: () => void;
 }) {
   const [filter, setFilter] = useState("all");
   const said = releaseHeadline(view);
@@ -223,7 +233,32 @@ export function ReleasesPanel({
       ) ?? null)
     : null;
 
-  const rows: Row[] = view.all.map((release) => {
+  // The deployment in flight is the newest row, above the release it will
+  // replace, and it opens on its commands as they run. The list and the
+  // strip say "deploying" together, never "latest attempt: deployed" over
+  // work that is still going.
+  const flight: Row | null = deploying
+    ? {
+        id: `flight-${deploying.id}`,
+        at: deploying.startedAt,
+        revision: deploying.commit,
+        short: deploying.commit.slice(0, 7),
+        image: null,
+        server: running?.server ?? "",
+        changes: deploying.title ? [deploying.title] : [],
+        note: "",
+        outcome: "attempted",
+        checks: [],
+        steps: workSince(deploying.startedAt, executions),
+        serving: false,
+        broke: false,
+        word: "deploying",
+        tone: "working",
+        flight: true,
+      }
+    : null;
+
+  const recorded: Row[] = view.all.map((release) => {
     const steps = workFor(release, records, executions);
     const serving = release.id === running?.id;
     return {
@@ -251,6 +286,7 @@ export function ReleasesPanel({
             : "good",
     };
   });
+  const rows = flight ? [flight, ...recorded] : recorded;
   const words = [...new Set(rows.map((row) => row.word))];
   const shown = rows.filter((row) => filter === "all" || row.word === filter);
 
@@ -266,6 +302,7 @@ export function ReleasesPanel({
           note={
             [
               row.serving ? "serving now" : "",
+              row.flight ? "deploying now" : "",
               // On the row, not only inside it: "live" over a migration that
               // did not run keeps a reader from the one thing they would want
               // to know at a glance.
@@ -306,6 +343,14 @@ export function ReleasesPanel({
       width: 84,
       align: "end",
       cell: (row) => {
+        if (row.flight)
+          return (
+            <Num>
+              {duration(
+                Math.max(0, Math.round((now - Date.parse(row.at)) / 1000)),
+              )}
+            </Num>
+          );
         const timed = row.steps.filter((step) => step.seconds !== null);
         return timed.length ? (
           <Num>
@@ -322,145 +367,115 @@ export function ReleasesPanel({
       width: 110,
       align: "end",
       sort: (row) => Date.parse(row.at),
-      cell: (row) => <Num>{ago(row.at, now)}</Num>,
+      cell: (row) => <Num>{row.flight ? "in progress" : ago(row.at, now)}</Num>,
     },
     {
       key: "outcome",
       head: "Outcome",
       width: 128,
-      cell: (row) => <Tag tone={row.tone}>{row.word}</Tag>,
+      cell: (row) => (
+        <Tag tone={row.tone}>
+          {row.flight && <SpinnerGap className="rp-spin" weight="bold" />}
+          {row.word}
+        </Tag>
+      ),
     },
   ];
 
   return (
     <section className="hv-rg-sheet rp" aria-label="What is running">
-      <Strip>
-        {/* The lead, and the only place the page states what is serving. */}
-        <Figure
-          label="Live"
-          value={
-            running ? (
-              // "Running" only while the newest attempt is the one serving.
-              // After a failed or unestablished update the honest words are
-              // "last verified", and the headline already chooses them.
-              <span className="rp-live">{said.says.replace(/\.$/, "")}</span>
-            ) : (
-              "Not established"
-            )
-          }
-          tone={running && !said.limit ? "good" : latest ? "warn" : "plain"}
-          note={
-            running ? (
+      <div className="rp-status">
+        <div>
+          <p className="rp-status-say">
+            {running ? (
               <>
-                {/* The source it was built from, exactly, beside the machine
-                    it runs on. The short form above is for reading; this is
-                    for matching against a repository. */}
-                <code>{running.revision.slice(0, 12)}</code> on {running.server}{" "}
-                · <LocalTime value={running.at} variant="compact" />
+                <span className="rp-dot" data-tone="good" />
+                {/* "Running" only while the newest attempt is what serves.
+                    After a failed or unconfirmed update the honest words are
+                    "last verified", and the line under this one says why. */}
+                {said.limit ? "Last verified release: " : "Running "}
+                <code>{running.short}</code>
+                <span className="rp-muted">
+                  {" "}
+                  · for{" "}
+                  {ago(running.at, now)
+                    .replace(" ago", "")
+                    .replace(/^1 d$/, "1 day")
+                    .replace(/ d$/, " days")}
+                </span>
               </>
             ) : (
-              said.says
-            )
-          }
-        />
-        <Figure
-          label="Before that"
-          value={before ? before.short : "—"}
-          note={
-            before
-              ? `${before.changes[0] ?? "No change recorded"} · ${ago(before.at, now)}`
-              : running
-                ? "This is the first release on record"
-                : "No earlier release is on record"
-          }
-        />
-        {/* Two facts, never folded into one. A reader told only that the
-            update failed does not know whether their application is up. */}
-        <Figure
-          label="Latest attempt"
-          value={
-            !latest
-              ? "None"
-              : latest.outcome === "deployed"
-                ? "Deployed"
-                : latest.outcome === "failed"
-                  ? "Failed"
-                  : "Not established"
-          }
-          tone={
-            !latest || latest.outcome === "deployed"
-              ? "plain"
-              : latest.outcome === "failed"
-                ? "bad"
-                : "warn"
-          }
-          note={
-            said.limit ??
-            (latest
-              ? `${latest.short} · ${ago(latest.at, now)}`
-              : "Nothing has been released yet")
-          }
-        />
-        {/* The one action this page owes the reader. A link only where a
-            record says there is a way in; otherwise it asks for one, rather
-            than offering a button that goes nowhere. */}
-        <Figure
-          label="Way in"
-          value={
-            !access ? "None on record" : access.localOnly ? "Private" : "Public"
-          }
-          tone={closed ? "warn" : "plain"}
-          note={
-            access && closed ? (
-              // The tunnel is not answering, so the address is not a way in.
-              <>
-                The tunnel is closed, so <code>{access.url}</code> does not
-                answer from this PC.
-              </>
-            ) : access ? (
-              <>
-                {access.localOnly
-                  ? reachable === "checking"
-                    ? "Checking that the tunnel still answers"
-                    : "From this PC only, while the tunnel is up"
-                  : "Answered by the server"}
-                <br />
-                <code>{access.url}</code>
-              </>
-            ) : (
-              "No record says where this application answers."
-            )
-          }
-        >
-          {access && closed ? (
-            onReopen ? (
-              <button
-                type="button"
-                className="rp-open is-ask"
-                onClick={onReopen}
-              >
+              <span className="rp-muted">{said.says}</span>
+            )}
+          </p>
+          {deploying ? (
+            <p className="rp-status-sub" data-tone="working">
+              <SpinnerGap className="rp-spin" weight="bold" />
+              Deploying <code>{deploying.commit.slice(0, 7)}</code> · started{" "}
+              {ago(deploying.startedAt, now)}
+              {onFollow && (
+                <>
+                  {" · "}
+                  <button type="button" className="rp-link" onClick={onFollow}>
+                    Follow
+                  </button>
+                </>
+              )}
+            </p>
+          ) : said.limit ? (
+            <p
+              className="rp-status-sub"
+              data-tone={latest?.outcome === "failed" ? "bad" : "warn"}
+            >
+              {said.limit}
+            </p>
+          ) : null}
+        </div>
+        {/* The one action this page owes the reader, as a link: the address
+            itself, or what to do when the tunnel to it is closed. */}
+        {access && closed ? (
+          // Never a link to an address just found not to answer.
+          <span className="rp-way">
+            <span className="rp-muted">The tunnel is closed</span>
+            {onReopen && (
+              <button type="button" className="rp-link" onClick={onReopen}>
                 Open the connection again
               </button>
-            ) : null
-          ) : access ? (
-            <a className="rp-open" href={access.url}>
-              Open app
-            </a>
-          ) : (
-            <button
-              type="button"
-              className="rp-open is-ask"
-              onClick={() =>
-                onAsk(
-                  "How do I open this application? Open private access if it is not open, then give me the address and check that it answers.",
-                )
-              }
+            )}
+          </span>
+        ) : access ? (
+          <span className="rp-way">
+            {access.localOnly && (
+              <span className="rp-muted">
+                {reachable === "checking"
+                  ? "Checking that the tunnel still answers"
+                  : "From this PC only"}
+              </span>
+            )}
+            <a
+              className="rp-link"
+              href={access.url}
+              target="_blank"
+              rel="noreferrer"
             >
-              Open app
-            </button>
-          )}
-        </Figure>
-      </Strip>
+              {access.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+              <ArrowUpRight weight="bold" />
+            </a>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="rp-link"
+            onClick={() =>
+              onAsk(
+                "How do I open this application? Open private access if it is not open, then give me the address and check that it answers.",
+              )
+            }
+          >
+            How do I open it?
+          </button>
+        )}
+      </div>
 
       <Board
         title="Releases"
@@ -494,110 +509,130 @@ export function ReleasesPanel({
           // The newest attempt opens itself when it is the one that needs
           // reading. A release that simply holds stays a row.
           defaultOpen={
-            latest && latest.outcome !== "deployed" ? latest.id : null
+            flight
+              ? flight.id
+              : latest && latest.outcome !== "deployed"
+                ? latest.id
+                : null
           }
           empty={`No release is recorded as ${filter}.`}
-          detail={(row) => (
-            <Opened
-              asks={
-                <>
-                  <Ask
-                    onAsk={onAsk}
-                    tone={row.outcome === "failed" ? "bad" : "plain"}
-                    prompt={
-                      row.outcome === "failed"
-                        ? `The release of ${row.short} failed. What went wrong, and what would make it go through?`
-                        : row.outcome === "attempted"
-                          ? `Nothing established what came of releasing ${row.short}. Check what is running now.`
-                          : `What exactly changed between ${row.short} and the release before it?`
-                    }
-                  >
-                    {row.outcome === "failed"
-                      ? "Why did it fail?"
-                      : row.outcome === "attempted"
-                        ? "Check what is running"
-                        : "What changed here?"}
-                  </Ask>
-                  {row.serving && before && (
+          detail={(row) =>
+            row.flight ? (
+              <Opened
+                asks={
+                  onFollow ? (
+                    <Go onGo={onFollow}>Follow in the conversation</Go>
+                  ) : null
+                }
+              >
+                <Note>
+                  Hallvi is deploying this commit. It becomes a release once its
+                  checks pass, and the release below keeps serving until then.
+                </Note>
+                <Work steps={row.steps} />
+              </Opened>
+            ) : (
+              <Opened
+                asks={
+                  <>
                     <Ask
                       onAsk={onAsk}
-                      prompt={`What would rolling back from ${row.short} to ${before.short} actually change?`}
+                      tone={row.outcome === "failed" ? "bad" : "plain"}
+                      prompt={
+                        row.outcome === "failed"
+                          ? `The release of ${row.short} failed. What went wrong, and what would make it go through?`
+                          : row.outcome === "attempted"
+                            ? `Nothing established what came of releasing ${row.short}. Check what is running now.`
+                            : `What exactly changed between ${row.short} and the release before it?`
+                      }
                     >
-                      What would a rollback change?
+                      {row.outcome === "failed"
+                        ? "Why did it fail?"
+                        : row.outcome === "attempted"
+                          ? "Check what is running"
+                          : "What changed here?"}
                     </Ask>
-                  )}
-                  {onOpenDestination && (
-                    <Go onGo={() => onOpenDestination("logs")}>
-                      All command output
-                    </Go>
-                  )}
-                </>
-              }
-            >
-              {row.note && <Note>{row.note}</Note>}
-              <Work steps={row.steps} />
-              <Facts
-                items={[
-                  {
-                    label: "Source",
-                    value: (
-                      <span className="hv-rg-mono">
-                        {row.revision.slice(0, 12)}
-                      </span>
-                    ),
-                  },
-                  {
-                    label: "Image",
-                    value: row.image ? (
-                      <span className="hv-rg-mono">{row.image}</span>
-                    ) : (
-                      <None />
-                    ),
-                  },
-                  { label: "Server", value: row.server },
-                  {
-                    label: "Released",
-                    value: <LocalTime value={row.at} variant="compact" />,
-                  },
-                ]}
-              />
-              <div className="rp-lists">
+                    {row.serving && before && (
+                      <Ask
+                        onAsk={onAsk}
+                        prompt={`What would rolling back from ${row.short} to ${before.short} actually change?`}
+                      >
+                        What would a rollback change?
+                      </Ask>
+                    )}
+                    {onOpenDestination && (
+                      <Go onGo={() => onOpenDestination("logs")}>
+                        All command output
+                      </Go>
+                    )}
+                  </>
+                }
+              >
+                {row.note && <Note>{row.note}</Note>}
+                <Work steps={row.steps} />
                 <Facts
                   items={[
                     {
-                      label: "What changed",
-                      value: row.changes.length ? (
-                        <ul className="rp-list">
-                          {row.changes.map((change) => (
-                            <li key={change}>{change}</li>
-                          ))}
-                        </ul>
+                      label: "Source",
+                      value: (
+                        <span className="hv-rg-mono">
+                          {row.revision.slice(0, 12)}
+                        </span>
+                      ),
+                    },
+                    {
+                      label: "Image",
+                      value: row.image ? (
+                        <span className="hv-rg-mono">{row.image}</span>
                       ) : (
                         <None />
                       ),
                     },
+                    { label: "Server", value: row.server },
                     {
-                      label: "What was checked",
-                      value: row.checks.length ? (
-                        <ul className="rp-list rp-checks">
-                          {row.checks.map((check) => (
-                            <li
-                              key={check.label}
-                              data-pass={check.passed || undefined}
-                            >
-                              {check.label}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        "Nothing was checked."
-                      ),
+                      label: "Released",
+                      value: <LocalTime value={row.at} variant="compact" />,
                     },
                   ]}
                 />
-              </div>
-            </Opened>
-          )}
+                <div className="rp-lists">
+                  <Facts
+                    items={[
+                      {
+                        label: "What changed",
+                        value: row.changes.length ? (
+                          <ul className="rp-list">
+                            {row.changes.map((change) => (
+                              <li key={change}>{change}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <None />
+                        ),
+                      },
+                      {
+                        label: "What was checked",
+                        value: row.checks.length ? (
+                          <ul className="rp-list rp-checks">
+                            {row.checks.map((check) => (
+                              <li
+                                key={check.label}
+                                data-pass={check.passed || undefined}
+                              >
+                                {check.label}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          "Nothing was checked."
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              </Opened>
+            )
+          }
         />
       </Board>
     </section>

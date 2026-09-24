@@ -197,34 +197,53 @@ export function workFor(
   return executions
     .filter((execution) => ids.has(execution.id) || runs.has(execution.runId))
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
-    .map((execution) => {
-      const full = commandOf(execution.input);
-      const place = whereItRan({
-        ...execution,
-        target: execution.target ?? "",
-      });
-      const finished = execution.finishedAt
-        ? Date.parse(execution.finishedAt) - Date.parse(execution.createdAt)
-        : null;
-      return {
-        id: execution.id,
-        title:
-          intentOf(execution.input) ??
-          TITLE_OF[execution.tool] ??
-          execution.tool.replaceAll("_", " "),
-        caption: clip(essence(full), 120),
-        command: full,
-        where: place
-          ? [place.said, place.detail].filter(Boolean).join(" · ")
-          : placeOf(execution.tool),
-        seconds:
-          finished === null || !Number.isFinite(finished)
-            ? null
-            : Math.max(0, Math.round(finished / 1000)),
-        outcome: execution.status,
-        output: execution.output ?? "",
-      };
-    });
+    .map(stepOf);
+}
+
+/**
+ * The commands of a deployment still in flight: everything that started
+ * after it did. There is no release record to cite them yet, and while one
+ * deployment runs at a time, what ran since it began is its work.
+ */
+export function workSince(
+  startedAt: string,
+  executions: ExecutionRecord[],
+): ReleaseStep[] {
+  return executions
+    .filter(
+      (execution) => Date.parse(execution.createdAt) >= Date.parse(startedAt),
+    )
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    .map(stepOf);
+}
+
+function stepOf(execution: ExecutionRecord): ReleaseStep {
+  const full = commandOf(execution.input);
+  const place = whereItRan({
+    ...execution,
+    target: execution.target ?? "",
+  });
+  const finished = execution.finishedAt
+    ? Date.parse(execution.finishedAt) - Date.parse(execution.createdAt)
+    : null;
+  return {
+    id: execution.id,
+    title:
+      intentOf(execution.input) ??
+      TITLE_OF[execution.tool] ??
+      execution.tool.replaceAll("_", " "),
+    caption: clip(essence(full), 120),
+    command: full,
+    where: place
+      ? [place.said, place.detail].filter(Boolean).join(" · ")
+      : placeOf(execution.tool),
+    seconds:
+      finished === null || !Number.isFinite(finished)
+        ? null
+        : Math.max(0, Math.round(finished / 1000)),
+    outcome: execution.status,
+    output: execution.output ?? "",
+  };
 }
 
 /**
