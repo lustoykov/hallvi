@@ -131,7 +131,7 @@ worktree and Hallvi ran from another, it said so rather than printing this
 checkout's branch beside that one's address:
 
 ```
-Serving      /Users/aiwithlyubomir/biz/code/hallvi
+Serving      the main checkout
 Its branch   main at 2506ccf48
 Release identity   none — a development run is not built from a release
 

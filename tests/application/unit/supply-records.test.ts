@@ -273,7 +273,7 @@ describe("cdn", () => {
         {
           facts: [
             fact("provider", "Cloudflare"),
-            fact("origin", "46.62.253.6"),
+            fact("origin", "203.0.113.60"),
             fact("covers", "Everything on the name"),
           ],
           checks: [
@@ -288,7 +288,7 @@ describe("cdn", () => {
     ]);
     expect(story.cdn.on).toBe(true);
     expect(story.cdn.originReachable).toBe("no");
-    expect(story.cdn.origin).toBe("46.62.253.6");
+    expect(story.cdn.origin).toBe("203.0.113.60");
     expect(story.cdn.detail).toMatch(/522/);
   });
 
@@ -303,13 +303,13 @@ describe("cdn", () => {
         {
           facts: [
             fact("provider", "Cloudflare"),
-            fact("origin", "46.62.253.6"),
+            fact("origin", "203.0.113.60"),
           ],
           checks: [check("caching", "passed")],
         },
       ),
     ]);
-    expect(story.cdn.concern).toMatch(/46\.62\.253\.6/);
+    expect(story.cdn.concern).toMatch(/203\.0\.113\.60/);
     expect(story.cdn.concern).toMatch(/192\.0\.2\.10/);
   });
 

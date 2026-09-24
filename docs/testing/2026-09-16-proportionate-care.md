@@ -69,7 +69,7 @@ A defect existed in the PR #94 branch before merge: `addressOf` returned `new UR
 
 - Conversation, records, approvals and the injected faults: `tests/results/care/` (gitignored, retained) — `watch.log`, `state/server-guy.db`, `web.log`, `worker.log`.
 - Hetzner server `166143738` `bookmarks-dev-c9b6c4dc` and its SSH key `130081176` were deleted and verified absent. The unrelated `paperless-test-5dd5a76f` was not touched.
-- The controller on 3480 was stopped. The inventory record at `~/Library/Application Support/Server Guy/development-cleanup/9c6fa658-….json` is closed.
+- The controller on 3480 was stopped. Its record, `9c6fa658-….json` in the local development inventory, is closed.
 - Homepage prototype rounds remain on `prototype/homepage-directions` (`0d32242`) with their screenshots and README.
 
 The decision this checks is drawn in [proportionate care](../architecture/proportionate-care.html).

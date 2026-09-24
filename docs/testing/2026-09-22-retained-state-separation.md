@@ -1,6 +1,6 @@
 # Four retained applications, one owner each — 22 September 2026
 
-What was done on the owner's MacBook, in the order it was done, with what
+What was done on a MacBook, in the order it was done, with what
 each step showed. Branch `claude/hallvi-retained-state-d7f4e6`; the four
 applications and their host are the ones the
 [development environment](../development-environment.md) describes.
@@ -26,7 +26,7 @@ paths in `applications.host`.
 ## Stopping the writers
 
 The four-application launcher (`scripts/dev.mjs`, pid 54034, from
-`/Users/aiwithlyubomir/biz/code/hallvi`) was stopped with SIGTERM — sooner
+the main checkout) was stopped with SIGTERM — sooner
 than intended: a `pgrep -f scripts/dev.mjs | head -1` meant for a scratch
 launcher matched it first. The worker had nothing in hand, the database
 checked out afterwards (`integrity_check` ok, schema 18, 4/4/86), and

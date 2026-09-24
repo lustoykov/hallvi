@@ -47,6 +47,6 @@ Provider references: [Cloud API](https://docs.hetzner.cloud/reference/cloud), [S
 
 ## Local trial follow-up: GitHub renewal
 
-The owner's repository check exposed an expired login retained on the main PC during the machine move. GitHub returned `incorrect_client_credentials` when that login tried to renew, but the application treated it as a transient failure and Settings still reported a connection. The newer transferred credential was verified against the real repository, restored locally with the old file backed up, and the application repository check passed at `6b025fc5`.
+The owner's repository check exposed an expired login retained on another development machine during the machine move. GitHub returned `incorrect_client_credentials` when that login tried to renew, but the application treated it as a transient failure and Settings still reported a connection. The newer transferred credential was verified against the real repository, restored locally with the old file backed up, and the application repository check passed at `6b025fc5`.
 
 Renewal now classifies `incorrect_client_credentials` as requiring sign-in, alongside other rejected authentication grants, instead of suggesting repeated retries. The existing integration test verifies that this invalidates the unusable connection without exposing provider credential details. All 62 GitHub setup/API tests passed; changed-file ESLint and formatting passed. This does not establish future refresh success for the restored login. The roadmap sequence is unchanged.

@@ -542,11 +542,11 @@ describe("a name, and whether anything answers on it", () => {
             "Cloudflare returned 522 after 15s; the origin never answered.",
         }),
       ],
-      [fact("origin", "46.62.253.6"), fact("proxied", "true")],
+      [fact("origin", "203.0.113.60"), fact("proxied", "true")],
     );
     expect(story.domain?.state).toBe("unreachable");
     expect(story.domain?.proxied).toBe(true);
-    expect(story.domain?.origin).toBe("46.62.253.6");
+    expect(story.domain?.origin).toBe("203.0.113.60");
     const caller = story.callers.find((item) => item.id === "domain");
     expect(caller?.outcome).toBe("no-answer");
     expect(caller?.headline).toMatch(/does not/i);
@@ -600,12 +600,12 @@ describe("a name, and whether anything answers on it", () => {
         at: "2026-09-13T12:00:00.000Z",
         facts: [
           fact("name", "shop.example.com", "identity"),
-          fact("origin", "46.62.253.6"),
+          fact("origin", "203.0.113.60"),
         ],
         checks: [check("resolves", "passed")],
       }),
     ]);
-    expect(story.domain?.concern).toMatch(/46\.62\.253\.6/);
+    expect(story.domain?.concern).toMatch(/203\.0\.113\.60/);
     expect(story.domain?.concern).toMatch(/192\.0\.2\.10/);
   });
 

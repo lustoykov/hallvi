@@ -26,7 +26,7 @@ worker were each checked to have this worktree as their working directory, the
 worker to run under Node 22, and the worker's socket to be readable only by
 its user. Model: the configured ChatGPT subscription (`openai-codex`) through
 Pi's own `ModelRuntime`; workspace: the real Docker repository workspace;
-provider: the authorized Default Hetzner project.
+provider: an authorized Hetzner project.
 
 | Step | What happened |
 | --- | --- |

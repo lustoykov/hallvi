@@ -1,6 +1,6 @@
 # A development environment that keeps what it has — 20 September 2026
 
-One Hallvi on the owner's MacBook, four applications really deployed on one
+One Hallvi on a MacBook, four applications really deployed on one
 Hetzner host, and the state carried across a schema change rather than started
 again. What was checked, and what it does not establish.
 
@@ -208,10 +208,10 @@ applications present by id and answering at its address.
 
 ```
 ok    controller answers http://127.0.0.1:5147  (307)
-ok    uptime-kuma  … answers https://46-62-253-6.sslip.io/  (302)
-ok    whoami       … answers https://whoami.46-62-253-6.sslip.io/  (200)
-ok    v2           … answers https://miniflux.46-62-253-6.sslip.io/  (200)
-ok    paperless-ngx… answers https://paperless.46-62-253-6.sslip.io/  (302)
+ok    uptime-kuma  … answers https://203-0-113-60.sslip.io/  (302)
+ok    whoami       … answers https://whoami.203-0-113-60.sslip.io/  (200)
+ok    v2           … answers https://miniflux.203-0-113-60.sslip.io/  (200)
+ok    paperless-ngx… answers https://paperless.203-0-113-60.sslip.io/  (302)
 ```
 
 **The coordination rules hold.** With `task-a` holding `paperless-ngx`:

@@ -21,8 +21,8 @@ is what was built and installed.
 | Controller under test | Hetzner `cx43`, Ubuntu 24.04.4 LTS x64, `hallvi-update-e2e-0abbbca3`, a disposable fixture created for this work |
 | Installed as | An ordinary user (`owner`), systemd user service, lingering on |
 | Release source | `https://releases-test.hallvi.com`, Caddy with a Let's Encrypt certificate on that same host, serving a releases index in the shape the GitHub API answers with |
-| Release key | An Ed25519 keypair generated for this test and named in the installation's `hallvi.env` through `HALLVI_RELEASE_KEY`. Not Hallvi's own key, which stayed on the owner's MacBook |
-| macOS | The owner's MacBook, Apple silicon: both platform archives built, and the launchd side of the update helper exercised. **The owner's own installed Hallvi was not touched**; it was still `0.1.0 (0cd9874)`, running, with its program directory unchanged, at the end |
+| Release key | An Ed25519 keypair generated for this test and named in the installation's `hallvi.env` through `HALLVI_RELEASE_KEY`. Not Hallvi's own key, which stayed on a MacBook |
+| macOS | A MacBook, Apple silicon: both platform archives built, and the launchd side of the update helper exercised. **The owner's own installed Hallvi was not touched**; it was still `0.1.0 (0cd9874)`, running, with its program directory unchanged, at the end |
 
 Archives, both built on the platform they run on:
 

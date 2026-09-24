@@ -282,7 +282,7 @@ sequenceDiagram
 
 ## Live run, 18 September 2026
 
-One real journey on the owner's Default Hetzner project (empty beforehand) and
+One real journey on an empty Hetzner project (empty beforehand) and
 Cloudflare zone, with existing credentials reused and never printed. The
 server is a labelled, registered development fixture.
 
@@ -305,7 +305,7 @@ server is a labelled, registered development fixture.
   password as too weak; Pi stopped again with nothing exposed. It continued
   once asked to generate the password itself (`generate_secret`), claimed the
   setup privately and proved a real login before opening anything.
-- **Direct address.** `https://46-62-253-6.sslip.io` served a trusted Let's
+- **Direct address.** `https://203-0-113-60.sslip.io` served a trusted Let's
   Encrypt certificate for that name, redirected HTTP to HTTPS and reached the
   dashboard, checked from this computer independently of Pi's own
   `check_public_access`; port 3001 still did not answer from outside. The
@@ -317,7 +317,7 @@ server is a labelled, registered development fixture.
   for the zone, and asked for no token. "Let Hallvi add the record" resumed
   Pi, which wrote a DNS-only A record (commented `managed-by=hallvi`),
   obtained a certificate and verified sign-in through
-  `https://hallvi-test.accountant-agent.com`; verified again from this
+  `https://hallvi-test.example.org`; verified again from this
   computer. The sslip.io address kept working.
 
 What the run changed: a request whose estimate overran its own schema was

@@ -10,7 +10,7 @@ the virtual machine themselves.
 
 | Role | Machine |
 | --- | --- |
-| Mac | The owner's MacBook, macOS 26, Apple silicon, launchd agent |
+| Mac | A MacBook, macOS 26, Apple silicon, launchd agent |
 | Virtual machine | Hetzner CX23, Ubuntu 24.04 x64, systemd 255, unprivileged user `owner` |
 | Application server | Hetzner CX23, Ubuntu 24.04; a Python web server bound to `127.0.0.1:3000` only |
 | Laptop | The same MacBook, reaching the virtual machine with the SSH configuration `server-guy remote` printed |

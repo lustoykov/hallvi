@@ -469,7 +469,7 @@ is asked before anything is claimed, so Settings says *connected* because
 Cloudflare said so, not because a variable is set.
 
 Verified against the real account: the token is `active`, one zone is visible
-(`accountant-agent.com`, active), and 14 R2 buckets are listed.
+(`example.org`, active), and 14 R2 buckets are listed.
 
 ## The distinction the UI keeps
 
@@ -531,8 +531,8 @@ has read; `not-configured` needs a written absence.
 
 ## What that was proved against
 
-`server-guy-getting-started-b2184a72.accountant-agent.com`, an `A` record to
-`46.62.253.6`, proxied — created by the owner, read but never written by
+`server-guy-getting-started-b2184a72.example.org`, an `A` record to
+`203.0.113.60`, proxied — created by the owner, read but never written by
 Hallvi. Pi checked it from the application's own server:
 
 ```

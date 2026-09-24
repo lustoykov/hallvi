@@ -40,7 +40,7 @@ all of it Pi building the image and checking the result.
 - A worker stopped *mid-deployment* was not exercised live; the `interrupted`
   outcome is covered by the integration test.
 - The instance ran from a checkout with `scripts/serve.mjs` under Node 22 on
-  the owner's MacBook, not as an installed service on the Mac mini.
+  a MacBook, not as an installed service on the Mac mini.
 - Permission mode was *Pi decides*; *Always ask* was not exercised.
 
 ## Fixtures

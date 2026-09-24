@@ -83,7 +83,7 @@ not complete that external-user gate.
 ## Artifact and resource disposition
 
 The MacBook retains both archives, checksums and installer in
-`~/Downloads/Hallvi-install-candidate-2b18af-2026-09-19/`. The Mac mini
+a local downloads folder. The Mac mini
 retains the macOS three-file bundle in its matching Downloads directory. Its
 temporary test service and state were removed. The previous `db009f61`
 bundles remain as clearly marked superseded evidence.
@@ -98,4 +98,4 @@ cleanup. The application host's labeled SQLite volume held only task-created
 test items and was on its deleted server disk. The installed controller's
 temporary ChatGPT credential files and database were on its deleted server
 disk.
-The owner's existing MacBook Hallvi service and data were not changed.
+An existing MacBook Hallvi service and data were not changed.
