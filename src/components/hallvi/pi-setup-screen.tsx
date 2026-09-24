@@ -17,6 +17,7 @@ import type { DetectedPiSetup } from "@/server/pi-configuration";
 import type { PiLoginAttempt, PiSetupStatus } from "@/server/pi-setup";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import type { SetupReturn } from "@/server/setup-return";
+import { PI_MODEL_ID } from "@/server/pi-settings";
 import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
 
@@ -79,7 +80,7 @@ export function PiSetupScreen({
   const [effort, setEffort] = useState(initialStatus.selection.reasoningEffort);
   const working = active(attempt);
   const models = [...status.models].sort(
-    (a, b) => Number(b.id === "gpt-5.6-sol") - Number(a.id === "gpt-5.6-sol"),
+    (a, b) => Number(b.id === PI_MODEL_ID) - Number(a.id === PI_MODEL_ID),
   );
   const selectedModel = models.find((model) => model.id === modelId);
   const validSelection =
@@ -566,7 +567,7 @@ export function PiSetupScreen({
                   {models.map((model) => (
                     <option key={model.id} value={model.id}>
                       {model.name}
-                      {model.id === "gpt-5.6-sol" ? " · Default" : ""}
+                      {model.id === PI_MODEL_ID ? " · Default" : ""}
                     </option>
                   ))}
                 </select>

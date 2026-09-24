@@ -18,7 +18,7 @@ import type {
   PiSdkLoader,
   PiSelection,
 } from "./pi-configuration";
-import { PI_PROVIDER_ID } from "./pi-settings";
+import { PI_MODEL_LABEL, PI_PROVIDER_ID } from "./pi-settings";
 import { traceExportConfiguration } from "./tracing-config";
 import { diagnosticLogPath } from "./diagnostics";
 import {
@@ -88,7 +88,7 @@ function baseStatus(): PiSetupStatus {
     selection: {
       ...defaultPiSelection,
       provider: "OpenAI Codex",
-      model: "GPT-5.6 Sol",
+      model: PI_MODEL_LABEL,
     },
     issue: null,
   };

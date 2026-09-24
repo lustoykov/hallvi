@@ -10,10 +10,10 @@ vi.mock("next/navigation", () => ({
 
 const selection = {
   providerId: "openai-codex",
-  modelId: "gpt-5.6-sol",
+  modelId: "gpt-6-sol",
   reasoningEffort: "high" as const,
   provider: "OpenAI Codex",
-  model: "GPT-5.6 Sol",
+  model: "GPT-6 Sol",
 };
 const initialStatus: PiSetupStatus = {
   state: "needs-choice",
@@ -115,7 +115,7 @@ describe("account-first setup and progressive disclosure", () => {
     );
     expect(defaultView).toContain("Connect another account");
     expect(defaultView).not.toContain("Check for a saved login");
-    expect(defaultView).toContain("GPT-5.6 Sol / High");
+    expect(defaultView).toContain("GPT-6 Sol / High");
     expect(html).toContain("/pi/auth.json");
     expect(html).toContain(
       "Reuse shares Pi’s login file and copies its model preferences.",
