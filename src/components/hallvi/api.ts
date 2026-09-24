@@ -86,12 +86,18 @@ export const api = {
     message: string,
     requestKey: string,
     delivery: "next" | "steer" = "next",
+    images: { mimeType: string; data: string }[] = [],
   ) {
     return jsonRequest<ChatSnapshot>(
       `/api/applications/${applicationId}/chats/${chatId}/messages`,
       {
         method: "POST",
-        body: JSON.stringify({ message, requestKey, delivery }),
+        body: JSON.stringify({
+          message,
+          requestKey,
+          delivery,
+          ...(images.length ? { images } : {}),
+        }),
       },
     );
   },

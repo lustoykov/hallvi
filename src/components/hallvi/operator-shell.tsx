@@ -40,6 +40,7 @@ import { labelOf } from "./operation-model";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { RenameApplicationDialog } from "./rename-application-dialog";
 import { DemoContext } from "./external-link";
+import type { ImageAttachment } from "./message-images";
 import {
   acceptedDraftCanClear,
   clearPendingSubmission,
@@ -193,7 +194,14 @@ export function OperatorShell({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [chatIds, initialView.application?.id]);
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{
+    body: string;
+    images: ImageAttachment[];
+  } | null>(null);
+  /** Images waiting in each conversation's composer. Kept in memory only. */
+  const [attachments, setAttachments] = useState<
+    Record<string, ImageAttachment[]>
+  >({});
   const [terminal, setTerminal] = useState({
     open: false,
     expanded: false,
@@ -214,6 +222,7 @@ export function OperatorShell({
   const activeChat =
     view.chats.find((chat) => chat.id === view.selectedChatId) ?? null;
   const composer = activeChat ? (drafts[activeChat.id] ?? "") : "";
+  const attached = activeChat ? (attachments[activeChat.id] ?? []) : [];
   const applicationId = application?.id;
   const selectedChatId = view.selectedChatId;
   const refreshDeployment = useCallback(async () => {
@@ -659,21 +668,28 @@ export function OperatorShell({
   /** `told` is a message a card sends for the owner; the draft is kept. */
   function sendMessage(told?: string, delivery: "next" | "steer" = "next") {
     const message = (told ?? composer).trim();
-    if (!message) return;
+    const images = told ? [] : attached;
+    if (!message && !images.length) return;
     if (busy || !piReady || !application || !activeChat) {
       // Not sendable right now: leave it where the owner can send it.
       if (told) setComposer(told);
       return;
     }
-    setPendingMessage(message);
+    setPendingMessage({ body: message, images });
     submittingChat.current = activeChat.id;
     // Clear the field optimistically, but keep its durable copy until the
     // server accepts it. Text typed after this point is a newer draft and
     // wins in both React state and storage.
-    if (!told) setDrafts((current) => ({ ...current, [activeChat.id]: "" }));
+    if (!told) {
+      setDrafts((current) => ({ ...current, [activeChat.id]: "" }));
+      setAttachments((current) => ({ ...current, [activeChat.id]: [] }));
+    }
     const previous = readPendingSubmission(application.id, activeChat.id);
+    // Images are not kept across a reload, so a key is reused only for words.
     const key =
-      previous?.message === message ? previous.key : crypto.randomUUID();
+      previous?.message === message && !images.length
+        ? previous.key
+        : crypto.randomUUID();
     submittingKey.current = key;
     editedAfterSubmission.current.delete(key);
     if (told) editedAfterSubmission.current.add(key);
@@ -703,6 +719,7 @@ export function OperatorShell({
           message,
           key,
           delivery,
+          images.map(({ mimeType, data }) => ({ mimeType, data })),
         );
         accepted = true;
         setPendingMessage(null);
@@ -760,6 +777,11 @@ export function OperatorShell({
             writeConversationDraft(application.id, activeChat.id, next);
             return { ...current, [activeChat.id]: next };
           });
+          if (images.length)
+            setAttachments((current) => ({
+              ...current,
+              [activeChat.id]: [...images, ...(current[activeChat.id] ?? [])],
+            }));
         }
         const refreshed = await api
           .view(application.id, activeChat.id)
@@ -960,6 +982,14 @@ export function OperatorShell({
                 piReady={piReady}
                 onArchive={archiveActiveChat}
                 onComposerChange={setComposer}
+                attachments={attached}
+                onAttachmentsChange={(update) => {
+                  if (activeChat)
+                    setAttachments((current) => ({
+                      ...current,
+                      [activeChat.id]: update(current[activeChat.id] ?? []),
+                    }));
+                }}
                 onDismissContext={() => {
                   if (!activeChat || !application) return;
                   setContexts((current) => ({

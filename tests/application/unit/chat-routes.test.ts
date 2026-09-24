@@ -111,11 +111,16 @@ describe("Chat request validation", () => {
       "00000000-0000-4000-8000-000000000001",
       // Left to the domain, which sends it after Pi's current work.
       undefined,
+      undefined,
     );
   });
 
   it.each([
-    ["blank message", { message: "   " }, "Write a message first."],
+    [
+      "blank message",
+      { message: "   ", requestKey: "00000000-0000-4000-8000-000000000001" },
+      "Write a message first.",
+    ],
     ["non-text message", { message: 42 }, "Write a message first."],
     [
       "oversized message",

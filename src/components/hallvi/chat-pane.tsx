@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   PaperPlaneRight,
+  Paperclip,
   SpinnerGap,
   WarningCircle,
   X,
@@ -39,6 +40,14 @@ import type { Reachability } from "./deployment-prototype/page-head";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
+import {
+  attachmentSources,
+  MAX_IMAGES,
+  MessageImages,
+  readImage,
+  sentImageSources,
+  type ImageAttachment,
+} from "./message-images";
 import { hasActivity, PiActivity } from "./pi-activity";
 import { WorkingMascot } from "./working-mascot";
 import {
@@ -212,6 +221,8 @@ export function ChatPane({
   pendingMessage,
   piReady,
   composer,
+  attachments = [],
+  onAttachmentsChange,
   context = null,
   onComposerChange,
   onDismissContext,
@@ -241,9 +252,14 @@ export function ChatPane({
   activeChat: Chat | null;
   busy: string | null;
   error: string | null;
-  pendingMessage: string | null;
+  pendingMessage: { body: string; images: ImageAttachment[] } | null;
   piReady: boolean;
   composer: string;
+  /** Images going with the next message. */
+  attachments?: ImageAttachment[];
+  onAttachmentsChange?: (
+    update: (current: ImageAttachment[]) => ImageAttachment[],
+  ) => void;
   context?: ConversationContext | null;
   onComposerChange: (value: string) => void;
   onDismissContext?: () => void;
@@ -278,6 +294,32 @@ export function ChatPane({
 }) {
   const chatId = activeChat?.id ?? null;
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [dropping, setDropping] = useState(false);
+  /** Anything to send: words, pictures, or both. */
+  const drafted = Boolean(composer.trim()) || attachments.length > 0;
+  async function attach(files: File[]) {
+    if (!onAttachmentsChange || !files.length) return;
+    setAttachError(null);
+    const room = MAX_IMAGES - attachments.length;
+    if (files.length > room)
+      setAttachError(`A message can carry ${MAX_IMAGES} images.`);
+    const read = await Promise.allSettled(files.slice(0, room).map(readImage));
+    const added = read.flatMap((r) =>
+      r.status === "fulfilled" ? [r.value] : [],
+    );
+    const failed = read.find((r) => r.status === "rejected");
+    if (failed?.status === "rejected")
+      setAttachError(
+        failed.reason instanceof Error
+          ? failed.reason.message
+          : "This image could not be attached.",
+      );
+    onAttachmentsChange((current) =>
+      [...current, ...added].slice(0, MAX_IMAGES),
+    );
+  }
   const openDestination = onOpenDestination ?? (() => {});
   const messageCount = view.messages.length;
   /**
@@ -745,6 +787,16 @@ export function ChatPane({
                         <Markdown source={message.body} />
                       </MessageResponse>
                     )}
+                    {message.images && view.application && chatId && (
+                      <MessageImages
+                        sources={sentImageSources(
+                          view.application.id,
+                          chatId,
+                          message.id,
+                          message.images,
+                        )}
+                      />
+                    )}
                     {unread && (
                       <div className="hv-run-progress">
                         <p className="hv-run-status" role="status">
@@ -904,9 +956,14 @@ export function ChatPane({
                   <span className="hv-source-tag">Pending</span>
                 </div>
                 <MessageContent>
-                  <MessageResponse>
-                    <Markdown source={pendingMessage} />
-                  </MessageResponse>
+                  {pendingMessage.body && (
+                    <MessageResponse>
+                      <Markdown source={pendingMessage.body} />
+                    </MessageResponse>
+                  )}
+                  <MessageImages
+                    sources={attachmentSources(pendingMessage.images)}
+                  />
                 </MessageContent>
               </Message>
               <p className="hv-reply-pending" role="status">
@@ -1065,7 +1122,31 @@ export function ChatPane({
           </div>
         )}
         <div
-          className={`hv-composer-box${composerDisabled ? " disabled" : ""}`}
+          className={`hv-composer-box${composerDisabled ? " disabled" : ""}${dropping ? " dropping" : ""}`}
+          onDragOver={(event) => {
+            if (
+              composerDisabled ||
+              !onAttachmentsChange ||
+              !event.dataTransfer.types.includes("Files")
+            )
+              return;
+            event.preventDefault();
+            setDropping(true);
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node))
+              setDropping(false);
+          }}
+          onDrop={(event) => {
+            if (!dropping) return;
+            event.preventDefault();
+            setDropping(false);
+            void attach(
+              [...event.dataTransfer.files].filter((file) =>
+                file.type.startsWith("image/"),
+              ),
+            );
+          }}
         >
           {context && !context.requestKey && (
             <div className="hv-composer-context">
@@ -1090,12 +1171,35 @@ export function ChatPane({
               </button>
             </div>
           )}
+          <MessageImages
+            sources={attachmentSources(attachments)}
+            onRemove={(key) =>
+              onAttachmentsChange?.((current) =>
+                current.filter((image) => image.id !== key),
+              )
+            }
+          />
+          {attachError && (
+            <p className="hv-attach-error" role="alert">
+              {attachError}
+            </p>
+          )}
           <textarea
             ref={composerRef}
             disabled={composerDisabled}
             id="pi-composer"
             aria-label="Message Hallvi"
             onChange={(event) => onComposerChange(event.target.value)}
+            onPaste={(event) => {
+              const images = [...event.clipboardData.files].filter((file) =>
+                file.type.startsWith("image/"),
+              );
+              if (!images.length || !onAttachmentsChange) return;
+              // A copied picture often carries its name as text as well.
+              if (!event.clipboardData.getData("text/plain"))
+                event.preventDefault();
+              void attach(images);
+            }}
             onKeyDown={(event) => {
               if (
                 event.key === "Enter" &&
@@ -1121,6 +1225,33 @@ export function ChatPane({
           />
           <div className="hv-composer-bar">
             <span className="hv-composer-left">
+              {onAttachmentsChange && (
+                <>
+                  <button
+                    className="hv-attach"
+                    type="button"
+                    disabled={
+                      composerDisabled || attachments.length >= MAX_IMAGES
+                    }
+                    aria-label="Attach images"
+                    title="Attach images — or paste or drop them here"
+                    onClick={() => imageInput.current?.click()}
+                  >
+                    <Paperclip weight="bold" aria-hidden="true" />
+                  </button>
+                  <input
+                    ref={imageInput}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={(event) => {
+                      void attach([...(event.target.files ?? [])]);
+                      event.target.value = "";
+                    }}
+                  />
+                </>
+              )}
               {view.application && chatId && view.chats[0]?.id === chatId && (
                 <OperatorConsole
                   key={`settings:${view.application.id}:${chatId}`}
@@ -1136,7 +1267,7 @@ export function ChatPane({
             </span>
             {/* While a turn runs and nothing is typed, Send's place is Stop.
                 Typing brings Send next back, so a follow-up can be queued. */}
-            {inFlight && !readOnly && composer.trim() && (
+            {inFlight && !readOnly && drafted && (
               <button
                 className="hv-steer"
                 disabled={sendDisabled || busy !== null}
@@ -1147,7 +1278,7 @@ export function ChatPane({
                 Steer
               </button>
             )}
-            {requestPending && !readOnly && !composer.trim() ? (
+            {requestPending && !readOnly && !drafted ? (
               <button
                 className="hv-stop"
                 disabled={busy !== null}
@@ -1161,7 +1292,7 @@ export function ChatPane({
             ) : (
               <button
                 className="hv-send"
-                disabled={!composer.trim() || sendDisabled || busy !== null}
+                disabled={!drafted || sendDisabled || busy !== null}
                 type="submit"
               >
                 {busy === "message" ? (

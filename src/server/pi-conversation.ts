@@ -4,14 +4,18 @@
 // back by the id Pi gave each tool call.
 import { activityFromTranscript } from "./pi-activity";
 import { listExecutions, type ExecutionRecord } from "./operator-execution";
-import { assertChatWritable, loadChat } from "./applications";
+import { assertChatWritable, loadChat, NotFoundError } from "./applications";
 import { touchChat } from "./db";
 import { sendChatMessageRequestSchema } from "./schemas";
 import { listInformation } from "./saved-information";
 import type { MessageBlock } from "./operator-data";
 import type { Transcript } from "./pi-transcript";
 import type { ChatMessage, ChatSnapshot } from "./types";
-import { askWorker, WorkerUnavailableError } from "./worker-link";
+import {
+  askWorker,
+  WorkerRefusal,
+  WorkerUnavailableError,
+} from "./worker-link";
 
 const NO_WORKER: Transcript = {
   status: "idle",
@@ -128,19 +132,48 @@ export async function sendChatMessage(
   body: string,
   requestKey: string,
   delivery: NonNullable<ChatMessage["delivery"]> = "next",
+  images?: { mimeType: string; data: string }[],
 ) {
   const input = sendChatMessageRequestSchema.parse({
     message: body,
     requestKey,
     delivery,
+    images,
   });
   assertChatWritable(loadChat(applicationId, chatId).chat);
   await askWorker("send", {
     scope: { applicationId, chatId },
-    message: { id: input.requestKey, body: input.message, delivery },
+    message: {
+      id: input.requestKey,
+      body: input.message,
+      delivery,
+      images: input.images,
+    },
   });
   touchChat(chatId);
   return chatSnapshot(applicationId, chatId);
+}
+
+/**
+ * An image the owner attached, read back from Pi's history. The transcript
+ * only counts them, so a conversation with pictures stays light to watch.
+ */
+export async function chatImage(
+  applicationId: string,
+  chatId: string,
+  messageId: string,
+  index: number,
+) {
+  loadChat(applicationId, chatId);
+  const image = await askWorker<{ mimeType: string; data: string }>("image", {
+    scope: { applicationId, chatId },
+    message: { id: messageId, index },
+  }).catch((error) => {
+    throw error instanceof WorkerRefusal && error.code === "missing"
+      ? new NotFoundError(error.message)
+      : error;
+  });
+  return { mimeType: image.mimeType, bytes: Buffer.from(image.data, "base64") };
 }
 
 /** Pi goes on with what an interruption left. Only its owner says so. */
