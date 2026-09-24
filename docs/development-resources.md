@@ -171,6 +171,23 @@ Do not mark an uncertain deletion complete. If blocked, leave labels and records
 intact and report the remaining resource to the owner. Archiving a session
 removes its worktree, which is not proof that a cloud resource is unused.
 
+### Local preview processes
+
+Record the PID and port of every preview a task starts. Stop previews used
+only for your own checks before the handoff. Leave the preview the owner will
+review running and put its link in the handoff; stop it when the owner's review
+ends, and at the latest in the check [after your work merges](#after-your-work-merges).
+Stop the exact processes the task started with `SIGTERM`, run
+`node scripts/check-preview-processes.mjs` in that checkout to find any
+remaining Next.js or local preview processes, and confirm their ports closed.
+
+The check reports PIDs without stopping anything or printing command arguments.
+Match each PID to its owner, command and listening port before stopping it.
+Keep intentional SSH tunnels, installed Hallvi services and other retained
+processes running, and record their owner in the task handoff. If a retained
+process needs files inside a temporary checkout, move that dependency to its
+retained location before the checkout disappears.
+
 ## After your work merges
 
 When a task's pull request merges into `main`, check every resource the task
