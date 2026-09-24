@@ -98,40 +98,35 @@ test(
     await expect(
       page.getByText("Production", { exact: true }),
     ).not.toBeVisible();
-    // Before a deployment records the stack, only the application and care
-    // destinations exist; Processes, Database and the rest appear as recorded.
-    // A quiet row reveals what the application could run, with the reason
-    // each is hidden, and the empty view says what Hallvi would do there.
+    // The sidebar grows with the application: only the pages every
+    // application has, plus Access, are listed until a record gives one
+    // content. A quiet row reveals the rest, each saying why it is down
+    // there, and the empty view says what Hallvi would do on it.
     await expect(
       nav.getByRole("button", { name: "Database", exact: true }),
     ).toHaveCount(0);
     await nav.getByRole("button", { name: "Show more", exact: true }).click();
     await expect(
-      nav.getByRole("button", {
-        name: "Jobs after deployment",
-        exact: true,
-      }),
+      nav.getByRole("button", { name: "Jobs not checked", exact: true }),
     ).toBeVisible();
-    // Delivery is two destinations: Access is always listed, while CDN waits
-    // until a CDN caches something.
+    // Access is listed whatever the records say, because its unknowns are the
+    // point. CDN waits, and says its emptiness is a decision rather than a
+    // gap in looking.
     await expect(
-      nav.getByRole("button", { name: "Access", exact: true }),
+      nav.getByRole("button", { name: "Access not checked", exact: true }),
     ).toHaveCount(1);
     await expect(
-      nav.getByRole("button", { name: "CDN after deployment", exact: true }),
+      nav.getByRole("button", { name: "CDN not set up", exact: true }),
     ).toBeVisible();
     await nav
-      .getByRole("button", { name: "Database after deployment", exact: true })
+      .getByRole("button", { name: "Database not checked", exact: true })
       .click();
     await expect(
       page.getByRole("heading", { name: "Database", exact: true }),
     ).toBeVisible();
     await nav.getByRole("button", { name: "Show less", exact: true }).click();
     await expect(
-      nav.getByRole("button", {
-        name: "Jobs after deployment",
-        exact: true,
-      }),
+      nav.getByRole("button", { name: "Jobs not checked", exact: true }),
     ).toHaveCount(0);
     // The viewed destination stays listed while open, even when hidden.
     await expect(
@@ -140,29 +135,35 @@ test(
     // Command output is inside Activity now, which is shut when you arrive.
     // Opening it is part of reaching the page, so the journey opens it.
     await nav.getByRole("button", { name: "Activity", exact: true }).click();
-    for (const section of [
-      "Architecture",
-      "Deployment",
-      "Backups",
-      "Command output",
-      "Monitoring",
-    ]) {
+    for (const section of ["Architecture", "Deployment", "Command output"]) {
       await nav.getByRole("button", { name: section, exact: true }).click();
       await expect(
         page.getByRole("heading", { name: section, exact: true }),
       ).toBeVisible();
     }
     // Access carries no title of its own: the first board is the answer.
-    await nav.getByRole("button", { name: "Access", exact: true }).click();
+    await nav
+      .getByRole("button", { name: "Access not checked", exact: true })
+      .click();
     await expect(
       page.getByRole("heading", { name: "What a visitor sees", exact: true }),
     ).toBeVisible();
-    // Configuration is gated too now: nothing has named a variable, so it
-    // waits in the quiet row with its reason rather than being listed.
+    // Nothing has arranged a copy or a watcher, and nothing has named a
+    // variable, so all three wait in the quiet row with their reason. Each is
+    // still one press away.
     await nav.getByRole("button", { name: "Show more", exact: true }).click();
+    for (const [name, heading] of [
+      ["Backups not set up", "Backups"],
+      ["Monitoring not set up", "Monitoring"],
+    ]) {
+      await nav.getByRole("button", { name, exact: true }).click();
+      await expect(
+        page.getByRole("heading", { name: heading, exact: true }),
+      ).toBeVisible();
+    }
     await nav
       .getByRole("button", {
-        name: "Environment Variables after deployment",
+        name: "Environment Variables not checked",
         exact: true,
       })
       .click();
@@ -173,7 +174,11 @@ test(
     await expect(
       page.getByRole("heading", { name: "Environment Variables", exact: true }),
     ).toBeVisible();
-    await nav.getByRole("button", { name: "Backups", exact: true }).click();
+    // A reload shuts the quiet row again, so the rest are one press away.
+    await nav.getByRole("button", { name: "Show more", exact: true }).click();
+    await nav
+      .getByRole("button", { name: "Backups not set up", exact: true })
+      .click();
     // Unknown inventory and missing protection are stated separately: neither
     // is presented as proof that there is nothing to back up.
     await expect(

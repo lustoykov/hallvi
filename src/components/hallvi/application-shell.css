@@ -1618,7 +1618,9 @@ dd.hv-protection-warn {
 .hv-application-navigation .hv-nav-unused svg {
   opacity: 0.7;
 }
-.hv-application-navigation .hv-nav-unused small {
+/* A row that is listed with nothing to show carries the same quiet reason
+   as one waiting under "Show more". */
+.hv-application-navigation .hv-destinations small {
   font-size: 10.5px;
   margin-top: 2px;
 }
@@ -1627,7 +1629,7 @@ dd.hv-protection-warn {
 }
 
 @media (max-width: 640px) {
-  .hv-application-navigation .hv-nav-unused small {
+  .hv-application-navigation .hv-destinations small {
     display: none;
   }
 }

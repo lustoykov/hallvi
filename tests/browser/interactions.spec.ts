@@ -55,9 +55,7 @@ test.describe("operating the destinations", () => {
       // A revealed destination says why it is not there, rather than
       // pretending to be a place to go.
       const revealed = await sidebar.innerText();
-      expect(revealed).toMatch(
-        /nothing has looked|nothing can record this|after deployment|check firewall/i,
-      );
+      expect(revealed).toMatch(/not checked|not set up|none here/i);
 
       await sidebar.getByRole("button", { name: /show less/i }).click();
       await expect(more).toBeVisible();

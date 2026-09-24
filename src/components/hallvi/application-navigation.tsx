@@ -15,16 +15,17 @@ import {
   applicationSections,
   type ApplicationSection,
   type ApplicationSectionDefinition,
+  type ListedSection,
 } from "./application-sections";
 import type { ChatSummary } from "@/server/types";
 
 import { ThisHallvi } from "./hallvi-version";
 
 /**
- * What else this application could run, one click away at the bottom of the
- * destinations: the hidden stack destinations as muted rows, each saying why
- * it is hidden. Hiding keeps a simple application clean; revealing shows
- * what Hallvi could take on.
+ * The destinations this application has not earned, one click away at the
+ * bottom of the list: muted rows, each saying quietly why it is down here.
+ * A short list keeps a small application readable; revealing shows what
+ * Hallvi could take on, and nothing is ever gone.
  */
 function Reveal({
   hidden,
@@ -159,11 +160,14 @@ export function ApplicationNavigation({
 }: {
   /** The application identity, when it sits here rather than in the top bar. */
   head?: ReactNode;
-  /** The destinations to list; defaults to every one. */
-  sections?: readonly ApplicationSectionDefinition[];
   /**
-   * Stack destinations this application does not show, each with the reason.
-   * A quiet row at the end of the stack group reveals them.
+   * The destinations to list; defaults to every one. A listed row with a
+   * `note` is one that has nothing to show yet and says so.
+   */
+  sections?: readonly ListedSection[];
+  /**
+   * The destinations this application does not list, each with the reason.
+   * A quiet row at the end reveals them.
    */
   hidden?: readonly (ApplicationSectionDefinition & { note: string })[];
   revealed?: boolean;
@@ -204,7 +208,7 @@ export function ApplicationNavigation({
           {primary.map((item, index) => {
             const groupStart =
               index > 0 && item.group !== primary[index - 1].group;
-            const row = (
+            return (
               <button
                 key={item.id}
                 className={`${section === item.id ? "selected" : ""} ${groupStart ? "hv-nav-group-start" : ""}`}
@@ -212,10 +216,12 @@ export function ApplicationNavigation({
                 onClick={() => onSection(item.id)}
               >
                 <item.icon aria-hidden="true" />
-                <span>{item.label}</span>
+                <span>
+                  {item.label}
+                  {item.note && <small>{item.note}</small>}
+                </span>
               </button>
             );
-            return row;
           })}
           {hidden.length > 0 && (
             <Reveal

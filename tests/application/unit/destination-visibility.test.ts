@@ -1,17 +1,17 @@
 // Which destinations an application lists, decided by its records.
 //
-// This used to be decided twice: by the records, and behind them by a stack
-// derived from a deployment model the product stopped writing to. The second
-// answer could only ever say "nothing", which is the worst thing a fallback
-// can say — it reads like an answer. The records decide it now, and this
-// holds them to it, because a destination wrongly hidden is a page the owner
-// cannot reach and a destination wrongly shown is a claim that something
-// exists.
+// The sidebar grows with the application: a page is listed when a record
+// gives it something to show, and everything else waits under "Show more"
+// with the reason on the row. A destination wrongly listed is a claim that
+// something exists; a destination wrongly hidden is a page the owner cannot
+// find. Neither is allowed, so the four answers a row can carry — content,
+// silence, an established absence, and a decision nobody has made — are held
+// apart here.
 import { describe, expect, it } from "vitest";
 
 import {
   hiddenSections,
-  recordedSections,
+  standings,
   visibleSections,
 } from "../../../src/components/hallvi/application-sections";
 import type { SavedInformation } from "../../../src/server/operator-data";
@@ -33,25 +33,35 @@ const record = (
     presentation,
   }) as SavedInformation;
 
-const states = (kind: string, retiredAt: string | null = null) =>
+const states = (
+  kind: string,
+  presence: "present" | "absent" = "present",
+  retiredAt: string | null = null,
+) =>
   record(
     {
       views: ["overview"],
       role: "status",
       status: "verified",
       checks: [],
-      states: { ref: { kind, id: `${kind}-1` }, presence: "present" },
+      states: { ref: { kind, id: `${kind}-1` }, presence },
     } as unknown as SavedInformation["presentation"],
     retiredAt,
   );
 
 const ids = (records: SavedInformation[], active = null) =>
-  visibleSections(active, recordedSections(records)).map(
-    (section) => section.id,
+  visibleSections(active, standings(records)).map((section) => section.id);
+
+const why = (records: SavedInformation[], active = null) =>
+  Object.fromEntries(
+    hiddenSections(active, standings(records)).map((section) => [
+      section.id,
+      section.note,
+    ]),
   );
 
 describe("what an application lists", () => {
-  it("hides a stack destination nothing names, and lists the ones that are", () => {
+  it("lists a destination a record gives content, and hides the rest", () => {
     const listed = ids([states("process"), states("volume")]);
     expect(listed).toContain("processes");
     expect(listed).toContain("storage");
@@ -60,19 +70,39 @@ describe("what an application lists", () => {
     expect(listed).not.toContain("jobs");
   });
 
-  it("always lists the destinations whose absence is itself the answer", () => {
+  // The bug the sidebar exploration found. whoami's one volume record exists
+  // to say the container keeps nothing, and the sidebar read it as storage
+  // worth a page — off the very record that says there is none.
+  it("does not let a record stating an absence light its destination", () => {
+    expect(ids([states("volume", "absent")])).not.toContain("storage");
+    expect(why([states("volume", "absent")]).storage).toBe(
+      "checked · none here",
+    );
+  });
+
+  it("always lists the pages that exist for every application, and Access", () => {
     const listed = ids([]);
     for (const always of [
       "overview",
       "architecture",
       "deployment",
       "history",
-      "backups",
-      "monitoring",
-      "access",
       "logs",
+      // Its unknowns are the point: a page that appears only once a firewall
+      // has been read hides the fact that nobody read one.
+      "access",
     ])
       expect(listed).toContain(always);
+  });
+
+  // They used to be listed whatever the records said. On a stateless
+  // container with nothing arranged that is two care pages about nothing, and
+  // the offer belongs on the row rather than in a page nobody asked for.
+  it("waits for content before listing Backups and Monitoring", () => {
+    expect(ids([])).not.toContain("backups");
+    expect(ids([])).not.toContain("monitoring");
+    expect(ids([states("backup-copy")])).toContain("backups");
+    expect(ids([states("monitor")])).toContain("monitoring");
   });
 
   it("keeps the destination being viewed listed even with nothing recorded", () => {
@@ -81,43 +111,28 @@ describe("what an application lists", () => {
 
   it("stops listing a destination whose only record was retired", () => {
     expect(ids([states("database")])).toContain("database");
-    expect(ids([states("database", "2026-09-16T12:00:00.000Z")])).not.toContain(
-      "database",
-    );
+    expect(
+      ids([states("database", "present", "2026-09-16T12:00:00.000Z")]),
+    ).not.toContain("database");
   });
 
-  it("says why a hidden destination is hidden, and changes it once something ships", () => {
-    const before = Object.fromEntries(
-      hiddenSections(null, recordedSections([])).map((section) => [
-        section.id,
-        section.note,
-      ]),
-    );
-    expect(before.cdn).toBe("after deployment");
+  it("says why a destination is not listed, and keeps the answers apart", () => {
+    const reasons = why([]);
+    // Nobody has looked.
+    expect(reasons.database).toBe("not checked");
+    // Nobody has arranged it, which is a decision rather than a gap.
+    expect(reasons.backups).toBe("not set up");
+    expect(reasons.monitoring).toBe("not set up");
+    expect(reasons.cdn).toBe("not set up");
+  });
 
-    const deployed = recordedSections([
-      record({
-        views: ["deployment"],
-        role: "outcome",
-        status: "verified",
-        checks: [],
-        content: {
-          kind: "deployment",
-          repositoryUrl: "https://github.com/qa/app",
-          revision: "abcdef0",
-          server: "host",
-          changes: [],
-        },
-      } as unknown as SavedInformation["presentation"]),
-    ]);
-    const after = Object.fromEntries(
-      hiddenSections(null, deployed).map((section) => [
-        section.id,
-        section.note,
-      ]),
+  it("says on the row when a listed page has nothing to show", () => {
+    const rows = visibleSections(null, standings([]));
+    expect(rows.find((section) => section.id === "access")?.note).toBe(
+      "not checked",
     );
-    // "After deployment" is false once one has happened; what is true then is
-    // that nobody has looked.
-    expect(after.cdn).toBe("not checked yet");
+    expect(
+      rows.find((section) => section.id === "overview")?.note,
+    ).toBeUndefined();
   });
 });

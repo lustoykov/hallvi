@@ -527,6 +527,33 @@ around the visual it already had. It lives in `register.tsx` and
   a release that holds with a failed command inside it shows before it is
   opened.
 
+### The sidebar grows with the application
+
+Decided 24 September 2026, from a four-direction exploration. The list used to
+be the same fourteen rows whatever the application was, so a stateless
+container advertised a storage page and a backups page about nothing.
+
+- **A page is listed when a record gives it content.** Content means a record
+  that says its subject is *present*. A record that says a subject is absent
+  is an answer of its own and does not light the page: whoami's one volume
+  record exists to say it keeps nothing. The map does not count either — it
+  draws shapes, and a shape is not a thing that exists.
+- **Access is always listed**, because its unknowns are the point. A page that
+  appears only once a firewall has been read is a page that hides the fact
+  that nobody read one. Overview, Architecture, Deployment, History and
+  Command output are always listed too: they describe every application, or
+  record what was done to it.
+- **Everything else waits under "Show more" with a quiet reason**, and the
+  reasons are kept apart: "not checked" is silence, "checked · none here" is
+  an established absence, and "not set up" is a decision nobody has made. A
+  page that is not listed is one press away and never gone.
+- **A listed page with nothing to show says so on its row.** Access on a fresh
+  application reads "not checked" under its name, in the same small muted type
+  the hidden rows use.
+
+`application-sections.ts` owns the rule (`standings`, `visibleSections`,
+`hiddenSections`); `application-navigation.tsx` draws it.
+
 ### Access
 
 Decided 24 September 2026, from a five-direction exploration the owner narrowed
