@@ -192,6 +192,39 @@ Do not mark an uncertain deletion complete. If blocked, leave labels/records int
 for the daily audit and report the remaining resource. Removing a worktree is not
 itself proof that a cloud resource is unused.
 
+## After your work merges
+
+When a task's pull request merges into `main`, check every resource the task
+created: Git worktrees, local and GitHub branches, Docker containers, images and
+volumes, and temporary outputs.
+
+For each exact resource, establish that the task owns it and that nothing still
+depends on it. Check running processes, open files and ports, `git status`
+including untracked and ignored files, commits that are not on `main`, other
+worktrees, open pull requests, and any data or test evidence. A merged pull
+request or an old modification date alone does not show that deletion is safe.
+
+Then give the owner a short GO/NO-GO list that names each exact target, says why
+it is or is not safe to remove, and estimates the space it frees. Wait for fresh
+approval before deleting anything under `~/biz/` or any Docker resource. These
+instructions are not that approval, and neither is an approval given earlier
+for a different target.
+
+Once the owner approves:
+
+- Remove a worktree with plain `git worktree remove`, never with `--force`.
+- Delete a GitHub branch only after verifying that its exact tip is in `main`,
+  that it is not protected, that no open pull request uses it as head or base,
+  and that the remote tip has not moved. Delete it with an expected-SHA lease,
+  so a concurrent push stops the deletion.
+- Remove only task-owned Docker containers and images that nothing else depends
+  on. A volume is persistent data: ask for separate, explicit approval for each
+  one.
+- Never prune worktrees, Docker resources or branches in bulk.
+
+Verify each removal, then report what you removed and what you kept, with the
+reason for each. Keep task histories, the owner's outputs and evidence.
+
 ## Daily audit and expired cleanup
 
 Inventory all pages of servers, volumes, snapshots/backups, primary and floating

@@ -29,8 +29,12 @@ Cleanup is limited to exact Hallvi development resources with verified
 ownership and disposable contents; a project folder is not blanket permission
 to remove user data. Never extend cleanup to unrelated folders or resources.
 Record ownership and retention outside worktrees. Task completion includes
-verified cleanup or an explicit retained-resource handoff. The local daily
-Dev Cleanup task is the fallback; it also owns shared cloud cleanup.
+verified cleanup or an explicit retained-resource handoff. After your work
+merges, give the owner the GO/NO-GO list described in
+[after your work merges](docs/development-resources.md#after-your-work-merges)
+and wait for fresh approval before deleting anything under `~/biz/` or in
+Docker. The local daily Dev Cleanup task is the fallback; it also owns shared
+cloud cleanup.
 
 Use the existing authorized Default Hetzner project. On 14 September 2026 the
 owner standing-authorized creating billed development resources there whenever
