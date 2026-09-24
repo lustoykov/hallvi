@@ -171,6 +171,22 @@ Do not mark an uncertain deletion complete. If blocked, leave labels and records
 intact and report the remaining resource to the owner. Archiving a session
 removes its worktree, which is not proof that a cloud resource is unused.
 
+### Local preview processes
+
+Run task previews in a foreground terminal. If a preview must run in the
+background, record its PID and port with the task so it can be stopped later.
+When the review ends, stop the exact preview processes the task started with
+`SIGTERM`, then run `node scripts/check-preview-processes.mjs` in that checkout
+to find any remaining Next.js or local preview processes. Confirm that their
+ports closed. This is part of finishing the task.
+
+The check reports PIDs without stopping anything or printing command arguments.
+Match each PID to its owner, command and listening port before stopping it.
+Keep intentional SSH tunnels, installed Hallvi services and other retained
+processes running, and record their owner in the task handoff. If a retained
+process needs files inside a temporary checkout, move that dependency to its
+retained location before the checkout disappears.
+
 ## After your work merges
 
 When a task's pull request merges into `main`, check every resource the task
@@ -183,18 +199,6 @@ depends on it. Check running processes, open files and ports, `git status`
 including untracked and ignored files, commits that are not on `main`, other
 worktrees, open pull requests, and any data or test evidence. A merged pull
 request or an old modification date alone does not show that deletion is safe.
-
-Before archiving a session with a managed worktree, run
-`node scripts/check-worktree-processes.mjs /absolute/path/to/worktree` from
-another checkout. A nonzero result blocks the handoff: identify each process
-and stop only the task's obsolete local previews, then run the check again.
-Keep intentional tunnels, installed Hallvi services and other retained
-processes running. If they depend on files in the worktree, move that
-dependency to its retained location and restart them under their owner before
-archiving. A clear result checks working directories and command paths; also
-inspect open files and ports for less visible dependencies. Run previews in a
-foreground terminal and stop them when their review ends; do not leave
-`next start` detached from the session that launched it.
 
 Then give the owner a short GO/NO-GO list that names each exact target, says why
 it is or is not safe to remove, and estimates the space it frees. Wait for fresh
@@ -262,9 +266,8 @@ in the same durable registry. For Docker, apply the same labels where supported;
 for Git and files, use registry entries. Renew the default 72-hour lease during
 active work. Completion cleanup precedes branch removal and archiving the session.
 
-- Worktrees: archive only after the process check and retained-resource handoff
-  above. Archiving the session removes its managed worktree. Do not remove it by
-  hand; a worktree no session manages is report-only.
+- Worktrees: archiving the session removes them. Do not remove them by hand;
+  a worktree no session manages is report-only.
 - Local branches: require confirmed task completion, no checked-out worktree and
   proof all commits are preserved in the intended integration branch. Keep default,
   protected and unmerged branches. Use `git branch -d`; do not force-delete.
