@@ -30,6 +30,7 @@ import {
   MissingFacts,
   Unchecked,
   processFacts,
+  recorded,
 } from "./evidence";
 import { processesFromRecords } from "./processes-records";
 import { probeReading } from "./pulse";
@@ -339,6 +340,7 @@ export function ProcessesPage({
             defaultOpen={rows.find((row) => row.probes.some(broke))?.id ?? null}
             detail={(row) => {
               const broken = row.probes.find(broke);
+              const readings = recorded(factsOf(row));
               return (
                 <Opened
                   asks={
@@ -422,12 +424,14 @@ export function ProcessesPage({
                       nothing says whether it is running.
                     </Note>
                   )}
-                  <Facts
-                    items={factsOf(row).map((fact) => ({
-                      label: fact.label,
-                      value: <FactCell fact={fact} />,
-                    }))}
-                  />
+                  {readings.length > 0 && (
+                    <Facts
+                      items={readings.map((fact) => ({
+                        label: fact.label,
+                        value: <FactCell fact={fact} />,
+                      }))}
+                    />
+                  )}
                 </Opened>
               );
             }}

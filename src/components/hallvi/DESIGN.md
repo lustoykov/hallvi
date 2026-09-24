@@ -537,8 +537,10 @@ and table around the visual they already had. It lives in `register.tsx` and
   column of pips saying how much of what could be known about a row is known
   ("4 of 7 facts"), in place of the columns that mostly held unknowns.
   Not-applicable is not counted, and a row where everything is not-applicable
-  reads "n/a" rather than "0 of 0". Opening the row names what nobody has
-  looked at and asks for all of it in one question.
+  reads "n/a" rather than "0 of 0". Opening the row says each fact once: the
+  line at the top names what has no reading and asks for all of it in one
+  question, and the list under it holds the readings, so a gap is never a
+  grey chip in both places at once.
 - **Pips are evidence at a glance.** One pip per step or check, in the row, so
   a release that holds with a failed command inside it shows before it is
   opened.

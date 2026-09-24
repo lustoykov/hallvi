@@ -37,6 +37,7 @@ import {
   MissingFacts,
   Unchecked,
   databaseFacts,
+  recorded,
 } from "./evidence";
 import { ProtectionLine } from "./protection-line";
 import { probeReading } from "./pulse";
@@ -381,7 +382,9 @@ export function DatabasePage({
                   <Facts
                     items={[
                       { label: "Engine", value: row.label },
-                      ...factsOf(row)
+                      // Checks and Answering have columns of their own, and
+                      // the sub-table above is the proof.
+                      ...recorded(factsOf(row))
                         .filter(
                           (fact) =>
                             fact.key !== "checks" && fact.key !== "answering",

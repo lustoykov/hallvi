@@ -20,6 +20,10 @@
 // A dash is none of the three and appears nowhere. Not-applicable never
 // counts against a row: a worker with no public address is not a row with a
 // hole in it.
+//
+// Each fact is said once in an opened row. What has no reading is named in
+// the line above (`MissingFacts`); what has one is in the list below
+// (`recorded`).
 
 import type { ReactNode } from "react";
 
@@ -86,6 +90,16 @@ export function FactCell({ fact }: { fact: Fact }) {
 export const askable = (facts: Fact[]) =>
   facts.filter((fact) => fact.state !== "na");
 
+/**
+ * The facts that carry a reading, for the list that shows readings.
+ *
+ * What has none is named once, in the line above it. A fact list that also
+ * printed a "not checked" chip per gap said the same thing twice and put
+ * the field of grey back, one row lower.
+ */
+export const recorded = (facts: Fact[]) =>
+  facts.filter((fact) => fact.state === "known" || fact.state === "absent");
+
 /** The pips, and "3 of 5 facts" beside them. */
 export function Known({ facts }: { facts: Fact[] }) {
   const counted = askable(facts);
@@ -117,7 +131,12 @@ export function Known({ facts }: { facts: Fact[] }) {
   );
 }
 
-/** What an opened row has not been asked, by name, with one ask for the lot. */
+/**
+ * What an opened row has no reading for, by name, with one ask for the lot.
+ *
+ * The only place a gap is named. The fact list under it shows readings, so
+ * a reader meets each fact once, on the side it belongs to.
+ */
 export function MissingFacts({
   facts,
   subject,
@@ -130,21 +149,23 @@ export function MissingFacts({
 }) {
   const open = facts.filter((fact) => fact.state === "unchecked");
   const na = facts.filter((fact) => fact.state === "na");
-  if (!open.length)
-    return (
-      <p className="hv-rg-note">
-        Every fact Hallvi can record about {subject} has been recorded.
-      </p>
-    );
   const names = open.map((fact) => fact.label.toLowerCase()).join(", ");
   return (
     <div className="hv-rg-missing">
-      <span className="hv-rg-label">Not checked</span>
-      {open.map((fact) => (
-        <Unchecked key={fact.key} reason={fact.reason}>
-          {fact.label.toLowerCase()}
-        </Unchecked>
-      ))}
+      {open.length ? (
+        <>
+          <span className="hv-rg-label">Not checked</span>
+          {open.map((fact) => (
+            <Unchecked key={fact.key} reason={fact.reason}>
+              {fact.label.toLowerCase()}
+            </Unchecked>
+          ))}
+        </>
+      ) : (
+        <p className="hv-rg-note">
+          Nothing about {subject} is waiting to be checked.
+        </p>
+      )}
       {na.length ? (
         <>
           <span className="hv-rg-label">Not applicable</span>
@@ -155,9 +176,11 @@ export function MissingFacts({
           ))}
         </>
       ) : null}
-      <Ask onAsk={onAsk} prompt={`Check ${subject} now and record ${names}.`}>
-        Check {open.length === 1 ? "it" : `all ${open.length}`}
-      </Ask>
+      {open.length ? (
+        <Ask onAsk={onAsk} prompt={`Check ${subject} now and record ${names}.`}>
+          Check {open.length === 1 ? "it" : `all ${open.length}`}
+        </Ask>
+      ) : null}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   askable,
   databaseFacts,
   processFacts,
+  recorded,
 } from "@/components/hallvi/evidence";
 import type { ProcessCard } from "@/components/hallvi/stack-prototype/line-story";
 
@@ -66,9 +67,12 @@ describe("what a row is known to say", () => {
   });
 
   it("zero restarts is a reading, and no restart count is not", () => {
-    expect(state(processFacts(process({ restarts: "0" })), "restarts")).toBe(
-      "absent",
-    );
+    const none = processFacts(process({ restarts: "0" }));
+    expect(state(none, "restarts")).toBe("absent");
+    // And it stays in the list an opened row draws, where a gap does not.
+    expect(recorded(none).map((fact) => fact.key)).toContain("restarts");
+    expect(recorded(none).map((fact) => fact.key)).not.toContain("memory");
+
     expect(state(processFacts(process({ restarts: "3" })), "restarts")).toBe(
       "known",
     );
