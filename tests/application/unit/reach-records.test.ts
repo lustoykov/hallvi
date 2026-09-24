@@ -943,6 +943,47 @@ describe("a published address", () => {
     ]);
     expect(story.doors.map((door) => door.id)).toEqual(["https"]);
   });
+
+  it("keeps a loopback door on the same port as a separate way in", () => {
+    const story = read([
+      published("https://shop.example"),
+      address([check("https", "passed", "reachability")]),
+      states(
+        { kind: "door", id: "admin" },
+        {
+          facts: [
+            fact("port", "443/tcp"),
+            fact("sources", "Host loopback only"),
+          ],
+          checks: [check("refused", "passed")],
+        },
+      ),
+    ]);
+    expect(story.doors.map((door) => door.id).sort()).toEqual([
+      "admin",
+      "site",
+    ]);
+    expect(story.doors.find((door) => door.id === "site")).toMatchObject({
+      reach: "internet",
+      established: "answered",
+    });
+  });
+
+  it("carries the address's answer onto an unchecked door it arrives through", () => {
+    const story = read([
+      published("https://shop.example"),
+      address([check("https", "passed", "reachability")]),
+      states(
+        { kind: "door", id: "https" },
+        { facts: [fact("port", "443"), fact("sources", "Internet")] },
+      ),
+    ]);
+    expect(story.doors).toHaveLength(1);
+    expect(story.doors[0]).toMatchObject({
+      id: "https",
+      established: "answered",
+    });
+  });
 });
 
 // What the Access page reads off the projection: the order of the ports, the
