@@ -45,7 +45,10 @@ did not create: label it, register it, and retire it when the task ends.
 Never print credentials or copy them into code, artifacts, commits or pull
 requests. Preserve dirty work, unique data, credentials, retained evidence and
 uncertain resources. Never broadly prune Docker volumes. Worktrees go when
-their session is archived, not by hand.
+their session is archived, not by hand. Before archiving a session with a
+worktree, check for live processes with
+`node scripts/check-worktree-processes.mjs /absolute/path/to/worktree` from
+another checkout and follow the retained-process handoff in the cleanup guide.
 
 ## Changes and checks
 

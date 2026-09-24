@@ -184,6 +184,18 @@ including untracked and ignored files, commits that are not on `main`, other
 worktrees, open pull requests, and any data or test evidence. A merged pull
 request or an old modification date alone does not show that deletion is safe.
 
+Before archiving a session with a managed worktree, run
+`node scripts/check-worktree-processes.mjs /absolute/path/to/worktree` from
+another checkout. A nonzero result blocks the handoff: identify each process
+and stop only the task's obsolete local previews, then run the check again.
+Keep intentional tunnels, installed Hallvi services and other retained
+processes running. If they depend on files in the worktree, move that
+dependency to its retained location and restart them under their owner before
+archiving. A clear result checks working directories and command paths; also
+inspect open files and ports for less visible dependencies. Run previews in a
+foreground terminal and stop them when their review ends; do not leave
+`next start` detached from the session that launched it.
+
 Then give the owner a short GO/NO-GO list that names each exact target, says why
 it is or is not safe to remove, and estimates the space it frees. Wait for fresh
 approval before deleting anything under `~/biz/` or any Docker resource. These
@@ -250,8 +262,9 @@ in the same durable registry. For Docker, apply the same labels where supported;
 for Git and files, use registry entries. Renew the default 72-hour lease during
 active work. Completion cleanup precedes branch removal and archiving the session.
 
-- Worktrees: archiving the session removes them. Do not remove them by hand;
-  a worktree no session manages is report-only.
+- Worktrees: archive only after the process check and retained-resource handoff
+  above. Archiving the session removes its managed worktree. Do not remove it by
+  hand; a worktree no session manages is report-only.
 - Local branches: require confirmed task completion, no checked-out worktree and
   proof all commits are preserved in the intended integration branch. Keep default,
   protected and unmerged branches. Use `git branch -d`; do not force-delete.
