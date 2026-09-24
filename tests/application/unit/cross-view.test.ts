@@ -247,7 +247,7 @@ describe("Access and Processes agree about the way in", () => {
   it("reads the same access mode on both", () => {
     const { processes, reach } = of(world());
     expect(processes.restricted).toBe(true);
-    expect(reach.audience).toBe("controller");
+    expect(reach.audience).toBe("private");
   });
 });
 

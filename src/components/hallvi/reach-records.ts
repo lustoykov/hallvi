@@ -74,6 +74,12 @@ export interface Caller {
   typed: string;
   outcome: "loads" | "refused" | "no-name" | "insecure" | "no-answer";
   /**
+   * Whether this is somewhere a visitor would type, or a port somebody
+   * connected to. Only an address can settle what a visitor gets, so a
+   * refused port must never count towards "every address was asked".
+   */
+  kind: "address" | "port";
+  /**
    * Whether the way in is encrypted: true when it is, false when a check
    * found it is not, null when nothing has checked. "Plain HTTP" is a claim,
    * and a missing or aged certificate reading does not make it.
@@ -146,8 +152,13 @@ export interface ReachView {
   address: string | null;
   domain: DomainState | null;
   tls: TlsState;
-  /** Who the deployment opened HTTP to. */
-  audience: "public" | "controller";
+  /**
+   * Who the deployment opened HTTP to, in three answers. `unknown` is no
+   * access record at all, which is not the same as a private one: saying
+   * "only this computer reaches it" off silence invents a tunnel nobody
+   * recorded.
+   */
+  audience: "public" | "private" | "unknown";
   callers: Caller[];
   doors: Door[];
   ssh: {
@@ -212,6 +223,30 @@ export const hostOf = (typed: string) =>
     .replace(/^https?:\/\//, "")
     .replace(/\/.*$/, "")
     .toLowerCase();
+
+/**
+ * Why the visitor board has no window to draw, which is three different
+ * answers and never one.
+ *
+ * The one that must not be guessed is `none-answered`. "Hallvi asked every
+ * address, and none answered" is a claim about somebody asking for a page,
+ * and neither a name that only resolves nor a port that refused a connection
+ * is one: DNS says the internet can find the provider, and a refusal says a
+ * port is shut. Both used to produce that sentence.
+ *
+ * `unasked` covers an address nobody has asked, including the case where one
+ * address was asked and another was not, because "every address" is then
+ * untrue.
+ */
+export function visitorSilence(
+  callers: Caller[],
+): "no-address" | "unasked" | "none-answered" {
+  const addresses = callers.filter((caller) => caller.kind === "address");
+  if (!addresses.length) return "no-address";
+  return addresses.every((caller) => caller.sure === "proved")
+    ? "none-answered"
+    : "unasked";
+}
 
 /**
  * The addresses worth drawing a window for: the ones that answered, one per
@@ -290,7 +325,12 @@ function urlPort(url: string | null) {
   return port ? `${port}/tcp` : null;
 }
 
-const portNumber = (port: string) => port.match(/^\d+/)?.[0] ?? null;
+/** A TCP port number, or null for UDP, a range or no port on record. */
+function tcpPort(port: string) {
+  const match = port.trim().match(/^(\d+)(?:\/(tcp|udp))?$/i);
+  if (!match || match[2]?.toLowerCase() === "udp") return null;
+  return match[1];
+}
 
 function portOf(fact: (key: string) => string | null) {
   const local = fact("local-port");
@@ -385,9 +425,11 @@ export function reachFromRecords({
   );
   const access = accessRecord?.presentation?.content;
   const audience: ReachView["audience"] =
-    access?.kind === "application-access" && access.mode === "public"
-      ? "public"
-      : "controller";
+    access?.kind !== "application-access"
+      ? "unknown"
+      : access.mode === "public"
+        ? "public"
+        : "private";
 
   /** A label only counts as something to read when it is more than a name. */
   const sentence = (said: string | undefined | null) =>
@@ -501,19 +543,31 @@ export function reachFromRecords({
           detail: refused.value.detail ?? refused.value.label,
         });
     }
-  // A published address and the door it arrives through are one way in.
-  // Keep the door: its checks are about the port itself.
-  const doorPorts = new Set(
-    doors
-      .filter((door) => !addresses.has(door.id))
-      .map((door) => portNumber(door.port)),
-  );
-  for (let at = doors.length - 1; at >= 0; at--)
-    if (
-      addresses.has(doors[at].id) &&
-      doorPorts.has(portNumber(doors[at].port))
-    )
-      doors.splice(at, 1);
+  // A published address and the door it arrives through are one way in, but
+  // only when they are the same endpoint: a door that faces the internet on
+  // the same TCP port. A loopback-only door that also uses 443 is a
+  // different endpoint and stays, as does anything without a port on record.
+  // The door is kept, since its checks are about the port itself, and it
+  // takes over the address's observed answer if it has none of its own.
+  for (let at = doors.length - 1; at >= 0; at--) {
+    const address = doors[at];
+    if (!addresses.has(address.id)) continue;
+    const port = tcpPort(address.port);
+    if (!port) continue;
+    const door = doors.find(
+      (one) =>
+        !addresses.has(one.id) &&
+        one.reach === "internet" &&
+        tcpPort(one.port) === port,
+    );
+    if (!door) continue;
+    if (address.established === "answered" && door.established !== "answered") {
+      door.established = "answered";
+      door.at = address.at;
+      door.unasked = undefined;
+    }
+    doors.splice(at, 1);
+  }
 
   // ---- The firewall. Its absence is a hole, never a tick.
   const firewallRef = subjectsOfKind(live, "firewall")[0] ?? null;
@@ -706,6 +760,7 @@ export function reachFromRecords({
   if (accessUrl)
     callers.push({
       id: "access",
+      kind: "address",
       who: audience === "public" ? "Anyone online" : "You, on this computer",
       from: audience === "public" ? "the internet" : "127.0.0.1",
       typed: accessUrl,
@@ -740,6 +795,7 @@ export function reachFromRecords({
     if (door.reach === "closed")
       callers.push({
         id: `door:${door.id}`,
+        kind: "port",
         who: "Anyone online",
         from: "the internet",
         typed: `port ${door.port}`,
@@ -765,6 +821,7 @@ export function reachFromRecords({
   if (domainRef && !domainGone && (resolves || serves))
     callers.push({
       id: "domain",
+      kind: "address",
       who: "Anyone typing the name",
       from: "the internet",
       typed: domainFacts?.get("name")?.value.value ?? domainRef.id,

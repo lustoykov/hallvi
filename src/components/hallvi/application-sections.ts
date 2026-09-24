@@ -16,6 +16,11 @@ import {
   SlidersHorizontal,
 } from "@phosphor-icons/react";
 import type { SavedInformation } from "@/server/operator-data";
+import {
+  presenceOf,
+  subjectsOfKind,
+  type SubjectKindOf,
+} from "@/server/record-projection";
 
 /**
  * The stable destinations, in the order the sidebar draws them, so a simple
@@ -180,6 +185,25 @@ const always = new Set<ApplicationSection>([
 const NEVER_HIDDEN: ApplicationSection = "access";
 
 /**
+ * Each subject of these kinds, as it stands now.
+ *
+ * One subject at a time, through the same projection the pages read. Asking
+ * whether *any* record says "present" answers with a record a later one
+ * contradicted: a volume that was there on Thursday and removed on Friday
+ * kept Storage and Backups listed while the Storage page, reading the newer
+ * record, said it was gone.
+ */
+function presentSubjects(
+  records: SavedInformation[],
+  kinds: readonly string[],
+) {
+  const live = records.filter((record) => !record.retiredAt);
+  return kinds
+    .flatMap((kind) => subjectsOfKind(live, kind as SubjectKindOf))
+    .map((ref) => presenceOf(live, ref));
+}
+
+/**
  * Whether anything on record holds data this application would lose.
  *
  * Backups is listed from this rather than from a copy existing, because the
@@ -188,13 +212,8 @@ const NEVER_HIDDEN: ApplicationSection = "access";
  * is exactly the case that must not be quiet.
  */
 const holdsData = (records: SavedInformation[]) =>
-  records.some(
-    (record) =>
-      !record.retiredAt &&
-      ["volume", "database"].includes(
-        record.presentation?.states?.ref.kind ?? "",
-      ) &&
-      record.presentation?.states?.presence !== "absent",
+  presentSubjects(records, ["volume", "database"]).some(
+    (subject) => subject.known && subject.presence === "present",
   );
 
 export function standingOf(
@@ -209,12 +228,8 @@ export function standingOf(
   if (section.id === "variables" && waiting) return "recorded";
   const kinds = speaks[section.id];
   if (!kinds) return "recorded";
-  const mine = records
-    .filter((record) => !record.retiredAt)
-    .filter((record) =>
-      kinds.includes(record.presentation?.states?.ref.kind ?? ""),
-    );
-  if (mine.some((record) => record.presentation?.states?.presence !== "absent"))
+  const mine = presentSubjects(records, kinds);
+  if (mine.some((subject) => subject.known && subject.presence === "present"))
     return "recorded";
   // Somebody looked and said there is none. That is an answer, and it is not
   // the same answer as silence.

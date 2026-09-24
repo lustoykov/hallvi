@@ -16,9 +16,14 @@ import {
 } from "../../../src/components/hallvi/application-sections";
 import type { SavedInformation } from "../../../src/server/operator-data";
 
+const AT = "2026-09-16T10:00:00.000Z";
+
 const record = (
   presentation: SavedInformation["presentation"],
-  retiredAt: string | null = null,
+  {
+    at = AT,
+    retiredAt = null,
+  }: { at?: string; retiredAt?: string | null } = {},
 ) =>
   ({
     id: `r-${Math.random()}`,
@@ -26,17 +31,27 @@ const record = (
     title: "",
     body: "",
     evidence: [],
-    establishedAt: "2026-09-16T10:00:00.000Z",
-    createdAt: "2026-09-16T10:00:00.000Z",
-    updatedAt: "2026-09-16T10:00:00.000Z",
+    establishedAt: at,
+    createdAt: AT,
+    updatedAt: AT,
     retiredAt,
     presentation,
   }) as SavedInformation;
 
+/** A record speaking for one subject. `at` decides which one is current. */
 const states = (
   kind: string,
-  presence: "present" | "absent" = "present",
-  retiredAt: string | null = null,
+  {
+    presence = "present",
+    retiredAt = null,
+    at = AT,
+    id = `${kind}-1`,
+  }: {
+    presence?: "present" | "absent";
+    retiredAt?: string | null;
+    at?: string;
+    id?: string;
+  } = {},
 ) =>
   record(
     {
@@ -44,9 +59,9 @@ const states = (
       role: "status",
       status: "verified",
       checks: [],
-      states: { ref: { kind, id: `${kind}-1` }, presence },
+      states: { ref: { kind, id }, presence },
     } as unknown as SavedInformation["presentation"],
-    retiredAt,
+    { at, retiredAt },
   );
 
 const ids = (records: SavedInformation[], active = null) =>
@@ -74,8 +89,10 @@ describe("what an application lists", () => {
   // to say the container keeps nothing, and the sidebar read it as storage
   // worth a page — off the very record that says there is none.
   it("does not let a record stating an absence light its destination", () => {
-    expect(ids([states("volume", "absent")])).not.toContain("storage");
-    expect(why([states("volume", "absent")]).storage).toBe(
+    expect(ids([states("volume", { presence: "absent" })])).not.toContain(
+      "storage",
+    );
+    expect(why([states("volume", { presence: "absent" })]).storage).toBe(
       "checked · none here",
     );
   });
@@ -111,8 +128,41 @@ describe("what an application lists", () => {
   it("lists Backups as soon as something on record holds data", () => {
     expect(ids([states("volume")])).toContain("backups");
     expect(ids([states("database")])).toContain("backups");
-    expect(ids([states("volume", "absent")])).not.toContain("backups");
-    expect(why([states("volume", "absent")]).backups).toBe("not set up");
+    expect(ids([states("volume", { presence: "absent" })])).not.toContain(
+      "backups",
+    );
+    expect(why([states("volume", { presence: "absent" })]).backups).toBe(
+      "not set up",
+    );
+  });
+
+  // A subject has one current state, and it is the newest record's. Reading
+  // "does any record say present" answers with a record a later one
+  // contradicted, and the pages themselves read the newer one.
+  it("follows the newest record about a subject, not any record", () => {
+    const removed = [
+      states("volume", { at: "2026-09-11T12:00:00.000Z" }),
+      states("volume", { at: "2026-09-12T12:00:00.000Z", presence: "absent" }),
+    ];
+    expect(ids(removed)).not.toContain("storage");
+    expect(ids(removed)).not.toContain("backups");
+    expect(why(removed).storage).toBe("checked · none here");
+
+    const added = [
+      states("volume", { at: "2026-09-11T12:00:00.000Z", presence: "absent" }),
+      states("volume", { at: "2026-09-12T12:00:00.000Z" }),
+    ];
+    expect(ids(added)).toContain("storage");
+    expect(ids(added)).toContain("backups");
+  });
+
+  it("keeps a destination while one of its subjects is still there", () => {
+    const listed = ids([
+      states("volume", { id: "gone", presence: "absent" }),
+      states("volume", { id: "documents" }),
+    ]);
+    expect(listed).toContain("storage");
+    expect(listed).toContain("backups");
   });
 
   it("keeps the destination being viewed listed even with nothing recorded", () => {
@@ -122,7 +172,7 @@ describe("what an application lists", () => {
   it("stops listing a destination whose only record was retired", () => {
     expect(ids([states("database")])).toContain("database");
     expect(
-      ids([states("database", "present", "2026-09-16T12:00:00.000Z")]),
+      ids([states("database", { retiredAt: "2026-09-16T12:00:00.000Z" })]),
     ).not.toContain("database");
   });
 

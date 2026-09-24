@@ -128,9 +128,10 @@ test(
     await expect(
       nav.getByRole("button", { name: "Jobs not checked", exact: true }),
     ).toHaveCount(0);
-    // The viewed destination stays listed while open, even when hidden.
+    // The viewed destination stays listed while open, even when nothing has
+    // recorded it, and it keeps saying so on its row while it is open.
     await expect(
-      nav.getByRole("button", { name: "Database", exact: true }),
+      nav.getByRole("button", { name: "Database not checked", exact: true }),
     ).toHaveAttribute("aria-current", "page");
     // Command output is inside Activity now, which is shut when you arrive.
     // Opening it is part of reaching the page, so the journey opens it.
@@ -141,12 +142,24 @@ test(
         page.getByRole("heading", { name: section, exact: true }),
       ).toBeVisible();
     }
-    // Access carries no title of its own: the first board is the answer.
+    // Access is listed whatever the records say, and says so on its row. On
+    // an application nothing has looked at it takes its empty state rather
+    // than drawing boards about nothing, and offers the question that would
+    // change it.
     await nav
       .getByRole("button", { name: "Access not checked", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "What a visitor sees", exact: true }),
+      page.getByRole("heading", {
+        name: "Nothing here has been looked at yet.",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Ask Hallvi what can reach it",
+        exact: true,
+      }),
     ).toBeVisible();
     // Nothing has arranged a copy or a watcher, and nothing has named a
     // variable, so all three wait in the quiet row with their reason. Each is

@@ -157,6 +157,37 @@ describe("what the page says about it", () => {
   it("no longer says connecting a name is unimplemented", () => {
     expect(render([tunnelled()])).not.toContain("not implemented");
   });
+
+  // Silence about access is not a private application. With no access record
+  // at all, "only this computer reaches it" is a tunnel nobody recorded, and
+  // the path must not draw one either.
+  it("invents no private way in when no access record says anything", () => {
+    const html = render([
+      states(
+        { kind: "door", id: "closed" },
+        { facts: [fact("port", "3000")], checks: [check("refused", "passed")] },
+      ),
+    ]);
+    expect(html).not.toContain("Only this computer reaches");
+    expect(html).not.toContain("through a private tunnel");
+    expect(html).toContain("nothing says who can reach it");
+  });
+
+  // A name that resolves proves the internet can find the provider. Nobody
+  // asked the application for a page, so nothing may say they did.
+  it("does not say every address was asked when only DNS answered", () => {
+    const html = render([
+      states(
+        { kind: "domain", id: "shop-example-com" },
+        {
+          facts: [fact("name", "paper.example.com")],
+          checks: [check("resolves", "passed")],
+        },
+      ),
+    ]);
+    expect(html).not.toContain("asked every address");
+    expect(html).toContain("not every address on record has been asked");
+  });
 });
 
 // The header's own copy. A published address has no tunnel to be closed,

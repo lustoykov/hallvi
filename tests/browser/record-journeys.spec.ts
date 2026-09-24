@@ -59,6 +59,9 @@ test.describe("what the pages must never stop saying", () => {
       // established reads as an absence rather than as "nobody looked".
       expect(backups).toMatch(/nothing copies this application's data yet/i);
       const access = await open(page, SCENARIOS, SCENARIO.absent, "access");
+      // Records exist here, so Access draws its boards rather than its empty
+      // state, and the established absence reads as an absence.
+      expect(access).toMatch(/what a visitor sees/i);
       expect(access).toMatch(/this server has no firewall/i);
       expect(access).not.toMatch(/nobody has checked the firewall/i);
     },
