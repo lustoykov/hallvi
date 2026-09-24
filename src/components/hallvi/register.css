@@ -519,6 +519,66 @@
   color: #9aa5b9;
   white-space: nowrap;
 }
+/* A reading nobody has taken. Grey, labelled, and never a dash. */
+.hv-rg-unchecked {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px dashed #ccd5e3;
+  background: #f7f9fc;
+  color: #7d8aa0;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+.hv-rg-unchecked::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #b9c3d4;
+}
+/* Not applicable: there is nothing here to read, and never will be. */
+.hv-rg-unchecked[data-kind="na"] {
+  border-style: solid;
+  border-color: var(--line);
+  background: var(--panel);
+  color: #98a2b5;
+}
+.hv-rg-unchecked[data-kind="na"]::before {
+  display: none;
+}
+/* Checked, and the answer was none. A reading, so it is ink, not grey. */
+.hv-rg-absent {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+/* How much of what could be known about a row is known. */
+.hv-rg-known {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.hv-rg-known em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* What an opened row has not been asked, by name. */
+.hv-rg-missing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hv-rg-missing .hv-rg-label {
+  flex: none;
+}
 .hv-rg-clip {
   display: block;
   overflow: hidden;

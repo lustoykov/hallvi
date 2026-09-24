@@ -2,9 +2,10 @@
 
 // Database, on real records.
 //
-// The selected design (the register): every database a record names, with
-// where its bytes are, how big it was when somebody last read it, and every
-// check that touched it.
+// The selected design (the register): every database a record names, how
+// much of what could be known about it is known (`evidence.tsx`), and every
+// check that touched it. Opening a row names what nobody has looked at and
+// asks for it in one question.
 //
 // "Is this data safe" is the second question anyone arrives here with, and
 // this page used to answer it four times over in its own words. Backups owns
@@ -30,17 +31,22 @@ import {
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
+import {
+  FactCell,
+  Known,
+  MissingFacts,
+  Unchecked,
+  databaseFacts,
+} from "./evidence";
 import { ProtectionLine } from "./protection-line";
 import { probeReading } from "./pulse";
 import {
   Ask,
   Board,
-  Clip,
   Facts,
   Figure,
   Lede,
   Name,
-  None,
   Note,
   Num,
   Opened,
@@ -145,6 +151,12 @@ export function DatabasePage({
       .map((probe) => probe.at!)
       .sort()
       .at(-1) ?? null;
+  // What a record could say about each database, and what it does say.
+  const facts = new Map(rows.map((row) => [row.id, databaseFacts(row, now)]));
+  const factsOf = (row: DatabaseRow) => facts.get(row.id) ?? [];
+  const factOf = (row: DatabaseRow, key: string) =>
+    factsOf(row).find((fact) => fact.key === key)!;
+
   const columns: Column<DatabaseRow>[] = [
     {
       key: "database",
@@ -158,52 +170,42 @@ export function DatabasePage({
       ),
     },
     {
-      key: "where",
-      head: "Where its data lives",
-      cell: (row) => (row.path ? <Clip text={row.path} mono /> : <None />),
+      key: "known",
+      head: "Known",
+      width: 200,
+      cell: (row) => <Known facts={factsOf(row)} />,
     },
     {
-      key: "size",
-      head: "Size",
-      width: 110,
-      align: "end",
-      cell: (row) => (row.size ? <Num>{row.size}</Num> : <None />),
-    },
-    {
-      key: "owner",
-      head: "Used by",
+      key: "answering",
+      head: "Answering",
       width: 150,
-      cell: (row) => (row.owner ? <Clip text={row.owner} /> : <None />),
+      cell: (row) => {
+        const fact = factOf(row, "answering");
+        return fact.state === "known" ? (
+          <Tag tone="good">{fact.value}</Tag>
+        ) : fact.state === "absent" ? (
+          <Tag tone="bad">no</Tag>
+        ) : (
+          <FactCell fact={fact} />
+        );
+      },
     },
     {
       key: "checks",
       head: "Checks",
-      width: 96,
-      cell: (row) => (
-        <Pips
-          empty="never checked"
-          items={row.probes.map((probe) => ({
-            id: probe.key,
-            tone: probeTone(probe),
-            title: `${probe.label}: ${probeWord(probe)}`,
-          }))}
-        />
-      ),
-    },
-    {
-      key: "answered",
-      head: "Last answered",
-      width: 120,
-      align: "end",
-      sort: (row) =>
-        (row.answering?.passed && Date.parse(row.answering.at ?? "")) || 0,
+      width: 110,
       cell: (row) =>
-        row.absent ? (
-          <Tag>none here</Tag>
-        ) : row.answering?.passed && row.answering.at ? (
-          <Num>{ago(row.answering.at, now)}</Num>
+        row.probes.length ? (
+          <Pips
+            empty=""
+            items={row.probes.map((probe) => ({
+              id: probe.key,
+              tone: probeTone(probe),
+              title: `${probe.label}: ${probeWord(probe)}`,
+            }))}
+          />
         ) : (
-          <None>never asked</None>
+          <FactCell fact={factOf(row, "checks")} />
         ),
     },
   ];
@@ -231,15 +233,20 @@ export function DatabasePage({
                 ? present.length
                 : (first?.label ?? "None here")
             }
+            // A missing path is not an absent database. Falling through to
+            // the absence sentence printed "A record states there is no
+            // database" under the name of one that answers queries.
             note={
               present.length > 1
                 ? present.map((row) => row.label).join(", ")
-                : (first?.path ?? "A record states there is no database.")
+                : first
+                  ? (first.path ?? "Where its data lives is not recorded.")
+                  : "A record states there is no database."
             }
           />
           <Figure
             label="Size"
-            value={first?.size ?? "—"}
+            value={first?.size ?? "Not measured"}
             note={
               first?.size
                 ? `Read ${ago(first.sizeAt, now)}`
@@ -328,6 +335,11 @@ export function DatabasePage({
                     </>
                   }
                 >
+                  <MissingFacts
+                    facts={factsOf(row)}
+                    subject={`the ${row.label} database`}
+                    onAsk={onAsk}
+                  />
                   {row.probes.length ? (
                     <div>
                       <span className="hv-rg-label">What proves it</span>
@@ -344,7 +356,12 @@ export function DatabasePage({
                           cells: [
                             probe.label,
                             probe.detail ?? (
-                              <None key="detail">no detail written down</None>
+                              <Unchecked
+                                key="detail"
+                                reason="The check ran. Nobody wrote down what it looked at."
+                              >
+                                not written down
+                              </Unchecked>
                             ),
                             <Num key="when">{ago(probe.at, now)}</Num>,
                             <Tag key="result" tone={probeTone(probe)}>
@@ -364,17 +381,15 @@ export function DatabasePage({
                   <Facts
                     items={[
                       { label: "Engine", value: row.label },
-                      {
-                        label: "Path",
-                        value: row.path ? (
-                          <span className="hv-rg-mono">{row.path}</span>
-                        ) : (
-                          <None />
-                        ),
-                      },
-                      { label: "Size", value: row.size ?? <None /> },
-                      { label: "Used by", value: row.owner ?? <None /> },
-                      { label: "Port", value: row.port ?? <None /> },
+                      ...factsOf(row)
+                        .filter(
+                          (fact) =>
+                            fact.key !== "checks" && fact.key !== "answering",
+                        )
+                        .map((fact) => ({
+                          label: fact.label,
+                          value: <FactCell fact={fact} />,
+                        })),
                       ...row.extras,
                     ]}
                   />

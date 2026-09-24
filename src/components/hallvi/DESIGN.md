@@ -523,6 +523,22 @@ and table around the visual they already had. It lives in `register.tsx` and
   a zero and never a dash that reads as none. Colour is for readings: green for
   a pass that still counts, amber for one too old to count, red only for a
   check that ran and failed.
+- **Three answers, never one.** Chosen 23 September 2026, when a register of
+  four processes could be half grey and said "not recorded", "never checked",
+  "no detail written down" and a bare dash for the same thing. `evidence.tsx`
+  settles it. **Not checked** is a dashed grey pill (`hv-rg-unchecked`) with
+  the reason on hover. **Not applicable** is a solid grey "n/a"
+  (`data-kind="na"`): a worker has no public address, and a check would not
+  produce one, so it is a recorded fact about the thing and never a gap in it.
+  **Checked and absent** is a reading, drawn in ink like every other reading
+  (`hv-rg-absent`): zero restarts is a count somebody took. A dash is none of
+  the three and appears nowhere, in a cell or in a strip figure.
+- **One Known column, not a field of grey.** Processes and Database carry one
+  column of pips saying how much of what could be known about a row is known
+  ("4 of 7 facts"), in place of the columns that mostly held unknowns.
+  Not-applicable is not counted, and a row where everything is not-applicable
+  reads "n/a" rather than "0 of 0". Opening the row names what nobody has
+  looked at and asks for all of it in one question.
 - **Pips are evidence at a glance.** One pip per step or check, in the row, so
   a release that holds with a failed command inside it shows before it is
   opened.
