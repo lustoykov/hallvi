@@ -112,32 +112,13 @@ test(
         exact: true,
       }),
     ).toBeVisible();
-    // Delivery is three destinations: Domains is always listed, while CDN and
-    // Security wait until a CDN caches or a host is available to inspect.
+    // Delivery is two destinations: Access is always listed, while CDN waits
+    // until a CDN caches something.
     await expect(
-      nav.getByRole("button", { name: "Domains", exact: true }),
+      nav.getByRole("button", { name: "Access", exact: true }),
     ).toHaveCount(1);
-    for (const hidden of ["CDN", "Security"])
-      await expect(
-        nav.getByRole("button", {
-          name:
-            hidden === "Security"
-              ? "Security check firewall rules"
-              : "CDN after deployment",
-          exact: true,
-        }),
-      ).toBeVisible();
-    await nav
-      .getByRole("button", {
-        name: "Security check firewall rules",
-        exact: true,
-      })
-      .click();
     await expect(
-      page.getByRole("heading", {
-        name: "Security",
-        exact: true,
-      }),
+      nav.getByRole("button", { name: "CDN after deployment", exact: true }),
     ).toBeVisible();
     await nav
       .getByRole("button", { name: "Database after deployment", exact: true })
@@ -165,13 +146,17 @@ test(
       "Backups",
       "Command output",
       "Monitoring",
-      "Domains",
     ]) {
       await nav.getByRole("button", { name: section, exact: true }).click();
       await expect(
         page.getByRole("heading", { name: section, exact: true }),
       ).toBeVisible();
     }
+    // Access carries no title of its own: the first board is the answer.
+    await nav.getByRole("button", { name: "Access", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "What a visitor sees", exact: true }),
+    ).toBeVisible();
     // Configuration is gated too now: nothing has named a variable, so it
     // waits in the quiet row with its reason rather than being listed.
     await nav.getByRole("button", { name: "Show more", exact: true }).click();

@@ -108,8 +108,8 @@ const destinations: Partial<Record<Part["kind"], ApplicationSection>> = {
   web: "processes",
   private: "processes",
   volume: "storage",
-  gate: "security",
-  tls: "domains",
+  gate: "access",
+  tls: "access",
   offsite: "backups",
   monitor: "monitoring",
 };

@@ -104,9 +104,9 @@ await open("scenario=simple&step=5");
 await shot("10-simple-05-backup-proposal");
 await open("scenario=simple&step=6&section=backups");
 await shot("10-simple-06-backups", { fullPage: true });
-await open("scenario=simple&step=7&section=domains");
+await open("scenario=simple&step=7&section=access");
 await shot("10-simple-07-domain-pending", { fullPage: true });
-await open("scenario=simple&step=8&section=domains");
+await open("scenario=simple&step=8&section=access");
 await shot("10-simple-08-https", { fullPage: true });
 await open("scenario=simple&step=9&section=overview");
 await shot("10-simple-09-down-overview", { fullPage: true });
@@ -137,7 +137,7 @@ if (!quick) {
     [0, "backups"],
     [0, "logs"],
     [0, "monitoring"],
-    [0, "domains"],
+    [0, "access"],
     [0, "variables"],
     [3, "backups"],
     [5, "backups"],
@@ -152,8 +152,8 @@ if (!quick) {
     [14, "jobs"],
     [15, "deployment"],
     [17, "deployment"],
-    [19, "domains"],
-    [21, "domains"],
+    [19, "access"],
+    [21, "access"],
     [22, "variables"],
     [25, "overview"],
     [25, "monitoring"],

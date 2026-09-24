@@ -71,7 +71,7 @@ const chrome: Record<
   },
   access: {
     label: "Access",
-    destination: "security",
+    destination: "access",
     ask: "What can reach this application from outside?",
   },
 };

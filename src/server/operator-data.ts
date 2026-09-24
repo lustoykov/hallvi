@@ -331,9 +331,8 @@ export const informationInputSchema = z.object({
             "backups",
             "logs",
             "monitoring",
-            "domains",
+            "access",
             "cdn",
-            "security",
             "variables",
           ]),
         )

@@ -238,7 +238,7 @@ export function scenarios(): Scenario[] {
           {
             title: "There is no firewall in front of this server",
             presence: "absent",
-            views: ["security"],
+            views: ["access"],
           },
         ),
         states(
@@ -924,7 +924,7 @@ function richRecords(id: string): SavedInformation[] {
       {
         at: ago(2 * HOUR),
         title: "The name resolves and serves",
-        views: ["domains"],
+        views: ["access"],
         facts: [
           fact(
             "name",
@@ -945,7 +945,7 @@ function richRecords(id: string): SavedInformation[] {
       {
         at: ago(2 * HOUR),
         title: "HTTPS is valid",
-        views: ["domains"],
+        views: ["access"],
         facts: [
           fact("issuer", "Let's Encrypt", "identity", "reported"),
           fact(
@@ -978,7 +978,7 @@ function richRecords(id: string): SavedInformation[] {
       {
         at: ago(HOUR),
         title: "The firewall allows SSH and HTTPS",
-        views: ["security"],
+        views: ["access"],
         facts: [
           fact("provider", "Hetzner Cloud", "configuration", "reported"),
           fact("default", "Deny unless listed", "configuration", "reported"),
@@ -993,7 +993,7 @@ function richRecords(id: string): SavedInformation[] {
       {
         at: ago(HOUR),
         title: "HTTPS is open to everyone",
-        views: ["security"],
+        views: ["access"],
         facts: [fact("port", "443"), fact("sources", "anywhere")],
         checks: [check("open", "passed")],
       },
@@ -1004,7 +1004,7 @@ function richRecords(id: string): SavedInformation[] {
       {
         at: ago(HOUR),
         title: "The database port refuses from outside",
-        views: ["security"],
+        views: ["access"],
         facts: [fact("port", "5432"), fact("sources", "the container network")],
         checks: [
           check("refused", "passed", "reachability", {
@@ -1364,7 +1364,7 @@ function paperlessRecords(id: string): SavedInformation[] {
       {
         at: ago(2 * HOUR),
         title: "The site is reachable through the tunnel",
-        views: ["security"],
+        views: ["access"],
         facts: [
           fact("port", "8000"),
           fact("sources", "Server loopback via SSH tunnel"),
@@ -1378,7 +1378,7 @@ function paperlessRecords(id: string): SavedInformation[] {
       {
         at: ago(2 * HOUR),
         title: "The database port is open on the private network",
-        views: ["security"],
+        views: ["access"],
         facts: [fact("port", "5432"), fact("sources", "the container network")],
         checks: [
           check("open", "passed", "reachability", {

@@ -95,10 +95,9 @@ test.describe("operating the destinations", () => {
         "Backups",
         "Command output",
         "Monitoring",
-        "Domains",
+        "Access",
         "Environment Variables",
         "CDN",
-        "Security",
       ];
       const labels = (await sidebar.locator("button").allInnerTexts())
         .map((text) => text.trim().split("\n")[0])

@@ -1,0 +1,229 @@
+/* Access: every class here starts with hv-ac-.
+   It sits on the register (`hv-rg-*`) and the shell's own tokens. No new
+   colours, no dark surfaces: a browser window, a signal meter and a path. */
+
+/* The Open button is taller than a heading; give its row room to breathe. */
+.hv-ac .hv-rg-board-head:has(.hv-rg-board-tools) {
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.hv-ac-nothing {
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.75;
+  max-width: 68ch;
+}
+
+/* ------------------------------------------------ what a visitor sees */
+
+/* A browser as wide as a browser is. */
+.hv-ac-visits {
+  display: grid;
+  gap: 12px;
+}
+.hv-ac-visit {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: #fff;
+  box-shadow: var(--shadow-s);
+}
+.hv-ac-visit-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+}
+.hv-ac-visit-dots {
+  display: inline-flex;
+  gap: 5px;
+}
+.hv-ac-visit-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+.hv-ac-visit-url {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hv-ac-visit-url svg {
+  flex-shrink: 0;
+  color: var(--green-text);
+}
+.hv-ac-visit-body {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 18px 20px;
+}
+.hv-ac-visit-saw {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+.hv-ac-visit-saw li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hv-ac-visit-saw svg {
+  flex-shrink: 0;
+  color: var(--green);
+  font-size: 15px;
+}
+/* A picture of "a page", faint, so the window reads as a browser. */
+.hv-ac-visit-page {
+  display: grid;
+  flex: 0 0 170px;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #fbfcff, #f6f8fd);
+}
+.hv-ac-visit-page i {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--blue-soft);
+}
+.hv-ac-visit-page i:nth-child(1) {
+  width: 45%;
+  height: 9px;
+}
+.hv-ac-visit-page i:nth-child(2) {
+  width: 90%;
+}
+.hv-ac-visit-page i:nth-child(3) {
+  width: 75%;
+}
+.hv-ac-visit-page i:nth-child(4) {
+  width: 40%;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 6px;
+}
+.hv-ac-visit-foot {
+  padding: 8px 20px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- ports */
+
+/* How open a port is: a small signal meter, fullest for the internet. */
+.hv-ac-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hv-ac-meter {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+}
+.hv-ac-meter i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--line-2);
+}
+.hv-ac-meter i:nth-child(1) {
+  height: 4px;
+}
+.hv-ac-meter i:nth-child(2) {
+  height: 6px;
+}
+.hv-ac-meter i:nth-child(3) {
+  height: 8px;
+}
+.hv-ac-meter i:nth-child(4) {
+  height: 11px;
+}
+.hv-ac-meter[data-level="1"] i:nth-child(-n + 1),
+.hv-ac-meter[data-level="2"] i:nth-child(-n + 2),
+.hv-ac-meter[data-level="3"] i:nth-child(-n + 3),
+.hv-ac-meter[data-level="4"] i {
+  background: color-mix(in srgb, var(--ink-2) 62%, transparent);
+}
+
+/* ------------------------------------------- how a visitor gets there */
+
+.hv-ac-path {
+  display: flex;
+  align-items: flex-start;
+  margin: 10px 0 16px;
+  padding: 0 12px;
+}
+.hv-ac-node {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  max-width: 240px;
+}
+.hv-ac-node b {
+  position: relative;
+  padding-left: 14px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hv-ac-node b::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+.hv-ac-node[data-live] b::before {
+  background: var(--green);
+}
+.hv-ac-node small {
+  padding-left: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.hv-ac-link {
+  flex: 1 1 24px;
+  min-width: 24px;
+  height: 1px;
+  margin: 10px 12px 0;
+  background: var(--line);
+}
+.hv-ac-link[data-live] {
+  background: color-mix(in srgb, var(--green) 45%, transparent);
+}

@@ -1337,9 +1337,9 @@ export function JourneyDirection({
               <button
                 type="button"
                 className="ax-textlink"
-                onClick={() => onOpenDestination("security")}
+                onClick={() => onOpenDestination("access")}
               >
-                Open Security <ArrowRight />
+                Open Access <ArrowRight />
               </button>
             </details>
           ))

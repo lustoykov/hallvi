@@ -69,7 +69,7 @@ describe("what an application lists", () => {
       "history",
       "backups",
       "monitoring",
-      "domains",
+      "access",
       "logs",
     ])
       expect(listed).toContain(always);
@@ -94,7 +94,6 @@ describe("what an application lists", () => {
       ]),
     );
     expect(before.cdn).toBe("after deployment");
-    expect(before.security).toBe("check firewall rules");
 
     const deployed = recordedSections([
       record({

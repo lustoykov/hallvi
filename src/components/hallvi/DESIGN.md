@@ -502,9 +502,9 @@ application with nothing wrong.
 ### The register
 
 Chosen 21 September 2026 from the ten-directions exploration (direction F), and
-the shared vocabulary of the inventory destinations: Deployment, Processes and
-Database are registers; Security and Monitoring borrow its strip and table
-around the visual they already had. It lives in `register.tsx` and
+the shared vocabulary of the inventory destinations: Deployment, Processes,
+Database and Access are registers; Monitoring borrows its strip and table
+around the visual it already had. It lives in `register.tsx` and
 `register.css`, every class prefixed `hv-rg-`.
 
 - **Strip, then table.** A strip of three or four figures states the totals
@@ -526,6 +526,35 @@ around the visual they already had. It lives in `register.tsx` and
 - **Pips are evidence at a glance.** One pip per step or check, in the row, so
   a release that holds with a failed command inside it shows before it is
   opened.
+
+### Access
+
+Decided 24 September 2026, from a five-direction exploration the owner narrowed
+over three rounds. Domains and Security were one question asked twice — "who
+can reach it" — and a reader who wanted the answer had to hold two pages in
+their head. They are now one destination, `access`, drawn by `access-page.tsx`
+on the `reach-records.ts` projection, with its own classes prefixed `hv-ac-`.
+
+- **No title, and no verdict above the boards.** The page opens on "What a
+  visitor sees". A line that grades the page before the boards say anything
+  is the same answer twice, and the second one is always vaguer.
+- **The window says what was seen, in the checks' own words.** One browser per
+  host, the address record's passing observed checks as a checklist, and a
+  footer that dates the reading. The page sketch beside it is a picture of "a
+  page" and never carries a fact. Where a published address and the name in
+  front of it are the same host, that is one window, not two.
+- **Ports are a register, most public first.** The order is the exposure
+  ranking in `reach-records.ts`: answering the internet, facing it untested,
+  named networks, a private network, not stated, the host's own loopback. A
+  small grey meter carries the same ranking in the row, and the outside test
+  says answered, refused, inconclusive or not tested. Opening a row says what
+  the test found and offers to run it again.
+- **The firewall is the ports' footer, not a board.** An unread policy says so
+  in one sentence and offers the read; it never colours the table it sits
+  under.
+- **The path is lit only where a check saw it work.** The internet, the name,
+  the port, the application. A green dot is a reading, and the line between
+  two nodes is grey until one exists.
 
 ### Buttons and fields
 

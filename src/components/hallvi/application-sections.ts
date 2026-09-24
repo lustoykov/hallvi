@@ -12,7 +12,6 @@ import {
   TerminalWindow,
   Pulse,
   Globe,
-  ShieldCheck,
   StackSimple,
   SlidersHorizontal,
 } from "@phosphor-icons/react";
@@ -26,7 +25,7 @@ import type { SavedInformation } from "@/server/operator-data";
  *
  * The activity group is History and command output, and it is drawn apart
  * from the rest: they are the record of what has been done, not parts of the
- * application, and as rows beside Backups and Domains they read as two more
+ * application, and as rows beside Backups and Access they read as two more
  * things needing attention. The sidebar closes them into one heading and
  * opens it again whenever a link lands on either.
  *
@@ -110,19 +109,14 @@ export const applicationSections = [
     group: "activity",
   },
   { id: "monitoring", label: "Monitoring", icon: Pulse, group: "care" },
-  { id: "domains", label: "Domains", icon: Globe, group: "care" },
+  // One destination for who can reach the application: the name, the ports
+  // and the path between them. It is never hidden, because the answers a
+  // reader most needs from it are the ones nobody has established yet.
+  { id: "access", label: "Access", icon: Globe, group: "care" },
   {
     id: "cdn",
     label: "CDN",
     icon: StackSimple,
-    group: "care",
-    hideable: true,
-    available: true,
-  },
-  {
-    id: "security",
-    label: "Security",
-    icon: ShieldCheck,
     group: "care",
     hideable: true,
     available: true,
@@ -185,7 +179,6 @@ export function recordedSections(
   return {
     processes: states("process") || has("web", "private"),
     storage: states("volume") || has("volume"),
-    security: states("door", "access", "firewall") || has("gate", "tls"),
     database: states("database"),
     cache: states("cache", "queue"),
     jobs: states("job"),
@@ -196,9 +189,10 @@ export function recordedSections(
     deployed: live.some(
       (record) => record.presentation?.content?.kind === "deployment",
     ),
-    // Backups and Monitoring are always listed: "nothing is watching" and
-    // "nothing has been established about copies" are the answers a reader
-    // most needs, and a destination that hides them says the opposite.
+    // Access, Backups and Monitoring are always listed: "nothing is
+    // watching", "nothing has been established about copies" and "nobody has
+    // checked what can reach in" are the answers a reader most needs, and a
+    // destination that hides them says the opposite.
   };
 }
 
@@ -246,18 +240,15 @@ export function hiddenSections(
     )
     .map((section) => ({
       ...section,
-      note:
-        section.id === "security"
-          ? "check firewall rules"
-          : !("available" in section && section.available)
-            ? "nothing can record this yet"
-            : recorded.deployed
-              ? // Deployed, and still nothing names one. "Not used" would be
-                // a claim; "after deployment" was simply wrong, because the
-                // deployment has happened. Said the same way Overview says
-                // it, so the two surfaces describe one state in one phrase.
-                "not checked yet"
-              : "after deployment",
+      note: !("available" in section && section.available)
+        ? "nothing can record this yet"
+        : recorded.deployed
+          ? // Deployed, and still nothing names one. "Not used" would be a
+            // claim; "after deployment" was simply wrong, because the
+            // deployment has happened. Said the same way Overview says it,
+            // so the two surfaces describe one state in one phrase.
+            "not checked yet"
+          : "after deployment",
     }));
 }
 
