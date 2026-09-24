@@ -117,8 +117,18 @@ export function OperatorShell({
     focusComposer();
   }
   useEffect(() => {
-    const restore = () =>
-      setActiveSection(sectionFromHash(window.location.hash));
+    const restore = () => {
+      const hash = window.location.hash;
+      const section = sectionFromHash(hash);
+      // A hash that names no page would leave the URL saying one thing and
+      // the screen another. Record links (`#record-…`) belong to the chat.
+      if (!section && hash && !hash.startsWith("#record-")) {
+        const url = new URL(window.location.href);
+        url.hash = "";
+        window.history.replaceState(null, "", url);
+      }
+      setActiveSection(section);
+    };
     const timer = window.setTimeout(restore, 0);
     window.addEventListener("popstate", restore);
     window.addEventListener("hashchange", restore);

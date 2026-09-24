@@ -91,7 +91,7 @@ The architectural direction is sufficiently clear to begin bounded implementatio
 
 After those checkpoints establish the deployment journey, begin the view-by-view design work described above. Detailed care features and broad hardening remain deferred. Exact application repositories, final record fields and visual details can be settled at the relevant checkpoint; they do not require another comprehensive architecture exercise.
 
-This walkthrough is a proposal to refine with the user, not a fixed workflow or new set of state-machine stages. Start with a repository-backed application on one server; use the existing provider as the initial concrete example. Do not design every source, provider and topology variant at once. Use Pi decides for the illustrative interaction; it does not settle the product's default permission mode.
+This walkthrough is a proposal to refine with the user, not a fixed workflow or new set of state-machine stages. Start with a repository-backed application on one server; use the existing provider as the initial concrete example. Do not design every source, provider and topology variant at once. Use Hallvi decides for the illustrative interaction; it does not settle the product's default permission mode.
 
 | Moment | Pi's responsibility | User experience |
 | --- | --- | --- |
@@ -328,7 +328,7 @@ Use explicit host execution and controller-held credentials, with named private 
 
 - How scheduled checks and external requests use the operator's native queue/steer capabilities when ongoing care enters scope. User-facing queue, steer and read-only side-chat interactions are agreed above.
 - What read-only side conversations can inspect, and how findings move into the main conversation when action is desired.
-- Permission scope is per application, defaults to Pi decides and is saved in its operator settings. The first interaction is inline Approve/Decline on the pending tool call.
+- Permission scope is per application, defaults to Hallvi decides and is saved in its operator settings. The first interaction is inline Approve/Decline on the pending tool call.
 - The minimum saved-record structure, update/history behavior and evidence references; how stale or conflicting knowledge gets corrected.
 - The exact view catalog, presentation roles, ordering, record lifecycle and suggested-action interactions.
 - Which current records remain necessary for executable state, and which can become shared knowledge or execution history. Avoid adding a new Task entity alongside existing Runs and Operations without a demonstrated need.
@@ -375,7 +375,7 @@ A database needed by the deployed application is a separate concern. Pi determin
 
 Implement and review storage before Hetzner provisioning, then review provisioning before the first lightweight deployment. Queue/steer and further side-chat interactions stay deferred. Old development application data is disposable; account credentials and `.env.local` are separate and must remain.
 
-- **Applications:** repository identity and latest access check, permission mode (Pi decides by default), optional host connection with controller credential references and optional provider/server identity, timestamps.
+- **Applications:** repository identity and latest access check, permission mode (Hallvi decides by default), optional host connection with controller credential references and optional provider/server identity, timestamps.
 - **Conversations:** application/title, one main conversation and read-only sides, native session reference, current status, timestamps. The worker enforces one live conversation per application; the main label alone is not a lock.
 - **Messages:** user-facing text and structured references to saved information or executions, source, completion state and timestamps. Response delivery metadata belongs here; there is no separate runs table. An in-memory response projection may serve the worker/API without duplicating database records.
 - **Saved information:** application, title/body, evidence references, establishment time, optional presentation (views, role, outcome, checks, next step and URL), creation/update/retirement times. Pi searches, saves, updates and retires it. Presentation is optional: private working knowledge and surfaced information use the same record. Saved preferences cannot override permission settings.

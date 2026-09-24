@@ -844,7 +844,7 @@ function Intake({
         {mode === "always-ask"
           ? "You are on Always ask: every command will wait for your approval."
           : mode === "pi-decides"
-            ? "You are on Pi decides: Hallvi asks before consequential steps, at its own judgment."
+            ? "You are on Hallvi decides: Hallvi asks before consequential steps, at its own judgment."
             : "You are on Bypass: Hallvi will not ask before running commands."}
       </p>
     </main>
@@ -990,7 +990,7 @@ function Bar({
                 }
               >
                 <option value="always-ask">Always ask</option>
-                <option value="pi-decides">Pi decides</option>
+                <option value="pi-decides">Hallvi decides</option>
                 <option value="bypass">Bypass</option>
               </select>
             </label>

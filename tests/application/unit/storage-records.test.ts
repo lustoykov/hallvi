@@ -49,6 +49,28 @@ describe("storageFromRecords", () => {
     expect(story.volumes[0].mount).toBe("/etc/todos");
   });
 
+  it("tells two volumes of one process apart by the names the map gives them", () => {
+    const story = read([
+      topology(
+        [
+          { id: "app", kind: "web", name: "Paperless" },
+          { id: "media", kind: "volume", name: "Documents and media" },
+          { id: "data", kind: "volume", name: "Application data" },
+        ],
+        [
+          { from: "app", to: "media", network: "disk" },
+          { from: "app", to: "data", network: "disk" },
+        ],
+      ),
+      volume("media"),
+      volume("data"),
+    ]);
+    expect(story.pieces.map((piece) => piece.label).sort()).toEqual([
+      "Application data",
+      "Documents and media",
+    ]);
+  });
+
   it("says nobody tested persistence rather than implying it holds", () => {
     const story = read([volume("data", { facts: [fact("path", "/data")] })]);
     expect(story.keptAt).toBeNull();

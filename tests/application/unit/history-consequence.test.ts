@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { historyFromRecords } from "@/components/hallvi/history-records";
+import { attentionItems } from "@/components/hallvi/operation-model";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 
@@ -178,6 +179,53 @@ describe("what earns a row in a history", () => {
     expect(events).toHaveLength(1);
     expect(events[0].steps?.map((step) => step.at)).toEqual([
       "2026-09-15T11:56:00.000Z",
+    ]);
+  });
+});
+
+describe("what needs the owner", () => {
+  it("keeps a failed probe Hallvi carried on past, without asking for anyone", () => {
+    const operations = historyFromRecords({
+      records: [],
+      executions: [
+        execution("probe", "failed", "2026-09-15T12:00:00.000Z"),
+        execution("next", "succeeded", "2026-09-15T12:01:00.000Z"),
+      ],
+    });
+    expect(operations.map((one) => one.id)).toContain("execution:probe");
+    expect(attentionItems(operations)).toEqual([]);
+  });
+
+  it("asks for the owner when the work stopped on the failure", () => {
+    const operations = historyFromRecords({
+      records: [],
+      executions: [execution("last", "failed")],
+    });
+    expect(attentionItems(operations).map((one) => one.id)).toEqual([
+      "execution:last",
+    ]);
+  });
+
+  it("still asks about a failed release, whatever ran after it", () => {
+    const operations = historyFromRecords({
+      records: [
+        record(
+          "release",
+          {},
+          {
+            status: "failed",
+            views: ["deployment"],
+            content: { kind: "deployment", revision: "abc1234" },
+          },
+        ),
+      ],
+      executions: [
+        execution("probe", "failed", "2026-09-15T12:00:00.000Z"),
+        execution("next", "succeeded", "2026-09-15T12:01:00.000Z"),
+      ],
+    });
+    expect(attentionItems(operations).map((one) => one.id)).toEqual([
+      "record:release",
     ]);
   });
 });

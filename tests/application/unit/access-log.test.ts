@@ -57,6 +57,19 @@ describe("the access log", () => {
     expect(parseCaddyLine(line)?.status).toBe(500);
   });
 
+  it("leaves Hallvi's own checks out of the visitors", () => {
+    const own = line.replace(
+      '"headers":{}',
+      '"headers":{"User-Agent":["Hallvi access check"]}',
+    );
+    expect(parseCaddyLine(own)).toBeNull();
+    const browser = line.replace(
+      '"headers":{}',
+      '"headers":{"User-Agent":["Mozilla/5.0"]}',
+    );
+    expect(parseCaddyLine(browser)).not.toBeNull();
+  });
+
   it("ignores everything that is not a request", () => {
     expect(parseCaddyLine("hallvi-following")).toBeNull();
     expect(parseCaddyLine('{"level":"info","msg":"serving"}')).toBeNull();

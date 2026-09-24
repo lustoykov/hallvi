@@ -149,7 +149,7 @@ async function workspaceArchitecture(
   if (Architecture === "amd64" || Architecture === "x86_64") return "amd64";
   if (Architecture === "arm64" || Architecture === "aarch64") return "arm64";
   throw new Error(
-    `Pi's workspace does not support this Docker Engine architecture (${String(Architecture ?? "unknown")}).`,
+    `Hallvi's workspace does not support this Docker Engine architecture (${String(Architecture ?? "unknown")}).`,
   );
 }
 

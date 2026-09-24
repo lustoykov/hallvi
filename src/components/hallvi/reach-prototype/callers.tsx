@@ -184,10 +184,13 @@ export function CallersDirection({
                 <i aria-hidden="true" />
                 <i aria-hidden="true" />
                 <i aria-hidden="true" />
-                <span className="axca-url" data-secure={secure && loads}>
+                <span
+                  className="axca-url"
+                  data-secure={Boolean(secure && loads)}
+                >
                   {loads && secure ? (
                     <Lock weight="fill" />
-                  ) : (
+                  ) : secure === null && loads ? null : (
                     <Warning weight="fill" />
                   )}
                   <em>{caller.typed}</em>
@@ -206,7 +209,9 @@ export function CallersDirection({
                     <small>
                       {secure
                         ? "Encrypted end to end"
-                        : "Plain HTTP · readable on the way"}
+                        : secure === null
+                          ? "Encryption not checked"
+                          : "Plain HTTP · readable on the way"}
                     </small>
                   </span>
                 ) : (

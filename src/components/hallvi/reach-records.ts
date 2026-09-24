@@ -66,6 +66,34 @@ const listOf = (value: string | null) =>
  * the one that matters to a reader is the end they type. Naming both keys
  * here rather than aliasing them keeps `access` an honest kind of its own.
  */
+/**
+ * Words Pi uses for "anyone on the internet". An unrecognised word is not
+ * guessed at: it stays a named network.
+ */
+const INTERNET =
+  /^(public|internet|the internet|anyone|everyone|any|anywhere|all|\*|0\.0\.0\.0(\/0)?|::(\/0)?)$/i;
+
+/** The port a URL is reached on: the one written in it, else the scheme's. */
+function urlPort(url: string | null) {
+  if (!url || !URL.canParse(url)) return null;
+  const parsed = new URL(url);
+  const port =
+    parsed.port ||
+    (parsed.protocol === "https:"
+      ? "443"
+      : parsed.protocol === "http:"
+        ? "80"
+        : "");
+  return port ? `${port}/tcp` : null;
+}
+
+/** A TCP port number, or null for UDP, a range or no port on record. */
+function tcpPort(port: string) {
+  const match = port.trim().match(/^(\d+)(?:\/(tcp|udp))?$/i);
+  if (!match || match[2]?.toLowerCase() === "udp") return null;
+  return match[1];
+}
+
 function portOf(fact: (key: string) => string | null) {
   const local = fact("local-port");
   const remote = fact("remote-port");
@@ -105,6 +133,7 @@ export function reachFromRecords({
   // ---- The doors, and whether each is doing its job.
   const doors: Door[] = [];
   const guards: Guard[] = [];
+  const addresses = new Set<string>();
   for (const kind of ["door", "access"] as const)
     for (const ref of subjectsOfKind(live, kind)) {
       const presence = presenceOf(live, ref);
@@ -122,13 +151,28 @@ export function reachFromRecords({
       );
       const refused =
         observation?.[0] === "refused" ? observation[1] : undefined;
-      const open = observation?.[0] === "open" ? observation[1] : undefined;
+      // A published address is configured to face the internet; that is
+      // intent. It answers only when a check observed it answering, which
+      // for the address itself is any reachability check of it that passed.
+      const published =
+        ref.kind === "access" &&
+        access?.kind === "application-access" &&
+        access.mode === "public";
+      const open =
+        observation?.[0] === "open"
+          ? observation[1]
+          : published
+            ? [...checks.values()].find(
+                (check) =>
+                  check.value.claim === "reachability" &&
+                  check.value.basis === "observed" &&
+                  check.value.status === "passed",
+              )
+            : undefined;
       const shut = refused?.value.status === "passed";
       const reach: Reach = shut
         ? "closed"
-        : sources.some((source) =>
-              /^(public|anywhere|0\.0\.0\.0\/0|::\/0)$/i.test(source),
-            )
+        : published || sources.some((source) => INTERNET.test(source))
           ? "internet"
           : sources.length
             ? "restricted"
@@ -136,8 +180,12 @@ export function reachFromRecords({
               ? "restricted"
               : "private";
 
+      if (published) addresses.add(ref.id);
       const edge = map?.edges.find((item) => item.from === ref.id);
-      const port = portOf(fact) ?? tunnelPort(access, ref.kind);
+      const port =
+        portOf(fact) ??
+        tunnelPort(access, ref.kind) ??
+        (published ? urlPort(accessRecord?.presentation?.url ?? null) : null);
       doors.push({
         id: ref.id,
         port: port ?? "not recorded",
@@ -190,6 +238,31 @@ export function reachFromRecords({
           detail: refused.value.detail ?? refused.value.label,
         });
     }
+  // A published address and the door it arrives through are one way in, but
+  // only when they are the same endpoint: a door that faces the internet on
+  // the same TCP port. A loopback-only door that also uses 443 is a
+  // different endpoint and stays, as does anything without a port on record.
+  // The door is kept, since its checks are about the port itself, and it
+  // takes over the address's observed answer if it has none of its own.
+  for (let at = doors.length - 1; at >= 0; at--) {
+    const address = doors[at];
+    if (!addresses.has(address.id)) continue;
+    const port = tcpPort(address.port);
+    if (!port) continue;
+    const door = doors.find(
+      (one) =>
+        !addresses.has(one.id) &&
+        one.reach === "internet" &&
+        tcpPort(one.port) === port,
+    );
+    if (!door) continue;
+    if (address.established === "answered" && door.established !== "answered") {
+      door.established = "answered";
+      door.at = address.at;
+      door.unasked = undefined;
+    }
+    doors.splice(at, 1);
+  }
 
   // ---- The firewall. Its absence is a hole, never a tick.
   const firewallRef = subjectsOfKind(live, "firewall")[0] ?? null;
@@ -450,7 +523,14 @@ export function reachFromRecords({
                 servesRead === "stale"
                 ? "loads"
                 : "no-answer",
-      secure: validRead === "verified",
+      // A certificate that checked out stays the reading until one fails;
+      // the window dates it. No certificate reading is no claim either way.
+      secure:
+        validRead === "verified" || validRead === "stale"
+          ? true
+          : validRead === "failed"
+            ? false
+            : null,
       headline:
         domainState === "failed"
           ? "The name does not resolve"

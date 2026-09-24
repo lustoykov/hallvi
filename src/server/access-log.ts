@@ -77,6 +77,12 @@ const salt = randomBytes(16);
 const visitorOf = (address: string) =>
   createHash("sha256").update(salt).update(address).digest("hex").slice(0, 10);
 
+/**
+ * What Hallvi's own requests call themselves. The page follows visitors, and
+ * Hallvi checking its own address every half minute is not one.
+ */
+export const HALLVI_USER_AGENT = "Hallvi access check";
+
 /** One line of Caddy's JSON access log, or null for anything else. */
 export function parseCaddyLine(line: string): AccessLine | null {
   const start = line.indexOf("{");
@@ -91,6 +97,7 @@ export function parseCaddyLine(line: string): AccessLine | null {
       uri?: unknown;
       client_ip?: unknown;
       remote_ip?: unknown;
+      headers?: Record<string, unknown>;
     };
   };
   try {
@@ -111,6 +118,13 @@ export function parseCaddyLine(line: string): AccessLine | null {
     !request ||
     typeof request.uri !== "string" ||
     typeof entry.status !== "number"
+  )
+    return null;
+  const agent = request.headers?.["User-Agent"];
+  if (
+    Array.isArray(agent) &&
+    typeof agent[0] === "string" &&
+    agent[0].startsWith(HALLVI_USER_AGENT)
   )
     return null;
   const address = request.client_ip ?? request.remote_ip;

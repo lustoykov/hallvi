@@ -28,7 +28,7 @@ const modes = [
   },
   {
     id: "pi-decides",
-    label: "Pi decides",
+    label: "Hallvi decides",
     means: "Hallvi decides when to ask for your approval.",
   },
   {

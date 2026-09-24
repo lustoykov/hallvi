@@ -116,6 +116,11 @@ export function MonitoringPage({
         {/* How much it is used stands whether or not anything is watching. */}
         <MonitoringUsage
           usage={usage}
+          followed={records.some(
+            (record) =>
+              !record.retiredAt &&
+              record.presentation?.content?.kind === "access-log",
+          )}
           name={applicationName}
           now={now}
           onAsk={onAsk}

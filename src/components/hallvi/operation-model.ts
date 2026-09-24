@@ -44,7 +44,7 @@ export function unresolved(
   operation: ApplicationOperation,
   operations: ApplicationOperation[],
 ) {
-  if (operation.state !== "failed") return false;
+  if (operation.state !== "failed" || operation.carriedOn) return false;
   const resolver = operation.resolvedById
     ? operations.find((item) => item.id === operation.resolvedById)
     : undefined;

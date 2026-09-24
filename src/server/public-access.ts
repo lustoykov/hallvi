@@ -32,6 +32,8 @@ import {
 import { connect as netConnect, isIP } from "node:net";
 import { checkServerIdentity, connect as tlsConnect } from "node:tls";
 
+import { HALLVI_USER_AGENT } from "./access-log";
+
 /** Refuses a target that cannot answer the question being asked. */
 function publicTarget(host: string) {
   const value = host
@@ -325,7 +327,7 @@ export async function checkPublicAccess(
       const response = await fetch(httpsUrl, {
         redirect: "follow",
         signal: signal ?? AbortSignal.timeout(20_000),
-        headers: { "user-agent": "Hallvi public access check" },
+        headers: { "user-agent": HALLVI_USER_AGENT },
       });
       const body = await response.text().catch(() => "");
       const title = /<title[^>]*>([^<]{1,200})/i.exec(body)?.[1]?.trim();
@@ -361,7 +363,7 @@ export async function checkPublicAccess(
       const response = await fetch(plainUrl, {
         redirect: "manual",
         signal: signal ?? AbortSignal.timeout(15_000),
-        headers: { "user-agent": "Hallvi public access check" },
+        headers: { "user-agent": HALLVI_USER_AGENT },
       });
       const location = response.headers.get("location");
       await response.body?.cancel();
@@ -442,7 +444,7 @@ export async function publicUrlReachable(url: string) {
       method: "GET",
       redirect: "follow",
       signal: AbortSignal.timeout(6000),
-      headers: { "user-agent": "Hallvi access check" },
+      headers: { "user-agent": HALLVI_USER_AGENT },
     });
     await response.body?.cancel();
     return response.status < 500;

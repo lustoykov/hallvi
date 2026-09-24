@@ -468,11 +468,14 @@ function Host({
 
 export function MonitoringUsage({
   usage,
+  followed = false,
   name,
   now,
   onAsk,
 }: {
   usage: Usage | null;
+  /** Whether a record says where the access log is, so Overview follows it. */
+  followed?: boolean;
   name: string;
   now: number;
   onAsk: (draft: string) => void;
@@ -485,11 +488,18 @@ export function MonitoringUsage({
         <div className="axmu-ghost">
           <div>
             <h2>Traffic and load</h2>
-            <p>
-              Nothing has been read yet. The server already keeps what this
-              needs — the proxy&apos;s access log and the machine&apos;s own
-              samples — so there is nothing to install.
-            </p>
+            {followed ? (
+              <p>
+                Overview follows requests as they arrive. No full day has been
+                read yet, and no CPU or memory samples.
+              </p>
+            ) : (
+              <p>
+                Nothing has been read yet. The server already keeps what this
+                needs — the proxy&apos;s access log and the machine&apos;s own
+                samples — so there is nothing to install.
+              </p>
+            )}
           </div>
           <AskButton onClick={() => onAsk(read)}>
             Ask Hallvi to read it

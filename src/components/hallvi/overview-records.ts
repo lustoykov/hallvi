@@ -13,7 +13,8 @@
 // every subject the records mention.
 
 import { allAsk } from "./pulse-asks";
-import { clip, commandOf, essence } from "./execution-text";
+import { clip, commandOf, essence, executionLine } from "./execution-text";
+import { carriedOnAfter } from "./history-records";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { Ref, SavedInformation } from "@/server/operator-data";
 import type { ChatSummary } from "@/server/types";
@@ -384,6 +385,20 @@ export function overviewFromRecords({
             destination: chrome[id].destination,
           },
         });
+  // Work that stopped on a failed command is waiting for the owner, the
+  // same rule History's "Needs you" uses. One Hallvi carried on past is not.
+  for (const execution of executions)
+    if (execution.status === "failed" && !carriedOnAfter(execution, executions))
+      needs.push({
+        id: `failed:${execution.id}`,
+        tone: "failed",
+        title: "The work stopped on a failed command",
+        detail: executionLine(execution, 200),
+        primary: {
+          label: "Open the conversation",
+          open: () => onOpenConversation(execution.chatId, null),
+        },
+      });
   for (const execution of executions)
     if (execution.status === "awaiting-approval")
       needs.push({

@@ -447,7 +447,10 @@ export function protectionFromRecords(
       const presence = presenceOf(live, ref);
       if (!(presence.known && presence.presence === "present")) continue;
       const holds = currentFacts(live, ref).get("holds")?.value.value ?? null;
-      required.push({ id: ref.id, label: holds ?? ref.id });
+      const drawn =
+        map?.parts.find((part) => part.id === ref.id && part.kind === "volume")
+          ?.name ?? null;
+      required.push({ id: ref.id, label: holds ?? drawn ?? ref.id });
     }
 
   /**
@@ -470,6 +473,10 @@ export function protectionFromRecords(
 
   const uncovered = stated ? missingFrom([...covers.keys()]) : [];
   const names = namesFor(live);
+  // A volume nothing names in words keeps the name the map draws it with.
+  for (const item of required)
+    if (!names.has(item.id) && item.label !== item.id)
+      names.set(item.id, item.label);
   // A database nobody named, whose files live in a volume somebody did, is
   // that volume's contents. Without this the same thing appeared twice on one
   // page under two names: "PostgreSQL's data" where the volume answered, and

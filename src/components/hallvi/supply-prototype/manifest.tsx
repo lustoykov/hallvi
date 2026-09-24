@@ -74,14 +74,14 @@ export function ManifestDirection({
   const say = story.waiting.length
     ? `Hallvi is waiting for ${listed(story.waiting.map((item) => item.name))}.`
     : story.values.length || story.files.length
-      ? `${story.name} runs on ${listed(
+      ? `${story.name}: ${listed(
           [
             story.values.length &&
               `${story.values.length} value${story.values.length === 1 ? "" : "s"}`,
             story.files.length &&
               `${story.files.length} configuration file${story.files.length === 1 ? "" : "s"}`,
           ].filter(Boolean) as string[],
-        )}.`
+        )} on record.`
       : `Nothing configures ${story.name} on record.`;
 
   return (

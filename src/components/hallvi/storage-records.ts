@@ -110,13 +110,20 @@ export function storageFromRecords({
     if (created && (!createdAt || created < createdAt)) createdAt = created;
 
     // What is in it, in the fewest words that stay true. Pi's own `holds`
-    // is best; failing that the owner names it, because "Grafana's data"
-    // reads and a mount path does not.
+    // is best; then the name the map gives the volume, which Architecture
+    // already shows; failing that the owner names it, because "Grafana's
+    // data" reads and a mount path does not. The map's name comes before the
+    // owner's: two volumes of one process were both "Paperless-ngx's data".
     const holds = fact("holds");
+    const drawn =
+      map?.parts.find((part) => part.id === ref.id && part.kind === "volume")
+        ?.name ?? null;
     const piece: Piece = {
       key: ref.id,
       label:
-        holds ?? (owner ? `${owner.name}'s data` : `Everything in ${ref.id}`),
+        holds ??
+        drawn ??
+        (owner ? `${owner.name}'s data` : `Everything in ${ref.id}`),
       volume: ref.id,
       // Only a backup plan that says it covers this volume makes it copied.
       method: null,

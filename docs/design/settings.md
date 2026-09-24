@@ -23,7 +23,7 @@ rounded: {card: "14px", button: "7px", help: "12px"}
 # Settings design reference
 
 **Settings is one page (20 September 2026).** `/setup/connections` lists every
-account Hallvi acts through — ChatGPT, GitHub, Pi's workspace, then the owner's
+account Hallvi acts through — ChatGPT, GitHub, Hallvi’s workspace, then the owner's
 providers — each with its state in words and one action. A ChatGPT or GitHub
 row that is not connected expands the same card the conversation draws
 (`onboarding/chatgpt-connect.tsx`, `onboarding/github-connect.tsx`) with

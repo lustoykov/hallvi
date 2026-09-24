@@ -121,7 +121,7 @@ ordinary user account over SSH or at the machine.
 1. Choose where Pi works in **Settings → Workspace**. **On this computer**
    is the default and needs no Docker. If you choose **In Docker**, start your
    local Docker Engine before choosing **Read repository**. See
-   [Pi’s workspace](#pis-workspace) for the access each mode permits.
+   [Hallvi’s workspace](#hallvis-workspace) for the access each mode permits.
 2. Open Hallvi and add the public GitHub repository you want to deploy.
 3. Connect ChatGPT when prompted, then choose **Read repository**. A public
    repository does not need GitHub login. Private repositories require the
@@ -213,7 +213,7 @@ connections can delay the interface's shutdown, so recovery may take tens of
 seconds. A conversation that was
 being answered at that moment shows as interrupted and can be retried.
 
-## Pi's workspace
+## Hallvi's workspace
 
 Pi works on a copy of your repository: it reads the source, writes packaging
 such as a Dockerfile or Compose file, and runs checks. Settings → Workspace
@@ -240,7 +240,7 @@ trust.
 system and none of your files or credentials. It needs a running local Docker
 Engine (Docker Desktop, OrbStack, Colima or the Docker service); the first use
 builds the workspace image, which needs network access. If Docker is chosen and
-not running, Pi's workspace tools are withdrawn for that turn and Pi says why.
+not running, Hallvi's workspace tools are withdrawn for that turn and Pi says why.
 Hallvi never runs the workspace on this computer instead. Start Docker or
 change the setting; the Workspace page shows whether Docker answers.
 
@@ -501,8 +501,8 @@ the same "Dev" chip. The installed Hallvi has none of these.
 - Updates are only ever started by the owner. There is no automatic
   installation, no scheduled one, and no way to ask for one.
 - One update at a time, and only the last attempt is remembered.
-- On this computer, Pi's workspace is a precaution rather than isolation; see
-  [Pi's workspace](#pis-workspace). A first search there may download `rg`
+- On this computer, Hallvi's workspace is a precaution rather than isolation; see
+  [Hallvi's workspace](#hallvis-workspace). A first search there may download `rg`
   or `fd` into the temporary directory when neither is installed.
 - Private application links close when the service restarts or the machine
   reboots. The Overview shows the link as closed; ask Pi to open it again.
