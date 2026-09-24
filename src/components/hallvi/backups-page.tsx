@@ -2,20 +2,15 @@
 
 // Backups, on real records.
 //
-// Application-first Backups over the same three subjects Storage reads — plan,
-// copy and restore test — because the pages ask different questions of them.
-// Storage asks "would this survive the container being replaced"; this one
-// asks "would the application's data survive losing the server".
+// The one page that says whether this application's data is copied, what a
+// copy holds and whether a restore has ever opened one. Storage and Database
+// each carry a single read-only line of that and send the reader here.
 //
-// The application and its data are the page. The calendar board that used to
-// sit under them is kept at backup-prototype/calendar.tsx as the alternative
-// it now is: with
-// the things themselves inside the stages, a board of the same copies by day
-// is the reader meeting the same facts twice. One finding went with it — the
-// board marked a day where a schedule implied a copy and none was on record,
-// which it worked out by assuming the schedule was daily. Nothing on record
-// says the cadence, so that mark is not reproduced here rather than guessed
-// at again.
+// It opens on the four figures a reader arrives with: what holds data and
+// how much of it is in a copy, how old the newest copy is, whether a restore
+// has been tried, and what the plan says. Under them the stages show the
+// work. Storage asks a different question of the same subjects — would this
+// survive the container being replaced — and answers only that.
 //
 // The empty state is the one that has to be right. "No backups" is a claim,
 // and a page that makes it on the strength of no records has told the reader
@@ -32,11 +27,17 @@ import {
 } from "@/server/record-projection";
 
 import type { PageChrome } from "./deployment-prototype/page-head";
-import { protectionFromRecords, protectionVerdict } from "./backups-records";
+import {
+  inNewestCopy,
+  protectionFromRecords,
+  protectionVerdict,
+} from "./backups-records";
 import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";
+import { databasesFromRecords } from "./database-records";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
-import { storageFromRecords } from "./storage-records";
+import { Figure, Lede, Strip, ago } from "./register";
+import { storageFromRecords, volumeName } from "./storage-records";
 
 export function BackupsPage({
   records,
@@ -92,6 +93,28 @@ export function BackupsPage({
     () => protectionVerdict(protection, now),
     [protection, now],
   );
+  // Everything on record that holds data, however it is stored. A volume and
+  // a database are two answers to one question, and only because of how the
+  // bytes sit on disk.
+  const holders = useMemo(() => {
+    const databases = databasesFromRecords({ records, now });
+    return [
+      ...story.volumes.map((volume) => ({
+        id: volume.name,
+        name: volumeName(volume),
+      })),
+      ...databases
+        .filter((row) => !row.absent)
+        .map((row) => ({ id: row.id, name: row.label })),
+    ];
+  }, [records, story.volumes, now]);
+  const copied = holders.filter(
+    (one) => inNewestCopy(protection, one.id) === true,
+  );
+  const newest = protection.copies[0] ?? null;
+  const proved = newest ? protection.verifiedCopies.get(newest.id) : null;
+  const { schedule } = protection.summary;
+
   const head = (
     <PageHead
       bar={chrome.bar}
@@ -108,6 +131,83 @@ export function BackupsPage({
     <div className="ax-root" data-variant="stages">
       <section className="hv-backups" aria-label="Backups">
         {head}
+        <Lede>
+          What is protected, and whether a restore has been tried. Storage and
+          Database each carry one line of this and send you here.
+        </Lede>
+        <Strip>
+          <Figure
+            label="Holds data"
+            // "0 of 5" is an established zero. Nobody having looked is not
+            // that, and must not borrow its confidence.
+            value={
+              !holders.length || !protection.assessed
+                ? "Not checked"
+                : `${copied.length} of ${holders.length} in a copy`
+            }
+            tone={
+              !holders.length || !protection.assessed
+                ? "plain"
+                : copied.length === holders.length
+                  ? "good"
+                  : "warn"
+            }
+            note={
+              !holders.length
+                ? "No record names a volume or a database."
+                : !protection.assessed
+                  ? "Nobody has looked at whether any of it is copied."
+                  : holders.map((one) => one.name).join(", ")
+            }
+          />
+          <Figure
+            label="Newest copy"
+            value={newest ? ago(newest.at, now) : "None on record"}
+            note={
+              newest
+                ? (newest.destination ?? "Where it went is not recorded.")
+                : "Nothing has copied this application's data."
+            }
+          />
+          <Figure
+            label="Restore"
+            // "Never tested" is a claim about what has happened. Only a page
+            // that has looked may make it.
+            value={
+              proved
+                ? `Tested ${ago(proved.at, now)}`
+                : protection.assessed
+                  ? "Never tested"
+                  : "Not checked"
+            }
+            // Worth amber only once there is a copy to be unsure about.
+            tone={proved ? "good" : newest ? "warn" : "plain"}
+            note={
+              proved
+                ? proved.detail
+                : "A copy counts once one has been opened and loaded."
+            }
+          />
+          <Figure
+            label="Plan"
+            value={
+              schedule
+                ? schedule.words
+                : protection.declaredAbsent
+                  ? "None"
+                  : protection.planned
+                    ? "No schedule"
+                    : "Not checked"
+            }
+            // Not the verdict's own sentence: the band below already says it,
+            // and a page that repeats itself is the fault this one is fixing.
+            note={
+              protection.coverLabels.length
+                ? `Covers ${protection.coverLabels.join(", ")}`
+                : (verdict.limit ?? "No plan names what to copy.")
+            }
+          />
+        </Strip>
         <BackupStages
           protection={protection}
           verdict={verdict}

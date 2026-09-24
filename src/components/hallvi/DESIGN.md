@@ -492,8 +492,8 @@ application with nothing wrong.
   those reads "Answering · other checks 20 h ago", not "Verified".
 - **Not set up is an offer, not an alarm.** No backups, no firewall read, no
   watcher, Hallvi's own records not copied: each is stated once, plainly, with
-  the question that would change it. Storage draws no "stays behind" wall
-  unless a plan exists and leaves that data out.
+  the question that would change it. An application with nothing on disk gets
+  no protection line at all: there is nothing there to be unprotected.
 - **Amber means somebody is needed.** Pi's own `warning` on a record, a
   decision waiting, a watch gone quiet, a backup that was promised and is
   overdue. Red is a check that ran and failed. If a page shows more than one
@@ -502,9 +502,9 @@ application with nothing wrong.
 ### The register
 
 Chosen 21 September 2026 from the ten-directions exploration (direction F), and
-the shared vocabulary of the inventory destinations: Deployment, Processes and
-Database are registers; Security and Monitoring borrow its strip and table
-around the visual they already had. It lives in `register.tsx` and
+the shared vocabulary of the inventory destinations: Deployment, Processes,
+Database and Storage are registers; Security and Monitoring borrow its strip
+and table around the visual they already had. It lives in `register.tsx` and
 `register.css`, every class prefixed `hv-rg-`.
 
 - **Strip, then table.** A strip of three or four figures states the totals
@@ -526,6 +526,18 @@ around the visual they already had. It lives in `register.tsx` and
 - **Pips are evidence at a glance.** One pip per step or check, in the row, so
   a release that holds with a failed command inside it shows before it is
   opened.
+- **One page owns a story; the others carry a line of it.** Chosen
+  23 September 2026, after the backup situation was told three times in three
+  wordings that drifted apart. Backups owns copies, plans and restores, and
+  opens on four figures: what holds data and how much of it is in a copy, how
+  old the newest copy is, whether a restore was tried, and what the plan says.
+  Storage owns what is on disk and whether it survives the container being
+  replaced. Database owns the engine, its files and whether it answers.
+  Storage and Database each print one read-only `hv-rg-line` that links to
+  Backups ("Not set up · Backups", "Copied 2 h ago, restore untested ·
+  Backups"), and say nothing else about it. Every telling reads the same
+  projection, and coverage is answered in one place (`inNewestCopy` in
+  `backups-records.ts`), so the pages cannot disagree.
 
 ### Buttons and fields
 

@@ -550,6 +550,28 @@ export function protectionFromRecords(
 }
 
 /**
+ * Whether the newest copy holds one thing: yes, no, or nobody wrote it down.
+ *
+ * The one place that answers it, because three pages ask. Deliberately not a
+ * read of a copy's own `covers` list: a copy names the subject it captured,
+ * which can be the database while the page is asking about the volume its
+ * files live in. Reading `covers` directly made the same records say "in the
+ * latest copy" in the stages and "0 of 2 in a copy" in the strip above them.
+ *
+ * `missing` only compares data a record states is there. A subject another
+ * record merely mentions is outside that comparison, so it answers null.
+ */
+export function inNewestCopy(protection: Protection, id: string) {
+  const { basis, missing } = protection.newestCopyCoverage;
+  if (
+    basis === "unrecorded" ||
+    !protection.requiredData.some((item) => item.id === id)
+  )
+    return null;
+  return !missing.some((item) => item.id === id);
+}
+
+/**
  * Where a copy goes, and therefore what losing something would cost.
  *
  * This is the whole question the Backups page exists to answer, and it cannot
