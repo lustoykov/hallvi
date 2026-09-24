@@ -8,8 +8,7 @@ summarizes the gates; the resource-specific rules below also apply.
 
 ## Scope: development resources, not user systems
 
-This policy applies to agents developing Hallvi and its development cleanup
-task. It grants no housekeeping authority to Pi operating a user's application,
+This policy applies to agents developing Hallvi. It grants no housekeeping authority to Pi operating a user's application,
 whether Hallvi was launched with a development or production command.
 User deployments and local product data are not development fixtures.
 
@@ -70,12 +69,15 @@ services there. Retiring that host does not make its files or servers disposable
 Audit its remaining work once, preserve unique work and configuration, stop only
 verified obsolete development processes, and record unresolved resources locally.
 
-The local **Dev Cleanup** scheduled task owns recurring Hallvi cleanup,
-including GitHub branches and authorized Hetzner development resources. Do not
-rely on a cloud audit on another machine or create a second cloud cleanup owner.
-The separate **Disk Audit** remains read-only and covers the wider Mac. Local
-**RAM Care** may manage preview memory under its own narrow authorization; all
-cleanup must recheck active use immediately before acting.
+No scheduled task deletes development resources. Each task cleans up what it
+created once its work merges, as [after your work merges](#after-your-work-merges)
+describes. The local **Disk Audit** runs daily and only reads: it reports this
+Mac's worktrees, branches, Docker resources and temporary outputs and deletes
+nothing. Local **RAM Care** may manage preview memory under its own narrow
+authorization. Nothing audits Hetzner on a schedule; when the owner asks, follow
+[provider audit on request](#provider-audit-on-request). Do not create a
+scheduled cleaner or a second cleanup owner unless the owner asks for one, and
+recheck active use immediately before any removal.
 
 Use local provider stand-ins when a real provider adds nothing — a stand-in is
 faster and free, and everything above the provider API behaves identically. Use
@@ -96,46 +98,23 @@ access before any provider mutation. Inaccessible resources are a coverage gap.
 
 Keep one inventory and dated audit records outside all worktrees at
 `~/Library/Application Support/Server Guy/development-cleanup/` on the local Mac
-(named before the rename to Hallvi; the Dev Cleanup task reads it there).
+(named before the rename to Hallvi).
 Use owner-only permissions (directory 0700, files 0600), with no secret values.
 Record resource identity, machine/project, task UUID/link, exact branch and tip,
 worktree, purpose, lifetime, retention decision and verification evidence.
 
-### Planned Hallvi inventory-path migration
+### Moving the inventory to a Hallvi path
 
-The target canonical path is
-`~/Library/Application Support/Hallvi/development-cleanup/`, but the Server Guy
-path above remains authoritative until one coordinated implementation change has
-completed. Do not rename or move the live directory ahead of the scheduled-task
-prompt, and do not merge documentation that calls the Hallvi path canonical while
-the task still reads the old path.
-
-That implementation must use one pull request and one bounded maintenance window:
-
-1. Confirm that Dev Cleanup is not running, record its current schedule, status
-   and target task, and inventory the old directory without exposing record
-   contents or credentials.
-2. Copy the directory to a new owner-only staging directory, preserving file
-   metadata. Compare the complete relative-path list, file sizes and hashes, and
-   verify directory mode 0700 and file mode 0600 before promoting the staged copy
-   to the Hallvi path. A partial copy is a failure; keep the old directory
-   authoritative.
-3. Update the existing Dev Cleanup automation in place to read and write only the
-   Hallvi path. Preserve its schedule, status and target task. Record the prompt
-   change and verification in the same pull request; do not create a replacement
-   automation or competing owner.
-4. Change this section's canonical path in that pull request only after the copied
-   records and updated prompt agree. Run one read-only audit from the existing
-   target task and verify that new audit output lands under the Hallvi path.
-5. Keep the old Server Guy directory as a read-only rollback source until the new
-   path has completed a successful scheduled run and all current records and
-   unresolved decisions are present. Retiring the old copy is a separate exact
-   cleanup action requiring fresh ownership, dependency and retention evidence;
-   never delete it merely because the new copy exists.
-
-If validation fails, restore the automation prompt to the old path and leave both
-directories untouched for review. The path change does not authorize renaming any
-product runtime data or compatibility identifiers.
+The inventory may move to
+`~/Library/Application Support/Hallvi/development-cleanup/`. No scheduled task
+reads it now, so the move needs no maintenance window, but it must not lose a
+record. Copy the directory to a new owner-only staging directory, preserving file
+metadata. Compare the complete relative-path list, file sizes and hashes, and
+check directory mode 0700 and file mode 0600 before promoting the copy. Change
+this section's path in the same pull request. Keep the Server Guy directory as a
+read-only fallback: retiring it is a separate exact cleanup action that needs
+fresh evidence and the owner's approval, never just the new copy's existence.
+The move does not rename any product runtime data or compatibility identifiers.
 
 Reconcile any legacy `~/.codex/server-guy-development-resources/` records from
 accessible machines into this inventory by exact resource ID, retaining their
@@ -188,13 +167,47 @@ cleanup or that attached resources are disposable.
 
 Check provider completion and re-list resources to verify absence. Record UTC time,
 deleted IDs, retained IDs/reasons and failures in the registry and task handoff.
-Do not mark an uncertain deletion complete. If blocked, leave labels/records intact
-for the daily audit and report the remaining resource. Removing a worktree is not
+Do not mark an uncertain deletion complete. If blocked, leave labels and records
+intact and report the remaining resource to the owner. Removing a worktree is not
 itself proof that a cloud resource is unused.
 
-## Daily audit and expired cleanup
+## After your work merges
 
-Inventory all pages of servers, volumes, snapshots/backups, primary and floating
+When a task's pull request merges into `main`, check every resource the task
+created: Git worktrees, local and GitHub branches, Docker containers, images and
+volumes, and temporary outputs.
+
+For each exact resource, establish that the task owns it and that nothing still
+depends on it. Check running processes, open files and ports, `git status`
+including untracked and ignored files, commits that are not on `main`, other
+worktrees, open pull requests, and any data or test evidence. A merged pull
+request or an old modification date alone does not show that deletion is safe.
+
+Then give the owner a short GO/NO-GO list that names each exact target, says why
+it is or is not safe to remove, and estimates the space it frees. Wait for fresh
+approval before deleting anything under `~/biz/` or any Docker resource. These
+instructions are not that approval, and neither is an approval given earlier
+for a different target.
+
+Once the owner approves:
+
+- Remove a worktree with plain `git worktree remove`, never with `--force`.
+- Delete a GitHub branch only after verifying that its exact tip is in `main`,
+  that it is not protected, that no open pull request uses it as head or base,
+  and that the remote tip has not moved. Delete it with an expected-SHA lease,
+  so a concurrent push stops the deletion.
+- Remove only task-owned Docker containers and images that nothing else depends
+  on. A volume is persistent data: ask for separate, explicit approval for each
+  one.
+- Never prune worktrees, Docker resources or branches in bulk.
+
+Verify each removal, then report what you removed and what you kept, with the
+reason for each. Keep task histories, the owner's outputs and evidence.
+
+## Provider audit on request
+
+Nothing audits Hetzner on a schedule. When the owner asks for an audit,
+inventory all pages of servers, volumes, snapshots/backups, primary and floating
 IPs, load balancers, networks, firewalls and SSH keys in each configured authorized
 Hetzner project. Use existing credentials without printing them. Report inaccessible
 projects or resource types as coverage gaps, never as an empty account.
@@ -205,7 +218,8 @@ Report unlabelled/legacy resources for classification; do not automatically adop
 them into cleanup. Estimate recurring cost from current provider prices where
 available, clearly identifying estimates and unknowns.
 
-Automatic deletion requires **all** of the following:
+Present the findings as a GO/NO-GO list and delete only what the owner approves.
+A resource is a GO candidate only when **all** of the following hold:
 
 - Exact project/environment/lifecycle labels above, nonempty owner and branch,
   `sg-cleanup=allowed`, and a valid expired Unix timestamp.
@@ -219,16 +233,16 @@ Automatic deletion requires **all** of the following:
 
 Use the completion verification above. Expiry makes a resource a cleanup candidate;
 low usage, old age, a merged branch or an absent local worktree alone does not.
-Resources without provider label support are report-only during scheduled audits.
+Resources without provider label support are report-only.
 Keep a dated audit record in the canonical local inventory.
-Notify on newly actionable findings, verified deletions, failures or needed input;
-stay quiet when findings are unchanged and non-actionable.
 
 ## Local development resources
 
-The daily audit also covers Hallvi worktrees, local and GitHub branches, Docker
+The same care covers Hallvi worktrees, local and GitHub branches, Docker
 containers/images/networks/volumes/build cache, development databases, build
-outputs, logs and temporary artifacts. Scope is this project's resources on
+outputs, logs and temporary artifacts, whether a task is cleaning up after
+itself or the owner asked for an audit. Deleting any of them under `~/biz/` or
+in Docker needs the owner's fresh approval of that exact target. Scope is this project's resources on
 the local development Mac and explicitly scoped retirement audits, not arbitrary
 personal files or other projects.
 Record exact paths/IDs, machine, task, branch, purpose, expiry and cleanup permission
@@ -321,8 +335,7 @@ become disposable in a later run.
 Measure disk usage before and after where useful. Moving files to Trash is
 recoverable relocation, not reclaimed disk space. Do not empty unrelated Trash.
 Verify cloud deletions with a fresh inventory including separately billed
-resources. Report only meaningful changes, actionable findings, failures or
-needed decisions; remain quiet when nothing actionable has changed.
+resources. Report meaningful changes, actionable findings, failures and needed decisions.
 
 Before deleting anything in a shared provider project, snapshot **every**
 collection it holds, not the kinds you are about to delete: servers, primary
