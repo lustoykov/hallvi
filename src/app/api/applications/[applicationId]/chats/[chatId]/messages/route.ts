@@ -30,6 +30,7 @@ export async function POST(
         body.requestKey,
         body.delivery,
         body.images,
+        body.origin,
       ),
       // Accepted means Pi has durably taken it; its answer is still to come.
       { status: 202 },

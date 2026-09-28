@@ -332,7 +332,7 @@ Use explicit host execution and controller-held credentials, with named private 
 - The minimum saved-record structure, update/history behavior and evidence references; how stale or conflicting knowledge gets corrected.
 - The exact view catalog, presentation roles, ordering, record lifecycle and suggested-action interactions.
 - Which current records remain necessary for executable state, and which can become shared knowledge or execution history. Avoid adding a new Task entity alongside existing Runs and Operations without a demonstrated need.
-- The eventual interface for other agents; it should share the operator and evidence rather than create competing execution paths.
+- The interface for other agents shares the operator and evidence rather than creating competing execution paths. Its first form is the `hallvi` command's [request commands](cli.md): a request is an ordinary follow-up in the main conversation, followed by the Pi operation that took it. An MCP adapter over the same client, and how an agent's label is chosen, remain open.
 
 The immediate next design exercise is the main deployment happy path. Monitoring mechanisms, error-detection scripts and detailed per-view care defaults are deferred until that journey is established.
 

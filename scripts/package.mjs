@@ -122,6 +122,11 @@ try {
     "scripts/serve.mjs",
     "scripts/migrate-account-connections.mjs",
     "scripts/cli.mjs",
+    // The command's two halves: this machine's service, and requests to a
+    // controller it names. cli.mjs imports the second before anything else.
+    "scripts/cli-service.mjs",
+    "scripts/cli-requests.mjs",
+    "scripts/controller-client.mjs",
     "scripts/dev-environment.mjs",
     "scripts/state-location.mjs",
     "scripts/retained-state.mjs",
@@ -182,6 +187,8 @@ try {
   );
   // Exercise the shipped command, not the checkout's imports. A missing
   // runtime helper must fail packaging before the archive is handed out.
+  // Printing the usage loads both halves: the request commands' modules as
+  // cli.mjs is read, and the service's to print it.
   execFileSync(resolve(target, "node", "bin", "node"), ["scripts/cli.mjs"], {
     cwd: target,
     stdio: "inherit",

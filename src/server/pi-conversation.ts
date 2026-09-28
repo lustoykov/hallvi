@@ -85,6 +85,21 @@ function placeEvidence(
   };
 }
 
+/**
+ * The conversation with its evidence placed, for a reader that must not take
+ * an absent worker for an empty conversation: without one this throws.
+ */
+export async function readConversation(applicationId: string, chatId: string) {
+  loadChat(applicationId, chatId);
+  const transcript = await askWorker<Transcript>("transcript", {
+    scope: { applicationId, chatId },
+  });
+  return {
+    transcript,
+    ...placeEvidence(applicationId, transcript, listExecutions(applicationId)),
+  };
+}
+
 export async function chatSnapshot(
   applicationId: string,
   chatId: string,
@@ -133,12 +148,14 @@ export async function sendChatMessage(
   requestKey: string,
   delivery: NonNullable<ChatMessage["delivery"]> = "next",
   images?: { mimeType: string; data: string }[],
+  origin?: ChatMessage["origin"],
 ) {
   const input = sendChatMessageRequestSchema.parse({
     message: body,
     requestKey,
     delivery,
     images,
+    origin,
   });
   assertChatWritable(loadChat(applicationId, chatId).chat);
   await askWorker("send", {
@@ -148,6 +165,7 @@ export async function sendChatMessage(
       body: input.message,
       delivery,
       images: input.images,
+      origin: input.origin,
     },
   });
   touchChat(chatId);
