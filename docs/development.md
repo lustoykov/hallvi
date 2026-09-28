@@ -91,6 +91,15 @@ Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and 
 
 These are available checks, not a requirement to rerun every suite for every change. Select checks proportionate to the implementation stage; documentation-only edits need document/link checks rather than deployment proofs.
 
+As you develop and test, consider the user's experience and opportunities to
+make Hallvi easier, more useful or more reliable. Record worthwhile bugs,
+improvement proposals and product ideas through
+[Agent feedback](../AGENT_FEEDBACK.md#how-to-contribute), in the same PR as the
+task. Explain the benefit and distinguish observations from expected gains;
+an idea does not require a failure. That file owns deduplication, evidence and
++1 counting; the owner decides priorities. It is contributor guidance, not a
+Pi product workflow.
+
 ```sh
 npm test
 npm run lint
