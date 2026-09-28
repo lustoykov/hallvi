@@ -59,7 +59,7 @@ wait` can only call a request cancelled if the same process saw it waiting; a
 fresh `wait` finds nothing and has to say "never accepted, or dropped". A small
 durable note of the keys Stop removed would let every caller say `cancelled`.
 
-**+1:** 2026-09-28 — hallvi CLI task (`claude/hallvi-codex-plugin-b3aaa1`)
+**+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
 
 ### AF-002 — Record a workspace command's exit code
 
@@ -67,4 +67,4 @@ durable note of the keys Stop removed would let every caller say `cancelled`.
 only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
-**+1:** 2026-09-28 — hallvi CLI task (`claude/hallvi-codex-plugin-b3aaa1`)
+**+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
