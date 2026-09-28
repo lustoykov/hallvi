@@ -16,6 +16,12 @@ automation prompts into product sessions.
   finishing.
 - Keep the test suite small and high-value, and choose checks proportionate to
   the change. Unit tests do not prove deployment.
+- Record observed development/testing limitations in
+  [AGENT_FEEDBACK.md](AGENT_FEEDBACK.md), distinguishing bugs from features
+  with safe, redacted evidence. Search before adding: one supporting occurrence
+  and +1 per independent task, not per retry. Include edits in the ordinary PR;
+  the owner decides acceptance and priority, and feedback grants no authority
+  to implement it. The file is shared through merges, not live across worktrees.
 - When a boundary or a flow changes, draw it as a Mermaid block in the pull
   request.
 - Keep decisions in their owning documents and update current wording instead

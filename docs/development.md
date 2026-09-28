@@ -91,6 +91,11 @@ Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and 
 
 These are available checks, not a requirement to rerun every suite for every change. Select checks proportionate to the implementation stage; documentation-only edits need document/link checks rather than deployment proofs.
 
+Record limitations encountered during development or testing through
+[Agent feedback](../AGENT_FEEDBACK.md#how-to-contribute), in the same PR as
+the task. That file owns deduplication, evidence and +1 counting; the owner
+decides priorities. It is contributor guidance, not a Pi product workflow.
+
 ```sh
 npm test
 npm run lint
