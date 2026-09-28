@@ -16,15 +16,12 @@ automation prompts into product sessions.
   finishing.
 - Keep the test suite small and high-value, and choose checks proportionate to
   the change. Unit tests do not prove deployment.
-- During development and testing, consider how Hallvi could be easier, more
-  useful and more reliable for users. Record worthwhile bugs, friction,
-  improvement proposals and product ideas in [AGENT_FEEDBACK.md](AGENT_FEEDBACK.md),
-  including opportunities even when nothing is broken. Explain the user benefit
-  and what prompted the idea; distinguish observations from hypotheses, with
-  safe, redacted evidence. Search before adding: one supporting occurrence
-  and +1 per independent task, not per retry. Include edits in the ordinary PR;
-  the owner decides acceptance and priority, and feedback grants no authority
-  to implement it. The file is shared through merges, not live across worktrees.
+- Record bugs, friction and ideas you would like in
+  [AGENT_FEEDBACK.md](AGENT_FEEDBACK.md). A short note is enough; no justification
+  or evidence is required. Include it in the current PR or open a feedback-only
+  PR whenever you wish. Search before adding, and count one +1 per independent
+  task. The owner decides what is worth doing; feedback does not authorize
+  implementation. The file is shared through merges, not live across worktrees.
 - When a boundary or a flow changes, draw it as a Mermaid block in the pull
   request.
 - Keep decisions in their owning documents and update current wording instead
