@@ -61,11 +61,41 @@ If there are no material findings, say so directly.
 
 - The PR states the concrete requirement and where reviewers should focus.
 - The PR reviews `ROADMAP.md` and includes needed sprint status, scope or sequencing updates, or explains why none are needed. Local work must not be presented as already merged.
-- A change to a boundary or a flow is explained with a diagram, in the PR or
-  in the document that owns the decision. A change that alters neither needs
-  no diagram.
+- A change to a boundary or a flow is explained with a focused Mermaid diagram
+  in the PR. Keep diagrams worth retaining in the document that owns the
+  decision too. A change that alters neither needs no diagram.
 - Verification is proportionate to the risk and supports the claims being made.
 - The change does not include unrelated refactors or preparatory machinery.
+
+## Verification proportional to risk
+
+Choose verification by consequences, blast radius and complexity, not diff
+size. A one-line permission change can need more proof than a large styling
+change. Briefly explain the risk and point reviewers at consequential decisions.
+
+| Change | Expected verification |
+| --- | --- |
+| **Small, isolated** — copy, spacing, documentation | A brief actual check and result. One screenshot for visible changes; no separate verification report. |
+| **Normal feature or fix** — changed behavior within one area | Relevant checks plus captioned screenshots or a short interaction recording when the user experience changes. A diagram when a flow or boundary changes. |
+| **Critical or complex** — permissions, credentials, data integrity, deployment, shared infrastructure, multi-step workflows | Representative end-to-end proof, a diagram of any changed flow or boundary, relevant failure/recovery evidence and explicit remaining gaps. Include UI evidence wherever the user experience changes. |
+
+For critical or complex changes, select the failure and recovery scenarios
+that address the concrete risk introduced or changed. Explain how consequential
+operational failures are contained and how to recover or revert, including any
+irreversible effects. This does not require an exhaustive failure matrix or a
+new recovery subsystem.
+
+State the tested revision and environment, the behavior checked, the observed
+result and its evidence. Distinguish real Pi, hosts and providers from fixtures
+or stand-ins. Report material failed, skipped or unverified checks explicitly;
+a plan to verify is not completed evidence. If later edits affect a demonstrated
+behavior, refresh the relevant evidence before claiming it covers that change.
+
+Diagrams explain the design; screenshots and videos show observed behavior;
+execution or external verification supports operational claims. For example,
+a restore PR needs evidence that restored data can actually be read, beyond
+a diagram of the restore flow or a screenshot saying it succeeded. Select
+automated checks using [the testing bar](tests/README.md#the-8020-bar).
 
 ## Visual verification evidence
 
@@ -73,11 +103,15 @@ PRs affecting the user experience must attach or link visual evidence from the
 implemented revision using representative application data. Prefer a few
 captioned screenshots for layouts and resulting states. Use short video clips
 when interaction, transitions, or a sequence matters to understanding the change.
+Show before/after when comparison helps. For critical or complex journeys,
+include the relevant waiting, failure and recovery states as well as success;
+clearly label simulated states rather than presenting them as real execution.
 
 Omit or accelerate waiting periods and clearly mark time skips. Preserve the
 action and its result; link longer recordings only when useful for investigating
-a failure. Aim for 2–5 screenshots or a 30–90-second clip when appropriate;
-these are guidelines, not quotas or duration gates.
+a failure. A small visual change can use one screenshot; a broader journey may
+benefit from a few screenshots or a short clip. There are no screenshot quotas
+or video duration gates.
 
 State the tested revision, environment, what the evidence demonstrates, and
 material limitations. Never include credentials or sensitive user data. Visuals
