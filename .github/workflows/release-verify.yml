@@ -14,7 +14,7 @@ on:
       baseline_version:
         description: Published version to upgrade from (must be older)
         required: true
-        default: "0.1.1-alpha.7"
+        default: "0.1.1-alpha.8"
         type: string
 
 permissions:

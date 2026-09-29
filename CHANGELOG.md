@@ -4,6 +4,15 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.9 — 29 September 2026
+
+Reconnect a saved private address and get clearer information when a conversation loses its connection or ends early.
+
+- **Reconnect private access.** An established private route has a Reconnect action that asks Pi to restore that saved route through the main conversation, under your existing permissions.
+- **Know what was checked.** Private access distinguishes a recorded address from an observed connection, keeps checks tied to their route, and shows when the result was observed.
+- **Recover without a stale error.** A temporary settings-read failure clears after a successful refresh. Failed or uncertain saves remain visible.
+- **Understand an early failure.** When Pi records a useful failure reason, the conversation and terminal result show a bounded, redacted diagnostic. Missing evidence stays unknown.
+
 ## 0.1.1-alpha.8 — 29 September 2026
 
 Hallvi does less repeated work in long conversations and keeps its interface responsive while storage is busy.
