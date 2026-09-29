@@ -65,7 +65,7 @@ identifies the controller, not the server hosting a deployed application.
 
 ### Private application access
 
-Pi defaults to loopback-only application ports on the remote server and a local SSH tunnel. Open the `http://127.0.0.1:<port>` link Pi supplies on the PC running Hallvi. Public web access requires an explicit request. If the tunnel stops or the PC restarts, ask Pi to reopen private access; there is no automatic tunnel supervisor. The `open_server_port` tool verifies local HTTP status but does not change remote listeners or firewalls.
+Pi defaults to loopback-only application ports on the remote server and a local SSH tunnel. Open the `http://127.0.0.1:<port>` link Pi supplies on the PC running Hallvi. Public web access requires an explicit request. If the tunnel stops or the PC restarts, use Reconnect for an established saved private route. It sends a scoped request to Main operator under the current permission mode and preserves your draft; there is no automatic tunnel supervisor. Legacy records whose server label does not match the attached address offer Review private access instead. Unknown acceptance can be retried explicitly with the same request key. The `open_server_port` tool verifies local HTTP status but does not change remote listeners or firewalls.
 
 ### Data and migrations
 

@@ -2165,3 +2165,39 @@ dd.hv-protection-warn {
     max-width: 230px;
   }
 }
+
+.hv-reconnect-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+.hv-reconnect-notice span {
+  min-width: 0;
+}
+.hv-reconnect-notice button {
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .hv-reconnect-notice {
+    align-items: flex-start;
+    padding: 0.75rem 1rem;
+  }
+}
+
+.hv-reconnect-follow {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  cursor: pointer;
+}
+.axj3-reopen:disabled,
+.rp-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -5,15 +5,20 @@ const mocks = vi.hoisted(() => ({
   privateOpen: vi.fn(),
   publicOpen: vi.fn(),
   server: vi.fn(),
+  settings: vi.fn(),
 }));
 vi.mock("@/server/saved-information", () => ({
   listInformation: mocks.records,
 }));
 vi.mock("@/server/private-access", () => ({
   privateAccessOpen: mocks.privateOpen,
+  privateAccessPortAllowed: () => true,
 }));
 vi.mock("@/server/public-access", () => ({
   publicUrlReachable: mocks.publicOpen,
+}));
+vi.mock("@/server/operator-execution", () => ({
+  operatorSettings: mocks.settings,
 }));
 vi.mock("@/server/pulse", () => ({ serverBeat: mocks.server }));
 vi.mock("@/server/http", () => ({
@@ -22,6 +27,7 @@ vi.mock("@/server/http", () => ({
 import { GET } from "@/app/api/applications/[applicationId]/access/route";
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.settings.mockResolvedValue({ host: { address: "host" } });
   mocks.server.mockResolvedValue("answering");
   mocks.privateOpen.mockResolvedValue(true);
   mocks.publicOpen.mockResolvedValue(false);
@@ -47,6 +53,7 @@ it("checks exactly the current private route and reports tunnel evidence without
   mocks.records.mockResolvedValue([saved]);
   expect(await read()).toMatchObject({
     mode: "private",
+    reconnectable: true,
     open: true,
     server: "answering",
     routeIdentity: expect.stringContaining(saved.id),

@@ -1,4 +1,5 @@
 "use client";
+import { useReconnectAction } from "./reconnect-action";
 
 // What is running, and every release since.
 //
@@ -221,6 +222,7 @@ export function ReleasesPanel({
   /** Opens the conversation that is doing the deploying. */
   onFollow?: () => void;
 }) {
+  const reconnect = useReconnectAction();
   const [filter, setFilter] = useState("all");
   const said = releaseHeadline(view);
   const { running, latest, access } = view;
@@ -441,8 +443,13 @@ export function ReleasesPanel({
           <span className="rp-way">
             <span className="rp-muted">The tunnel is closed</span>
             {onReopen && (
-              <button type="button" className="rp-link" onClick={onReopen}>
-                Open the connection again
+              <button
+                type="button"
+                className="rp-link"
+                disabled={reconnect.disabled}
+                onClick={onReopen}
+              >
+                {reconnect.label}
               </button>
             )}
           </span>

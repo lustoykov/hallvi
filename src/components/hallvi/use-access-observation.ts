@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 import { accessRouteIdentity } from "@/server/access-record";
 import type { Reachability } from "./deployment-prototype/page-head";
@@ -11,6 +11,7 @@ interface Answer {
   routeIdentity: string | null;
   state: Reachability;
   pulse: Pulse;
+  reconnectable?: boolean;
 }
 
 /** Page-bound observations only; this never opens a tunnel or asks Pi. */
@@ -20,6 +21,8 @@ export function useAccessObservation(
 ) {
   const routeIdentity = accessRouteIdentity(record);
   const [answered, setAnswered] = useState<Answer | null>(null);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
   useEffect(() => {
     if (!applicationId) return;
     let cancelled = false;
@@ -56,6 +59,7 @@ export function useAccessObservation(
         setAnswered({
           applicationId,
           routeIdentity,
+          reconnectable: body.reconnectable === true,
           state:
             body.open === true
               ? "open"
@@ -85,7 +89,7 @@ export function useAccessObservation(
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [applicationId, routeIdentity]);
+  }, [applicationId, routeIdentity, revision]);
   const current =
     answered?.applicationId === applicationId &&
     answered?.routeIdentity === routeIdentity
@@ -95,5 +99,7 @@ export function useAccessObservation(
     reachable: current?.state ?? "checking",
     pulse: current?.pulse ?? QUIET_PULSE,
     routeIdentity,
+    reconnectable: current?.reconnectable === true,
+    refresh,
   };
 }

@@ -39,6 +39,7 @@ Each of these is linked from the document that owns its decision.
 | [Reading execution evidence](../architecture.md#reading-execution-evidence) | [Architecture](../architecture.md) |
 | [Who holds a credential, and who may read it](credential-lifecycle.html) | [Roadmap](../../ROADMAP.md) |
 | [Where the way in is answered](private-access-reachability.html) | [Roadmap](../../ROADMAP.md) |
+| [Reconnect an established private route](reconnect-private-route.md) | [Operator design](../operator-design.md) |
 | [What trusts what in a release](../releases.md#what-trusts-what) | [Publishing a release](../releases.md) |
 
 ## Historical

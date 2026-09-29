@@ -7,8 +7,12 @@ import {
   type Context,
   type Model,
   type SimpleStreamOptions,
+  type ToolCall,
 } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { makeStrictJsonSchema } from "@earendil-works/pi-ai/api/constrained-sampling";
+import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
+import { privateAccessArguments } from "@/server/saved-private-access";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -336,6 +340,63 @@ afterAll(async () => {
   await store.closeDatabase();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
+});
+
+it("the registered private-access tool accepts provider nullable forms through Pi validation and the executor", async () => {
+  const a = await application("private-schema");
+  await loseWorker();
+  const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
+  try {
+    const tool = (await direct.harness.getTools(ctx)).find(
+      (item) => item.name === "open_server_port",
+    )!;
+    expect(tool).toBeDefined();
+    const providerSchema = makeStrictJsonSchema(tool.parameters);
+    expect(providerSchema).toMatchObject({
+      type: "object",
+      required: expect.arrayContaining([
+        "remotePort",
+        "localPort",
+        "accessRecordId",
+        "expectedUpdatedAt",
+      ]),
+    });
+    const saved = {
+      accessRecordId: randomUUID(),
+      expectedUpdatedAt: new Date().toISOString(),
+    };
+    const normalize = (args: ToolCall["arguments"]) =>
+      validateToolArguments(tool, {
+        type: "toolCall",
+        id: "private-schema",
+        name: tool.name,
+        arguments: args,
+      });
+    const savedArgs = normalize({
+      ...saved,
+      remotePort: null,
+      localPort: null,
+    });
+    expect(savedArgs).toEqual(saved);
+    expect(privateAccessArguments.parse(savedArgs)).toEqual(saved);
+    const explicitArgs = normalize({
+      remotePort: 8080,
+      localPort: null,
+      accessRecordId: null,
+      expectedUpdatedAt: null,
+    });
+    expect(explicitArgs).toEqual({ remotePort: 8080 });
+    expect(privateAccessArguments.parse(explicitArgs)).toEqual({
+      remotePort: 8080,
+    });
+    expect(
+      privateAccessArguments.safeParse(
+        normalize({ ...saved, remotePort: 8080, localPort: null }),
+      ).success,
+    ).toBe(false);
+  } finally {
+    await direct.close();
+  }
 });
 
 async function application(name: string, address?: string) {

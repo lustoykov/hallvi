@@ -1,6 +1,6 @@
 import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
-import { openServerPort } from "./private-access";
+import { executePrivateAccess } from "./saved-private-access";
 import { requestDomain, requestHost } from "./connection-requests";
 import {
   askDeploymentChoice,
@@ -410,28 +410,32 @@ export async function openPiSession(
             name: "open_server_port",
             label: "Open private application access",
             description:
-              "Open or reuse an SSH tunnel from this controller PC's 127.0.0.1 to a loopback port on the connected server. Returns a local HTTP URL; verify the app separately. Omit localPort unless you need a particular one: an installation keeps private links on ports its owner forwards to their browser, picks a free one for you, and refuses ports outside them. Does not change the server's listeners/firewall. If the local port on this PC is occupied, choose another and carry on: picking a free port is bookkeeping, not a decision, and it needs no approval and no mention beyond the address you end up giving. A port in use on this PC says only that this PC is using it — it is not evidence about the server, and it never means another application has taken the deployment host. A port already in use on the *server* is a different matter: find out what is listening before you take it or move around it, and if the answer is that something else is deployed there, that is a question about which machine this application should be on and it goes to the owner. The URL works on this PC while the tunnel is alive, and in the owner's browser on another machine only when the result's access says this installation's ports are forwarded to it; give the URL as returned either way. No credentials or arbitrary bind addresses are accepted.",
-            parameters: Type.Object({
-              remotePort: Type.Number({ minimum: 1, maximum: 65535 }),
-              localPort: Type.Optional(
-                Type.Number({ minimum: 1024, maximum: 65535 }),
-              ),
-            }),
+              "Open or reuse an SSH tunnel from this controller PC's 127.0.0.1 to a loopback port on the connected server. Returns a local HTTP URL; verify the app separately. Omit localPort unless you need a particular one: an installation keeps private links on ports its owner forwards to their browser, picks a free one for you, and refuses ports outside them. Does not change the server's listeners/firewall. If the local port on this PC is occupied, choose another and carry on: picking a free port is bookkeeping, not a decision, and it needs no approval and no mention beyond the address you end up giving. A port in use on this PC says only that this PC is using it — it is not evidence about the server, and it never means another application has taken the deployment host. A port already in use on the *server* is a different matter: find out what is listening before you take it or move around it, and if the answer is that something else is deployed there, that is a question about which machine this application should be on and it goes to the owner. The URL works on this PC while the tunnel is alive, and in the owner's browser on another machine only when the result's access says this installation's ports are forwarded to it; give the URL as returned either way. No credentials or arbitrary bind addresses are accepted. To reconnect an established saved private route, instead supply only accessRecordId and expectedUpdatedAt from that record. The server validates its current revision, canonical attached host and exact saved ports before approval and again before opening. In saved-route form, never switch ports or fall back to explicit-port setup after failure; report the access result and stop. Reconnect does not authorize service repair, restart, public exposure or changes to the saved route.",
+            // Providers require an object at the tool-schema root. The
+            // executor validates the two mutually exclusive argument forms.
+            parameters: Type.Object(
+              {
+                remotePort: Type.Optional(
+                  Type.Integer({ minimum: 1, maximum: 65535 }),
+                ),
+                localPort: Type.Optional(
+                  Type.Integer({ minimum: 1024, maximum: 65535 }),
+                ),
+                accessRecordId: Type.Optional(Type.String({ format: "uuid" })),
+                expectedUpdatedAt: Type.Optional(
+                  Type.String({ format: "date-time" }),
+                ),
+              },
+              { additionalProperties: false },
+            ),
             async execute(id, params, signal) {
               return json(
-                await execution.execute(
-                  "open_server_port",
-                  "Private access on the controller PC",
+                await executePrivateAccess(
+                  scope.applicationId,
+                  execution,
                   params,
-                  () =>
-                    openServerPort(
-                      scope.applicationId,
-                      params,
-                      signal ?? options.signal,
-                    ),
-                  false,
                   id,
-                  signal,
+                  signal ?? options.signal,
                 ),
               );
             },

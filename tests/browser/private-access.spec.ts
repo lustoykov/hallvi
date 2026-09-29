@@ -305,9 +305,11 @@ test("private route observations stay with their route, survive refresh and lose
     ).toBeVisible();
     await page
       .locator(".rp")
-      .getByRole("button", { name: "Open the connection again" })
+      .getByRole("button", { name: "Review private access" })
       .click();
-    await expect(page.locator("#pi-composer")).toHaveValue(/18000/);
+    await expect(page.locator("#pi-composer")).toHaveValue(
+      /Review the saved private access/,
+    );
     await expect(page.locator("#pi-composer")).not.toHaveValue(/18001/);
     await page.goto(`/applications/${appId}#overview`);
     response = {

@@ -303,7 +303,7 @@ browser as it is written. Connecting ChatGPT and GitHub uses device codes, so
 both work through the same connection with nothing further to forward. If the
 SSH session drops, run the second command again; the Hallvi service, saved
 account connections and conversation remain on the other machine. A private
-application link may need Pi to reopen it after a service restart.
+application link may need Reconnect after a service restart. Reconnect reopens the saved route through Main operator under the existing permission mode, preserving the installation port and URL. It cannot restore the laptop-to-controller SSH connection; run the command above first.
 
 If one of those ports is already used on the laptop, `ssh` refuses the whole
 connection and names it, so no page half-works. Leave whatever has the port

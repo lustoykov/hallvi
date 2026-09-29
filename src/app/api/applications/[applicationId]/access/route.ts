@@ -2,6 +2,8 @@ import { handle } from "@/server/http";
 import { privateAccessOpen } from "@/server/private-access";
 import { publicUrlReachable } from "@/server/public-access";
 import { serverBeat } from "@/server/pulse";
+import { operatorSettings } from "@/server/operator-execution";
+import { reconnectEligible } from "@/server/saved-private-access";
 import { listInformation } from "@/server/saved-information";
 import {
   accessRouteIdentity,
@@ -64,6 +66,10 @@ async function wayIn(applicationId: string) {
   return {
     mode: "private",
     routeIdentity,
+    reconnectable: reconnectEligible(
+      record,
+      (await operatorSettings(applicationId)).host,
+    ),
     open: await privateAccessOpen(
       applicationId,
       access.remotePort,
