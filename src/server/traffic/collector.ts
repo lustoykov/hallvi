@@ -30,6 +30,7 @@ import {
   LOG_FORMATS,
   OTHER,
   STORED_PER_LIST,
+  TRAFFIC_LISTS,
   type Collection,
   type Coverage,
   type Gap,
@@ -55,8 +56,15 @@ export const TICK_MS = 2_000;
 /** Today is written this often while lines arrive, and at least each minute. */
 const WRITE_MS = 5_000;
 const IDLE_WRITE_MS = 60_000;
-/** The backlog is read once the follow has been quiet this long. */
+/**
+ * The backlog is read once the follow has sent nothing for this long. A file
+ * log says where its backlog ends, so it waits for that; only a stall that
+ * long without it — the file cut short under the follow — counts instead.
+ */
 const QUIET_MS = 1_500;
+const STALLED_MS = 30_000;
+/** How often the words of a catch-up are written. */
+const PROGRESS_MS = 2_000;
 /** A start recounts at most this many finished days. */
 const REACH_DAYS = 31;
 /**
@@ -346,7 +354,7 @@ function largerList(a: Ranked[], b: Ranked[]) {
  *   hourly — visitors, lists, time on page, page speed — cannot be split by
  *   hour, so each is the larger of the two counts, per entry. Each count saw
  *   only part of the day, so that is a floor, never a sum: a browser seen by
- *   both would be counted twice by adding.
+ *   both would be counted twice by adding. The day says so in `partial`.
  */
 export function combined(
   stored: TrafficDay,
@@ -380,18 +388,6 @@ export function combined(
       ? { day: recount, spans: a, from, to }
       : { day: stored, spans: b, from, to };
   });
-  const lists = [
-    "pages",
-    "sources",
-    "campaigns",
-    "countries",
-    "devices",
-    "browsers",
-    "systems",
-    "errors",
-    "goals",
-    "bots",
-  ] as const;
   return {
     ...recount,
     computedAt: now,
@@ -402,7 +398,10 @@ export function combined(
     visitors: Math.max(stored.visitors, recount.visitors),
     errorVisitors: Math.max(stored.errorVisitors, recount.errorVisitors),
     ...Object.fromEntries(
-      lists.map((list) => [list, largerList(stored[list], recount[list])]),
+      TRAFFIC_LISTS.map((list) => [
+        list,
+        largerList(stored[list], recount[list]),
+      ]),
     ),
     browserOnlyPages: Math.max(
       stored.browserOnlyPages,
@@ -426,6 +425,14 @@ export function combined(
       (entry) => entry.path,
       (entry) => entry.count,
     ),
+    // Each of those saw part of the day: say so, wherever they are read.
+    partial: [
+      "visitors",
+      ...TRAFFIC_LISTS,
+      "engagement",
+      "vitals",
+      "scriptErrors",
+    ],
   };
 }
 
@@ -505,6 +512,15 @@ async function finishDays(target: Target, oldest: number | null) {
   return moved;
 }
 
+/** The oldest line the log holds now, recorded; null for an empty log. */
+async function reach({ applicationId, host, log, signal }: Target) {
+  const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
+  recordCollector(applicationId, {
+    oldestRetainedAt: oldest === null ? null : iso(oldest),
+  });
+  return oldest;
+}
+
 /** When the next day can be finished: ten minutes after its midnight. */
 function nextFinish(timeZone: string, now = Date.now()) {
   return (
@@ -528,18 +544,15 @@ interface Open {
  * again from the log and follow it until the connection ends. Answers why it
  * ended, and whether it had been following.
  */
-async function connection(target: Target, first: boolean) {
+async function connection(target: Target, announce: boolean) {
   const { applicationId, host, log, timeZone } = target;
   const inner = new AbortController();
   const signal = AbortSignal.any([target.signal, inner.signal]);
   const scope = { ...target, signal };
 
-  const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
-  recordCollector(applicationId, {
-    oldestRetainedAt: oldest === null ? null : iso(oldest),
-    ...(first ? { state: "catching-up" as const, detail: null } : {}),
-  });
-  await finishDays(scope, oldest);
+  if (announce)
+    recordCollector(applicationId, { state: "catching-up", detail: null });
+  await finishDays(scope, await reach(scope));
   signal.throwIfAborted();
   // Listed again for the follow, which reads exactly these files and stops
   // if a rotation moved one since: today's coverage is this listing's.
@@ -591,6 +604,12 @@ async function connection(target: Target, first: boolean) {
   let finishing = false;
   let finishAt = nextFinish(timeZone);
   let rebuild = false;
+  // How far the backlog has been read, and what was last said about it.
+  let backlog: { file: string; read: number; total: number | null } | null =
+    null;
+  let backlogDone = false;
+  let said: string | null = null;
+  let saidAt = 0;
 
   const write = (aliveTo: number) => {
     const now = Date.now();
@@ -631,7 +650,21 @@ async function connection(target: Target, first: boolean) {
   const timer = setInterval(() => {
     const now = Date.now();
     if (!live) {
-      if (readyAt !== null && now - heardAt >= QUIET_MS) caughtUp();
+      if (readyAt === null) return;
+      const quiet =
+        log.source.type === "file" && !backlogDone ? STALLED_MS : QUIET_MS;
+      if (now - heardAt >= quiet) return caughtUp();
+      // What is being read, every few seconds, for the page to say.
+      const words = backlog
+        ? backlog.total
+          ? `${Math.min(99, Math.floor((backlog.read / backlog.total) * 100))}% of ${backlog.file}`
+          : backlog.file
+        : null;
+      if (words !== said && now - saidAt >= PROGRESS_MS) {
+        said = words;
+        saidAt = now;
+        recordCollector(applicationId, { detail: words });
+      }
       return;
     }
     // Past midnight the follow carries on into the next day.
@@ -647,7 +680,11 @@ async function connection(target: Target, first: boolean) {
       finishing = true;
       for (let index = days.length - 1; index >= 0; index--)
         if (now >= days[index].end + FINAL_AFTER_MS) days.splice(index, 1);
-      finishDays(scope, oldest)
+      let retry = false;
+      // Listed again first: a log that was empty when the follow began has
+      // lines now, and rotation has moved its oldest on since.
+      reach(scope)
+        .then((oldest) => finishDays(scope, oldest))
         .then((moved) => {
           const counting = days.at(-1)!.counter.switchAt;
           const since = collectionOf(applicationId).scriptSince;
@@ -661,10 +698,12 @@ async function connection(target: Target, first: boolean) {
             inner.abort();
           }
         })
-        .catch(() => {})
+        // A listing or a read that failed is tried again in a minute, not
+        // at the next midnight.
+        .catch(() => (retry = true))
         .finally(() => {
           finishing = false;
-          finishAt = nextFinish(timeZone);
+          finishAt = retry ? Date.now() + 60_000 : nextFinish(timeZone);
         });
     }
   }, 500);
@@ -677,7 +716,6 @@ async function connection(target: Target, first: boolean) {
       today.start - LOOKBACK_MS,
       {
         line: (line) => {
-          heardAt = Date.now();
           dirty = true;
           const entry = days.at(-1)!;
           // The next day opens a few minutes early, to read what the log
@@ -692,6 +730,19 @@ async function connection(target: Target, first: boolean) {
         ready: () => {
           readyAt = Date.now();
           heardAt = readyAt;
+          // Connected, and counting today again before it is live.
+          recordCollector(applicationId, {
+            state: "catching-up",
+            detail: null,
+          });
+        },
+        heard: () => (heardAt = Date.now()),
+        backlog: (at) => {
+          backlog = at;
+          if (at.done && !backlogDone) {
+            backlogDone = true;
+            caughtUp();
+          }
         },
         unreadable: (name) => unreadable.add(name),
       },
@@ -729,20 +780,23 @@ async function connection(target: Target, first: boolean) {
 async function collect(target: Target) {
   const { applicationId, log, signal } = target;
   recordCollector(applicationId, {
-    source: { proxy: log.proxy, format: log.format },
+    source: sourceOf(log),
   });
   let failures = 0;
   let moves = 0;
-  let first = true;
+  // Said at the first start and at a start-over; after a failure the state
+  // stays lost until the follow is connected again.
+  let announce = true;
   while (!signal.aborted) {
     const began = Date.now();
     let detail: string;
     try {
-      const ended = await connection(target, first);
+      const ended = await connection(target, announce);
       if (signal.aborted) return;
       // Started over at once; a log that rotates under every start in a row
       // waits like any failure.
       moves = ended.moved ? moves + 1 : 0;
+      announce = true;
       if (ended.rebuild && moves <= 3) continue;
       detail = ended.detail;
       if (ended.live && Date.now() - began >= STEADY_MS) failures = 0;
@@ -753,7 +807,7 @@ async function collect(target: Target) {
           ? error.message.slice(0, 300)
           : "The log could not be read.";
     }
-    first = false;
+    announce = false;
     recordCollector(applicationId, { state: "lost", detail });
     await delay(BACKOFF_MS[Math.min(failures, BACKOFF_MS.length - 1)], null, {
       signal,
@@ -764,6 +818,19 @@ async function collect(target: Target) {
 
 // ---------------------------------------------------------------------------
 // Every application
+
+/**
+ * What wrote the log, as the record says. Traefik cannot rewrite its log,
+ * so that it keeps queries is known from the format alone; anything else is
+ * what the record claims, or unknown.
+ */
+function sourceOf(log: AccessLogRecord): Collection["source"] {
+  return {
+    proxy: log.proxy,
+    format: log.format,
+    queries: log.queries ?? (log.format === "traefik-json" ? "kept" : null),
+  };
+}
 
 /** Why history cannot be read, in the words the Traffic page shows. */
 function blocked(
@@ -806,7 +873,7 @@ export function trafficCollector(signal: AbortSignal) {
       )
         recordCollector(applicationId, {
           ...reason,
-          source: log ? { proxy: log.proxy, format: log.format } : null,
+          source: log ? sourceOf(log) : null,
         });
       return;
     }

@@ -155,3 +155,24 @@ and its files `root:adm 0640`. User `hv` has passwordless sudo and is not in
 The day's close, the interval rule and the worker's independent ticks have
 tests of their own (`traffic-day-close`, `traffic-collector`,
 `pi-worker-traffic`). The full collection run above was not repeated.
+
+## Second review round, checked in local Docker
+
+29 September 2026, on the round-2 branch, in disposable containers on
+127.0.0.1, torn down afterwards.
+
+- **The file `tail` opened.** In `debian:bookworm` (bash 5.2, coreutils
+  9.1), the follow command ran three ways against a real `/proc`: with no
+  rotation it read both lines and followed a third; with the file rolled in
+  the instant before `tail` opened it (a `tail` wrapper renamed it first), it
+  printed the new file's line, then `hallvi-moved access.log`, and ended
+  `tail`; with the file rolled after `tail` opened it, `tail -F` moved to the
+  new file and nothing was said.
+- **A large backlog.** An `ubuntu:24.04` sshd (OpenSSH 9.6p1) with its
+  link held to 20 Mbit/s (`tc tbf`) served a 167 MB Caddy log of 150,000
+  lines, a quarter of them the application's. The follow read the whole
+  backlog in 64.3 s before and 4.6 s with SSH compression; 40 MB through
+  `ssh -tt` alone took 16.2 s and 1.2 s. Parsing and counting 836,000 such
+  lines on the controller takes about 3 s, so the link, not the parser, is
+  what a start or a reconnect waits for. The generated lines repeat more
+  than a real log's, so a real log compresses less than this.

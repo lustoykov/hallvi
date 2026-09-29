@@ -6,7 +6,7 @@
 
 import type { ReleaseImpact } from "@/server/traffic/contract";
 
-import { impactLine } from "./model";
+import { comparedWords, impactLine } from "./model";
 import { useImpacts, useTrafficListed } from "./source";
 import "./traffic.css";
 
@@ -34,7 +34,11 @@ export function ImpactLine({
   const line = impact ? impactLine(impact, now) : null;
   if (!line) return null;
   return (
-    <span className="tf-impact" data-tone={line.tone} title={line.says}>
+    <span
+      className="tf-impact"
+      data-tone={line.tone}
+      title={`${line.says} (${comparedWords(impact!)})`}
+    >
       {line.says}
     </span>
   );
@@ -44,5 +48,5 @@ export function ImpactLine({
 export function impactQuestion(impact: ReleaseImpact | undefined, now: number) {
   const line = impact ? impactLine(impact, now) : null;
   if (!line || (line.tone !== "bad" && line.tone !== "warn")) return null;
-  return `${line.says}. Read the application's output since that release and tell me what broke, and whether rolling back would fix it.`;
+  return `${line.says} (${comparedWords(impact!)}). Read the application's output since that release and tell me what broke, and whether rolling back would fix it.`;
 }

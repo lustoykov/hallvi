@@ -131,6 +131,17 @@ const READ_FILES = [
 // that file and says `hallvi-moved`, and the collector lists again and starts
 // over rather than lose what the name no longer holds. A file that cannot be
 // read says `hallvi-unreadable`, and its time is a gap.
+//
+// The file being written is checked again once `tail` has it open, because
+// a rotation between the check by name and `tail` opening that name would
+// otherwise hand it the new file unnoticed. `tail` replaces the shell, as
+// before, so it ends with the connection; a check beside it looks at the
+// very file `tail` holds (/proc/<pid>/fd on Linux; elsewhere the name, a
+// moment after), and on a mismatch says `hallvi-moved` and ends `tail`.
+//
+// Each rotated file is announced (`hallvi-reading`), and the file being
+// written with its size (`hallvi-backlog`), so the collector knows how far
+// the backlog goes and says it is still catching up until it is read.
 const FOLLOW_FILES = [
   ...UNREADABLE,
   "name=${1##*/}",
@@ -138,10 +149,17 @@ const FOLLOW_FILES = [
   "shift",
   'for ((k = 1; k <= $#; k += 3)); do f=${!k}; [ ! -e "$f" ] || [ -r "$f" ] || unreadable "$f"; done',
   'same() { local i s; [ -e "$1" ] || return 1; read -r i _ < <(ls -di -- "$1"); s=$(wc -c < "$1") || return 1; [ "$i" = "$2" ] || return 1; if [ "$1" = "$name" ]; then [ "$s" -ge "$3" ]; else [ "$s" -eq "$3" ]; fi; }',
+  // 0: the process holds the listed file; 1: another; 2: none yet.
+  'held() { local l i s; [ -d "/proc/$$/fd" ] || { sleep 1; same "$@"; return; }; for l in /proc/$$/fd/*; do [ -f "$l" ] || continue; read -r i _ < <(ls -diL -- "$l"); s=$(wc -c < "$l") || return 1; [ "$i" = "$2" ] && [ "$s" -ge "$3" ]; return; done; return 2; }',
   `echo ${READY}`,
   "while [ $# -ge 3 ]; do",
   '  same "$1" "$2" "$3" 2>/dev/null || { echo "hallvi-moved $1"; exit 5; }',
-  '  [ "$1" != "$name" ] || exec tail -n +1 -F -- "$name"',
+  '  if [ "$1" = "$name" ]; then',
+  '    echo "hallvi-backlog $(wc -c < "$name")"',
+  '    { for _ in {1..50}; do held "$1" "$2" "$3" 2>/dev/null; r=$?; [ "$r" = 2 ] || break; sleep 0.1; done; [ "$r" = 0 ] || { echo; echo "hallvi-moved $1"; kill $$; }; } &',
+  '    exec tail -n +1 -F -- "$name"',
+  "  fi",
+  '  echo "hallvi-reading $1"',
   '  gzip -cdf -- "$1"; s=$?; echo',
   '  [ "$s" = 0 ] || echo "hallvi-unreadable $1"',
   "  shift 3",
@@ -523,12 +541,27 @@ export async function followLog(
     ready?: () => void;
     /** A listed file that could not be read: its time is a gap. */
     unreadable?: (name: string) => void;
+    /** Anything at all arrived: the connection is still sending. */
+    heard?: () => void;
+    /**
+     * How far the backlog has been read: a rotated file by name, then the
+     * file being written, by bytes of its size when the follow began.
+     * `done` once, when that much has arrived. A container says nothing.
+     */
+    backlog?: (at: {
+      file: string;
+      read: number;
+      total: number | null;
+      done: boolean;
+    }) => void;
   },
   signal: AbortSignal,
 ) {
   const { source } = log;
   const options = optionsOf(log);
   let moved: string | null = null;
+  let backlog: { file: string; read: number; total: number | null } | null =
+    null;
   const result = await onServer(
     host,
     followLogCommand(
@@ -541,10 +574,28 @@ export async function followLog(
       since,
     ),
     (text) => {
-      const marker = /^hallvi-(moved|unreadable) (\S+)\s*$/.exec(text);
+      on.heard?.();
+      const marker =
+        /^hallvi-(moved|unreadable|reading|backlog)\s+(\S+)\s*$/.exec(text);
       if (marker?.[1] === "moved") moved = marker[2];
-      else if (marker) on.unreadable?.(marker[2]);
+      else if (marker?.[1] === "unreadable") on.unreadable?.(marker[2]);
+      else if (marker?.[1] === "reading") {
+        backlog = { file: marker[2], read: 0, total: null };
+        on.backlog?.({ ...backlog, done: false });
+      } else if (marker?.[1] === "backlog" && source.type === "file") {
+        backlog = {
+          file: baseOf(source.path),
+          read: 0,
+          total: Number(marker[2]) || 0,
+        };
+        on.backlog?.({ ...backlog, done: backlog.total === 0 });
+      }
       if (marker) return;
+      // Bytes of the file being written, as the terminal ended each line.
+      if (backlog?.total != null && backlog.read < backlog.total) {
+        backlog.read += Buffer.byteLength(text) + 1;
+        on.backlog?.({ ...backlog, done: backlog.read >= backlog.total });
+      }
       const line = parseLine(log.format, text, options);
       if (line && line.at >= since) on.line(line);
     },
@@ -598,8 +649,13 @@ export function onServer(
           // session and left the follow running on the server until its next
           // write — on a quiet site, indefinitely. With one, the server hangs
           // the process up when the connection goes. A read that ends by
-          // itself needs none, and its JSON compresses well on the way.
-          ...(follow ? ["-tt"] : ["-o", "Compression=yes"]),
+          // itself needs none.
+          ...(follow ? ["-tt"] : []),
+          // JSON lines compress well, and a follow starts with the day's
+          // backlog: 40 MB of Caddy's lines took 16 s over a 20 Mbit/s link,
+          // and 1.2 s compressed (docs/testing, traffic collection).
+          "-o",
+          "Compression=yes",
           "-o",
           "ConnectTimeout=10",
           // A page that says "live" has to find out quickly that it is not:

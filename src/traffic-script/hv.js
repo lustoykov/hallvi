@@ -28,6 +28,15 @@
     "ref",
   ];
   const GOAL = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
+  // An application that routes pages by a query key (WordPress's ?p=) names
+  // it on the tag: data-hv-page-key="p". Its value is the only part of a
+  // query a view carries; checked as Hallvi checks it (PAGE_KEY_VALUE).
+  // Read now: the tag is known only while the script first runs.
+  const named = document.currentScript?.getAttribute("data-hv-page-key");
+  const PAGE_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(named || "")
+    ? named
+    : null;
+  const PAGE_VALUE = /^[^\u0000-\u001f\u007f?#&=]{1,100}$/u;
   // An error thrown in a loop would otherwise be a request per frame.
   const ERRORS_PER_VIEW = 10;
 
@@ -79,7 +88,18 @@
     if (!navigator.sendBeacon?.(url))
       fetch(url, { method: "POST", keepalive: true }).catch(() => {});
   };
-  const emit = (t, more) => view && send({ t, s: view.s, p: view.p, ...more });
+  const emit = (t, more) =>
+    view && send({ t, s: view.s, p: view.p, k: view.k, ...more });
+
+  // The page: its path, and the page key's value when the tag names one.
+  const path = () => location.pathname.slice(0, 300);
+  const keyed = () => {
+    if (!PAGE_KEY) return;
+    const value = new URLSearchParams(location.search)
+      .get(PAGE_KEY)
+      ?.slice(0, 100);
+    if (value && PAGE_VALUE.test(value)) return value;
+  };
 
   // Where the page the browser loaded was reached from: the referrer's
   // origin, never the page it was — this site's own when the visitor came
@@ -110,7 +130,8 @@
       s: Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) =>
         byte.toString(16).padStart(2, "0"),
       ).join(""),
-      p: location.pathname.slice(0, 300),
+      p: path(),
+      k: keyed(),
       shown: 0,
       since: visible() ? now() : null,
       left: false,
@@ -154,7 +175,7 @@
   };
 
   const moved = () => {
-    if (location.pathname.slice(0, 300) === view.p) return;
+    if (path() === view.p && keyed() === view.k) return;
     end();
     start(false);
   };
@@ -221,8 +242,9 @@
     observe("event", interactions, { durationThreshold: 40 });
     observe("first-input", interactions);
 
-    // Route changes inside the application. The same path again (a query or
-    // a hash changing, a router tidying its state) is the same page view.
+    // Route changes inside the application. The same page again (another
+    // part of the query or the hash changing, a router tidying its state) is
+    // the same page view; a new path or page key's value is a new one.
     for (const name of ["pushState", "replaceState"]) {
       const original = history[name];
       history[name] = function (...args) {

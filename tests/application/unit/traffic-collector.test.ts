@@ -70,6 +70,7 @@ describe("a recount against what was stored", () => {
   it("takes the recount when it answers for everything stored", () => {
     const again = recount("00:00:00");
     expect(combined(stored("06:00:00", "12:00:00"), again, day)).toBe(again);
+    expect(again.partial).toBeUndefined();
   });
 
   it("keeps what was stored when the log has since lost part of it", () => {
@@ -79,6 +80,7 @@ describe("a recount against what was stored", () => {
       day,
     );
     expect(requests(kept)).toBe(108);
+    expect(kept.partial).toBeUndefined();
     // After its last moment Hallvi was not following, and nothing holds it.
     expect(kept.coverage).toEqual({
       from: iso(day.start),
@@ -111,9 +113,13 @@ describe("a recount against what was stored", () => {
         },
       ],
     });
-    // A list is not hourly: the larger count, a floor and never a sum.
+    // A list is not hourly: the larger count, a floor and never a sum, and
+    // the day says which of its figures are such floors.
     expect(both.pages).toEqual([{ key: "/", count: 111, visitors: 7 }]);
     expect(both.visitors).toBe(7);
+    expect(both.partial).toEqual(
+      expect.arrayContaining(["visitors", "pages", "engagement", "vitals"]),
+    );
 
     // Two halves of equal length: the later one no longer replaces the
     // earlier.
