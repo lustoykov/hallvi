@@ -1,6 +1,7 @@
 # Private access observations — plan 02 increment 1
 
-The access check, Open links and existing reopen draft now use one current
+[Draft PR #256](https://github.com/lustoykov/hallvi/pull/256) contains this increment;
+it has not been merged. The access check, Open links and existing reopen draft now use one current
 saved route. A private connection being open establishes SSH tunnel liveness;
 it does not establish application HTTP health. Missing answers, controller
 read errors and edited routes cannot retain an earlier green answer.

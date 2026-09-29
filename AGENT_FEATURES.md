@@ -45,7 +45,8 @@ submission, the saved-route tool form and the real return/remote-device
 acceptance remain unimplemented and unassigned.
 **Assignment:** On 2026-09-29 the owner selected plan 02 increment 1: truthful
 access observations and one current saved-route selector. Assigned to
-`codex/private-access-observations`, based on #255. Existing reopen actions
+`codex/private-access-observations`, based on #255, in draft
+[PR #256](https://github.com/lustoykov/hallvi/pull/256). Existing reopen actions
 still prepare a main-conversation draft; they do not submit or reconnect.
 The full feature remains partial. [Verification and matched captures](docs/assets/private-access-observations/README.md)
 cover this increment only.

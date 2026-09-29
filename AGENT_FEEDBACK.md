@@ -129,7 +129,7 @@ tool disclosures are insufficient.
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
-| [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in this increment |
+| [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in draft #256 |
 
 ### AF-012 — Keep private access observations truthful and on one route
 
@@ -141,9 +141,10 @@ poll responses. Visual QA also found the shared header Open button's background
 token missing on Overview; it now falls back to the existing shell token.
 
 **+1:** 2026-09-29 — private-access increment 1 task
-(`codex/private-access-observations`).
+(`codex/private-access-observations`), [PR #256](https://github.com/lustoykov/hallvi/pull/256).
 
-**Status:** Resolved in this increment. [Verification and matched captures](docs/assets/private-access-observations/README.md)
+**Status:** Resolved in draft [#256](https://github.com/lustoykov/hallvi/pull/256),
+not yet merged. [Verification and matched captures](docs/assets/private-access-observations/README.md)
 show the modeled states and limitations. Reopen remains draft-only; the full
 reconnect feature is partial.
 
