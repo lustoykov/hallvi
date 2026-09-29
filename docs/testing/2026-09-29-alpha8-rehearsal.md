@@ -1,6 +1,6 @@
 # Alpha.8 candidate verification — 29 September 2026
 
-The signed candidate is `0.1.1-alpha.8`, revision `48927a1417659448d249ee31f07bd868ec451add`, prepared in [PR #254](https://github.com/lustoykov/hallvi/pull/254). Product code is identical to merged performance PR #252 at `a81b6953ed3d3929393382662640e56a1ca5cd7c`; only package/lockfile versions and the changelog differ. The candidate is a draft. Published latest remains alpha.7.
+The signed candidate is `0.1.1-alpha.8`, revision `48927a1417659448d249ee31f07bd868ec451add`, prepared in [PR #254](https://github.com/lustoykov/hallvi/pull/254). Product code is identical to merged performance PR #252 at `a81b6953ed3d3929393382662640e56a1ca5cd7c`; only package/lockfile versions and the changelog differ. This was the preliminary draft; published latest remained alpha.7 during these checks. Final publication requires a rebuilt candidate containing the agreed integrated scope and fresh verification of its affected boundaries.
 
 ## Native packages and clean installations
 
@@ -68,4 +68,4 @@ A final comparison found three changed files among 184 original database/history
 
 ## Beta boundary
 
-No provider deployment or installed-service upgrade was performed. A dedicated test server has not been selected for the live rehearsal. The full [beta walkthrough](../beta-walkthrough.md) requires a fresh user to deploy a useful application, verify stored application data after refresh/restart, and report friction. Agent fixture checks do not complete that acceptance step.
+At the end of these preliminary checks, no provider deployment or installed-service upgrade had been performed. The owner subsequently chose to reuse the registered development host, and a live isolated rehearsal is underway. The current [beta walkthrough](../beta-walkthrough.md) permits owner-run and agent-assisted evidence; a separate external tester is not required before publication. The remaining evidence must establish useful application behavior and stored data after update/restart/return on the final integrated candidate. This preliminary report does not establish those outcomes or external-user onboarding.
