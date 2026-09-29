@@ -272,8 +272,11 @@ says so and names what is host-wide.
   counted site, writing `/var/log/caddy/hallvi/access.log` with
   `roll_interval 24h`, `roll_keep 1000`, `roll_keep_for 30d`, `roll_size 100MiB`,
   `mode 0640`, `dir_mode 0755`; a `format filter` with
-  `request>uri regexp \?.*$ ""` and `request>headers>Referer regexp [?#].*$ ""`
-  wrapping json; `log_append hv_<key> {query.<key>}` for each kept key, and
+  `request>uri regexp \?.*$ ""`, `request>headers>Referer regexp [?#].*$ ""`,
+  `resp_headers>Location regexp [?#].*$ ""` and `delete` for the other response
+  headers that can carry the requested address (Content-Location, Link,
+  Refresh, htmx's Hx-Location, Hx-Redirect, Hx-Push-Url, Hx-Replace-Url),
+  wrapping json (in `fields {}` on 2.6 and 2.7); `log_append hv_<key> {query.<key>}` for each kept key, and
   `hv_page` only where the application routes by a query key. Rotated names
   carry the reason (`access-<UTC ms>-size|time|manual.log.gz`), rotation is
   lazy, and `.zst` is not read.
@@ -331,8 +334,13 @@ configuration not owned by root; nginx's `$uri` is rewritten by `try_files`
 (an SPA route was logged as `/spa/index.html`), so the path comes from
 `$request_uri`; Caddy without `mode`/`dir_mode` writes files only root can read;
 Caddy still writes a failed request's error entries, **with the full query
-string**, to its default logger (stderr, `docker logs`), which Pi may read; a
-single-file bind mount goes stale when the file is replaced.
+string**, to its default logger (stderr, `docker logs`), which Pi may read;
+Caddy logs response headers whole, and Paperless's sign-in redirect
+(`Location: /accounts/login/?next=<path and query>`) carried the request's
+query into Hallvi's log until the Location filter; nginx's `hallvi-json` line
+and Traefik's keep list never log Location (checked on nginx 1.14 and 1.30,
+Traefik 2.0 to 3.7); a single-file bind mount goes stale when the file is
+replaced.
 
 ## Where it shows
 

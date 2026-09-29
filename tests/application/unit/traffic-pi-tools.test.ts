@@ -180,6 +180,20 @@ describe("traffic_setup", () => {
         );
   });
 
+  it("keeps the request's query out of every Caddy log's response headers", () => {
+    // Caddy logs response headers whole: a sign-in redirect's Location
+    // carried ?next=<the path and query> into the log on a real server.
+    for (const variant of ["caddy", "caddy-2.8", "caddy-2.6"] as const) {
+      const text = LOG_SETUP[variant].config.Caddyfile;
+      const [, pattern] = /resp_headers>Location regexp (\S+) ""/.exec(text)!;
+      expect(
+        "/accounts/login/?next=/x?token=y#f".replace(new RegExp(pattern), ""),
+      ).toBe("/accounts/login/");
+      for (const header of ["Content-Location", "Link", "Refresh"])
+        expect(text).toContain(`resp_headers>${header} delete`);
+    }
+  });
+
   it("has Caddy 2.6 keep only the kept keys in the path, where the reader finds them", () => {
     // Caddy 2.6 has no log_append: its filter rewrites the logged path.
     // Go's ReplaceAllString and a global JavaScript replace agree on it.
