@@ -159,7 +159,7 @@ token missing on Overview; it now falls back to the existing shell token.
 (`codex/private-access-observations`), [PR #256](https://github.com/lustoykov/hallvi/pull/256).
 
 **Status:** Resolved in draft [#256](https://github.com/lustoykov/hallvi/pull/256),
-not yet merged. [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256)
+not yet merged. [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
 show the modeled states and limitations. Reopen remains draft-only; the full
 reconnect feature is partial.
 

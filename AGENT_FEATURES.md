@@ -48,7 +48,7 @@ access observations and one current saved-route selector. Assigned to
 `codex/private-access-observations`, based on #255, in draft
 [PR #256](https://github.com/lustoykov/hallvi/pull/256). Existing reopen actions
 still prepare a main-conversation draft; they do not submit or reconnect.
-The full feature remains partial. [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256)
+The full feature remains partial. [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
 cover this increment only.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
