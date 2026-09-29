@@ -8,7 +8,14 @@
 import type { TrafficHistory } from "@/server/traffic/contract";
 
 import { Ask } from "../register";
-import { count, errorsHitVisitors, milliseconds, plural } from "./model";
+import {
+  atLeast,
+  count,
+  errorsAcrossMidnight,
+  errorsHitVisitors,
+  milliseconds,
+  plural,
+} from "./model";
 
 export function Errors({
   history,
@@ -19,8 +26,16 @@ export function Errors({
   name: string;
   onAsk: (draft: string) => void;
 }) {
-  const hit = errorsHitVisitors(history);
-  const failing = hit ? history.errors.filter((row) => row.count > 0) : [];
+  const oneDay = history.range === "24h";
+  // The 24-hour range starts yesterday, while its visitor estimates and its
+  // lists are today's: today's errors are the ones they describe, and what
+  // came before midnight is said apart.
+  const split = oneDay ? errorsAcrossMidnight(history) : null;
+  const hit = split
+    ? split.todayHit || split.earlierHit
+    : errorsHitVisitors(history);
+  const listed = split ? split.todayHit : hit;
+  const failing = listed ? history.errors.filter((row) => row.count > 0) : [];
   const script = history.scriptErrors.filter((row) => row.count > 0);
   // Only what reached somebody earns a card; the rest is small print under
   // Responses.
@@ -28,14 +43,17 @@ export function Errors({
   // Visitor estimates are per day. Over one day a list can say "about 9
   // visitors"; over a week it can only say how many days errors reached
   // anyone, and which day was worst.
-  const oneDay = history.range === "24h";
   const days = history.series.filter((point) => point.errorVisitors > 0);
   const worst = [...days].sort((a, b) => b.errorVisitors - a.errorVisitors)[0];
   const says = !hit
     ? null
-    : oneDay || !worst
-      ? `${plural(history.totals.errors, "server error")}, hitting about ${plural(history.totals.errorVisitors, "visitor")}.`
-      : `${plural(history.totals.errors, "server error")} reached visitors on ${plural(days.length, "day")}, most ${worst === history.series.at(-1) ? "today" : `on ${new Date(worst.at).toLocaleDateString("en-GB", { weekday: "long", timeZone: history.timeZone })}`} (about ${plural(worst.errorVisitors, "visitor")}).`;
+    : split
+      ? split.todayHit
+        ? `${plural(split.today, "server error")} today, hitting about ${plural(history.totals.errorVisitors, "visitor")}.${split.earlier ? ` ${count(split.earlier)} more before midnight.` : ""}`
+        : `${plural(split.earlier, "server error")} before midnight reached visitors; none has today.`
+      : !worst
+        ? `${plural(history.totals.errors, "server error")}, hitting about ${plural(history.totals.errorVisitors, "visitor")}.`
+        : `${plural(history.totals.errors, "server error")} reached visitors on ${plural(days.length, "day")}, most ${worst === history.series.at(-1) ? "today" : `on ${new Date(worst.at).toLocaleDateString("en-GB", { weekday: "long", timeZone: history.timeZone })}`} (about ${plural(worst.errorVisitors, "visitor")}).`;
   const top = failing[0];
   return (
     <section className="tf-card tf-errors" data-wide aria-label="Errors">
@@ -48,7 +66,10 @@ export function Errors({
           {failing.slice(0, 6).map((row) => (
             <li key={row.key}>
               <code title={row.key}>{row.key}</code>
-              <b>{plural(row.count, "error")}</b>
+              <b>
+                {history.partialLists.includes("errors") ? "≥ " : ""}
+                {plural(row.count, "error")}
+              </b>
               <span>
                 {oneDay && row.visitors
                   ? `about ${plural(row.visitors, "visitor")}`
@@ -73,7 +94,7 @@ export function Errors({
           <Ask
             onAsk={onAsk}
             tone="bad"
-            prompt={`${name} answered ${top.key} with ${plural(top.count, "server error")} in the ${history.range === "24h" ? "last 24 hours" : history.range === "7d" ? "last 7 days" : "last 30 days"}. Read the application's output from then and tell me what went wrong.`}
+            prompt={`${name} answered ${top.key} with ${plural(top.count, "server error")} ${oneDay ? "today" : history.range === "7d" ? "in the last 7 days" : "in the last 30 days"}. Read the application's output from then and tell me what went wrong.`}
           >
             Why is {top.key} failing?
           </Ask>
@@ -118,7 +139,10 @@ export function Responses({ history }: { history: TrafficHistory }) {
       </header>
       {history.totals.p95Ms !== null ? (
         <p className="tf-figure">
-          {milliseconds(history.totals.p95Ms)}
+          {atLeast(
+            milliseconds(history.totals.p95Ms),
+            history.totals.p95AtLeast,
+          )}
           <small>for the slowest 1 in 20</small>
         </p>
       ) : (
