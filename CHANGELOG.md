@@ -9,6 +9,7 @@ A release's notes are written in the pull request that raises its version, as a 
 Hallvi does less repeated work in long conversations and keeps its interface responsive while storage is busy.
 
 - **Lighter chat updates.** Unchanged execution history is reused, idle conversations wait for changes, and database work runs outside the main JavaScript thread. The layout and controls stay the same.
+- **Clearer work in progress.** The conversation names the action and its target while Pi works, and elapsed time stays readable on narrow screens.
 - **Requests from a terminal.** Use `hallvi apps`, `exec`, `wait` and `inspect` to send work to a named local controller and read the recorded result. Existing permissions still apply; approvals stay in the browser.
 - **Images in conversations.** Attach, paste or drop up to four images into a message as context for Pi. Sent images remain available after reloading the conversation.
 - **Clearer Deployment and Jobs pages.** Deployment leads with the running release and access status. Jobs lists recorded schedules, recent runs and failures together.

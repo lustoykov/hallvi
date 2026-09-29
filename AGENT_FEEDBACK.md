@@ -10,6 +10,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
+| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -121,6 +122,18 @@ reasoning and the native session tree when the conversation's messages and
 tool disclosures are insufficient.
 
 **+1:** 2026-09-29 — Hallvi software factory task, codex/factory-verification-fixes
+
+### AF-013 — Investigate the first-navigation event-loop pause
+
+The alpha.8 rehearsal observed a 687 ms maximum web event-loop delay on the
+first browser opening, versus 14–23 ms during idle windows. A separate profile
+with histories already warmed showed substantial module loading, source reads
+and compilation; it does not fully attribute the original spike. Investigate
+first-navigation responsiveness separately from the now-cached history reads.
+The [rehearsal report](docs/testing/2026-09-29-alpha8-rehearsal.md) records the
+environment and limits. No optimization was added during release verification.
+
+**+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
 
 ## Archive
 
