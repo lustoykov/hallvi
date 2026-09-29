@@ -21,7 +21,13 @@ import { parseLine } from "@/server/traffic/parse";
 const root = mkdtempSync(join(tmpdir(), "hallvi-traffic-fixture-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-function backfill(format: LogFormat, out: string, seed = "3", days = "1") {
+function backfill(
+  format: LogFormat,
+  out: string,
+  seed = "3",
+  days = "1",
+  shape = "spa",
+) {
   const dir = join(root, out);
   const result = spawnSync(
     process.execPath,
@@ -30,7 +36,7 @@ function backfill(format: LogFormat, out: string, seed = "3", days = "1") {
       "tsx",
       resolve("scripts/traffic-fixture.ts"),
       "backfill",
-      ...["--format", format, "--shape", "spa", "--days", days],
+      ...["--format", format, "--shape", shape, "--days", days],
       ...["--seed", seed, "--end", "2026-09-20T06:00:00Z", "--out", dir],
       ...["--releases", "2026-09-19T09:30:00Z"],
     ],
@@ -117,5 +123,21 @@ describe("the traffic fixture", () => {
         format,
       ).toEqual([]);
     }
+  }, 60_000);
+
+  it("keeps query strings out of a Caddy redirect's Location", () => {
+    // A login redirect's ?next= carries the asked-for address whole; Pi's
+    // filter cuts Location at ? as it cuts the path and the Referer.
+    const locations = backfill("caddy-json", "busy", "3", "1", "busy")
+      .flatMap(({ bytes }) =>
+        gunzipSync(bytes).toString("utf8").trimEnd().split("\n"),
+      )
+      .flatMap((text) => JSON.parse(text).resp_headers?.Location ?? []);
+    expect(locations.some((value: string) => value.startsWith("/login"))).toBe(
+      true,
+    );
+    expect(locations.filter((value: string) => value.includes("?"))).toEqual(
+      [],
+    );
   }, 60_000);
 });

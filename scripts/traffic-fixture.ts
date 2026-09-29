@@ -2339,7 +2339,10 @@ function caddyLine(plan: Plan, hit: Hit) {
     if (hit.size && hit.status !== 304)
       answer["Content-Length"] = [String(hit.size)];
   }
-  for (const [name, value] of hit.answer) answer[name] = [value];
+  // Pi's filter cuts a redirect's Location at ? as well: a login redirect's
+  // ?next= carries the asked-for address, query string and all.
+  for (const [name, value] of hit.answer)
+    answer[name] = [name === "Location" ? value.replace(/\?.*$/, "") : value];
   const kept = keptOf(hit.query);
   const alpn =
     hit.proto === "HTTP/3.0"
