@@ -7,11 +7,8 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 
 ## Proposals
 
-| Proposal | +1 | Status | Intended result |
-| --- | --- | --- | --- |
-| [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | In progress (partial) | Return to the same private route in one action |
-| [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | In progress (partial) | Understand the action, target and unknown outcome |
-| [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | In progress | Hand over enough evidence to reproduce and repair a defect |
+No selected implementation remains assigned after the 29 September batch.
+Completed selected scopes and their remaining evidence limits are in the Archive.
 
 Votes show interest, not priority or approval. Each count comes from the task
 references in that proposal, including its initial proposal task.
@@ -23,96 +20,6 @@ list indexes their selection and assignment instead of copying the plans.
 Performance work from #248/#249 merged through [#252](https://github.com/lustoykov/hallvi/pull/252)
 and is not proposed again. The
 fresh-user beta walkthrough remains open; these ideas add no beta prerequisites.
-
-### Reconnect to a known private application
-
-**Status:** In progress (partial)
-
-**Problem and intended result:** An owner returning to a private app needs its
-established route reopened and verified through one Reconnect action.
-
-**Smallest scope:** Submit through the existing main operator and permission
-mode, keep the saved host/ports, and show truthful tunnel and HTTP observations.
-
-**Evidence:** [Dated source review, existing plan and feedback](docs/research/2026-09-29-feature-intake.md#open-the-same-private-route-again).
-
-**Acceptance:** After disconnect and controller restart, reopen from the owner's
-actual device and use a named saved item while preserving private exposure.
-Distinguish closed tunnel, SSH failure and an application that does not answer.
-
-**Open decisions:** Bypassing Pi would require a separate contract. Installed
-real-model return after controller restart and owner-device acceptance remain
-unverified. No additional Reconnect implementation task is assigned.
-**Assignment:** Increment 1's truthful observations and current saved-route
-selector landed in [PR #256](https://github.com/lustoykov/hallvi/pull/256).
-[Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
-cover that increment only. On 2026-09-29 the owner selected increment 2:
-direct main-operator submission and the saved-route tool form. Assigned to
-`codex/reconnect-saved-route`, merged in
-[PR #263](https://github.com/lustoykov/hallvi/pull/263). It preserves the
-existing permission, queue and execution evidence contracts and does not add
-an automatic recovery service. Installed real-model and owner-device
-acceptance remains outstanding; the full feature remains partial.
-
-**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
-
-### Explain current work and interruption
-
-**Status:** In progress (partial)
-
-**Problem and intended result:** Existing activity and interruption text can
-leave the owner unsure what ran, where it ran and what remains unknown.
-
-**Smallest scope:** Add the recorded action and target to the existing work line
-and an evidence-based interruption explanation beside Continue/Stop. The selected
-increment in [PR #255](https://github.com/lustoykov/hallvi/pull/255) covers the
-current action/target and mobile elapsed-time wrapping and is merged. The owner
-selected the next increment: concise interruption evidence in the existing
-Continue/Stop panel and truthful Stop wording. Approval-consequence metadata and
-handover redesign are outside this assignment.
-
-**Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#explain-current-work-and-interruption);
-[scoped verification and matched visual evidence for #255](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md).
-
-**Acceptance:** After refresh and a controlled interruption, an unfamiliar owner
-can identify the action, target, pending decision and unknown outcome. Verify
-matching evidence and existing continuation behavior on disposable state.
-
-**Open decisions:** Broader approval and handover proposals remain unselected. User benefit and
-earlier findings remain unproven: the real Pi check reported its findings only
-in the final reply; the screenshots' early finding is synthetic.
-**Assignment:** The first increment merged in #255. On 2026-09-29 the owner
-selected the interruption/Stop increment, assigned to the existing implementation
-task on `codex/interruption-evidence`. It reads matching native tool history and
-execution results, distinguishes returned results from unknown effects, and counts
-waiting follow-ups. Continue/Stop retain native behavior. The feature remains
-partial until the increment is merged and unfamiliar-owner acceptance is observed.
-
-**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
-
-### Copy a problem for a coding agent
-
-**Status:** In progress (selected smallest increment)
-
-**Problem and intended result:** Application defects need a reproducible handoff
-across Hallvi's operating/code boundary; Copy reply currently copies prose.
-
-**Smallest scope:** Copy the smallest useful coding-agent handoff from existing
-matching evidence. The owner chooses where to paste it. No new investigation
-store, generic packet framework or broader handover redesign.
-
-**Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#copy-a-reproducible-problem-for-a-coding-agent).
-
-**Acceptance:** A coding agent given only the packet and repository reproduces
-and repairs one disposable defect. After owner merge and an authorized release,
-the original behavior check passes against the observed running revision.
-
-**Open decisions:** Handoff usefulness, redaction and omission checks remain
-for the selected increment. Broader packet storage and procedure work are deferred.
-**Assignment:** Selected by the owner on 2026-09-29; the coding-agent-handoff
-worker owns implementation and verification.
-
-**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 
 ## Research workflow
 
@@ -190,3 +97,111 @@ belong to this file; feedback keeps its separate `AF-NNN` identifiers and counts
 
 These files and research instructions are contributor material. Never load them
 into Pi's product sessions or publish private application data in proposals.
+
+## Archive
+
+| Proposal | +1 | Status | Delivered scope |
+| --- | --- | --- | --- |
+| [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | Done | Saved route through Pi, with installed acceptance |
+| [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | Done | Work line and truthful existing recovery panel |
+| [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | Done | Saved Markdown and existing Copy reply |
+
+### Reconnect to a known private application
+
+**Status:** Done (selected scope)
+
+**Problem and intended result:** An owner returning to a private app needs its
+established route reopened and verified through one Reconnect action.
+
+**Smallest scope:** Submit through the existing main operator and permission
+mode, keep the saved host/ports, and show truthful tunnel and HTTP observations.
+
+**Evidence:** [Dated source review, existing plan and feedback](docs/research/2026-09-29-feature-intake.md#open-the-same-private-route-again).
+
+**Acceptance:** After disconnect and controller restart, reopen from the owner's
+actual device and use a named saved item while preserving private exposure.
+Distinguish closed tunnel, SSH failure and an application that does not answer.
+
+**Open decisions:** Bypassing Pi remains outside the selected scope. No additional
+Reconnect implementation task is assigned.
+**Assignment:** Increment 1's truthful observations and current saved-route
+selector landed in [PR #256](https://github.com/lustoykov/hallvi/pull/256).
+[Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
+cover that increment only. On 2026-09-29 the owner selected increment 2:
+direct main-operator submission and the saved-route tool form. Assigned to
+`codex/reconnect-saved-route`, merged in
+[PR #263](https://github.com/lustoykov/hallvi/pull/263). It preserves the
+existing permission, queue and execution evidence contracts and does not add
+an automatic recovery service. [Installed alpha.9 acceptance](https://github.com/lustoykov/hallvi/pull/267#issuecomment-5896833172)
+passed on 29 September: real Pi saved-route approval/reopen, laptop access to the
+same saved item, and unchanged data through an installed restart.
+
+**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
+
+### Explain current work and interruption
+
+**Status:** Done (selected scope)
+
+**Problem and intended result:** Existing activity and interruption text can
+leave the owner unsure what ran, where it ran and what remains unknown.
+
+**Smallest scope:** Add the recorded action and target to the existing work line
+and an evidence-based interruption explanation beside Continue/Stop. The selected
+increment in [PR #255](https://github.com/lustoykov/hallvi/pull/255) covers the
+current action/target and mobile elapsed-time wrapping and is merged. The owner
+selected the next increment: concise interruption evidence in the existing
+Continue/Stop panel and truthful Stop wording. Approval-consequence metadata and
+handover redesign are outside this assignment.
+
+**Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#explain-current-work-and-interruption);
+[scoped verification and matched visual evidence for #255](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md).
+
+**Acceptance for the selected increment:** After refresh and a controlled
+interruption, show only matching action/target/result evidence, unknown outcomes
+and queued follow-ups. Preserve native continuation and Stop semantics on
+disposable state. Unfamiliar-owner comprehension is a separate product hypothesis.
+
+**Open decisions:** Broader approval and handover proposals remain unselected. User benefit and
+earlier findings remain unproven: the real Pi check reported its findings only
+in the final reply; the screenshots' early finding is synthetic.
+**Assignment:** The first increment merged in #255. On 2026-09-29 the owner
+selected the interruption/Stop increment, assigned to the existing implementation
+task on `codex/interruption-evidence`. It reads matching native tool history and
+execution results, distinguishes returned results from unknown effects, and counts
+waiting follow-ups. Delivered in [#268](https://github.com/lustoykov/hallvi/pull/268),
+with focused evidence/queue checks and browser restart/Continue/Stop coverage.
+Continue/Stop retain native behavior. [Readable captures](https://github.com/lustoykov/hallvi/pull/268#issuecomment-5896795339)
+show the existing panel at desktop and mobile sizes. Unfamiliar-owner comprehension
+and earlier findings during real Pi work remain unmeasured; neither is claimed by
+this bounded implementation.
+
+**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
+
+### Copy a problem for a coding agent
+
+**Status:** Done (selected scope)
+
+**Problem and intended result:** Application defects need a reproducible handoff
+across Hallvi's operating/code boundary; Copy reply currently copies prose.
+
+**Smallest scope:** Copy the smallest useful coding-agent handoff from existing
+matching evidence. The owner chooses where to paste it. No new investigation
+store, generic packet framework or broader handover redesign.
+
+**Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#copy-a-reproducible-problem-for-a-coding-agent).
+
+**Acceptance for the selected increment:** Native Pi saves a useful Markdown
+packet and returns its saved body; copying yields that complete body before and
+after refresh. Redaction holds for creation and update. A coding agent
+reproducing/repairing the defect and a deployed repair passing the original
+check remain separate, unproven outcomes.
+
+**Open decisions:** Broader packet storage, automation and procedure work remain
+deferred. Downstream adoption, real diagnosis and repair/deployment are unproven.
+**Assignment:** Selected by the owner on 2026-09-29 and delivered in
+[#270](https://github.com/lustoykov/hallvi/pull/270). A bounded real-Pi trial with
+explicitly synthetic observations made one save call; the saved body equaled the
+final reply and clipboard before and after refresh. Existing records and Copy
+reply are reused; no new schema or UI layout is introduced.
+
+**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)

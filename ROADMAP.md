@@ -12,17 +12,27 @@ Keep the scope on the views and interactions needed by that journey. Medium and 
 
 ## Selected product increments
 
-On 29 September 2026 the owner selected three bounded changes: **03** interruption
-clarity in the existing Continue/Stop presentation, **05** the smallest copyable
-coding-agent handoff, and **11** existing-CLI documentation and a friction exercise.
-The [research plan index](https://github.com/lustoykov/hallvi/pull/246) records their
-scope and deferred proposals. The owner authorized implementing and merging these
-three together after coordinator review; visual evidence remains required, with no
-additional owner-approval gate. FACTORY separately owns release and acceptance.
+The 29 September batch implements the three selected increments:
 
-Performance #252 and Reconnect #256/#263 are merged checkpoints, not assignments
-for these workers. Reconnect remains partial pending installed real-model and
-owner-device acceptance. Return brief, quiet care, recovery rehearsal, learned
+- **03 — Interruption clarity**, [#268](https://github.com/lustoykov/hallvi/pull/268):
+  matching returned results, unknown outcomes and waiting follow-ups beside native
+  Continue/Stop, with truthful Stop wording and readable before/after evidence.
+- **05 — Coding-agent handoff**, [#270](https://github.com/lustoykov/hallvi/pull/270):
+  a saved, redacted Markdown problem packet through the existing Copy reply action.
+  A bounded real-Pi trial established saving, reply equality and copying after refresh;
+  diagnosis, downstream adoption and a repaired deployment remain unproven.
+- **11 — Existing CLI example**, [#269](https://github.com/lustoykov/hallvi/pull/269):
+  a source-checked read-only example with request identity and honest outcome handling.
+  This is documentation, not evidence of broader adoption.
+
+These are source changes merged as one reviewed batch, not a published release.
+The [research plan index](https://github.com/lustoykov/hallvi/pull/246) preserves
+the proposals; larger mechanisms in those plans are not implementation requirements.
+
+Performance #252 and Reconnect #256/#263 are merged checkpoints. Reconnect's
+[installed alpha.9 acceptance](https://github.com/lustoykov/hallvi/pull/267#issuecomment-5896833172)
+also passed: actual saved-route approval/reopen, laptop access and preserved data
+through an installed restart. Return brief, quiet care, recovery rehearsal, learned
 procedures, existing-stack adoption and update rehearsal are deferred. The eleven
 research plans do not constitute eleven implementation commitments.
 
