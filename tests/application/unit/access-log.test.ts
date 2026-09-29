@@ -18,23 +18,26 @@ const line =
 const chrome =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
-/** The same line as a browser's GET, at another moment and path. */
+/**
+ * The same line as a browser's GET, at another moment and path — or, as a
+ * `beacon`, the script's event: a POST the proxy answered with 204.
+ */
 const request = (
   path: string,
   at: number,
-  { agent = chrome, address = "203.0.113.9", dest = "document" } = {},
+  { agent = chrome, address = "203.0.113.9", beacon = false } = {},
 ) =>
   parseLine(
     "caddy-json",
     line
       .replace('"ts":1789817074.446724', `"ts":${at / 1000}`)
-      .replace('"method":"POST"', '"method":"GET"')
-      .replace('"status":500', '"status":200')
+      .replace('"method":"POST"', beacon ? '"method":"POST"' : '"method":"GET"')
+      .replace('"status":500', beacon ? '"status":204' : '"status":200')
       .replace('"client_ip":"203.0.113.9"', `"client_ip":"${address}"`)
       .replace("/checkout/pay?token=secret#x", path)
       .replace(
         '"headers":{}',
-        `"headers":{"User-Agent":["${agent}"],"Sec-Fetch-Dest":["${dest}"],"Sec-Fetch-Mode":["navigate"]}`,
+        `"headers":{"User-Agent":["${agent}"],"Sec-Fetch-Dest":["${beacon ? "empty" : "document"}"],"Sec-Fetch-Mode":["${beacon ? "no-cors" : "navigate"}"]}`,
       ),
     { hosts: ["shop.example"] },
   )!;
@@ -113,7 +116,7 @@ describe("the access log", () => {
     const view = request(
       eventPath({ t: "view", s: "abcdefgh12", p: "/docs", w: 400 }),
       now - 90_000,
-      { dest: "empty" },
+      { beacon: true },
     );
     expect(window.arrival(view)).toMatchObject({
       kind: "view",
@@ -124,7 +127,7 @@ describe("the access log", () => {
     const ping = (s: string, at: number, address: string) =>
       window.arrival(
         request(eventPath({ t: "ping", s, p: "/docs" }), at, {
-          dest: "empty",
+          beacon: true,
           address,
         }),
       );

@@ -36,7 +36,7 @@ import {
   type Ranked,
   type TrafficDay,
 } from "./contract";
-import { DayCounter, FINAL_AFTER_MS } from "./count";
+import { DayCounter, FINAL_AFTER_MS, LOOKBACK_MS } from "./count";
 import { addDays, controllerTimeZone, dayBounds, dayOf, HOUR_MS } from "./days";
 import {
   followLog,
@@ -131,14 +131,18 @@ function sorted(gaps: Gap[]) {
   return gaps.sort((a, b) => a.from.localeCompare(b.from));
 }
 
-/** A finished day's coverage, from what a read of it answered for. */
+/**
+ * A day's coverage, from what a read of it answered for. The read may reach
+ * past the day — a few minutes before it, a file being written — and what it
+ * says there is not the day's.
+ */
 export function readCoverage(
   bounds: { start: number; end: number },
   read: { covered: Span[]; unreadable: Span[] },
   enabledAt: number | null,
 ): Coverage {
-  const covered = joined(read.covered);
-  const unreadable = joined(read.unreadable);
+  const covered = joined(clipped(read.covered, bounds.start, bounds.end));
+  const unreadable = joined(clipped(read.unreadable, bounds.start, bounds.end));
   return {
     from: covered.length ? iso(covered[0].from) : null,
     to: covered.length ? iso(covered.at(-1)!.to) : null,
@@ -177,21 +181,15 @@ function followedCoverage(
         to: index === files.length - 1 ? Number.POSITIVE_INFINITY : file.to,
       }))
     : [{ name: "", from: Date.now(), to: Number.POSITIVE_INFINITY }];
-  return (to: number) => {
-    const within = (list: typeof all) =>
-      list.map((file) => ({
-        from: Math.max(file.from, start),
-        to: Math.min(file.to, to),
-      }));
-    return readCoverage(
+  return (to: number) =>
+    readCoverage(
       { start, end: to },
       {
-        covered: within(all.filter((file) => !unreadable.has(file.name))),
-        unreadable: within(all.filter((file) => unreadable.has(file.name))),
+        covered: all.filter((file) => !unreadable.has(file.name)),
+        unreadable: all.filter((file) => unreadable.has(file.name)),
       },
       enabledAt,
     );
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +459,9 @@ async function finishDay(target: Target, day: string) {
   const read = await readLog(
     host,
     log,
-    { from: bounds.start, to: bounds.end },
+    // The minutes before midnight too: a page load there may be the one
+    // this day's first script view reports.
+    { from: bounds.start - LOOKBACK_MS, to: bounds.end },
     (line) => counter.add(line),
     signal,
   );
@@ -604,7 +604,11 @@ async function connection(target: Target, first: boolean) {
         final: false,
       });
     }
-    const newest = days.at(-1)!.counter;
+    // The day being written now; the next one may be open a few minutes
+    // early, with nothing of its own yet.
+    const newest = (
+      days.findLast((entry) => entry.start <= now) ?? days.at(-1)!
+    ).counter;
     const seen = Math.max(
       ...days.map((entry) => entry.counter.lastLineAt ?? 0),
     );
@@ -670,17 +674,17 @@ async function connection(target: Target, first: boolean) {
       host,
       log,
       files,
-      today.start,
+      today.start - LOOKBACK_MS,
       {
         line: (line) => {
           heardAt = Date.now();
           dirty = true;
-          let entry = days.at(-1)!;
-          if (line.at >= entry.end)
-            entry = open(dayOf(line.at, timeZone), null);
-          for (const one of days)
-            if (line.at >= one.start && line.at < one.end)
-              one.counter.add(line);
+          const entry = days.at(-1)!;
+          // The next day opens a few minutes early, to read what the log
+          // counted just before its midnight; each counter keeps its own.
+          if (line.at >= entry.end - LOOKBACK_MS)
+            open(dayOf(entry.end, timeZone), null);
+          for (const one of days) one.counter.add(line);
           // A line from the last few seconds: the backlog is behind us.
           if (!live && readyAt !== null && line.at >= readyAt - 5_000)
             caughtUp();

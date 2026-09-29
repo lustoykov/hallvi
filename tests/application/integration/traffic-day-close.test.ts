@@ -88,7 +88,7 @@ vi.mock("@/server/traffic/sources", () => ({
 }));
 
 import { trafficCollector } from "@/server/traffic/collector";
-import { FINAL_AFTER_MS } from "@/server/traffic/count";
+import { FINAL_AFTER_MS, LOOKBACK_MS } from "@/server/traffic/count";
 import { controllerTimeZone, dayBounds, dayOf } from "@/server/traffic/days";
 import { readDays, setCollection } from "@/server/traffic/store";
 
@@ -155,7 +155,8 @@ describe("a day's close", () => {
     // closes.
     server.push(request(Date.now()));
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(server.reads).toEqual([{ from: start, to: end }]);
+    // From a few minutes before the day, for what the log counted there.
+    expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]);
     expect(stored().final).toBe(true);
     expect(requests()).toBe(2);
     expect(stored().coverage).toEqual({
