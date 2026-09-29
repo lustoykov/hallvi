@@ -72,7 +72,9 @@ flowchart LR
     Hub -->|one GET /changes per web process| Local
     Local -->|matching application or chat| Stream[Browser SSE handlers]
     Stream -->|initial, changed or reconnected| Snapshot[Current chat snapshot]
-    Snapshot --> Browser[Open conversations]
+    Snapshot -->|connect or reconnect: full state| Browser[Open conversations]
+    Snapshot --> Compare[Compare records with this stream's previous state]
+    Compare -->|changed records, removals and order| Browser
 ```
 
 The web hub is shared across Next route bundles and keyed by canonical
@@ -90,6 +92,22 @@ event arriving during an asynchronous read schedules another read. Bursts
 are coalesced, with at most one read in flight and one start every 500 ms;
 the first change after idle can start after 100 ms. Identical snapshots are
 not sent again. The 15-second heartbeat transports no state and reads none.
+
+The page opts into incremental frames with `events?changes=1`. Its first frame
+is a full `ChatSnapshot`; later frames replace only changed records in messages,
+executions, Pi activity and presented information. A record replacement clears
+missing optional fields. Membership or ordering changes carry the resulting id
+order, and removals are explicit. Unchanged records are compared structurally,
+without serializing their output or tool results. The browser retains the full
+usable state and the same record identities, so older messages, quiet tool
+disclosures, approvals and open output cards keep their data and interaction
+state. POST, SSR, CLI inspection and execution detail remain full responses.
+
+Each connection holds only its previous snapshot, drops the initial serialized
+string after sending it, and releases the baseline on close. Reconnect starts
+with authoritative full state rather than replaying missed frames. The original
+`events` URL continues sending full snapshots for already-open clients whose
+JavaScript predates the upgrade. There is no durable cursor or frame store.
 
 Worker loss produces one unavailable snapshot. Connection retries do not
 rebuild histories; a successful reconnect reads current state, including
@@ -218,7 +236,10 @@ Execution writes remain synchronous. The worker awaits the async reader for
 recovery before accepting socket requests and for settlement before a live
 stretch stops driving. Settlement starts a fresh scan after the scope stops
 executing, so it cannot join an older read and overwrite a completed command.
-Transcript projection and response serialization still run on the main thread.
+Transcript projection, worker-link transcript serialization and changed-record
+response serialization still run on the main thread. Incremental browser frames
+avoid repeatedly encoding unchanged history; initial connections and a change
+affecting most of the history still carry it in full.
 The [synthetic measurement](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-execution-reader.md) separates
 file-read counts from response cost and these remaining limits.
 

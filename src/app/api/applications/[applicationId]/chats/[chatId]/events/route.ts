@@ -4,6 +4,7 @@ import { assertSameOrigin } from "@/server/schemas";
 import { loadChat } from "@/server/applications";
 import { subscribeChanges } from "@/server/change-notifications";
 import { invalidateExecutionReads } from "@/server/operator-execution";
+import { ChatFrames } from "@/server/chat-frames";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,23 @@ export async function GET(
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
     await loadChat(applicationId, chatId);
-    let latest = "";
+    const frames = new ChatFrames();
+    // Installed clients may reconnect with JavaScript from before an upgrade.
+    // Only clients that can apply changes opt in; the old URL stays full-state.
+    const incremental =
+      new URL(request.url).searchParams.get("changes") === "1";
+    let latestFull = "";
+    let initial = "";
+    const encode = (snapshot: Awaited<ReturnType<typeof chatSnapshot>>) => {
+      if (incremental) {
+        const frame = frames.next(snapshot);
+        return frame ? JSON.stringify(frame) : undefined;
+      }
+      const text = JSON.stringify(snapshot);
+      if (text === latestFull) return undefined;
+      latestFull = text;
+      return text;
+    };
     let timer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let closed = false;
@@ -27,6 +44,9 @@ export async function GET(
     const encoder = new TextEncoder();
     const clean = () => {
       closed = true;
+      frames.clear();
+      latestFull = "";
+      initial = "";
       clearTimeout(timer);
       clearInterval(heartbeat);
       subscription.close();
@@ -64,11 +84,10 @@ export async function GET(
       lastReadAt = Date.now();
       const at = generation;
       try {
-        const next = JSON.stringify(await chatSnapshot(applicationId, chatId));
-        if (next !== latest) {
-          latest = next;
-          send(`data: ${next}\n\n`);
-        }
+        const snapshot = await chatSnapshot(applicationId, chatId);
+        if (closed) return;
+        const next = encode(snapshot);
+        if (next) send(`data: ${next}\n\n`);
       } catch {
         close();
       } finally {
@@ -102,7 +121,9 @@ export async function GET(
       invalidateExecutionReads(applicationId);
       initialGeneration = generation;
       lastReadAt = Date.now();
-      latest = JSON.stringify(await chatSnapshot(applicationId, chatId));
+      const snapshot = await chatSnapshot(applicationId, chatId);
+      request.signal.throwIfAborted();
+      initial = encode(snapshot)!;
     } catch (error) {
       clean();
       throw error;
@@ -117,7 +138,8 @@ export async function GET(
         }
         // Reconnect always starts with authoritative latest state; no token
         // history, cursor retention, or missed frame can lose an accepted run.
-        send(`data: ${latest}\n\n`);
+        send(`data: ${initial}\n\n`);
+        initial = "";
         if (generation !== initialGeneration) schedule();
         heartbeat = setInterval(() => send(": keep-alive\n\n"), 15_000);
       },

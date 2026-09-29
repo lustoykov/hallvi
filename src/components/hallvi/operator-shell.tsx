@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { currentAccessRecord } from "@/server/access-record";
+import { applyChatFrame, type ChatFrame } from "@/lib/chat-stream";
 import { useAccessObservation } from "./use-access-observation";
 
 import type { ApplicationFacts } from "@/server/application-facts";
@@ -309,14 +310,21 @@ export function OperatorShell({
     if (!applicationId || !selectedChatId) return;
     let active = true;
     let outcomeVersion = "";
+    // This baseline belongs only to this stream. POST/SSR views can arrive
+    // independently; reconnect's full frame replaces it authoritatively.
+    let streamed: ChatSnapshot | null = null;
     const stream = new EventSource(
-      `/api/applications/${applicationId}/chats/${selectedChatId}/events`,
+      `/api/applications/${applicationId}/chats/${selectedChatId}/events?changes=1`,
     );
     stream.onopen = () => setReconnecting(false);
     stream.onerror = () => setReconnecting(true);
     stream.onmessage = (event) => {
       if (!active) return;
-      const snapshot = JSON.parse(event.data) as ChatSnapshot;
+      const snapshot = applyChatFrame(
+        streamed,
+        JSON.parse(event.data) as ChatFrame,
+      );
+      streamed = snapshot;
       setView((current) =>
         current.selectedChatId === selectedChatId
           ? {
@@ -384,6 +392,7 @@ export function OperatorShell({
     };
     return () => {
       active = false;
+      streamed = null;
       stream.close();
     };
   }, [applicationId, selectedChatId]);
