@@ -12,6 +12,8 @@
 
 <!-- Name real Pi/services/providers versus fixtures or stand-ins. State what was actually checked and how a reviewer can try the result. For small changes, replace the table with one check → result sentence; no separate report is needed. -->
 
+<!-- Show meaningful use of verify-hallvi through the chosen environment, observed behavior and evidence, not a skill-use declaration. Include any narrow workflow correction this task exposed and how it was validated; leave working guidance alone. See AGENTS.md and REVIEW.md. -->
+
 | Behavior checked | Observed result | Evidence |
 | --- | --- | --- |
 | … | … | Screenshot, video timestamp, test output, or execution record |
