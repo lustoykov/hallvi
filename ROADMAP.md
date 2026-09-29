@@ -73,6 +73,10 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 - [x] **Requests from a terminal — merged in [PR #241](https://github.com/lustoykov/hallvi/pull/241), 29 September 2026.** `hallvi apps`, `exec`, `wait` and `inspect` let a person, a script or a coding agent send work to an application's main conversation through a named controller's loopback API, and read back the Pi operation that took it: its status, Pi's answer and bounded, redacted evidence. Approvals, input and interrupted work are handed back to Hallvi's page, never answered by the command. Checked through the development workflow against retained applications (uptime-kuma, whoami), with Pi 0.87.1 accepted for both after a snapshot trial. [Contract and limits](docs/cli.md). An MCP adapter over the same client, an interactive `attach`, an explicit `resume`, application creation and remote controller access are deferred.
 
+## Traffic
+
+- [ ] **Who uses the application, and how it is doing — in progress on `claude/traffic-v1`.** Asked for by the owner on 28–29 September 2026: live arrivals, a world map, 24 h/7 d/30 d history, pages, sources, countries and devices, errors with the visitors they reached, deploy markers and a before/after line per release, shown in Traffic, Overview, Deployment and Monitoring without a model call. Counted from Caddy, nginx or Traefik access logs, and from Hallvi's optional script through the same log; recounted from the log so a restart cannot count twice. [Design](docs/design/traffic.md). Not a prerequisite for the beta.
+
 ## Later milestone: Pi heartbeat and state synchronization
 
 Jev is a viable candidate to test for ambiguous-signal triage and wakeup recommendations within this deferred milestone; see the [use case and evaluation limits](docs/operator-design.md#always-on-care-and-visible-commitments). The suggested first experiment is [offline transcript evaluation](tests/README.md#candidate-experiment-jev-transcript-evaluation). [PR #124](https://github.com/lustoykov/hallvi/pull/124) records this option to evaluate, not a selected dependency or a change to delivery order.

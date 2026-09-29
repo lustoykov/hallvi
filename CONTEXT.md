@@ -114,6 +114,18 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Issue**: A persistent observed problem with evidence and a next action. A notification delivers attention to an issue; reading it does not resolve the problem.
 
+## Traffic
+
+**Traffic history** (`src/server/traffic/`): The owner's standing choice to have the worker count the proxy's access log, kept as totals per day in `traffic.db` beside the controller database. It never keeps an address, a user agent or a query string. [Traffic](docs/design/traffic.md) owns the design.
+
+**View**: A browser navigating to a page, as the access log shows it, or a `view` event from Hallvi's script once the application has passed its switch point. A request is not a view.
+
+**Visitor estimate**: Distinct browsers — address and user agent — within one day. Always called an estimate, and never summed across days into unique people.
+
+**Coverage**: The part of a period the access log actually covered. What it did not cover is a gap with a reason, never a zero.
+
+**Switch point**: The first script event counted for an application. Before it, views come from the access log; after it, only from the script.
+
 ## Retired and optional terms
 
 **Retired record**: A record of Hallvi's retired preparation workflow, kept read-only as an Observation under its original identity. It grants no authority and never runs again.
