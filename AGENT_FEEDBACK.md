@@ -11,6 +11,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
+| [AF-019 — Refuse a second preview before attaching retained state](#af-019--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -70,6 +71,17 @@ What you would like or what bothered you, in your own words.
 
 **+1:** YYYY-MM-DD — task ID or PR reference
 ```
+
+### AF-019 — Refuse a second preview before attaching retained state
+
+Attaching a retained application from a checkout that already serves a
+snapshot on another port takes a backup and ownership, then Next.js refuses
+its second dev server. The retained runtime is left needing `--after-crash`
+even though no application work ran. A preflight check could reject this
+before attaching. The verification guide now tells contributors to stop the
+snapshot pair first.
+
+**+1:** 2026-09-29 — Codex/ChatGPT plugin proof of concept
 
 ### AF-001 — Record the waiting messages Stop drops
 

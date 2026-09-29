@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hallvi applications</title>
+<style>
+  :root { color-scheme: light dark; --ink:#202838; --muted:#596477; --line:#e7e9ee; --surface:#fff; --context:#fafbfc; --blue:#285ad8; --waiting:#9a4b10; --failed:#a6312b; }
+  @media(prefers-color-scheme:dark) { :root { --ink:#e6eaf2; --muted:#aab5c7; --line:#384151; --surface:#20242c; --context:#272d38; --blue:#8aafff; --waiting:#f0bc86; --failed:#ffada6; } }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; background:var(--surface); color:var(--ink); font:14px/1.65 system-ui,sans-serif; }
+  main { max-width:760px; margin:auto; }
+  header, .section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  h1 { font-size:24px; letter-spacing:-.025em; margin:0; }
+  h2 { font-size:18px; margin:0; }
+  h3 { font-size:14px; margin:0; }
+  p { margin:6px 0 16px; max-width:70ch; }
+  .muted, small { color:var(--muted); }
+  small { font-size:12px; }
+  label { display:block; font-weight:600; margin-bottom:6px; }
+  button, select { font:inherit; border:1px solid var(--line); border-radius:7px; color:var(--ink); background:var(--surface); min-height:38px; padding:6px 12px; }
+  button { cursor:pointer; white-space:nowrap; }
+  button:hover { background:var(--context); }
+  button:disabled { cursor:wait; opacity:.55; }
+  select { width:100%; margin-bottom:24px; }
+  :focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
+  a { color:var(--blue); text-underline-offset:3px; overflow-wrap:anywhere; }
+  ::selection { background:#d5e1fb; color:#202838; }
+  * { scrollbar-color:var(--muted) var(--surface); }
+  section { margin-top:24px; padding-top:20px; border-top:1px solid var(--line); }
+  dl { display:grid; grid-template-columns:100px 1fr; gap:6px 12px; margin:12px 0; }
+  dt { color:var(--muted); }
+  dd { margin:0; overflow-wrap:anywhere; }
+  ul { list-style:none; padding:0; margin:12px 0; }
+  li { padding:12px 0; border-bottom:1px solid var(--line); }
+  li:last-child { border-bottom:0; }
+  .attention { color:var(--waiting); }
+  #error { color:var(--failed); white-space:pre-wrap; }
+  #notice { margin-top:12px; }
+  pre { background:var(--context); padding:12px; border-radius:7px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.6 ui-monospace,monospace; max-height:260px; }
+  summary { cursor:pointer; overflow-wrap:anywhere; }
+  .status { font-variant-numeric:tabular-nums; color:var(--muted); }
+  [hidden] { display:none!important; }
+  @media(max-width:440px) { body { padding:16px; } dl { grid-template-columns:86px 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Hallvi</h1><button id="refresh" disabled>Refresh</button></header>
+  <p class="muted">Your applications, on your servers.</p>
+  <p id="notice" role="status">Connecting to Hallvi…</p>
+  <p id="error" role="alert" hidden></p>
+  <div id="picker" hidden><label for="application">Application</label><select id="application"></select></div>
+  <div id="detail" hidden>
+    <h2 id="name"></h2>
+    <p id="condition" class="muted"></p>
+    <dl id="facts"></dl>
+    <a id="open" href="#" target="_blank" rel="noreferrer">Open in Hallvi</a>
+    <small style="display:block;margin-top:8px">Approvals, missing input, Continue and Stop are handled in Hallvi.</small>
+    <section id="attention-section" hidden><h3>Needs your attention</h3><ul id="attention" class="attention"></ul></section>
+    <section><h3>Recorded information</h3><ul id="records"></ul><small id="records-note"></small></section>
+    <section><h3>Recent executions</h3><ul id="executions"></ul><small id="executions-note"></small></section>
+    <section><p class="muted">Use the conversation to ask Hallvi to check or operate this application. These records describe past observations; Refresh reads them again without probing your server.</p></section>
+  </div>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+let rpcId = 0;
+const pending = new Map();
+let applications = [];
+let selected = null;
+let generation = 0;
+let ready = false;
+const notify = (method, params) => window.parent.postMessage({ jsonrpc:"2.0", method, params }, "*");
+const request = (method, params) => new Promise((resolve, reject) => {
+  const id = ++rpcId;
+  const timer = setTimeout(() => { pending.delete(id); reject(new Error("The connection did not answer. Try Refresh.")); }, 45000);
+  pending.set(id, { resolve, reject, timer });
+  window.parent.postMessage({ jsonrpc:"2.0", id, method, params }, "*");
+});
+window.addEventListener("message", (event) => {
+  if (event.source !== window.parent || event.data?.jsonrpc !== "2.0") return;
+  const message = event.data;
+  if (typeof message.id === "number" && pending.has(message.id)) {
+    const item = pending.get(message.id); pending.delete(message.id); clearTimeout(item.timer);
+    if (message.error) item.reject(new Error(message.error.message || "The host declined the request."));
+    else item.resolve(message.result);
+  } else if (message.method === "ui/notifications/tool-result" && message.params?.structuredContent?.applications) {
+    applyApplications(message.params.structuredContent.applications);
+  }
+});
+const showError = (error) => { $("error").hidden=false; $("error").textContent=error.message || "Hallvi could not be read. Try Refresh."; };
+const call = async (name, args={}) => {
+  const response = await request("tools/call", { name, arguments:args });
+  if (response.isError || response.structuredContent?.error)
+    throw new Error(response.structuredContent?.error?.message || "Hallvi could not be read. Try Refresh.");
+  return response.structuredContent;
+};
+function text(tag, value, className) {
+  const node=document.createElement(tag); node.textContent=value;
+  if (className) node.className=className;
+  return node;
+}
+function display(value) {
+  if (value == null) return "Unknown";
+  if (typeof value === "string") return value;
+  return value.text || value.summary || value.label || value.title || JSON.stringify(value);
+}
+function clearSelectionContext() {
+  generation++;
+  $("detail").hidden=true;
+  void request("ui/update-model-context", { content:[{type:"text",text:"Application selection is unconfirmed or unavailable. Confirm the intended application with hallvi_apps and hallvi_inspect before sending work."}] }).catch(() => {});
+}
+function applyApplications(list) {
+  clearSelectionContext();
+  applications=list;
+  const previous=selected;
+  $("application").replaceChildren();
+  for (const app of applications) {
+    const option=text("option", app.name); option.value=app.id;
+    $("application").append(option);
+  }
+  selected=applications.some((app) => app.id === previous) ? previous : applications[0]?.id;
+  $("picker").hidden=!selected;
+  $("detail").hidden=true;
+  $("notice").textContent=selected ? "Select an application to share its context with this conversation." : "No applications yet. Add one in Hallvi, then Refresh.";
+  if (selected) { $("application").value=selected; if (ready) void inspect(); }
+}
+async function inspect() {
+  const appId=selected;
+  const version=++generation;
+  $("error").hidden=true;
+  $("detail").hidden=true;
+  $("notice").textContent="Reading application records…";
+  void request("ui/update-model-context", { content:[{type:"text",text:"Application selection is changing. Confirm the intended application with hallvi_apps and hallvi_inspect before sending work."}] }).catch(() => {});
+  try {
+    const data=await call("hallvi_inspect", { application_id:appId });
+    if (version !== generation) return;
+    const app=data.application;
+    $("name").textContent=app.name;
+    $("condition").textContent=display(data.condition);
+    $("facts").replaceChildren();
+    const facts=[ ["Repository",app.repositoryUrl], ["Host",app.host?.address], ["Permissions", {"always-ask":"Always ask", "pi-decides":"Hallvi decides", "bypass":"Bypass"}[app.permissionMode] || app.permissionMode], ["Operator",data.main?.status], ["Read at",new Date().toLocaleTimeString()] ];
+    for (const [label,value] of facts) $("facts").append(text("dt",label),text("dd",display(value)));
+    const url=new URL(data.page);
+    if (!["http:","https:"].includes(url.protocol)) throw new Error("Hallvi returned an unsupported page address.");
+    $("open").href=url.href;
+    $("open").onclick=async (event) => { event.preventDefault(); try { await request("ui/open-link",{url:url.href}); } catch(error) { showError(error); } };
+    $("attention").replaceChildren(...(data.attention || []).map((item) => text("li",item.reason)));
+    $("attention-section").hidden=false;
+    if (!data.attention?.length) $("attention").append(text("li", data.main?.worker?.alive ? "Nothing waiting for your input when these records were read." : "Operator unavailable; pending attention is unknown.", "muted"));
+    $("records").replaceChildren(...(data.records || []).map((record) => {
+      const li=document.createElement("li"); li.append(text("div",record.title));
+      if (record.nextStep) li.append(text("small",record.nextStep));
+      return li;
+    }));
+    $("records-note").textContent=data.records?.length ? `${data.recordsOmitted || 0} additional records not shown.` : "No recorded information. This application has not been assessed here.";
+    $("executions").replaceChildren(...(data.executions || []).map((execution) => {
+      const li=document.createElement("li"); const details=document.createElement("details");
+      const summary=text("summary",`${execution.tool} · ${execution.status || "unknown"}`);
+      if (execution.status === "failed") summary.style.color="var(--failed)";
+      const when=execution.startedAt ? new Date(execution.startedAt).toLocaleString() : "Time unknown";
+      summary.append(text("small", `${when} · ${execution.target || "Target unknown"}`));
+      summary.lastChild.style.display="block";
+      if (execution.input) { const input=text("small",execution.input.slice(0,120)+(execution.input.length>120 ? "…" : "")); input.style.display="block"; summary.append(input); }
+      details.append(summary);
+      if (execution.input) details.append(text("pre",execution.input));
+      details.append(text("pre",execution.output || "No output recorded."));
+      if (execution.outputTruncated) details.append(text("small","Output excerpt only. Ask the conversation to inspect this execution in full."));
+      li.append(details); return li;
+    }));
+    $("executions-note").textContent=data.executions?.length ? `${data.executionsOmitted || 0} additional executions not shown.` : "No executions recorded.";
+    $("detail").hidden=false;
+    $("notice").textContent="Selected application shared with this conversation.";
+    try {
+      await request("ui/update-model-context", { content:[{type:"text",text:JSON.stringify({applicationId:appId,name:app.name,controller:data.controller,page:data.page})}] });
+    } catch { $("notice").textContent="Viewing this application. Context sharing is unavailable; mention its name in chat."; }
+  } catch(error) {
+    if (version !== generation) return;
+    $("notice").textContent="Application records unavailable."; showError(error);
+  }
+}
+async function refresh() {
+  $("refresh").disabled=true; $("error").hidden=true; clearSelectionContext();
+  try { const data=await call("hallvi_apps"); applyApplications(data.applications); }
+  catch(error) { $("notice").textContent="Hallvi is unavailable. Check the connection and try Refresh."; showError(error); }
+  finally { $("refresh").disabled=false; }
+}
+$("refresh").onclick=refresh;
+$("application").onchange=() => { selected=$("application").value; void inspect(); };
+try {
+  if (window.parent === window) throw new Error("Open this panel through the Hallvi plugin in ChatGPT. It needs an MCP Apps host.");
+  await request("ui/initialize", { appInfo:{name:"hallvi",version:"0.1.0"}, appCapabilities:{}, protocolVersion:"2026-01-26" });
+  notify("ui/notifications/initialized",{}); ready=true;
+  await refresh();
+} catch(error) { $("notice").textContent="Panel connection unavailable."; showError(error); }
+</script>
+</body>
+</html>

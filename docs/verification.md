@@ -45,8 +45,10 @@ Before attaching older state, check its schema and Pi version against this
 checkout. Test compatibility on a snapshot first: open the application and
 its history through the running worker, inspect its records, and refresh the
 browser. A schema change needs the documented migration on a copy first too.
-Only after that proof, use `attach <name> --accept-format` if Pi's version
-differs; the normal attach takes a verified backup. Follow the
+Stop the snapshot preview and its paired tools before attaching from the same
+checkout: Next.js allows only one development server per checkout, even on
+different ports. Only after that proof, use `attach <name> --accept-format` if
+Pi's version differs; the normal attach takes a verified backup. Follow the
 [upgrade procedure](development-environment.md#upgrading-the-records), not
 `db:push`, for supported retained upgrades.
 
