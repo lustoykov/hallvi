@@ -51,7 +51,8 @@ export async function getOperatorView(
       connected: access.connected,
       signIn: Boolean(githubAppRegistration()),
     },
-    executions: conversation?.executions ?? listExecutions(applicationId),
+    executions:
+      conversation?.executions ?? (await listExecutions(applicationId)),
     piActivity: conversation?.piActivity ?? [],
     worker: conversation?.worker,
     chats,

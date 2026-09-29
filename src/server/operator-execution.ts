@@ -16,6 +16,7 @@ import { piConfigDir } from "./pi-configuration";
 import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
 import { managedSshOptions } from "./managed-ssh";
+import { ExecutionReader } from "./execution-reader";
 
 import { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
 export { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
@@ -95,7 +96,23 @@ function executionDirectory(applicationId: string) {
 function recordPath(applicationId: string, id: string) {
   return join(executionDirectory(applicationId), `${z.uuid().parse(id)}.json`);
 }
-export function listExecutions(applicationId: string): ExecutionRecord[] {
+const executionReader = new ExecutionReader();
+
+/** Before a notified refresh; omit the scope when the worker reconnects. */
+export function invalidateExecutionReads(applicationId?: string) {
+  executionReader.invalidate(
+    applicationId ? executionDirectory(applicationId) : undefined,
+  );
+}
+
+export async function listExecutions(applicationId: string) {
+  loadApplication(applicationId);
+  return executionReader.list(executionDirectory(applicationId));
+}
+
+// Recovery runs synchronously while worker ownership is acquired, before any
+// request can start a new command. Keep that ordering and the writer unchanged.
+function executionsForRecovery(applicationId: string): ExecutionRecord[] {
   loadApplication(applicationId);
   let files: string[];
   try {
@@ -107,11 +124,11 @@ export function listExecutions(applicationId: string): ExecutionRecord[] {
   return files
     .filter((name) => /^[0-9a-f-]{36}\.json$/.test(name))
     .map((name) => {
-      const record = read<ExecutionRecord>(
+      return read<ExecutionRecord>(
         join(executionDirectory(applicationId), name),
-      )!;
-      return record;
+      );
     })
+    .filter((record): record is ExecutionRecord => record !== undefined)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 /**
@@ -127,9 +144,9 @@ export function awaitingDecision(record: ExecutionRecord) {
 }
 
 /** One execution record as the executor wrote it, or nothing. */
-export function readExecution(applicationId: string, id: string) {
+export async function readExecution(applicationId: string, id: string) {
   loadApplication(applicationId);
-  return read<ExecutionRecord>(recordPath(applicationId, id));
+  return executionReader.read(recordPath(applicationId, id));
 }
 export function decideExecution(
   applicationId: string,
@@ -174,7 +191,7 @@ export function settleRunningExecutions(
   applicationId: string,
   chatId: string | null,
 ) {
-  for (const record of listExecutions(applicationId))
+  for (const record of executionsForRecovery(applicationId))
     if (
       ["running", "awaiting-approval"].includes(record.status) &&
       (chatId === null || record.chatId === chatId)

@@ -350,7 +350,7 @@ export async function openPiSession(
                     retireInformation(scope.applicationId, params.id),
                   );
                 }
-                const record = saveInformation(
+                const record = await saveInformation(
                   scope.applicationId,
                   params.record,
                   params.id,
@@ -397,7 +397,7 @@ export async function openPiSession(
                   serverId: settings.host.serverId,
                 }
               : null,
-            executions: listExecutions(scope.applicationId).slice(-20),
+            executions: (await listExecutions(scope.applicationId)).slice(-20),
           });
         },
       }),

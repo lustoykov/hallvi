@@ -33,6 +33,7 @@ Each of these is linked from the document that owns its decision.
 | [Proportionate care](proportionate-care.html) | [Care evidence](../testing/2026-09-16-proportionate-care.md) |
 | [Who owns a conversation's lifecycle](conversation-lifecycle.md) | [Operator design](../operator-design.md#interaction-while-pi-is-busy) |
 | [A request from a terminal](../cli.md#where-it-is-shown) | [Working from a terminal](../cli.md) |
+| [Reading execution evidence](../architecture.md#reading-execution-evidence) | [Architecture](../architecture.md) |
 | [Who holds a credential, and who may read it](credential-lifecycle.html) | [Roadmap](../../ROADMAP.md) |
 | [Where the way in is answered](private-access-reachability.html) | [Roadmap](../../ROADMAP.md) |
 | [What trusts what in a release](../releases.md#what-trusts-what) | [Publishing a release](../releases.md) |

@@ -388,7 +388,8 @@ export async function inspectApplication(applicationId: string) {
     ? `/applications/${applicationId}?chat=${main.id}`
     : `/applications/${applicationId}`;
   const clean = cleaner(applicationId);
-  const executions = listExecutions(applicationId);
+  const executions =
+    conversation?.executions ?? (await listExecutions(applicationId));
   const attention: Attention[] = [
     ...executions.filter(awaitingDecision).map((record) => ({
       kind: "approval" as const,
@@ -470,8 +471,11 @@ export async function inspectApplication(applicationId: string) {
 }
 
 /** One execution in full, as recorded: the executor's own output limit only. */
-export function executionDetail(applicationId: string, executionId: string) {
-  const record = readExecution(applicationId, executionId);
+export async function executionDetail(
+  applicationId: string,
+  executionId: string,
+) {
+  const record = await readExecution(applicationId, executionId);
   if (!record)
     throw new NotFoundError("This application has no execution with that id.");
   const clean = cleaner(applicationId);

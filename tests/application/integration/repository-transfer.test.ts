@@ -139,10 +139,15 @@ it("copies private main twice with the same connection, preserves exact files an
   );
   expect(statSync(join(second.directory, "start.sh")).mode & 0o111).toBe(0o111);
   expect(
-    JSON.stringify([state.calls, first, second, listExecutions(applicationId)]),
+    JSON.stringify([
+      state.calls,
+      first,
+      second,
+      await listExecutions(applicationId),
+    ]),
   ).not.toContain(state.token);
   expect(
-    listExecutions(applicationId).every(
+    (await listExecutions(applicationId)).every(
       (record) => record.status === "succeeded",
     ),
   ).toBe(true);

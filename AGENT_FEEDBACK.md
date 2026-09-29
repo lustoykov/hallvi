@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
+| [AF-003 — Reduce full-history response serialization](#af-003--reduce-full-history-response-serialization) | 1 | New |
 
 ## How to contribute
 
@@ -68,3 +69,15 @@ only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+
+### AF-003 — Reduce full-history response serialization
+
+After execution reads are cached, serializing the complete execution history
+still blocks the event loop: ten readers of a synthetic 2,000-record history
+showed about 82 ms maximum delay from the warm response path. Change
+notifications will remove idle polling; consider bounded or incremental
+evidence responses if long histories still make active chats slow. The
+[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
+from this remaining cost.
+
+**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)

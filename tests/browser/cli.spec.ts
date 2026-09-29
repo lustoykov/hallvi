@@ -15,6 +15,9 @@ const CLI = "scripts/cli.mjs";
 function environment() {
   const env = { ...process.env };
   delete env.HALLVI_CONTROLLER_URL;
+  // Playwright forces colour; automation may set NO_COLOR. Node warns on
+  // that conflict before the CLI starts, polluting its checked stderr.
+  delete env.FORCE_COLOR;
   return env;
 }
 function hallvi(...args: string[]) {

@@ -71,8 +71,63 @@ all records with a subject and a claim.
 Three things live in files beside the database rather than in it. Native Pi
 conversation history, under `pi-sessions/<application>/<chat>/`, because Pi's
 session repository owns it and its format. Execution evidence — every command, its output and its
-outcome — under `operator/<application>/executions/`, because a command's
-output is large and append-only. And local diagnostics, under `diagnostics/`.
+outcome — under `operator/<application>/executions/`, with each update
+atomically replacing that execution's JSON file. And local diagnostics, under
+`diagnostics/`.
+
+### Reading execution evidence
+
+Chat snapshots, application views, CLI inspection and Pi's status tool await
+the same [execution reader](../src/server/execution-reader.ts). It scans file
+names and metadata asynchronously, then reads and parses only changed or
+uncached records. Overlapping lists of one directory share their scan, and
+overlapping reads of the same file version share their content read. A call
+joining an in-progress list observes that scan; the next list checks again.
+This is neither a directory-wide transactional snapshot nor a freshness TTL.
+`invalidateExecutionReads(applicationId)` makes a notified refresh start a new
+scan instead of joining one begun before the change; omitting the ID does this
+for all in-flight lists on reconnect. Metadata checks keep cached content and
+single-file reads correct without purging unchanged records. Polling callers
+do not need this hook; the notification integration will call it.
+
+The process-local cache keys absolute storage paths, not application IDs
+alone. Device, inode, size, nanosecond modification and change times identify
+a file version, so atomic replacement, running output, new files and removal
+are visible on subsequent reads. A version that changes during a read is not
+cached. Missing files are omitted; other read/parse failures remain errors.
+No watcher or cross-process invalidation service is needed: the writer's
+files remain authoritative, and a restarted process starts with an empty cache.
+
+Each reader process retains at most 4,096 records and a 32 MiB estimated
+content budget (UTF-16 JSON length plus entry overhead), evicting least recently
+used records. This is a cache budget, not a total heap limit: active responses
+still contain the complete requested history. Large histories exceeding the
+budget are reread as needed. At most eight file jobs run together across
+applications, with only eight queued workers per directory. Returned arrays
+and flat execution objects are copies; their immutable strings may be shared.
+
+```mermaid
+flowchart LR
+    C[Chat, views, CLI and Pi status] --> R[Async execution reader]
+    R --> M[Directory and file metadata]
+    M --> V{Cached version matches?}
+    V -->|yes| B[Bounded process cache]
+    V -->|no| F[Async content read and JSON parse]
+    F -->|version unchanged| B
+    B --> O[Independent record objects]
+    F --> O
+    O --> C
+    W[Synchronous execution writer] -->|atomic rename| D[Authoritative JSON files]
+    D --> M
+    D --> F
+```
+
+Execution writing and the worker's recovery sweep remain synchronous in this
+slice, preserving settlement before socket intake and before a live stretch
+stops driving. Recovery does not reuse the async reader yet. Snapshot polling,
+SQLite access, transcript projection and response serialization are unchanged.
+The [synthetic measurement](testing/2026-09-29-execution-reader.md) separates
+file-read counts from response cost and these remaining limits.
 
 ## What Pi can do
 

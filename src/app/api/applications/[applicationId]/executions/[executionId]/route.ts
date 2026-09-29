@@ -17,7 +17,7 @@ export async function GET(
     const { applicationId, executionId } = await context.params;
     if (!z.uuid().safeParse(executionId).success)
       throw new RequestValidationError("An execution id is a UUID.");
-    return Response.json(executionDetail(applicationId, executionId), {
+    return Response.json(await executionDetail(applicationId, executionId), {
       headers: { "Cache-Control": "no-store" },
     });
   });

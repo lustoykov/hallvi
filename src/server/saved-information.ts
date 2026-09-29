@@ -27,7 +27,7 @@ export function listInformation(
     `${r.title}\n${r.body}`.toLowerCase().includes(search),
   );
 }
-export function saveInformation(
+export async function saveInformation(
   applicationId: string,
   input: unknown,
   id?: string,
@@ -38,6 +38,9 @@ export function saveInformation(
   // cannot be drawn is refused here with what to change, so Pi corrects it
   // in the same turn rather than the page rendering a lie later.
   requireReadableRecord(value);
+  const executions = value.evidence.some((e) => e.type === "execution")
+    ? await listExecutions(applicationId)
+    : [];
   for (const evidence of value.evidence) {
     // Earlier records may cite a message. Pi keeps the conversation now, and
     // what it did is cited by execution or URL.
@@ -45,7 +48,7 @@ export function saveInformation(
       throw new Error("Cite an execution or a URL as evidence, not a message.");
     if (
       evidence.type === "execution" &&
-      !listExecutions(applicationId).some((e) => e.id === evidence.id)
+      !executions.some((e) => e.id === evidence.id)
     )
       throw new Error("Evidence execution not found in this application.");
   }

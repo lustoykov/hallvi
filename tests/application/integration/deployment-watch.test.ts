@@ -64,8 +64,8 @@ function watch() {
   return deploymentWatch(conversations);
 }
 
-function release(revision: string, outcome: "verified" | "failed") {
-  saveInformation(applicationId, {
+async function release(revision: string, outcome: "verified" | "failed") {
+  await saveInformation(applicationId, {
     title: `Release ${revision.slice(0, 7)}`,
     body: "What the deployment did.",
     establishedAt: new Date().toISOString(),
@@ -161,7 +161,7 @@ it("is watching only once GitHub has answered, and waits for a first release", a
 });
 
 it("deploys each pushed commit once, one at a time, and catches up to the newest", async () => {
-  release(A, "verified");
+  await release(A, "verified");
   await watch().tick();
   expect(sent).toHaveLength(0);
 
@@ -180,7 +180,7 @@ it("deploys each pushed commit once, one at a time, and catches up to the newest
   expect(deploymentState(applicationId).latest?.commit).toBe(C);
 
   // Pi verifies B. Only now is B deployed, and C starts.
-  release(B, "verified");
+  await release(B, "verified");
   await watching.tick();
   const state = deploymentState(applicationId);
   expect(state.attempts.map((one) => [one.commit, one.outcome])).toEqual([
@@ -192,7 +192,7 @@ it("deploys each pushed commit once, one at a time, and catches up to the newest
 });
 
 it("reports a failed deployment and never retries that commit by itself", async () => {
-  release(C, "failed");
+  await release(C, "failed");
   await watch().tick();
   // A restart changes nothing: the record says C was tried.
   await watch().tick();
