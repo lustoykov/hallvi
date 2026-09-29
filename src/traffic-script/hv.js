@@ -1,0 +1,282 @@
+// Hallvi's traffic script, served by the application's own proxy at /_hv/s.js.
+//
+// Each thing a page view does is one request to /_hv/e/1/<event>, which the
+// same proxy answers with 204 and writes to its access log; Hallvi counts the
+// log. The event is base64url JSON in the path, because every proxy logs the
+// path and removing query strings never touches it. The shapes are
+// `ScriptEvent` in src/server/traffic/contract.ts.
+//
+// No cookie, nothing stored in the browser, nothing that tells people apart:
+// a page view has a random id that joins its own events and nothing else.
+//
+// What is served is this file without its whole-line comments
+// (src/server/traffic/script.ts), so keep every comment on a line of its own
+// and no line of a string starting with //.
+(() => {
+  // Included twice, or run again by a router that re-executes the head: the
+  // first copy is already counting. (An element with id="hv" is not a copy.)
+  if (typeof window.hv === "function") return;
+
+  const PREFIX = "/_hv/e/1/";
+  const PING_MS = 30_000;
+  const KEPT = [
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "ref",
+  ];
+  const GOAL = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
+  // An error thrown in a loop would otherwise be a request per frame.
+  const ERRORS_PER_VIEW = 10;
+
+  // Nothing here may break the page it measures.
+  const safely =
+    (run) =>
+    (...args) => {
+      try {
+        return run(...args);
+      } catch {}
+    };
+  const now = () => performance.now();
+  const visible = () => document.visibilityState === "visible";
+  const whole = (value, most) => Math.min(Math.round(value), most);
+  const originOf = (url) => url.protocol + "//" + url.host;
+
+  // The page view being counted: its id and path, how long it has been
+  // visible, and whether its leave went out.
+  let view;
+  // Its page speed so far (see `init`), and the observers that measure it.
+  let lcp;
+  let lcpOver = false;
+  let inp;
+  let cls = 0;
+  let shifts = false;
+  let session = 0;
+  let sessionStart = 0;
+  let sessionEnd = 0;
+  const observers = [];
+
+  // One event, one request. sendBeacon survives the page going away, and
+  // fetch with keepalive does the same where there is no sendBeacon. The
+  // address is absolute so that a <base> pointing elsewhere cannot move it.
+  const send = (event) => {
+    const json = JSON.stringify(event);
+    const path =
+      PREFIX +
+      btoa(String.fromCharCode(...new TextEncoder().encode(json)))
+        .replace(/=+$/, "")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_");
+    // Hallvi reads at most 2,000 characters. Only campaign tags can take an
+    // event past that, and a view without them still counts.
+    if (path.length > 2000) {
+      if (event.u) send({ ...event, u: undefined });
+      return;
+    }
+    const url = location.origin + path;
+    if (!navigator.sendBeacon?.(url))
+      fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+  };
+  const emit = (t, more) => view && send({ t, s: view.s, p: view.p, ...more });
+
+  // Where the page the browser loaded was reached from: the referrer's
+  // origin, never the page it was — this site's own when the visitor came
+  // from inside it, so that only a view with no referrer at all reads as a
+  // direct landing. An app's referrer (android-app://…) has no origin, so its
+  // scheme and host stand in for one.
+  const referrer = () => {
+    try {
+      const origin = originOf(new URL(document.referrer));
+      if (origin.length <= 200) return origin;
+    } catch {}
+  };
+
+  // Campaign tags from the address: only the keys the log keeps too, never
+  // the rest of the query string.
+  const tags = () => {
+    const query = new URLSearchParams(location.search);
+    let u;
+    for (const key of KEPT) {
+      const value = query.get(key);
+      if (value) (u ||= {})[key] = value.slice(0, 100);
+    }
+    return u;
+  };
+
+  const start = (landing) => {
+    view = {
+      s: Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join(""),
+      p: location.pathname.slice(0, 300),
+      shown: 0,
+      since: visible() ? now() : null,
+      left: false,
+      errors: 0,
+    };
+    // Any other view was reached from inside the application: a route
+    // change, or a page brought back from the browser's memory.
+    emit("view", {
+      r: landing ? referrer() : originOf(location),
+      u: tags(),
+      w: screen.width,
+    });
+  };
+  const shown = () =>
+    view.shown + (view.since === null ? 0 : now() - view.since);
+
+  // The view is over. Sent once, at the first of the tab being hidden, the
+  // page going away or a route change: hidden is often the last moment a
+  // page gets, since a phone rarely says goodbye.
+  const end = () => {
+    for (const [observer, handle] of observers) handle(observer.takeRecords());
+    if (!view.left) {
+      view.left = true;
+      if (lcp !== undefined)
+        emit("vital", { n: "LCP", v: whole(lcp, 120_000) });
+      if (shifts && shown())
+        emit("vital", { n: "CLS", v: whole(cls * 1000, 120_000) });
+      if (inp !== undefined)
+        emit("vital", { n: "INP", v: whole(inp, 120_000) });
+      // Visible time only: a tab left open behind others was not being read.
+      emit("leave", { e: whole(shown(), 30 * 60_000) });
+    }
+    // Whatever happens after this belongs to the next view.
+    lcpOver = true;
+    lcp = inp = undefined;
+    cls = session = 0;
+  };
+
+  const moved = () => {
+    if (location.pathname.slice(0, 300) === view.p) return;
+    end();
+    start(false);
+  };
+
+  const hv = (name) => {
+    if (typeof name === "string" && GOAL.test(name)) emit("goal", { g: name });
+  };
+  window.hv = safely(hv);
+
+  const observe = (type, handle, options) => {
+    if (!window.PerformanceObserver?.supportedEntryTypes?.includes(type))
+      return false;
+    const observer = new PerformanceObserver(
+      safely((list) => handle(list.getEntries())),
+    );
+    observer.observe({ type, buffered: true, ...options });
+    observers.push([observer, handle]);
+    return true;
+  };
+
+  const init = () => {
+    // Page speed, as Chrome's web-vitals defines it, reduced to what one page
+    // view needs:
+    // - LCP: the start of the last largest-contentful-paint, which the
+    //   browser stops reporting at the first input. Only the page the browser
+    //   loaded has one, only in a tab that was visible, and a prerendered
+    //   page's wait starts when it was shown.
+    // - CLS: shifts not caused by input, grouped into windows of shifts under
+    //   a second apart and at most five seconds long; the worst window, times
+    //   1000.
+    // - INP: the slowest interaction. web-vitals passes over one in every
+    //   fifty as an outlier; a page view rarely has fifty. Interactions under
+    //   40 ms are seen only through the first input, which is always reported.
+    // Each is sent once, with the view's leave: by then it is final.
+    const shownAt =
+      performance.getEntriesByType?.("navigation")[0]?.activationStart || 0;
+    lcpOver = !visible();
+    observe("largest-contentful-paint", (entries) => {
+      const entry = entries[entries.length - 1];
+      if (entry && !lcpOver) lcp = Math.max(entry.startTime - shownAt, 0);
+    });
+    shifts = observe("layout-shift", (entries) => {
+      for (const entry of entries) {
+        if (entry.hadRecentInput) continue;
+        if (
+          session &&
+          entry.startTime - sessionEnd < 1000 &&
+          entry.startTime - sessionStart < 5000
+        )
+          session += entry.value;
+        else {
+          session = entry.value;
+          sessionStart = entry.startTime;
+        }
+        sessionEnd = entry.startTime;
+        cls = Math.max(cls, session);
+      }
+    });
+    const interactions = (entries) => {
+      for (const entry of entries)
+        if (entry.interactionId || entry.entryType === "first-input")
+          inp = Math.max(inp || 0, entry.duration);
+    };
+    observe("event", interactions, { durationThreshold: 40 });
+    observe("first-input", interactions);
+
+    // Route changes inside the application. The same path again (a query or
+    // a hash changing, a router tidying its state) is the same page view.
+    for (const name of ["pushState", "replaceState"]) {
+      const original = history[name];
+      history[name] = function (...args) {
+        const result = original.apply(this, args);
+        safely(moved)();
+        return result;
+      };
+    }
+    addEventListener("popstate", safely(moved));
+
+    document.addEventListener(
+      "visibilitychange",
+      safely(() => {
+        if (visible()) view.since = now();
+        else {
+          view.shown = shown();
+          view.since = null;
+          end();
+        }
+      }),
+    );
+    addEventListener("pagehide", safely(end));
+    // Back to a page the browser kept whole in memory: the log sees no
+    // request, so this is the only place the visit shows.
+    addEventListener(
+      "pageshow",
+      safely((event) => event.persisted && start(false)),
+    );
+
+    // "Open right now" is the views whose tab pinged lately.
+    setInterval(
+      safely(() => visible() && emit("ping")),
+      PING_MS,
+    );
+
+    document.addEventListener(
+      "click",
+      safely((event) => {
+        const goal = event.target.closest?.("[data-hv-goal]");
+        if (goal) hv(goal.getAttribute("data-hv-goal"));
+      }),
+      true,
+    );
+
+    // A count, never the message: messages carry whatever the page held.
+    const failed = safely(
+      () => view.errors++ < ERRORS_PER_VIEW && emit("error"),
+    );
+    addEventListener("error", failed);
+    addEventListener("unhandledrejection", failed);
+
+    start(true);
+  };
+
+  // A prerendered page may never be shown. It counts from the moment it is.
+  if (document.prerendering)
+    document.addEventListener("prerenderingchange", safely(init), {
+      once: true,
+    });
+  else safely(init)();
+})();
