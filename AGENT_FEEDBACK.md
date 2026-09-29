@@ -11,7 +11,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -153,6 +152,18 @@ initial runs which only isolated Hallvi's account were excluded.
 
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
 
+## Archive
+
+| Request ID / title | +1 | Status |
+| --- | --- | --- |
+| [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Implemented in #266 (pending merge) |
+| [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Implemented (in review) |
+| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
+| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
+| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+| [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
+| [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
 ### AF-014 — Preserve why an operator turn ended early
 
 During an installed alpha.8 deployment, connecting an existing machine started
@@ -167,16 +178,7 @@ A following queued request successfully continued deployment.
 **+1:** 2026-09-29 — installed Mac mini beta verification
 (`codex/installed-beta-feedback`).
 
-## Archive
-
-| Request ID / title | +1 | Status |
-| --- | --- | --- |
-| [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Implemented (in review) |
-| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
-| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
-| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
-| [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
-| [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+**Status:** Implemented in [#266](https://github.com/lustoykov/hallvi/pull/266), pending merge. Native failures now retain a bounded redacted reason in chat and CLI; unknown reasons and worker interruption stay distinct. The historical turn's cause remains unknown.
 
 ### AF-015 — Clear stale fetch errors after reconnection
 
