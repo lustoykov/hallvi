@@ -163,6 +163,8 @@ clean installation and baseline-to-candidate upgrade on macOS arm64 and
 Ubuntu 24.04 x64. Upgrade jobs create application, main/side-chat and permission
 settings records through the baseline API, then require the candidate installer
 to replace the running service while preserving those records and its address.
+They then restart the candidate with an active conversation stream, requiring
+the old stream to close and the same records and address to survive.
 This exercises installer-mediated upgrades, not public automatic-update discovery
 or downloading. The jobs refuse an existing same-user installation or service.
 All four jobs must pass before publishing. The

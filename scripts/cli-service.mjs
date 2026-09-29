@@ -122,6 +122,7 @@ function launchdDefinition() {
       ${variables}
     </dict>
     <key>RunAtLoad</key><true/>
+    <key>ExitTimeOut</key><integer>20</integer>
     <key>KeepAlive</key>
     <dict>
       <key>SuccessfulExit</key><false/>
