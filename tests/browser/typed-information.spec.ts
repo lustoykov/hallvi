@@ -148,7 +148,7 @@ test("records render in chat and their views, survive refresh, and update by rec
     // than offering an address that would fail in the reader's browser.
     await expect(chat.getByText("Tunnel closed")).toBeVisible();
     await expect(
-      chat.getByRole("link", { name: /Open app(?:lication)?/ }),
+      chat.locator(`a[href="${accessPresentation.url}"]`),
     ).toHaveCount(0);
     await expect(chat.getByText("Inspect application logs.")).toBeVisible();
     // Reload: the cards are read back from the records, not from the turn.
@@ -179,7 +179,7 @@ test("records render in chat and their views, survive refresh, and update by rec
       overview.getByRole("button", { name: /Access Tunnel is closed/ }),
     ).toBeVisible();
     await expect(
-      overview.getByRole("link", { name: /Open app(?:lication)?/ }),
+      page.locator(`a[href="${accessPresentation.url}"]`),
     ).toHaveCount(0);
     // And a map nothing describes is missing, which is not the same as an
     // application with no parts.
@@ -209,25 +209,26 @@ test("records render in chat and their views, survive refresh, and update by rec
     // a page composed from the same records. What it owes the reader is the
     // release that is running and an honest account of the way in.
     //
-    // The status line names the running revision; the full commit, the host
-    // and the image evidence belong to the release's expandable row below.
-    await expect(
-      view.getByRole("region", { name: "What is running" }),
-    ).toContainText("Running abcdef0");
+    // One line says which release is running. The revision is its own element
+    // in that line, so the line is read whole, the way a reader sees it. The
+    // exact source, the host and the image are in the release's row.
+    const running = view.getByRole("region", { name: "What is running" });
+    await expect(running.getByText(/Running abcdef0\b/)).toBeVisible();
     const releaseRow = (change: string) =>
       view.getByRole("row").filter({
         has: page.getByRole("cell", { name: change, exact: true }),
       });
     await expect(releaseRow("Added container packaging")).toBeVisible();
-    // A way in that is closed is said, with how to reopen it, never offered.
+    // The way in is named as closed rather than offered. While the tunnel
+    // answers, the link on that line is the address itself.
     await expect(
-      view.getByText("The tunnel is closed", { exact: true }),
+      running.getByText("The tunnel is closed", { exact: true }),
     ).toBeVisible();
     await expect(
-      view.getByRole("button", { name: "Open the connection again" }),
+      running.getByRole("button", { name: "Open the connection again" }),
     ).toBeVisible();
     await expect(
-      view.getByRole("link", { name: /Open app(?:lication)?/ }),
+      view.getByRole("link", { name: /127\.0\.0\.1:8080/ }),
     ).toHaveCount(0);
     // What was checked belongs to the release that was checked, so it is
     // inside that release rather than loose on the page. It still has to be
