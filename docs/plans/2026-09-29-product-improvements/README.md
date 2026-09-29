@@ -4,9 +4,16 @@
 
 Requested on 29 September 2026, following the [product research](../../research/2026-09-29-product-opportunities.md). The plans inspect main snapshot `cc7e9179`; refresh the relevant source before implementation. They are proposals for review, not completed capabilities or a replacement for the [Roadmap](../../../ROADMAP.md).
 
-**Implementation status, 29 September:** performance integration [PR #252](https://github.com/lustoykov/hallvi/pull/252) is merged into main at `a81b6953`. Its local fixture measurements and verification limits are recorded in the PR; merging does not establish deployment. Plan 03's first increment is in [draft PR #255](https://github.com/lustoykov/hallvi/pull/255), with matched before/after screenshots and recordings for owner review. The status line and mobile wrapping are verified; a bounded real-Pi check completed, but it reported findings only in its final reply, so earlier reporting remains unproven. The UI increment is unmerged. The other feature plans remain proposals.
+**Completed selected scope, 29 September:** the three bounded increments merged as one reviewed batch: **03** interruption/Stop explanations in [#268](https://github.com/lustoykov/hallvi/pull/268), **05** a saved Markdown handoff through existing Copy reply in [#270](https://github.com/lustoykov/hallvi/pull/270), and **11** a verified existing-CLI example in [#269](https://github.com/lustoykov/hallvi/pull/269). Final main `0966f6ea` matches the checked combined tree: 81 focused tests, four browser journeys, TypeScript, formatting/lint and production build passed. The real-Pi handoff trial established saving and copying after refresh using synthetic observations. Downstream diagnosis/adoption/repair remain unproven. This batch is merged source, not a published installed release. Larger mechanisms in the individual research plans were not requirements for these increments.
+
+**Deferred by the owner:** **04**, **06**, **07**, **08**, **09** and **10**. Keep the current Overview; do not add a return brief. Their six planning workers are archived, and the plans remain available for later reconsideration. The completed 02 worker and redundant 01 planner are archived too. The three completed implementation workers are archived after the batch merge. FACTORY and PERF remain independent peer coordinators with their own teams.
+
+**Earlier merged checkpoints:** performance integration [#252](https://github.com/lustoykov/hallvi/pull/252), current-action/target and mobile wrapping [#255](https://github.com/lustoykov/hallvi/pull/255), truthful access observations [#256](https://github.com/lustoykov/hallvi/pull/256), and saved-route Reconnect [#263](https://github.com/lustoykov/hallvi/pull/263). Earlier findings during real Pi work remain unproven. FACTORY completed [installed alpha.9 Reconnect acceptance](https://github.com/lustoykov/hallvi/pull/267#issuecomment-5896833172): real approval/reopen, laptop access and data preservation through an installed restart.
 
 ## TL;DR for Lyubomir
+
+This table preserves the original research options. The completed scope and
+explicit deferrals above govern current work.
 
 | Plan | Smallest useful release | What establishes success |
 | --- | --- | --- |
@@ -24,28 +31,30 @@ Requested on 29 September 2026, following the [product research](../../research/
 
 ## Visual review before approval
 
-**Owner requirement, 29 September 2026:** show before/after for UI changes before approval, at minimum in the implementation PR. This applies to each increment's visible layout, copy and interaction changes. Planning approval does not approve an unseen UI implementation.
+**Owner requirement, 29 September 2026:** retain readable before/after evidence for UI changes in the implementation PR. The owner subsequently authorized the coordinator to review and merge the three selected increments without another approval round; visual verification remains required.
 
 Plans **02–10** include visible changes to access, progress, summaries, cards, controls or intake. Plan **01** primarily changes performance; plan **11** starts with documentation and CLI adoption. Apply the requirement to the actual diff: even a backend change can alter loading, interruption or recovery behavior.
 
-- **Matched before/after:** capture the baseline and implemented branch with the same representative data, viewport and scenario. Identify both revisions and label synthetic fixtures. Put the images side by side in the PR with a short explanation of what the owner will experience differently.
+- **Matched before/after:** capture the baseline and implemented branch with the same representative data, viewport and scenario. Identify both revisions and label synthetic fixtures. Provide a full-size comparison viewer with zoom and linked scrolling, plus readable full-width images in the PR. Do not squeeze full-screen desktop captures into tiny GitHub table cells.
 - **Relevant states:** include the changed state and any affected waiting, missing-input, approval, failure or recovery state. Use a short recording for transitions or timing that still images cannot explain. Include a narrow-screen comparison when responsive layout changes.
 - **Preview versus implementation:** a proposed design preview may help settle a substantial layout change early; label it as a proposal. The final PR still needs captures from the implemented revision. An image does not establish that Pi or an application operation works; keep the plan's behavioral checks.
-- **Review and approval:** show the comparison to the owner and link it from the PR before requesting approval to merge. If capture or upload is blocked, keep that gap explicit and provide an accessible local preview; an unreviewed visual change is not ready for approval.
+- **Review:** the coordinator inspects the implemented comparison and links it from the PR before merging. If capture or upload is blocked, keep that gap explicit and provide an accessible local preview. The three selected increments do not need another owner approval request.
 - **No visible change:** say so. For performance-only work, provide comparable measurements and the tested environment; for CLI or documentation work, show the relevant output/example change. Do not manufacture a visual redesign to satisfy the review format.
 
-Use the existing [visual verification guidance](../../../REVIEW.md#visual-verification-evidence), [PR template](../../../.github/pull_request_template.md) and [verification workflow](../../verification.md). The coordinator carries this requirement into every implementation dispatch and checks that the linked evidence is accessible before presenting a PR for approval.
+Use the existing [visual verification guidance](../../../REVIEW.md#visual-verification-evidence), [PR template](../../../.github/pull_request_template.md) and [verification workflow](../../verification.md). The coordinator carries this requirement into each implementation dispatch and checks that the linked evidence is accessible before merging.
 
-## Recommended implementation order
+## Completed batch sequence
 
-1. **Use the merged performance integration as the baseline.** PR #252 completed that integration. Prepare 11's documentation independently and preserve the combined behavior when editing storage, snapshots and the shell.
-2. **Improve everyday use in small PRs:** 03's work line, then 02's access journey and 04's return brief. Coordinate shared projections and shell edits.
-3. **Add useful retained knowledge:** 05's packet and 08's procedures. Sequence edits to `pi.ts`, record contracts and information cards under one integration owner.
-4. **Prove operational capabilities:** 07's application restore before 10's update rehearsal. Resolve 06's observation contract and receipt source separately. Plan 09's broader intake/data-model change follows the core return journey.
+1. **03:** explained the latest returned result, unknown outcome and waiting messages beside native Continue/Stop; removed unsupported claims about commands having run.
+2. **05 and 11:** reused existing records, copy interaction, CLI and permission boundaries. No new packet schema, release automation, dashboard or transport was needed.
+3. **Integrated all three:** reviewed source and readable visual evidence, passed proportionate combined checks, and merged the PRs as one coordinated batch.
 
-These increments do not make all eleven features prerequisites for beta. Keep the external-user install → deploy → use → restart → return checks in the release sequence.
+The other six ideas are deferred, not queued behind this batch. These increments do not make all eleven features prerequisites for beta. External-user acceptance remains a separate unproven milestone, not a blocker to the owner-authorized development and release work.
 
 ## Shared choices and dependencies
+
+The relationships below describe the research proposals. They do not activate
+the deferred work or enlarge the selected three increments.
 
 - **Reconnect:** recommend Pi first. It removes request composition while preserving execution/approval ownership; removing model latency needs a later deterministic-mutation contract.
 - **Care:** agree a narrowly scoped, owner-enabled background reader before adding it. Stored procedures and ordinary notes never activate scheduling or authorize repair.
