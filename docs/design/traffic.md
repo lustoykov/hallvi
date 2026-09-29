@@ -233,9 +233,14 @@ origin and are counted; the visitor's address and country come from
 `CF-Connecting-IP` and `CF-IPCountry` in the log. Where a CDN caches pages, only
 the script counts those views — its events are never cached. Cloudflare's raw
 request logs are Enterprise-only, so CDN logs are not how visitors are counted.
-When Pi sets up caching it records whether pages are cached — the fact
-`caches-pages`, "yes" or "no", on the `cdn` subject — so the Traffic page can
-say what the log cannot see.
+Pi caches pages at Cloudflare with `set_cache_rule`: one rule per hostname,
+recognisably Hallvi's, placed first so the owner's own rules still win, and
+leaving the application's `Cache-Control` headers to decide what is kept
+(a page without one is not cached; Hallvi's events never are). It never
+replaces or reorders the zone's other rules and removes only its own.
+It then records whether pages are cached — the fact `caches-pages`, "yes"
+only once a page came back as a cache hit, otherwise "no", on the `cdn`
+subject — so the Traffic page can say what the log cannot see.
 
 ### If a machine is lost
 
