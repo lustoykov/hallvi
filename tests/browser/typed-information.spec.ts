@@ -224,8 +224,13 @@ test("records render in chat and their views, survive refresh, and update by rec
     await expect(
       running.getByText("The tunnel is closed", { exact: true }),
     ).toBeVisible();
+    // This legacy route names a server label without an attached host. It
+    // needs review before the current reconnect flow can reuse a saved route.
     await expect(
-      running.getByRole("button", { name: "Open the connection again" }),
+      running.getByRole("button", {
+        name: "Review private access",
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(
       view.getByRole("link", { name: /127\.0\.0\.1:8080/ }),
