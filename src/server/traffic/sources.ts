@@ -71,10 +71,15 @@ function command(script: string, values: string[]) {
   return `bash -c '${script}' hallvi ${values.map((value) => `'${value}'`).join(" ")}`;
 }
 
-// A log Hallvi's user cannot read is read again as root when sudo allows it
-// without a password, and not otherwise.
-const AS_ROOT_IF_NEEDED =
-  'if [ ! -r "$1" ] && [ "$(id -u)" != 0 ] && sudo -n true 2>/dev/null; then exec sudo -n bash -c "$BASH_EXECUTION_STRING" hallvi "$@"; fi';
+// Whatever a command reads, Hallvi's user must be able to read: the log's
+// directory and each of its files. When it cannot and sudo allows it without
+// a password, the command runs itself again as root; otherwise it says what
+// it could not read, rather than leaving a silent hole in the history.
+const UNREADABLE = [
+  'args=("$@")',
+  'unreadable() { if [ "$(id -u)" != 0 ] && sudo -n true 2>/dev/null; then exec sudo -n bash -c "$BASH_EXECUTION_STRING" hallvi "${args[@]}"; fi; echo "$1 is not readable by $(id -un)."; exit 4; }',
+  'cd -- "${1%/*}/" 2>/dev/null && [ -r . ] || unreadable "${1%/*}/"',
+];
 const DOCKER = 'd=docker; docker ps >/dev/null 2>&1 || d="sudo -n docker"';
 
 // $1 is the log's path. Its rotated files sit beside it: logrotate's
@@ -82,13 +87,16 @@ const DOCKER = 'd=docker; docker ps >/dev/null 2>&1 || d="sudo -n docker"';
 // A name with anything but letters, digits, dots, dashes and underscores is
 // skipped here and refused again when read back.
 const LIST_FILES = [
-  AS_ROOT_IF_NEEDED,
-  'cd -- "${1%/*}/" || exit 3',
-  'name=${1##*/}; stem=${name%.*}; ext=${name#"$stem"}',
-  'echo "hallvi-now $(date +%s)"',
+  ...UNREADABLE,
+  'name=${1##*/}; stem=${name%.*}; ext=${name#"$stem"}; files=()',
   'for f in "$name".[0-9]* "$stem"-[0-9]*"$ext" "$stem"-[0-9]*"$ext".gz "$name"; do',
   '  [ -f "$f" ] || continue',
   "  case $f in *[^A-Za-z0-9._-]*) continue ;; esac",
+  '  [ -r "$f" ] || unreadable "$f"',
+  '  files+=("$f")',
+  "done",
+  'echo "hallvi-now $(date +%s)"',
+  'for f in "${files[@]}"; do',
   '  echo "hallvi-file $f $(wc -c < "$f") $(date -r "$f" +%s)"',
   '  gzip -cdf -- "$f" 2>/dev/null | head -n 3; echo',
   "done",
@@ -96,11 +104,13 @@ const LIST_FILES = [
 
 // $1 is the log's path; the rest are files beside it, oldest first. A file
 // that ends part way through a line gets its line ended, so the next file's
-// first line is never glued to it.
+// first line is never glued to it. One that has gone since it was listed —
+// rotated on, or removed — is said to be unreadable, and a later read finds
+// it under its new name.
 const READ_FILES = [
-  AS_ROOT_IF_NEEDED,
-  'cd -- "${1%/*}/" || exit 3',
+  ...UNREADABLE,
   "shift",
+  'for f in "$@"; do [ ! -e "$f" ] || [ -r "$f" ] || unreadable "$f"; done',
   'for f in "$@"; do',
   '  gzip -cdf -- "$f"; s=$?; echo',
   '  [ "$s" = 0 ] || echo "hallvi-unreadable $f"',
@@ -111,12 +121,12 @@ const READ_FILES = [
 // following it by name through the next rotation. One command, so no line
 // written between a read and a follow can fall between them.
 const FOLLOW_FILES = [
-  AS_ROOT_IF_NEEDED,
-  '[ -r "$1" ] || { echo "The access log is not readable."; exit 1; }',
-  'cd -- "${1%/*}/" || exit 1',
+  ...UNREADABLE,
   "name=${1##*/}",
-  `echo ${READY}`,
+  '[ -r "$name" ] || unreadable "$name"',
   "shift",
+  'for f in "$@"; do [ ! -e "$f" ] || [ -r "$f" ] || unreadable "$f"; done',
+  `echo ${READY}`,
   'for f in "$@"; do gzip -cdf -- "$f"; echo; done',
   'exec tail -n +1 -F -- "$name"',
 ].join("\n");
@@ -459,6 +469,11 @@ function joined(spans: Span[]) {
   return out;
 }
 
+// tail's word that the log rotated and it moved on: news, not a reason. Taken
+// for one, a follow that later lost its connection blamed the rotation.
+const ROTATED =
+  /^tail: .*(has appeared|has been replaced|following new file|file truncated)/;
+
 /**
  * Runs one of these commands on the server and hands on its output line by
  * line. What went wrong is said in words by ssh, sudo, docker or tail; a line
@@ -523,7 +538,8 @@ export function onServer(
             text.trim() &&
             !text.includes("{") &&
             !text.startsWith("hallvi-") &&
-            !STAMP.test(text)
+            !STAMP.test(text) &&
+            !ROTATED.test(text)
           )
             said = text.trim().slice(0, 200);
           onText(text);
