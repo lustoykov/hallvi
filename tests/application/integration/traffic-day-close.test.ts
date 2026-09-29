@@ -23,6 +23,19 @@ const server = vi.hoisted(() => ({
   oldest: 0 as number | null,
   reads: [] as { from: number; to: number }[],
   push: (() => {}) as (line: TrafficLine) => void,
+  /** When set, the follow does only what the test says, through `on`. */
+  scripted: false,
+  on: null as null | {
+    line: (line: TrafficLine) => void;
+    ready?: () => void;
+    heard?: () => void;
+    backlog?: (at: {
+      file: string;
+      read: number;
+      total: number | null;
+      done: boolean;
+    }) => void;
+  },
 }));
 vi.mock("@/server/db", async (actual) => ({
   ...(await actual<typeof import("@/server/db")>()),
@@ -78,23 +91,29 @@ vi.mock("@/server/traffic/sources", () => ({
     _log: unknown,
     _files: unknown,
     since: number,
-    on: { line: (line: TrafficLine) => void; ready?: () => void },
+    on: NonNullable<typeof server.on>,
     signal: AbortSignal,
   ) =>
     new Promise((resolve) => {
-      on.ready?.();
-      for (const line of server.followed) if (line.at >= since) on.line(line);
-      server.push = on.line;
+      server.on = on;
       signal.addEventListener("abort", () =>
         resolve({ exitCode: null, said: "", moved: null }),
       );
+      if (server.scripted) return;
+      on.ready?.();
+      for (const line of server.followed) if (line.at >= since) on.line(line);
+      server.push = on.line;
     }),
 }));
 
 import { trafficCollector } from "@/server/traffic/collector";
 import { FINAL_AFTER_MS, LOOKBACK_MS } from "@/server/traffic/count";
 import { controllerTimeZone, dayBounds, dayOf } from "@/server/traffic/days";
-import { readDays, setCollection } from "@/server/traffic/store";
+import {
+  collectionOf,
+  readDays,
+  setCollection,
+} from "@/server/traffic/store";
 
 let root: string;
 beforeAll(() => {
@@ -206,5 +225,43 @@ describe("a day's close", () => {
 
     stop.abort();
     await collector.stop();
+  });
+
+  it("says it is catching up until the backlog is read, however long that pauses", async () => {
+    const zone = controllerTimeZone();
+    const day = dayOf(Date.parse("2026-10-05T12:00:00Z"), zone);
+    const { start } = dayBounds(day, zone);
+    vi.useFakeTimers({ now: start + 12 * 3_600_000 });
+    server.oldest = start;
+    server.log = [];
+    server.scripted = true;
+    const stop = new AbortController();
+    const collector = trafficCollector(stop.signal);
+    collector.tick();
+    await vi.advanceTimersByTimeAsync(500);
+    const on = server.on!;
+    on.ready?.();
+    on.backlog?.({ file: "access.log", read: 0, total: 1000, done: false });
+    on.heard?.();
+    on.line(request(start + 3_600_000));
+    // A long pause in the middle of a big backlog is not the end of it.
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(collectionOf("app")).toMatchObject({
+      state: "catching-up",
+      detail: "0% of access.log",
+    });
+    expect(readDays("app", day, day)).toEqual([]);
+    on.backlog?.({ file: "access.log", read: 1000, total: 1000, done: true });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(collectionOf("app")).toMatchObject({ state: "live", detail: null });
+    expect(
+      readDays("app", day, day)[0].hours.reduce(
+        (sum, hour) => sum + hour.requests,
+        0,
+      ),
+    ).toBe(1);
+    stop.abort();
+    await collector.stop();
+    server.scripted = false;
   });
 });

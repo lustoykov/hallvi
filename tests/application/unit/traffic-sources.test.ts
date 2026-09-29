@@ -474,6 +474,43 @@ describe("the access log on the server", () => {
     expect(seen.at(-1)).toBe("2026-09-29T09:00:00.000Z");
   });
 
+  it("says how far its backlog goes, and when it has all been read", async () => {
+    const dir = join(root, "backlog");
+    mkdirSync(dir);
+    const rolled = "access-2026-09-29T08-00-00.000-size.log.gz";
+    file(join(dir, rolled), [caddy("2026-09-29T07:00:00Z")], "2026-09-29T08:00:00Z");
+    file(
+      join(dir, "access.log"),
+      [caddy("2026-09-29T08:00:00Z"), caddy("2026-09-29T08:30:00Z")],
+      "2026-09-29T09:00:00Z",
+    );
+    const source = log("caddy-json", join(dir, "access.log"));
+    const size = readFileSync(join(dir, "access.log")).length;
+    const stop = new AbortController();
+    const seen: string[] = [];
+    await followLog(
+      host,
+      source,
+      await listLog(host, source),
+      Date.parse("2026-09-29T00:00:00Z"),
+      {
+        line: () => {},
+        backlog: ({ file, read, total, done }) => {
+          seen.push(`${file} ${read}/${total}${done ? " done" : ""}`);
+          if (done) stop.abort();
+        },
+      },
+      stop.signal,
+    );
+    const first = Buffer.byteLength(caddy("2026-09-29T08:00:00Z")) + 1;
+    expect(seen).toEqual([
+      `${rolled} 0/null`,
+      `access.log 0/${size}`,
+      `access.log ${first}/${size}`,
+      `access.log ${size}/${size} done`,
+    ]);
+  });
+
   it("notices a rotation between its last check and tail opening the file", async () => {
     const dir = join(root, "instant");
     mkdirSync(dir);

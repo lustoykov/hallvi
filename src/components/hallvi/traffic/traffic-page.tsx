@@ -258,6 +258,7 @@ function CollectionLine({
         <span className="hv-sheen">
           Counting what the server&apos;s log still holds…
         </span>
+        {collection.detail && <small> {collection.detail}</small>}
       </p>
     );
   if (collection.state === "lost")
