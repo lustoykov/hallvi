@@ -614,9 +614,9 @@ export function TrafficPage({
       {collection.scriptSilentSince && (
         <p className="tf-state" data-tone="warn">
           <span>
-            Hallvi&apos;s script has been silent since{" "}
-            {ago(collection.scriptSilentSince, now)}, while the server still
-            serves pages.
+            Hallvi&apos;s script has been silent for{" "}
+            {ago(collection.scriptSilentSince, now).replace(/ ago$/, "")}, while
+            the server still serves pages.
           </span>
           <button
             type="button"
