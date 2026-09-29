@@ -4,9 +4,9 @@
 | --- | --- | --- |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
+| [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
-| [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 
 ## How to contribute
 
@@ -74,13 +74,12 @@ both if the workspace kept the code too.
 
 ### AF-003 — Open-link checks in the shared-information smoke match nothing
 
-`tests/browser/typed-information.spec.ts` proves a closed tunnel's address is
-not offered with `getByRole("link", { name: /Open app(?:lication)?/ })` at
+Before this fix, `tests/browser/typed-information.spec.ts` checked that a closed
+tunnel's address was not offered with `getByRole("link", { name: /Open app(?:lication)?/ })` at
 count 0, in the chat and on Overview. No shipping page names a link that way
 any more: the chat card's link is "Open" and the page header's is "Open"
-followed by the application's name, so both checks pass whatever the page
-offers. The
-Deployment one now names the address, which is the link that page draws.
+followed by the application's name, so both checks passed whatever the page
+offered. The Deployment one now names the address, which is the link that page draws.
 
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
