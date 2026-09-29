@@ -106,8 +106,8 @@ export interface Observation {
 }
 
 /**
- * The authoritative Chat state delivered over SSE and on demand: its status,
- * its messages, and the evidence and records placed beside them.
+ * The authoritative Chat state returned on demand and at SSE connect. Clients
+ * opting into changes reconstruct this same shape for subsequent updates.
  */
 export interface ChatSnapshot {
   status: import("./operator-data").ConversationStatus;

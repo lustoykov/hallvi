@@ -33,7 +33,8 @@ export async function githubDeviceRequest(path: string, body: Record<string, str
   if (current.login === "expired") return { error: "expired_token" };
   return { access_token: "ghu_QA-SYNTHETIC", token_type: "bearer", expires_in: 28800, refresh_token: "ghr_QA-SYNTHETIC", refresh_token_expires_in: 15897600 };
 }
-export async function githubArchive(fullName: string, sha: string) {
+export async function githubArchive(fullName: string, sha: string, _token: string | null, options: { signal?: AbortSignal; maxBytes: number }) {
+  options.signal?.throwIfAborted();
   return gzipSync(
     writeTar(
       fixtureFiles(fullName).map((file) => ({
@@ -43,7 +44,8 @@ export async function githubArchive(fullName: string, sha: string) {
     ),
   );
 }
-export async function githubJson(path: string, _token: string, _options: { method?: "POST" | "PATCH"; body?: unknown; allowNotFound?: boolean } = {}) {
+export async function githubJson(path: string, _token: string | null, options: { signal?: AbortSignal; method?: "POST" | "PATCH"; body?: unknown; allowNotFound?: boolean; ifNoneMatch?: string } = {}): Promise<{ data: unknown; scopes: string[]; etag?: string | null; unchanged?: boolean }> {
+  options.signal?.throwIfAborted();
   const current = scenario();
   if (current.repository === "private" && !_token) throw new GithubAccessError("The repository is missing or this login cannot access it.", "access");
   if (current.repository === "revoked") throw new GithubAccessError("GitHub no longer accepts this login. Reconnect in Settings → GitHub.", "auth");

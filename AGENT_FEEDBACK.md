@@ -5,7 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 2 | New |
+| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Accepted |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 2 | Accepted |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
@@ -88,6 +88,22 @@ from this remaining cost.
 **+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
 Idle reads now stop; active updates still serialize full histories. Keep the
 500 ms sustained cadence until a measured response-shape change improves it.
+
+**+1:** 2026-09-29 — long-history responses (`codex/long-history-responses`),
+owner-authorized implementation in review. Incremental SSE retains a full
+initial/reconnect snapshot and all recorded evidence, then sends changed
+records only. A warm 240-call fixture updating answer text and live output
+reduces each active payload from about 2.28 MB to 10.8 KB; ten-reader frame
+construction plus encoding falls from about 24.4 ms to 2.4 ms. A bounded
+2,000-call stress case still spends about 134 ms projecting ten snapshots,
+separately from the remaining 20 ms diff cost. Worker-link transcript encoding,
+first-connect costs and full-history projection remain; this change does not
+claim to eliminate them. Reproduce with `scripts/benchmark-chat-responses.ts`;
+the production browser comparison retains all six updates in 1/5/10 readers.
+At ten readers, 240 calls produce about 2.31 MB per full response versus 10.7 KB
+per incremental response, with maximum loop delay 201 ms versus 76 ms. These
+bounded synthetic measurements are not latency guarantees; verification and
+the earlier unattributed development-mode miss belong in the implementation PR.
 
 ### AF-001 — Record the waiting messages Stop drops
 

@@ -102,6 +102,23 @@ must emit `changed(...)` after writing fixture records or transcripts; there
 is no periodic snapshot poll to discover an unannounced fixture edit.
 See [29 September measurements](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-chat-notifications.md).
 
+`unit/chat-frames.test.ts` checks full reconstruction from incremental frames,
+ordering, removals and optional-field clearing. `long-history-responses.spec.ts`
+keeps old evidence disclosures and live output usable through updates and
+reconnect. Its opt-in profile compares full and incremental responses on the
+same warmed, production-built Next fixture with 1/5/10 real browser readers:
+`HALLVI_QA_PRODUCTION=1 HALLVI_RESPONSE_PROFILE=1 HALLVI_E2E_PORT=3960 npm run test:e2e -- long-history-responses.spec.ts --grep 'profile warm' --reporter=list`.
+Choose a free QA port. Fixture build and first-connect work are outside the
+measured update interval. Production QA uses webpack because its dependency
+symlink crosses the disposable root; optimization and type checks stay enabled.
+Check the shipping build separately with `npm run build` and its normal bundler.
+`node --import tsx scripts/benchmark-chat-responses.ts`
+separates cached file scans, activity projection, frame construction and JSON
+encoding for 240 and 2,000 synthetic calls; it excludes database, worker socket,
+SSR and browser work. Both profiles make no model calls, isolate fixture
+accounts, and keep raw results in ignored `work/` or `tests/results/`. Browser
+response counters are injected only into the disposable QA copy.
+
 A browser case asserts what the product says, not what a past layout said. Scope
 by landmark and accessible name rather than by layout class: a routine record is
 one compact line in a transcript and its content is behind a disclosure, and a

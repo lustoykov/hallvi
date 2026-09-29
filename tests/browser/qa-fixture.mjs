@@ -22,6 +22,7 @@ import {
 const source = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const parentPid = process.ppid;
 const port = Number(process.argv[2] ?? 3111);
+const production = process.env.HALLVI_QA_PRODUCTION === "1";
 const loginMode = process.argv[3] ?? "failure";
 if (!["success", "failure"].includes(loginMode))
   throw new Error("Choose success or failure for QA login.");
@@ -193,6 +194,39 @@ execFileSync("npm", ["run", "db:push", "--silent"], {
   env,
   stdio: "pipe",
 });
+if (production) {
+  // Typecheck the copied contributor scripts with their fixture-only imports.
+  cpSync(join(source, "tests/fixtures"), join(app, "tests/fixtures"), {
+    recursive: true,
+  });
+  mkdirSync(join(app, "tests/dashboard"), { recursive: true });
+  for (const name of ["learning-update.ts", "learning-catalog.ts"])
+    cpSync(
+      join(source, "tests/dashboard", name),
+      join(app, "tests/dashboard", name),
+    );
+  // The fixture links dependencies outside /tmp. Turbopack rejects that link;
+  // webpack supports it, as in the existing development fixture. Keep Next's
+  // production optimization and typecheck enabled. The shipping build is
+  // checked separately with its normal bundler.
+  const buildPath = join(app, "scripts/build.mjs");
+  const buildSource = readFileSync(buildPath, "utf8");
+  const buildAnchor = 'node(["node_modules/next/dist/bin/next", "build"]);';
+  if (buildSource.split(buildAnchor).length !== 2)
+    throw new Error("QA production build anchor changed.");
+  writeFileSync(
+    buildPath,
+    buildSource.replace(
+      buildAnchor,
+      'node(["node_modules/next/dist/bin/next", "build", "--webpack"]);',
+    ),
+  );
+  execFileSync(process.execPath, ["scripts/build.mjs"], {
+    cwd: app,
+    env,
+    stdio: "inherit",
+  });
+}
 const manifest = {
   root,
   app,
@@ -201,6 +235,7 @@ const manifest = {
   port,
   source,
   initialSetup,
+  production,
   database: env.HALLVI_DB_PATH,
   externalAdapters:
     "Production Pi adapter, native SDK sessions and tools; only model responses and GitHub API/credentials (fixture repository trees and contents at synthetic commits) are synthetic. ChatGPT OAuth " +
@@ -232,8 +267,7 @@ child = spawn(
   process.execPath,
   [
     join(source, "node_modules/next/dist/bin/next"),
-    "dev",
-    "--webpack",
+    ...(production ? ["start"] : ["dev", "--webpack"]),
     "--hostname",
     "127.0.0.1",
     "--port",
