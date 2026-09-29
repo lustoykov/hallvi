@@ -76,7 +76,7 @@ own log untouched: Hallvi adds its own beside it.
 Every source must support three operations, or it gives live data and no
 history: **list** the retained log files oldest first with the time each
 covers, **read** a time range, and **follow** new lines. File sources cover
-Caddy's own rotation (`access-<time>.log.gz`) and logrotate's
+Caddy's own rotation (`access-<UTC ms>-size|time|manual.log.gz`) and logrotate's
 (`access.log.1`, `access.log.2.gz`); container sources use
 `docker logs --since/--until`. Commands stay fixed in Hallvi's code; a record
 supplies only closed-shape values (a path, a container name, a time).
@@ -109,9 +109,11 @@ away, the log was unreadable). Charts draw a gap as a gap, never as zero.
 - **A view** is a real browser navigation: `GET`, 2xx or 304, `Sec-Fetch-Dest:
   document`, not a prefetch or prerender (`Sec-Purpose`/`Purpose`). Without
   fetch metadata, an HTML response to a browser-shaped request.
-- **Bots and scanners** — known crawler agents, clients without a browser's
-  fetch metadata, probes for `/wp-login.php`, `/.env` and the like — are
-  counted as their own line and never as visitors.
+- **Bots and scanners** — known crawler agents, self-declared bots, browser
+  agents that a modern browser's fetch metadata gives away as imitations, and
+  probes for `/wp-login.php`, `/.env` and the like — are counted as their own
+  line and never as visitors. Tools and API clients (`curl`, libraries, SDKs)
+  are requests: neither bots nor visitors. `classify.ts` holds the rules.
 - **Hallvi's own requests** (its access check, `/_hv/s.js`, the `/_hv/e/`
   events themselves) are never requests or views.
 - **A visitor estimate** is a distinct browser (address and user agent) within
