@@ -2,8 +2,9 @@
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-
-No requests recorded yet.
+| [AF-001 — Open-link checks in the shared-information smoke match nothing](#af-001--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | New |
+| [AF-002 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-002--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | New |
+| [AF-003 — Let the browser suite use a preinstalled Chromium](#af-003--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 
 ## How to contribute
 
@@ -51,3 +52,36 @@ What you would like or what bothered you, in your own words.
 
 **+1:** YYYY-MM-DD — task ID or PR reference
 ```
+
+### AF-001 — Open-link checks in the shared-information smoke match nothing
+
+`tests/browser/typed-information.spec.ts` proves a closed tunnel's address is
+not offered with `getByRole("link", { name: /Open app(?:lication)?/ })` at
+count 0, in the chat and on Overview. No shipping page names a link that way
+any more: the chat card's link is "Open" and the page header's is "Open"
+followed by the application's name, so both checks pass whatever the page
+offers. The
+Deployment one now names the address, which is the link that page draws.
+
+**+1:** 2026-09-29 — typed-information smoke fix, branch `claude/funny-gauss-vog9sp`
+
+### AF-002 — Shared-information smoke can miss its 10 s window on a cold dev server
+
+Run alone in a cold cloud container, the spec failed at line 149: "Tunnel
+closed" appeared 10.0 s after the page loaded, just past the expect timeout.
+The page compiles for about 20 s on first visit, and API routes the fixture
+does not warm (`/operator`, `/connections`, `/secrets`, `/api/host`,
+`/api/hallvi/update`) took 3–10 s each on first hit. The full smoke run
+passed. Warming those in the fixture might take the race out.
+
+**+1:** 2026-09-29 — typed-information smoke fix, branch `claude/funny-gauss-vog9sp`
+
+### AF-003 — Let the browser suite use a preinstalled Chromium
+
+The cloud container ships Playwright's Chromium 1194 and does not allow
+downloading browsers, while the repository pins `@playwright/test` 1.62.1,
+which expects Chromium 1234. Running the suite there took a wrapper config
+that sets `launchOptions.executablePath`. An environment variable read in
+`tests/browser/playwright.config.ts` would make that one setting.
+
+**+1:** 2026-09-29 — typed-information smoke fix, branch `claude/funny-gauss-vog9sp`
