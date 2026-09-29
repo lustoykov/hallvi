@@ -413,31 +413,35 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         );
         return;
       }
-      if (request.method === "GET" && url.pathname === "/guide") {
-        // The written acceptance contract, rendered read-only inside the
-        // dashboard shell.
+      if (
+        request.method === "GET" &&
+        ["/guide", "/feedback"].includes(url.pathname)
+      ) {
+        const feedback = url.pathname === "/feedback";
+        const path = feedback
+          ? "AGENT_FEEDBACK.md"
+          : "docs/testing/phase-one-acceptance.md";
+        const title = feedback ? "Agent feedback" : "Acceptance guide";
         response.setHeader("Content-Type", "text/html; charset=utf-8");
+        let body: string;
         try {
-          response.end(
-            guidePage(
-              renderMarkdown(
-                readFileSync(
-                  join(root, "docs/testing/phase-one-acceptance.md"),
-                  "utf8",
-                ),
-              ),
-              "Acceptance guide",
-            ),
+          body = renderMarkdown(
+            readFileSync(join(root, path), "utf8"),
+            feedback
+              ? `https://github.com/${REPOSITORY}/blob/main/`
+              : undefined,
           );
-        } catch {
-          response.writeHead(404);
-          response.end(
-            guidePage(
-              '<p class="empty">The acceptance guide was not found at docs/testing/phase-one-acceptance.md.</p>',
-              "Acceptance guide",
-            ),
-          );
+          if (feedback)
+            body = body.replace(
+              "</h1>",
+              '</h1><p class="footnote">Read-only view of <code>AGENT_FEEDBACK.md</code> in this checkout. Reload to see local edits. Feedback is shared between worktrees through merges; repository links open GitHub main.</p>',
+            );
+        } catch (error) {
+          const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+          response.statusCode = missing ? 404 : 500;
+          body = `<h1>${title}</h1><p class="empty">${path} ${missing ? "was not found in this checkout" : "could not be read"}. Check the file and reload.</p>`;
         }
+        response.end(guidePage(body, title, appUrl, url.pathname));
         return;
       }
       if (request.headers["x-hallvi-testing-token"] !== token) {
