@@ -7,7 +7,7 @@ import { listInformation } from "./saved-information";
 import { listApplicationChatSummaries } from "./db";
 import { loadApplication, loadChat, repositoryAccess } from "./applications";
 import { githubAppRegistration } from "./github-connection";
-import type { OperatorView } from "./types";
+import type { OperatorMetadata, OperatorView } from "./types";
 
 /**
  * The application page, projected from durable records: the selected
@@ -18,20 +18,40 @@ export async function getOperatorView(
   applicationId: string,
   chatId?: string,
 ): Promise<OperatorView> {
+  const view = await getOperatorMetadata(applicationId, chatId);
+  const conversation = view.selectedChatId
+    ? await chatSnapshot(applicationId, view.selectedChatId)
+    : null;
+  return {
+    ...view,
+    executions:
+      conversation?.executions ?? (await listExecutions(applicationId)),
+    piActivity: conversation?.piActivity ?? [],
+    worker: conversation?.worker,
+    messages: conversation?.messages ?? [],
+    information:
+      conversation?.information ??
+      (await listInformation(applicationId, "", true)).filter(
+        (r) => r.presentation,
+      ),
+  };
+}
+
+/** Keep non-chat facts current without reconstructing an unchanged history. */
+export async function getOperatorMetadata(
+  applicationId: string,
+  chatId?: string,
+): Promise<OperatorMetadata> {
   const application = chatId
-    ? loadChat(applicationId, chatId).application
-    : loadApplication(applicationId);
-  const chats = listApplicationChatSummaries(application.id);
+    ? (await loadChat(applicationId, chatId)).application
+    : await loadApplication(applicationId);
+  const chats = await listApplicationChatSummaries(application.id);
   const selected =
     (chatId ? chats.find((chat) => chat.id === chatId) : null) ??
     chats.find((chat) => !chat.archivedAt) ??
     chats[0] ??
     null;
-  const access = repositoryAccess(application);
-  // The selected conversation comes from Pi, with evidence placed into it.
-  const conversation = selected
-    ? await chatSnapshot(application.id, selected.id)
-    : null;
+  const access = await repositoryAccess(application);
   return {
     application: {
       id: application.id,
@@ -51,17 +71,10 @@ export async function getOperatorView(
       connected: access.connected,
       signIn: Boolean(githubAppRegistration()),
     },
-    executions: conversation?.executions ?? listExecutions(applicationId),
-    piActivity: conversation?.piActivity ?? [],
-    worker: conversation?.worker,
     chats,
     selectedChatId: selected?.id ?? null,
-    messages: conversation?.messages ?? [],
-    information: listInformation(application.id, "", true).filter(
-      (r) => r.presentation,
-    ),
     secrets: listSecrets(application.id),
-    deployment: deploymentStatus(application.id),
+    deployment: await deploymentStatus(application.id),
     // Hallvi's own protection is the same fact for every application:
     // read from the controller's records, not from this application's.
     facts: { controllerProtection: controllerProtectionFacts() },

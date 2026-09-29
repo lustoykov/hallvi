@@ -58,14 +58,13 @@ const conversations = {
   }),
 };
 
-/** A watch whose minute has always passed: every tick looks at GitHub. */
+/** A new watcher has no previous look; the first tick reaches GitHub. */
 function watch() {
-  vi.setSystemTime(Date.now() + 61_000);
   return deploymentWatch(conversations);
 }
 
-function release(revision: string, outcome: "verified" | "failed") {
-  saveInformation(applicationId, {
+async function release(revision: string, outcome: "verified" | "failed") {
+  await saveInformation(applicationId, {
     title: `Release ${revision.slice(0, 7)}`,
     body: "What the deployment did.",
     establishedAt: new Date().toISOString(),
@@ -98,20 +97,19 @@ function release(revision: string, outcome: "verified" | "failed") {
 }
 
 beforeAll(async () => {
-  vi.useFakeTimers({ toFake: ["Date"] });
   root = mkdtempSync(join(tmpdir(), "hallvi-watch-test-"));
   vi.stubEnv("HALLVI_DB_PATH", join(root, "test.db"));
   vi.stubEnv("HALLVI_CONFIG_DIR", join(root, "config"));
   pushTestDatabase(process.env.HALLVI_DB_PATH!);
-  const app = store.insertApplication({
+  const app = await store.insertApplication({
     name: "Private app",
     repositoryUrl: "https://github.com/qa/private",
     repositoryOwner: "qa",
     repositoryName: "private",
   });
   applicationId = app.id;
-  chatId = store.insertChat(app.id, "Main operator").id;
-  saveOperatorSettings(app.id, {
+  chatId = (await store.insertChat(app.id, "Main operator")).id;
+  await saveOperatorSettings(app.id, {
     permissionMode: "bypass",
     host: {
       address: "fixture.invalid",
@@ -132,10 +130,8 @@ beforeAll(async () => {
     };
   });
 });
-afterAll(() => {
-  vi.useRealTimers();
-  globalThis.__hallviDb?.$client.close();
-  delete globalThis.__hallviDb;
+afterAll(async () => {
+  await store.closeDatabase();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
@@ -154,19 +150,19 @@ it("is watching only once GitHub has answered, and waits for a first release", a
     branch: "main",
   });
   expect(chosen.latest?.commit).toBe(A);
-  expect(deploymentStatus(applicationId).watching).toBe(true);
+  expect((await deploymentStatus(applicationId)).watching).toBe(true);
   // Nothing is deployed yet: the first deployment is the owner's and Pi's.
   await watch().tick();
   expect(sent).toHaveLength(0);
 });
 
 it("deploys each pushed commit once, one at a time, and catches up to the newest", async () => {
-  release(A, "verified");
+  await release(A, "verified");
   await watch().tick();
   expect(sent).toHaveLength(0);
 
   tip = B;
-  const watching = watch();
+  let watching = watch();
   await watching.tick();
   expect(sent).toHaveLength(1);
   expect(sent[0].id).toMatch(/^wakeup:/);
@@ -174,13 +170,13 @@ it("deploys each pushed commit once, one at a time, and catches up to the newest
 
   // A second push lands while B is still deploying: noticed, not started.
   tip = C;
-  vi.setSystemTime(Date.now() + 61_000);
+  watching = watch();
   await watching.tick();
   expect(sent).toHaveLength(1);
   expect(deploymentState(applicationId).latest?.commit).toBe(C);
 
   // Pi verifies B. Only now is B deployed, and C starts.
-  release(B, "verified");
+  await release(B, "verified");
   await watching.tick();
   const state = deploymentState(applicationId);
   expect(state.attempts.map((one) => [one.commit, one.outcome])).toEqual([
@@ -192,11 +188,11 @@ it("deploys each pushed commit once, one at a time, and catches up to the newest
 });
 
 it("reports a failed deployment and never retries that commit by itself", async () => {
-  release(C, "failed");
+  await release(C, "failed");
   await watch().tick();
   // A restart changes nothing: the record says C was tried.
   await watch().tick();
-  const status = deploymentStatus(applicationId);
+  const status = await deploymentStatus(applicationId);
   expect(status.attempts[0]).toMatchObject({ commit: C, outcome: "failed" });
   expect(status.attempts[0].detail).toContain("The application answered");
   expect(status.deployed).toBe(B);

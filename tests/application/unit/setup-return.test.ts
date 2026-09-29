@@ -33,9 +33,9 @@ beforeEach(() => {
 });
 
 describe("the way back from setup", () => {
-  it("returns to the exact conversation", () => {
+  it("returns to the exact conversation", async () => {
     expect(
-      setupReturnDestination({ application: APPLICATION, chat: CHAT }),
+      await setupReturnDestination({ application: APPLICATION, chat: CHAT }),
     ).toEqual({
       href: `/applications/${APPLICATION}?chat=${CHAT}`,
       label: "Back to the conversation",
@@ -43,26 +43,26 @@ describe("the way back from setup", () => {
     });
   });
 
-  it("refuses a chat that belongs to another application", () => {
+  it("refuses a chat that belongs to another application", async () => {
     records.getChat.mockReturnValue({ id: CHAT, applicationId: "elsewhere" });
     expect(
-      setupReturnDestination({ application: APPLICATION, chat: CHAT }),
+      await setupReturnDestination({ application: APPLICATION, chat: CHAT }),
     ).toBeNull();
   });
 
-  it("refuses a conversation that is not there", () => {
+  it("refuses a conversation that is not there", async () => {
     records.getChat.mockReturnValue(null);
     expect(
-      setupReturnDestination({ application: APPLICATION, chat: CHAT }),
+      await setupReturnDestination({ application: APPLICATION, chat: CHAT }),
     ).toBeNull();
     records.getApplication.mockReturnValue(null);
     records.getChat.mockReturnValue({ id: CHAT, applicationId: APPLICATION });
     expect(
-      setupReturnDestination({ application: APPLICATION, chat: CHAT }),
+      await setupReturnDestination({ application: APPLICATION, chat: CHAT }),
     ).toBeNull();
   });
 
-  it("never takes a destination from the link itself", () => {
+  it("never takes a destination from the link itself", async () => {
     for (const application of [
       "https://example.invalid/",
       "//example.invalid",
@@ -70,10 +70,14 @@ describe("the way back from setup", () => {
       "",
       [APPLICATION, APPLICATION],
     ])
-      expect(setupReturnDestination({ application, chat: CHAT })).toBeNull();
+      expect(
+        await setupReturnDestination({ application, chat: CHAT }),
+      ).toBeNull();
     // Nothing is even looked up for an id that is not an id.
     expect(records.getApplication).not.toHaveBeenCalled();
-    expect(setupReturnDestination({ chat: CHAT })).toBeNull();
-    expect(setupReturnDestination({ application: APPLICATION })).toBeNull();
+    expect(await setupReturnDestination({ chat: CHAT })).toBeNull();
+    expect(
+      await setupReturnDestination({ application: APPLICATION }),
+    ).toBeNull();
   });
 });

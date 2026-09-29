@@ -12,7 +12,7 @@ export async function POST(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
-    archiveChat(applicationId, chatId);
+    await archiveChat(applicationId, chatId);
     return getOperatorView(applicationId);
   });
 }
