@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures";
 import { exchange, scriptWorker } from "./scripted-worker";
+import { failureText, nativeFailure } from "../../src/server/pi-failure";
 
 test.use({ scriptedWorker: true });
 
@@ -87,6 +88,93 @@ test("Pi text stays once in order through completion and reload @journey-streami
     await expect(
       page.getByRole("region", { name: "Application server terminal" }),
     ).toHaveCount(0);
+  } finally {
+    await closeWorker();
+  }
+});
+
+// The integration suite proves the native projection; this fixture checks its
+// rendering and recovery control on the shipping page.
+test("a native failure reason after a successful status read remains visible after refresh", async ({
+  page,
+  fixture,
+}) => {
+  const response = await page.request.post("/api/applications", {
+    data: {
+      requestKey: randomUUID(),
+      repositoryUrl: "https://github.com/qa/diagnostic",
+    },
+  });
+  expect(response.ok()).toBe(true);
+  const created = await response.json();
+  const appId = created.application?.id ?? created.id;
+  const chatId = created.selectedChatId as string;
+  const failure = nativeFailure(
+    "model",
+    "HTTP 400 context window exceeded; password=fixture-private; response body {private-payload}",
+    (text) => text,
+  );
+  const closeWorker = await scriptWorker(fixture, () => {
+    const { replyId, messages } = exchange(chatId, "Check application status", {
+      body: "",
+      status: "completed",
+    });
+    return {
+      status: "idle",
+      messages: messages.map((message) =>
+        message.id === replyId
+          ? {
+              ...message,
+              status: "failed",
+              failure,
+              error: failureText(failure),
+            }
+          : message,
+      ),
+      calls: {
+        status: {
+          replyId,
+          sequence: 1,
+          tool: "get_application_status",
+          args: {},
+          at: new Date().toISOString(),
+          result: {
+            text: "Application is connected",
+            failed: false,
+            at: new Date().toISOString(),
+          },
+        },
+      },
+      said: [],
+    };
+  });
+  try {
+    await page.goto(`/applications/${appId}`);
+    const message = page.locator('[id="hv-message-reply:asked"]');
+    await expect(
+      message.getByText(/The model stopped: HTTP 400 context window exceeded/),
+    ).toBeVisible();
+    await expect(
+      message.getByRole("button", { name: "Try again", exact: true }),
+    ).toBeVisible();
+    expect(await message.innerText()).not.toMatch(
+      /fixture-private|private-payload|Settings|no command recorded why/,
+    );
+    await page.reload();
+    await expect(
+      message.getByText(/The model stopped: HTTP 400 context window exceeded/),
+    ).toBeVisible();
+    await page.screenshot({ path: "tests/results/native-failure-desktop.png" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(
+      message.getByText(/The model stopped: HTTP 400 context window exceeded/),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+    await page.screenshot({ path: "tests/results/native-failure-mobile.png" });
   } finally {
     await closeWorker();
   }

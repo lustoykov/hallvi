@@ -356,7 +356,7 @@ export async function requestOutcome(
     },
     answer: answer?.text ? clean(answer.text) : null,
     answerTruncated: answer?.truncated ?? false,
-    /** Why Pi could not finish, as advice: never the provider's own words. */
+    /** Why Pi could not finish: bounded, redacted native reason and advice. */
     failure:
       status === "failed"
         ? (last?.error ??

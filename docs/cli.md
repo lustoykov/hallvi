@@ -156,7 +156,7 @@ object and nothing is written to stderr.
   },
   "answer": "…",           // Pi's final words, once the operation ended
   "answerTruncated": false,
-  "failure": null,         // why Pi could not finish, as advice
+  "failure": null,         // bounded redacted native reason and advice
   "attention": null,       // { kind, reason, page, executionId? }
   "evidence": [],          // the operation's calls, below
   "evidenceOmitted": 0,
