@@ -6,11 +6,11 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 2 | New |
+| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 2 | Accepted |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 1 | New |
 | [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | New |
 | [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | New |
 
@@ -128,15 +128,31 @@ tool disclosures are insufficient.
 
 ### AF-013 — Investigate the first-navigation event-loop pause
 
-The alpha.8 rehearsal observed a 687 ms maximum web event-loop delay on the
-first browser opening, versus 14–23 ms during idle windows. A separate profile
-with histories already warmed showed substantial module loading, source reads
-and compilation; it does not fully attribute the original spike. Investigate
-first-navigation responsiveness separately from the now-cached history reads.
-The [release verification](https://github.com/lustoykov/hallvi/pull/254) records the
-environment and limits. No optimization was added during release verification.
+The signed alpha.8 package reproduces a cold first-opening pause without a
+development server: a greeting-only chat and a synthetic 40-message history took
+1.09–1.26 seconds to show the composer and initial stream snapshot, with
+331–387 ms maximum web event-loop delay. Warm openings took 180–230 ms, with
+14–30 ms maximum delay; idle delay was about 12 ms. Warming the history API
+before the first document reduced opening to 600 ms and maximum delay to 49 ms.
+These are local observations on one shared Mac, not performance guarantees.
+
+Profiles show substantial Node module resolution, source parsing/evaluation and
+SSR chunk initialization. Setup loads the full Pi coding-agent entry, and
+model validation also imports Pi AI. Standalone asynchronous SDK imports have
+substantial wall/CPU cost but do not reproduce the page's large event-loop
+delay, so import duration alone does not attribute the whole stall. The pinned
+SDK has no supported narrow model-runtime export; no small supported production
+reduction was established. No runtime optimization was added.
+
+The earlier [release verification](https://github.com/lustoykov/hallvi/pull/254)
+observed 687 ms after histories were warmed. The packaged investigation confirms
+a production first-use cost but does not fully attribute that original spike.
+Its authoritative runs isolate both Hallvi's account and standalone Pi discovery;
+initial runs which only isolated Hallvi's account were excluded.
 
 **+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
+
+**+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
 
 ### AF-014 — Preserve why an operator turn ended early
 
