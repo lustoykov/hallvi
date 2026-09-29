@@ -131,35 +131,77 @@ keepalive, terminal, forwarding and output handling.
 
 ### Requests as they arrive
 
-Overview follows the proxy's access log while it is open, and keeps nothing.
-[access-log.ts](../src/server/access-log.ts) owns it; the rule that lets the
-controller run this without a prompt is in
+Overview and Traffic follow the proxy's access log while they are open, and
+keep nothing. [access-log.ts](../src/server/access-log.ts) owns it; the rule
+that lets the controller run this without a prompt is in
 [Product](../PRODUCT.md#what-the-modes-cover).
 
 ```mermaid
 sequenceDiagram
   participant Pi
   participant Records as Saved records
-  participant Page as Overview (browser)
+  participant Page as Overview or Traffic (browser)
   participant Route as GET /traffic (SSE)
   participant Server as Application server
-  Pi->>Server: turn on Caddy JSON access logging (through the boundary)
-  Pi->>Records: save access-log {container name | file path}
+  Pi->>Server: set up the access log from traffic_setup (through the boundary)
+  Pi->>Records: save access-log {proxy, format, file path | container, hosts}
   Page->>Route: EventSource
   Route->>Records: newest access-log record
   Route->>Server: ssh, fixed command: docker logs -f | tail -F
-  Server-->>Route: one JSON line per request
-  Route-->>Page: method, path without query, status, ms, salted visitor label
+  Server-->>Route: one JSON line per request (caddy-json, hallvi-json or traefik-json)
+  Route-->>Page: arrivals (kind, page, status, ms, country, source, device, label), now (visitors in 5 min, pages open)
   Page->>Route: page closes
   Route->>Server: session ends
 ```
 
 One SSH session per open page, ended when the page goes away. The record's
 fields are closed shapes that cannot carry shell, the command only reads, and
-client addresses and query strings never leave the controller: the page gets a
-label salted per process, enough to count visitors and nothing else. With no
+client addresses, user agents and query strings never leave the controller:
+each request is classified by the same rules as the totals, and the page gets a
+label salted per stream, enough to count visitors and nothing else. With no
 `access-log` record the stream answers `no-log` and the page offers to ask Pi;
 it does not go looking for a log by itself.
+
+### Traffic history
+
+When the owner keeps traffic history, the worker counts the same log into
+`traffic.db` beside `hallvi.db`; [the traffic design](design/traffic.md) owns
+the rules. [collector.ts](../src/server/traffic/collector.ts) runs from the
+worker loop: every two seconds it reads each application's choice, server and
+`access-log` record, and starts, keeps or stops one follow per application.
+The follows run on their own and never hold the loop. The commands are the
+fixed, read-only ones in [sources.ts](../src/server/traffic/sources.ts).
+
+```mermaid
+sequenceDiagram
+  participant Owner as Traffic page
+  participant Store as traffic.db
+  participant Worker as Worker loop (collector)
+  participant Server as Application server
+  Owner->>Store: keep traffic history
+  Worker->>Store: choice, record, server (every 2 s)
+  Worker->>Server: list the log's files (oldest retained line)
+  Worker->>Server: read each finished day that is missing or not final
+  Worker->>Store: that day, final, with coverage and gaps
+  Worker->>Server: follow: today's retained lines, then new ones
+  Worker->>Store: today, provisional, every few seconds; state live
+  Note over Worker,Server: connection lost: state lost, reconnect with backoff, count today again
+  Note over Worker,Store: ten minutes after midnight: count yesterday from the files, final
+  Owner->>Store: stop keeping history
+  Worker->>Server: follow ends
+```
+
+A day is a function of its lines: today is counted again on every start and
+reconnect, a finished day from the files, and nothing is added to a stored
+number, so a restart cannot count twice. A start re-reads only days that are
+missing, not final, partly unreadable or counted before a switch point that
+now covers them, within the log's reach. Coverage comes from what the files
+hold, and a stretch they no longer hold is named as a gap. The collector
+records its state (`catching-up`, `live`, `lost`, `no-log`, `unsupported`),
+the last line, the oldest line the server keeps and the script's switch point
+and silence, which the Traffic page shows. The
+[collection experiment](testing/2026-09-29-traffic-collection.md) is the
+proof.
 
 ## From a record to a page
 
@@ -333,8 +375,10 @@ controller stays manual; see
   path is not proved.
 - Nothing retrieves an application's own logs; the Logs destination holds what
   Hallvi's own commands printed, and says so.
-- Live requests need Caddy writing JSON access logs and a record saying where.
-  Other proxies and formats are not read. Both sources were
+- Live requests and traffic history need an access log in one of three
+  formats — Caddy's JSON, Hallvi's line from nginx, Traefik's JSON — set up
+  the way `traffic_setup` tells Pi, and a record saying where. Other proxies
+  and formats are not read. Caddy's container and file sources were
   [run on a rented server](testing/2026-09-19-overview-live.md) with a record
   Pi wrote. A private application has no proxy until the owner asks for this,
   and a dead connection takes about fifteen seconds to notice.
