@@ -38,6 +38,7 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ApplicationNavigation } from "./application-navigation";
+import { useTrafficListed } from "./traffic/source";
 import "./application-shell.css";
 import "./views.css";
 import { OperatorConsole } from "./operator-console";
@@ -351,13 +352,16 @@ export function OperatorShell({
     }
   }
 
+  // Traffic is listed on the owner's standing choice, which is not a record.
+  const trafficKept = useTrafficListed(applicationId);
   const listedHere = useMemo(
     () =>
       standings(
         view.information ?? [],
         (view.secrets ?? []).some((secret) => !secret.establishedAt),
+        trafficKept,
       ),
-    [view.information, view.secrets],
+    [view.information, view.secrets, trafficKept],
   );
   // Facts the view already carries, refreshed by the same poll as the record,
   // under the facts a destination fetches for itself while it is open.

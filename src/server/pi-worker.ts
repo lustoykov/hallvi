@@ -5,6 +5,7 @@ import { deploymentWatch } from "./deployment-watch";
 import { dirname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ownSessions } from "./pi-owner";
+import { TICK_MS, trafficCollector } from "./traffic/collector";
 
 /**
  * Another worker already serves this database. Not a failure: it answers the
@@ -58,6 +59,9 @@ export async function runPiWorker(signal: AbortSignal) {
       "A Pi worker is already running for this database.",
     );
   const { owner } = owned;
+  let trafficTicks: ReturnType<typeof setInterval> | undefined;
+  let traffic: ReturnType<typeof trafficCollector> | undefined;
+  let trafficTick: Promise<void> | undefined;
   let watching: Promise<void> | undefined;
   try {
     // A send is answered once Pi has the message, so the first one should
@@ -77,6 +81,26 @@ export async function runPiWorker(signal: AbortSignal) {
     // one round at a time, started again a few seconds after it ends. Each
     // application decides inside whether its own minute has passed.
     let nextWatch = 0;
+    // Traffic history: an asynchronous look at each application's choice
+    // and records, on a clock of its own. Never a step of this loop, which
+    // waits on the controller's copy for minutes: turning history off has to
+    // end the follow within seconds, whatever an upload is doing.
+    traffic = trafficCollector(signal);
+    const tickTraffic = () => {
+      if (trafficTick || signal.aborted) return;
+      trafficTick = Promise.resolve(traffic!.tick())
+        .catch((error) =>
+          console.warn(
+            "Traffic collection could not read application records:",
+            error,
+          ),
+        )
+        .finally(() => {
+          trafficTick = undefined;
+        });
+    };
+    tickTraffic();
+    trafficTicks = setInterval(tickTraffic, TICK_MS);
     while (!signal.aborted) {
       if (!watching && Date.now() >= nextWatch) {
         watching = watch
@@ -112,6 +136,9 @@ export async function runPiWorker(signal: AbortSignal) {
       await delay(250, undefined, { signal }).catch(() => undefined);
     }
   } finally {
+    clearInterval(trafficTicks);
+    await trafficTick;
+    await traffic?.stop();
     // Ownership is held until every session is let go, or the process ends.
     try {
       await owned.close();

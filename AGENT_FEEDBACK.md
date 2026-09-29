@@ -156,6 +156,7 @@ initial runs which only isolated Hallvi's account were excluded.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
 | [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Implemented in #266 (pending merge) |
 | [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Implemented (in review) |
 | [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
@@ -163,6 +164,19 @@ initial runs which only isolated Hallvi's account were excluded.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-016 — Keep traffic counting consistent with owner choices and page routes
+
+A worker could restore collection after Stop or Forget by saving an older
+choice. The browser script also dropped the configured page query key and
+counted the first script arrival twice in the live feed. Lock before reading
+the collection choice, preserve only the configured page key, and pair that
+first event with its already counted log view.
+
+**+1:** 2026-09-29 — private review and fixes, [PR #259](https://github.com/lustoykov/hallvi/pull/259).
+
+**Status:** Fixed in #259, with a competing SQLite writer regression, a real
+browser query-navigation test, and live-arrival counting coverage.
 
 ### AF-014 — Preserve why an operator turn ended early
 

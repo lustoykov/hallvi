@@ -198,6 +198,7 @@ it("side chats have no shell, approval or mutation tools", async () => {
     "find",
     "ls",
     "search_information",
+    "read_traffic",
     "get_application_status",
   ]);
   await call("read", "read", { path: "README.md" });

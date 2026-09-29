@@ -147,6 +147,7 @@ try {
     "scripts/update-start.mjs",
     "scripts/update-helper.mjs",
     "scripts/pi-workspace",
+    "src/traffic-script/hv.js",
     "dist/worker.mjs",
     "dist/worker.mjs.map",
     "dist/database-worker.mjs",

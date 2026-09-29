@@ -24,6 +24,9 @@ import {
 import type { Usage } from "../monitoring-records";
 import type { Overview } from "../overview-prototype/overview-model";
 import { Tag } from "../presentation";
+import { hasTotals, trafficListed } from "../traffic/model";
+import { VisitorsToday } from "../traffic/overview-tile";
+import { useCollection, useHistory } from "../traffic/source";
 import { RequestFlow } from "./request-flow";
 import { useTraffic, WINDOW_MINUTES, type Traffic } from "./use-traffic";
 import "./overview-live.css";
@@ -252,8 +255,17 @@ export function OverviewLive({
 }) {
   const traffic = useTraffic(applicationId);
   const pulse = usePulse();
+  // Where traffic history is kept, today's visitors and the last day's
+  // response times come from stored totals rather than a day Pi read.
+  const { collection } = useCollection(applicationId);
+  const kept = trafficListed(collection);
+  const month = useHistory(applicationId, "30d", kept).history;
+  const counted = useHistory(applicationId, "24h", kept).history;
+  const hourly = kept && hasTotals(counted) ? counted : null;
   const day = usage?.traffic ?? null;
-  const p95 = (day?.p95Ms ?? []).filter((value) => value > 0);
+  const p95 = (
+    hourly ? hourly.series.map((point) => point.p95Ms ?? 0) : (day?.p95Ms ?? [])
+  ).filter((value) => value > 0);
   const typical = [...p95].sort((a, b) => a - b)[Math.floor(p95.length / 2)];
   const health =
     reachable === "open"
@@ -349,52 +361,75 @@ export function OverviewLive({
           )}
         </Tile>
 
-        <Tile
-          wide
-          label={
-            day && usage?.at ? (
-              <>The last day Hallvi read · {ago(usage.at, now)}</>
+        {kept ? (
+          <Tile
+            wide
+            label="Visitors"
+            className="ovl-visitors"
+            onOpen={() => onOpenDestination("traffic")}
+          >
+            <VisitorsToday month={month} traffic={traffic} />
+          </Tile>
+        ) : (
+          <Tile
+            wide
+            label={
+              day && usage?.at ? (
+                <>The last day Hallvi read · {ago(usage.at, now)}</>
+              ) : (
+                "The last day"
+              )
+            }
+            onOpen={() => onOpenDestination("monitoring")}
+          >
+            {day ? (
+              <>
+                <p className="ovl-number">
+                  {count(sum(day.requests))}
+                  <small>
+                    {sum(day.requests) === 1 ? "request" : "requests"}
+                    {day.visitors !== undefined &&
+                      ` · ${plural(day.visitors, "visitor")}`}
+                    {sum(day.serverErrors) > 0 &&
+                      ` · ${count(sum(day.serverErrors))} failed`}
+                  </small>
+                </p>
+                <Area values={day.requests} />
+                <p className="ovl-foot">{day.source}</p>
+              </>
             ) : (
-              "The last day"
-            )
-          }
-          onOpen={() => onOpenDestination("monitoring")}
-        >
-          {day ? (
-            <>
-              <p className="ovl-number">
-                {count(sum(day.requests))}
-                <small>
-                  {sum(day.requests) === 1 ? "request" : "requests"}
-                  {day.visitors !== undefined &&
-                    ` · ${plural(day.visitors, "visitor")}`}
-                  {sum(day.serverErrors) > 0 &&
-                    ` · ${count(sum(day.serverErrors))} failed`}
-                </small>
-              </p>
-              <Area values={day.requests} />
-              <p className="ovl-foot">{day.source}</p>
-            </>
-          ) : (
-            <>
-              <p className="ovl-empty">
-                Hallvi has not read a day of traffic yet. That is not a claim
-                that there was none.
-              </p>
-              <button
-                type="button"
-                className="ovl-ask"
-                onClick={() =>
-                  onAsk(
-                    `Read the last 24 hours of ${name}'s access log and its server's CPU and memory, and record what you find.`,
-                  )
-                }
-              >
-                Ask Hallvi to read it →
-              </button>
-            </>
-          )}
-        </Tile>
+              <>
+                <p className="ovl-empty">
+                  Hallvi has not read a day of traffic yet. That is not a claim
+                  that there was none.
+                </p>
+                {/* Once the choice can be read, the offer is the standing one:
+                  keep traffic history, on the page that holds it. */}
+                {collection ? (
+                  <button
+                    type="button"
+                    className="ovl-ask"
+                    onClick={() => onOpenDestination("traffic")}
+                  >
+                    Keep traffic history →
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ovl-ask"
+                    onClick={() =>
+                      onAsk(
+                        `Read the last 24 hours of ${name}'s access log and its server's CPU and memory, and record what you find.`,
+                      )
+                    }
+                  >
+                    Ask Hallvi to read it →
+                  </button>
+                )}
+              </>
+            )}
+          </Tile>
+        )}
 
         <Tile label="What wants you">
           {built.needs.length ? (
@@ -430,7 +465,10 @@ export function OverviewLive({
                 <small>ms, slowest 1 in 20, typical hour</small>
               </p>
               <div className="ovl-bars" aria-hidden="true">
-                {(day?.p95Ms ?? []).map((value, index) => (
+                {(hourly
+                  ? hourly.series.map((point) => point.p95Ms ?? 0)
+                  : (day?.p95Ms ?? [])
+                ).map((value, index) => (
                   <i
                     key={index}
                     style={{ height: `${(value / Math.max(...p95)) * 100}%` }}
