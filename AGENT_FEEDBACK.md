@@ -70,7 +70,7 @@ reader; automatic watching and private repository access still need a connection
 **+1:** 2026-09-29 — fresh-account alpha.10 onboarding acceptance
 (`codex/manual-public-deployment`).
 
-**Disposition:** A bounded mode-aware branch read is in review, including a
+**Disposition:** [#282](https://github.com/lustoykov/hallvi/pull/282) makes the branch read mode-aware, including a
 manual-to-automatic transition check. Verification guidance worked as written.
 
 Use this small template; add detail only when useful. Link the overview row to
