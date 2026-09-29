@@ -171,7 +171,7 @@ export function guidePage(
 <body>
   <header class="topbar">
     <a class="brand" href="/"><strong>Hallvi</strong><span class="brand-tag">Testing</span></a>
-    <nav class="pages" aria-label="Pages"><a href="/">Run checks</a><a href="/evals">Eval archive</a><a href="/development">Development</a><a href="/feedback"${page === "/feedback" ? ' aria-current="page"' : ""}>Agent feedback</a><a href="/releases">Releases</a><a href="/about">How it works</a></nav>
+    <nav class="pages" aria-label="Pages"><a href="/">Run checks</a><a href="/evals">Eval archive</a><a href="/development">Development</a><a href="/feedback"${page === "/feedback" ? ' aria-current="page"' : ""}>Agent feedback</a><a href="/features"${page === "/features" ? ' aria-current="page"' : ""}>Agent features</a><a href="/releases">Releases</a><a href="/about">How it works</a></nav>
     <nav class="resources" aria-label="Resources"><a href="/guide"${page === "/guide" ? ' aria-current="page"' : ""}>Acceptance guide</a><a href="${escape(appUrl)}/applications" target="_blank" rel="noreferrer">Open app</a></nav>
   </header>
   <main class="guide"><article class="markdown">${body}</article></main>
