@@ -49,6 +49,10 @@ export function milliseconds(ms: number) {
   return `${Math.round(ms)} ms`;
 }
 
+/** A figure that fell past the last bound is only a floor: "≥ 10 s". */
+export const atLeast = (words: string, floor: boolean) =>
+  floor ? `≥ ${words}` : words;
+
 /** Visible time on a page: "48 s", "2 min 5 s". */
 export function onPage(ms: number) {
   const seconds = Math.round(ms / 1000);
@@ -105,6 +109,55 @@ const inOrder = (series: SeriesPoint[]) =>
 /** Whether the log covered any of the range: nothing stored is unassessed. */
 export const hasTotals = (history: TrafficHistory | null) =>
   Boolean(history?.series.some((point) => point.covered > 0));
+
+const localDay = (at: string, timeZone: string) => {
+  try {
+    return new Date(at).toLocaleDateString("en-CA", { timeZone });
+  } catch {
+    return at.slice(0, 10);
+  }
+};
+
+/**
+ * The buckets of today, the range's last local day: its hours in 24 h,
+ * which starts yesterday, and its last point otherwise.
+ */
+export function todayPoints(history: TrafficHistory) {
+  const points = inOrder(history.series);
+  const last = points.at(-1);
+  if (!last) return [];
+  if (history.range !== "24h") return [last];
+  const today = localDay(last.at, history.timeZone);
+  return points.filter(
+    (point) => localDay(point.at, history.timeZone) === today,
+  );
+}
+
+/**
+ * Whether the log covered any of today. A day nobody read is unassessed,
+ * so its visitors are never "0".
+ */
+export const todayCovered = (history: TrafficHistory) =>
+  todayPoints(history).some((point) => point.covered > 0);
+
+/**
+ * The 24-hour range's server errors, split at midnight: its visitor
+ * estimates and its lists are today's, so today's errors are the ones they
+ * describe, and what came before midnight is said apart.
+ */
+export function errorsAcrossMidnight(history: TrafficHistory) {
+  const today = new Set(todayPoints(history));
+  const before = history.series.filter((point) => !today.has(point));
+  const sum = (points: SeriesPoint[], field: "errors" | "errorVisitors") =>
+    points.reduce((total, point) => total + point[field], 0);
+  return {
+    today: sum([...today], "errors"),
+    todayHit:
+      history.totals.errorVisitors > 0 || sum([...today], "errorVisitors") > 0,
+    earlier: sum(before, "errors"),
+    earlierHit: sum(before, "errorVisitors") > 0,
+  };
+}
 
 /**
  * Whether a server error reached a visitor in the range. A scanner that
@@ -220,6 +273,7 @@ export function isQuiet(history: TrafficHistory) {
 export function quietLine(history: TrafficHistory) {
   const { views, visitors } = history.totals;
   if (history.range === "24h") {
+    if (!todayCovered(history)) return "Nothing is counted for today yet.";
     if (!visitors && !views) return "No visitors yet today.";
     return `${plural(visitors, "estimated visitor")} today, ${plural(views, "page view")}.`;
   }
@@ -353,7 +407,7 @@ export function impactLine(impact: ReleaseImpact, now: number) {
   if (before.p95Ms && after.p95Ms && after.p95Ms >= before.p95Ms * 1.5)
     return {
       tone: "warn" as const,
-      says: `${lead}: slower, ${milliseconds(before.p95Ms)} → ${milliseconds(after.p95Ms)} for the slowest 1 in 20`,
+      says: `${lead}: slower, ${atLeast(milliseconds(before.p95Ms), before.p95AtLeast)} → ${atLeast(milliseconds(after.p95Ms), after.p95AtLeast)} for the slowest 1 in 20`,
     };
   if (after.errors < before.errors)
     return {

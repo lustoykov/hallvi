@@ -654,7 +654,10 @@ function totals(
 
 interface Hour {
   at: number;
+  /** The share of the whole hour the log covered, for scaling its counts. */
   covered: number;
+  /** How much of the hour has passed, in ms. */
+  elapsed: number;
   visitors: number;
   views: number;
   requests: number;
@@ -719,6 +722,7 @@ function hourOf(scenario: Scenario, at: number, now: number): Hour {
   return {
     at,
     covered,
+    elapsed: Math.max(0, end - at),
     visitors,
     views,
     requests: Math.round(views * profile.requestsPerView + bots),
@@ -734,7 +738,7 @@ function hourOf(scenario: Scenario, at: number, now: number): Hour {
 const sum = (hours: Hour[], key: keyof Hour) =>
   hours.reduce((total, hour) => total + (hour[key] as number), 0);
 
-function pointOf(hours: Hour[], at: number, length: number): SeriesPoint {
+function pointOf(hours: Hour[], at: number): SeriesPoint {
   const counted = hours.filter((hour) => hour.covered > 0);
   const timed = counted.filter((hour) => hour.requests > 0);
   return {
@@ -752,7 +756,15 @@ function pointOf(hours: Hour[], at: number, length: number): SeriesPoint {
       ? Math.round(Math.max(...timed.map((hour) => hour.p95)) * 0.92)
       : null,
     p95AtLeast: false,
-    covered: Math.round((sum(hours, "covered") / length) * 1000) / 1000,
+    // Like the stored totals: a share of the time that has passed, so the
+    // bucket still running is short only of what the log missed.
+    covered:
+      Math.round(
+        Math.min(
+          1,
+          (sum(hours, "covered") * HOUR) / sum(hours, "elapsed") || 0,
+        ) * 1000,
+      ) / 1000,
   };
 }
 
@@ -804,7 +816,6 @@ function rangeOf(
     pointOf(
       bucket.hours.map((at) => hourOf(scenario, at, now)),
       bucket.at,
-      bucket.hours.length,
     ),
   );
   const counted = series.filter((point) => point.covered > 0);
@@ -1013,8 +1024,15 @@ export function fixtureSource(scenario: Scenario): TrafficSource {
           disabledAt: at,
           state: "off",
         };
+      // As the store does: the collection record goes with the totals.
       if (action === "forget")
-        state.collection = { ...state.collection, storedFrom: null };
+        state.collection = {
+          ...state.collection,
+          enabledAt: null,
+          disabledAt: null,
+          state: "off",
+          storedFrom: null,
+        };
       return wait(state.collection);
     },
     impact: (_, at) =>

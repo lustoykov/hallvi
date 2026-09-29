@@ -5,14 +5,28 @@
 // Page views are the soft bars and estimated visitors the line. A release is
 // a hairline with a small mark on top; the moment Hallvi's script took over
 // counting is a dashed one. A stretch the log did not cover is hatched and
-// holds no bar and no line: a gap is a gap, never a zero. The bucket still
-// in progress — this hour, today — is drawn lighter, because it is.
+// holds no bar and no line: a gap is a gap, never a zero; a bucket covered in
+// part is hatched lightly. The bucket still in progress — this hour, today —
+// is drawn lighter, because it is, and only its future is exempt from gaps.
 
 import { useMemo, useState, type PointerEvent } from "react";
 
 import type { SeriesPoint, TrafficHistory } from "@/server/traffic/contract";
 
-import { compact, count, gapWords, milliseconds, plural } from "./model";
+import {
+  atLeast,
+  compact,
+  count,
+  gapWords,
+  milliseconds,
+  plural,
+} from "./model";
+
+/**
+ * How far the collector's written coverage may trail the clock: it writes
+ * at least once a minute, and the page reads a little after that.
+ */
+const UNWRITTEN_MS = 2 * 60_000;
 
 export interface ReleaseMark {
   at: string;
@@ -123,13 +137,23 @@ export function TrafficChart({
     .map((release) => ({ ...release, x: place(Date.parse(release.at)) }))
     .filter((mark) => mark.x >= 0 && mark.x <= 100);
   const switchAt = scriptSince ? place(Date.parse(scriptSince)) : null;
-  // A bucket still being counted is not short of coverage, only unfinished.
+  // Coverage is a share of the time that has passed, so the bucket still
+  // being counted is short of it only where the log missed a stretch: its
+  // future is no gap, and neither are the last moments the collector has
+  // yet to write down.
+  const short = (index: number) => {
+    const { covered } = points[index];
+    if (covered >= 1) return false;
+    if (!(index === last && running)) return true;
+    const elapsed = Math.max(0, now - starts[index]);
+    return (1 - covered) * elapsed > UNWRITTEN_MS;
+  };
+  // A gap in the running bucket reaches only as far as now.
+  const until = (index: number) =>
+    index === last && running ? Math.min(ends[index], now) : ends[index];
   const gaps = points
     .map((point, index) => ({ point, index }))
-    .filter(
-      ({ point, index }) =>
-        point.covered < 1 && !(index === last && running && point.covered),
-    );
+    .filter(({ index }) => short(index));
 
   const whyNot = (index: number) => {
     const bucket = { from: starts[index], to: ends[index] };
@@ -181,7 +205,7 @@ export function TrafficChart({
             data-part={point.covered > 0 || undefined}
             style={{
               left: `${place(starts[index])}%`,
-              width: `${place(ends[index]) - place(starts[index])}%`,
+              width: `${place(until(index)) - place(starts[index])}%`,
             }}
           />
         ))}
@@ -301,19 +325,23 @@ export function TrafficChart({
                   )}
                   {hovered.p95Ms !== null && (
                     <span className="tf-chart-quiet">
-                      Slowest 1 in 20: {milliseconds(hovered.p95Ms)}
+                      Slowest 1 in 20:{" "}
+                      {atLeast(milliseconds(hovered.p95Ms), hovered.p95AtLeast)}
                     </span>
                   )}
-                  {hovered.covered < 1 && !(hover === last && running) && (
+                  {short(hover) && (
                     <span className="tf-chart-quiet">
-                      The log covered {Math.round(hovered.covered * 100)}% of
-                      it: {whyNot(hover)}
+                      The log covered {Math.round(hovered.covered * 100)}% of it
+                      {hover === last && running ? " so far" : ""}:{" "}
+                      {whyNot(hover)}
                     </span>
                   )}
                 </>
               ) : (
                 <span className="tf-chart-quiet">
-                  Not counted: {whyNot(hover)}
+                  {short(hover)
+                    ? `Not counted: ${whyNot(hover)}`
+                    : "Nothing counted yet"}
                 </span>
               )}
               {hoveredReleases.map((mark) => (

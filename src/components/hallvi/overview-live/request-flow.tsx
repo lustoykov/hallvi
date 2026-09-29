@@ -124,7 +124,8 @@ export function RequestFlow({
     let streaks: Streak[] = [];
     const rings: { x: number; y: number; age: number }[] = [];
     const stop = onArrival((line, lane) => {
-      if (still || streaks.length > 160) return;
+      // A script's view is not a request the application answered.
+      if (line.script || still || streaks.length > 160) return;
       const target = live.current.find((item) => item.lane.name === lane);
       if (!target) return;
       streaks.push({
