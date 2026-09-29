@@ -8,8 +8,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
-| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
-| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+
+[Archive](#archive) keeps resolved and declined requests out of the active list.
 
 ## How to contribute
 
@@ -42,14 +42,17 @@ Keep credentials and private application data out of entries and linked material
    the same task do not add votes.
 3. Give a new request the next unused `AF-NNN` ID, a short title and a brief
    description. Add a linked overview row with count `1` and status `New`.
-4. Recount +1s from the task references and sort active requests by count, with
-   closed requests below. Count is interest, not priority. Reconcile duplicate
-   requests and ID collisions before merging; never reuse a merged ID.
+4. Recount +1s from the task references and sort active requests by count.
+   Move resolved or declined requests out of the active overview and into the
+   final Archive section, including their overview rows, full entries, votes
+   and fix/decision references. Count is interest, not priority. Reconcile
+   duplicate requests and ID collisions before merging; never reuse a merged ID.
 
 **Status:** New (awaiting owner review), Accepted (owner wants it), Declined
-(owner passed on it), Resolved (done, with a fix reference). Preserve closed
-entries. If you want to revisit one, add your feedback and flag it for the owner
-rather than changing their decision.
+(owner passed on it), Resolved (done, with a fix reference). The dashboard
+collapses the Archive by default. Preserve closed entries there; if you want
+to revisit one, add your feedback and flag it for the owner rather than
+changing their decision.
 
 ## Requests
 
@@ -81,6 +84,23 @@ both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
 
+### AF-005 — Let the browser suite use a preinstalled Chromium
+
+The cloud container ships Playwright's Chromium 1194 and does not allow
+downloading browsers, while the repository pins `@playwright/test` 1.62.1,
+which expects Chromium 1234. Running the suite there took a wrapper config
+that sets `launchOptions.executablePath`. An environment variable read in
+`tests/browser/playwright.config.ts` would make that one setting.
+
+**+1:** 2026-09-29 — typed-information smoke fix, PR #245
+
+## Archive
+
+| Request ID / title | +1 | Status |
+| --- | --- | --- |
+| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
+| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+
 ### AF-003 — Open-link checks in the shared-information smoke match nothing
 
 Before this fix, `tests/browser/typed-information.spec.ts` checked that a closed
@@ -109,13 +129,3 @@ and the badge showed 0.9 s after load. GitHub Actions passed the spec in
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
 Resolved in #245: warm the five existing read routes before interaction deadlines begin.
-
-### AF-005 — Let the browser suite use a preinstalled Chromium
-
-The cloud container ships Playwright's Chromium 1194 and does not allow
-downloading browsers, while the repository pins `@playwright/test` 1.62.1,
-which expects Chromium 1234. Running the suite there took a wrapper config
-that sets `launchOptions.executablePath`. An environment variable read in
-`tests/browser/playwright.config.ts` would make that one setting.
-
-**+1:** 2026-09-29 — typed-information smoke fix, PR #245

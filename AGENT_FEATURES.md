@@ -7,11 +7,14 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 
 ## Proposals
 
-| Proposal | Status | Intended result |
-| --- | --- | --- |
-| [Reconnect to a known private application](#reconnect-to-a-known-private-application) | Proposed | Return to the same private route in one action |
-| [Explain current work and interruption](#explain-current-work-and-interruption) | Proposed | Understand the action, target and unknown outcome |
-| [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | Proposed | Hand over enough evidence to reproduce and repair a defect |
+| Proposal | +1 | Status | Intended result |
+| --- | --- | --- | --- |
+| [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | Proposed | Return to the same private route in one action |
+| [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | Proposed | Understand the action, target and unknown outcome |
+| [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | Proposed | Hand over enough evidence to reproduce and repair a defect |
+
+Votes show interest, not priority or approval. Each count comes from the task
+references in that proposal, including its initial proposal task.
 
 These are candidates from the [29 September intake](docs/research/2026-09-29-feature-intake.md),
 which rechecked the existing research in [PR #246](https://github.com/lustoykov/hallvi/pull/246)
@@ -39,6 +42,8 @@ Distinguish closed tunnel, SSH failure and an application that does not answer.
 **Open decisions:** Owner selection; bypassing Pi would require a separate contract.
 **Assignment:** Unassigned.
 
+**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
+
 ### Explain current work and interruption
 
 **Status:** Proposed
@@ -57,6 +62,8 @@ matching evidence and existing continuation behavior on disposable state.
 
 **Open decisions:** Owner selection and wording; user benefit is not yet measured.
 **Assignment:** Unassigned. Coordinate shared code with #248/#249.
+
+**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 
 ### Copy a problem for a coding agent
 
@@ -78,6 +85,8 @@ the original behavior check passes against the observed running revision.
 **Open decisions:** Owner selection and packet contract; test redaction and
 omissions. Saving a procedure does not authorize execution.
 **Assignment:** Unassigned.
+
+**+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 
 ## Research workflow
 
@@ -117,6 +126,9 @@ names the assigned task and branch/PR. **Done** links a merged implementation an
 its verification. **Declined** preserves the owner's decision and reason if given.
 Research may identify shipped work, but must not silently promote an idea to Ready
 or reopen a declined decision. A research-plan PR is not an implementation PR.
+Move Done and Declined proposals out of the active overview into a final Archive
+section, retaining their rows, full entries, votes and decision/verification
+references. The dashboard collapses that section by default.
 
 When the owner assigns a feature, record its task/branch before dispatching so
 two agents do not take the same work. Follow the linked scope and acceptance
@@ -128,8 +140,13 @@ check open PRs as well as this checkout before assigning work.
 ## Entry format
 
 Use a short stable slug as the heading and link it from the overview table.
-Search merged and open proposals before adding one. These slugs belong to this
-file; feedback keeps its separate `AF-NNN` identifiers and +1 counts.
+Search merged and open proposals, including archived ones, before adding one.
+Add a dated **+1** with the task ID or PR reference when an independent task
+wants an existing proposal. Count once per task, including the initial proposal;
+retries, multiple agents and multiple PRs in that task do not add votes. Agreement
+needs no new research. Recount from those references and sort the active overview
+by count. Do not copy feedback votes across automatically: these slugs and votes
+belong to this file; feedback keeps its separate `AF-NNN` identifiers and counts.
 
 ```markdown
 ### Short feature title
@@ -141,6 +158,8 @@ file; feedback keeps its separate `AF-NNN` identifiers and +1 counts.
 **Acceptance:** Observable behavior that would establish completion.
 **Open decisions:** Uncertainty or a choice that still needs the owner.
 **Assignment:** Owner instruction, task/branch and PR when they exist.
+
+**+1:** YYYY-MM-DD — task ID or PR reference
 ```
 
 These files and research instructions are contributor material. Never load them

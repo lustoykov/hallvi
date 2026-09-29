@@ -443,11 +443,20 @@ export function createDashboard(root: string, launch: Launch = spawn) {
               ? `https://github.com/${REPOSITORY}/blob/main/`
               : undefined,
           );
-          if (repositoryDocument)
+          if (repositoryDocument) {
+            // Agent documents keep closed entries in a final Archive section.
+            body = body.replace(
+              /<h2 id="archive">Archive<\/h2>([\s\S]*)$/,
+              (_section, archive: string) => {
+                const count = (archive.match(/<h3\b/g) ?? []).length;
+                return `<details class="document-archive" id="archive"><summary>Archive (${count})</summary>${archive}</details>`;
+              },
+            );
             body = body.replace(
               "</h1>",
               `</h1><p class="footnote">Read-only view of <code>${path}</code> in this checkout. Reload to see local edits. Changes are shared between worktrees through merges; repository links open GitHub main.</p>`,
             );
+          }
         } catch (error) {
           const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
           response.statusCode = missing ? 404 : 500;
