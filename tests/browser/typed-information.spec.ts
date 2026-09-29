@@ -209,26 +209,26 @@ test("records render in chat and their views, survive refresh, and update by rec
     // a page composed from the same records. What it owes the reader is the
     // release that is running and an honest account of the way in.
     //
-    // The live strip names the running revision and host. Image evidence
-    // belongs to the release's expandable register row.
-    await expect(
-      view.getByText("Running abcdef0", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      view.getByText(/abcdef012345 on fixture-server/),
-    ).toBeVisible();
+    // One line says which release is running. The revision is its own element
+    // in that line, so the line is read whole, the way a reader sees it. The
+    // exact source, the host and the image are in the release's row.
+    const running = view.getByRole("region", { name: "What is running" });
+    await expect(running.getByText(/Running abcdef0\b/)).toBeVisible();
     const releaseRow = (change: string) =>
       view.getByRole("row").filter({
         has: page.getByRole("cell", { name: change, exact: true }),
       });
     await expect(releaseRow("Added container packaging")).toBeVisible();
-    // The address is named, and named as not answering, rather than offered.
-    await expect(view.getByText(/The tunnel is closed, so/)).toBeVisible();
+    // The way in is named as closed rather than offered. While the tunnel
+    // answers, the link on that line is the address itself.
     await expect(
-      view.getByRole("button", { name: "Open the connection again" }),
+      running.getByText("The tunnel is closed", { exact: true }),
     ).toBeVisible();
     await expect(
-      view.getByRole("link", { name: /Open app(?:lication)?/ }),
+      running.getByRole("button", { name: "Open the connection again" }),
+    ).toBeVisible();
+    await expect(
+      view.getByRole("link", { name: /127\.0\.0\.1:8080/ }),
     ).toHaveCount(0);
     // What was checked belongs to the release that was checked, so it is
     // inside that release rather than loose on the page. It still has to be
