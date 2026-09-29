@@ -158,6 +158,8 @@ initial runs which only isolated Hallvi's account were excluded.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
+| [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fixed in #280 |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Fixed in #275 |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
 | [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fixed in #276 |
@@ -169,6 +171,35 @@ initial runs which only isolated Hallvi's account were excluded.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-020 — Name failed check groups without claiming they passed
+
+The same rehearsal's app timeline shows a red failed moment labelled “7 checks
+passed”. `lane-rails.tsx` turns every counted check group into that phrase,
+including groups containing failures. Keep a failed group's label consistent
+with its recorded outcomes.
+
+**+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
+(`codex/overview-subject-verdict`), observed again in its isolated browser proof.
+
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) labels only passing groups as
+passed; failed, informational and planned groups keep a neutral check count.
+
+### AF-019 — Keep deployment failures out of passing server checks
+
+An installed alpha.9 rehearsal correctly recorded a failed application smoke
+check and three passed host checks, but Overview answered “No” to “Is the server
+up?” beside “3 checks passed”. The server lane inherited the failed deployment
+event's overall status through its passing neighbor-preservation check.
+Only a judgement about a subject in that lane should apply; individual failed
+host checks must still report failure.
+
+**+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
+(`codex/overview-subject-verdict`).
+
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) corrects the projection; the regression
+keeps the application failure visible and the passed host checks consistent
+with the timeline. Verification workflow guidance worked as written.
 
 ### AF-017 — Make record validation easier for Pi to recover from
 
