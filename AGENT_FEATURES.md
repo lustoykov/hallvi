@@ -192,16 +192,21 @@ store, generic packet framework or broader handover redesign.
 
 **Acceptance for the selected increment:** Native Pi saves a useful Markdown
 packet and returns its saved body; copying yields that complete body before and
-after refresh. Redaction holds for creation and update. A coding agent
-reproducing/repairing the defect and a deployed repair passing the original
-check remain separate, unproven outcomes.
+after refresh. Redaction holds for creation and update. The
+[29–30 September real repair rehearsal](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065)
+also established one downstream repair: an independent worker reproduced the
+filter defect, its reviewed fix was merged only to the rehearsal branch, and Pi
+redeployed it. The original checks, browser filters and exact record preservation
+passed. This is one observed repair loop, not broad downstream adoption.
 
 **Open decisions:** Broader packet storage, automation and procedure work remain
-deferred. Downstream adoption, real diagnosis and repair/deployment are unproven.
+deferred. Broader downstream adoption remains untested.
 **Assignment:** Selected by the owner on 2026-09-29 and delivered in
 [#270](https://github.com/lustoykov/hallvi/pull/270). A bounded real-Pi trial with
 explicitly synthetic observations made one save call; the saved body equaled the
 final reply and clipboard before and after refresh. Existing records and Copy
-reply are reused; no new schema or UI layout is introduced.
+reply are reused; no new schema or UI layout is introduced. The later installed
+alpha.10 rehearsal copied an 8,339-character packet from observed source/API
+evidence and completed the separate repair/deployment acceptance linked above.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
