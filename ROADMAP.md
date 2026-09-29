@@ -71,7 +71,7 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 ## Access for other agents
 
-- [ ] **Requests from a terminal — in review in [PR #241](https://github.com/lustoykov/hallvi/pull/241).** `hallvi apps`, `exec`, `wait` and `inspect` let a person, a script or a coding agent send work to an application's main conversation through a named controller's loopback API, and read back the Pi operation that took it: its status, Pi's answer and bounded, redacted evidence. Approvals, input and interrupted work are handed back to Hallvi's page, never answered by the command. [Contract and limits](docs/cli.md). An MCP adapter over the same client, an interactive `attach`, an explicit `resume`, application creation and remote controller access are deferred.
+- [x] **Requests from a terminal — merged in [PR #241](https://github.com/lustoykov/hallvi/pull/241), 29 September 2026.** `hallvi apps`, `exec`, `wait` and `inspect` let a person, a script or a coding agent send work to an application's main conversation through a named controller's loopback API, and read back the Pi operation that took it: its status, Pi's answer and bounded, redacted evidence. Approvals, input and interrupted work are handed back to Hallvi's page, never answered by the command. Checked through the development workflow against retained applications (uptime-kuma, whoami), with Pi 0.87.1 accepted for both after a snapshot trial. [Contract and limits](docs/cli.md). An MCP adapter over the same client, an interactive `attach`, an explicit `resume`, application creation and remote controller access are deferred.
 
 ## Later milestone: Pi heartbeat and state synchronization
 

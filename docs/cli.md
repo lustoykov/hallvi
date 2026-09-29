@@ -148,7 +148,7 @@ object and nothing is written to stderr.
   "stoppedByUser": false,  // Ctrl-C
   "background": false,
   "operation": {
-    "id": "…",             // Pi's own operation id
+    "id": "…",             // Pi's own; the request key when this request began it
     "status": "completed", // open, completed, failed, aborted
     "startedAt": "…",
     "endedAt": "…",
@@ -221,14 +221,15 @@ runs that application's Hallvi in the checkout, and names that controller.
    nothing to lose; `uptime-kuma` keeps its own data.
 3. In one terminal, `node scripts/retained-application.mjs attach <name>`. It
    takes a verified copy of the records first, then prints the controller's
-   address — `Attached … http://127.0.0.1:5148. Ctrl-C detaches.` — and stays in
-   the foreground. When it refuses because the histories were written by
+   address — `Attached … http://127.0.0.1:<port>. Ctrl-C detaches.`, each
+   application on its own port — and stays in the foreground; with one
+   terminal, start it in the background and read what it printed. When it refuses because the histories were written by
    another Pi, look at a snapshot with this checkout first (below); if it reads
    them, attach again with `--accept-format`.
-4. In a second terminal, name that controller and work:
+4. In a second terminal, name the controller at the address it printed and work:
 
    ```sh
-   export HALLVI_CONTROLLER_URL=http://127.0.0.1:5148
+   export HALLVI_CONTROLLER_URL=http://127.0.0.1:<port>
    node scripts/cli.mjs apps
    node scripts/cli.mjs inspect <app>
    node scripts/cli.mjs exec <app> "Report … without changing anything"
@@ -236,7 +237,7 @@ runs that application's Hallvi in the checkout, and names that controller.
    ```
 
 5. `node scripts/retained-application.mjs detach <name>`, or Ctrl-C in the first
-   terminal, when done. It lets Pi finish before letting go.
+   terminal, when done. It lets Pi finish, then stops everything attach started.
 
 These applications are really deployed, on a host they share. Ask for
 read-only work unless changing that application is the task, and say which one
