@@ -28,8 +28,8 @@ fresh-user beta walkthrough remains open; these ideas add no beta prerequisites.
 
 **Status:** In progress (partial)
 
-**Problem and intended result:** Returning to a private app currently prepares
-a conversation draft. Offer one Reconnect action for its established route.
+**Problem and intended result:** An owner returning to a private app needs its
+established route reopened and verified through one Reconnect action.
 
 **Smallest scope:** Submit through the existing main operator and permission
 mode, keep the saved host/ports, and show truthful tunnel and HTTP observations.
@@ -40,9 +40,9 @@ mode, keep the saved host/ports, and show truthful tunnel and HTTP observations.
 actual device and use a named saved item while preserving private exposure.
 Distinguish closed tunnel, SSH failure and an application that does not answer.
 
-**Open decisions:** Bypassing Pi would require a separate contract. Increment 3's
-real return after controller restart and remote-device acceptance remains
-unimplemented and unassigned.
+**Open decisions:** Bypassing Pi would require a separate contract. Installed
+real-model return after controller restart and owner-device acceptance remain
+unverified. No additional Reconnect implementation task is assigned.
 **Assignment:** Increment 1's truthful observations and current saved-route
 selector landed in [PR #256](https://github.com/lustoykov/hallvi/pull/256).
 [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
