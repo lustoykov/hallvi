@@ -13,7 +13,11 @@ import {
 import { dayBounds } from "@/server/traffic/days";
 import { historyOf } from "@/server/traffic/merge";
 import { caddyKeptField, parseLine } from "@/server/traffic/parse";
-import { LOG_SETUP, trafficReading } from "@/server/traffic/pi-tools";
+import {
+  LOG_SETUP,
+  setupVariant,
+  trafficReading,
+} from "@/server/traffic/pi-tools";
 
 const ZONE = "Europe/Sofia";
 const HOUR = 3_600_000;
@@ -168,10 +172,59 @@ describe("traffic_setup", () => {
     expect(conf).toContain("map $http_referer $hallvi_referrer");
   });
 
-  it("gives Caddy a field for every kept key, under the name the reader reads", () => {
-    for (const key of KEPT_QUERY_KEYS)
-      expect(LOG_SETUP.caddy.config.Caddyfile).toContain(
-        `log_append ${caddyKeptField(key)} {query.${key}}`,
-      );
+  it("gives Caddy from 2.8 a field for every kept key, under the name the reader reads", () => {
+    for (const variant of ["caddy", "caddy-2.8"] as const)
+      for (const key of KEPT_QUERY_KEYS)
+        expect(LOG_SETUP[variant].config.Caddyfile).toContain(
+          `log_append ${caddyKeptField(key)} {query.${key}}`,
+        );
+  });
+
+  it("has Caddy 2.6 keep only the kept keys in the path, where the reader finds them", () => {
+    // Caddy 2.6 has no log_append: its filter rewrites the logged path.
+    // Go's ReplaceAllString and a global JavaScript replace agree on it.
+    const [, pattern, replacement] = /request>uri regexp (\S+) (\S+)/.exec(
+      LOG_SETUP["caddy-2.6"].config.Caddyfile,
+    )!;
+    const filtered = (uri: string) =>
+      uri.replace(new RegExp(pattern, "g"), replacement);
+    const uri = filtered(
+      "/a&b/c?token=reset-secret&utm_campaign=spring&x=1&ref=hn&utm_source=news",
+    );
+    expect(uri).toBe("/a&b/c?&utm_campaign=spring&ref=hn&utm_source=news");
+    const line = JSON.stringify({
+      logger: "http.log.access.log0",
+      ts: 1790000000.5,
+      status: 200,
+      duration: 0.01,
+      request: { host: "shop.example.com", method: "GET", uri },
+    });
+    expect(parseLine("caddy-json", line)).toMatchObject({
+      path: "/a&b/c",
+      kept: { utm_campaign: "spring", ref: "hn", utm_source: "news" },
+    });
+    expect(filtered("/?token=reset-secret")).toBe("/?");
+  });
+
+  it("gives each installed version its own text, never an upgrade", () => {
+    const picked = (proxy: "caddy" | "nginx" | "traefik", version: string) => {
+      const chosen = setupVariant(proxy, version);
+      return "variant" in chosen ? chosen.variant : "unsupported";
+    };
+    // As each prints it: Debian's Caddy, the official build, nginx -v.
+    expect(picked("caddy", "2.6.2")).toBe("caddy-2.6");
+    expect(picked("caddy", "v2.7.6 h1:abc=")).toBe("caddy-2.6");
+    expect(picked("caddy", "v2.8.4 h1:abc=")).toBe("caddy-2.8");
+    expect(picked("caddy", "v2.10.2 h1:abc=")).toBe("caddy-2.8");
+    expect(picked("caddy", "v2.11.4 h1:abc=")).toBe("caddy");
+    expect(picked("caddy", "v2.12.0")).toBe("caddy");
+    expect(picked("caddy", "v2.5.2")).toBe("caddy-2.6");
+    expect(picked("caddy", "v2.4.6")).toBe("unsupported");
+    expect(picked("caddy", "")).toBe("unsupported");
+    expect(picked("nginx", "nginx version: nginx/1.24.0 (Ubuntu)")).toBe(
+      "nginx",
+    );
+    expect(picked("nginx", "nginx version: nginx/1.10.3")).toBe("unsupported");
+    expect(picked("traefik", "Version:      2.11.3")).toBe("traefik");
   });
 });

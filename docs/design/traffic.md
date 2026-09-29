@@ -241,12 +241,24 @@ say what the log cannot see.
 ### Setting up the log
 
 Tested on Caddy 2.11.4, nginx 1.30.5 and Traefik 3.7.13 over real SSH as
-root, a sudo user and a user without sudo. This is what Pi's instructions say:
-the rules are in its system prompt ([`pi.ts`](../../src/server/pi.ts)), and the
+root, a sudo user and a user without sudo, and in Docker on every version the
+common distributions ship (below). This is what Pi's instructions say: the
+rules are in its system prompt ([`pi.ts`](../../src/server/pi.ts)), and the
 exact configuration, steps, checks and record for each proxy come from its
 read-only `traffic_setup` tool (`LOG_SETUP` in
 [`pi-tools.ts`](../../src/server/traffic/pi-tools.ts)), so the long text is read
 only when a log is being set up. Change the tested text there.
+
+Pi reads the installed version first (`caddy version`, `nginx -v`,
+`traefik version`) and the tool returns that version's text. Setting the log up
+never upgrades, replaces or restarts a proxy a reload can serve: the shared dev
+host's Ubuntu Caddy 2.6.2 rejected the 2.11 text once, and asking for a
+host-wide upgrade to turn history on is the failure this prevents. An upgrade
+is at most an optional suggestion put to the owner once. An existing
+access-log record stays untouched until the new log is proved, and is then
+updated in place — never retired first, never saved twice — because Overview's
+live view reads it. When the proxy serves other applications, every approval
+says so and names what is host-wide.
 
 - **The record** points at the **host** path:
   `{kind:'access-log', proxy, format, source:{type:'file', path}, hosts, pageKey?, retainDays}`.
@@ -256,7 +268,7 @@ only when a log is being set up. Change the tested text there.
   container bind-mounts the host directory at the same path. Hallvi's SSH user
   must be root, have passwordless sudo, or be able to read the files; reads
   fall back to `sudo -n` and otherwise say which file is unreadable.
-- **Caddy:** a `log hallvi` of its own beside the owner's, imported into each
+- **Caddy 2.11:** a `log hallvi` of its own beside the owner's, imported into each
   counted site, writing `/var/log/caddy/hallvi/access.log` with
   `roll_interval 24h`, `roll_keep 1000`, `roll_keep_for 30d`, `roll_size 100MiB`,
   `mode 0640`, `dir_mode 0755`; a `format filter` with
@@ -265,6 +277,34 @@ only when a log is being set up. Change the tested text there.
   `hv_page` only where the application routes by a query key. Rotated names
   carry the reason (`access-<UTC ms>-size|time|manual.log.gz`), rotation is
   lazy, and `.zst` is not read.
+- **Older Caddy** lacks, by version (checked with `caddy validate`/`adapt` on
+  each `caddy:<version>` image): `roll_interval` and `dir_mode` before 2.11;
+  `mode` before 2.9, and 2.8 and older **ignore it without a word**, as they do
+  any unknown `output file` option; `log_append`, filters written directly in
+  `format filter` (rather than in `fields {}`) and two logs in one site before
+  2.8 — on 2.6 and 2.7 a second `log` in a site block silently **replaces the
+  owner's**; named site logs from 2.7; the `regexp` filter from 2.5, and on 2.5
+  it does not apply to a header. Debian 12 and 13 and Ubuntu 24.04 to 26.04 ship
+  2.6.2, EPEL 9 and Alpine 3.18 2.6.4, Alpine 3.20 2.7.6.
+  - **2.8 to 2.10:** the 2.11 text with `roll_disabled` for its writer.
+  - **2.6 and 2.7:** a named `log hallvi` in the global options with
+    `include http.log.access`, taking every logging site's lines (host-wide,
+    `hosts` picks the application's); a site without a log of its own imports
+    `log { output discard }` to turn its lines on. With no `log_append`, the
+    `request>uri` regexp `^([^?]*)|([?&](?:<kept keys>)=[^&]*)|(\?)[^&]*|&[^&]*`
+    → `$1$2$3` keeps the campaign tags in the path's query and removes every
+    other key; the reader takes them from there.
+  - Both: the file is made first (`install -m 0640 -o <Caddy's user> -g adm`),
+    because Caddy keeps an existing file's mode and `caddy validate` as root
+    would otherwise create it root's; logrotate `copytruncate` rolls it daily
+    (Caddy writes with `O_APPEND`, so no holes), losing the lines written in
+    the instant of the copy. 2.5 works with the 2.6 text, but its file keeps
+    referrers' queries and no Content-Type; before 2.5 the path cannot be
+    filtered and the address is logged where the reader does not look, so it
+    is not counted. Proved end to end with Debian 12's and Ubuntu 24.04's own
+    package running as `caddy`: reload, three rotations, the owner's log
+    intact, every line in the files and none carrying a removed key, and the reader's
+    listing as a non-root `adm` user.
 - **nginx:** Hallvi's log in **its own directory** (`install -d -m 0755
   /var/log/nginx/hallvi` first), a `conf.d/hallvi-log.conf` with maps that cut
   `$request_uri` and `$http_referer` at `?`/`#` and pick each host's page key,
@@ -274,11 +314,15 @@ only when a log is being set up. Change the tested text there.
   `/etc/logrotate.d/hallvi-nginx` (root-owned, 0644): daily, 30 kept,
   compress + delaycompress, `nodateext`, `create 0640 root adm`, and a
   postrotate USR1 to nginx — without it nginx keeps writing into the renamed
-  file.
+  file. The same text runs unchanged on nginx 1.14 (RHEL 8) to 1.30; before
+  1.11.8 there is no `escape=json` and the log is not counted.
 - **Traefik:** JSON access log to `/var/log/traefik/access.log` with header
   mode `drop` except User-Agent, Referer, Sec-Fetch-Dest, Sec-Fetch-Mode,
-  Sec-Purpose, Purpose, Content-Type, CF-Connecting-IP and CF-IPCountry; the
-  same logrotate block with a USR1 to Traefik.
+  Sec-Purpose, Purpose, Content-Type, Cf-Connecting-Ip and Cf-Ipcountry —
+  spelled canonically, because Traefik 2.0 matches names letter for letter; the
+  same logrotate block with a USR1 to Traefik. Field names are the same from
+  2.0 to 3.7. Its access log is static configuration, so turning it on is a
+  restart of every application behind it, said as such.
 
 What went wrong when it was tried, so Pi does not repeat it: a Hallvi file
 inside `/var/log/nginx/*.log` duplicates Debian's own logrotate entry and makes
