@@ -331,6 +331,16 @@ check immediately and open the result. When a release is available, press
 **Update** in that panel to install it. Checking does not start installation.
 **What's new**, beside the version in that panel, lists what changed in each
 release up to the installed one; an available release links to its own notes.
+
+The service coming back does not replace the interface already loaded in your
+browser. When an open page sees the update finish, **Reload page** loads that
+interface. It asks first: keep a copy of unsent work, attached images and unsaved
+settings before reloading. Conversation text drafts and uncertain text-message
+request keys use the existing browser recovery; images and unsaved settings do
+not. Reloading does not retry an action or settle an unknown result. An older
+release's already open page cannot gain this new control; reload it with the
+browser after the update finishes.
+
 Or, in a terminal:
 
 ```bash

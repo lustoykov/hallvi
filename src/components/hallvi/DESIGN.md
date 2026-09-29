@@ -686,6 +686,15 @@ on the `reach-records.ts` projection, with its own classes prefixed `hv-ac-`.
 
 ### Buttons and fields
 
+An installed update completing means the replacement service answered, while an
+already open page still runs its loaded interface. That page offers **Reload
+page** beside Dismiss after it observes completion. Reload is always the owner's
+choice and asks them to keep unsent work, images and unsaved settings first.
+Existing browser storage restores text drafts and pending text request keys;
+images and unsaved settings are not covered. A fresh page showing the completed
+attempt offers only Dismiss. Reload neither retries work nor resolves uncertain
+actions.
+
 One primary button everywhere (19 September): 34px tall (`--button-height`), 0 by 14px padding, 13px at weight 560, 8px radius, 15px icons, action blue with `--button-shadow` — a faint top light and a short shadow — so it reads as the action without sheer size. The home call to action, the setup and connection footers, the new-application form, dialogs and the Deployment “Open” button all use it; none is 44px or full-width on desktop. Secondary buttons share the height on white with a `field-line` border and no shadow. Smaller variants stay small and take the same shadow: the 32px Send, the 30px in-transcript retry and record pills, the onboarding rail start. Every primary uses `--blue` and `--blue-hover`; no file hard-codes its own blue. Password inputs keep a `field-line` border; inside records the input is 8px by 10px at 12px type.
 
 ## Do's and Don'ts

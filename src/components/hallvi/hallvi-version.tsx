@@ -10,7 +10,8 @@
 //
 // An update is the rare thing here that takes Hallvi away and brings it back,
 // so its phase stays visible whether the panel is open or not. Completion
-// means the new interface answers with the revision that was installed.
+// means the new server answers with the revision that was installed. The
+// browser still needs a full page reload to replace its loaded interface.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowClockwise } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -120,6 +121,7 @@ export function ThisHallvi({
   const [busy, setBusy] = useState<"check" | "install" | null>(null);
   const [error, setError] = useState("");
   const [disconnected, setDisconnected] = useState(false);
+  const [needsReload, setNeedsReload] = useState(false);
   const here = useRef<HTMLDivElement>(null);
 
   /** A layer over the page closes the way one is expected to. */
@@ -172,6 +174,7 @@ export function ThisHallvi({
         if (alive) {
           setDisconnected(false);
           setState(value);
+          if (value.attempt?.phase === "completed") setNeedsReload(true);
         }
       } catch {
         if (alive) setDisconnected(true);
@@ -206,6 +209,18 @@ export function ThisHallvi({
       setBusy(null);
     }
   }, []);
+
+  function reloadInterface() {
+    // Drafts and pending text request keys already have browser recovery, but
+    // attachments and settings edits can exist only in this page. Never reload
+    // automatically or claim all unsent work is saved.
+    if (
+      window.confirm(
+        "Reload Hallvi to use the updated interface? Copy any unsent work, keep your attached images and save any settings edits first.",
+      )
+    )
+      window.location.reload();
+  }
 
   if (!state) return null;
   const { installed, available } = state;
@@ -394,6 +409,17 @@ export function ThisHallvi({
                 </>
               )}
             </p>
+            {noticePhase === "completed" && needsReload && (
+              <>
+                <p>
+                  Reload this page to use the updated interface. Keep a copy of
+                  unsent work, attached images and unsaved settings first.
+                </p>
+                <button type="button" onClick={reloadInterface}>
+                  Reload page
+                </button>
+              </>
+            )}
             {noticePhase === "downloading" &&
               typeof attempt?.progress === "number" && (
                 <progress
