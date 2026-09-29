@@ -183,6 +183,12 @@ test("Send next and Steer wait on active work, and Stop settles them as not star
       .getByRole("button", { name: "Stop + cancel 2 waiting", exact: true })
       .click();
     await expect(waiting).toHaveCount(0);
+    await expect(page.locator(".hv-run-status")).toContainText(
+      "Stopping does not undo changes or confirm that remote processes stopped.",
+    );
+    await expect(page.locator(".hv-run-status")).not.toContainText(
+      "Nothing had run",
+    );
     // Pi's abort ended its answer and emptied its queues, as the button said:
     // neither instruction is Pi's any more, and neither ever runs.
     await expect(

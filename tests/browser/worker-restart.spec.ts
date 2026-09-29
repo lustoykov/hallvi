@@ -55,12 +55,17 @@ test("without a worker nothing is accepted; after a restart nothing runs until t
     await expect(page.getByText("No worker is running")).toBeVisible({
       timeout: 30_000,
     });
-    // Nothing is accepted without the worker, and what was typed is kept.
+    // Current main blocks admission locally under its existing worker notice.
+    // No second transport error is needed; prove no POST and a kept draft.
+    let sends = 0;
+    page.on("request", (request) => {
+      if (request.method() === "POST" && request.url().endsWith("/messages"))
+        sends++;
+    });
     await composer.fill("Is anybody there?");
     await page.getByRole("button", { name: /^Send/ }).click();
-    await expect(
-      page.getByText("worker is not running", { exact: false }).first(),
-    ).toBeVisible();
+    await expect(page.getByText("No worker is running")).toBeVisible();
+    expect(sends).toBe(0);
     await expect(composer).toHaveValue("Is anybody there?");
     await composer.fill("");
 

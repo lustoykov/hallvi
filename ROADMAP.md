@@ -10,6 +10,32 @@ Connect real saved records and execution evidence to the accepted reference desi
 
 Keep the scope on the views and interactions needed by that journey. Medium and more complicated applications and broader ongoing care follow this UI/UX checkpoint. Broad security hardening is deferred until after beta; during beta, communicate current risks and practical precautions without turning this into a new architecture project.
 
+## Selected product increments
+
+The 29 September batch implements the three selected increments:
+
+- **03 — Interruption clarity**, [#268](https://github.com/lustoykov/hallvi/pull/268):
+  matching returned results, unknown outcomes and waiting follow-ups beside native
+  Continue/Stop, with truthful Stop wording and readable before/after evidence.
+- **05 — Coding-agent handoff**, [#270](https://github.com/lustoykov/hallvi/pull/270):
+  a saved, redacted Markdown problem packet through the existing Copy reply action.
+  A bounded real-Pi trial established saving, reply equality and copying after refresh;
+  diagnosis, downstream adoption and a repaired deployment remain unproven.
+- **11 — Existing CLI example**, [#269](https://github.com/lustoykov/hallvi/pull/269):
+  a source-checked read-only example with request identity and honest outcome handling.
+  This is documentation, not evidence of broader adoption.
+
+These are source changes merged as one reviewed batch, not a published release.
+The [research plan index](https://github.com/lustoykov/hallvi/pull/246) preserves
+the proposals; larger mechanisms in those plans are not implementation requirements.
+
+Performance #252 and Reconnect #256/#263 are merged checkpoints. Reconnect's
+[installed alpha.9 acceptance](https://github.com/lustoykov/hallvi/pull/267#issuecomment-5896833172)
+also passed: actual saved-route approval/reopen, laptop access and preserved data
+through an installed restart. Return brief, quiet care, recovery rehearsal, learned
+procedures, existing-stack adoption and update rehearsal are deferred. The eleven
+research plans do not constitute eleven implementation commitments.
+
 ## Sprint TODO
 
 This is the single implementation checklist. Completed means merged into `main`; distinguish local work from shipped work. Update the remaining items as implementation and user reviews teach us more.
