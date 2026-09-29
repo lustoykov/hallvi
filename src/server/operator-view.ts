@@ -7,7 +7,7 @@ import { listInformation } from "./saved-information";
 import { listApplicationChatSummaries } from "./db";
 import { loadApplication, loadChat, repositoryAccess } from "./applications";
 import { githubAppRegistration } from "./github-connection";
-import type { OperatorView } from "./types";
+import type { OperatorMetadata, OperatorView } from "./types";
 
 /**
  * The application page, projected from durable records: the selected
@@ -18,6 +18,30 @@ export async function getOperatorView(
   applicationId: string,
   chatId?: string,
 ): Promise<OperatorView> {
+  const view = await getOperatorMetadata(applicationId, chatId);
+  const conversation = view.selectedChatId
+    ? await chatSnapshot(applicationId, view.selectedChatId)
+    : null;
+  return {
+    ...view,
+    executions:
+      conversation?.executions ?? (await listExecutions(applicationId)),
+    piActivity: conversation?.piActivity ?? [],
+    worker: conversation?.worker,
+    messages: conversation?.messages ?? [],
+    information:
+      conversation?.information ??
+      (await listInformation(applicationId, "", true)).filter(
+        (r) => r.presentation,
+      ),
+  };
+}
+
+/** Keep non-chat facts current without reconstructing an unchanged history. */
+export async function getOperatorMetadata(
+  applicationId: string,
+  chatId?: string,
+): Promise<OperatorMetadata> {
   const application = chatId
     ? (await loadChat(applicationId, chatId)).application
     : await loadApplication(applicationId);
@@ -28,10 +52,6 @@ export async function getOperatorView(
     chats[0] ??
     null;
   const access = await repositoryAccess(application);
-  // The selected conversation comes from Pi, with evidence placed into it.
-  const conversation = selected
-    ? await chatSnapshot(application.id, selected.id)
-    : null;
   return {
     application: {
       id: application.id,
@@ -51,16 +71,8 @@ export async function getOperatorView(
       connected: access.connected,
       signIn: Boolean(githubAppRegistration()),
     },
-    executions:
-      conversation?.executions ?? (await listExecutions(applicationId)),
-    piActivity: conversation?.piActivity ?? [],
-    worker: conversation?.worker,
     chats,
     selectedChatId: selected?.id ?? null,
-    messages: conversation?.messages ?? [],
-    information: (await listInformation(application.id, "", true)).filter(
-      (r) => r.presentation,
-    ),
     secrets: listSecrets(application.id),
     deployment: await deploymentStatus(application.id),
     // Hallvi's own protection is the same fact for every application:

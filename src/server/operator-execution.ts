@@ -16,6 +16,7 @@ import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
 import { managedSshOptions } from "./managed-ssh";
 import { ExecutionReader } from "./execution-reader";
+import { notifyChange } from "./change-notifications";
 
 import { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
 export { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
@@ -58,10 +59,12 @@ function read<T>(path: string): T | undefined {
     throw error;
   }
 }
-function write(path: string, value: unknown) {
+function write(path: string, value: ExecutionRecord) {
   const tmp = `${path}.${randomUUID()}.tmp`;
   writeFileSync(tmp, JSON.stringify(value), { mode: 0o600 });
   renameSync(tmp, path);
+  invalidateExecutionReads(value.applicationId);
+  notifyChange({ kind: "execution", applicationId: value.applicationId });
 }
 export async function operatorSettings(
   applicationId: string,
@@ -136,6 +139,7 @@ export async function decideExecution(
     JSON.stringify({ approved }),
     { flag: "wx", mode: 0o600 },
   );
+  notifyChange({ kind: "execution", applicationId });
   return { approved };
 }
 /**

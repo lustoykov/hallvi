@@ -1,6 +1,7 @@
 import { DatabaseClient } from "./database-client";
 import { databasePath } from "./database-path";
 import type { operations } from "./database-store";
+import { notifyChange, type StateChange } from "./change-notifications";
 export { databasePath } from "./database-path";
 
 declare global {
@@ -30,17 +31,40 @@ export async function closeDatabase() {
   }
 }
 
-function operation<K extends keyof typeof operations>(name: K) {
-  return (
+function operation<K extends keyof typeof operations>(
+  name: K,
+  changed?: (...args: Parameters<(typeof operations)[K]>) => StateChange,
+) {
+  return async (
     ...args: Parameters<(typeof operations)[K]>
-  ): Promise<Awaited<ReturnType<(typeof operations)[K]>>> =>
-    client().call(name, args);
+  ): Promise<Awaited<ReturnType<(typeof operations)[K]>>> => {
+    const value = await client().call(name, args);
+    // The database thread acknowledges after the whole operation commits.
+    // Refused/rolled-back operations never notify a reader.
+    if (changed) notifyChange(changed(...args));
+    return value;
+  };
 }
+
+const applicationChanged = (applicationId: string): StateChange => ({
+  kind: "application",
+  applicationId,
+});
+const informationChanged = (applicationId: string): StateChange => ({
+  kind: "information",
+  applicationId,
+});
 
 export const listApplications = operation("listApplications");
 export const getApplication = operation("getApplication");
-export const deleteApplication = operation("deleteApplication");
-export const renameApplicationRow = operation("renameApplicationRow");
+export const deleteApplication = operation(
+  "deleteApplication",
+  applicationChanged,
+);
+export const renameApplicationRow = operation(
+  "renameApplicationRow",
+  applicationChanged,
+);
 export const insertApplication = operation("insertApplication");
 export const createApplicationRecords = operation("createApplicationRecords");
 export const insertChat = operation("insertChat");
@@ -52,11 +76,23 @@ export const listApplicationChatSummaries = operation(
 export const touchChat = operation("touchChat");
 export const archiveChat = operation("archiveChat");
 export const latestObservation = operation("latestObservation");
-export const insertObservation = operation("insertObservation");
+export const insertObservation = operation(
+  "insertObservation",
+  ({ applicationId }) => applicationChanged(applicationId),
+);
 export const setNativeSessionId = operation("setNativeSessionId");
-export const updateOperatorSettings = operation("updateOperatorSettings");
+export const updateOperatorSettings = operation(
+  "updateOperatorSettings",
+  applicationChanged,
+);
 export const listInformation = operation("listInformation");
-export const saveInformationRow = operation("saveInformationRow");
-export const retireInformation = operation("retireInformation");
+export const saveInformationRow = operation(
+  "saveInformationRow",
+  informationChanged,
+);
+export const retireInformation = operation(
+  "retireInformation",
+  informationChanged,
+);
 
 export const backupDatabase = operation("backupDatabase");

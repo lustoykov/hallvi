@@ -9,6 +9,7 @@ import { realpathSync, rmSync } from "node:fs";
 import { request, createServer, type Server } from "node:http";
 import { workerSocketPath } from "../../scripts/worker-socket.mjs";
 import { databasePath } from "./db";
+import { ownChangeNotifications } from "./change-notifications";
 
 const socketPath = () => workerSocketPath(databasePath());
 
@@ -112,16 +113,19 @@ export async function serveWorker(
     lock.close();
     return null;
   }
+  const changes = ownChangeNotifications();
   try {
     // Recovery is part of taking ownership, before any request can arrive.
     await owned?.();
   } catch (error) {
+    changes.close();
     lock.close();
     throw error;
   }
   const path = socketPath();
   rmSync(path, { force: true });
   const server = createServer((incoming, outgoing) => {
+    if (changes.handle(incoming, outgoing)) return;
     let text = "";
     incoming.setEncoding("utf8");
     incoming.on("data", (chunk) => (text += chunk));
@@ -151,6 +155,7 @@ export async function serveWorker(
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", (error) => {
+      changes.close();
       lock.close();
       reject(error);
     });
@@ -163,5 +168,11 @@ export async function serveWorker(
   });
   // The lock is referenced from what is returned, so it is not collected
   // while this process is the owner.
-  return { server, release: () => lock.close() };
+  return {
+    server,
+    release: () => {
+      changes.close();
+      lock.close();
+    },
+  };
 }

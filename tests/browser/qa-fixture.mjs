@@ -13,6 +13,7 @@ import {
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
+import { instrumentNotifications } from "./notification-metrics.mjs";
 import {
   createTemporaryRoot,
   removeTemporaryRoot,
@@ -84,6 +85,7 @@ writeFileSync(
     ),
 );
 symlinkSync(join(source, "node_modules"), join(app, "node_modules"), "dir");
+if (process.env.HALLVI_QA_NOTIFICATIONS === "1") instrumentNotifications(app);
 renameSync(
   join(app, "src/server/pi-configuration.ts"),
   join(app, "src/server/pi-configuration-real.ts"),

@@ -40,6 +40,7 @@ import { settleRunningExecutions } from "./operator-execution";
 import { beginRunDiagnostics } from "./tracing";
 import type { PiReply } from "./types";
 import { serveWorker, WorkerRefusal } from "./worker-link";
+import { notifyChange } from "./change-notifications";
 
 export interface Scope {
   applicationId: string;
@@ -151,8 +152,20 @@ export function sessionOwner(
     const watch = await session.lane.watch(ctx);
     let snapshot = watch.snapshot;
     const fresh = async () => (snapshot = await watch.resnapshot(ctx));
-    watch.start((event) => {
-      if (reduceLaneSnapshot(snapshot, event)) void fresh();
+    watch.start(async (event) => {
+      if (reduceLaneSnapshot(snapshot, event)) await fresh();
+      // The reducer returns undefined for ordinary changes, including tokens.
+      // Publish after applying them, not just when it requests a resnapshot.
+      if (
+        ![
+          "usage",
+          "handler_error",
+          "config_update",
+          "value_update",
+          "lane_created",
+        ].includes(event.type)
+      )
+        notifyChange({ kind: "chat", ...scope });
     });
     let read:
       | {
@@ -193,6 +206,7 @@ export function sessionOwner(
         else if (event.type === "update")
           previews.set(event.id, partialText(event.partial));
         else if (event.type === "end") previews.delete(event.id);
+        notifyChange({ kind: "chat", ...scope });
       },
     });
     let diagnostics: ReturnType<typeof beginRunDiagnostics> | undefined;
@@ -232,6 +246,11 @@ export function sessionOwner(
   async function shut(conversation: Opened) {
     opened.delete(conversation.chatId);
     await conversation.close();
+    notifyChange({
+      kind: "chat",
+      applicationId: conversation.applicationId,
+      chatId: conversation.chatId,
+    });
   }
 
   /** The conversation as it stands, opened for reading if it was not open. */
@@ -256,6 +275,11 @@ export function sessionOwner(
     first: () => Promise<unknown>,
   ) {
     conversation.driving = true;
+    notifyChange({
+      kind: "chat",
+      applicationId: conversation.applicationId,
+      chatId: conversation.chatId,
+    });
     conversation.trace(operationId);
     conversation.done = (async () => {
       let step = first;

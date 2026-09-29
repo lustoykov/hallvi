@@ -55,6 +55,55 @@ and bounded, redacted evidence ([requests.ts](../src/server/requests.ts)).
 Nothing is stored for a request. [Working from a terminal](cli.md) owns the
 contract.
 
+### Conversation change delivery
+
+The worker's existing Unix socket also carries ephemeral invalidations. Pi
+lane and tool-preview changes target one conversation; execution writes,
+saved-information commits and application changes target all conversations
+of that application. Readers always reconstruct the current snapshot from
+Pi and durable records; notifications contain no transcript or retained log.
+
+```mermaid
+flowchart LR
+    Pi[Pi lane and tool changes] --> Hub[Worker change hub]
+    Writes[Committed database or execution writes] --> Hub
+    WebWrite[Web mutation commits] --> Local[Web process hub]
+    Local -->|POST /changed on worker.sock| Hub
+    Hub -->|one GET /changes per web process| Local
+    Local -->|matching application or chat| Stream[Browser SSE handlers]
+    Stream -->|initial, changed or reconnected| Snapshot[Current chat snapshot]
+    Snapshot --> Browser[Open conversations]
+```
+
+The web hub is shared across Next route bundles and keyed by canonical
+database and controller-configuration paths. Both ends check that identity;
+sharing a Pi account does not share this channel. Web-originated commits
+notify local readers immediately and relay their invalidation to the worker.
+A failed relay retries coalesced scopes, never a database write or Pi send.
+Notifications run after a database acknowledgement or atomic execution-file
+replacement. A broken observer cannot turn a committed write into a failure.
+
+Each SSE handler subscribes before its initial read. The worker acknowledges
+only after registering its listener. Every initial or reconnected read, and
+every execution change, invalidates an older in-flight execution scan. An
+event arriving during an asynchronous read schedules another read. Bursts
+are coalesced, with at most one read in flight and one start every 500 ms;
+the first change after idle can start after 100 ms. Identical snapshots are
+not sent again. The 15-second heartbeat transports no state and reads none.
+
+Worker loss produces one unavailable snapshot. Connection retries do not
+rebuild histories; a successful reconnect reads current state, including
+changes missed during the gap. Slow readers are disconnected instead of
+accumulating snapshots. The last browser subscriber releases its upstream
+connection, retry and heartbeat resources.
+
+The page's 2.5/15-second refresh reads application metadata only: repository,
+chat summaries, deployment, secrets metadata and controller-protection facts.
+The permission control reads settings only; the logs view takes execution
+records from SSE. Existing access observations and traffic subscriptions
+keep their own cadence. No periodic background path reconstructs idle chat
+history. See the [notification measurements](testing/2026-09-29-chat-notifications.md).
+
 ## Asynchronous SQLite boundary
 
 [db.ts](../src/server/db.ts) exposes asynchronous storage operations. Each
@@ -127,10 +176,11 @@ overlapping reads of the same file version share their content read. A call
 joining an in-progress list observes that scan; the next list checks again.
 This is neither a directory-wide transactional snapshot nor a freshness TTL.
 `invalidateExecutionReads(applicationId)` makes a notified refresh start a new
-scan instead of joining one begun before the change; omitting the ID does this
-for all in-flight lists on reconnect. Metadata checks keep cached content and
-single-file reads correct without purging unchanged records. Polling callers
-do not need this hook; the notification integration will call it.
+scan instead of joining one begun before the change. SSE uses it before every
+initial read, on worker connection changes and on execution notices for that
+application. Omitting the ID invalidates all in-flight lists. Metadata checks
+keep cached content and single-file reads correct without purging unchanged
+records.
 
 The process-local cache keys absolute storage paths, not application IDs
 alone. Device, inode, size, nanosecond modification and change times identify

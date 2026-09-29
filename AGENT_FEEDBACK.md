@@ -123,3 +123,7 @@ evidence responses if long histories still make active chats slow. The
 from this remaining cost.
 
 **+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
+
+**+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
+Idle reads now stop; active updates still serialize full histories. Keep the
+500 ms sustained cadence until a measured response-shape change improves it.

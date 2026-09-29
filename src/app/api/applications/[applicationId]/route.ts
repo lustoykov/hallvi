@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { removeApplication, renameApplication } from "@/server/applications";
 import { handle } from "@/server/http";
-import { getOperatorView } from "@/server/operator-view";
+import { getOperatorView, getOperatorMetadata } from "@/server/operator-view";
 import {
   assertSameOrigin,
   parseJsonRequest,
@@ -21,6 +21,8 @@ export async function GET(
   return handle(async () => {
     const { applicationId } = await context.params;
     const chatId = request.nextUrl.searchParams.get("chat") ?? undefined;
+    if (request.nextUrl.searchParams.get("view") === "metadata")
+      return getOperatorMetadata(applicationId, chatId);
     return getOperatorView(applicationId, chatId);
   });
 }

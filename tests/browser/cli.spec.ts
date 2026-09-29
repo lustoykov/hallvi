@@ -285,6 +285,11 @@ test("in Always ask a CLI request stops at the approval with nothing run, and ap
     ).status(),
   ).toBe(200);
 
+  // Both pages are already watching when the separate CLI process sends.
+  // Approval and completion must arrive through SSE, without a reload.
+  const observer = await page.context().newPage();
+  await page.goto(`/applications/${app.id}`);
+  await observer.goto(`/applications/${app.id}`);
   const request = "Ask me first [mark]";
   const asked = hallvi(
     "exec",
@@ -315,13 +320,18 @@ test("in Always ask a CLI request stops at the approval with nothing run, and ap
   // The command has not run: it would have left its mark.
   expect(existsSync(markOf(fixture.state, request))).toBe(false);
 
-  await page.goto(waiting.attention.page);
   const sent = page.locator(`#hv-message-${waiting.requestKey}`);
   await expect(sent.locator(".hv-message-heading strong")).toHaveText("CLI");
   const approve = page.getByRole("button", { name: "Approve", exact: true });
+  await expect(
+    observer.getByRole("button", { name: "Approve", exact: true }),
+  ).toBeVisible();
   await approve.click();
   // Taken once the card stops asking; then the caller follows it again.
   await expect(approve).toHaveCount(0);
+  await expect(
+    observer.getByRole("button", { name: "Approve", exact: true }),
+  ).toHaveCount(0);
 
   const finished = hallvi("wait", waiting.handle, "--json");
   expect(finished.code, finished.stdout).toBe(0);
@@ -333,6 +343,10 @@ test("in Always ask a CLI request stops at the approval with nothing run, and ap
     ],
   });
   expect(existsSync(markOf(fixture.state, request))).toBe(true);
+  await expect(
+    observer.getByText(`[QA fixture reply] ${request}`, { exact: true }),
+  ).toBeVisible();
+  await observer.close();
 
   // Where it came from is kept with the message, not in the page.
   await page.reload();
