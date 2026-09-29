@@ -21,6 +21,8 @@ import {
 import { MonitoringUsage } from "./monitoring-usage";
 import { AskButton, MonitoringLede, WatchingMap } from "./monitoring-watching";
 import { EmptySketch } from "./empty-sketch";
+import { hasTotals, trafficListed } from "./traffic/model";
+import { useCollection, useHistory } from "./traffic/source";
 
 export function MonitoringPage({
   records,
@@ -56,9 +58,16 @@ export function MonitoringPage({
     () => usageFromRecords(records, applicationId),
     [records, applicationId],
   );
+  // Where the owner keeps traffic history, its totals answer the traffic
+  // questions here, kept current, instead of a day Pi read.
+  const kept = trafficListed(useCollection(applicationId).collection);
+  const counted = useHistory(applicationId, "24h", kept).history;
+  const history = kept && hasTotals(counted) ? counted : null;
 
   // A check can pass while visitors get errors; the lede says both.
-  const failed = usage?.traffic?.serverErrors.reduce((a, b) => a + b, 0) ?? 0;
+  const failed = history
+    ? history.totals.errors
+    : (usage?.traffic?.serverErrors.reduce((a, b) => a + b, 0) ?? 0);
   const aside = failed
     ? `In the last 24 hours the access log shows ${failed.toLocaleString("en-US")} ${failed === 1 ? "request" : "requests"} failing on the server.`
     : null;
@@ -116,6 +125,7 @@ export function MonitoringPage({
         {/* How much it is used stands whether or not anything is watching. */}
         <MonitoringUsage
           usage={usage}
+          history={history}
           followed={records.some(
             (record) =>
               !record.retiredAt &&
