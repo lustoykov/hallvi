@@ -147,8 +147,9 @@ describe("read_traffic", () => {
     );
     const release = releaseImpact(
       [parts],
-      new Date(dayBounds("2026-09-27", ZONE).start + 14 * HOUR + 20 * 60_000)
-        .toISOString(),
+      new Date(
+        dayBounds("2026-09-27", ZONE).start + 14 * HOUR + 20 * 60_000,
+      ).toISOString(),
       120,
       noon("2026-09-29"),
     );

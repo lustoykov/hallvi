@@ -478,7 +478,11 @@ describe("the access log on the server", () => {
     const dir = join(root, "backlog");
     mkdirSync(dir);
     const rolled = "access-2026-09-29T08-00-00.000-size.log.gz";
-    file(join(dir, rolled), [caddy("2026-09-29T07:00:00Z")], "2026-09-29T08:00:00Z");
+    file(
+      join(dir, rolled),
+      [caddy("2026-09-29T07:00:00Z")],
+      "2026-09-29T08:00:00Z",
+    );
     file(
       join(dir, "access.log"),
       [caddy("2026-09-29T08:00:00Z"), caddy("2026-09-29T08:30:00Z")],

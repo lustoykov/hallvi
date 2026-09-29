@@ -232,11 +232,15 @@ describe("the privacy line", () => {
       queries: "removed" | "path-only" | "kept" | null,
       format: "caddy-json" | "traefik-json" = "caddy-json",
     ) => serverLogWords({ proxy: "Caddy", format, queries });
-    expect(words("removed")).toMatch(/removed — from the address asked for and from the referrer/);
+    expect(words("removed")).toMatch(
+      /removed — from the address asked for and from the referrer/,
+    );
     // Caddy 2.5 keeps referrers' queries: never "removed" for them.
     expect(words("path-only")).toMatch(/referrers keep theirs/);
     expect(words("path-only")).not.toMatch(/and from the referrer/);
-    expect(words("kept", "traefik-json")).toMatch(/Traefik's log cannot be rewritten/);
+    expect(words("kept", "traefik-json")).toMatch(
+      /Traefik's log cannot be rewritten/,
+    );
     // A record that does not say: nothing is claimed either way.
     for (const unknown of [words(null), serverLogWords(null)])
       expect(unknown).not.toMatch(/removed/);
@@ -313,8 +317,9 @@ describe("a release's line in Deployment", () => {
     // A release at 12:20: 11:00–13:00 was compared with 13:00 onwards, and
     // at 15:00 the hours after it are not over yet.
     const late = (hour: number) =>
-      new Date(Date.parse("2026-09-29T00:00:00.000Z") + hour * 3_600_000)
-        .toISOString();
+      new Date(
+        Date.parse("2026-09-29T00:00:00.000Z") + hour * 3_600_000,
+      ).toISOString();
     const straddling = impact({
       releaseAt: late(12.3333),
       compared: {

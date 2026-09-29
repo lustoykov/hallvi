@@ -109,11 +109,7 @@ vi.mock("@/server/traffic/sources", () => ({
 import { trafficCollector } from "@/server/traffic/collector";
 import { FINAL_AFTER_MS, LOOKBACK_MS } from "@/server/traffic/count";
 import { controllerTimeZone, dayBounds, dayOf } from "@/server/traffic/days";
-import {
-  collectionOf,
-  readDays,
-  setCollection,
-} from "@/server/traffic/store";
+import { collectionOf, readDays, setCollection } from "@/server/traffic/store";
 
 let root: string;
 beforeAll(() => {
@@ -218,7 +214,9 @@ describe("a day's close", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(requests()).toBe(1);
 
-    await vi.advanceTimersByTimeAsync(end + FINAL_AFTER_MS + 1_000 - Date.now());
+    await vi.advanceTimersByTimeAsync(
+      end + FINAL_AFTER_MS + 1_000 - Date.now(),
+    );
     expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]);
     expect(stored().final).toBe(true);
     expect(requests()).toBe(2);

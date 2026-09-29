@@ -653,7 +653,7 @@ export function onServer(
           ...(follow ? ["-tt"] : []),
           // JSON lines compress well, and a follow starts with the day's
           // backlog: 40 MB of Caddy's lines took 16 s over a 20 Mbit/s link,
-          // and 1.2 s compressed (docs/testing/2026-09-29-traffic-collection.md).
+          // and 1.2 s compressed (docs/testing, traffic collection).
           "-o",
           "Compression=yes",
           "-o",

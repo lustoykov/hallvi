@@ -82,8 +82,7 @@ function coveredIn(days: Stored[], from: number, to: number) {
 const floored = (
   day: Pick<TrafficDay, "partial"> | undefined,
   figure: DayFigure,
-) =>
-  Boolean(day?.partial?.includes(figure));
+) => Boolean(day?.partial?.includes(figure));
 
 function share(part: number, whole: number) {
   return whole > 0 ? Math.min(1, Math.max(0, part / whole)) : 0;

@@ -20,8 +20,8 @@
 //
 // A page load the log counted just before the switch point sends its own
 // script view a moment after it, perhaps just past midnight: the two are one
-// view, paired by browser and page. So a pass also reads the last `LOOKBACK_MS` before its day, only to
-// know what the log counted there.
+// view, paired by browser and page. So a pass also reads the last
+// `LOOKBACK_MS` before its day, only to know what the log counted there.
 
 import { createHmac, randomBytes } from "node:crypto";
 

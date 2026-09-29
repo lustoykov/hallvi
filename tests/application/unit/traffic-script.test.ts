@@ -51,7 +51,10 @@ function browse(address: string, referrer: string, pageKey?: string) {
   window.window = window;
   runInNewContext(trafficScript().content, window);
   return {
-    history: window.history as { pushState: typeof go; replaceState: typeof go },
+    history: window.history as {
+      pushState: typeof go;
+      replaceState: typeof go;
+    },
     fire: (type: string) => handlers[type](),
     every: () => every,
     events: () =>
@@ -142,6 +145,15 @@ it("accepts a page key's value alone", () => {
     `/_hv/e/1/${Buffer.from(JSON.stringify({ t: "view", s: "abcdefgh12", p: "/", k })).toString("base64url")}`;
   expect(eventOf(path("12"))).toMatchObject({ k: "12" });
   expect(eventOf(path("héllo wörld"))).toMatchObject({ k: "héllo wörld" });
-  for (const bad of ["", "1&token=x", "1?x", "a=b", "1#x", "a\nb", "x".repeat(101), 12])
+  for (const bad of [
+    "",
+    "1&token=x",
+    "1?x",
+    "a=b",
+    "1#x",
+    "a\nb",
+    "x".repeat(101),
+    12,
+  ])
     expect(eventOf(path(bad)), String(bad)).toBeNull();
 });

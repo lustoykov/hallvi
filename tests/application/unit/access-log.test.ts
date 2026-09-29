@@ -153,9 +153,7 @@ describe("the access log", () => {
       at: number,
       address = "203.0.113.9",
     ) =>
-      window.arrival(
-        request(eventPath(event), at, { beacon: true, address }),
-      );
+      window.arrival(request(eventPath(event), at, { beacon: true, address }));
     // One tab: a page, then a route change — the first page's leave may be
     // logged after the next view, and it still closes it.
     const one = new LiveWindow({ hosts: ["shop.example"], script: true });
@@ -164,7 +162,11 @@ describe("the access log", () => {
     sent(one, { t: "leave", s: "aaaaaaaa11", p: "/", e: 10_000 }, now - 9_000);
     expect(one.now(now)).toMatchObject({ openNow: 1, recentVisitors: 1 });
     // Hidden, then shown again: its leave closes it, the next ping reopens.
-    sent(one, { t: "leave", s: "bbbbbbbb22", p: "/next", e: 5_000 }, now - 5_000);
+    sent(
+      one,
+      { t: "leave", s: "bbbbbbbb22", p: "/next", e: 5_000 },
+      now - 5_000,
+    );
     expect(one.now(now)).toMatchObject({ openNow: 0 });
     sent(one, { t: "ping", s: "bbbbbbbb22", p: "/next" }, now - 1_000);
     expect(one.now(now)).toMatchObject({ openNow: 1 });

@@ -318,7 +318,11 @@ describe("floors", () => {
         ),
       ),
       {
-        totals: totals({ visitors: 9, visitorsPer: "day", visitorsAtLeast: true }),
+        totals: totals({
+          visitors: 9,
+          visitorsPer: "day",
+          visitorsAtLeast: true,
+        }),
         pages: [{ key: "/pricing", count: 110, visitors: 40 }],
         errors: [{ key: "/pricing", count: 3, visitors: 2 }],
         engagement: [{ path: "/pricing", averageMs: 30_000, samples: 4 }],

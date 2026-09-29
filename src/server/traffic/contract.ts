@@ -340,11 +340,7 @@ export type TrafficList = (typeof TRAFFIC_LISTS)[number];
 
 /** A day's figures that are not kept by the hour. */
 export type DayFigure =
-  | "visitors"
-  | TrafficList
-  | "engagement"
-  | "vitals"
-  | "scriptErrors";
+  "visitors" | TrafficList | "engagement" | "vitals" | "scriptErrors";
 
 export interface Gap {
   from: string;

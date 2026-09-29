@@ -426,7 +426,13 @@ export function combined(
       (entry) => entry.count,
     ),
     // Each of those saw part of the day: say so, wherever they are read.
-    partial: ["visitors", ...TRAFFIC_LISTS, "engagement", "vitals", "scriptErrors"],
+    partial: [
+      "visitors",
+      ...TRAFFIC_LISTS,
+      "engagement",
+      "vitals",
+      "scriptErrors",
+    ],
   };
 }
 

@@ -92,9 +92,7 @@ function Rows({
         </p>
       )}
       {sampled && (
-        <p className="tf-card-quiet">
-          From part of the views on some days.
-        </p>
+        <p className="tf-card-quiet">From part of the views on some days.</p>
       )}
       {rows.length > SHOWN && (
         <button
