@@ -10,8 +10,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
-| [AF-019 — Send one review's findings to one branch](#af-019--send-one-reviews-findings-to-one-branch) | 1 | New |
+| [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fix in review |
+| [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -60,6 +60,19 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-021 — Let manual public deployment proceed without GitHub login
+
+A fresh account could read a public repository and connect its existing server,
+then “Deploy master when I ask” failed with a request to connect GitHub so Hallvi
+could watch the branch. Manual branch selection should use the existing public
+reader; automatic watching and private repository access still need a connection.
+
+**+1:** 2026-09-29 — fresh-account alpha.10 onboarding acceptance
+(`codex/manual-public-deployment`).
+
+**Disposition:** [#282](https://github.com/lustoykov/hallvi/pull/282) makes the branch read mode-aware, including a
+manual-to-automatic transition check. Verification guidance worked as written.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
@@ -156,20 +169,7 @@ initial runs which only isolated Hallvi's account were excluded.
 
 **+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
 
-### AF-017 — Make record validation easier for Pi to recover from
-
-During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
-then nine save calls failed because `presentation.checks[].basis` contained
-explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
-the calls and finished, but saving the useful result added avoidable churn.
-Make the tool contract easier to follow without relaxing record validation.
-
-**Status:** Owner-authorized correction in review on `codex/record-basis-contract`: explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. Archive after the fix merges.
-
-**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
-[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
-
-### AF-019 — Send one review's findings to one branch
+### AF-022 — Send one review's findings to one branch
 
 The traffic v1 review findings were fixed twice in parallel: on main (c0e4bf05)
 and on the feature branch (round 2). Both fixed query-routed pages with
@@ -184,8 +184,11 @@ noting on the other which findings are taken, would save that merge.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
+| [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fixed in #280 |
+| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Fixed in #275 |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
-| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fix in review #276 |
+| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fixed in #276 |
 | [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
 | [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Resolved in #266 |
 | [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Resolved in #265 |
@@ -194,6 +197,48 @@ noting on the other which findings are taken, would save that merge.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-020 — Name failed check groups without claiming they passed
+
+The same rehearsal's app timeline shows a red failed moment labelled “7 checks
+passed”. `lane-rails.tsx` turns every counted check group into that phrase,
+including groups containing failures. Keep a failed group's label consistent
+with its recorded outcomes.
+
+**+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
+(`codex/overview-subject-verdict`), observed again in its isolated browser proof.
+
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) labels only passing groups as
+passed; failed, informational and planned groups keep a neutral check count.
+
+### AF-019 — Keep deployment failures out of passing server checks
+
+An installed alpha.9 rehearsal correctly recorded a failed application smoke
+check and three passed host checks, but Overview answered “No” to “Is the server
+up?” beside “3 checks passed”. The server lane inherited the failed deployment
+event's overall status through its passing neighbor-preservation check.
+Only a judgement about a subject in that lane should apply; individual failed
+host checks must still report failure.
+
+**+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
+(`codex/overview-subject-verdict`).
+
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) corrects the projection; the regression
+keeps the application failure visible and the passed host checks consistent
+with the timeline. Verification workflow guidance worked as written.
+
+### AF-017 — Make record validation easier for Pi to recover from
+
+During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
+then nine save calls failed because `presentation.checks[].basis` contained
+explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
+the calls and finished, but saving the useful result added avoidable churn.
+Make the tool contract easier to follow without relaxing record validation.
+
+**Status:** Fixed in [#275](https://github.com/lustoykov/hallvi/pull/275): explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. A bounded real-Pi trial saved valid observed, planned and reported values; future retry-free behavior is not guaranteed.
+
+**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
+[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
 
 ### AF-018 — Load the updated interface after an installed upgrade
 
@@ -207,7 +252,7 @@ without losing unsent work, or make the required reload clear.
 **+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
 [release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
 
-**Disposition:** Fix in review in [#276](https://github.com/lustoykov/hallvi/pull/276).
+**Disposition:** Fixed in [#276](https://github.com/lustoykov/hallvi/pull/276).
 An open page that observes completion offers an explicit, confirmed Reload page
 action. The warning asks the owner to keep unsent work, images and unsaved
 settings first. Existing browser recovery preserves text drafts and pending
