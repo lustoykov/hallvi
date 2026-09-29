@@ -162,7 +162,70 @@ describe("a range", () => {
     );
     // Each hour alone: about 10 ms and 2,425 ms, which average to 1,218.
     // Together, 190 of 200 requests are answered within 2,350 ms.
-    expect(history.totals.p95Ms).toBe(2350);
+    expect(history.totals).toMatchObject({ p95Ms: 2350, p95AtLeast: false });
+  });
+
+  it("says a percentile past the last bound is only a floor", () => {
+    const day = stored("2026-09-29", {
+      hourly: { 10: { requests: 50, latency: took(60_000, 50) } },
+      vitals: [
+        {
+          path: "/",
+          metric: "LCP",
+          buckets: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+        },
+      ],
+    });
+    const history = historyOf(
+      [day],
+      "7d",
+      local("2026-09-29", 12),
+      collection,
+      ZONE,
+    );
+    expect(history.totals).toMatchObject({ p95Ms: 10_000, p95AtLeast: true });
+    expect(history.series.at(-1)).toMatchObject({ p95AtLeast: true });
+    expect(history.vitals).toEqual([
+      { path: "/", metric: "LCP", p75: 10_000, atLeast: true, samples: 4 },
+    ]);
+    const impact = releaseImpact(
+      [day],
+      iso(local("2026-09-29", 9)),
+      120,
+      local("2026-09-29", 23),
+    );
+    expect(impact.after).toMatchObject({ p95Ms: 10_000, p95AtLeast: true });
+  });
+
+  it("says which lists a day kept only in part, and merges the rest exactly", () => {
+    // Each day kept its top entries and folded the rest into "(other)".
+    const pages = (top: string, count: number, other: number) => [
+      { key: top, count, visitors: count },
+      { key: "(other)", count: other, visitors: other },
+    ];
+    const history = historyOf(
+      [
+        stored("2026-09-28", {
+          pages: pages("/", 500, 10),
+          sources: [{ key: "Direct", count: 5, visitors: 5 }],
+        }),
+        stored("2026-09-29", {
+          pages: pages("/pricing", 100, 30),
+          sources: [{ key: "Direct", count: 7, visitors: 7 }],
+        }),
+      ],
+      "7d",
+      local("2026-09-29", 12),
+      collection,
+      ZONE,
+    );
+    // /pricing had views on the 28th too, folded into that day's "(other)":
+    // 100 is only a floor. Sources were kept whole and merge exactly.
+    expect(history.pages.find((row) => row.key === "/pricing")?.count).toBe(
+      100,
+    );
+    expect(history.partialLists).toEqual(["pages"]);
+    expect(history.sources[0].count).toBe(12);
   });
 
   it("draws the last 24 hours across midnight, with today's visitors, and a gap as a gap", () => {
@@ -277,11 +340,21 @@ describe("what a release changed", () => {
   const now = local("2026-09-29", 23);
 
   it("names a path that started failing, with the visitors it reached", () => {
-    const at = iso(local("2026-09-29", 14, 10));
+    const at = iso(local("2026-09-29", 14));
     const impact = releaseImpact([day], at, 120, now);
     expect(impact).toMatchObject({
       releaseAt: at,
       windowMinutes: 120,
+      compared: {
+        before: {
+          from: iso(local("2026-09-29", 12)),
+          to: iso(local("2026-09-29", 14)),
+        },
+        after: {
+          from: iso(local("2026-09-29", 14)),
+          to: iso(local("2026-09-29", 16)),
+        },
+      },
       notable: true,
       covered: 1,
       paths: [
@@ -295,6 +368,46 @@ describe("what a release changed", () => {
     });
     expect(impact.before).toMatchObject({ requests: 200, errors: 0 });
     expect(impact.after).toMatchObject({ requests: 200, errors: 14 });
+  });
+
+  it("never counts a failure before the release as after it", () => {
+    // Released at 14:20. The errors came at 14:01–14:03, before it, and
+    // nothing failed after: the hour holding both is compared in neither.
+    const early = stored("2026-09-29", {
+      hourly: {
+        12: busy,
+        13: busy,
+        14: {
+          ...busy,
+          errors: 3,
+          errorVisitors: 3,
+          errorPaths: [{ path: "/checkout", errors: 3, visitors: 3 }],
+        },
+        15: busy,
+        16: busy,
+      },
+    });
+    const impact = releaseImpact(
+      [early],
+      iso(local("2026-09-29", 14, 20)),
+      120,
+      now,
+    );
+    expect(impact).toMatchObject({
+      compared: {
+        before: {
+          from: iso(local("2026-09-29", 12)),
+          to: iso(local("2026-09-29", 14)),
+        },
+        after: {
+          from: iso(local("2026-09-29", 15)),
+          to: iso(local("2026-09-29", 17)),
+        },
+      },
+      notable: false,
+      paths: [],
+    });
+    expect(impact.after.errors).toBe(0);
   });
 
   it("stays quiet when nothing changed, and when there is nothing to compare with", () => {

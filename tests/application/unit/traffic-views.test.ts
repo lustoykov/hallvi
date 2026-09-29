@@ -53,6 +53,7 @@ const day = (ago: number, visitors: number, covered = 1): SeriesPoint => ({
   errorVisitors: 0,
   bots: 0,
   p95Ms: 200,
+  p95AtLeast: false,
   covered,
 });
 
@@ -225,6 +226,16 @@ describe("a release's line in Deployment", () => {
   const impact = (input: Partial<ReleaseImpact>): ReleaseImpact => ({
     releaseAt: new Date(NOW - 5 * 3_600_000).toISOString(),
     windowMinutes: 120,
+    compared: {
+      before: {
+        from: new Date(NOW - 7 * 3_600_000).toISOString(),
+        to: new Date(NOW - 5 * 3_600_000).toISOString(),
+      },
+      after: {
+        from: new Date(NOW - 4 * 3_600_000).toISOString(),
+        to: new Date(NOW - 2 * 3_600_000).toISOString(),
+      },
+    },
     before: {
       requests: 100,
       views: 40,
@@ -232,6 +243,7 @@ describe("a release's line in Deployment", () => {
       errorVisitors: 0,
       bots: 0,
       p95Ms: 200,
+      p95AtLeast: false,
       visitors: 20,
     },
     after: {
@@ -241,6 +253,7 @@ describe("a release's line in Deployment", () => {
       errorVisitors: 0,
       bots: 0,
       p95Ms: 200,
+      p95AtLeast: false,
       visitors: 20,
     },
     paths: [],

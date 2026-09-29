@@ -284,8 +284,12 @@ export const UNKNOWN = "(unknown)";
 export const DIRECT = "Direct";
 /** Device keys. Countries are ISO 3166-1 alpha-2, upper case, or UNKNOWN. */
 export const DEVICES = ["desktop", "mobile", "tablet"] as const;
-/** Entries stored per list per day; a range merges these exactly. */
-export const STORED_PER_LIST = 200;
+/**
+ * Entries stored per list per day, the rest one `OTHER` row. A range merges
+ * exactly what every day kept; where a day kept an entry only in its `OTHER`,
+ * `partialLists` says so. A busy day stays under 150 kB at this size.
+ */
+export const STORED_PER_LIST = 1000;
 
 export interface Gap {
   from: string;
@@ -473,6 +477,14 @@ export interface TrafficHistory {
 export interface ReleaseImpact {
   releaseAt: string;
   windowMinutes: number;
+  /**
+   * The stretches compared, in whole stored hours. The hour the release fell
+   * in is in neither, so a failure before it is never counted after it.
+   */
+  compared: {
+    before: { from: string; to: string };
+    after: { from: string; to: string };
+  };
   before: Omit<RangeTotals, "visitorsPer">;
   after: Omit<RangeTotals, "visitorsPer">;
   /** Paths whose errors rose, worst first. */

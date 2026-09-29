@@ -10,12 +10,13 @@
 // an imitation candidate.
 
 import {
+  EVENT_PREFIX,
   eventOf,
   HALLVI_PATH_PREFIX,
   type ScriptEvent,
   type TrafficLine,
 } from "./contract";
-import { agentOf } from "./enrich";
+import { agentOf, type Agent } from "./enrich";
 import { HALLVI_USER_AGENT } from "./parse";
 
 export type Classified =
@@ -169,11 +170,33 @@ export function hasFetchMetadata(line: TrafficLine) {
   return Boolean(line.fetchDest || line.fetchMode);
 }
 
+/**
+ * Sent the way the script sends an event: a `POST` the proxy answered with
+ * 204, as a beacon or a fetch — never a navigation — where the browser said.
+ * Anything else reached the application or came from somewhere else, and
+ * must not switch counting to a script that may not even be served.
+ */
+function eventTransport(line: TrafficLine) {
+  return (
+    line.method === "POST" &&
+    line.status === 204 &&
+    (line.fetchDest === null || line.fetchDest === "empty") &&
+    (line.fetchMode === null ||
+      ["no-cors", "cors", "same-origin"].includes(line.fetchMode))
+  );
+}
+
 export function classify(line: TrafficLine): Classified {
   if (line.userAgent.startsWith(HALLVI_USER_AGENT)) return { kind: "own" };
   const agent = agentOf(line.userAgent);
+  const eventish = line.path.startsWith(EVENT_PREFIX);
+  if (eventish && !eventTransport(line)) {
+    // Not an event: an ordinary request for an odd path, never a page.
+    const request = requestOf(line, agent);
+    return { ...request, document: false, view: false };
+  }
   if (line.path.startsWith(HALLVI_PATH_PREFIX)) {
-    const event = eventOf(line.path);
+    const event = eventish ? eventOf(line.path) : null;
     // A crawler that runs the script is still a crawler, and something that
     // is not a browser did not run it. An event is counted, so a forged one
     // must not pass for a browser's: one claiming a browser that always
@@ -186,6 +209,10 @@ export function classify(line: TrafficLine): Classified {
       ? { kind: "event", event }
       : { kind: "own" };
   }
+  return requestOf(line, agent);
+}
+
+function requestOf(line: TrafficLine, agent: Agent): Request {
   const bot = botOf(line.userAgent) ?? probeOf(line.path, line.status);
   const browser = !bot && agent.shaped;
   const redirect =
