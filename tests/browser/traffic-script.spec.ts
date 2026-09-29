@@ -234,7 +234,7 @@ test("a single-page application: a new path is a new view, the same path is not"
   );
 });
 
-test("pings while the tab is visible, and a view leaves only once", async ({
+test("pings while the tab is visible, and visible time keeps adding up after a return", async ({
   page,
 }) => {
   await page.clock.install();
@@ -244,21 +244,47 @@ test("pings while the tab is visible, and a view leaves only once", async ({
   await page.clock.runFor(2 * PING_SECONDS * 1000 + 1000);
   await until("ping", 2, view.s);
 
+  // Hidden: the time so far goes out, and nothing pings.
   await setVisibility(page, "hidden");
-  const [leave] = await until("leave", 1, view.s);
-  expect(leave.e).toBeGreaterThanOrEqual(2 * PING_SECONDS * 1000);
-  expect(leave.e).toBeLessThan(3 * PING_SECONDS * 1000);
+  const [first] = await until("leave", 1, view.s);
+  expect(first.e).toBeGreaterThanOrEqual(2 * PING_SECONDS * 1000);
+  expect(first.e).toBeLessThan(3 * PING_SECONDS * 1000);
   await page.clock.runFor(2 * PING_SECONDS * 1000);
   expect(ofType("ping", view.s)).toHaveLength(2);
 
-  // Back again: still open, so it pings; but it has already left.
+  // Back for another thirty seconds, then away by a link: the leave carries
+  // the whole visible time, and hidden time counts for nothing.
   await setVisibility(page, "visible");
   await page.clock.runFor(PING_SECONDS * 1000);
   await until("ping", 3, view.s);
   await page.getByRole("link", { name: "Back to landing" }).click();
   await until("view", 2);
-  await page.waitForTimeout(500);
-  expect(ofType("leave", view.s)).toHaveLength(1);
+  const leaves = await until("leave", 2, view.s);
+  expect(leaves.at(-1)!.e).toBeGreaterThanOrEqual(3 * PING_SECONDS * 1000);
+  expect(leaves.at(-1)!.e).toBeLessThan(4 * PING_SECONDS * 1000);
+});
+
+test("ten seconds visible, ten hidden and sixty visible is seventy seconds on the page", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto(`${site}/next`);
+  const [view] = await until("view", 1);
+
+  await page.clock.runFor(10_000);
+  await setVisibility(page, "hidden");
+  await page.clock.runFor(10_000);
+  await setVisibility(page, "visible");
+  await page.clock.runFor(60_000);
+  await setVisibility(page, "hidden");
+
+  const leaves = await until("leave", 2, view.s);
+  expect(leaves.map((leave) => Math.round(leave.e / 1000))).toEqual([10, 70]);
+  // Hiding again while hidden, or closing the hidden tab, adds nothing.
+  await setVisibility(page, "hidden");
+  await page.evaluate(() => dispatchEvent(new Event("pagehide")));
+  await page.waitForTimeout(300);
+  expect(ofType("leave", view.s)).toHaveLength(2);
 });
 
 test("a prerendered page counts only once it is shown", async ({ page }) => {
