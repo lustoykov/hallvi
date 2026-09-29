@@ -35,6 +35,9 @@ automation prompts into product sessions.
   request.
 - Keep decisions in their owning documents and update current wording instead
   of appending handoffs.
+- Keep verification screenshots, logs and per-run reports in ignored
+  `tests/results/` or `work/`. Summarize checks in the PR; do not commit review
+  artifacts or add new reports under `docs/testing/`.
 - Never commit `.hallvi/`, `.next/` or `tests/results/`. Never print
   credentials or copy them into code, artifacts, commits or pull requests.
 - Clean up what your task created and nothing else, as

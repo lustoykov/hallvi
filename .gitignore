@@ -12,6 +12,8 @@ out/
 dist/
 coverage/
 tests/results/
+# Historical tracked reports remain; new verification artifacts stay local.
+docs/testing/
 .impeccable/
 *.tsbuildinfo
 .env.local
