@@ -21,12 +21,13 @@ import { browserJourneys } from "../browser/journeys.ts";
 import { suiteGuides } from "./suite-guides.ts";
 import { guidePage, renderMarkdown } from "./markdown.ts";
 import { checkout, developmentState, releasesState } from "./development.ts";
-import { createLearning, LearningError, learningSources } from "./learning.ts";
+import { createLearning, LearningError } from "./learning.ts";
+import type { RebuildOptions } from "./learning-rebuild.ts";
 import { learningPage, learningSourcePage } from "./learning-page.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
-export const API_VERSION = 8;
+export const API_VERSION = 9;
 
 const REPOSITORY = "lustoykov/hallvi";
 
@@ -230,8 +231,12 @@ export type Launch = (
   args: string[],
   options: SpawnOptions,
 ) => ChildProcess;
-export function createDashboard(root: string, launch: Launch = spawn) {
-  const learning = createLearning(root);
+export function createDashboard(
+  root: string,
+  launch: Launch = spawn,
+  learningOptions: RebuildOptions = {},
+) {
+  const learning = createLearning(root, learningOptions);
   const pairedAppPort = Number(process.env.HALLVI_DEV_APP_PORT) || undefined;
   const appUrl = `http://127.0.0.1:${pairedAppPort ?? 3000}`;
   const storage = directory(join(root, "tests/results"));
@@ -391,18 +396,16 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       }
       if (request.method === "GET" && url.pathname === "/learn/source") {
         const path = url.searchParams.get("file");
-        if (!learningSources.some((source) => source === path)) {
+        const revision = url.searchParams.get("revision");
+        let source: string;
+        try {
+          source = learning.source(path ?? "", revision);
+        } catch {
           json({ error: "Unknown learning source" }, 404);
           return;
         }
         response.setHeader("Content-Type", "text/html; charset=utf-8");
-        response.end(
-          learningSourcePage(
-            path!,
-            readFileSync(join(root, path!), "utf8"),
-            appUrl,
-          ),
-        );
+        response.end(learningSourcePage(path!, source, appUrl, revision));
         return;
       }
       if (
@@ -525,6 +528,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           "/api/releases/build",
           "/api/releases/publish",
           "/api/learning",
+          "/api/learning/rebuild",
         ].includes(url.pathname)
       ) {
         json({ error: "Not found" }, 404);
@@ -544,6 +548,11 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           throw new Error("Request too large");
       }
       const body = JSON.parse(text);
+      if (url.pathname === "/api/learning/rebuild") {
+        const { force } = z.strictObject({ force: z.boolean() }).parse(body);
+        json(learning.rebuild(force), 202);
+        return;
+      }
       if (url.pathname === "/api/learning") {
         json(learning.act(body));
         return;
@@ -658,6 +667,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     token,
     stop: () => {
       cancelActive?.();
+      learning.stop();
       server.close();
     },
   };

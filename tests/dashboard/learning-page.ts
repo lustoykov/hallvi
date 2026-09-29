@@ -16,7 +16,13 @@ export function learningPage(appUrl: string, token: string) {
       <div><h1>Learn Hallvi</h1><p>Keep your understanding in step with the code.</p></div>
       <button id="continue" class="primary" disabled>Start learning</button>
     </header>
-    <p id="checkout" class="learn-checkout">Reading this checkout…</p>
+    <section class="learn-refresh" aria-label="Architecture freshness">
+      <div><p id="checkout" class="learn-checkout">Reading architecture…</p>
+        <p id="rebuild-status" class="footnote" role="status">Checking rebuild status…</p></div>
+      <div class="learn-rebuild-action"><button id="rebuild" class="secondary" type="button" disabled>Rebuild now</button>
+        <span class="footnote">Counts toward Codex usage</span></div>
+    </section>
+    <details id="rebuild-summary" class="learn-rebuild-summary" hidden><summary>What changed in the last rebuild</summary><p></p></details>
     <div id="learning-error" class="error" role="alert" hidden></div>
     <div class="learn-toolbar">
       <nav class="learn-views" aria-label="Learning views">
@@ -24,27 +30,27 @@ export function learningPage(appUrl: string, token: string) {
         <a href="#quiz">Quiz <span id="due-count"></span></a>
         <a href="#progress">Your progress</a>
       </nav>
-      <p id="learning-sync" class="footnote" role="status">Checking sources…</p>
+      <p id="learning-sync" class="footnote" role="status">Connecting…</p>
     </div>
     <section id="overview" aria-labelledby="map-title">
       <section class="learn-map surface">
         <header class="learn-section-heading"><div><h2 id="map-title">How the pieces connect</h2>
           <p class="muted">Select a component to trace its connections.</p></div>
-          <a href="/learn/source?file=docs%2Farchitecture.md" class="footnote">Architecture source</a></header>
+          <a id="architecture-source" href="/learn/source?file=docs%2Farchitecture.md" class="footnote">Architecture notes</a></header>
         <div id="architecture-map" class="learn-map-scroll" role="region" aria-label="Interactive architecture map" tabindex="0"></div>
         <div id="map-detail" class="learn-map-detail" aria-live="polite"></div>
       </section>
       <section class="learn-concepts" aria-labelledby="concepts-title">
         <div class="learn-section-heading"><div><h2 id="concepts-title">Build your understanding</h2>
-          <p id="overview-progress" class="muted">Questions follow the sources in this checkout.</p></div>
+          <p id="overview-progress" class="muted">Questions follow the architecture and its source code.</p></div>
           <label class="learn-search">Find a concept<input type="search" id="concept-search" placeholder="Search concepts and responsibilities"></label></div>
         <div id="topics"></div>
       </section>
       <details class="learn-about"><summary>How this stays current</summary>
-        <p>The page checks local sources every five seconds while open. Definitions come from <code>CONTEXT.md</code>, the map from <code>docs/architecture.md</code>, and tool contracts and table fields from their TypeScript source. Source links show this checkout, including local edits.</p>
-        <p>A changed definition, tool description or table field list becomes a new question version. Correct answers to unchanged questions stay completed. Old versions and removed concepts stay in your history; archived questions leave your queue until you restore them or their content changes.</p>
-        <p>The definitions describe Hallvi's domain, including concepts whose wording explicitly says they are planned. Documentation still needs to be updated when behavior changes. These questions test that documented model and the extracted contracts; they do not verify the running application.</p>
-        <p>No model calls. Progress is saved on this machine, shared by this repository's worktrees. It is separate from Hallvi application data and is not committed to Git.</p>
+        <p>Once a day while this page is open, the dashboard checks <code>origin/main</code>. If merged code has changed, a temporary Codex CLI job reads a fixed snapshot of the code and documentation, updates the map and questions, then exits. If the dashboard was closed, it catches up when you open this page. <strong>Rebuild now</strong> runs the review immediately, even if main has not changed.</p>
+        <p>The job uses <code>gpt-5.6-sol</code> with medium reasoning and your Codex CLI sign-in. It consumes your Codex usage; it does not run Hallvi’s Pi operator. Install the CLI and run <code>codex login</code> on this machine if needed. Before the first successful rebuild, you can learn from starter questions extracted from this checkout.</p>
+        <p>Unchanged questions keep their answers. Changed knowledge becomes a new version, and removed concepts leave your queue but stay in your saved history. The previous catalog stays available during a rebuild or if a rebuild fails. Source links in a rebuilt catalog open the cited commit, so you can check the explanation against the code. Model-generated explanations can be wrong; the sources are there to inspect.</p>
+        <p>Progress and rebuilt content are saved on this machine, shared by this repository’s worktrees. They are separate from Hallvi application data and are not committed to Git.</p>
         <p id="progress-location" class="footnote"></p>
       </details>
     </section>
@@ -90,6 +96,7 @@ export function learningSourcePage(
   path: string,
   source: string,
   appUrl: string,
+  revision: string | null = null,
 ) {
   const lines = source
     .split("\n")
@@ -100,7 +107,7 @@ export function learningSourcePage(
     .join("");
   return guidePage(
     `<p><a href="/learn">Back to Learn Hallvi</a></p><h1>${escape(path)}</h1>
-     <p>Current local source. This includes uncommitted edits.</p>
+     <p>${revision ? `Source at commit ${escape(revision)}.` : "Current local source. This includes uncommitted edits."}</p>
      <pre class="learn-source"><code>${lines}</code></pre>`,
     path,
     appUrl,

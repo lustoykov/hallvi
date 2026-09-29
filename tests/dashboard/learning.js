@@ -9,7 +9,7 @@ const escape = (value) =>
       ],
   );
 const sourceLink = (source) =>
-  `/learn/source?file=${encodeURIComponent(source.path)}#L${source.line}`;
+  `/learn/source?file=${encodeURIComponent(source.path)}${source.revision ? `&revision=${encodeURIComponent(source.revision)}` : ""}#L${source.line}`;
 const key = (question) => `${question.id}@${question.version}`;
 const due = (question) => !["learned", "archived"].includes(question.status);
 const labels = {
@@ -18,7 +18,7 @@ const labels = {
   changed: "Changed",
   retry: "Still learning",
   archived: "Archived",
-  removed: "Removed from this checkout",
+  removed: "Retired from the architecture",
 };
 let state;
 let signature = "";
@@ -31,6 +31,8 @@ let loading = false;
 let connected = false;
 let selectedNode = "";
 let mutation = 0;
+let rebuilding = false;
+let autoRetryAfter = 0;
 const deferred = new Set();
 const groups = () => [...new Set(state.questions.map((q) => q.topic))];
 const queue = () =>
@@ -42,8 +44,8 @@ const queue = () =>
         Number(b.status === "changed") - Number(a.status === "changed"),
     );
 
-async function request(body) {
-  const response = await fetch("/api/learning", {
+async function request(body, path = "/api/learning") {
+  const response = await fetch(path, {
     method: body ? "POST" : "GET",
     headers: {
       "X-Hallvi-Testing-Token": token,
@@ -66,11 +68,14 @@ async function refresh() {
   const readingAt = mutation;
   try {
     const next = await request();
+    if (!next.refresh)
+      throw new Error(
+        "Restart the local dashboard to enable architecture rebuilds.",
+      );
     if (readingAt !== mutation) return;
     connected = true;
     $("learning-error").hidden = true;
-    $("learning-sync").textContent =
-      `Checked ${new Date(next.checkedAt).toLocaleTimeString()} · updates automatically`;
+    $("learning-sync").textContent = "Progress saved locally";
     const nextSignature = JSON.stringify([
       next.sourceVersion,
       next.history,
@@ -88,6 +93,10 @@ async function refresh() {
     } else if ($("question").querySelector("button:disabled")) {
       renderQuestion();
     }
+    state.refresh = next.refresh;
+    renderRefresh();
+    if (next.refresh.due && !document.hidden && Date.now() >= autoRetryAfter)
+      void rebuild(false);
   } catch (error) {
     connected = false;
     fail(error);
@@ -95,6 +104,62 @@ async function refresh() {
     if (state) renderQuestion();
   } finally {
     loading = false;
+  }
+}
+function renderRefresh() {
+  if (!state) return;
+  const refresh = state.refresh;
+  const running = refresh.status === "running";
+  const time = (value) =>
+    new Date(value).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  $("checkout").textContent = refresh.revision
+    ? `Merged main · ${refresh.revision.slice(0, 8)} · rebuilt ${time(refresh.builtAt)}`
+    : `Starter content from ${state.checkout.branch || "this checkout"} · awaiting first Codex rebuild`;
+  $("checkout").title = state.checkout.root;
+  const elapsed = Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(refresh.startedAt)) / 1000),
+  );
+  $("rebuild-status").textContent = running
+    ? `${refresh.message} · ${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+    : refresh.status === "failed"
+      ? refresh.message
+      : `${refresh.lastCheckedAt ? `Main checked ${time(refresh.lastCheckedAt)}. ` : ""}${refresh.nextCheckAt ? `Next daily check ${time(refresh.nextCheckAt)}.` : "Daily refresh will start shortly."}`;
+  $("rebuild-status").classList.toggle(
+    "learn-refresh-error",
+    refresh.status === "failed",
+  );
+  $("rebuild").disabled = !connected || rebuilding || running;
+  $("rebuild").textContent =
+    running || rebuilding
+      ? "Rebuilding…"
+      : refresh.status === "failed"
+        ? "Retry rebuild"
+        : "Rebuild now";
+  $("rebuild-summary").hidden = !refresh.summary;
+  $("rebuild-summary").querySelector("p").textContent = refresh.summary ?? "";
+  $("architecture-source").href = sourceLink({
+    path: "docs/architecture.md",
+    line: 1,
+    revision: refresh.revision,
+  });
+}
+async function rebuild(force) {
+  if (rebuilding) return;
+  rebuilding = true;
+  renderRefresh();
+  try {
+    state.refresh = await request({ force }, "/api/learning/rebuild");
+    $("learning-error").hidden = true;
+  } catch (error) {
+    autoRetryAfter = Date.now() + 60_000;
+    fail(error);
+  } finally {
+    rebuilding = false;
+    renderRefresh();
   }
 }
 function view() {
@@ -129,9 +194,6 @@ function render() {
   const archived = state.questions.filter(
     (q) => q.status === "archived",
   ).length;
-  $("checkout").textContent =
-    `${state.checkout.branch || "Detached checkout"} · ${state.checkout.revision.slice(0, 8) || "No commit yet"}${state.checkout.dirty ? " · local source edits" : ""}`;
-  $("checkout").title = state.checkout.root;
   $("due-count").textContent = remaining ? String(remaining) : "";
   $("continue").textContent = learned ? "Continue learning" : "Start learning";
   $("continue").disabled = !connected || !remaining;
@@ -145,6 +207,7 @@ function render() {
   renderQuiz();
   renderHistory();
   renderView();
+  renderRefresh();
 }
 function wrapLabel(text, measure, width) {
   const lines = [""];
@@ -165,6 +228,12 @@ function wrapLabel(text, measure, width) {
 }
 function renderMap() {
   const { nodes, edges } = state.graph;
+  if (!nodes.length) {
+    $("architecture-map").textContent =
+      "The first Codex rebuild will create your architecture map and questions.";
+    $("map-detail").textContent = "";
+    return;
+  }
   if (!nodes.some((node) => node.id === selectedNode))
     selectedNode = nodes[0]?.id ?? "";
   // Breadth-first placement leaves cycles intact. Returning edges run
@@ -323,6 +392,11 @@ function renderQuestion() {
     selected = "";
     result = null;
   }
+  if (!state.questions.length) {
+    $("question").innerHTML =
+      '<h2 tabindex="-1">Your learning catalog is being prepared.</h2><p>Use Rebuild now above to retry if the first rebuild has failed. Your saved progress is kept.</p>';
+    return;
+  }
   if (!question) {
     $("question").innerHTML =
       `<h2 tabindex="-1">You're up to date${topic ? " on this topic" : ""}.</h2>
@@ -393,7 +467,7 @@ function renderHistory() {
         <p class="muted">${row.attempts} attempt${row.attempts === 1 ? "" : "s"}${row.selected ? ` · last answer: ${escape(row.selected)}` : ""}${row.completedAt ? ` · learned ${new Date(row.completedAt).toLocaleString()}` : ""}</p>
         ${
           ["removed", "changed"].includes(row.reason)
-            ? '<p class="footnote">Kept as history. This version no longer belongs to this checkout’s quiz.</p>'
+            ? '<p class="footnote">Kept as history. This version no longer belongs to the current quiz.</p>'
             : `<button class="secondary" data-history-action="${row.reason === "archived" ? "restore" : "archive"}" data-id="${escape(q.id)}" data-version="${escape(q.version)}" ${busy || !connected ? "disabled" : ""}>${row.reason === "archived" ? "Restore question" : "Archive question"}</button>`
         }</div></details>`;
       })
@@ -459,6 +533,7 @@ async function save(action) {
     }
   }
 }
+$("rebuild").addEventListener("click", () => void rebuild(true));
 $("continue").addEventListener("click", () => openQuiz());
 $("concept-search").addEventListener("input", renderTopics);
 $("history-filter").addEventListener("change", renderHistory);

@@ -100,46 +100,73 @@ Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and 
 ## Learn the current architecture
 
 Open **Learn Hallvi** in the developer dashboard, or its `/learn` address.
-The overview is the Mermaid flowchart under **The shape of it** in
-`docs/architecture.md`. Selecting a component traces its incoming and outgoing
-connections. The quiz reads definitions from `CONTEXT.md`, tool descriptions
-from `defineTool` calls in `src/server/pi.ts`, and table fields from
-`src/server/db-schema.ts`. It parses TypeScript without importing the operator.
-Sources are checked every five seconds while the page is visible, including
-uncommitted edits; each source link opens the local file with line numbers.
+The overview maps the architecture; selecting a component traces its connections.
+The quiz teaches core concepts, responsibilities and flows, and keeps your
+answers across visits.
 
-Correct answers leave the queue. A changed definition, tool description or table field list
-gets a new question version; moving a definition or changing its formatting
-does not reset progress. Removed questions and previous versions remain in
-Your progress, with the question and answer saved at the time. Archive removes
-a current question from the queue, and Restore brings it back. Wrong answers
-save the attempt and remain in the queue.
+Once every 24 hours while the page is visible, it asks the local dashboard to
+fetch `origin/main`. If that commit differs from the last successful rebuild,
+a temporary **Codex CLI** job reviews a fixed snapshot of tracked code and
+documentation and returns an incremental catalog update. No model run is needed
+when main is unchanged. **Rebuild now** forces a fresh review, including when
+main is unchanged. After the dashboard was closed, the next visit catches up.
+This is a page-triggered daily check, not an OS service or a merge requirement.
 
-Progress is single-user and local to this repository, in
-`<git-common-dir>/hallvi-learning.sqlite`, shared by its worktrees. Switching
-branches compares progress against that checkout's sources without retiring
-questions in another branch. It survives dashboard restarts and worktree
-removal, is never committed, and is separate from the controller's database
-and account files. Back up this file to preserve learning progress when
-removing a repository. `HALLVI_LEARNING_DB_PATH` selects another progress file,
-which is useful for a disposable preview or test.
+Install Codex CLI and sign in with `codex login` on the dashboard's machine.
+The job uses `gpt-5.6-sol` with medium reasoning and the saved CLI authentication,
+and consumes Codex usage. It runs in a read-only sandbox with an ephemeral
+session and without user config or execution rules; it is separate from this
+Codex chat and from Hallvi's Pi operator. The snapshot contains regular tracked
+text files, excludes local state, dotfiles and contributor instructions, and is
+removed when the run finishes. The dashboard never checks out another branch,
+imports the operator or opens managed application data.
 
-Keep the canonical documentation and tool descriptions current when changing
-behavior. This is automatic extraction of their content, not an independent
-audit of implementation behavior. The map supports one directed Mermaid edge
-per line with rectangular or database nodes; unsupported source shapes fail
-visibly and do not erase progress. The dashboard does not generate questions
-with a model, invoke Pi, or inspect managed applications.
+The page shows the source commit, rebuild time, next daily check, running status
+and errors. Existing content remains usable during a rebuild. The dashboard
+validates the output schema, question identities, answer choices, source paths
+and line ranges, and map connections before publishing it atomically. A failure
+keeps the previous catalog; Retry rebuild retries immediately. Failed daily
+checks wait until the next daily check rather than looping model calls. A shared
+SQLite lock prevents duplicate runs across tabs, servers and worktrees. Runs stop
+when their dashboard stops and are limited to 15 minutes. A later dashboard
+recognizes an interrupted run and offers retry.
+
+Before the first successful review, starter questions are extracted from
+`CONTEXT.md`, `docs/architecture.md`, `src/server/pi.ts` and
+`src/server/db-schema.ts`. These reflect the local checkout and are labeled as
+starter content. If their format has changed, Codex can create the first catalog
+from scratch. Afterwards the published catalog follows merged main, independent
+of local edits. Source links open the cited commit; unchanged questions may
+retain an older, still relevant citation. The overview's architecture link opens
+the notes at the reviewed commit. Model explanations are learning aids, not
+runtime verification; source references let you inspect their basis.
+
+Correct answers leave the queue. Codex is asked to leave unchanged knowledge
+verbatim; versions depend on the prompt, correct answer, description and
+explanation, not line movement or distractors. Changed material becomes a new
+version. Removed questions and previous versions remain in Your progress with
+their saved answers. Archive removes a current question from the queue; Restore
+brings it back. Wrong answers save the attempt and remain in the queue.
+
+Progress and the published catalog are single-user and local to this repository,
+in `<git-common-dir>/hallvi-learning.sqlite`, shared by its worktrees. They
+survive dashboard restarts and worktree removal, are never committed, and stay
+separate from the controller database and account files. Back up this file before
+removing a repository. `HALLVI_LEARNING_DB_PATH` selects another file for **both**
+progress and rebuild state; use it for disposable verification.
 
 ```mermaid
 flowchart LR
-    Sources[Local definitions, architecture, tool and schema source]
-    Sources --> Extract[Read and version the current learning material]
-    Extract --> View[Architecture map and quiz]
-    View -->|Answer or archive a current version| Progress[(Shared repository learning progress)]
+    Page[Daily check while open or Rebuild now] --> Fetch[Fetch origin/main]
+    Fetch -->|Changed commit or manual rebuild| Snapshot[Fixed source snapshot]
+    Fetch -->|Same commit on daily check| Skip[Keep catalog without a model call]
+    Snapshot --> Codex[Temporary read-only Codex CLI job]
+    Codex --> Validate[Validate incremental catalog]
+    Validate -->|Valid| Catalog[(Published catalog)]
+    Validate -->|Failure| Keep[Keep previous catalog and show retry]
+    Catalog --> View[Architecture map and quiz]
+    View -->|Answer or archive| Progress[(Saved learning progress)]
     Progress -->|Match question ID and content version| View
-    Extract -->|Changed or removed version| History[Earlier questions stay in history]
-    Progress --> History
 ```
 
 ## Verify
