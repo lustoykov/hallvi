@@ -67,12 +67,15 @@ Deployment one now names the address, which is the link that page draws.
 
 ### AF-002 — Shared-information smoke can miss its 10 s window on a cold dev server
 
-Run alone in a cold cloud container, the spec failed at line 149: "Tunnel
-closed" appeared 10.0 s after the page loaded, just past the expect timeout.
-The page compiles for about 20 s on first visit, and API routes the fixture
-does not warm (`/operator`, `/connections`, `/secrets`, `/api/host`,
-`/api/hallvi/update`) took 3–10 s each on first hit. The full smoke run
-passed. Warming those in the fixture might take the race out.
+In a cloud container the spec failed at line 149 in two of three runs at the
+project's timeouts: "Tunnel closed" appeared about 10 s after the page loaded,
+at or past the expect timeout. After hydration the page asks five API routes
+the fixture does not warm (`/operator`, `/connections`, `/secrets`,
+`/api/host`, `/api/hallvi/update`); they took 3–10 s each on first hit, and
+the badge came only after they answered. With those five added to the
+warm-up list in `tests/browser/fixtures.ts`, every request took under 0.7 s
+and the badge showed 0.9 s after load. GitHub Actions passed the spec in
+40.5 s on 2026-09-24, so slower machines may be the ones that see it.
 
 **+1:** 2026-09-29 — typed-information smoke fix, branch `claude/funny-gauss-vog9sp`
 
