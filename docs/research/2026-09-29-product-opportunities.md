@@ -4,6 +4,8 @@ Research date: **29 September 2026**. Final source review: `261cd33ffc1123e1f953
 
 **Status: product research and proposed experiments.** This document does not change [Product](../../PRODUCT.md), the [operator design](../operator-design.md), or the [Roadmap](../../ROADMAP.md). It is contributor research, never instructions for Pi operating a user's application.
 
+The owner's follow-up requested a separate planning chat for each ranked proposal. The [coordinated implementation plans](../plans/2026-09-29-product-improvements/README.md) provide one short reading page and eleven detailed plans, with dependencies and acceptance checks.
+
 ## Recommendation
 
 **Make Hallvi exceptionally good at the complete ownership of a small, stateful application: deploy it, keep it usable, understand changes, and recover its data.** Prioritize people building or running useful software who do not want operating it to become another job. Solo builders and small teams are the initial audience already named in Product; stronger demand from particular subgroups still needs validation.

@@ -6,12 +6,13 @@
 // through an SSH connection from another one, and nothing said which. With two
 // installations that is two identical tabs, so the machine's name goes in the
 // tab title, where two tabs are told apart. The version at the foot of the
-// sidebar names it too, for anyone who asks the page itself.
+// sidebar names it too. The top strip keeps the host visible on every page.
 //
 // A checkout runs on the same machine as the installed Hallvi, so the
 // machine's name does not tell them apart. A checkout leads its tab title with
 // "Dev" and what it is, wears a green mascot in the tab, and says so in the
-// strip at the top of every page.
+// strip at the top of every page. Both installed and development tabs name
+// the host, since checkouts can live on another computer too.
 
 import { useEffect, useState } from "react";
 
@@ -65,8 +66,8 @@ const DEVELOPMENT_ICON = `data:image/svg+xml,${encodeURIComponent(
 
 /**
  * Keeps the tab saying which Hallvi it is: the machine's name at the end of
- * the title, or "Dev" and the checkout at its start. Pages set their own
- * titles and icons as they load, so this follows the head rather than a route.
+ * the title, with "Dev" and the checkout at its start when applicable. Pages
+ * set their own titles and icons, so this follows the head rather than a route.
  */
 export function HostTitle() {
   const { name, development } = useThisHallvi();
@@ -75,7 +76,7 @@ export function HostTitle() {
     const prefix = development
       ? `Dev · ${development.application ?? development.checkout} · `
       : "";
-    const suffix = development ? "" : ` · ${name}`;
+    const suffix = ` · ${name}`;
     const apply = () => {
       if (!document.title.startsWith(prefix))
         document.title = prefix + document.title;
@@ -116,6 +117,17 @@ export function DevelopmentLabel() {
       }
     >
       Dev · {application ?? checkout}
+    </span>
+  );
+}
+
+/** The computer serving Hallvi, including when opened through an SSH tunnel. */
+export function HostLabel() {
+  const { name } = useThisHallvi();
+  if (!name) return null;
+  return (
+    <span className="hv-host-label" title={`Hallvi runs on ${name}`}>
+      Running on {name}
     </span>
   );
 }
