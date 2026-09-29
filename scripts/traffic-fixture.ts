@@ -3413,8 +3413,10 @@ function verify(flags: Record<string, string>, files: string[]) {
   if (!LOG_FORMATS.includes(format))
     fail(`Give --format ${LOG_FORMATS.join("|")}.`);
   if (!files.length) fail("Name the log files to count.");
+  // Days are cut where the controller is, as Hallvi cuts them.
   const timeZone =
-    flags["time-zone"] ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+    flags["time-zone"] ??
+    (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   const dayOf = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",

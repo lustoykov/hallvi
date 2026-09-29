@@ -21,7 +21,7 @@ import { parseLine } from "@/server/traffic/parse";
 const root = mkdtempSync(join(tmpdir(), "hallvi-traffic-fixture-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-function backfill(format: LogFormat, out: string, seed = "3") {
+function backfill(format: LogFormat, out: string, seed = "3", days = "1") {
   const dir = join(root, out);
   const result = spawnSync(
     process.execPath,
@@ -30,7 +30,7 @@ function backfill(format: LogFormat, out: string, seed = "3") {
       "tsx",
       resolve("scripts/traffic-fixture.ts"),
       "backfill",
-      ...["--format", format, "--shape", "spa", "--days", "1"],
+      ...["--format", format, "--shape", "spa", "--days", days],
       ...["--seed", seed, "--end", "2026-09-20T06:00:00Z", "--out", dir],
       ...["--releases", "2026-09-19T09:30:00Z"],
     ],
@@ -63,13 +63,26 @@ function read(format: LogFormat, files: { name: string; bytes: Buffer }[]) {
 
 describe("the traffic fixture", () => {
   it("writes the same files for the same seed, named as Caddy names them", () => {
-    const first = backfill("caddy-json", "first");
-    expect(backfill("caddy-json", "again")).toEqual(first);
-    expect(backfill("caddy-json", "other", "4")).not.toEqual(first);
-    // Caddy 2.11 rolling every 24 hours, the last roll at --end.
-    expect(first.map((file) => file.name)).toEqual([
-      "access-2026-09-20T06-00-00.000-time.log.gz",
-    ]);
+    const first = backfill("caddy-json", "first", "3", "2");
+    expect(backfill("caddy-json", "again", "3", "2")).toEqual(first);
+    expect(backfill("caddy-json", "other", "4", "2")).not.toEqual(first);
+    // Caddy 2.11 rolling every 24 hours: the last roll at --end, the one
+    // before it at the write that opened the next file. Hallvi's listing
+    // reads the two as neighbours only if that write is within two seconds
+    // of the time in the name; later, and the night between is a gap.
+    const [older, newer] = first;
+    expect(newer.name).toBe("access-2026-09-20T06-00-00.000-time.log.gz");
+    const stamp = /^access-(\d{4}-\d\d-\d\d)T(\d\d)-(\d\d)-(\d\d\.\d{3})-time/
+      .exec(older.name)!
+      .slice(1);
+    const rolled = Date.parse(
+      `${stamp[0]}T${stamp[1]}:${stamp[2]}:${stamp[3]}Z`,
+    );
+    const opened = JSON.parse(
+      gunzipSync(newer.bytes).toString("utf8").split("\n")[0],
+    ).ts;
+    expect(opened * 1000 - rolled).toBeGreaterThanOrEqual(0);
+    expect(opened * 1000 - rolled).toBeLessThan(2_000);
   }, 60_000);
 
   it("writes lines Hallvi reads, in every format", () => {
