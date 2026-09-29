@@ -4,6 +4,9 @@
 | --- | --- | --- |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
+| [AF-003 — Avoid rereading unchanged execution history](#af-003--avoid-rereading-unchanged-execution-history) | 1 | New |
+| [AF-004 — Reopen a known private application directly](#af-004--reopen-a-known-private-application-directly) | 1 | New |
+| [AF-005 — Make agreed ongoing care visible](#af-005--make-agreed-ongoing-care-visible) | 1 | New |
 
 ## How to contribute
 
@@ -68,3 +71,31 @@ only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+
+### AF-003 — Avoid rereading unchanged execution history
+
+Each open chat rebuilds its snapshot every 500 ms and reads all application
+execution files before suppressing unchanged output. I would like long-history
+return visits to avoid this repeated work. The [product research](docs/research/2026-09-29-product-opportunities.md#1-make-the-interface-fast-by-avoiding-work-that-has-not-changed)
+includes an isolated measurement and a proposed multi-chat check; it does not
+establish a production slowdown or justify a database replacement.
+
+**+1:** 2026-09-29 — task `codex/hallvi-product-research`
+
+### AF-004 — Reopen a known private application directly
+
+I would like a clear Open/Reconnect action for an application's previously
+established private route, so returning to use it does not require a free-form
+conversation. The [proposal](docs/research/2026-09-29-product-opportunities.md#2-make-open-work-after-the-owner-comes-back)
+identifies the permission-contract decision this would require.
+
+**+1:** 2026-09-29 — task `codex/hallvi-product-research`
+
+### AF-005 — Make agreed ongoing care visible
+
+When Hallvi agrees to check something later, I want to see what it will check,
+where it runs, its last result, its next due time, and how to pause it. Start
+with one quiet care loop after the current beta gate. The [proposal](docs/research/2026-09-29-product-opportunities.md#6-prove-one-quiet-ongoing-care-loop)
+keeps this separate from approval of background collection or repair.
+
+**+1:** 2026-09-29 — task `codex/hallvi-product-research`
