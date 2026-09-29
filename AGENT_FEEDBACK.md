@@ -130,6 +130,7 @@ tool disclosures are insufficient.
 | [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+| [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 
 ### AF-003 — Open-link checks in the shared-information smoke match nothing
 
@@ -172,3 +173,16 @@ updates requested in Codex. The dashboard only reads saved content; it has no
 agent launcher or per-PR review requirement. That approach is implemented in #247.
 
 **+1:** 2026-09-29 — `codex/architecture-learning`
+
+### AF-011 — Keep elapsed time together on narrow work lines
+
+At 390px, the work line split `2m 0s` across two lines. Keep each elapsed phrase
+together while the surrounding status wraps.
+
+**+1:** 2026-09-29 — clear-progress increment 1 task (`codex/clear-progress`),
+[PR #255](https://github.com/lustoykov/hallvi/pull/255)
+
+**Status:** Resolved in [#255](https://github.com/lustoykov/hallvi/pull/255).
+The [390px capture](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/candidate/finding-narrow.png)
+and [verification report](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md)
+show `2m 0s` and the longer quiet-time phrase together without page overflow.

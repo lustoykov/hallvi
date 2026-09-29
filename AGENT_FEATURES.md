@@ -10,7 +10,7 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 | Proposal | +1 | Status | Intended result |
 | --- | --- | --- | --- |
 | [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | Proposed | Return to the same private route in one action |
-| [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | Proposed | Understand the action, target and unknown outcome |
+| [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | In progress (partial) | Understand the action, target and unknown outcome |
 | [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | Proposed | Hand over enough evidence to reproduce and repair a defect |
 
 Votes show interest, not priority or approval. Each count comes from the task
@@ -47,22 +47,31 @@ Distinguish closed tunnel, SSH failure and an application that does not answer.
 
 ### Explain current work and interruption
 
-**Status:** Proposed
+**Status:** In progress (partial)
 
 **Problem and intended result:** Existing activity and interruption text can
 leave the owner unsure what ran, where it ran and what remains unknown.
 
 **Smallest scope:** Add the recorded action and target to the existing work line
-and an evidence-based interruption explanation beside Continue/Stop.
+and an evidence-based interruption explanation beside Continue/Stop. The selected
+increment in [PR #255](https://github.com/lustoykov/hallvi/pull/255) covers the
+current action/target and mobile elapsed-time wrapping. The broader interruption
+explanation is unimplemented and unassigned.
 
-**Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#explain-current-work-and-interruption).
+**Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#explain-current-work-and-interruption);
+[scoped verification and matched visual evidence for #255](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md).
 
 **Acceptance:** After refresh and a controlled interruption, an unfamiliar owner
 can identify the action, target, pending decision and unknown outcome. Verify
 matching evidence and existing continuation behavior on disposable state.
 
-**Open decisions:** Owner selection and wording; user benefit is not yet measured.
-**Assignment:** Unassigned. Build on the merged performance changes from #252.
+**Open decisions:** Broader interruption scope and wording. User benefit and
+earlier findings remain unproven: the real Pi check reported its findings only
+in the final reply; the screenshots' early finding is synthetic.
+**Assignment:** On 2026-09-29 the owner selected the current-action/target increment
+and mobile wrapping for completion in #255. Assigned to the existing clear-progress
+implementation task on `codex/clear-progress`, building on #252. The full feature
+remains partial; no task is assigned to the interruption explanation.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 
