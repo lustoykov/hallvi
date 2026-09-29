@@ -20,6 +20,20 @@ Requested on 29 September 2026, following the [product research](../../research/
 | [10 — Update rehearsal](10-update-rehearsal.md) | Apply one pinned target version to an isolated restored copy. | Retained data and new work pass; clone results never become live-release claims. Depends on 07. |
 | [11 — Existing CLI adoption](11-cli-agent-adoption.md) | A concise example and one builder using their local coding agent with the merged CLI. | Correct attribution, approval handling, failed-check reporting and independently verified behavior. |
 
+## Visual review before approval
+
+**Owner requirement, 29 September 2026:** show before/after for UI changes before approval, at minimum in the implementation PR. This applies to each increment's visible layout, copy and interaction changes. Planning approval does not approve an unseen UI implementation.
+
+Plans **02–10** include visible changes to access, progress, summaries, cards, controls or intake. Plan **01** primarily changes performance; plan **11** starts with documentation and CLI adoption. Apply the requirement to the actual diff: even a backend change can alter loading, interruption or recovery behavior.
+
+- **Matched before/after:** capture the baseline and implemented branch with the same representative data, viewport and scenario. Identify both revisions and label synthetic fixtures. Put the images side by side in the PR with a short explanation of what the owner will experience differently.
+- **Relevant states:** include the changed state and any affected waiting, missing-input, approval, failure or recovery state. Use a short recording for transitions or timing that still images cannot explain. Include a narrow-screen comparison when responsive layout changes.
+- **Preview versus implementation:** a proposed design preview may help settle a substantial layout change early; label it as a proposal. The final PR still needs captures from the implemented revision. An image does not establish that Pi or an application operation works; keep the plan's behavioral checks.
+- **Review and approval:** show the comparison to the owner and link it from the PR before requesting approval to merge. If capture or upload is blocked, keep that gap explicit and provide an accessible local preview; an unreviewed visual change is not ready for approval.
+- **No visible change:** say so. For performance-only work, provide comparable measurements and the tested environment; for CLI or documentation work, show the relevant output/example change. Do not manufacture a visual redesign to satisfy the review format.
+
+Use the existing [visual verification guidance](../../../REVIEW.md#visual-verification-evidence), [PR template](../../../.github/pull_request_template.md) and [verification workflow](../../verification.md). The coordinator carries this requirement into every implementation dispatch and checks that the linked evidence is accessible before presenting a PR for approval.
+
 ## Recommended implementation order
 
 1. **Complete the existing performance integration.** Prepare 11's documentation independently. Establish the combined baseline before concurrent edits to storage, snapshots and the shell.

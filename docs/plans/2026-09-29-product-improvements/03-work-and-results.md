@@ -82,6 +82,8 @@ Across 03/04/05, tie “confirmed,” “current,” “unresolved” and “unk
 
 ### Acceptance, evidence and cleanup
 
+Follow [Visual review before approval](README.md#visual-review-before-approval): show the owner a before/after comparison before approval, at minimum in the implementation PR. For the smallest slice, compare the current action/target, the first useful finding, and waiting for input or approval. Include interrupted work with confirmed/unknown outcomes and Continue/Stop when reviewing increment 2; include the final four-answer result when reviewing increment 3. Match viewport, application records, permission mode and evidence state between baseline and candidate, including after refresh. Label proposed design previews separately from screenshots of implemented behavior, and identify revisions and simulated fixtures. Use a short recording when timing or interaction matters, especially finding arrival during a long command and transitions into/out of waiting or interrupted work.
+
 Follow [verify-hallvi](../../../.agents/skills/verify-hallvi/SKILL.md) and the [verification guide](../../verification.md). Future checks, not completed evidence:
 
 - Extend existing `run-activity`, `chat-recovery` and execution-text tests for specific action/target, another reply's excluded evidence, and ambiguous interrupted execution. Reuse `operator-execution`/`pi-owner` integration coverage for all three modes, decline, queue order and no replay; add only the missing assertion for changed behavior.
