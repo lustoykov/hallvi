@@ -50,6 +50,11 @@ interface Check { key: string; label: string; status: "passed" | "failed" | "inf
                   freshFor?: number }
 ```
 
+For checks and facts, `basis` is exactly `observed` (Pi checked it),
+`reported` (a provider, manifest or person said it) or `planned` (an intention).
+A check's explanation belongs in `detail`, and its supporting execution IDs
+or URLs belong in the record's `evidence`. A planned check has status `info`.
+
 `about` and `states` live inside `presentation` because that is what views
 read, and because the `presentation` column is the one place a record's
 readable shape is stored. There is no second home for them.

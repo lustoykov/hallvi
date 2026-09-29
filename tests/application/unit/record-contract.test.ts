@@ -62,6 +62,46 @@ describe("a record that can be drawn", () => {
 });
 
 describe("what would make a record unreadable", () => {
+  it("rejects prose as a check basis and tells Pi where the explanation belongs", () => {
+    const check = good.presentation.checks[0];
+    const result = informationInputSchema.safeParse({
+      ...good,
+      presentation: {
+        ...good.presentation,
+        checks: [{ ...check, basis: "SSH connected successfully" }],
+      },
+    });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("Prose must not become a basis.");
+    expect(result.error.issues).toHaveLength(1);
+    expect(result.error.issues[0].path).toEqual([
+      "presentation",
+      "checks",
+      0,
+      "basis",
+    ]);
+    expect(result.error.issues[0].message).toContain(
+      'exactly "observed", "planned" or "reported"',
+    );
+    expect(result.error.issues[0].message).toContain("explanation in detail");
+    expect(result.error.issues[0].message).toContain("record.evidence");
+    expect(
+      review({
+        ...good,
+        presentation: {
+          ...good.presentation,
+          checks: [
+            {
+              ...check,
+              basis: "observed",
+              detail: "SSH connected successfully",
+            },
+          ],
+        },
+      }),
+    ).toEqual([]);
+  });
+
   it("asks for the key, claim and basis a check is missing, and suggests one", () => {
     const found = review({
       ...good,
