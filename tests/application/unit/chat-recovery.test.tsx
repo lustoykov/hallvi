@@ -111,7 +111,7 @@ describe("conversation recovery and assistant branding", () => {
     // printed; see run-activity.test.ts.
     [
       "failed",
-      "The turn ended before it finished, and no command recorded why.",
+      "The turn ended before it finished. No failure reason is available.",
     ],
     // Stopping ends the reply and does not undo work that already ran, so
     // the line reports what happened rather than naming the reply.
@@ -133,7 +133,7 @@ describe("conversation recovery and assistant branding", () => {
       body: "Saved: hosting budget €30/month.",
     });
     expect(html).toContain(
-      "The turn ended before it finished, and no command recorded why.",
+      "The turn ended before it finished. No failure reason is available.",
     );
     expect(html).toMatch(
       /<details class="hv-run-draft"><summary>Show unfinished draft<\/summary>/,

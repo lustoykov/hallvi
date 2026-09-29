@@ -223,6 +223,7 @@ function lastMeaningfulLine(output: string) {
 export function runFailure(input: {
   runId: string | undefined;
   error?: string | null;
+  failure?: import("@/server/pi-failure").NativeFailure;
   executions: ExecutionRecord[];
 }): RunFailure {
   const mine = input.runId
@@ -263,18 +264,13 @@ export function runFailure(input: {
     };
   }
 
-  // A run's own `error` is runtime text — "Transaction failed for internal
-  // Run id." — and this product has already decided it does not reach the
-  // reader. That decision is right and is guarded by a test: an internal
-  // identifier in a status line tells somebody nothing and looks like a
-  // crash. A failed command's output is different and is used above: it is
-  // the command's own words, already redacted, already on screen in its
-  // terminal.
-  //
-  // So with no command to read, the honest line says exactly that, and the
-  // offer is the one thing that might work.
+  // Only the worker's typed, redacted native diagnostic may use this field.
+  // Arbitrary internal errors and older stand-ins keep the unknown fallback.
   return {
-    says: "The turn ended before it finished, and no command recorded why.",
+    says:
+      input.failure && input.error
+        ? input.error
+        : "The turn ended before it finished. No failure reason is available.",
     action: { label: "Try again", kind: "retry" },
   };
 }

@@ -76,6 +76,8 @@ export interface ChatMessage {
    */
   operationId?: string | null;
   error?: string | null;
+  /** Bounded, redacted native failure. Absent on arbitrary internal errors. */
+  failure?: import("./pi-failure").NativeFailure;
   startedAt?: string | null;
   finishedAt?: string | null;
   revision: number;

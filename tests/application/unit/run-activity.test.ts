@@ -230,8 +230,23 @@ describe("what to say and offer when a turn failed", () => {
       executions: [],
     });
     expect(said.says).not.toContain("Transaction failed");
-    expect(said.says).toContain("no command recorded why");
+    expect(said.says).toContain("No failure reason is available");
     expect(said.action.kind).toBe("retry");
+  });
+
+  it("shows the typed native reason when no command failed", () => {
+    const said = runFailure({
+      runId: RUN,
+      executions: [],
+      error: "The model stopped: HTTP 400 context window exceeded.",
+      failure: {
+        source: "model",
+        category: "unknown",
+        reason: "HTTP 400 context window exceeded",
+      },
+    });
+    expect(said.says).toContain("context window exceeded");
+    expect(said.says).not.toContain("no reason");
   });
 
   it("does not read another turn's failure", () => {
@@ -239,6 +254,6 @@ describe("what to say and offer when a turn failed", () => {
       runId: RUN,
       executions: [failed({ runId: "another", output: "ERROR: boom" })],
     });
-    expect(said.says).toContain("no command recorded why");
+    expect(said.says).toContain("No failure reason is available");
   });
 });
