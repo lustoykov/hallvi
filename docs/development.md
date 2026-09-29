@@ -54,6 +54,15 @@ The worker stays a separate process, the only one that opens Pi's sessions; the 
 
 Messages are accepted only after the running worker has saved them in Pi. When no worker is available, sending fails visibly and the composer keeps the draft. After a restart, Pi keeps unfinished work until the owner chooses Continue or Stop. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
 
+### Instance label
+
+The top strip and browser tab identify the computer running Hallvi, including
+when its loopback address is forwarded over SSH. On macOS this uses the friendly
+Computer Name from System Settings; other hosts use their hostname. Set
+`HALLVI_HOST_LABEL` in the server environment (for example `MacBook Pro` in
+`.env.local`) to override the displayed name, then restart Hallvi. The label
+identifies the controller, not the server hosting a deployed application.
+
 ### Private application access
 
 Pi defaults to loopback-only application ports on the remote server and a local SSH tunnel. Open the `http://127.0.0.1:<port>` link Pi supplies on the PC running Hallvi. Public web access requires an explicit request. If the tunnel stops or the PC restarts, ask Pi to reopen private access; there is no automatic tunnel supervisor. The `open_server_port` tool verifies local HTTP status but does not change remote listeners or firewalls.
