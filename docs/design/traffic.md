@@ -102,8 +102,13 @@ A day's numbers are a function of that day's log lines and nothing else.
 - **Today** is recounted from the log whenever the collector starts or
   reconnects, then kept current in memory from the follow and written as
   provisional every few seconds. The follow reads exactly the files it
-  measured coverage by; a rotation between the listing and the follow starts
-  it over, and a file it cannot read is a gap.
+  measured coverage by — the file being written checked again once `tail`
+  holds it; a rotation between the listing and the follow starts it over,
+  and a file it cannot read is a gap. The follow says where its backlog ends,
+  and until that much is read the collection says it is catching up, with
+  what it is reading, and writes nothing: a half-counted today is never shown
+  as live. The follow is compressed, since its backlog is most of a day of
+  JSON.
 - Nothing is ever added to a saved number, so a restart cannot count twice. A
   glitch in the live follow only touches today's provisional numbers and is
   corrected when the day is recounted.
