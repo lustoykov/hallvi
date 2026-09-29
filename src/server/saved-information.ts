@@ -1,5 +1,5 @@
 import { readExecution } from "./operator-execution";
-import { getApplication, saveInformationRow } from "./db";
+import { getApplication, listInformation, saveInformationRow } from "./db";
 import { informationInputSchema } from "./operator-data";
 import { requireReadableRecord } from "./record-contract";
 import { redactHeldSecrets } from "./application-secrets";
@@ -36,5 +36,21 @@ export async function saveInformation(
     )
       throw new Error("Evidence execution not found in this application.");
   }
-  return await saveInformationRow(applicationId, value, id);
+  // An update replaces the whole record, so a fact left out is erased. Say
+  // which, with what it held, so Pi can put back one it meant to keep.
+  const before = id
+    ? (await listInformation(applicationId, "", true)).find(
+        (record) => record.id === id,
+      )
+    : undefined;
+  const saved = await saveInformationRow(applicationId, value, id);
+  const kept = new Set(value.presentation?.facts?.map((fact) => fact.key));
+  const dropped = (before?.presentation?.facts ?? []).filter(
+    (fact) => fact.key && !kept.has(fact.key),
+  );
+  if (!dropped.length) return saved;
+  return {
+    ...saved,
+    warning: `This update removed ${dropped.map((fact) => `${fact.key} ("${fact.value}")`).join(", ")}, which the record had. An update replaces the whole record; if a fact still holds, save again with it.`,
+  };
 }

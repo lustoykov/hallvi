@@ -11,6 +11,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fix in review |
+| [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -167,6 +168,17 @@ initial runs which only isolated Hallvi's account were excluded.
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
 
 **+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
+
+### AF-022 — Send one review's findings to one branch
+
+The traffic v1 review findings were fixed twice in parallel: on main (c0e4bf05)
+and on the feature branch (round 2). Both fixed query-routed pages with
+different event shapes (`q: {k, v}` against `k`), the first live script
+arrival and serialization, and the follow-up merge had to pick one of each
+and port the tests. Naming one branch as the owner of a review's findings, or
+noting on the other which findings are taken, would save that merge.
+
+**+1:** 2026-09-29 — traffic follow-up (`claude/traffic-v1-followup`)
 
 ## Archive
 

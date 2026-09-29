@@ -20,14 +20,19 @@ import type { OperatorSettings } from "./operator-data";
 import { listInformation } from "./saved-information";
 import { classify, hasFetchMetadata, IMITATION } from "./traffic/classify";
 import { LOOKBACK_MS } from "./traffic/count";
-import type { Arrival, TrafficLine } from "./traffic/contract";
+import {
+  EVENT_PREFIX,
+  type Arrival,
+  type TrafficLine,
+} from "./traffic/contract";
 import {
   agentOf,
   arrivalOf,
   countryOf,
   deviceOf,
   eventPage,
-  pageName,
+  keyedPage,
+  tagOf,
 } from "./traffic/enrich";
 import { parseLine } from "./traffic/parse";
 import {
@@ -57,7 +62,11 @@ export const followCommand = liveLogCommand;
 /** How far back "recent visitors" reach, and the backlog a page is sent. */
 export const LIVE_WINDOW_MINUTES = 5;
 const WINDOW_MS = LIVE_WINDOW_MINUTES * 60_000;
-/** A page is open while its script pinged within this; a view is a ping. */
+/**
+ * A page is open while its script pinged within this and has not left since:
+ * a view is a ping, its `leave` closes it (a route change, the tab hidden),
+ * and a later ping — the tab shown again — opens it again.
+ */
 const OPEN_MS = 60_000;
 
 /**
@@ -77,10 +86,16 @@ export class LiveWindow {
   private readonly withMetadata = new Set<string>();
   /** Browsers, by label, and when each was last seen. */
   private readonly browsers = new Map<string, number>();
-  /** Page views, by the script's id, and when each last pinged. */
-  private readonly open = new Map<string, number>();
-  /** A log view may be followed by the script reporting the same load. */
-  private readonly loaded = new Map<string, { page: string; at: number }>();
+  /**
+   * Page views, by the script's id: when each last pinged and last left.
+   * Events arrive in any order, so a view is open when its ping is later.
+   */
+  private readonly open = new Map<string, { seen: number; left: number }>();
+  /**
+   * Page loads the log showed, by browser and page, when each was: the
+   * script's first view of the same load is not shown again.
+   */
+  private readonly loaded = new Map<string, number>();
   private script: boolean;
 
   constructor(options: {
@@ -114,17 +129,20 @@ export class LiveWindow {
       const { event } = kind;
       this.script = true;
       this.seen(this.browsers, visitor, line.at);
-      if (event.t === "view" || event.t === "ping")
-        this.seen(this.open, event.s, line.at);
+      if (event.t === "view" || event.t === "ping" || event.t === "leave") {
+        const page = this.open.get(event.s) ?? { seen: 0, left: 0 };
+        if (event.t === "leave") page.left = Math.max(page.left, line.at);
+        else page.seen = Math.max(page.seen, line.at);
+        this.open.set(event.s, page);
+      }
       if (event.t !== "view") return null;
       const page = eventPage(event, this.pageKey);
-      const load = this.loaded.get(visitor);
-      this.loaded.delete(visitor);
+      const load = this.loaded.get(`${visitor} ${page}`);
+      this.loaded.delete(`${visitor} ${page}`);
       if (
-        load &&
-        load.page === page &&
-        load.at <= line.at &&
-        line.at - load.at <= LOOKBACK_MS
+        load !== undefined &&
+        load <= line.at &&
+        line.at - load <= LOOKBACK_MS
       )
         return null;
       return {
@@ -155,15 +173,22 @@ export class LiveWindow {
     if (person) this.seen(this.browsers, visitor, line.at);
     const view = person && kind.view && !this.script;
     if (person && kind.view) {
-      if (view && !kind.imitation)
-        this.loaded.set(visitor, { page: this.pageOf(line), at: line.at });
-      else this.loaded.delete(visitor);
+      const load = `${visitor} ${this.pageOf(line)}`;
+      if (view && !kind.imitation) this.loaded.set(load, line.at);
+      else this.loaded.delete(load);
     }
     return {
       at: line.at,
       kind: bot ? "bot" : view ? "view" : "request",
       script: false,
-      path: view ? this.pageOf(line) : line.path.slice(0, 200),
+      // Sent to the events' path but no event — the wrong method, a failure,
+      // a forgery — it still carries a payload that may hold a whole address
+      // (a reset link's token): it is shown as where it was sent, no more.
+      path: view
+        ? this.pageOf(line)
+        : line.path.startsWith(EVENT_PREFIX)
+          ? EVENT_PREFIX
+          : line.path.slice(0, 200),
       status: line.status,
       ms: line.ms,
       country: country(),
@@ -183,14 +208,16 @@ export class LiveWindow {
   /** Browsers in the window, and pages open now (null without the script). */
   now(at = Date.now()) {
     for (const [key, load] of this.loaded)
-      if (load.at < at - LOOKBACK_MS) this.loaded.delete(key);
+      if (load < at - LOOKBACK_MS) this.loaded.delete(key);
     for (const [key, seen] of this.browsers)
       if (seen < at - WINDOW_MS) this.browsers.delete(key);
-    for (const [id, seen] of this.open)
-      if (seen < at - OPEN_MS) this.open.delete(id);
+    let open = 0;
+    for (const [id, page] of this.open)
+      if (Math.max(page.seen, page.left) < at - OPEN_MS) this.open.delete(id);
+      else if (page.seen >= at - OPEN_MS && page.seen > page.left) open += 1;
     return {
       type: "now" as const,
-      openNow: this.script ? this.open.size : null,
+      openNow: this.script ? open : null,
       recentVisitors: this.browsers.size,
       windowMinutes: LIVE_WINDOW_MINUTES,
     };
@@ -198,11 +225,8 @@ export class LiveWindow {
 
   /** A page as the counting names it, with the application's page key. */
   private pageOf(line: TrafficLine) {
-    const value = this.pageKey
-      ? line.kept[this.pageKey]?.slice(0, 100)
-      : undefined;
-    const page = pageName(line.path);
-    return value ? `${page}?${this.pageKey}=${value}` : page;
+    const key = this.pageKey;
+    return keyedPage(line.path, key, key ? tagOf(line.kept, key) : undefined);
   }
 
   private seen(map: Map<string, number>, key: string, at: number) {

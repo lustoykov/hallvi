@@ -391,7 +391,7 @@ hold, and a stretch they no longer hold is named as a gap. The collector
 records its state (`catching-up`, `live`, `lost`, `no-log`, `unsupported`),
 the last line, the oldest line the server keeps and the script's switch point
 and silence, which the Traffic page shows. The
-[collection experiment](https://github.com/lustoykov/hallvi/blob/072f69a1d5da22650ddedb7897142db8d43aa019/docs/testing/2026-09-29-traffic-collection.md) is the
+[collection experiment](https://github.com/lustoykov/hallvi/blob/5832ce7fc8e8bfea0a04321da9ad7a8b08a1662c/docs/testing/2026-09-29-traffic-collection.md) is the
 proof.
 
 ## From a record to a page
