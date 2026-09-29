@@ -38,7 +38,7 @@ automation prompts into product sessions.
   feedback; they do not need a broad product research pass. The owner selects
   work, and [ROADMAP.md](ROADMAP.md) owns delivery order.
 - For worker agents and automated or scheduled work in this repository, default to
-  `gpt-6-sol` with `high` reasoning unless the owner requests otherwise.
+  `gpt-6.1-sol` with `high` reasoning unless the owner requests otherwise.
 - When a boundary or a flow changes, draw it as a Mermaid block in the pull
   request.
 - Keep decisions in their owning documents and update current wording instead
