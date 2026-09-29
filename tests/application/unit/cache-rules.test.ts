@@ -104,7 +104,11 @@ const hallviRule = (over: Partial<Rule> = {}): Rule => ({
   expression: `(http.host eq "${HOST}" and not starts_with(http.request.uri.path, "/_hv/e/"))`,
   description: `managed-by=hallvi cache-pages host=${HOST} app=shop`,
   enabled: true,
-  action_parameters: { cache: true, edge_ttl: { mode: "bypass_by_default" } },
+  action_parameters: {
+    cache: true,
+    edge_ttl: { mode: "bypass_by_default" },
+    browser_ttl: { mode: "respect_origin" },
+  },
   ...over,
 });
 
@@ -137,11 +141,14 @@ describe("setting Hallvi's cache rule", () => {
       body: {
         position: { before: OWNER_RULE },
         description: `managed-by=hallvi cache-pages host=${HOST} app=shop`,
-        action_parameters: {
-          cache: true,
-          edge_ttl: { mode: "bypass_by_default" },
-        },
       },
+    });
+    // The application's own max-age reaches browsers: without browser_ttl
+    // the zone's Browser Cache TTL (often 4 hours) would replace it.
+    expect((writes()[0].body as Rule).action_parameters).toEqual({
+      cache: true,
+      edge_ttl: { mode: "bypass_by_default" },
+      browser_ttl: { mode: "respect_origin" },
     });
     // First, so the owner's later rule still wins where both match.
     expect(rules!.map((rule) => rule.id)).toEqual([
@@ -172,18 +179,21 @@ describe("setting Hallvi's cache rule", () => {
   });
 
   it("brings its own rule back to what Hallvi writes and addresses nothing else", async () => {
-    const stale = hallviRule({ action_parameters: { cache: true } });
+    // A rule written before browser_ttl was added, as on real zones.
+    const earlier = { cache: true, edge_ttl: { mode: "bypass_by_default" } };
+    const stale = hallviRule({ action_parameters: earlier });
     fakeCloudflare([stale, ownerRule]);
     const outcome = await cloudflare.setCacheRule({
       hostname: HOST,
       owner: "shop",
     });
     expect(outcome.action).toBe("updated");
-    expect(outcome.previous?.settings).toEqual({ cache: true });
+    expect(outcome.previous?.settings).toEqual(earlier);
     expect(writes()).toHaveLength(1);
     expect(writes()[0]).toMatchObject({
       method: "PATCH",
       path: `/zones/${ZONE}/rulesets/${RULESET}/rules/${stale.id}`,
+      body: { action_parameters: { browser_ttl: { mode: "respect_origin" } } },
     });
     expect(rules![1]).toEqual(ownerRule);
   });

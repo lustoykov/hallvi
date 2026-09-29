@@ -468,6 +468,8 @@ export interface DomainRecordOutcome {
   proxied: boolean;
   /** What stood at this exact name and type before, when anything did. */
   previous: { content: string; proxied: boolean } | null;
+  /** What changed, said plainly, when only the proxy was turned on or off. */
+  changed?: string;
   /**
    * Every other address record still held for the same name. A stale AAAA
    * beside a fresh A is the failure this field exists to make visible:
@@ -535,12 +537,10 @@ export async function writeDomainRecord(change: {
     throw new Error(
       `${wanted} is a CNAME to ${conflicting[0].content}, and a CNAME cannot sit beside an ${change.type} record. Remove the CNAME first, or pass replace to take the name over, and tell the owner what it was pointing at.`,
     );
-  if (
-    existing &&
-    (existing.content.toLowerCase() !== content.toLowerCase() ||
-      existing.proxied !== proxied) &&
-    !change.replace
-  )
+  const sameAddress = existing?.content.toLowerCase() === content.toLowerCase();
+  // Turning the proxy on or off for the address already there is an update
+  // of that record, not a takeover: the name keeps pointing where it did.
+  if (existing && !sameAddress && !change.replace)
     throw new Error(
       `${wanted} already has an ${change.type} record pointing at ${existing.content}${existing.proxied ? " (proxied)" : ""}. Nothing was changed. Tell the owner what is there and pass replace only once they have decided to take the name over.`,
     );
@@ -556,18 +556,17 @@ export async function writeDomainRecord(change: {
     comment: `managed-by=hallvi${change.owner ? ` app=${change.owner}` : ""}`,
   };
   let action: DomainRecordOutcome["action"] = "created";
+  let changed: string | undefined;
   if (existing) {
-    if (
-      existing.content.toLowerCase() === content.toLowerCase() &&
-      existing.proxied === proxied
-    )
-      action = "unchanged";
+    if (sameAddress && existing.proxied === proxied) action = "unchanged";
     else {
       await call(`/zones/${zone.id}/dns_records/${existing.id}`, {
         method: "PUT",
         body,
       });
       action = "updated";
+      if (sameAddress)
+        changed = `Only the proxy changed: ${wanted} still points at ${content}, and is now ${proxied ? "proxied" : "direct (not proxied)"}.`;
     }
   } else await call(`/zones/${zone.id}/dns_records`, { method: "POST", body });
   return {
@@ -578,6 +577,7 @@ export async function writeDomainRecord(change: {
     content,
     proxied,
     previous,
+    ...(changed ? { changed } : {}),
     others: (await addressRecords(zone.id, wanted)).filter(
       (item) => item.type !== change.type,
     ),
@@ -702,6 +702,9 @@ function cacheRuleFor(hostname: string, owner?: string) {
     action_parameters: {
       cache: true,
       edge_ttl: { mode: "bypass_by_default" },
+      // Without this the zone's Browser Cache TTL overrides a shorter
+      // max-age from the application.
+      browser_ttl: { mode: "respect_origin" },
     },
   };
 }
@@ -779,6 +782,7 @@ function sameRule(
 ) {
   const parameters = held.action_parameters ?? {};
   const edge = parameters.edge_ttl as { mode?: string } | undefined;
+  const browser = parameters.browser_ttl as { mode?: string } | undefined;
   return (
     held.action === wanted.action &&
     held.expression === wanted.expression &&
@@ -786,7 +790,8 @@ function sameRule(
     held.enabled !== false &&
     parameters.cache === true &&
     edge?.mode === wanted.action_parameters.edge_ttl.mode &&
-    Object.keys(parameters).length === 2
+    browser?.mode === wanted.action_parameters.browser_ttl.mode &&
+    Object.keys(parameters).length === 3
   );
 }
 

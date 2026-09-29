@@ -363,6 +363,42 @@ describe("pointing a name at a server", () => {
     expect(wrote()[0].method).toBe("PUT");
   });
 
+  // Turning the proxy on for the address already there is an update of that
+  // record: the name keeps pointing where it did, so it is not a takeover.
+  it("turns the proxy on for the same address without replace", async () => {
+    zone([held()]);
+    const outcome = await cloudflare.writeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+      proxied: true,
+    });
+    expect(outcome.action).toBe("updated");
+    expect(outcome.previous).toEqual({
+      content: "203.0.113.10",
+      proxied: false,
+    });
+    expect(outcome.changed).toMatch(/Only the proxy changed.*now proxied/);
+    expect(wrote()).toHaveLength(1);
+    expect(wrote()[0]).toMatchObject({
+      method: "PUT",
+      body: { content: "203.0.113.10", proxied: true },
+    });
+  });
+
+  it("still needs replace for a different address, proxied or not", async () => {
+    zone([held({ content: "198.51.100.5", proxied: true })]);
+    await expect(
+      cloudflare.writeDomainRecord({
+        name: "app.example.com",
+        type: "A",
+        content: "203.0.113.10",
+        proxied: true,
+      }),
+    ).rejects.toThrow(/198\.51\.100\.5.*Nothing was changed/s);
+    expect(wrote()).toHaveLength(0);
+  });
+
   it("writes nothing when the record already says what was asked for", async () => {
     zone([held()]);
     const outcome = await cloudflare.writeDomainRecord({

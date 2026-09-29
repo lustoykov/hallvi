@@ -373,7 +373,10 @@ says so and names what is host-wide.
   `$request_uri` and `$http_referer` at `?`/`#` and pick each host's page key,
   `log_format hallvi escape=json` emitting the `hallvi-json` line, and an
   `access_log … hallvi;` in every `server` block that already has its own
-  (such a block inherits none from `http`). Retention in
+  (such a block inherits none from `http`). An SPA fallback
+  `try_files $uri /index.html` drops the query on its internal redirect, so
+  `$arg_utm_*` came out empty on route loads; it becomes
+  `/index.html?$args`. Retention in
   `/etc/logrotate.d/hallvi-nginx` (root-owned, 0644): daily, 30 kept,
   compress + delaycompress, `nodateext`, `create 0640 root adm`, and a
   postrotate USR1 to nginx — without it nginx keeps writing into the renamed

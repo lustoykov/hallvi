@@ -234,6 +234,14 @@ describe("traffic_setup", () => {
     expect(conf).toContain("map $http_referer $hallvi_referrer");
   });
 
+  // A proof behind an SPA found $arg_utm_* empty on route loads: the
+  // fallback's internal redirect to /index.html had dropped the query.
+  it("keeps the query through an SPA fallback, so campaign tags are logged", () => {
+    expect(LOG_SETUP.nginx.steps.join("\n")).toContain(
+      "try_files $uri /index.html?$args;",
+    );
+  });
+
   it("gives Caddy from 2.8 a field for every kept key, under the name the reader reads", () => {
     for (const variant of ["caddy", "caddy-2.8"] as const)
       for (const key of KEPT_QUERY_KEYS)

@@ -576,6 +576,7 @@ export const LOG_SETUP = {
       "`install -d -m 0755 /var/log/nginx/hallvi` — Hallvi's log goes in a directory of its own. A file matching /var/log/nginx/*.log duplicates Debian's own logrotate entry, and logrotate then skips the owner's whole nginx configuration.",
       'Write /etc/nginx/conf.d/hallvi-log.conf (it must be included inside `http {}`, as conf.d is on Debian and the official image). In the $hallvi_page map, list each host that routes by a query key with that key\'s $arg_; otherwise keep only `default "";`.',
       "Add `access_log /var/log/nginx/hallvi/access.log hallvi;` to every `server` block that has an access_log of its own: such a block inherits none from `http`.",
+      "An SPA fallback `try_files $uri /index.html;` drops the query on the internal redirect, so $arg_utm_* are empty on every route load: make it `try_files $uri /index.html?$args;` (the same for any fallback URI without ?$args). It changes nothing the application serves.",
       "The access_log in hallvi-log.conf is at the http level, so it is host-wide: every server block without an access_log of its own writes its lines to Hallvi's file. Say so when you ask for approval.",
       "nginx in a container: bind-mount the host directory /var/log/nginx/hallvi at the same path.",
       "`nginx -t`, then reload.",
