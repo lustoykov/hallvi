@@ -2,10 +2,11 @@
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
-| [AF-006 — Keep architecture explanations in step with code](#af-006--keep-architecture-explanations-in-step-with-code) | 1 | Accepted; in review #247 |
+| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Accepted; in review #247 |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 
@@ -112,7 +113,23 @@ that sets `launchOptions.executablePath`. An environment variable read in
 
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
-### AF-006 — Keep architecture explanations in step with code
+### AF-006 — Reduce full-history response serialization
+
+After execution reads are cached, serializing the complete execution history
+still blocks the event loop: ten readers of a synthetic 2,000-record history
+showed about 82 ms maximum delay from the warm response path. Change
+notifications will remove idle polling; consider bounded or incremental
+evidence responses if long histories still make active chats slow. The
+[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
+from this remaining cost.
+
+**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
+
+**+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
+Idle reads now stop; active updates still serialize full histories. Keep the
+500 ms sustained cadence until a measured response-shape change improves it.
+
+### AF-007 — Keep architecture explanations in step with code
 
 I want architecture and domain explanations kept current as behavior changes.
 The overview diagram and tools paragraph disagreed about the tool count, and

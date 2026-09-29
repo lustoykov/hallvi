@@ -21,14 +21,21 @@ export const test = base.extend<
      * real worker the first one stopped.
      */
     scriptedWorker: boolean;
+    notificationMetrics: boolean;
   }
 >({
   isolatedApp: [false, { scope: "worker", option: true }],
   freshSetup: [false, { scope: "worker", option: true }],
   scriptedWorker: [false, { scope: "worker", option: true }],
+  notificationMetrics: [false, { scope: "worker", option: true }],
   fixture: [
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    async ({ freshSetup, scriptedWorker }, provide, workerInfo) => {
+    async (
+      // This dependency selects a separate worker even though it is not read.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      { freshSetup, scriptedWorker, notificationMetrics },
+      provide,
+      workerInfo,
+    ) => {
       // 3180 by default. Another checkout of this repository may already be
       // running its own fixtures there, so a run can be moved out of the way
       // with HALLVI_E2E_PORT rather than waiting for the port back.
@@ -45,6 +52,10 @@ export const test = base.extend<
         {
           detached: true,
           stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            HALLVI_QA_NOTIFICATIONS: notificationMetrics ? "1" : "0",
+          },
         },
       );
       let output = "";
@@ -87,6 +98,7 @@ export const test = base.extend<
           `/api/applications/${missing}/secrets`,
           "/api/host",
           "/api/hallvi/update",
+          `/api/applications/${missing}/executions/${missing}/decision`,
           `/api/applications/${missing}/chats`,
           `/api/applications/${missing}/chats/${missing}/messages`,
           `/api/applications/${missing}/chats/${missing}/events`,

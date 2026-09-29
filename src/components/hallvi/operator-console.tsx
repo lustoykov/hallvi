@@ -86,6 +86,9 @@ export function OperatorConsole({
   records?: ExecutionRecord[];
 }) {
   const url = `/api/applications/${applicationId}/operator`;
+  const suppliedRecords = records !== undefined;
+  const readUrl =
+    settingsOnly || suppliedRecords ? `${url}?settingsOnly=1` : url;
   const [settings, setSettings] = useState<OperatorSettings | null>(null);
   const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -93,13 +96,13 @@ export function OperatorConsole({
   const refresh = useCallback(async () => {
     const state = await request<{
       settings: OperatorSettings;
-      executions: ExecutionRecord[];
-    }>(url);
+      executions?: ExecutionRecord[];
+    }>(readUrl);
     setSettings(state.settings);
-    setExecutions(state.executions);
-  }, [url]);
+    if (state.executions) setExecutions(state.executions);
+  }, [readUrl]);
   useEffect(() => {
-    if (records !== undefined && !settingsOnly) return;
+    if (suppliedRecords && !settingsOnly) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
@@ -110,14 +113,14 @@ export function OperatorConsole({
       try {
         const state = await request<{
           settings: OperatorSettings;
-          executions: ExecutionRecord[];
-        }>(url);
+          executions?: ExecutionRecord[];
+        }>(readUrl);
         if (alive) {
           setSettings(state.settings);
-          setExecutions(state.executions);
+          if (state.executions) setExecutions(state.executions);
         }
         if (
-          state.executions.some(
+          state.executions?.some(
             (execution) =>
               execution.status === "running" ||
               execution.status === "awaiting-approval",
@@ -134,7 +137,7 @@ export function OperatorConsole({
       alive = false;
       clearTimeout(timer);
     };
-  }, [url, records, settingsOnly]);
+  }, [readUrl, suppliedRecords, settingsOnly]);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("execution");
     if (!id) return;

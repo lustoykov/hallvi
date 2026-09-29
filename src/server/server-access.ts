@@ -235,8 +235,8 @@ export async function connectServer(
     );
   await options.require?.(host);
   signal?.throwIfAborted();
-  saveOperatorSettings(applicationId, {
-    ...operatorSettings(applicationId),
+  await saveOperatorSettings(applicationId, {
+    ...(await operatorSettings(applicationId)),
     host,
   });
   return {

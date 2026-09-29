@@ -228,15 +228,17 @@ export function OperatorShell({
   const refreshDeployment = useCallback(async () => {
     if (!applicationId || !selectedChatId || demo) return;
     {
-      const next = await api.view(applicationId, selectedChatId);
+      const next = await api.metadata(applicationId, selectedChatId);
       setView((current) =>
-        current.selectedChatId === next.selectedChatId ? next : current,
+        current.application?.id === applicationId &&
+        current.selectedChatId === next.selectedChatId
+          ? { ...current, ...next }
+          : current,
       );
     }
   }, [applicationId, selectedChatId, demo]);
-  // Whether anything is actually happening. An idle page re-read every
-  // record and every execution off disk every 2.5 seconds to learn nothing,
-  // for as long as the tab stayed open.
+  // Only application metadata is polled. Conversation, execution and shared
+  // information updates come through the change-driven SSE subscription.
   const working =
     view.messages.some(
       (message) => message.status === "waiting" || message.status === "running",
@@ -250,8 +252,7 @@ export function OperatorShell({
     const initial = window.setTimeout(() => {
       void refreshDeployment().catch(() => undefined);
     }, 0);
-    // Fast while Pi is working, because that is when the page changes under
-    // the reader; slow otherwise, because nothing else changes it.
+    // Preserve the cadence of background deployment/protection facts.
     const timer = setInterval(
       () => void refreshDeployment().catch(() => undefined),
       working ? 2500 : 15_000,
@@ -433,11 +434,13 @@ export function OperatorShell({
       if (nextVersion !== outcomeVersion) {
         outcomeVersion = nextVersion;
         void api
-          .view(applicationId, selectedChatId)
+          .metadata(applicationId, selectedChatId)
           .then((next) => {
             if (active)
               setView((current) =>
-                current.selectedChatId === selectedChatId ? next : current,
+                current.selectedChatId === selectedChatId
+                  ? { ...current, ...next }
+                  : current,
               );
           })
           .catch(() => {
@@ -960,6 +963,7 @@ export function OperatorShell({
                     applicationId={applicationId}
                     chatId={view.chats[0]?.id ?? ""}
                     main={false}
+                    records={view.executions}
                   />
                 )}
               </ApplicationSectionView>

@@ -99,6 +99,7 @@ test(
       record = { ...record, ...next };
       writeFileSync(`${path}.tmp`, JSON.stringify(record));
       renameSync(`${path}.tmp`, path);
+      closeWorker.changed({ kind: "execution", applicationId: appId });
     }
     update({});
 
@@ -138,6 +139,11 @@ test(
       finishedAt: new Date().toISOString(),
     });
     finished = true;
+    closeWorker.changed({
+      kind: "chat",
+      applicationId: appId,
+      chatId: chat.id,
+    });
 
     await expect(page.locator(".hv-still-working")).toHaveCount(0);
     await expect(stop).toHaveCount(0);

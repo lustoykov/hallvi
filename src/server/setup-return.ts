@@ -19,15 +19,15 @@ export type SetupReturn = {
   query: string;
 };
 
-export function setupReturnDestination(params: {
+export async function setupReturnDestination(params: {
   application?: string | string[];
   chat?: string | string[];
-}): SetupReturn | null {
+}): Promise<SetupReturn | null> {
   const applicationId = single(params.application);
   const chatId = single(params.chat);
   if (!applicationId || !chatId) return null;
-  const application = getApplication(applicationId);
-  const chat = getChat(chatId);
+  const application = await getApplication(applicationId);
+  const chat = await getChat(chatId);
   if (!application || !chat || chat.applicationId !== application.id)
     return null;
   return {
