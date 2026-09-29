@@ -11,6 +11,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 1 | New |
+| [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -135,6 +136,20 @@ The [release verification](https://github.com/lustoykov/hallvi/pull/254) records
 environment and limits. No optimization was added during release verification.
 
 **+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
+
+### AF-014 — Preserve why an operator turn ended early
+
+During an installed alpha.8 deployment, connecting an existing machine started
+an operator turn that ended after a successful status read. The conversation
+said the turn ended before it finished with no command recording why; the CLI
+only suggested checking Settings or retrying. Keep a useful, redacted reason
+for an early model/worker turn exit, including whether the cause is known,
+so the owner can distinguish an account/provider problem from interruption
+without guessing. This observation does not establish the underlying cause.
+A following queued request successfully continued deployment.
+
+**+1:** 2026-09-29 — installed Mac mini beta verification
+(`codex/installed-beta-feedback`).
 
 ## Archive
 
