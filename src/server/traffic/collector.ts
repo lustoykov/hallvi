@@ -505,6 +505,15 @@ async function finishDays(target: Target, oldest: number | null) {
   return moved;
 }
 
+/** The oldest line the log holds now, recorded; null for an empty log. */
+async function reach({ applicationId, host, log, signal }: Target) {
+  const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
+  recordCollector(applicationId, {
+    oldestRetainedAt: oldest === null ? null : iso(oldest),
+  });
+  return oldest;
+}
+
 /** When the next day can be finished: ten minutes after its midnight. */
 function nextFinish(timeZone: string, now = Date.now()) {
   return (
@@ -534,12 +543,9 @@ async function connection(target: Target, first: boolean) {
   const signal = AbortSignal.any([target.signal, inner.signal]);
   const scope = { ...target, signal };
 
-  const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
-  recordCollector(applicationId, {
-    oldestRetainedAt: oldest === null ? null : iso(oldest),
-    ...(first ? { state: "catching-up" as const, detail: null } : {}),
-  });
-  await finishDays(scope, oldest);
+  if (first)
+    recordCollector(applicationId, { state: "catching-up", detail: null });
+  await finishDays(scope, await reach(scope));
   signal.throwIfAborted();
   // Listed again for the follow, which reads exactly these files and stops
   // if a rotation moved one since: today's coverage is this listing's.
@@ -647,7 +653,11 @@ async function connection(target: Target, first: boolean) {
       finishing = true;
       for (let index = days.length - 1; index >= 0; index--)
         if (now >= days[index].end + FINAL_AFTER_MS) days.splice(index, 1);
-      finishDays(scope, oldest)
+      let retry = false;
+      // Listed again first: a log that was empty when the follow began has
+      // lines now, and rotation has moved its oldest on since.
+      reach(scope)
+        .then((oldest) => finishDays(scope, oldest))
         .then((moved) => {
           const counting = days.at(-1)!.counter.switchAt;
           const since = collectionOf(applicationId).scriptSince;
@@ -661,10 +671,12 @@ async function connection(target: Target, first: boolean) {
             inner.abort();
           }
         })
-        .catch(() => {})
+        // A listing or a read that failed is tried again in a minute, not
+        // at the next midnight.
+        .catch(() => (retry = true))
         .finally(() => {
           finishing = false;
-          finishAt = nextFinish(timeZone);
+          finishAt = retry ? Date.now() + 60_000 : nextFinish(timeZone);
         });
     }
   }, 500);

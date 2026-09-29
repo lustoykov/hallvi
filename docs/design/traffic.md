@@ -86,8 +86,10 @@ supplies only closed-shape values (a path, a container name, a time).
 A day's numbers are a function of that day's log lines and nothing else.
 
 - **Finished days** are recounted from the retained files once the day is over
-  (after a short grace for requests still being written) and stored as final,
-  with their coverage. Only that recount makes a day final. A recount and a
+  (after a short grace for requests still being written, with the log listed
+  again then, so a log that was empty when the follow began is not
+  forgotten) and stored as final, with their coverage. Only that recount
+  makes a day final. A recount and a
   stored day are compared by the stretches of the day each covers, never by
   how long: the recount replaces a stored day it covers all of; a stored day
   that covers all of the recount and more (the log has since rotated part of

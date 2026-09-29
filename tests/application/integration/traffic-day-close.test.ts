@@ -19,7 +19,8 @@ const server = vi.hoisted(() => ({
   log: [] as TrafficLine[],
   /** The lines the follow hands on: one was lost on the way. */
   followed: [] as TrafficLine[],
-  oldest: 0,
+  /** When the log holds nothing, a listing is empty. */
+  oldest: 0 as number | null,
   reads: [] as { from: number; to: number }[],
   push: (() => {}) as (line: TrafficLine) => void,
 }));
@@ -48,16 +49,19 @@ vi.mock("@/server/access-log", () => ({
   }),
 }));
 vi.mock("@/server/traffic/sources", () => ({
-  listLog: async () => [
-    {
-      name: "access.log",
-      from: server.oldest,
-      to: Date.now() + 1000,
-      bytes: 1,
-      modified: Date.now(),
-      inode: "1",
-    },
-  ],
+  listLog: async () =>
+    server.oldest === null
+      ? []
+      : [
+          {
+            name: "access.log",
+            from: server.oldest,
+            to: Date.now() + 1000,
+            bytes: 1,
+            modified: Date.now(),
+            inode: "1",
+          },
+        ],
   readLog: async (
     _host: unknown,
     _log: unknown,
@@ -164,6 +168,41 @@ describe("a day's close", () => {
       to: new Date(end).toISOString(),
       gaps: [],
     });
+
+    stop.abort();
+    await collector.stop();
+  });
+
+  it("counts the day again when the log was empty as the follow began", async () => {
+    const zone = controllerTimeZone();
+    const day = dayOf(Date.parse("2026-10-02T12:00:00Z"), zone);
+    const { start, end } = dayBounds(day, zone);
+    const stored = () => readDays("app", day, day)[0];
+    const requests = () =>
+      stored().hours.reduce((sum, hour) => sum + hour.requests, 0);
+
+    // A container that has written nothing yet: its listing is empty.
+    vi.useFakeTimers({ now: end - 60_000 });
+    server.oldest = null;
+    server.log = [];
+    server.followed = [];
+    server.reads = [];
+    const stop = new AbortController();
+    const collector = trafficCollector(stop.signal);
+    collector.tick();
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    // Then traffic, of which the follow saw one request of two.
+    server.log = [request(end - 50_000), request(end - 40_000)];
+    server.oldest = end - 50_000;
+    server.push(server.log[0]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(requests()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(end + FINAL_AFTER_MS + 1_000 - Date.now());
+    expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]);
+    expect(stored().final).toBe(true);
+    expect(requests()).toBe(2);
 
     stop.abort();
     await collector.stop();
