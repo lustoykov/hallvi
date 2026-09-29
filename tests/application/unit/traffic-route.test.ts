@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessLogSource } from "@/server/access-log";
+import type { AccessLogRecord } from "@/server/traffic/sources";
 import type { OperatorSettings } from "@/server/operator-data";
 
 const fixture = vi.hoisted(() => ({
@@ -12,8 +13,18 @@ vi.mock("@/server/schemas", () => ({ assertSameOrigin: () => {} }));
 vi.mock("@/server/operator-execution", () => ({
   operatorSettings: () => ({ host: fixture.host }),
 }));
-vi.mock("@/server/access-log", () => ({
-  accessLogSource: () => fixture.source,
+vi.mock("@/server/traffic/store", () => ({
+  collectionOf: () => ({ scriptSince: null }),
+}));
+vi.mock("@/server/access-log", async (actual) => ({
+  ...(await actual<typeof import("@/server/access-log")>()),
+  accessLogRecord: (): AccessLogRecord | null =>
+    fixture.source && {
+      kind: "access-log",
+      proxy: "Caddy",
+      format: "caddy-json",
+      source: fixture.source,
+    },
   followAccessLog: (
     _host: unknown,
     _source: unknown,

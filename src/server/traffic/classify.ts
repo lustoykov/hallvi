@@ -9,7 +9,6 @@
 // the count decides it for the whole pass; here a request is only marked as
 // an imitation candidate.
 
-import { HALLVI_USER_AGENT } from "../access-log";
 import {
   eventOf,
   HALLVI_PATH_PREFIX,
@@ -17,6 +16,7 @@ import {
   type TrafficLine,
 } from "./contract";
 import { agentOf } from "./enrich";
+import { HALLVI_USER_AGENT } from "./parse";
 
 export type Classified =
   /** Hallvi's own: its access check, the script, a malformed event. */

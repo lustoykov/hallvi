@@ -6,10 +6,8 @@
 // backlog the server sends on connect, then whatever happens while the page
 // is open. It is never presented as a day, a week or a trend.
 //
-// The stream speaks either of two shapes. Today's sends request lines; the
-// traffic contract's sends arrivals (with a country, a source and a device)
-// and a "now" count. Both become the same seen lines here, so Overview's
-// flow and the Traffic page's map read one thing whichever the server sends.
+// The stream sends arrivals (with a country, a source and a device) and a
+// "now" count, so Overview's flow and the Traffic page's map read one thing.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -21,7 +19,7 @@ export type TrafficState =
   "connecting" | "live" | "lost" | "no-log" | "no-server";
 
 /** A request the page has seen, numbered so a list can key on it. */
-export type SeenLine = Arrival & { id: number; method?: string };
+export type SeenLine = Arrival & { id: number };
 
 export interface Lane {
   /** A path, grouped so one product page is not one lane each. */
@@ -68,17 +66,6 @@ export function laneOf(path: string) {
   if (asset.test(path)) return "assets";
   const first = path.split("/")[1] ?? "";
   return first ? `/${first}` : "/";
-}
-
-// Today's lines do not say which request was a page. Until the stream sends
-// arrivals, a successful GET for something that is not a file, an API or
-// Hallvi's own path stands in for one.
-const machinery = /^\/(?:api|graphql|trpc|_next|_hv|static|assets)(?:\/|$)/;
-function kindOf(line: { method: string; path: string; status: number }) {
-  if (line.method !== "GET" || line.status >= 400) return "request" as const;
-  if (asset.test(line.path) || machinery.test(line.path))
-    return "request" as const;
-  return "view" as const;
 }
 
 function summarise(lines: SeenLine[], now: number) {
@@ -187,22 +174,9 @@ export function useTraffic(applicationId: string): Traffic {
           });
           return;
         }
-        if (event.type === "arrivals") {
-          arrive(
-            event.arrivals.map((arrival) => ({
-              ...arrival,
-              id: counter.current++,
-            })),
-          );
-          return;
-        }
         arrive(
-          event.lines.map((line) => ({
-            ...line,
-            kind: kindOf(line),
-            country: null,
-            source: null,
-            device: null,
+          event.arrivals.map((arrival) => ({
+            ...arrival,
             id: counter.current++,
           })),
         );

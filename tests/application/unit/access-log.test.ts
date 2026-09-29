@@ -1,17 +1,42 @@
 // The live access log. What matters here: the command the controller runs is
 // its own and cannot be steered by a record, and what reaches the browser
-// carries no address and no query string.
+// carries no address, no agent and no query string.
 
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-import { followCommand, parseCaddyLine } from "@/server/access-log";
+import { followCommand, LiveWindow } from "@/server/access-log";
 import { informationInputSchema } from "@/server/operator-data";
 import { reviewRecord } from "@/server/record-contract";
+import { eventPath } from "@/server/traffic/contract";
+import { parseLine } from "@/server/traffic/parse";
 
 // A line Caddy 2 actually wrote, shortened only in its headers.
 const line =
   '{"level":"error","ts":1789817074.446724,"logger":"http.log.access.log0","msg":"handled request","request":{"remote_ip":"172.17.0.1","remote_port":"65028","client_ip":"203.0.113.9","proto":"HTTP/1.1","method":"POST","host":"shop.example","uri":"/checkout/pay?token=secret#x","headers":{}},"duration":0.0421,"size":4,"status":500}';
+const chrome =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+
+/** The same line as a browser's GET, at another moment and path. */
+const request = (
+  path: string,
+  at: number,
+  { agent = chrome, address = "203.0.113.9", dest = "document" } = {},
+) =>
+  parseLine(
+    "caddy-json",
+    line
+      .replace('"ts":1789817074.446724', `"ts":${at / 1000}`)
+      .replace('"method":"POST"', '"method":"GET"')
+      .replace('"status":500', '"status":200')
+      .replace('"client_ip":"203.0.113.9"', `"client_ip":"${address}"`)
+      .replace("/checkout/pay?token=secret#x", path)
+      .replace(
+        '"headers":{}',
+        `"headers":{"User-Agent":["${agent}"],"Sec-Fetch-Dest":["${dest}"],"Sec-Fetch-Mode":["navigate"]}`,
+      ),
+    { hosts: ["shop.example"] },
+  )!;
 
 const record = (source: unknown) => ({
   title: "Caddy access log",
@@ -33,47 +58,82 @@ const record = (source: unknown) => ({
 });
 
 describe("the access log", () => {
-  it("reads a request and leaves the person out of it", () => {
-    const parsed = parseCaddyLine(`caddy-1  | ${line}`);
-    expect(parsed).toMatchObject({
-      method: "POST",
+  it("tells arrivals apart and leaves the person out of them", () => {
+    const now = Date.now();
+    const window = new LiveWindow({ hosts: ["shop.example"], script: false });
+    const failed = window.arrival(
+      parseLine(
+        "caddy-json",
+        line.replace(
+          '"headers":{}',
+          `"headers":{"User-Agent":["${chrome}"],"Sec-Fetch-Dest":["empty"]}`,
+        ),
+      )!,
+    );
+    expect(failed).toMatchObject({
+      kind: "request",
       path: "/checkout/pay",
       status: 500,
       ms: 42,
-      at: 1789817074447,
     });
-    expect(JSON.stringify(parsed)).not.toMatch(/203\.0\.113\.9|secret/);
-    // Two requests from one address are one visitor.
-    expect(parseCaddyLine(line)?.visitor).toBe(parsed?.visitor);
-  });
-
-  it("counts a failed request once", () => {
-    // Caddy also reports a 502 through its error logger, with the same
-    // request and status. Seen on a real server: every failure was doubled.
-    const error = line
-      .replace("http.log.access.log0", "http.log.error.log0")
-      .replace("handled request", "dial tcp 172.18.0.2:9090: connect: refused");
-    expect(parseCaddyLine(error)).toBeNull();
-    expect(parseCaddyLine(line)?.status).toBe(500);
-  });
-
-  it("leaves Hallvi's own checks out of the visitors", () => {
-    const own = line.replace(
-      '"headers":{}',
-      '"headers":{"User-Agent":["Hallvi access check"]}',
+    const view = window.arrival(request("/pricing/", now));
+    expect(view).toMatchObject({
+      kind: "view",
+      path: "/pricing",
+      source: "Direct",
+      device: "desktop",
+    });
+    const bot = window.arrival(
+      request("/", now, { agent: "Mozilla/5.0 (compatible; Googlebot/2.1)" }),
     );
-    expect(parseCaddyLine(own)).toBeNull();
-    const browser = line.replace(
-      '"headers":{}',
-      '"headers":{"User-Agent":["Mozilla/5.0"]}',
+    expect(bot).toMatchObject({ kind: "bot", device: null, source: null });
+    // Two requests from one browser are one visitor, and nothing the page
+    // receives says who it was.
+    expect(window.arrival(request("/", now))?.visitor).toBe(view?.visitor);
+    expect(JSON.stringify([failed, view, bot])).not.toMatch(
+      /203\.0\.113\.9|secret|Chrome|Googlebot/,
     );
-    expect(parseCaddyLine(browser)).not.toBeNull();
+    // Without the script there is nothing to say about open pages.
+    expect(window.now(now)).toMatchObject({
+      openNow: null,
+      recentVisitors: 1,
+    });
   });
 
-  it("ignores everything that is not a request", () => {
-    expect(parseCaddyLine("hallvi-following")).toBeNull();
-    expect(parseCaddyLine('{"level":"info","msg":"serving"}')).toBeNull();
-    expect(parseCaddyLine("{not json")).toBeNull();
+  it("takes views from the script once it is heard, and counts open pages", () => {
+    const now = Date.now();
+    const window = new LiveWindow({ hosts: ["shop.example"], script: true });
+    // The page load is a request: the script's own view is the view.
+    expect(window.arrival(request("/", now - 90_000))?.kind).toBe("request");
+    const view = request(
+      eventPath({ t: "view", s: "abcdefgh12", p: "/docs", w: 400 }),
+      now - 90_000,
+      { dest: "empty" },
+    );
+    expect(window.arrival(view)).toMatchObject({
+      kind: "view",
+      path: "/docs",
+      device: "mobile",
+    });
+    const ping = (s: string, at: number, address: string) =>
+      window.arrival(
+        request(eventPath({ t: "ping", s, p: "/docs" }), at, {
+          dest: "empty",
+          address,
+        }),
+      );
+    expect(ping("abcdefgh12", now - 20_000, "203.0.113.9")).toBeNull();
+    expect(ping("zyxwvuts98", now - 70_000, "198.51.100.4")).toBeNull();
+    // A page that pinged within the minute is open; the other went quiet.
+    expect(window.now(now)).toMatchObject({
+      openNow: 1,
+      recentVisitors: 2,
+      windowMinutes: 5,
+    });
+    expect(window.now(now + 5 * 60_000)).toMatchObject({
+      openNow: 0,
+      recentVisitors: 0,
+    });
   });
 
   it("accepts a record that says where the log is", () => {
@@ -120,7 +180,7 @@ describe("the access log", () => {
     expect(
       followCommand({ type: "file", path: "/var/log/caddy/access.log" }),
     ).toBe(
-      "test -r '/var/log/caddy/access.log' || { echo 'The access log is not readable.'; exit 1; }; echo hallvi-following; exec tail -n 400 -F '/var/log/caddy/access.log'",
+      "test -r '/var/log/caddy/access.log' || { echo 'The access log is not readable.'; exit 1; }; echo hallvi-following; exec tail -n 2000 -F '/var/log/caddy/access.log'",
     );
     expect(
       followCommand({ type: "container", name: "shop-caddy-1" }),

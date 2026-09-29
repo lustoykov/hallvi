@@ -1,17 +1,19 @@
 import {
-  accessLogSource,
+  accessLogRecord,
   followAccessLog,
-  type AccessLine,
-  type TrafficEvent,
+  LIVE_WINDOW_MINUTES,
+  LiveWindow,
 } from "@/server/access-log";
 import { handle } from "@/server/http";
 import { operatorSettings } from "@/server/operator-execution";
 import { assertSameOrigin } from "@/server/schemas";
+import type { Arrival, LiveEvent } from "@/server/traffic/contract";
+import { collectionOf } from "@/server/traffic/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Requests as they arrive, for as long as Overview is open. */
+/** Requests as they arrive, for as long as Overview or Traffic is open. */
 export async function GET(
   request: Request,
   context: { params: Promise<{ applicationId: string }> },
@@ -21,10 +23,10 @@ export async function GET(
     const { applicationId } = await context.params;
     const configuration = () => {
       const host = operatorSettings(applicationId).host;
-      return { host, source: host ? accessLogSource(applicationId) : null };
+      return { host, log: host ? accessLogRecord(applicationId) : null };
     };
     const initial = configuration();
-    const { host, source } = initial;
+    const { host, log } = initial;
 
     const encoder = new TextEncoder();
     const session = new AbortController();
@@ -40,7 +42,7 @@ export async function GET(
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        const send = (event: TrafficEvent) => {
+        const send = (event: LiveEvent) => {
           if (!session.signal.aborted)
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
@@ -56,8 +58,8 @@ export async function GET(
           close();
           return;
         }
-        // A held-open page must discover a newly recorded source and stop
-        // following one that was retired or moved, without a page reload.
+        // A held-open page must discover a newly recorded log and stop
+        // following one that was retired, moved or changed, without a reload.
         watch = setInterval(() => {
           try {
             if (JSON.stringify(configuration()) === JSON.stringify(initial))
@@ -72,7 +74,7 @@ export async function GET(
         // not twenty.
         controller.enqueue(encoder.encode("retry: 15000\n\n"));
 
-        if (!host || !source) {
+        if (!host || !log) {
           send({ type: "state", state: host ? "no-log" : "no-server" });
           // Held open, quietly: closing would have EventSource ask again
           // every three seconds for an answer that has not changed.
@@ -84,14 +86,31 @@ export async function GET(
         }
 
         send({ type: "state", state: "connecting" });
-        let pending: AccessLine[] = [];
+        // Views come from the script once it has been heard from, as they do
+        // in the totals; before that, from the log.
+        let script = false;
+        try {
+          script = Boolean(collectionOf(applicationId).scriptSince);
+        } catch {
+          // No totals to read: the stream still tells the log's story.
+        }
+        const window = new LiveWindow({
+          hosts: log.hosts,
+          pageKey: log.pageKey,
+          script,
+        });
+        let pending: Arrival[] = [];
         let answered = false;
+        let ticks = 0;
         flush = setInterval(() => {
-          if (!pending.length) return;
-          // A burst is summarised by its newest lines; the page is a picture
-          // of traffic, not a copy of the log.
-          send({ type: "lines", lines: pending });
-          pending = [];
+          if (pending.length) {
+            // A burst is summarised by its newest lines; the page is a
+            // picture of traffic, not a copy of the log.
+            send({ type: "arrivals", arrivals: pending });
+            pending = [];
+          }
+          // The counts every few seconds, once the backlog has been read.
+          if (answered && ticks++ % 8 === 2) send(window.now());
         }, 400);
         heartbeat = setInterval(
           () => controller.enqueue(encoder.encode(": keep-alive\n\n")),
@@ -100,9 +119,16 @@ export async function GET(
 
         followAccessLog(
           host,
-          source,
+          log,
           (line) => {
-            pending.push(line);
+            const arrival = window.arrival(line);
+            // The backlog only reaches as far back as the page's window.
+            if (
+              !arrival ||
+              arrival.at < Date.now() - LIVE_WINDOW_MINUTES * 60_000
+            )
+              return;
+            pending.push(arrival);
             if (pending.length > 400) pending.shift();
           },
           session.signal,
