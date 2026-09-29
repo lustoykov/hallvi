@@ -11,6 +11,8 @@ export interface ConversationContext {
 export interface PendingSubmission {
   message: string;
   key: string;
+  /** Product actions keep the owner's composer untouched across recovery. */
+  preserveDraft?: boolean;
 }
 
 export function acceptedDraftCanClear(

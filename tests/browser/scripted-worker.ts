@@ -21,6 +21,10 @@ import { ownChangeNotifications } from "../../src/server/change-notifications";
 export async function scriptWorker(
   fixture: { state: string },
   transcript: () => Transcript,
+  onSend?: (body: {
+    scope: { applicationId: string; chatId: string };
+    message: { id: string; body: string; delivery: string };
+  }) => void,
 ) {
   const hand = JSON.parse(
     readFileSync(join(dirname(fixture.state), "worker.json"), "utf8"),
@@ -47,8 +51,12 @@ export async function scriptWorker(
     }
     if (incoming.url === "/changed") relays++;
     if (changes.handle(incoming, outgoing)) return;
-    incoming.resume();
+    let body = "";
+    incoming.on("data", (chunk) => {
+      body += chunk.toString();
+    });
     incoming.on("end", () => {
+      if (incoming.url === "/send") onSend?.(JSON.parse(body));
       if (incoming.url === "/transcript") transcriptReads++;
       outgoing.writeHead(200, { "Content-Type": "application/json" });
       outgoing.end(

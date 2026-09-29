@@ -18,8 +18,8 @@ existing tools; there is no development-verification command in the public CLI.
 Use an isolated worktree and Node 22 (`node --version`), then `npm ci`.
 Record `git rev-parse HEAD` and any uncommitted changes being tested.
 Keep temporary source archives for before/after comparisons under `work/`.
-TypeScript excludes that ignored scratch directory; source and tests remain
-in the normal checks. Remove task-owned archives after retaining the evidence.
+TypeScript, ESLint and Prettier exclude that ignored scratch directory; source
+and tests remain in the normal checks. Remove task-owned archives after retaining the evidence.
 
 | What the change needs to prove | Start here |
 | --- | --- |

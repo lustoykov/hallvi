@@ -37,7 +37,7 @@ export default defineConfig([
     "node_modules/**",
     "coverage/**",
     "tests/results/**",
-    "work/learning-update-*/**",
+    "work/**",
     "next-env.d.ts",
   ]),
 ]);

@@ -40,16 +40,17 @@ mode, keep the saved host/ports, and show truthful tunnel and HTTP observations.
 actual device and use a named saved item while preserving private exposure.
 Distinguish closed tunnel, SSH failure and an application that does not answer.
 
-**Open decisions:** Bypassing Pi would require a separate contract. Direct
-submission, the saved-route tool form and the real return/remote-device
-acceptance remain unimplemented and unassigned.
-**Assignment:** On 2026-09-29 the owner selected plan 02 increment 1: truthful
-access observations and one current saved-route selector. Assigned to
-`codex/private-access-observations`, based on #255, in draft
-[PR #256](https://github.com/lustoykov/hallvi/pull/256). Existing reopen actions
-still prepare a main-conversation draft; they do not submit or reconnect.
-The full feature remains partial. [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
-cover this increment only.
+**Open decisions:** Bypassing Pi would require a separate contract. Increment 3's
+real return after controller restart and remote-device acceptance remains
+unimplemented and unassigned.
+**Assignment:** Increment 1's truthful observations and current saved-route
+selector landed in [PR #256](https://github.com/lustoykov/hallvi/pull/256).
+[Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
+cover that increment only. On 2026-09-29 the owner selected increment 2:
+direct main-operator submission and the saved-route tool form. Assigned to
+`codex/reconnect-saved-route`; implementation is in review. It preserves the
+existing permission, queue and execution evidence contracts and does not add
+an automatic recovery service. The full feature remains partial.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 

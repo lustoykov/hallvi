@@ -124,3 +124,37 @@ describe("on an installation with fixed private ports", () => {
     expect(mocks.exec).not.toHaveBeenCalled();
   });
 });
+
+it("keeps saved URLs exact and rejects connection changes before SSH", async () => {
+  const host = (await mocks.settings()).host;
+  mocks.exec.mockResolvedValue({ stdout: "", stderr: "" });
+  await openServerPort(
+    "app-test",
+    { remotePort: 80, localPort: 18000 },
+    undefined,
+    { host, url: "https://127.0.0.1:18000/named-item" },
+  );
+  expect(fetch).toHaveBeenCalledWith(
+    "https://127.0.0.1:18000/named-item",
+    expect.objectContaining({ redirect: "manual" }),
+  );
+  mocks.exec.mockClear();
+  await expect(
+    openServerPort("app-test", { remotePort: 80 }, undefined, {
+      host: { ...host, port: 2222 },
+      url: "http://127.0.0.1:8080",
+    }),
+  ).rejects.toThrow("changed");
+  expect(mocks.exec).not.toHaveBeenCalled();
+});
+
+it("does not put private connection paths into SSH failure evidence", async () => {
+  mocks.exec.mockRejectedValue(
+    Object.assign(new Error("Command failed: ssh -i /private/key"), {
+      stderr: "bind failed; /private/pinned-host",
+    }),
+  );
+  await expect(openServerPort("app-test", { remotePort: 80 })).rejects.toThrow(
+    "bind failed; [pinned host]",
+  );
+});
