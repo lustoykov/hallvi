@@ -2432,7 +2432,10 @@ function traefikLine(plan: Plan, hit: Hit, count: number) {
     RequestCount: count,
     RequestHost: plan.host,
     RequestMethod: hit.method,
-    RequestPath: hit.query ? `${hit.path}?${hit.query}` : hit.path,
+    // Traefik lets Go turn the query's semicolons into ampersands first.
+    RequestPath: hit.query
+      ? `${hit.path}?${hit.query.replaceAll(";", "&")}`
+      : hit.path,
     RequestPort: "-",
     // Traefik speaks HTTP/3 only when asked to.
     RequestProtocol: hit.proto === "HTTP/3.0" ? "HTTP/2.0" : hit.proto,
@@ -2738,13 +2741,14 @@ interface Reply {
   html: string | null;
 }
 
+// A request is never cut off on the way out: one the proxy logged but the
+// sender tallied as failed would make the two counts disagree.
 function liveSend(
   base: URL,
   agent: http.Agent,
   method: string,
   target: string,
   headers: [string, string][],
-  signal: AbortSignal,
 ): Promise<Reply> {
   const client = base.protocol === "https:" ? https : http;
   return new Promise((resolve) => {
@@ -2762,7 +2766,6 @@ function liveSend(
           agent,
           headers: Object.fromEntries(headers),
           timeout: 15_000,
-          signal,
         },
         (response) => {
           const type =
@@ -2902,16 +2905,15 @@ async function live(flags: Record<string, string>) {
     target: string,
     headers: [string, string][],
   ) => {
-    const reply = await liveSend(
-      base,
-      agent,
-      method,
-      target,
-      headers,
-      stop.signal,
-    );
-    count(`${kind} requests`);
-    count(reply.status ? `status ${String(reply.status)[0]}xx` : "failed");
+    const reply = await liveSend(base, agent, method, target, headers);
+    // Tallied the way `verify` counts the proxy's log, so the two can be
+    // held against each other. A request that got no answer is not logged.
+    if (!reply.status) count("failed");
+    else if (target.startsWith(HALLVI_PATH_PREFIX)) count("own");
+    else {
+      count(kind);
+      if (reply.status >= 500) count("errors");
+    }
     return reply;
   };
 
@@ -2962,7 +2964,7 @@ async function live(flags: Record<string, string>) {
           },
           "browser",
         ),
-      ).then(() => count("events"));
+      ).then((reply) => reply.status && count(`event ${value.t}`));
     try {
       for (let views = 0; views < 12 && !stop.signal.aborted; views++) {
         let reply = await send(
@@ -3011,7 +3013,14 @@ async function live(flags: Record<string, string>) {
           bad.add(path);
           good.delete(path);
         }
-        count("documents");
+        // A browser without fetch metadata is only known by its HTML.
+        const answered =
+          (reply.status >= 200 && reply.status < 300) || reply.status === 304;
+        if (
+          answered &&
+          (!person.browser.noFetchMetadata || reply.type === "text/html")
+        )
+          count("views");
         const page = new URL(target, base).href;
         const found = reply.html
           ? linksIn(reply.html, new URL(page))
@@ -3102,9 +3111,8 @@ async function live(flags: Record<string, string>) {
             r: base.origin,
             w: person.width,
           });
-          for (const endpoint of data.api
-            .filter((item) => item.method === "GET")
-            .slice(0, own.int(1, 2)))
+          const reads = data.api.filter((item) => item.method === "GET");
+          for (const endpoint of own.shuffle(reads).slice(0, own.int(1, 2)))
             await send(
               agent,
               "browser",
@@ -3154,7 +3162,7 @@ async function live(flags: Record<string, string>) {
     });
     const paths =
       bot.work === "probe"
-        ? [...PROBES].sort(() => own.next() - 0.5).slice(0, own.int(1, 6))
+        ? own.shuffle(PROBES).slice(0, own.int(1, 6))
         : [
             bot.work === "crawl"
               ? crawlTarget(plan, own).path
@@ -3253,11 +3261,8 @@ async function live(flags: Record<string, string>) {
   stop.abort();
   await Promise.allSettled([...running]);
   clearInterval(report);
-  console.log(
-    `Done: ${Object.entries(counts)
-      .map(([key, value]) => `${value} ${key}`)
-      .join(", ")}.`,
-  );
+  // The same names `verify` prints, to hold one against the other.
+  console.log(`Done: ${JSON.stringify(counts, Object.keys(counts).sort())}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -3417,10 +3422,7 @@ function verify(flags: Record<string, string>, files: string[]) {
   const skipped = { notRequests: 0, unreadable: 0 };
   const perFile: { file: string; lines: number }[] = [];
   for (const file of files) {
-    const raw = readFileSync(file);
-    const text = (
-      raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw
-    ).toString("utf8");
+    const text = readLog(file);
     let lines = 0;
     for (const row of text.split("\n")) {
       if (!row.trim()) continue;
@@ -3587,13 +3589,22 @@ function finishDay({ sets, ...day }: ReturnType<typeof emptyDay>) {
 // ---------------------------------------------------------------------------
 // Ranges: every block against DB-IP Lite's countries.
 
+/** A log file's text, whether gzipped or not. */
+function readLog(file: string) {
+  let raw: Buffer;
+  try {
+    raw = readFileSync(file);
+  } catch {
+    fail(`Cannot read ${file}.`);
+  }
+  const zipped = raw[0] === 0x1f && raw[1] === 0x8b;
+  return (zipped ? gunzipSync(raw) : raw).toString("utf8");
+}
+
 function ranges(files: string[]) {
   if (!files[0])
     fail("Give the DB-IP Lite country CSV (dbip-country-lite-YYYY-MM.csv.gz).");
-  const raw = readFileSync(files[0]);
-  const text = (
-    raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw
-  ).toString("utf8");
+  const text = readLog(files[0]);
   // Both families as one number line: v4 below 2^32, v6 far above it.
   const number = (address: string) =>
     address.includes(":")
