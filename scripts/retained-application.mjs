@@ -675,7 +675,7 @@ export async function snapshot(into, names) {
   return [
     `Snapshot of ${chosen.map((each) => each.directory).join(", ")} in ${into}: records only, no keys, no secrets, no logins.`,
     "Look at it with the pair, on ports of its own. Its worker can read the copied histories and nothing more: with no login it cannot start a turn, and with no connections it cannot reach a provider or the host.",
-    `  HALLVI_DB_PATH=${target} HALLVI_CONFIG_DIR=${join(state, "config")} HALLVI_PI_CONFIG_DIR=${account} HALLVI_LOG_DIR=${join(state, "diagnostics")} npm run dev -- --port 3730`,
+    `  HALLVI_DB_PATH=${target} HALLVI_CONFIG_DIR=${join(state, "config")} HALLVI_PI_CONFIG_DIR=${account} PI_CODING_AGENT_DIR=${account} HALLVI_LOG_DIR=${join(state, "diagnostics")} npm run dev -- --port 3730`,
   ].join("\n");
 }
 
