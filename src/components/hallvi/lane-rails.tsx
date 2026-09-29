@@ -87,9 +87,9 @@ function stamp(at: number, now: number) {
 }
 
 /** Record keys, as something a person would say happened. */
-function friendly(title: string) {
+function friendly(title: string, tone: RailEvent["tone"]) {
   const counted = /^(\d+) checks?( passed)?$/i.exec(title);
-  if (counted) return `${counted[1]} checks passed`;
+  if (counted) return `${counted[1]} checks${tone === "pass" ? " passed" : ""}`;
   return (
     (
       {
@@ -221,14 +221,14 @@ function Rail({
                     <Check weight="bold" />
                   )}
                 </span>
-                <b>{friendly(event.title)}</b>
+                <b>{friendly(event.title, event.tone)}</b>
                 <small>{stamp(event.at, now)}</small>
               </button>
               {open === id && (
                 <div className="axlr-pop">
                   {eventPop?.(lane.id, event.id) ?? (
                     <div className="axlr-card" role="dialog">
-                      <b>{friendly(event.title)}</b>
+                      <b>{friendly(event.title, event.tone)}</b>
                       <small>
                         {stamp(event.at, now)} · {lasted(now - event.at)} ago
                       </small>
@@ -271,7 +271,7 @@ function Rail({
                 </span>
                 <span className="axlr-station axlr-planned">
                   <span className="axlr-ring" />
-                  <b>{friendly(coming.title)}</b>
+                  <b>{friendly(coming.title, coming.tone)}</b>
                   <small>{stamp(coming.at, now)}</small>
                 </span>
               </div>
