@@ -78,7 +78,7 @@ still blocks the event loop: ten readers of a synthetic 2,000-record history
 showed about 82 ms maximum delay from the warm response path. Change
 notifications will remove idle polling; consider bounded or incremental
 evidence responses if long histories still make active chats slow. The
-[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
+[measurement](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-execution-reader.md) separates file reads
 from this remaining cost.
 
 **+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
@@ -114,6 +114,7 @@ that sets `launchOptions.executablePath`. An environment variable read in
 
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
+
 ### AF-010 — Read Pi's recorded reasoning through a supported export
 
 The old standalone inspector cannot read the current database or Pi session
@@ -130,7 +131,7 @@ first browser opening, versus 14–23 ms during idle windows. A separate profile
 with histories already warmed showed substantial module loading, source reads
 and compilation; it does not fully attribute the original spike. Investigate
 first-navigation responsiveness separately from the now-cached history reads.
-The [rehearsal report](docs/testing/2026-09-29-alpha8-rehearsal.md) records the
+The [release verification](https://github.com/lustoykov/hallvi/pull/254) records the
 environment and limits. No optimization was added during release verification.
 
 **+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
@@ -139,6 +140,7 @@ environment and limits. No optimization was added during release verification.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
@@ -171,6 +173,19 @@ and the badge showed 0.9 s after load. GitHub Actions passed the spec in
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
 Resolved in #245: warm the five existing read routes before interaction deadlines begin.
+
+### AF-007 — Keep architecture explanations in step with code
+
+I want architecture and domain explanations kept current as behavior changes.
+The overview diagram and tools paragraph disagreed about the tool count, and
+both lagged the registered tools. Extracting documentation cannot establish
+that it is current; the stale counts were removed in this task.
+
+The owner chose a separate daily Codex task to review merged main, with manual
+updates requested in Codex. The dashboard only reads saved content; it has no
+agent launcher or per-PR review requirement. That approach is implemented in #247.
+
+**+1:** 2026-09-29 — `codex/architecture-learning`
 
 ### AF-011 — Keep elapsed time together on narrow work lines
 

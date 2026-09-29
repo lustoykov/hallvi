@@ -26,8 +26,8 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Development environment](development-environment.md) | Discover, snapshot, exclusively attach and detach retained applications; check compatibility, upgrade their records and recover them. |
 | [Development resources](development-resources.md) | Resource ownership, cloud fixtures and cleanup when a task finishes. |
 | [GitHub setup](integrations/github.md) | Connection and credential setup that still applies. |
-| [Testing and evidence](testing/README.md) | What has actually been proved, coverage gaps and links to dated source accounts. |
-| [Dashboard acceptance guide](testing/phase-one-acceptance.md) | Small reference retained at the path the test dashboard loads. |
+| [Test runners](../tests/README.md) | Commands, fixtures, coverage and verification limits. |
+| [Dashboard acceptance guide](../tests/acceptance.md) | Acceptance criteria loaded by the test dashboard. |
 
 The owning references outside this directory are [Product](../PRODUCT.md), [Roadmap](../ROADMAP.md), [terminology](../CONTEXT.md), [component design](../src/components/hallvi/DESIGN.md) and [test runner instructions](../tests/README.md). Avoid duplicating them here.
 
@@ -37,4 +37,4 @@ Update the current document when behavior changes. Delete completed handoffs, ol
 
 The redesign changes general execution, permissions, conversation ownership and record presentation. Follow the operator design for those decisions, the roadmap for stage order and the requirements for current outcomes. Existing architecture, runner contracts and prototype descriptions remain useful accounts of their implementation; they are not competing redesign plans.
 
-Dated audits and proof reports retain their historical claims and limitations. Their old next actions do not override the current roadmap. Setup, fixture instructions and visual tokens continue to apply where their implementation remains in use. The user has explicitly authorized discarding old development data. Remove obsolete code, tests, migrations and recovery machinery rather than adding compatibility layers. Historical documents describe old behavior, not a preservation requirement.
+Dated audits and proof reports remain in Git history with their historical claims and limitations; new run-specific evidence stays out of Git. Their old next actions do not override the current roadmap. Setup, fixture instructions and visual tokens continue to apply where their implementation remains in use. The user has explicitly authorized discarding old development data. Remove obsolete code, tests, migrations and recovery machinery rather than adding compatibility layers. Historical documents describe old behavior, not a preservation requirement.

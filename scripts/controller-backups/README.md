@@ -112,4 +112,4 @@ for the bucket, skips while a change runs, backs off after an attempt that
 produced nothing, applies retention, and opens a copy again through the
 command above. It calls no real provider. The first real upload to Cloudflare
 R2 is recorded in
-[docs/testing/2026-09-15-controller-protection.md](../../docs/testing/2026-09-15-controller-protection.md).
+[docs/testing/2026-09-15-controller-protection.md](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-15-controller-protection.md).
