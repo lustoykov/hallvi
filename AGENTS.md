@@ -23,14 +23,22 @@ automation prompts into product sessions.
   recurring friction you encounter; validate those narrow improvements and
   include them in the same PR. If it worked, leave it alone; no improvement
   quota. Preserve the verification standard, task scope and permission
-  boundaries. Larger workflow or product proposals belong in
-  [AGENT_FEEDBACK.md](AGENT_FEEDBACK.md) for the owner's decision.
-- Record bugs, friction and ideas you would like in
+  boundaries. Record raw wishes and workflow friction as feedback; deliberate
+  product proposals follow the feature research workflow below.
+- During ordinary implementation, testing and review, record useful bugs,
+  friction, wishes and ideas you encounter in
   [AGENT_FEEDBACK.md](AGENT_FEEDBACK.md). A short note is enough; no justification
-  or evidence is required. Include it in the current PR or open a feedback-only
-  PR whenever you wish. Search before adding, and count one +1 per independent
-  task. The owner decides what is worth doing; feedback does not authorize
-  implementation. The file is shared through merges, not live across worktrees.
+  or research is required. Before finishing, capture useful observations from
+  the task; invent nothing when there are none. Include them in the current PR
+  or a feedback-only PR. Search before adding, and count one +1 per independent
+  task. Feedback does not authorize implementation and is shared through merges.
+- [AGENT_FEATURES.md](AGENT_FEATURES.md) holds researched product proposals and
+  owns the research workflow. Read it for feature discovery, proposal updates
+  or an explicitly assigned feature. Ordinary coding tasks still contribute
+  feedback; they do not need a broad product research pass. The owner selects
+  work, and [ROADMAP.md](ROADMAP.md) owns delivery order.
+- For automated and scheduled work in this repository, default to
+  `gpt-6-sol` with `high` reasoning unless the owner requests otherwise.
 - When a boundary or a flow changes, draw it as a Mermaid block in the pull
   request.
 - Keep decisions in their owning documents and update current wording instead

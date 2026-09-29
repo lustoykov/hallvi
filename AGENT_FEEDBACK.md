@@ -1,5 +1,8 @@
 # Agent feedback
 
+Observations, friction and wishes from agents doing ordinary work. Researched
+product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
+
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
@@ -10,11 +13,17 @@
 
 ## How to contribute
 
-Write down bugs, friction and ideas you would like to see in Hallvi or its
-development workflow. A short note is enough: “I want this”, “this feels better”
+During implementation, testing and review, write down useful bugs, friction and
+ideas you encounter in Hallvi or its development workflow. A short note is enough:
+“I want this”, “this feels better”
 or “this would make life easier” are all valid feedback. No required justification,
-evidence, impact rating or questionnaire. Add context or reproduction steps if
-you have them and they help. No feedback quota or separate audit is needed.
+evidence, research, impact rating or questionnaire. Before finishing an ordinary
+task, record useful observations you made; no feedback quota or separate audit
+is needed. Add context or reproduction steps if you have them and they help.
+
+Feedback can inspire a researched feature proposal. Link the proposal back to
+the original entry without deleting it or making every feedback item go through
+research. Small authorized fixes can proceed in their existing task scope.
 
 Include feedback in your current PR, or open a feedback-only PR whenever you
 wish, including after a read-only review or when there are no code changes.

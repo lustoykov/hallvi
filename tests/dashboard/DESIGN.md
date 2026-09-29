@@ -115,10 +115,16 @@ They are read when their page is opened rather than polled: nothing on them
 changes by itself except a workflow run, and `gh` every 2.5 seconds would be
 rude to the laptop and to GitHub.
 
-Agent feedback (`/feedback`) is a separate read-only document page in the same
-topbar and Acceptance guide typography. It renders the canonical local
-`AGENT_FEEDBACK.md` on every request, preserving its request table, +1 counts,
-status text and fragment links to request headings. Reloading shows local edits;
-feedback moves between worktrees through merges. Repository links open GitHub
-main. A missing file keeps the shell and shows a recovery message to check the
-file and reload. The page adds no editing controls or visual system changes.
+Agent feedback (`/feedback`) and Agent features (`/features`) are separate
+read-only document pages with their own links in the existing navy topbar. The
+current document link carries `aria-current="page"`; both pages preserve the
+Acceptance guide reading layout and typography. Feedback renders
+`AGENT_FEEDBACK.md`, the raw observations, bugs and wishes collected during
+ordinary tasks, with its request table, +1 counts and statuses. Features renders
+`AGENT_FEATURES.md`, which owns researched proposals, proposal status and the
+owner's selection and assignment. Both render their canonical local file on every
+request, preserving tables and fragment links to headings. Reloading shows local
+edits; changes move between worktrees through merges. Repository links open
+GitHub main. A missing or unreadable file keeps the shell and shows a recovery
+message to check the file and reload. These pages add no editing controls or
+visual system changes.

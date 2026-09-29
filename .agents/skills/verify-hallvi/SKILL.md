@@ -27,7 +27,9 @@ Include actual observations and limitations in the existing PR verification
 section, not merely a declaration that this skill was used. Follow
 [AGENTS.md](../../../AGENTS.md) for maintenance: correct demonstrated workflow
 defects in the same PR, validate the correction, and leave working guidance
-alone. Larger proposals go to [agent feedback](../../../AGENT_FEEDBACK.md).
+alone. Capture useful task feedback in
+[agent feedback](../../../AGENT_FEEDBACK.md) without a research prerequisite;
+deliberate product proposals follow [agent features](../../../AGENT_FEATURES.md).
 
 This is contributor guidance. Never load it or its supporting guide into Pi's
 product sessions; send only the scoped application request.
