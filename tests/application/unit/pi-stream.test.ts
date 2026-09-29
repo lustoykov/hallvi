@@ -31,14 +31,21 @@ const context = {
   params: Promise.resolve({ applicationId: "app", chatId: "chat" }),
 };
 const snapshot = (revision: number) => ({
+  status: "idle",
+  worker: { alive: true },
+  executions: [],
+  piActivity: [],
+  information: [],
   messages: [{ id: "answer", revision }],
 });
 const frame = async (reader: ReadableStreamDefaultReader<Uint8Array>) =>
   new TextDecoder().decode((await reader.read()).value);
 let controller: AbortController;
-async function open() {
+async function open(incremental = true) {
   return GET(
-    new Request("http://localhost/events", { signal: controller.signal }),
+    new Request(`http://localhost/events${incremental ? "?changes=1" : ""}`, {
+      signal: controller.signal,
+    }),
     context,
   );
 }
@@ -47,6 +54,19 @@ beforeEach(() => {
   controller = new AbortController();
   mocks.ready = Promise.resolve();
   mocks.snapshot.mockResolvedValue(snapshot(1));
+});
+
+it("keeps full updates for already-open clients without incremental opt-in", async () => {
+  const reader = (await open(false)).body!.getReader();
+  expect(await frame(reader)).toContain(
+    '"messages":[{"id":"answer","revision":1}]',
+  );
+  mocks.snapshot.mockResolvedValue(snapshot(2));
+  mocks.notify({ kind: "chat" });
+  await vi.advanceTimersByTimeAsync(500);
+  const next = await frame(reader);
+  expect(next).toContain('"messages":[{"id":"answer","revision":2}]');
+  expect(next).not.toContain('"type":"changes"');
 });
 afterEach(() => {
   controller.abort();

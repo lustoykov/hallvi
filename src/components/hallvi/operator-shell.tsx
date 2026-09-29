@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { currentAccessRecord } from "@/server/access-record";
+import { applyChatFrame, type ChatFrame } from "@/lib/chat-stream";
 import { useAccessObservation } from "./use-access-observation";
 
 import type { ApplicationFacts } from "@/server/application-facts";
@@ -373,16 +374,23 @@ export function OperatorShell({
     let active = true;
     const observedChats = new Set([selectedChatId]);
     if (observedMainId) observedChats.add(observedMainId);
-    const streams = [...observedChats].map((chatId) => {
+    const subscriptions = [...observedChats].map((chatId) => {
       let outcomeVersion = "";
+      // Each observed chat owns a stream baseline. POST/SSR views arrive
+      // independently; reconnect replaces it with authoritative full state.
+      let streamed: ChatSnapshot | null = null;
       const stream = new EventSource(
-        `/api/applications/${applicationId}/chats/${chatId}/events`,
+        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1`,
       );
       stream.onopen = () => setReconnecting(false);
       stream.onerror = () => setReconnecting(true);
       stream.onmessage = (event) => {
         if (!active) return;
-        const snapshot = JSON.parse(event.data) as ChatSnapshot;
+        const snapshot = applyChatFrame(
+          streamed,
+          JSON.parse(event.data) as ChatFrame,
+        );
+        streamed = snapshot;
         if (chatId === mainChatId)
           setMainSnapshot({ applicationId, chatId, snapshot });
         setView((current) =>
@@ -455,11 +463,14 @@ export function OperatorShell({
             });
         }
       };
-      return stream;
+      return () => {
+        streamed = null;
+        stream.close();
+      };
     });
     return () => {
       active = false;
-      streams.forEach((stream) => stream.close());
+      subscriptions.forEach((close) => close());
     };
   }, [
     applicationId,

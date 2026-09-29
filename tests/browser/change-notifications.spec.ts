@@ -48,7 +48,7 @@ async function open(
   );
   const page = await context.newPage();
   const connected = page.waitForResponse((response) =>
-    response.url().endsWith(`/chats/${chat}/events`),
+    new URL(response.url()).pathname.endsWith(`/chats/${chat}/events`),
   );
   await page.goto(`/applications/${app}?chat=${chat}`);
   expect((await connected).ok()).toBe(true);
