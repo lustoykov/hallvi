@@ -81,7 +81,10 @@ flowchart LR
     Local -->|POST /changed on worker.sock| Hub
     Hub -->|one GET /changes per web process| Local
     Local -->|matching application or chat| Stream[Browser SSE handlers]
-    Stream -->|initial, changed or reconnected| Snapshot[Current chat snapshot]
+    Stream -->|initial or reconnected: independent read| Snapshot[Current chat snapshot]
+    Stream -->|refresh| Pending[Share pending read for this chat]
+    Local -->|notice invalidates older pending read| Pending
+    Pending --> Snapshot
     Snapshot -->|connect or reconnect: full state| Browser[Open conversations]
     Snapshot --> Compare[Compare records with this stream's previous state]
     Compare -->|changed records, removals and order| Browser
@@ -102,6 +105,15 @@ event arriving during an asynchronous read schedules another read. Bursts
 are coalesced, with at most one read in flight and one start every 500 ms;
 the first change after idle can start after 100 ms. Identical snapshots are
 not sent again. The 15-second heartbeat transports no state and reads none.
+
+Overlapping SSE refreshes of the same controller, application and chat share
+one pending snapshot read, including its worker transcript transfer and evidence
+projection. A notice makes a pre-notice read ineligible for new readers; each
+stream still schedules another read if a notice arrives during its own read.
+Settled and failed reads are discarded immediately. Initial/reconnected reads,
+SSR, CLI and write responses do not join this pending read. There is no settled
+transcript cache, freshness window or new worker protocol. Each stream compares
+the shared value against its own baseline without modifying it.
 
 The page opts into incremental frames with `events?changes=1`. Its first frame
 is a full `ChatSnapshot`; later frames replace only changed records in messages,

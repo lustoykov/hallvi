@@ -212,11 +212,13 @@ export function activityFromTranscript(input: {
   });
   // Replies in the order Pi wrote them, and within a reply the sequence Pi
   // gave each call and each thing it said.
-  const order = transcript.messages.map((message) => message.id);
-  const place = (runId: string) => {
-    const at = order.indexOf(runId);
-    return at < 0 ? order.length : at;
-  };
+  const order = new Map<string, number>();
+  transcript.messages.forEach((message, at) => {
+    // Match indexOf: if an id occurs twice, its first position wins.
+    if (!order.has(message.id)) order.set(message.id, at);
+  });
+  const place = (runId: string) =>
+    order.get(runId) ?? transcript.messages.length;
   return [...tools, ...said].sort(
     (a, b) => place(a.runId) - place(b.runId) || a.sequence - b.sequence,
   );

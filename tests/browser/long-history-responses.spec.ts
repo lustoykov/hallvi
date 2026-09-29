@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BrowserContext, Page } from "@playwright/test";
 import { longHistory } from "../fixtures/long-history";
@@ -140,6 +140,13 @@ for (const count of [1, 5, 10]) {
     );
     const contexts: BrowserContext[] = [];
     const report: object[] = [];
+    const eventPath = testInfo.outputPath("reader-events.jsonl");
+    const recordEvent = (value: object) =>
+      appendFileSync(
+        eventPath,
+        JSON.stringify({ at: Date.now(), ...value }) + "\n",
+      );
+    recordEvent({ stage: "setup" });
     const browserErrors: string[] = [];
     const readerPages: Page[] = [];
     const baseBody = transcript.messages.at(-1)!.body;
@@ -156,7 +163,12 @@ for (const count of [1, 5, 10]) {
       await page.goto(`/applications/${app}`);
       await expect(page.locator(`#execution-${last.id}`)).toBeVisible();
       await page.goto("about:blank");
-      for (const incremental of [false, true]) {
+      recordEvent({ stage: "warm" });
+      for (const incremental of process.env.HALLVI_RESPONSE_MODE === "changes"
+        ? [true]
+        : process.env.HALLVI_RESPONSE_MODE === "full"
+          ? [false]
+          : [false, true]) {
         const readers: Page[] = [];
         transcript.messages.at(-1)!.body = baseBody;
         last.output = baseOutput;
@@ -164,6 +176,11 @@ for (const count of [1, 5, 10]) {
         store();
         worker.changed({ kind: "execution", applicationId: app });
         while (readers.length < count) {
+          recordEvent({
+            stage: "opening",
+            incremental,
+            reader: readers.length,
+          });
           const context = await browser.newContext({ baseURL: fixture.url });
           contexts.push(context);
           await context.addInitScript(() => {
@@ -173,6 +190,7 @@ for (const count of [1, 5, 10]) {
               state: number;
               chars?: number;
               tail?: string;
+              marks?: string[];
             };
             const events: Event[] = [];
             (window as unknown as { qaSse: Event[] }).qaSse = events;
@@ -186,15 +204,23 @@ for (const count of [1, 5, 10]) {
                       kind === "message"
                         ? (event as MessageEvent<string>).data
                         : undefined;
-                    events.push({
+                    const entry = {
                       kind,
                       at: performance.now(),
                       state: this.readyState,
                       ...(data
-                        ? { chars: data.length, tail: data.slice(-600) }
+                        ? {
+                            chars: data.length,
+                            tail: data.slice(-600),
+                            marks: [
+                              ...new Set(data.match(/PROFILE-\d+-\d+/g) ?? []),
+                            ],
+                          }
                         : {}),
-                    });
-                    if (events.length > 12) events.shift();
+                    };
+                    events.push(entry);
+                    console.info("QA-SSE " + JSON.stringify(entry));
+                    if (events.length > 60) events.shift();
                   });
               }
             };
@@ -211,13 +237,25 @@ for (const count of [1, 5, 10]) {
           const reader = await context.newPage();
           readerPages.push(reader);
           reader.on("pageerror", (error) => browserErrors.push(error.message));
+          const index = readers.length;
+          reader.on("console", (message) => {
+            if (message.text().startsWith("QA-SSE "))
+              recordEvent({
+                incremental,
+                reader: index,
+                event: JSON.parse(message.text().slice(7)),
+              });
+          });
           const connected = reader.waitForResponse((response) =>
             new URL(response.url()).pathname.endsWith(`/chats/${chat}/events`),
           );
           await reader.goto(`/applications/${app}`);
+          recordEvent({ stage: "loaded", incremental, reader: index });
           await connected;
+          recordEvent({ stage: "sse-response", incremental, reader: index });
           await expect(reader.locator(`#execution-${last.id}`)).toBeVisible();
           readers.push(reader);
+          recordEvent({ stage: "connected", incremental, reader: index });
         }
         // Begin after the pending connect notices and initial frames settle.
         await page.waitForTimeout(800);
@@ -227,6 +265,7 @@ for (const count of [1, 5, 10]) {
         for (let wave = 0; wave < 6; wave++) {
           const changedAt = performance.now();
           const mark = `PROFILE-${count}-${wave}`;
+          recordEvent({ stage: "changed", incremental, mark });
           last.output += `\n${mark}`;
           call.preview = last.output;
           transcript.messages.at(-1)!.body += ` ${mark}`;
@@ -242,6 +281,12 @@ for (const count of [1, 5, 10]) {
             ),
           );
           visibleMs.push(performance.now() - changedAt);
+          recordEvent({
+            stage: "visible",
+            incremental,
+            mark,
+            visibleMs: visibleMs.at(-1),
+          });
           await page.waitForTimeout(550);
         }
         const after = await metrics();
@@ -263,12 +308,23 @@ for (const count of [1, 5, 10]) {
           parses: after.parses - before.parses,
           maxLoopDelayMs: after.maxLoopDelayMs,
           frames: after.frames,
+          projections: after.projections,
+          workerReads: after.workerReads,
+          transcriptReads: worker.reads(),
+          clientEvents: await Promise.all(
+            readers.map((reader) =>
+              reader.evaluate(
+                () => (window as unknown as { qaSse: unknown }).qaSse,
+              ),
+            ),
+          ),
         });
         writeFileSync(
           testInfo.outputPath("active-response-profile.json"),
           JSON.stringify(report, null, 2),
         );
-        for (const context of contexts) await context.close();
+        for (const context of contexts)
+          await context.close().catch(() => undefined);
         contexts.length = 0;
       }
       await testInfo.attach("active-response-profile", {
@@ -302,7 +358,8 @@ for (const count of [1, 5, 10]) {
           2,
         ),
       );
-      for (const context of contexts) await context.close();
+      for (const context of contexts)
+        await context.close().catch(() => undefined);
       await worker();
     }
   });
