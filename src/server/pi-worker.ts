@@ -59,6 +59,7 @@ export async function runPiWorker(signal: AbortSignal) {
       "A Pi worker is already running for this database.",
     );
   const { owner } = owned;
+  let trafficTicks: ReturnType<typeof setInterval> | undefined;
   try {
     // A send is answered once Pi has the message, so the first one should
     // not also wait for the SDK to load.
@@ -79,15 +80,13 @@ export async function runPiWorker(signal: AbortSignal) {
     let watching = false;
     let nextWatch = 0;
     // Traffic history: a quick synchronous look at each application's choice
-    // and records; the follows it starts run on their own and never hold
-    // this loop.
+    // and records, on a clock of its own. Never a step of this loop, which
+    // waits on the controller's copy for minutes: turning history off has to
+    // end the follow within seconds, whatever an upload is doing.
     const traffic = trafficCollector(signal);
-    let nextTraffic = 0;
+    traffic.tick();
+    trafficTicks = setInterval(() => traffic.tick(), TICK_MS);
     while (!signal.aborted) {
-      if (Date.now() >= nextTraffic) {
-        nextTraffic = Date.now() + TICK_MS;
-        traffic.tick();
-      }
       if (!watching && Date.now() >= nextWatch) {
         watching = true;
         void watch.tick().finally(() => {
@@ -115,6 +114,7 @@ export async function runPiWorker(signal: AbortSignal) {
       await delay(250, undefined, { signal }).catch(() => undefined);
     }
   } finally {
+    clearInterval(trafficTicks);
     // Ownership is held until every session is let go, or the process ends.
     await owned.close();
   }

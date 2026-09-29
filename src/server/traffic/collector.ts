@@ -9,7 +9,8 @@
 //   the log still holds for it, then kept current from the follow and
 //   written as provisional every few seconds;
 // - a finished day is counted again from the files once it is over (after
-//   `FINAL_AFTER_MS`), and stored as final;
+//   `FINAL_AFTER_MS`), and stored as final. Only that recount makes a day
+//   final: what the follow writes is provisional, whatever the clock says;
 // - on start, a day still within the log's reach that is missing, not final,
 //   partly unreadable or counted before a switch point it now falls after is
 //   counted again — and no other, so a restart does not re-read a month.
@@ -27,19 +28,16 @@ import { listApplications } from "../db";
 import { operatorSettings } from "../operator-execution";
 import {
   LOG_FORMATS,
+  OTHER,
+  STORED_PER_LIST,
   type Collection,
   type Coverage,
   type Gap,
+  type Ranked,
   type TrafficDay,
 } from "./contract";
 import { DayCounter, FINAL_AFTER_MS } from "./count";
-import {
-  addDays,
-  controllerTimeZone,
-  coveredMs,
-  dayBounds,
-  dayOf,
-} from "./days";
+import { addDays, controllerTimeZone, dayBounds, dayOf, HOUR_MS } from "./days";
 import {
   followLog,
   listLog,
@@ -159,30 +157,41 @@ export function readCoverage(
 }
 
 /**
- * Today's coverage before `to`, from a listing: the file being written is
- * followed, so it covers onwards, and anything the files do not reach —
- * before the oldest, or between two that are not neighbours — is missing.
+ * Today's coverage before `to`, from the listing the follow reads: the file
+ * being written is followed, so it covers onwards; a file the follow could
+ * not read (`unreadable`, filled in as it says so) is a gap of its own; and
+ * anything the files do not reach — before the oldest, or between two that
+ * are not neighbours — is missing.
  */
 function followedCoverage(
   start: number,
   files: LogFile[],
   enabledAt: number | null,
+  unreadable: ReadonlySet<string>,
 ) {
   // No file yet: the follow waits for the first one, and covers from now.
-  const spans = files.length
-    ? files.map((file, index) =>
-        index === files.length - 1
-          ? { from: file.from, to: Number.POSITIVE_INFINITY }
-          : { from: file.from, to: file.to },
-      )
-    : [{ from: Date.now(), to: Number.POSITIVE_INFINITY }];
-  const reach = joined(spans).find((span) => span.to > start);
-  const from = reach ? Math.max(start, reach.from) : null;
-  return (to: number): Coverage => ({
-    from: from !== null && to > from ? iso(from) : null,
-    to: from !== null && to > from ? iso(to) : null,
-    gaps: sorted(missing(uncovered(start, to, spans), enabledAt)),
-  });
+  const all = files.length
+    ? files.map((file, index) => ({
+        name: file.name,
+        from: file.from,
+        to: index === files.length - 1 ? Number.POSITIVE_INFINITY : file.to,
+      }))
+    : [{ name: "", from: Date.now(), to: Number.POSITIVE_INFINITY }];
+  return (to: number) => {
+    const within = (list: typeof all) =>
+      list.map((file) => ({
+        from: Math.max(file.from, start),
+        to: Math.min(file.to, to),
+      }));
+    return readCoverage(
+      { start, end: to },
+      {
+        covered: within(all.filter((file) => !unreadable.has(file.name))),
+        unreadable: within(all.filter((file) => unreadable.has(file.name))),
+      },
+      enabledAt,
+    );
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -221,10 +230,206 @@ function noteScript(applicationId: string, counter: DayCounter, live: boolean) {
 // ---------------------------------------------------------------------------
 // Finished days
 
-const covers = (day: TrafficDay) => {
-  const { start, end } = dayBounds(day.day, day.timeZone);
-  return coveredMs(day.coverage, start, end);
-};
+/** What a day's coverage says the log answered for, within the day. */
+function spansOf(coverage: Coverage, bounds: { start: number; end: number }) {
+  if (!coverage.from || !coverage.to) return [];
+  return uncovered(
+    Math.max(bounds.start, Date.parse(coverage.from)),
+    Math.min(bounds.end, Date.parse(coverage.to)),
+    coverage.gaps.map((gap) => ({
+      from: Date.parse(gap.from),
+      to: Date.parse(gap.to),
+    })),
+  );
+}
+
+const length = (spans: Span[]) =>
+  spans.reduce((total, span) => total + span.to - span.from, 0);
+const clipped = (spans: Span[], from: number, to: number) =>
+  spans
+    .map((span) => ({
+      from: Math.max(span.from, from),
+      to: Math.min(span.to, to),
+    }))
+    .filter((span) => span.to > span.from);
+/** Whether `outer` answers for every moment `inner` does. */
+const holds = (outer: Span[], inner: Span[]) =>
+  inner.every((span) => !uncovered(span.from, span.to, outer).length);
+
+/**
+ * Coverage made of parts, each counted by one side: what that side covered
+ * of it, and that side's own reason for the rest. A stored count says
+ * nothing about the time after its last moment: Hallvi was not following.
+ */
+function coverageOf(
+  parts: { day: TrafficDay; spans: Span[]; from: number; to: number }[],
+): Coverage {
+  const covered = joined(
+    parts.flatMap((part) => clipped(part.spans, part.from, part.to)),
+  );
+  const gaps: Gap[] = [];
+  for (const { day, spans, from, to } of parts) {
+    const reasons = day.coverage.gaps.map((gap) => ({
+      from: Date.parse(gap.from),
+      to: Date.parse(gap.to),
+      why: gap.why,
+    }));
+    for (const piece of uncovered(from, to, spans)) {
+      const cuts = [
+        piece.from,
+        ...reasons
+          .flatMap((gap) => [gap.from, gap.to])
+          .filter((at) => at > piece.from && at < piece.to),
+        piece.to,
+      ].sort((a, b) => a - b);
+      for (let index = 1; index < cuts.length; index++) {
+        const [start, end] = [cuts[index - 1], cuts[index]];
+        if (!(end > start)) continue;
+        const why =
+          reasons.find((gap) => gap.from <= start && start < gap.to)?.why ??
+          "hallvi-off";
+        const last = gaps.at(-1);
+        if (last && last.why === why && Date.parse(last.to) === start)
+          last.to = iso(end);
+        else gaps.push({ from: iso(start), to: iso(end), why });
+      }
+    }
+  }
+  return {
+    from: covered.length ? iso(covered[0].from) : null,
+    to: covered.length ? iso(covered.at(-1)!.to) : null,
+    gaps: sorted(gaps),
+  };
+}
+
+/** Per key, the entry that counted more. */
+function larger<T>(
+  a: T[],
+  b: T[],
+  key: (entry: T) => string,
+  weight: (entry: T) => number,
+) {
+  const out = new Map<string, T>();
+  for (const entry of [...a, ...b]) {
+    const have = out.get(key(entry));
+    if (!have || weight(entry) > weight(have)) out.set(key(entry), entry);
+  }
+  return [...out.values()];
+}
+
+function largerList(a: Ranked[], b: Ranked[]) {
+  const all = larger(
+    a,
+    b,
+    (entry) => entry.key,
+    (entry) => entry.count,
+  );
+  const other = all.find((entry) => entry.key === OTHER);
+  return [
+    ...all
+      .filter((entry) => entry !== other)
+      .sort((x, y) => y.count - x.count || x.key.localeCompare(y.key))
+      .slice(0, STORED_PER_LIST),
+    ...(other ? [other] : []),
+  ];
+}
+
+/**
+ * A finished day from its recount and what was stored for it before, the
+ * two compared by the stretches of the day each answers for — never by how
+ * much, since two counts of the same length can cover different hours:
+ *
+ * - the recount answers for everything the stored day did: the recount;
+ * - the stored day answers for everything the recount does, and more — the
+ *   log has since rotated part of it away: the stored day, now final;
+ * - each answers for something the other does not: every hour is taken from
+ *   the one that answers for all of it the other does (for more of it when
+ *   neither does), with that one's coverage and gaps. Figures that are not
+ *   hourly — visitors, lists, time on page, page speed — cannot be split by
+ *   hour, so each is the larger of the two counts, per entry. Each count saw
+ *   only part of the day, so that is a floor, never a sum: a browser seen by
+ *   both would be counted twice by adding.
+ */
+export function combined(
+  stored: TrafficDay,
+  recount: TrafficDay,
+  bounds: { start: number; end: number },
+): TrafficDay {
+  const now = iso(Date.now());
+  const a = spansOf(recount.coverage, bounds);
+  const b = spansOf(stored.coverage, bounds);
+  if (
+    holds(a, b) ||
+    stored.timeZone !== recount.timeZone ||
+    stored.hours.length !== recount.hours.length
+  )
+    return recount;
+  const whole = { from: bounds.start, to: bounds.end };
+  if (holds(b, a))
+    return {
+      ...stored,
+      computedAt: now,
+      coverage: coverageOf([{ day: stored, spans: b, ...whole }]),
+    };
+  const parts = recount.hours.map((_, index) => {
+    const from = bounds.start + index * HOUR_MS;
+    const to = Math.min(from + HOUR_MS, bounds.end);
+    const [ours, theirs] = [clipped(a, from, to), clipped(b, from, to)];
+    const recounted =
+      holds(ours, theirs) ||
+      (!holds(theirs, ours) && length(ours) >= length(theirs));
+    return recounted
+      ? { day: recount, spans: a, from, to }
+      : { day: stored, spans: b, from, to };
+  });
+  const lists = [
+    "pages",
+    "sources",
+    "campaigns",
+    "countries",
+    "devices",
+    "browsers",
+    "systems",
+    "errors",
+    "goals",
+    "bots",
+  ] as const;
+  return {
+    ...recount,
+    computedAt: now,
+    coverage: coverageOf(parts),
+    viewSource:
+      stored.viewSource === recount.viewSource ? recount.viewSource : "switch",
+    hours: parts.map((part, index) => part.day.hours[index]),
+    visitors: Math.max(stored.visitors, recount.visitors),
+    errorVisitors: Math.max(stored.errorVisitors, recount.errorVisitors),
+    ...Object.fromEntries(
+      lists.map((list) => [list, largerList(stored[list], recount[list])]),
+    ),
+    browserOnlyPages: Math.max(
+      stored.browserOnlyPages,
+      recount.browserOnlyPages,
+    ),
+    engagement: larger(
+      stored.engagement,
+      recount.engagement,
+      (entry) => entry.path,
+      (entry) => entry.samples,
+    ),
+    vitals: larger(
+      stored.vitals,
+      recount.vitals,
+      (entry) => `${entry.metric} ${entry.path}`,
+      (entry) => entry.buckets.reduce((total, count) => total + count, 0),
+    ),
+    scriptErrors: larger(
+      stored.scriptErrors,
+      recount.scriptErrors,
+      (entry) => entry.path,
+      (entry) => entry.count,
+    ),
+  };
+}
 
 /** Whether a finished day should be counted again from the log. */
 function due(applicationId: string, day: string, timeZone: string) {
@@ -266,37 +471,14 @@ async function finishDay(target: Target, day: string) {
     read,
     Date.parse(collection.enabledAt) || null,
   );
-  let counted = counter.day({ coverage });
-  // What was counted while the log still held it is kept, when the log now
-  // answers for less of the day: the stretch after its last moment is where
-  // Hallvi was not following, and nothing holds it any more.
+  const recount = counter.day({ coverage });
+  // What was counted while the log still held it is kept where the log no
+  // longer answers for it.
   const stored = readDays(applicationId, day, day)[0];
-  if (stored && !stored.final && covers(stored) > covers(counted)) {
-    const to = stored.coverage.to
-      ? Date.parse(stored.coverage.to)
-      : bounds.start;
-    counted = {
-      ...stored,
-      final: true,
-      computedAt: iso(Date.now()),
-      coverage: {
-        ...stored.coverage,
-        gaps: sorted([
-          ...stored.coverage.gaps.filter((gap) => Date.parse(gap.to) <= to),
-          ...(to < bounds.end
-            ? [
-                {
-                  from: iso(to),
-                  to: iso(bounds.end),
-                  why: "hallvi-off" as const,
-                },
-              ]
-            : []),
-        ]),
-      },
-    };
-  }
-  writeDay(applicationId, counted);
+  writeDay(applicationId, {
+    ...(stored ? combined(stored, recount, bounds) : recount),
+    final: true,
+  });
   return noteScript(applicationId, counter, false);
 }
 
@@ -352,14 +534,17 @@ async function connection(target: Target, first: boolean) {
   const signal = AbortSignal.any([target.signal, inner.signal]);
   const scope = { ...target, signal };
 
-  const files = await listLog(host, log, signal);
-  const oldest = files[0]?.from ?? null;
+  const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
   recordCollector(applicationId, {
     oldestRetainedAt: oldest === null ? null : iso(oldest),
     ...(first ? { state: "catching-up" as const, detail: null } : {}),
   });
   await finishDays(scope, oldest);
   signal.throwIfAborted();
+  // Listed again for the follow, which reads exactly these files and stops
+  // if a rotation moved one since: today's coverage is this listing's.
+  const files = await listLog(host, log, signal);
+  const unreadable = new Set<string>();
 
   const collection = collectionOf(applicationId);
   const enabledAt = collection.enabledAt
@@ -393,6 +578,7 @@ async function connection(target: Target, first: boolean) {
       dayBounds(dayOf(Date.now(), timeZone), timeZone).start,
       files,
       enabledAt,
+      unreadable,
     ),
   );
 
@@ -411,10 +597,12 @@ async function connection(target: Target, first: boolean) {
     for (const entry of days) {
       const to = Math.min(entry.end, aliveTo);
       if (!(to > entry.start)) continue;
-      writeDay(
-        applicationId,
-        entry.counter.day({ now, coverage: entry.coverage(to) }),
-      );
+      // Provisional, even past the day's close: only the recount from the
+      // files may make a day final, and a final day is not recounted.
+      writeDay(applicationId, {
+        ...entry.counter.day({ now, coverage: entry.coverage(to) }),
+        final: false,
+      });
     }
     const newest = days.at(-1)!.counter;
     const seen = Math.max(
@@ -478,31 +666,49 @@ async function connection(target: Target, first: boolean) {
   }, 500);
 
   try {
-    const { exitCode, said } = await followLog(
+    const { exitCode, said, moved } = await followLog(
       host,
       log,
+      files,
       today.start,
-      (line) => {
-        heardAt = Date.now();
-        dirty = true;
-        let entry = days.at(-1)!;
-        if (line.at >= entry.end) entry = open(dayOf(line.at, timeZone), null);
-        for (const one of days)
-          if (line.at >= one.start && line.at < one.end) one.counter.add(line);
-        // A line from the last few seconds: the backlog is behind us.
-        if (!live && readyAt !== null && line.at >= readyAt - 5_000) caughtUp();
+      {
+        line: (line) => {
+          heardAt = Date.now();
+          dirty = true;
+          let entry = days.at(-1)!;
+          if (line.at >= entry.end)
+            entry = open(dayOf(line.at, timeZone), null);
+          for (const one of days)
+            if (line.at >= one.start && line.at < one.end)
+              one.counter.add(line);
+          // A line from the last few seconds: the backlog is behind us.
+          if (!live && readyAt !== null && line.at >= readyAt - 5_000)
+            caughtUp();
+        },
+        ready: () => {
+          readyAt = Date.now();
+          heardAt = readyAt;
+        },
+        unreadable: (name) => unreadable.add(name),
       },
       signal,
-      () => {
-        readyAt = Date.now();
-        heardAt = readyAt;
-      },
     );
-    if (target.signal.aborted || rebuild) return { rebuild, live, detail: "" };
+    if (target.signal.aborted || rebuild)
+      return { rebuild, moved: false, live, detail: "" };
+    // The log rotated between the listing and the follow: list again and
+    // count today afresh, rather than follow a count that misses a file.
+    if (moved)
+      return {
+        rebuild: true,
+        moved: true,
+        live,
+        detail: "The log kept rotating while Hallvi began to follow it.",
+      };
     // Known alive until it went quiet, at most a keepalive before now.
     if (live) write(Math.max(heardAt, Date.now() - DEAD_AFTER_MS));
     return {
       rebuild: false,
+      moved: false,
       live,
       detail:
         said ||
@@ -522,6 +728,7 @@ async function collect(target: Target) {
     source: { proxy: log.proxy, format: log.format },
   });
   let failures = 0;
+  let moves = 0;
   let first = true;
   while (!signal.aborted) {
     const began = Date.now();
@@ -529,7 +736,10 @@ async function collect(target: Target) {
     try {
       const ended = await connection(target, first);
       if (signal.aborted) return;
-      if (ended.rebuild) continue;
+      // Started over at once; a log that rotates under every start in a row
+      // waits like any failure.
+      moves = ended.moved ? moves + 1 : 0;
+      if (ended.rebuild && moves <= 3) continue;
       detail = ended.detail;
       if (ended.live && Date.now() - began >= STEADY_MS) failures = 0;
     } catch (error) {

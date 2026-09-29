@@ -10,6 +10,7 @@ import { informationInputSchema } from "@/server/operator-data";
 import { reviewRecord } from "@/server/record-contract";
 import { eventPath } from "@/server/traffic/contract";
 import { parseLine } from "@/server/traffic/parse";
+import { listLogCommand } from "@/server/traffic/sources";
 
 // A line Caddy 2 actually wrote, shortened only in its headers.
 const line =
@@ -103,8 +104,12 @@ describe("the access log", () => {
   it("takes views from the script once it is heard, and counts open pages", () => {
     const now = Date.now();
     const window = new LiveWindow({ hosts: ["shop.example"], script: true });
-    // The page load is a request: the script's own view is the view.
-    expect(window.arrival(request("/", now - 90_000))?.kind).toBe("request");
+    // The page load is a request: the script's own view is the view, and
+    // says it is the script's, so the page never counts it as a request too.
+    expect(window.arrival(request("/", now - 90_000))).toMatchObject({
+      kind: "request",
+      script: false,
+    });
     const view = request(
       eventPath({ t: "view", s: "abcdefgh12", p: "/docs", w: 400 }),
       now - 90_000,
@@ -112,6 +117,7 @@ describe("the access log", () => {
     );
     expect(window.arrival(view)).toMatchObject({
       kind: "view",
+      script: true,
       path: "/docs",
       device: "mobile",
     });
@@ -171,19 +177,25 @@ describe("the access log", () => {
       ],
       { encoding: "utf8", timeout: 2000 },
     );
-    expect(result.status).toBe(1);
-    expect(result.stdout).toContain("The access log is not readable.");
+    expect(result.status).toBe(4);
+    expect(result.stdout).toContain(
+      "/hallvi-review-nonexistent/ is not readable by",
+    );
     expect(result.stdout).not.toContain("hallvi-following");
   });
 
-  it("only ever reads", () => {
-    expect(
-      followCommand({ type: "file", path: "/var/log/caddy/access.log" }),
-    ).toBe(
-      "test -r '/var/log/caddy/access.log' || { echo 'The access log is not readable.'; exit 1; }; echo hallvi-following; exec tail -n 2000 -F '/var/log/caddy/access.log'",
+  it("only ever reads, through sudo where history does", () => {
+    const file = { type: "file" as const, path: "/var/log/caddy/access.log" };
+    const live = followCommand(file);
+    expect(live).toContain('exec tail -n 2000 -F -- "$name"');
+    // The same read-only fallback as history: the fixed text again, as root.
+    const sudo = /^unreadable\(\) .*$/m;
+    expect(live.match(sudo)?.[0]).toContain(
+      'exec sudo -n bash -c "$BASH_EXECUTION_STRING"',
     );
-    expect(
-      followCommand({ type: "container", name: "shop-caddy-1" }),
-    ).toContain("docker logs --since 5m --follow 'shop-caddy-1'");
+    expect(live.match(sudo)?.[0]).toBe(listLogCommand(file).match(sudo)?.[0]);
+    expect(followCommand({ type: "container", name: "shop-caddy-1" })).toMatch(
+      /sudo -n docker[\s\S]*logs --since 5m --follow "\$1"/,
+    );
   });
 });

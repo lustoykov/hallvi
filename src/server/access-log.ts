@@ -11,7 +11,9 @@
 // reads, and it is the same kind of thing as the machine check on the
 // connections card. That is why it sits outside the permission boundary: the
 // boundary decides whether model-authored commands run, and there is no
-// model-authored text here to decide about.
+// model-authored text here to decide about. Where Hallvi's user cannot read
+// the log, it runs itself again through `sudo -n` exactly as history does
+// (traffic/sources.ts).
 import { createHmac, randomBytes } from "node:crypto";
 
 import type { OperatorSettings } from "./operator-data";
@@ -26,7 +28,11 @@ import {
   pageName,
 } from "./traffic/enrich";
 import { parseLine } from "./traffic/parse";
-import { onServer, READY, type AccessLogRecord } from "./traffic/sources";
+import {
+  liveLogCommand,
+  onServer,
+  type AccessLogRecord,
+} from "./traffic/sources";
 
 export { HALLVI_USER_AGENT } from "./traffic/parse";
 
@@ -42,18 +48,7 @@ export function accessLogRecord(applicationId: string): AccessLogRecord | null {
 }
 
 /** A few minutes of backlog so the page opens on something, then follow. */
-export function followCommand(source: AccessLogSource) {
-  const readable =
-    source.type === "file"
-      ? `test -r '${source.path}' || { echo 'The access log is not readable.'; exit 1; }; `
-      : "";
-  return `${readable}echo ${READY}; ${followOnly(source)}`;
-}
-function followOnly(source: AccessLogSource) {
-  if (source.type === "file") return `exec tail -n 2000 -F '${source.path}'`;
-  const logs = `logs --since 5m --follow '${source.name}'`;
-  return `if docker ps >/dev/null 2>&1; then exec docker ${logs} 2>&1; else exec sudo -n docker ${logs} 2>&1; fi`;
-}
+export const followCommand = liveLogCommand;
 
 /** How far back "recent visitors" reach, and the backlog a page is sent. */
 export const LIVE_WINDOW_MINUTES = 5;
@@ -95,8 +90,10 @@ export class LiveWindow {
   arrival(line: TrafficLine): Arrival | null {
     const kind = classify(line);
     if (kind.kind === "own") return null;
+    // A browser is its address and agent, whichever of the application's
+    // names it asked for.
     const visitor = createHmac("sha256", this.salt)
-      .update(`${line.address}\n${line.userAgent}\n${line.host}`)
+      .update(`${line.address}\n${line.userAgent}`)
       .digest("hex")
       .slice(0, 10);
     const country = () => {
@@ -117,6 +114,8 @@ export class LiveWindow {
       return {
         at: line.at,
         kind: "view",
+        // The script's word for a view, never a request the page counts.
+        script: true,
         path: pageName(event.p),
         status: line.status,
         ms: line.ms,
@@ -142,6 +141,7 @@ export class LiveWindow {
     return {
       at: line.at,
       kind: bot ? "bot" : view ? "view" : "request",
+      script: false,
       path: view ? this.pageOf(line) : line.path.slice(0, 200),
       status: line.status,
       ms: line.ms,
@@ -196,11 +196,9 @@ export function followAccessLog(
   onReady: () => void = () => {},
 ) {
   const options = { hosts: log.hosts, pageKey: log.pageKey };
-  // The command holds no `$`, backtick or double quote: its only variable
-  // part is a name or path whose shape excludes them.
   return onServer(
     host,
-    `bash -c "${followCommand(log.source)}"`,
+    followCommand(log.source),
     (text) => {
       const line = parseLine(log.format, text, options);
       if (line) onLine(line);
