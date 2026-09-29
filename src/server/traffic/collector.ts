@@ -230,8 +230,7 @@ const covers = (day: TrafficDay) => {
 function due(applicationId: string, day: string, timeZone: string) {
   const stored = readDays(applicationId, day, day)[0];
   if (!stored || !stored.final) return true;
-  if (stored.coverage.gaps.some((gap) => gap.why === "unreadable"))
-    return true;
+  if (stored.coverage.gaps.some((gap) => gap.why === "unreadable")) return true;
   const since = collectionOf(applicationId).scriptSince;
   return (
     stored.viewSource === "log" &&
@@ -285,7 +284,13 @@ async function finishDay(target: Target, day: string) {
         gaps: sorted([
           ...stored.coverage.gaps.filter((gap) => Date.parse(gap.to) <= to),
           ...(to < bounds.end
-            ? [{ from: iso(to), to: iso(bounds.end), why: "hallvi-off" as const }]
+            ? [
+                {
+                  from: iso(to),
+                  to: iso(bounds.end),
+                  why: "hallvi-off" as const,
+                },
+              ]
             : []),
         ]),
       },
@@ -485,8 +490,7 @@ async function connection(target: Target, first: boolean) {
         for (const one of days)
           if (line.at >= one.start && line.at < one.end) one.counter.add(line);
         // A line from the last few seconds: the backlog is behind us.
-        if (!live && readyAt !== null && line.at >= readyAt - 5_000)
-          caughtUp();
+        if (!live && readyAt !== null && line.at >= readyAt - 5_000) caughtUp();
       },
       signal,
       () => {
