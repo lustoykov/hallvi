@@ -14,13 +14,15 @@ import {
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 
-import type {
-  Ranked,
-  TrafficHistory,
-  VitalName,
+import {
+  STORED_PER_LIST,
+  type Ranked,
+  type TrafficHistory,
+  type VitalName,
 } from "@/server/traffic/contract";
 
 import {
+  atLeast,
   count,
   countryName,
   keyWords,
@@ -44,11 +46,14 @@ function Rows({
   rows,
   empty,
   mono,
+  partial,
 }: {
   rows: Row[];
   empty: string;
   /** Paths read better in the monospaced face. */
   mono?: boolean;
+  /** A day in the range kept only its busiest entries: counts are floors. */
+  partial?: boolean;
 }) {
   const [all, setAll] = useState(false);
   if (!rows.length) return <p className="tf-rank-empty">{empty}</p>;
@@ -69,11 +74,16 @@ function Rows({
               {row.label}
             </span>
             <span className="tf-rank-count">
-              {row.says ?? count(row.value)}
+              {row.says ?? atLeast(count(row.value), Boolean(partial))}
             </span>
           </li>
         ))}
       </ol>
+      {partial && (
+        <p className="tf-card-quiet">
+          At least these: some days kept only their {STORED_PER_LIST} busiest.
+        </p>
+      )}
       {rows.length > SHOWN && (
         <button
           type="button"
@@ -154,8 +164,11 @@ const VITAL_LIMITS: Record<VitalName, [number, number]> = {
   INP: [200, 500],
   CLS: [100, 250],
 };
-const vitalWords = (metric: VitalName, value: number) =>
-  metric === "CLS" ? (value / 1000).toFixed(2) : milliseconds(value);
+const vitalWords = (metric: VitalName, value: number, floor: boolean) =>
+  atLeast(
+    metric === "CLS" ? (value / 1000).toFixed(2) : milliseconds(value),
+    floor,
+  );
 const rating = (metric: VitalName, value: number) =>
   value <= VITAL_LIMITS[metric][0]
     ? "good"
@@ -207,7 +220,7 @@ function Speed({ vitals }: { vitals: TrafficHistory["vitals"] }) {
                   {vital ? (
                     <span data-rating={rating(metric, vital.p75)}>
                       <i aria-hidden="true" />
-                      {vitalWords(metric, vital.p75)}
+                      {vitalWords(metric, vital.p75, vital.atLeast)}
                     </span>
                   ) : (
                     <span className="tf-none">not measured</span>
@@ -242,6 +255,8 @@ export function Breakdowns({
   /** A small map above the countries, in the looks that move it there. */
   countriesAside?: ReactNode;
 }) {
+  const partial = (list: TrafficHistory["partialLists"][number]) =>
+    history.partialLists.includes(list);
   const time: Row[] = [...history.engagement]
     .sort((a, b) => b.samples - a.samples)
     .map((row) => ({
@@ -262,6 +277,7 @@ export function Breakdowns({
               <Rows
                 mono
                 rows={ranked(history.pages)}
+                partial={partial("pages")}
                 empty="No page views in this range."
               />
             ),
@@ -290,6 +306,7 @@ export function Breakdowns({
             body: (
               <Rows
                 rows={ranked(history.sources)}
+                partial={partial("sources")}
                 empty="No views arrived in this range."
               />
             ),
@@ -302,6 +319,7 @@ export function Breakdowns({
                   body: (
                     <Rows
                       rows={ranked(history.campaigns)}
+                      partial={partial("campaigns")}
                       empty="No campaign tags in this range."
                     />
                   ),
@@ -320,6 +338,7 @@ export function Breakdowns({
             body: (
               <Rows
                 rows={ranked(history.countries, countryName)}
+                partial={partial("countries")}
                 empty="No views to place in this range."
               />
             ),
@@ -334,6 +353,7 @@ export function Breakdowns({
             label: "Devices",
             body: (
               <Rows
+                partial={partial("devices")}
                 rows={ranked(history.devices, capital).map((row) => ({
                   ...row,
                   icon: DEVICE_ICON[row.key] ?? <Question aria-hidden="true" />,
@@ -348,6 +368,7 @@ export function Breakdowns({
             body: (
               <Rows
                 rows={ranked(history.browsers)}
+                partial={partial("browsers")}
                 empty="No views in this range."
               />
             ),
@@ -358,6 +379,7 @@ export function Breakdowns({
             body: (
               <Rows
                 rows={ranked(history.systems)}
+                partial={partial("systems")}
                 empty="No views in this range."
               />
             ),
@@ -377,6 +399,7 @@ export function Breakdowns({
                 body: (
                   <Rows
                     rows={ranked(history.goals)}
+                    partial={partial("goals")}
                     empty="No goal was reached in this range. A goal is hv('signup') in the page, or data-hv-goal on a button."
                   />
                 ),

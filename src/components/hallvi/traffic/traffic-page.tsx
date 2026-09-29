@@ -34,6 +34,7 @@ import { LiveArea } from "./live";
 import {
   count,
   countryName,
+  errorsAcrossMidnight,
   errorsHitVisitors,
   gapWords,
   hasTotals,
@@ -46,6 +47,7 @@ import {
   scriptDraft,
   scriptOffer,
   storedFrom,
+  todayCovered,
   trafficListed,
   type Moment,
   type ScriptAsk,
@@ -101,9 +103,21 @@ function Figure({
   );
 }
 
+/** "18 today, about 14 visitors": today's share, when yesterday had some. */
+function errorsNote(
+  split: ReturnType<typeof errorsAcrossMidnight>,
+  visitors: number,
+) {
+  const reached = visitors ? `about ${plural(visitors, "visitor")}` : null;
+  if (!split.earlier) return reached && `${reached} today`;
+  return [`${count(split.today)} today`, reached].filter(Boolean).join(", ");
+}
+
 function Strip({ history }: { history: TrafficHistory }) {
   const { totals, previous } = history;
   const oneDay = history.range === "24h";
+  // The visitor estimate is today's; the range began yesterday.
+  const split = oneDay ? errorsAcrossMidnight(history) : null;
   const engaged = history.engagement.reduce(
     (sum, row) => ({
       ms: sum.ms + row.averageMs * row.samples,
@@ -113,14 +127,18 @@ function Strip({ history }: { history: TrafficHistory }) {
   );
   return (
     <dl className="tf-strip">
-      <Figure
-        label={oneDay ? "Visitors today" : "Visitors a day"}
-        value={oneDay ? count(totals.visitors) : `~${count(totals.visitors)}`}
-        note={
-          change(totals.visitors, previous?.visitors) ??
-          (oneDay ? "estimated" : "estimated, on average")
-        }
-      />
+      {oneDay && !todayCovered(history) ? (
+        <Figure label="Visitors today" value="–" note="not counted yet" />
+      ) : (
+        <Figure
+          label={oneDay ? "Visitors today" : "Visitors a day"}
+          value={oneDay ? count(totals.visitors) : `~${count(totals.visitors)}`}
+          note={
+            change(totals.visitors, previous?.visitors) ??
+            (oneDay ? "estimated" : "estimated, on average")
+          }
+        />
+      )}
       <Figure
         label="Page views"
         value={count(totals.views)}
@@ -138,11 +156,7 @@ function Strip({ history }: { history: TrafficHistory }) {
           label="Server errors"
           value={count(totals.errors)}
           tone="bad"
-          note={
-            oneDay && totals.errorVisitors
-              ? `about ${plural(totals.errorVisitors, "visitor")}`
-              : null
-          }
+          note={split && errorsNote(split, totals.errorVisitors)}
         />
       )}
     </dl>
@@ -370,9 +384,12 @@ function Foot({
       </div>
       {asked}
       <p className="tf-foot-quiet">
-        Hallvi keeps totals on this computer, never an address. The server keeps
-        its own access log, as web servers do, with the query string removed
-        before it is written.{" "}
+        Hallvi keeps totals on this computer, never an address.{" "}
+        {collection.source?.format === "traefik-json"
+          ? "The server keeps its own access log, as web servers do. Traefik's log cannot be rewritten, so it keeps full addresses, query strings included; Hallvi keeps only campaign tags from them."
+          : collection.source
+            ? "The server keeps its own access log, as web servers do, with the query string removed before it is written."
+            : "The server keeps its own access log, as web servers do."}{" "}
         <a href="https://db-ip.com" target="_blank" rel="noreferrer">
           Country data by DB-IP
         </a>
@@ -734,7 +751,7 @@ export function TrafficPage({
       {forgetting && (
         <ConfirmActionDialog
           title="Forget the stored traffic totals?"
-          description={`Hallvi deletes every day it counted for ${applicationName} from this computer. The server's own access log is not touched, and history stays ${collection.enabledAt ? "on" : "off"}.`}
+          description={`Hallvi deletes every day it counted for ${applicationName} from this computer${collection.enabledAt ? " and stops keeping history, which would otherwise count the server's log straight back. You can keep it again afterwards" : ", and history stays off"}. The server's own access log is not touched.`}
           action="Forget totals"
           busy={busy}
           error={problem}

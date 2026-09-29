@@ -82,7 +82,10 @@ interface Release {
   at: number;
   revision: string;
   change: string;
-  impact?: Omit<ReleaseImpact, "releaseAt" | "windowMinutes" | "covered">;
+  impact?: Omit<
+    ReleaseImpact,
+    "releaseAt" | "windowMinutes" | "compared" | "covered"
+  >;
 }
 
 interface Errors {
@@ -641,6 +644,7 @@ function totals(
     errorVisitors,
     bots: 520,
     p95Ms,
+    p95AtLeast: false,
     visitors: 140,
   };
 }
@@ -650,7 +654,10 @@ function totals(
 
 interface Hour {
   at: number;
+  /** The share of the whole hour the log covered, for scaling its counts. */
   covered: number;
+  /** How much of the hour has passed, in ms. */
+  elapsed: number;
   visitors: number;
   views: number;
   requests: number;
@@ -715,6 +722,7 @@ function hourOf(scenario: Scenario, at: number, now: number): Hour {
   return {
     at,
     covered,
+    elapsed: Math.max(0, end - at),
     visitors,
     views,
     requests: Math.round(views * profile.requestsPerView + bots),
@@ -730,7 +738,7 @@ function hourOf(scenario: Scenario, at: number, now: number): Hour {
 const sum = (hours: Hour[], key: keyof Hour) =>
   hours.reduce((total, hour) => total + (hour[key] as number), 0);
 
-function pointOf(hours: Hour[], at: number, length: number): SeriesPoint {
+function pointOf(hours: Hour[], at: number): SeriesPoint {
   const counted = hours.filter((hour) => hour.covered > 0);
   const timed = counted.filter((hour) => hour.requests > 0);
   return {
@@ -747,7 +755,16 @@ function pointOf(hours: Hour[], at: number, length: number): SeriesPoint {
     p95Ms: timed.length
       ? Math.round(Math.max(...timed.map((hour) => hour.p95)) * 0.92)
       : null,
-    covered: Math.round((sum(hours, "covered") / length) * 1000) / 1000,
+    p95AtLeast: false,
+    // Like the stored totals: a share of the time that has passed, so the
+    // bucket still running is short only of what the log missed.
+    covered:
+      Math.round(
+        Math.min(
+          1,
+          (sum(hours, "covered") * HOUR) / sum(hours, "elapsed") || 0,
+        ) * 1000,
+      ) / 1000,
   };
 }
 
@@ -799,7 +816,6 @@ function rangeOf(
     pointOf(
       bucket.hours.map((at) => hourOf(scenario, at, now)),
       bucket.at,
-      bucket.hours.length,
     ),
   );
   const counted = series.filter((point) => point.covered > 0);
@@ -832,6 +848,7 @@ function rangeOf(
             ].p95Ms!,
           )
         : null,
+      p95AtLeast: false,
       visitors:
         range === "24h"
           ? Math.round(sum(todayHours, "visitors") / 1.18)
@@ -919,6 +936,7 @@ export function historyOf(
     systems: lists(profile.systems),
     errors,
     goals: script ? lists(scenario.script!.goals).slice(0, 5) : [],
+    partialLists: [],
     bots: current.totals.bots
       ? spread(
           [
@@ -951,6 +969,7 @@ export function historyOf(
             path,
             metric,
             p75,
+            atLeast: false,
             samples: Math.round(views / 20),
           })),
         )
@@ -1005,8 +1024,15 @@ export function fixtureSource(scenario: Scenario): TrafficSource {
           disabledAt: at,
           state: "off",
         };
+      // As the store does: the collection record goes with the totals.
       if (action === "forget")
-        state.collection = { ...state.collection, storedFrom: null };
+        state.collection = {
+          ...state.collection,
+          enabledAt: null,
+          disabledAt: null,
+          state: "off",
+          storedFrom: null,
+        };
       return wait(state.collection);
     },
     impact: (_, at) =>
@@ -1015,9 +1041,19 @@ export function fixtureSource(scenario: Scenario): TrafficSource {
           const release = state.releases.find(
             (candidate) => Math.abs(candidate.at - Date.parse(one)) < MINUTE,
           );
+          // The release's own hour is compared in neither window.
+          const hour = Math.floor(Date.parse(one) / 3_600_000) * 3_600_000;
+          const span = 2 * 3_600_000;
           return {
             releaseAt: one,
             windowMinutes: 120,
+            compared: {
+              before: { from: iso(hour - span), to: iso(hour) },
+              after: {
+                from: iso(hour + 3_600_000),
+                to: iso(hour + 3_600_000 + span),
+              },
+            },
             covered: 1,
             ...(release?.impact ?? {
               before: totals(0, 0, 220),
@@ -1046,6 +1082,7 @@ export function fixtureSource(scenario: Scenario): TrafficSource {
         const view: Arrival = {
           at,
           kind: "view",
+          script: false,
           path,
           status: 200,
           ms: Math.round(40 + random() * 160),

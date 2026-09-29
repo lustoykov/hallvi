@@ -49,6 +49,8 @@ export interface LogFile extends Span {
   /** The file's size and last write, epoch ms; null for a container. */
   bytes: number | null;
   modified: number | null;
+  /** Which file the name meant when it was listed; null for a container. */
+  inode: string | null;
 }
 
 export interface ReadResult {
@@ -98,7 +100,8 @@ const LIST_FILES = [
   "done",
   'echo "hallvi-now $(date +%s)"',
   'for f in "${files[@]}"; do',
-  '  echo "hallvi-file $f $(wc -c < "$f") $(date -r "$f" +%s)"',
+  '  read -r i _ < <(ls -di -- "$f")',
+  '  echo "hallvi-file $f $(wc -c < "$f") $(date -r "$f" +%s) $i"',
   '  gzip -cdf -- "$f" 2>/dev/null | head -n 3; echo',
   "done",
 ].join("\n");
@@ -121,15 +124,39 @@ const READ_FILES = [
 // The rotated files first, then the file being written from its first line,
 // following it by name through the next rotation. One command, so no line
 // written between a read and a follow can fall between them.
+//
+// Each file arrives as its name, inode and size when listed, the file being
+// written last. A rotation since the listing moves a name onto another file,
+// or empties the file being written: the command then stops before reading
+// that file and says `hallvi-moved`, and the collector lists again and starts
+// over rather than lose what the name no longer holds. A file that cannot be
+// read says `hallvi-unreadable`, and its time is a gap.
 const FOLLOW_FILES = [
   ...UNREADABLE,
   "name=${1##*/}",
   '[ -r "$name" ] || unreadable "$name"',
   "shift",
-  'for f in "$@"; do [ ! -e "$f" ] || [ -r "$f" ] || unreadable "$f"; done',
+  'for ((k = 1; k <= $#; k += 3)); do f=${!k}; [ ! -e "$f" ] || [ -r "$f" ] || unreadable "$f"; done',
+  'same() { local i s; [ -e "$1" ] || return 1; read -r i _ < <(ls -di -- "$1"); s=$(wc -c < "$1") || return 1; [ "$i" = "$2" ] || return 1; if [ "$1" = "$name" ]; then [ "$s" -ge "$3" ]; else [ "$s" -eq "$3" ]; fi; }',
   `echo ${READY}`,
-  'for f in "$@"; do gzip -cdf -- "$f"; echo; done',
-  'exec tail -n +1 -F -- "$name"',
+  "while [ $# -ge 3 ]; do",
+  '  same "$1" "$2" "$3" 2>/dev/null || { echo "hallvi-moved $1"; exit 5; }',
+  '  [ "$1" != "$name" ] || exec tail -n +1 -F -- "$name"',
+  '  gzip -cdf -- "$1"; s=$?; echo',
+  '  [ "$s" = 0 ] || echo "hallvi-unreadable $1"',
+  "  shift 3",
+  "done",
+].join("\n");
+
+// What Overview and Traffic draw while they are open: the last lines, then
+// each new one. The same fixed text and the same read-only `sudo -n` fallback
+// as history, so a user who reads the log through sudo sees it live as well.
+const LIVE_FILE = [
+  ...UNREADABLE,
+  "name=${1##*/}",
+  '[ -r "$name" ] || unreadable "$name"',
+  `echo ${READY}`,
+  'exec tail -n 2000 -F -- "$name"',
 ].join("\n");
 
 // A container's output, with docker's own time on every line: what `--since`
@@ -149,6 +176,11 @@ const FOLLOW_CONTAINER = [
   DOCKER,
   `echo ${READY}`,
   'exec $d logs --timestamps --since "$2" --follow "$1" 2>&1',
+].join("\n");
+const LIVE_CONTAINER = [
+  DOCKER,
+  `echo ${READY}`,
+  'exec $d logs --since 5m --follow "$1" 2>&1',
 ].join("\n");
 
 const valuesOf = (source: LogSource) => {
@@ -185,10 +217,13 @@ export function readLogCommand(
   ]);
 }
 
-/** Rotated files to read first, then the file being written, followed. */
+/**
+ * Rotated files to read first, then the file being written, followed: each
+ * as the listing found it, so a rotation since then is noticed.
+ */
 export function followLogCommand(
   source: LogSource,
-  rotated: string[],
+  files: Pick<LogFile, "name" | "inode" | "bytes">[],
   since: number,
 ) {
   if (source.type === "container")
@@ -196,10 +231,37 @@ export function followLogCommand(
       ...valuesOf(source),
       seconds(since - SLACK),
     ]);
+  const current = baseOf(source.path);
+  const rotated = files.filter((file) => file.name !== current);
+  rotatedOnly(
+    source.path,
+    rotated.map((file) => file.name),
+    false,
+  );
   return command(FOLLOW_FILES, [
     ...valuesOf(source),
-    ...rotatedOnly(source.path, rotated, false),
+    ...[
+      ...rotated,
+      // Not there when listed: whatever the name holds now is new.
+      files.find((file) => file.name === current) ?? {
+        name: current,
+        inode: null,
+        bytes: 0,
+      },
+    ].flatMap((file) => [
+      file.name,
+      file.inode ?? "-",
+      String(file.bytes ?? 0),
+    ]),
   ]);
+}
+
+/** The last lines of the log, then each new one: the live stream's. */
+export function liveLogCommand(source: LogSource) {
+  return command(
+    source.type === "file" ? LIVE_FILE : LIVE_CONTAINER,
+    valuesOf(source),
+  );
 }
 
 // A name read back from the server is used only if it is the log or one of
@@ -245,6 +307,7 @@ interface Found {
   name: string;
   bytes: number | null;
   modified: number;
+  inode: string | null;
   first: number | null;
   rotation: Rotation;
 }
@@ -264,7 +327,7 @@ function filesOf(path: string, format: LogFormat, output: string[]): LogFile[] {
     if (said?.[1] === "now") {
       now = Number(said[2]) * 1000;
     } else if (said?.[1] === "file") {
-      const [name = "", bytes, modified] = said[2].trim().split(/\s+/);
+      const [name = "", bytes, modified, inode] = said[2].trim().split(/\s+/);
       const rotation = rotationOf(base, name);
       reading =
         rotation && !found.has(name) && Number.isFinite(Number(modified))
@@ -272,6 +335,7 @@ function filesOf(path: string, format: LogFormat, output: string[]): LogFile[] {
               name,
               bytes: Number.isFinite(Number(bytes)) ? Number(bytes) : null,
               modified: Number(modified) * 1000,
+              inode: inode && /^\d+$/.test(inode) ? inode : null,
               first: null,
               rotation,
             }
@@ -299,6 +363,7 @@ function filesOf(path: string, format: LogFormat, output: string[]): LogFile[] {
       name: file.name,
       bytes: file.bytes,
       modified: file.modified,
+      inode: file.inode,
       from: from(file),
       to: Math.max(to, from(file)),
     };
@@ -343,6 +408,7 @@ export function containerOf(name: string, output: string[]): LogFile[] {
       name,
       bytes: null,
       modified: null,
+      inode: null,
       from,
       to: Math.max(Number.isFinite(now) ? now + 1000 : last + 1, from),
     },
@@ -442,35 +508,49 @@ export async function readLog(
 
 /**
  * Every request from `since` on, then each new one as it is written, until
- * the signal aborts or the connection ends. What went wrong is in `said`.
+ * the signal aborts or the connection ends. `files` is the listing the
+ * caller measured coverage by: exactly those files are read, and `moved`
+ * names the first one a rotation took from under it since, so the caller
+ * lists again and starts over. What went wrong is in `said`.
  */
 export async function followLog(
   host: Host,
   log: AccessLogRecord,
+  files: LogFile[],
   since: number,
-  onLine: (line: TrafficLine) => void,
+  on: {
+    line: (line: TrafficLine) => void;
+    ready?: () => void;
+    /** A listed file that could not be read: its time is a gap. */
+    unreadable?: (name: string) => void;
+  },
   signal: AbortSignal,
-  onReady: () => void = () => {},
 ) {
   const { source } = log;
-  const rotated =
-    source.type === "file"
-      ? (await listLog(host, log, signal))
-          .filter(
-            (file) => file.name !== baseOf(source.path) && file.to > since,
-          )
-          .map((file) => file.name)
-      : [];
   const options = optionsOf(log);
-  return onServer(
+  let moved: string | null = null;
+  const result = await onServer(
     host,
-    followLogCommand(source, rotated, since),
+    followLogCommand(
+      source,
+      source.type === "file"
+        ? files.filter(
+            (file) => file.name === baseOf(source.path) || file.to > since,
+          )
+        : [],
+      since,
+    ),
     (text) => {
+      const marker = /^hallvi-(moved|unreadable) (\S+)\s*$/.exec(text);
+      if (marker?.[1] === "moved") moved = marker[2];
+      else if (marker) on.unreadable?.(marker[2]);
+      if (marker) return;
       const line = parseLine(log.format, text, options);
-      if (line && line.at >= since) onLine(line);
+      if (line && line.at >= since) on.line(line);
     },
-    { follow: true, signal, onReady },
+    { follow: true, signal, onReady: on.ready },
   );
+  return { ...result, moved: moved as string | null };
 }
 
 function joined(spans: Span[]) {
@@ -542,10 +622,13 @@ export function onServer(
       if (!follow) child.stdin.end();
       let rest = "";
       let said = "";
-      child.stdout.on("data", (chunk: Buffer) => {
+      // Decoded as a stream: a character split across two reads stays whole.
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
         // A terminal ends its lines with a carriage return as well. A line
         // that never ends is cut rather than held without limit.
-        const lines = (rest + chunk.toString("utf8")).split(/\r?\n/);
+        const lines = (rest + chunk).split(/\r?\n/);
         rest = (lines.pop() ?? "").slice(-256_000);
         for (const text of lines) {
           if (text.trim() === READY) {
@@ -563,8 +646,8 @@ export function onServer(
           onText(text);
         }
       });
-      child.stderr.on("data", (chunk: Buffer) => {
-        said = chunk.toString("utf8").trim().slice(-300) || said;
+      child.stderr.on("data", (chunk: string) => {
+        said = chunk.trim().slice(-300) || said;
       });
       child.on("error", (error) =>
         signal?.aborted ? resolve({ exitCode: null, said }) : reject(error),

@@ -109,10 +109,10 @@ two agents.
   recounted from the log whenever the collector starts or reconnects," so
   the 15:49 deletion took the first batch out of today's totals after it
   had been counted live. What is left is a named `log-rotated` gap, not
-  zeros. A *finished* day keeps what was counted when the log now answers
-  for less of it: the stored provisional count becomes final, and the
-  stretch after its last moment becomes a `hallvi-off` gap. That path was
-  not exercised here; only its coverage rules have a unit test.
+  zeros. A *finished* day keeps what was counted where the log no longer
+  answers for it (the review fixes below compare the stretches each count
+  covers, hour by hour). That path was not exercised here; it has unit
+  tests.
 - The first deleted stretch straddled the moment collection was turned on.
   The part before it reads `not-collecting` ("history was not being kept")
   and the part after it reads `log-rotated`.
@@ -127,3 +127,31 @@ two agents.
 - `roll_interval 1m` and `roll_size 1MiB` are far below the design's 24 h
   and 100 MiB. Caddy rolls lazily, on the first write after the interval, so
   a rotated file's name is the moment of that write.
+
+## Review fixes, re-checked on a real server
+
+29 September 2026, 18:29 and 18:33 UTC, after the Codex review of PR #259
+(branch `claude/traffic-v1-fix-collector`). A disposable Compose project on
+127.0.0.1 ran `ubuntu:24.04` with OpenSSH 9.6p1, bash 5.2.21 and sudo
+1.9.15p5, torn down afterwards. `/var/log/caddy/hallvi` was `root:adm 0750`
+and its files `root:adm 0640`. User `hv` has passwordless sudo and is not in
+`adm`; user `nosudo` has neither. A script on the controller called
+`listLog`, `followLog` and `followAccessLog` over real SSH:
+
+- As `hv`, the listing ran itself again through `sudo -n` and gave each file
+  its inode.
+- The file being written was rolled after the listing and before the follow.
+  The follow read the rotated file, then said `hallvi-moved access.log` and
+  exited 5 before `tail` opened the new file.
+- Listed again, with the rotated `.gz` cut short, the follow read the rolled
+  file and the new one, said `hallvi-unreadable` for the `.gz`, and followed
+  a line appended afterwards.
+- The live stream as `hv` announced live, sent the last lines, and followed
+  an appended line through `sudo -n tail`.
+- After each abort, `pgrep tail` found nothing on the server.
+- As `nosudo`, the live stream ended with
+  "/var/log/caddy/hallvi/ is not readable by nosudo." (exit 4).
+
+The day's close, the interval rule and the worker's independent ticks have
+tests of their own (`traffic-day-close`, `traffic-collector`,
+`pi-worker-traffic`). The full collection run above was not repeated.

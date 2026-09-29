@@ -42,13 +42,15 @@ afterAll(() => {
 
 /** A day as counted, covering its first `hours` hours. */
 function counted(hours: number, final: boolean): TrafficDay {
-  return countDay([], {
+  const day = countDay([], {
     day: DAY,
     timeZone: ZONE,
     scriptSince: null,
     coverage: { from: iso(start), to: iso(start + hours * HOUR), gaps: [] },
     now: final ? end + HOUR : start + hours * HOUR,
   });
+  // Final as the collector's recount from the files stores it.
+  return { ...day, final };
 }
 
 function view(at: number, address: string): TrafficLine {
@@ -116,6 +118,42 @@ describe("traffic.db", () => {
     expect(stored).toEqual(countDay(lines, { ...options, now }));
     expect(stored.hours[8].views).toBe(40);
     expect(stored.visitors).toBe(7);
+  });
+
+  it("never stores a page's query or fragment, even from a forged event", () => {
+    setCollection("forged", "keep");
+    const at = start + 10 * HOUR;
+    const event = (payload: object) =>
+      `/_hv/e/1/${Buffer.from(JSON.stringify(payload)).toString("base64url")}`;
+    const beacon = (path: string, offset: number): TrafficLine => ({
+      ...view(at + offset, "203.0.113.9"),
+      method: "POST",
+      path,
+      status: 204,
+      fetchDest: "empty",
+      fetchMode: "no-cors",
+      contentType: null,
+    });
+    const s = "a1b2c3d4e5f6a7b8";
+    const lines = [
+      view(at, "203.0.113.9"),
+      beacon(event({ t: "view", s, p: "/reset?token=x#y" }), 1000),
+      beacon(event({ t: "leave", s, p: "/reset#token=x", e: 5000 }), 2000),
+      beacon(event({ t: "error", s, p: "/reset?token=x" }), 3000),
+    ];
+    const options = {
+      day: DAY,
+      timeZone: ZONE,
+      scriptSince: null,
+      coverage: { from: iso(start), to: iso(end), gaps: [] },
+      now: end + HOUR,
+    };
+    expect(writeDay("forged", countDay(lines, options))).toBe(true);
+    const [kept] = readDays("forged", DAY, DAY);
+    // Malformed events are nothing at all: not a view, not a switch.
+    expect(kept.viewSource).toBe("log");
+    expect(kept.pages).toEqual([{ key: "/", count: 1, visitors: 1 }]);
+    expect(JSON.stringify(kept)).not.toMatch(/token|reset/);
   });
 
   it("writes nothing while collection is off, and forgetting ends it", () => {

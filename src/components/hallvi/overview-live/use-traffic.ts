@@ -50,7 +50,10 @@ export interface Traffic {
   failed: number;
   perMinute: number;
   lanes: Lane[];
-  /** Called with each request that has only just happened. */
+  /**
+   * Called with each arrival that has only just happened: a script's view
+   * (`script`) as well as the requests the application answered.
+   */
   onArrival: (listener: (line: SeenLine, lane: string) => void) => () => void;
 }
 
@@ -68,10 +71,13 @@ export function laneOf(path: string) {
   return first ? `/${first}` : "/";
 }
 
-function summarise(lines: SeenLine[], now: number) {
+export function summarise(lines: SeenLine[], now: number) {
   const seen = lines.filter((line) => now - line.at <= WINDOW);
+  // A view built from a script event is shown, never counted as a request:
+  // the page it names was already a request of its own.
+  const served = seen.filter((line) => !line.script);
   const counts = new Map<string, Lane>();
-  for (const line of seen) {
+  for (const line of served) {
     const name = laneOf(line.path);
     const lane = counts.get(name) ?? { name, requests: 0, failed: 0 };
     lane.requests++;
@@ -91,15 +97,15 @@ function summarise(lines: SeenLine[], now: number) {
     at: now,
     seen,
     lanes,
-    visitors: new Set(seen.map((line) => line.visitor)).size,
+    visitors: new Set(served.map((line) => line.visitor)).size,
     // Browsers that opened a page, which is nearer to visitors than every
     // address that asked for a file.
     viewers: new Set(
       seen.filter((line) => line.kind === "view").map((line) => line.visitor),
     ).size,
-    requests: seen.length,
-    failed: seen.filter((line) => line.status >= 500).length,
-    perMinute: seen.filter((line) => now - line.at <= 60_000).length,
+    requests: served.length,
+    failed: served.filter((line) => line.status >= 500).length,
+    perMinute: served.filter((line) => now - line.at <= 60_000).length,
   };
 }
 

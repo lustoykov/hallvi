@@ -31,6 +31,13 @@ interface Counted {
   requests: number[];
   serverErrors: number[];
   p95Ms?: number[];
+  /** Per bucket: the percentile fell past the last bound, a floor. */
+  p95AtLeast?: boolean[];
+  /**
+   * The range's own p95, from its merged histogram, where the totals carry
+   * one. Without it the headline is the median of the buckets' readings.
+   */
+  p95?: { ms: number; atLeast: boolean } | null;
   /** How much of each bucket the log covered; absent when all was read. */
   covered?: number[];
   /** Distinct addresses across the window, when Pi read one. */
@@ -65,6 +72,11 @@ function fromHistory(history: TrafficHistory): Counted {
     requests: points.map((point) => (point.covered ? point.requests : 0)),
     serverErrors: points.map((point) => (point.covered ? point.errors : 0)),
     p95Ms: points.map((point) => point.p95Ms ?? 0),
+    p95AtLeast: points.map((point) => point.p95AtLeast),
+    p95:
+      history.totals.p95Ms === null
+        ? null
+        : { ms: history.totals.p95Ms, atLeast: history.totals.p95AtLeast },
     covered: points.map((point) => point.covered),
     paths: history.pages
       .filter((page) => page.key !== OTHER)
@@ -226,9 +238,16 @@ function Traffic({
   const worst = peakOf(serverErrors);
   const top = ceiling(Math.max(...requests));
   const rate = total ? (failed / total) * 100 : 0;
-  // An hour with no requests has no response time, not a fast one.
+  // Stored totals carry the range's own percentile. A read by Pi has only
+  // its buckets', and an hour with no requests has no response time, not a
+  // fast one.
   const timed = (p95Ms ?? []).filter((value) => value > 0);
-  const typical = timed.length ? median(timed) : null;
+  const typical =
+    traffic.p95 !== undefined
+      ? traffic.p95
+      : timed.length
+        ? { ms: median(timed), atLeast: false }
+        : null;
   const paths = traffic.paths.slice(0, 5);
   const pathTop = Math.max(1, ...paths.map((path) => path.requests));
   const gap = (index: number) => covered !== undefined && !covered[index];
@@ -270,7 +289,10 @@ function Traffic({
           bad={rate >= 1}
         />
         {typical !== null && (
-          <Stat label="Response, p95" value={duration(typical)} />
+          <Stat
+            label="Response, p95"
+            value={`${typical.atLeast ? "≥ " : ""}${duration(typical.ms)}`}
+          />
         )}
       </dl>
 
@@ -330,7 +352,8 @@ function Traffic({
                   </span>
                   {p95Ms?.[hover] ? (
                     <span className="axmu-tip-quiet">
-                      p95 {duration(p95Ms[hover])}
+                      p95 {traffic.p95AtLeast?.[hover] ? "≥ " : ""}
+                      {duration(p95Ms[hover])}
                     </span>
                   ) : null}
                 </>

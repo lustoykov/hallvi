@@ -30,9 +30,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TrafficLine } from "@/server/traffic/contract";
 import {
   containerOf,
+  followLog,
   followLogCommand,
   listLog,
   listLogCommand,
+  liveLogCommand,
+  onServer,
   readLog,
   readLogCommand,
   type AccessLogRecord,
@@ -346,13 +349,24 @@ describe("the access log on the server", () => {
     const container = { type: "container" as const, name: "shop-caddy-1" };
     const range = { from: 1790692978288, to: 1790696578288 };
     const rotated = ["access-2026-09-28T10-00-00.000-size.log.gz"];
+    const listed = (name: string, inode = "1234") => ({
+      name,
+      inode,
+      bytes: 4096,
+    });
     for (const command of [
       listLogCommand(file),
       listLogCommand(container),
       readLogCommand(file, [...rotated, "access.log"], range),
       readLogCommand(container, [], range),
-      followLogCommand(file, rotated, range.from),
+      followLogCommand(
+        file,
+        [listed(rotated[0]), listed("access.log")],
+        range.from,
+      ),
       followLogCommand(container, [], range.from),
+      liveLogCommand(file),
+      liveLogCommand(container),
     ])
       expect(command).toMatch(shape);
     expect(readLogCommand(container, [], range)).toMatch(
@@ -364,10 +378,98 @@ describe("the access log on the server", () => {
       () => readLogCommand(file, ["access.log.1;reboot"], range),
       () => readLogCommand(file, ["../../../etc/shadow"], range),
       () => readLogCommand(file, ["other.log"], range),
-      // The file being written is followed, never read first as rotated.
-      () => followLogCommand(file, ["access.log"], range.from),
+      () => followLogCommand(file, [listed("other.log")], range.from),
+      () => followLogCommand(file, [listed("access.log", "1;reboot")], 0),
+      () => liveLogCommand({ type: "file", path: "/var/log/x'; reboot #" }),
     ])
       expect(hostile).toThrow();
+  });
+
+  it("reads the files it listed, and stops when a rotation moved one since", async () => {
+    // Caddy rolls the file being written between the listing and the
+    // follow: its lines are under a new name the follow was not given.
+    const dir = join(root, "handoff");
+    mkdirSync(dir);
+    const rolled = "access-2026-09-29T08-00-00.000-size.log.gz";
+    file(
+      join(dir, rolled),
+      [caddy("2026-09-29T07:00:00Z")],
+      "2026-09-29T08:00:00Z",
+    );
+    file(
+      join(dir, "access.log"),
+      [caddy("2026-09-29T08:00:00Z")],
+      "2026-09-29T09:00:00Z",
+    );
+    const source = log("caddy-json", join(dir, "access.log"));
+    const files = await listLog(host, source);
+    expect(files.map((f) => f.inode)).toEqual([
+      expect.stringMatching(/^\d+$/),
+      expect.stringMatching(/^\d+$/),
+    ]);
+    const rotate = join(root, "roll.sh");
+    writeFileSync(
+      rotate,
+      `cd '${dir}' && mv access.log access-2026-09-29T09-00-00.000-size.log && printf '%s\\n' '${caddy("2026-09-29T09:00:00Z")}' > access.log\n`,
+    );
+    process.env.BEFORE_READ = rotate;
+    const lines: string[] = [];
+    const moved = await followLog(
+      host,
+      source,
+      files,
+      Date.parse("2026-09-29T00:00:00Z"),
+      { line: (line) => lines.push(iso(line.at)) },
+      new AbortController().signal,
+    );
+    delete process.env.BEFORE_READ;
+    expect(moved.moved).toBe("access.log");
+    // What it read before it noticed is the rotated file, and only that.
+    expect(lines).toEqual(["2026-09-29T07:00:00.000Z"]);
+
+    // Listed again, it reads everything and follows the new file; and a
+    // file that cannot be read is said, not skipped.
+    writeFileSync(
+      join(dir, rolled),
+      readFileSync(join(dir, rolled)).subarray(0, -8),
+    );
+    const again = await listLog(host, source);
+    expect(again.map((f) => f.name)).toEqual([
+      rolled,
+      "access-2026-09-29T09-00-00.000-size.log",
+      "access.log",
+    ]);
+    const follow = new AbortController();
+    const unreadable: string[] = [];
+    const seen: string[] = [];
+    const ended = await followLog(
+      host,
+      source,
+      again,
+      Date.parse("2026-09-29T00:00:00Z"),
+      {
+        line: (line) => {
+          seen.push(iso(line.at));
+          if (line.at === Date.parse("2026-09-29T09:00:00Z")) follow.abort();
+        },
+        unreadable: (name) => unreadable.push(name),
+      },
+      follow.signal,
+    );
+    expect(ended.moved).toBeNull();
+    expect(unreadable).toEqual([rolled]);
+    expect(seen).toContain("2026-09-29T08:00:00.000Z");
+    expect(seen.at(-1)).toBe("2026-09-29T09:00:00.000Z");
+  });
+
+  it("keeps a character whole when the connection splits it", async () => {
+    const texts: string[] = [];
+    await onServer(
+      host,
+      "printf 'caf\\303'; sleep 0.2; printf '\\251\\n'",
+      (text) => texts.push(text),
+    );
+    expect(texts).toEqual(["café"]);
   });
 
   it("says in words when there is no log to list", () => {

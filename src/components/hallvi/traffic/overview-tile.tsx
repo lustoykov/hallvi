@@ -36,12 +36,21 @@ export function VisitorsToday({
   const top = Math.max(1, ...days.map((day) => day.visitors));
   return (
     <div className="tf-tile">
-      <p className="ovl-number">
-        {count(today.visitors)}
-        <small>
-          estimated {today.visitors === 1 ? "visitor" : "visitors"} today
-        </small>
-      </p>
+      {today.covered ? (
+        <p className="ovl-number">
+          {count(today.visitors)}
+          <small>
+            estimated {today.visitors === 1 ? "visitor" : "visitors"} today
+          </small>
+        </p>
+      ) : (
+        // Nobody read today: that is unassessed, never nobody came.
+        <p className="ovl-empty">
+          {month.collection.enabledAt
+            ? "Nothing is counted for today yet."
+            : "History is off, so today is not counted."}
+        </p>
+      )}
       <p className="tf-tile-usual">
         {usual?.busier
           ? `Busier than a usual day, which has about ${count(usual.usual!)}.`
@@ -63,7 +72,7 @@ export function VisitorsToday({
           />
         ))}
       </div>
-      {today.errorVisitors > 0 && (
+      {today.covered > 0 && today.errorVisitors > 0 && (
         <p className="tf-tile-errors">
           {plural(today.errors, "server error")} today, hitting about{" "}
           {plural(today.errorVisitors, "visitor")}.

@@ -14,6 +14,7 @@
 
 import {
   EVENT_PREFIX,
+  KEPT_QUERY_KEYS,
   OTHER,
   eventPath,
   type Collection,
@@ -330,14 +331,22 @@ export function readTraffic(
 
 // ---------------------------------------------------------------------------
 // traffic_setup: the access log, as tested on Caddy 2.11.4, nginx 1.30.5 and
-// Traefik 3.7.13 over SSH as root, a sudo user and a user without sudo.
+// Traefik 3.7.13 over SSH as root, a sudo user and a user without sudo, and
+// in Docker on every Caddy from 2.6.2 (Debian and Ubuntu's own package) to
+// 2.11.4, nginx 1.14 to 1.30 and Traefik 2.0 to 3.7. Setting the log up never
+// takes a new proxy: each version has a text of its own here.
 
 /** A request of Hallvi's own: in the log, never counted. */
 const CHECK = `curl -sS -o /dev/null -w '%{http_code}\\n' -A 'Hallvi access check' -e 'https://shop.example.com/reset?token=check-referrer' 'https://shop.example.com/?utm_source=hallvi-check&token=check-path'`;
 const CHECK_WORDS =
   "Then send a request of your own (the user agent Hallvi access check is never counted) and read the newest line: the path has no query string, the referrer none either, utm_source is kept as its own field, and check-path and check-referrer appear nowhere.";
 
-const LOGROTATE = (path: string, reopen: string) =>
+/**
+ * Daily, 30 kept. A proxy told to reopen its file gets a fresh one; one that
+ * cannot be told (Caddy before 2.11) keeps writing the same file, which is
+ * copied and emptied instead.
+ */
+const LOGROTATE = (path: string, reopen: string | null) =>
   `${path} {
     daily
     rotate 30
@@ -347,46 +356,41 @@ const LOGROTATE = (path: string, reopen: string) =>
     compress
     delaycompress
     nodateext
-    create 0640 root adm
+${
+  reopen === null
+    ? "    copytruncate"
+    : `    create 0640 root adm
     postrotate
         ${reopen}
-    endscript
+    endscript`
+}
 }`;
 
 const RECORD = (proxy: string, format: string, path: string) =>
   `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], retainDays:30} — add pageKey:'p' only where the application routes by that query key`;
 
+const CADDY_LOG = "/var/log/caddy/hallvi/access.log";
+
 /**
- * What each proxy is given. `shop.example.com` stands for the application's
- * names, and `p` for a page key where the application routes by one.
+ * Hallvi's named log beside the owner's, from Caddy 2.8: `log_append` and two
+ * logs in one site.
  */
-export const LOG_SETUP: Record<
-  Proxy,
-  { steps: string[]; config: Record<string, string>; record: string }
-> = {
-  caddy: {
-    steps: [
-      "Add the hallvi_log snippet once, at the top of the Caddyfile, and `import hallvi_log` in every site block of this application. The owner's own `log` stays as it is: this is a second, named log beside it.",
-      "Add `log_append hv_page {query.p}` inside the site only when the application routes by a query key (WordPress's p); record that key as pageKey.",
-      "Caddy in a container: bind-mount the host directory /var/log/caddy/hallvi at the same path (a directory, never a single file — a single-file mount goes stale when the file is replaced).",
-      "`caddy validate`, then reload (`caddy reload`, or `docker exec <caddy> caddy reload --config /etc/caddy/Caddyfile`).",
-      CHECK_WORDS,
-      "Caddy rotates the files itself (roll_keep_for 30d); no logrotate.",
-    ],
-    config: {
-      Caddyfile: `(hallvi_log) {
+const caddySnippet = (writer: string) => `(hallvi_log) {
 	log hallvi {
-		output file /var/log/caddy/hallvi/access.log {
-			roll_size 100MiB
-			roll_interval 24h
-			roll_keep 1000
-			roll_keep_for 30d
-			mode 0640
-			dir_mode 0755
+		output file ${CADDY_LOG} {
+${writer}
 		}
 		format filter {
 			request>uri regexp \\?.*$ ""
 			request>headers>Referer regexp [?#].*$ ""
+			resp_headers>Location regexp [?#].*$ ""
+			resp_headers>Content-Location delete
+			resp_headers>Link delete
+			resp_headers>Refresh delete
+			resp_headers>Hx-Location delete
+			resp_headers>Hx-Redirect delete
+			resp_headers>Hx-Push-Url delete
+			resp_headers>Hx-Replace-Url delete
 			wrap json
 		}
 	}
@@ -402,16 +406,138 @@ shop.example.com, www.shop.example.com {
 	import hallvi_log
 	log_append hv_page {query.p}   # only when the application routes by ?p=
 	# … the site as it was …
-}`,
+}`;
+
+// Caddy before 2.11 can neither roll daily nor set the file's mode, and
+// before 2.9 ignores `mode` without a word. The file is made first with the
+// mode Hallvi needs, which Caddy keeps, and logrotate rolls it.
+const CADDY_OLDER_FILE = `\`install -d -m 0755 /var/log/caddy/hallvi\`, then \`install -m 0640 -o <user> -g adm /dev/null ${CADDY_LOG}\`, where <user> is the one Caddy runs as (\`ps -o user= -C caddy\`: caddy for a distribution's package, root in the official image). Do this before \`caddy validate\`: validating opens the file, and would otherwise create it as root, where a packaged Caddy cannot write.`;
+const CADDY_OLDER_STEPS = [
+  "Caddy in a container: bind-mount the host directory /var/log/caddy/hallvi at the same path (a directory, never a single file).",
+  "`caddy validate --config /etc/caddy/Caddyfile`, then reload: `systemctl reload caddy` for a distribution's package, `docker exec <caddy> caddy reload --config /etc/caddy/Caddyfile` in a container. A reload, never a restart.",
+  "Write /etc/logrotate.d/hallvi-caddy owned by root, mode 0644. It copies and empties the file (copytruncate), because this Caddy cannot be told to reopen it. Check it with `logrotate -d /etc/logrotate.conf`.",
+];
+const CADDY_OLDER_LOSES =
+  "Against Caddy 2.11: the file is rolled by logrotate rather than by Caddy, and the few lines written in the instant it is copied each night are lost.";
+
+/** Caddy 2.6 and 2.7 keep one log per site, and have no `log_append`. */
+const CADDY_26 = `{
+	log hallvi {
+		output file ${CADDY_LOG} {
+			roll_disabled
+		}
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp ^([^?]*)|([?&](?:${KEPT_QUERY_KEYS.join("|")})=[^&]*)|(\\?)[^&]*|&[^&]* $1$2$3
+				request>headers>Referer regexp [?#].*$ ""
+				resp_headers>Location regexp [?#].*$ ""
+				resp_headers>Content-Location delete
+				resp_headers>Link delete
+				resp_headers>Refresh delete
+				resp_headers>Hx-Location delete
+				resp_headers>Hx-Redirect delete
+				resp_headers>Hx-Push-Url delete
+				resp_headers>Hx-Replace-Url delete
+			}
+		}
+		include http.log.access
+	}
+}
+
+(hallvi_log) {
+	log {
+		output discard
+	}
+}
+
+shop.example.com, www.shop.example.com {
+	import hallvi_log   # only in a site block without a log of its own
+	# … the site as it was …
+}`;
+
+type Setup = {
+  /** The versions this text was run on. */
+  tested: string;
+  steps: string[];
+  config: Record<string, string>;
+  record: string;
+  /** What this text gives up against the newest one, said to the owner. */
+  loses?: string;
+};
+
+/**
+ * What each proxy is given, by version. `shop.example.com` stands for the
+ * application's names, and `p` for a page key where the application routes by
+ * one.
+ */
+export const LOG_SETUP = {
+  caddy: {
+    tested: "Caddy 2.11",
+    steps: [
+      "Add the hallvi_log snippet once, at the top of the Caddyfile, and `import hallvi_log` in every site block of this application. The owner's own `log` stays as it is: this is a second, named log beside it.",
+      "Add `log_append hv_page {query.p}` inside the site only when the application routes by a query key (WordPress's p); record that key as pageKey.",
+      "Caddy in a container: bind-mount the host directory /var/log/caddy/hallvi at the same path (a directory, never a single file — a single-file mount goes stale when the file is replaced).",
+      "`caddy validate`, then reload (`caddy reload`, or `docker exec <caddy> caddy reload --config /etc/caddy/Caddyfile`).",
+      CHECK_WORDS,
+      "Caddy rotates the files itself (roll_keep_for 30d); no logrotate.",
+    ],
+    config: {
+      Caddyfile: caddySnippet(`			roll_size 100MiB
+			roll_interval 24h
+			roll_keep 1000
+			roll_keep_for 30d
+			mode 0640
+			dir_mode 0755`),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", "/var/log/caddy/hallvi/access.log"),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+  },
+  "caddy-2.8": {
+    tested: "Caddy 2.8.4, 2.9.1 and 2.10.2",
+    steps: [
+      "This Caddy has no roll_interval or dir_mode (they came in 2.11). Use this text as it is; do not add options from a newer one.",
+      CADDY_OLDER_FILE,
+      "Add the hallvi_log snippet once, at the top of the Caddyfile, and `import hallvi_log` in every site block of this application. The owner's own `log` stays as it is: this is a second, named log beside it.",
+      "Add `log_append hv_page {query.p}` inside the site only when the application routes by a query key (WordPress's p); record that key as pageKey.",
+      ...CADDY_OLDER_STEPS,
+      CHECK_WORDS,
+    ],
+    config: {
+      Caddyfile: caddySnippet("\t\t\troll_disabled"),
+      "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
+      check: CHECK,
+    },
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    loses: CADDY_OLDER_LOSES,
+  },
+  "caddy-2.6": {
+    tested:
+      "Caddy 2.6.2 (Debian 12 and 13, Ubuntu 24.04 to 26.04), 2.6.4 (EPEL 9) and 2.7.6",
+    steps: [
+      "Caddy before 2.8 keeps one log per site, so a second `log` in a site block silently replaces the owner's. Hallvi's log is therefore a named log in the global options that takes every site's access lines (include http.log.access); the record's hosts picks this application's. Use this text as it is; do not add options from a newer one.",
+      CADDY_OLDER_FILE,
+      "Put the `log hallvi` block inside the global options block, the first block of the Caddyfile (add one there if there is none; there is only ever one). Add the hallvi_log snippet once, and `import hallvi_log` only in a site block of this application that has no `log` of its own: it turns the site's access lines on and discards the site's own copy. A site block with a log of its own already sends its lines; leave it as it is.",
+      "That global log is host-wide: every site on this Caddy that logs has its lines, stripped the same way, written to Hallvi's file. Say so when you ask for approval.",
+      "This Caddy has no log_append, so the filter keeps the campaign tags in the logged path's query and removes every other key. Where the application routes by a query key (WordPress's p), add it to the list in the request>uri pattern (…|ref|p) and record it as pageKey.",
+      ...CADDY_OLDER_STEPS,
+      "Then send a request of your own (the user agent Hallvi access check is never counted) and read the newest line: the path's query holds utm_source=hallvi-check and nothing else, the referrer has no query string, and check-path and check-referrer appear nowhere.",
+    ],
+    config: {
+      Caddyfile: CADDY_26,
+      "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
+      check: CHECK,
+    },
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    loses: `${CADDY_OLDER_LOSES} Campaign tags stay in the logged path's query instead of fields of their own (the same keys, nothing else).`,
   },
   nginx: {
+    tested: "nginx 1.14 (RHEL 8) to 1.30",
     steps: [
       "`install -d -m 0755 /var/log/nginx/hallvi` — Hallvi's log goes in a directory of its own. A file matching /var/log/nginx/*.log duplicates Debian's own logrotate entry, and logrotate then skips the owner's whole nginx configuration.",
       'Write /etc/nginx/conf.d/hallvi-log.conf (it must be included inside `http {}`, as conf.d is on Debian and the official image). In the $hallvi_page map, list each host that routes by a query key with that key\'s $arg_; otherwise keep only `default "";`.',
       "Add `access_log /var/log/nginx/hallvi/access.log hallvi;` to every `server` block that has an access_log of its own: such a block inherits none from `http`.",
+      "The access_log in hallvi-log.conf is at the http level, so it is host-wide: every server block without an access_log of its own writes its lines to Hallvi's file. Say so when you ask for approval.",
       "nginx in a container: bind-mount the host directory /var/log/nginx/hallvi at the same path.",
       "`nginx -t`, then reload.",
       "Write /etc/logrotate.d/hallvi-nginx owned by root, mode 0644 (logrotate ignores a configuration root does not own). The postrotate USR1 makes nginx reopen its file; without it nginx keeps writing into the renamed one. Check it with `logrotate -d /etc/logrotate.conf`: no duplicate-entry error, and the owner's nginx logs still listed.",
@@ -434,12 +560,14 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
     record: RECORD("nginx", "hallvi-json", "/var/log/nginx/hallvi/access.log"),
   },
   traefik: {
+    tested: "Traefik 2.0 to 3.7",
     steps: [
-      "Traefik's access log is static configuration: add accessLog to traefik.yml (or the same settings as --accesslog.* flags), and restart Traefik.",
+      "Traefik's access log is static configuration: add accessLog to traefik.yml (or the same settings as --accesslog.* flags), and restart Traefik. That restart is host-wide: every application behind this Traefik loses its connections for a moment. Say so when you ask for approval.",
       "Bind-mount the host directory /var/log/traefik into the Traefik container at the same path.",
       "Write /etc/logrotate.d/hallvi-traefik owned by root, mode 0644, with a postrotate USR1 to Traefik so it reopens its file.",
       "hosts is required when this Traefik fronts more than one application: its one log holds every application's lines.",
       "Traefik cannot rewrite a field, so its own file keeps full query strings; Hallvi removes them when it reads. Tell the owner the server's log keeps full addresses.",
+      "Keep the header names as written (Cf-Connecting-Ip, not CF-Connecting-IP): Traefik 2.0 matches them letter for letter.",
       "Send a request of your own (the user agent Hallvi access check is never counted) and read the newest line: RequestHost, RequestPath, DownstreamStatus and the kept request_ headers are there.",
     ],
     config: {
@@ -458,8 +586,8 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
         Sec-Purpose: keep
         Purpose: keep
         Content-Type: keep
-        CF-Connecting-IP: keep
-        CF-IPCountry: keep`,
+        Cf-Connecting-Ip: keep
+        Cf-Ipcountry: keep`,
       "/etc/logrotate.d/hallvi-traefik": LOGROTATE(
         "/var/log/traefik/access.log",
         "docker kill --signal=USR1 <traefik container> >/dev/null 2>&1 || true",
@@ -468,22 +596,93 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
     },
     record: RECORD("Traefik", "traefik-json", "/var/log/traefik/access.log"),
   },
+} satisfies Record<string, Setup>;
+export type SetupVariant = keyof typeof LOG_SETUP;
+
+/** The version `caddy version`, `nginx -v` or `traefik version` printed. */
+function versionOf(text: string) {
+  const found = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(text);
+  return found
+    ? Number(found[1]) * 1e6 + Number(found[2]) * 1e3 + Number(found[3] ?? 0)
+    : null;
+}
+const v = (major: number, minor: number, patch = 0) =>
+  major * 1e6 + minor * 1e3 + patch;
+
+const VERSION_COMMAND: Record<Proxy, string> = {
+  caddy: "caddy version",
+  nginx: "nginx -v",
+  traefik: "traefik version",
 };
+
+/**
+ * The text for the version installed, or why this version cannot be counted.
+ * A newer proxy is never a step: `note` says what an older one gives up, and
+ * the owner decides whether that is worth an upgrade.
+ */
+export function setupVariant(
+  proxy: Proxy,
+  version: string,
+): { variant: SetupVariant; note?: string } | { unsupported: string } {
+  const at = versionOf(version);
+  if (at === null)
+    return {
+      unsupported: `Read the installed version first (\`${VERSION_COMMAND[proxy]}\`, in the proxy's container if it runs in one) and pass what it prints.`,
+    };
+  if (proxy === "caddy") {
+    if (at >= v(2, 11)) return { variant: "caddy" };
+    if (at >= v(2, 8)) return { variant: "caddy-2.8" };
+    if (at >= v(2, 6)) return { variant: "caddy-2.6" };
+    if (at >= v(2, 5))
+      return {
+        variant: "caddy-2.6",
+        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
+      };
+    // No distribution in support ships these: the oldest found is 2.6.2.
+    return {
+      unsupported:
+        "Caddy before 2.5 cannot remove a query string before writing it, and logs the client's address where Hallvi does not read it: say this application's traffic cannot be counted with this Caddy. A newer Caddy is the owner's decision.",
+    };
+  }
+  if (proxy === "nginx")
+    return at >= v(1, 11, 8)
+      ? { variant: "nginx" }
+      : {
+          unsupported:
+            "nginx before 1.11.8 has no escape=json, so a request could break Hallvi's line: say this application's traffic cannot be counted. A newer nginx is the owner's decision.",
+        };
+  return at >= v(2, 0)
+    ? { variant: "traefik" }
+    : {
+        unsupported:
+          "Traefik 1 is configured differently and was never tested: say this application's traffic cannot be counted. Moving to Traefik 2 or 3 is the owner's decision.",
+      };
+}
 
 const SETUP_RULES = [
   "Hallvi's log goes beside any log the owner already has; never change or remove theirs.",
+  "Never upgrade, replace or reinstall the proxy to set this log up, and never restart it where a reload does: every version it takes has its own tested text here. An upgrade may be put to the owner once, as an optional suggestion with what this version gives up; it is never a step of the setup, and the setup does not wait for it.",
+  "An application that already has an access-log record keeps it, untouched, until the new log is proved: set the new log up, see a request of your own in it correctly stripped, and only then update that same record in place, by its id, to the new source. Never retire it first and never save a second one. If the setup fails, is declined or is left unfinished, the existing record stays exactly as it was.",
+  "When the proxy serves more than one application (other site blocks, server blocks or routers), say so in any approval you ask for: a reload or restart reaches every site on it, and a change outside this application's own site block is host-wide. Prefer changes inside this application's site block, and name each part that is host-wide.",
   "The record's path is the host's path. A file source is preferred: docker logs history ends when the container is recreated.",
   "hosts is every name the application answers on, lower case, without a port.",
   "Hallvi's SSH user must be root, have passwordless sudo, or be able to read the files (Traffic says which file it cannot read otherwise).",
   "Caddy writes a failed request's error entries, with the full query string, to its default logger (stderr, docker logs). Do not quote those lines into records or replies.",
-  "Save the access-log record only once a request of your own shows up in the new log, correctly stripped; update the existing access-log record instead of saving a second.",
 ];
 
-export function trafficSetup(proxy: Proxy) {
-  const setup = LOG_SETUP[proxy];
+export function trafficSetup(proxy: Proxy, version: string) {
+  const chosen = setupVariant(proxy, version);
+  if ("unsupported" in chosen)
+    return { proxy, version, unsupported: chosen.unsupported };
+  const setup: Setup = LOG_SETUP[chosen.variant];
   return {
     proxy,
+    version,
+    variant: chosen.variant,
+    tested: setup.tested,
     rules: SETUP_RULES,
+    ...(chosen.note && { note: chosen.note }),
+    ...(setup.loses && { loses: setup.loses }),
     steps: setup.steps,
     config: setup.config,
     record: setup.record,

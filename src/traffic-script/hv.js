@@ -45,7 +45,7 @@
   const originOf = (url) => url.protocol + "//" + url.host;
 
   // The page view being counted: its id and path, how long it has been
-  // visible, and whether its leave went out.
+  // visible, and whether its totals went out since it was last visible.
   let view;
   // Its page speed so far (see `init`), and the observers that measure it.
   let lcp;
@@ -127,24 +127,28 @@
   const shown = () =>
     view.shown + (view.since === null ? 0 : now() - view.since);
 
-  // The view is over. Sent once, at the first of the tab being hidden, the
-  // page going away or a route change: hidden is often the last moment a
-  // page gets, since a phone rarely says goodbye.
-  const end = () => {
+  // Where the view stands, as totals so far: its visible time and its page
+  // speed. Sent whenever the tab is hidden, the page goes away or the route
+  // changes — hidden is often the last moment a page gets, since a phone
+  // rarely says goodbye — and again after each return, with the new totals.
+  // Hallvi keeps the largest per view, so a resent figure only corrects.
+  const report = () => {
     for (const [observer, handle] of observers) handle(observer.takeRecords());
-    if (!view.left) {
-      view.left = true;
-      if (lcp !== undefined)
-        emit("vital", { n: "LCP", v: whole(lcp, 120_000) });
-      if (shifts && shown())
-        emit("vital", { n: "CLS", v: whole(cls * 1000, 120_000) });
-      if (inp !== undefined)
-        emit("vital", { n: "INP", v: whole(inp, 120_000) });
-      // Visible time only: a tab left open behind others was not being read.
-      emit("leave", { e: whole(shown(), 30 * 60_000) });
-    }
-    // Whatever happens after this belongs to the next view.
+    // Largest-contentful-paint ends when the page is first hidden.
     lcpOver = true;
+    if (view.left) return;
+    view.left = true;
+    if (lcp !== undefined) emit("vital", { n: "LCP", v: whole(lcp, 120_000) });
+    if (shifts && shown())
+      emit("vital", { n: "CLS", v: whole(cls * 1000, 120_000) });
+    if (inp !== undefined) emit("vital", { n: "INP", v: whole(inp, 120_000) });
+    // Visible time only: a tab left open behind others was not being read.
+    emit("leave", { e: whole(shown(), 30 * 60_000) });
+  };
+
+  // The view is over: whatever happens after this belongs to the next one.
+  const end = () => {
+    report();
     lcp = inp = undefined;
     cls = session = 0;
   };
@@ -184,7 +188,7 @@
     // - INP: the slowest interaction. web-vitals passes over one in every
     //   fifty as an outlier; a page view rarely has fifty. Interactions under
     //   40 ms are seen only through the first input, which is always reported.
-    // Each is sent once, with the view's leave: by then it is final.
+    // Each goes out with the view's leave, as it stands then.
     const shownAt =
       performance.getEntriesByType?.("navigation")[0]?.activationStart || 0;
     lcpOver = !visible();
@@ -232,11 +236,13 @@
     document.addEventListener(
       "visibilitychange",
       safely(() => {
-        if (visible()) view.since = now();
-        else {
+        if (visible()) {
+          view.since = now();
+          view.left = false;
+        } else {
           view.shown = shown();
           view.since = null;
-          end();
+          report();
         }
       }),
     );
