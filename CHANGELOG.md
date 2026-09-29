@@ -4,6 +4,14 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.11 — 30 September 2026
+
+Find the newest signed release even when GitHub lists older releases first, and keep traffic observations clearer.
+
+- **Reliable release discovery.** Hallvi checks newer version tags before reusing a previously verified release. The normal installer follows GitHub’s latest published release; signature and archive checks still apply. Older installed versions affected by release ordering can recover by running the official installer again.
+- **More accurate traffic observations.** Traffic retains partial-count labels, validates query-routed page values, and handles log rotation, catch-up and closing browser views more consistently.
+- **Cloudflare cache rules.** Pi can inspect cache rules and maintain Hallvi’s own rule for a hostname while preserving existing owner rules.
+
 ## 0.1.1-alpha.10 — 29 September 2026
 
 See application traffic, follow long conversations with less repeated loading, and hand a diagnosed code problem to a coding agent.
