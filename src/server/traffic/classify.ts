@@ -175,8 +175,14 @@ export function classify(line: TrafficLine): Classified {
   if (line.path.startsWith(HALLVI_PATH_PREFIX)) {
     const event = eventOf(line.path);
     // A crawler that runs the script is still a crawler, and something that
-    // is not a browser did not run it.
-    return event && agent.shaped && !botOf(line.userAgent)
+    // is not a browser did not run it. An event is counted, so a forged one
+    // must not pass for a browser's: one claiming a browser that always
+    // sends fetch metadata has to carry it. Over plain HTTP no browser
+    // does, so there the log keeps counting, as if the script were absent.
+    return event &&
+      agent.shaped &&
+      !botOf(line.userAgent) &&
+      !(agent.fetchMetadata && !hasFetchMetadata(line))
       ? { kind: "event", event }
       : { kind: "own" };
   }

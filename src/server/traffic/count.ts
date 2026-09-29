@@ -40,11 +40,12 @@ import {
 import { dayBounds, HOUR_MS, hoursIn } from "./days";
 import {
   agentOf,
-  campaignOf,
+  arrivalOf,
   countryOf,
   deviceOf,
+  pageName,
   referringPage,
-  sourceOf,
+  type Arrival,
 } from "./enrich";
 
 /** A day is final this long after it ends: lines still being written. */
@@ -58,6 +59,12 @@ const ERROR_PATHS = 20;
  */
 const SILENT_BROWSERS = 3;
 const SILENT_AFTER_MS = 10 * 60_000;
+/**
+ * How far apart a page load and the script's view of it can be. The first
+ * view the script sends is the switch point, and the log has already counted
+ * the load that sent it, a moment before.
+ */
+const OVERLAP_MS = 10_000;
 
 export interface CountOptions {
   /** `YYYY-MM-DD` in `timeZone`. */
@@ -302,6 +309,8 @@ export class DayCounter {
     { path: string; metric: VitalName; value: number }
   >();
   private readonly scriptErrors = new Map<string, number>();
+  /** The last few seconds of page loads the log counted, by browser, page. */
+  private readonly loaded = new Map<string, number>();
   private switchPoint: number | null;
   private lastEvent: number | null = null;
   private lastLine: number | null = null;
@@ -480,7 +489,8 @@ export class DayCounter {
   private pageOf(line: TrafficLine) {
     const key = this.options.pageKey;
     const value = key ? line.kept[key]?.slice(0, 100) : undefined;
-    return value ? `${line.path}?${key}=${value}` : line.path;
+    const page = pageName(line.path);
+    return value ? `${page}?${key}=${value}` : page;
   }
 
   private viewer(key: string, line: TrafficLine, width?: number): Viewer {
@@ -540,26 +550,34 @@ export class DayCounter {
       }
     }
     if (!person) return;
-    if (kind.document) into.documents.add(line.path);
+    if (kind.document) into.documents.add(pageName(line.path));
     else {
       const page = referringPage(line.referrer, line.host, this.hosts);
       if (page) into.referred.add(page);
     }
-    if (kind.view && (this.switchPoint === null || line.at < this.switchPoint))
-      this.view(
-        into,
-        hour,
-        key,
-        this.pageOf(line),
-        sourceOf({
-          referrer: line.referrer,
-          host: line.host,
-          hosts: this.hosts,
-          tags: line.kept,
-        }),
-        campaignOf(line.kept),
-        this.viewer(key, line),
-      );
+    if (
+      !kind.view ||
+      (this.switchPoint !== null && line.at >= this.switchPoint)
+    )
+      return;
+    this.view(into, hour, key, this.pageOf(line), this.viewer(key, line), {
+      referrer: line.referrer,
+      host: line.host,
+      hosts: this.hosts,
+      tags: line.kept,
+    });
+    if (into === this.main)
+      this.remember(`${key} ${pageName(line.path)}`, line.at);
+  }
+
+  /** Keeps a counted page load for as long as its script view can follow. */
+  private remember(load: string, at: number) {
+    this.loaded.delete(load);
+    this.loaded.set(load, at);
+    for (const [oldest, when] of this.loaded) {
+      if (when >= at - OVERLAP_MS) break;
+      this.loaded.delete(oldest);
+    }
   }
 
   private view(
@@ -567,18 +585,21 @@ export class DayCounter {
     hour: number,
     key: string,
     page: string,
-    source: string | null,
-    campaign: string | null,
     viewer: Viewer,
+    arrival: Arrival,
   ) {
     const totals = into.hours[hour];
     totals.views += 1;
     totals.visitors.add(key);
     into.visitors.add(key);
     bump(into.lists.pages, page, key);
-    // A page reached from another page of the same site is not an arrival.
-    if (source !== null) bump(into.lists.sources, source, key);
-    if (campaign !== null) bump(into.lists.campaigns, campaign, key);
+    // A page reached from another page of the same site is not an arrival:
+    // neither a source nor a campaign counts it.
+    const arrived = arrivalOf(arrival);
+    if (arrived) {
+      bump(into.lists.sources, arrived.source, key);
+      if (arrived.campaign) bump(into.lists.campaigns, arrived.campaign, key);
+    }
     bump(into.lists.countries, viewer.country, key);
     bump(into.lists.devices, viewer.device, key);
     bump(into.lists.browsers, viewer.browser, key);
@@ -603,53 +624,50 @@ export class DayCounter {
     if (this.lastEvent === null || line.at > this.lastEvent)
       this.lastEvent = line.at;
     this.quiet = null;
+    const page = pageName(event.p);
     switch (event.t) {
       case "view": {
-        const tags = event.u ?? {};
-        this.view(
-          this.main,
-          hour,
-          key,
-          event.p,
-          sourceOf({
-            referrer: event.r ?? null,
-            host: line.host,
-            hosts: this.hosts,
-            tags,
-          }),
-          campaignOf(tags),
-          this.viewer(key, line, event.w),
-        );
+        // A load the log counted just before the switch point, which the
+        // script now reports: one view, already counted.
+        const load = `${key} ${page}`;
+        const loadedAt = this.loaded.get(load);
+        if (
+          loadedAt !== undefined &&
+          loadedAt < this.switchPoint! &&
+          line.at - loadedAt <= OVERLAP_MS
+        ) {
+          this.loaded.delete(load);
+          return;
+        }
+        this.view(this.main, hour, key, page, this.viewer(key, line, event.w), {
+          referrer: event.r ?? null,
+          host: line.host,
+          hosts: this.hosts,
+          tags: event.u ?? {},
+        });
         return;
       }
-      // A page view may say `leave` more than once, each time with its
-      // whole visible time so far, and report a metric again as it grows;
-      // the largest is the one that stands.
+      // Events arrive in any order, a view's `leave` often after the next
+      // view, so they join on the view's id. Should one be sent twice, the
+      // largest stands: visible time and every page-speed figure only grow.
       case "leave": {
         const seen = this.leaves.get(event.s);
         if (!seen || event.e > seen.ms)
-          this.leaves.set(event.s, { path: event.p, ms: event.e });
+          this.leaves.set(event.s, { path: page, ms: event.e });
         return;
       }
       case "vital": {
         const id = `${event.s} ${event.n}`;
         const seen = this.vitals.get(id);
         if (!seen || event.v > seen.value)
-          this.vitals.set(id, {
-            path: event.p,
-            metric: event.n,
-            value: event.v,
-          });
+          this.vitals.set(id, { path: page, metric: event.n, value: event.v });
         return;
       }
       case "goal":
         bump(this.main.lists.goals, event.g, key);
         return;
       case "error":
-        this.scriptErrors.set(
-          event.p,
-          (this.scriptErrors.get(event.p) ?? 0) + 1,
-        );
+        this.scriptErrors.set(page, (this.scriptErrors.get(page) ?? 0) + 1);
         return;
       case "ping":
         return;

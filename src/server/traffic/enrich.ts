@@ -303,22 +303,39 @@ export interface Arrival {
 }
 
 /**
- * Where a view came from: a `utm_source` or `ref` tag first, then the
- * referring site, named when it is one people know. No referrer and no
- * campaign is Direct; a campaign without a named source is unknown. A
- * referrer on the application's own site is a page leading to another, not
- * an arrival, and gives null.
+ * Where a view arrived from, or null when it did not arrive: a referrer on
+ * the application's own site is one page leading to another (a link, a
+ * route change, a page brought back from memory), whatever tags its address
+ * still carries. An arrival's source is its `utm_source` or `ref` tag, then
+ * the referring site, named when it is one people know; with neither, a
+ * campaign's source is unknown and anything else is Direct.
  */
-export function sourceOf({ referrer, host, hosts, tags }: Arrival) {
-  const tag = tagged(tags.utm_source ?? "") ?? tagged(tags.ref ?? "");
-  if (tag) return tag;
+export function arrivalOf({ referrer, host, hosts, tags }: Arrival) {
   const from = referrer ? hostOf(referrer) : null;
-  if (from) return sameSite(from, host, hosts) ? null : sourceNamed(from);
-  return campaignOf(tags) ? UNKNOWN : DIRECT;
+  if (from && sameSite(from, host, hosts)) return null;
+  const campaign = tags.utm_campaign?.trim().slice(0, TAG_LIMIT) || null;
+  const source =
+    tagged(tags.utm_source ?? "") ??
+    tagged(tags.ref ?? "") ??
+    (from ? sourceNamed(from) : campaign ? UNKNOWN : DIRECT);
+  return { source, campaign };
 }
 
-export function campaignOf(tags: Partial<Record<string, string>>) {
-  return tags.utm_campaign?.trim().slice(0, TAG_LIMIT) || null;
+/**
+ * A page's name, the same from the log and from the script: both carry the
+ * path as the browser sent it, so it is decoded once, and a trailing slash
+ * does not make a second page. Without this, one page splits in two at the
+ * switch point.
+ */
+export function pageName(path: string) {
+  let name = path;
+  try {
+    name = decodeURI(path);
+  } catch {
+    // Not valid percent-encoding: keep it as it was sent.
+  }
+  if (name.length > 1) name = name.replace(/\/+$/, "") || "/";
+  return name.slice(0, 300);
 }
 
 /**
@@ -333,8 +350,9 @@ export function referringPage(
   if (!referrer) return null;
   try {
     const url = new URL(referrer);
-    if (!sameSite(url.hostname.toLowerCase(), host, hosts)) return null;
-    return url.pathname.slice(0, 300) || "/";
+    return sameSite(url.hostname.toLowerCase(), host, hosts)
+      ? pageName(url.pathname || "/")
+      : null;
   } catch {
     return null;
   }
