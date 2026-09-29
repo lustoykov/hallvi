@@ -9,6 +9,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
+| [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -41,8 +42,9 @@ Keep credentials and private application data out of entries and linked material
 2. Count one +1 per independent task, including the initial request. Record the
    task ID or PR reference; retries, multiple agents and multiple PRs within
    the same task do not add votes.
-3. Give a new request the next unused `AF-NNN` ID, a short title and a brief
-   description. Add a linked overview row with count `1` and status `New`.
+3. Check merged requests and open feedback PRs before choosing the next unused
+   `AF-NNN` ID. Give it a short title and a brief description. Add a linked
+   overview row with count `1` and status `New`.
 4. Recount +1s from the task references and sort active requests by count.
    Move resolved or declined requests out of the active overview and into the
    final Archive section, including their overview rows, full entries, votes
@@ -110,6 +112,15 @@ that sets `launchOptions.executablePath`. An environment variable read in
 `tests/browser/playwright.config.ts` would make that one setting.
 
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
+
+### AF-010 — Read Pi's recorded reasoning through a supported export
+
+The old standalone inspector cannot read the current database or Pi session
+format and has been removed. I would like a supported way to inspect recorded
+reasoning and the native session tree when the conversation's messages and
+tool disclosures are insufficient.
+
+**+1:** 2026-09-29 — Hallvi software factory task, codex/factory-verification-fixes
 
 ## Archive
 
