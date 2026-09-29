@@ -10,7 +10,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | New |
+| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
 | [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
@@ -144,6 +144,8 @@ then nine save calls failed because `presentation.checks[].basis` contained
 explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
 the calls and finished, but saving the useful result added avoidable churn.
 Make the tool contract easier to follow without relaxing record validation.
+
+**Status:** Owner-authorized correction in review on `codex/record-basis-contract`: explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. Archive after the fix merges.
 
 **+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
 [release evidence #267](https://github.com/lustoykov/hallvi/pull/267).

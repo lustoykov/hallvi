@@ -384,7 +384,12 @@ export const informationInputSchema = z.object({
             label: z.string(),
             status: z.enum(["passed", "failed", "info"]),
             claim: z.enum(claimKinds).optional(),
-            basis: z.enum(basisKinds).optional(),
+            basis: z
+              .enum(basisKinds, {
+                error:
+                  'basis must be exactly "observed", "planned" or "reported": observed when you checked it yourself, reported when a provider, manifest or person told you, planned when it is only intended. Put the check explanation in detail and supporting execution IDs or URLs in record.evidence.',
+              })
+              .optional(),
             /**
              * What was checked — which is also what gives the check its
              * lane, falling back to the subject the record speaks for.
