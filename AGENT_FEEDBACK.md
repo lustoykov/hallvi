@@ -10,7 +10,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fix in review |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
@@ -60,19 +59,6 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
-
-### AF-021 — Let manual public deployment proceed without GitHub login
-
-A fresh account could read a public repository and connect its existing server,
-then “Deploy master when I ask” failed with a request to connect GitHub so Hallvi
-could watch the branch. Manual branch selection should use the existing public
-reader; automatic watching and private repository access still need a connection.
-
-**+1:** 2026-09-29 — fresh-account alpha.10 onboarding acceptance
-(`codex/manual-public-deployment`).
-
-**Disposition:** [#282](https://github.com/lustoykov/hallvi/pull/282) makes the branch read mode-aware, including a
-manual-to-automatic transition check. Verification guidance worked as written.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
@@ -184,6 +170,7 @@ noting on the other which findings are taken, would save that merge.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fixed in #282 |
 | [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
 | [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fixed in #280 |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Fixed in #275 |
@@ -197,6 +184,19 @@ noting on the other which findings are taken, would save that merge.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-021 — Let manual public deployment proceed without GitHub login
+
+A fresh account could read a public repository and connect its existing server,
+then “Deploy master when I ask” failed with a request to connect GitHub so Hallvi
+could watch the branch. Manual branch selection should use the existing public
+reader; automatic watching and private repository access still need a connection.
+
+**+1:** 2026-09-29 — fresh-account alpha.10 onboarding acceptance
+(`codex/manual-public-deployment`).
+
+**Disposition:** Fixed in merged [#282](https://github.com/lustoykov/hallvi/pull/282) makes the branch read mode-aware, including a
+manual-to-automatic transition check. Verification guidance worked as written.
 
 ### AF-020 — Name failed check groups without claiming they passed
 
