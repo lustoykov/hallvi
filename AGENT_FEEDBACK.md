@@ -11,6 +11,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fix in review |
+| [AF-023 — Discover newer releases despite GitHub listing order](#af-023--discover-newer-releases-despite-github-listing-order) | 1 | Fix in review |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
@@ -60,6 +61,20 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-023 — Discover newer releases despite GitHub listing order
+
+After alpha.10 publication, GitHub listed alpha.9, alpha.8, then alpha.10.
+The installed updater stopped at its cached alpha.9 and said nothing newer was
+available; the official bootstrap also chose the first manifest. Rank update
+candidates before the cache shortcut and use GitHub's latest-release object
+for the default bootstrap, while preserving signed manifest verification.
+
+**+1:** 2026-09-29 — published alpha.10 updater acceptance
+(`codex/release-discovery-order`).
+
+**Disposition:** A bounded discovery correction is in review. Version tags
+only prioritize manifest reads; signed bytes still own the version and assets.
 
 ### AF-021 — Let manual public deployment proceed without GitHub login
 
