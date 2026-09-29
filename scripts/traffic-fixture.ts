@@ -4,7 +4,7 @@
 //   node --import tsx scripts/traffic-fixture.ts backfill --format caddy-json
 //     --shape busy --days 30 --out work/traffic --seed 7
 //     [--releases 2026-09-20T10:00:00Z,…] [--host example.test]
-//     [--end <iso>] [--name access.log] [--roll-mib 10]
+//     [--end <iso>] [--name access.log]
 //   node --import tsx scripts/traffic-fixture.ts live --url https://example.test
 //     --shape spa --rate 20 [--minutes 10] [--seed 7]
 //   node --import tsx scripts/traffic-fixture.ts verify --format caddy-json
@@ -98,12 +98,12 @@ const HELP = `Realistic traffic through the real pipeline, and an independent co
   backfill --format caddy-json|traefik-json|hallvi-json --shape ${SHAPES.join("|")}
            --out <dir> [--days 30] [--seed 1] [--end <iso>]
            [--releases <iso,…>] [--host example.test] [--name access.log]
-           [--roll-mib 10]
       Writes --days of history ending at --end (default now) as rotated log
-      files, named as the proxy's own rotation names them: Caddy's
-      <name>-<time>-size.log.gz, logrotate's <name>.1 and <name>.N.gz for
-      nginx (hallvi-json) and Traefik. The newest file ends at --end, so set
-      --end to the first line of the live log the files will sit beside.
+      files, named and cut as the rotation Pi sets up names and cuts them:
+      Caddy's <name>-<time>-time.log.gz every 24 hours, logrotate's daily
+      <name>.1 and <name>.N.gz for nginx (hallvi-json) and Traefik. The
+      newest file ends at --end, so set --end to the first line of the live
+      log the files will sit beside.
       Writes traffic-fixture.json, the list of files written, beside them,
       and never overwrites a file. The same arguments write the same bytes.
 
@@ -2312,13 +2312,13 @@ function caddyLine(plan: Plan, hit: Hit) {
   const headers: Record<string, string[]> = {};
   for (const [name, value] of hit.headers) {
     const key = canonical(name);
-    // Caddy hides credentials; Pi's filter cuts the Referer's query.
+    // Caddy hides credentials; Pi's filter cuts the Referer at ? or #.
     const shown = ["Cookie", "Authorization", "Proxy-Authorization"].includes(
       key,
     )
       ? "REDACTED"
       : key === "Referer"
-        ? value.replace(/\?.*$/, "")
+        ? value.replace(/[?#].*$/, "")
         : value;
     (headers[key] ??= []).push(shown);
   }
@@ -2376,8 +2376,8 @@ function caddyLine(plan: Plan, hit: Hit) {
     size: hit.size,
     status: hit.status,
     resp_headers: answer,
-    // `log_append` fields come out last-declared first, decoded.
-    hv_page: "",
+    // `log_append` fields come out last-declared first, decoded. No shape
+    // routes by a query key, so there is no `hv_page`.
     hv_ref: kept.ref ?? "",
     hv_utm_content: kept.utm_content ?? "",
     hv_utm_term: kept.utm_term ?? "",
@@ -2387,7 +2387,10 @@ function caddyLine(plan: Plan, hit: Hit) {
   });
 }
 
-/** Headers Traefik keeps with the access log Pi configures. */
+/**
+ * Headers Traefik keeps with the access log Pi configures, and the fixture's
+ * marker, which a real Traefik logs only when told to keep it too.
+ */
 const TRAEFIK_KEPT = [
   "User-Agent",
   "Referer",
@@ -2539,46 +2542,51 @@ function splitName(name: string) {
   return dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
 }
 
+/** Caddy's `roll_size` as Pi sets it. */
+const ROLL_BYTES = 100 * 1024 * 1024;
+
 /**
- * Caddy 2.11 rolls by size: a file ends when the next line would pass
- * `roll_size`, and is renamed <stem>-<time>-size<ext>.gz at that moment.
- * Split from the newest line back, so the newest file ends exactly at the
- * window's end, where the live log takes over.
+ * Caddy 2.11 as Pi sets it up rolls every 24 hours, renaming the file
+ * <stem>-<time>-time<ext>.gz, and sooner, -size, if a day passes 100 MiB.
+ * The days are counted back from the window's end, so the newest file ends
+ * exactly where the live log takes over.
  */
-function caddyFiles(plan: Plan, hits: Hit[], name: string, rollBytes: number) {
+function caddyFiles(plan: Plan, hits: Hit[], name: string) {
   const [stem, ext] = splitName(name);
   const files: { name: string; hits: Hit[]; text: string[]; rolled: number }[] =
     [];
-  let current: string[] = [];
-  let group: Hit[] = [];
-  let bytes = 0;
-  let rolled = plan.end;
-  for (let index = hits.length - 1; index >= 0; index--) {
-    const line = `${caddyLine(plan, hits[index])}\n`;
-    const length = Buffer.byteLength(line);
-    if (bytes + length > rollBytes && current.length) {
-      files.push({
-        name: `${stem}-${caddyStamp(rolled)}-size${ext}.gz`,
-        hits: group.reverse(),
-        text: current.reverse(),
-        rolled,
-      });
-      [current, group, bytes] = [[], [], 0];
-      // The older file was rolled as the newer one's first line came in.
-      rolled = hits[index + 1].at + 0.2;
+  const cuts: number[] = [];
+  for (let cut = plan.end; cut > plan.start; cut -= DAY) cuts.unshift(cut);
+  let index = 0;
+  for (const cut of cuts) {
+    let [text, group, bytes] = [[] as string[], [] as Hit[], 0];
+    for (; index < hits.length && hits[index].at < cut; index++) {
+      const line = `${caddyLine(plan, hits[index])}\n`;
+      const length = Buffer.byteLength(line);
+      if (bytes + length > ROLL_BYTES && text.length) {
+        // Rolled as the line that no longer fits comes in.
+        const rolled = hits[index].at;
+        files.push({
+          name: `${stem}-${caddyStamp(rolled)}-size${ext}.gz`,
+          hits: group,
+          text,
+          rolled,
+        });
+        [text, group, bytes] = [[], [], 0];
+      }
+      text.push(line);
+      group.push(hits[index]);
+      bytes += length;
     }
-    current.push(line);
-    group.push(hits[index]);
-    bytes += length;
+    if (group.length)
+      files.push({
+        name: `${stem}-${caddyStamp(cut)}-time${ext}.gz`,
+        hits: group,
+        text,
+        rolled: cut,
+      });
   }
-  if (current.length)
-    files.push({
-      name: `${stem}-${caddyStamp(rolled)}-size${ext}.gz`,
-      hits: group.reverse(),
-      text: current.reverse(),
-      rolled,
-    });
-  return files.reverse().map((file) => ({
+  return files.map((file) => ({
     name: file.name,
     hits: file.hits,
     body: gzipSync(file.text.join("")),
@@ -2664,12 +2672,7 @@ function backfill(flags: Record<string, string>) {
   const hits = simulate(plan);
   const files =
     format === "caddy-json"
-      ? caddyFiles(
-          plan,
-          hits,
-          name,
-          Number(flags["roll-mib"] ?? 10) * 1024 * 1024,
-        )
+      ? caddyFiles(plan, hits, name)
       : dailyFiles(plan, hits, name, format);
 
   mkdirSync(flags.out, { recursive: true });

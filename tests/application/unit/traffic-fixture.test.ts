@@ -66,10 +66,10 @@ describe("the traffic fixture", () => {
     const first = backfill("caddy-json", "first");
     expect(backfill("caddy-json", "again")).toEqual(first);
     expect(backfill("caddy-json", "other", "4")).not.toEqual(first);
-    for (const { name } of first)
-      expect(name).toMatch(
-        /^access-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d\.\d{3}-size\.log\.gz$/,
-      );
+    // Caddy 2.11 rolling every 24 hours, the last roll at --end.
+    expect(first.map((file) => file.name)).toEqual([
+      "access-2026-09-20T06-00-00.000-time.log.gz",
+    ]);
   }, 60_000);
 
   it("writes lines Hallvi reads, in every format", () => {
