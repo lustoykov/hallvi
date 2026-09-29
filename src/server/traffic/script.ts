@@ -121,7 +121,7 @@ ${caddyHandles.replace(/^/gm, "\t")}
 }`,
     /** The container, on Traefik's network, routed by labels. */
     compose: `hallvi-script:
-  image: caddy:2-alpine
+  image: caddy:2
   restart: unless-stopped
   command: caddy run --config ${SCRIPT_DIRECTORY}/Caddyfile --adapter caddyfile
   volumes:
