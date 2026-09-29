@@ -21,6 +21,7 @@ import {
   currentGithubConnectionId,
   readGithubConnection,
 } from "./github-connection";
+import { forget as forgetTraffic } from "./traffic/store";
 import { askWorker } from "./worker-link";
 import type { ApplicationRecord, Chat, CreateApplicationInput } from "./types";
 
@@ -274,6 +275,9 @@ export async function removeApplication(
   // of them is running.
   await askWorker("forget", { scope: { applicationId: application.id } });
   deleteApplication(application.id);
+  // Its traffic totals go with it; they live in traffic.db, which no foreign
+  // key reaches.
+  forgetTraffic(application.id);
   return { removedApplicationId: application.id };
 }
 
