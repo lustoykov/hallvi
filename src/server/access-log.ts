@@ -29,7 +29,8 @@ import {
   arrivalOf,
   countryOf,
   deviceOf,
-  pageName,
+  keyedPage,
+  tagOf,
 } from "./traffic/enrich";
 import { parseLine } from "./traffic/parse";
 import {
@@ -131,7 +132,7 @@ export class LiveWindow {
         kind: "view",
         // The script's word for a view, never a request the page counts.
         script: true,
-        path: pageName(event.p),
+        path: keyedPage(event.p, this.pageKey, event.k),
         status: line.status,
         ms: line.ms,
         country: country(),
@@ -199,11 +200,8 @@ export class LiveWindow {
 
   /** A page as the counting names it, with the application's page key. */
   private pageOf(line: TrafficLine) {
-    const value = this.pageKey
-      ? line.kept[this.pageKey]?.slice(0, 100)
-      : undefined;
-    const page = pageName(line.path);
-    return value ? `${page}?${this.pageKey}=${value}` : page;
+    const key = this.pageKey;
+    return keyedPage(line.path, key, key ? tagOf(line.kept, key) : undefined);
   }
 
   private seen(map: Map<string, number>, key: string, at: number) {

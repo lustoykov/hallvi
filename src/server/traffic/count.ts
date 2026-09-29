@@ -20,7 +20,7 @@
 //
 // A page load the log counted just before the switch point sends its own
 // script view a moment after it, perhaps just past midnight: the two are one
-// view. So a pass also reads the last `LOOKBACK_MS` before its day, only to
+// view, paired by browser and page. So a pass also reads the last `LOOKBACK_MS` before its day, only to
 // know what the log counted there.
 
 import { createHmac, randomBytes } from "node:crypto";
@@ -50,6 +50,7 @@ import {
   arrivalOf,
   countryOf,
   deviceOf,
+  keyedPage,
   pageName,
   referringPage,
   tagOf,
@@ -69,9 +70,10 @@ const SILENT_BROWSERS = 3;
 const SILENT_AFTER_MS = 10 * 60_000;
 /**
  * How far apart a page load and the script's view of it can be: a deferred
- * script on a slow phone. The two are paired only when the browser viewed
- * nothing in between, so the window can be generous. A pass reads this far
- * into the day before its own, and nothing from there is counted.
+ * script on a slow phone. Pairing matters only around the switch point —
+ * after it the log counts no loads — so the window can be generous. A pass
+ * reads this far into the day before its own, and nothing from there is
+ * counted.
  */
 export const LOOKBACK_MS = 3 * 60_000;
 
@@ -319,10 +321,11 @@ export class DayCounter {
   >();
   private readonly scriptErrors = new Map<string, number>();
   /**
-   * Each browser's latest view, when it was a page load the log counted: the
-   * one its script view can still be. Any other view replaces it.
+   * Page loads the log counted whose script view has not come yet, by
+   * browser and page, when each was loaded — oldest first. Each tab of a
+   * browser sends its own, so one tab's load never stands in for another's.
    */
-  private readonly pending = new Map<string, { page: string; at: number }>();
+  private readonly pending = new Map<string, number>();
   private switchPoint: number | null;
   private lastEvent: number | null = null;
   private lastLine: number | null = null;
@@ -513,9 +516,12 @@ export class DayCounter {
     // its payload is nobody's business.
     if (line.path.startsWith(EVENT_PREFIX)) return EVENT_PREFIX;
     const key = this.options.pageKey;
-    const value = key ? tagOf(line.kept, key)?.slice(0, 100) : undefined;
-    const page = pageName(line.path);
-    return value ? `${page}?${key}=${value}` : page;
+    return keyedPage(line.path, key, key ? tagOf(line.kept, key) : undefined);
+  }
+
+  /** The page an event names, as the log would name it. */
+  private eventPage(event: ScriptEvent) {
+    return keyedPage(event.p, this.options.pageKey, event.k);
   }
 
   private viewer(key: string, line: TrafficLine, width?: number): Viewer {
@@ -597,28 +603,36 @@ export class DayCounter {
     return this.switchPoint === null || line.at < this.switchPoint;
   }
 
-  /** A page load: the browser's latest view, pending its script view. */
+  /**
+   * A page load, pending its script view while the log counts it. Loads
+   * older than `LOOKBACK_MS` can no longer pair, and go.
+   */
   private loaded(line: TrafficLine, key: string, counted: boolean) {
-    if (counted)
-      this.pending.set(key, { page: pageName(line.path), at: line.at });
-    else this.pending.delete(key);
+    const id = `${key} ${this.pageOf(line)}`;
+    this.pending.delete(id);
+    if (!counted) return;
+    this.pending.set(id, line.at);
+    for (const [old, at] of this.pending) {
+      if (at >= line.at - LOOKBACK_MS) break;
+      this.pending.delete(old);
+    }
   }
 
   /**
-   * Whether a script view is the page load the log already counted: the
-   * same browser and page, the load a little before it, and no other view
-   * of that browser's in between. Either way it is now the latest view.
+   * Whether a script view is a page load the log already counted: the same
+   * browser and page, loaded a little before it and before the switch
+   * point. A load pairs with one script view at most.
    */
   private paired(key: string, page: string, at: number) {
-    const load = this.pending.get(key);
-    this.pending.delete(key);
+    const id = `${key} ${page}`;
+    const load = this.pending.get(id);
+    this.pending.delete(id);
     return (
       load !== undefined &&
-      load.page === page &&
-      load.at <= at &&
-      at - load.at <= LOOKBACK_MS &&
+      load <= at &&
+      at - load <= LOOKBACK_MS &&
       this.switchPoint !== null &&
-      load.at < this.switchPoint
+      load < this.switchPoint
     );
   }
 
@@ -634,7 +648,8 @@ export class DayCounter {
     if (kind.kind === "event") {
       if (this.switchPoint === null || line.at < this.switchPoint)
         this.switchPoint = line.at;
-      if (kind.event.t === "view") this.pending.delete(key);
+      if (kind.event.t === "view")
+        this.pending.delete(`${key} ${this.eventPage(kind.event)}`);
       return;
     }
     if (kind.view && !kind.imitation)
@@ -685,7 +700,7 @@ export class DayCounter {
     if (this.lastEvent === null || line.at > this.lastEvent)
       this.lastEvent = line.at;
     this.quiet = null;
-    const page = pageName(event.p);
+    const page = this.eventPage(event);
     switch (event.t) {
       case "view": {
         if (this.paired(key, page, line.at)) return;

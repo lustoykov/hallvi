@@ -161,11 +161,16 @@ every proxy records it. No collector service, no endpoint of Hallvi's on the
 internet, no cookies and nothing stored in the browser.
 
 - **Events:** `view` (including single-page route changes), `ping` (every 30 s
-  while the tab is visible — what "open right now" counts), `leave` (visible
-  time on the page), `goal` (`hv('signup')` or `data-hv-goal`), `vital` (LCP,
-  INP, CLS) and `error` (a count, never the message). Each carries a random id
-  for that one page view, so a `leave` joins its `view` without identifying
-  anyone.
+  while the tab is visible — what "open right now" counts, until the view's
+  `leave`), `leave` (visible time on the page), `goal` (`hv('signup')` or
+  `data-hv-goal`), `vital` (LCP, INP, CLS) and `error` (a count, never the
+  message). Each carries a random id for that one page view, so a `leave`
+  joins its `view` without identifying anyone, and the page's path — never
+  its query, except for an application that routes pages by a query key
+  (WordPress's `p`): its tag names the key (`data-hv-page-key="p"`, the
+  record's `pageKey`), and each event carries that key's value alone, so
+  pages are named as the log names them and a change of the key alone is a
+  new view.
 - **Installing it:** Pi's read-only `traffic_script` tool returns the file,
   its sha256, the proxy's serving snippet and the include line per stack
   ([`script.ts`](../../src/server/traffic/script.ts)); Pi writes the file and
@@ -187,8 +192,11 @@ internet, no cookies and nothing stored in the browser.
 - **No double counting.** The log and the script are never added together.
   Each application has one switch point, the first script event Hallvi
   counts: before it, views and visitors come from the log; after it, only from
-  the script. Requests, errors, response times and bots always come from the
-  log. The chart marks the switch. If events stop while browsers are still
+  the script. A page load the log counted just before the switch point and
+  its own script view, up to three minutes later, are one view, paired by
+  browser and page, so two tabs are never taken for one. Requests, errors,
+  response times and bots always come from the log. The chart marks the
+  switch. If events stop while browsers are still
   being served pages, the page says "script silent since …" rather than
   quietly falling back.
 

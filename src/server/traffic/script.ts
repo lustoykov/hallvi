@@ -15,7 +15,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { SCRIPT_PATH } from "./contract";
+import { PAGE_KEY_ATTRIBUTE, SCRIPT_PATH } from "./contract";
 
 /**
  * The script as the proxy serves it: src/traffic-script/hv.js without its
@@ -47,9 +47,10 @@ export const SCRIPT_TAG = `<script defer src="${SCRIPT_PATH}"></script>`;
 
 /**
  * Where the script lives on the application's server. One file serves every
- * application there: the script has no settings, because its events go back
- * to whichever site loaded it. A proxy in a container mounts this directory
- * read-only at the same path.
+ * application there: its events go back to whichever site loaded it, and its
+ * one setting, a page key, is on each application's own tag
+ * (`SCRIPT_PAGE_KEY`). A proxy in a container mounts this directory read-only
+ * at the same path.
  */
 export const SCRIPT_DIRECTORY = "/srv/hallvi";
 export const SCRIPT_FILE = `${SCRIPT_DIRECTORY}${SCRIPT_PATH}`;
@@ -151,10 +152,17 @@ ${caddyHandles.replace(/^/gm, "\t")}
 } as const;
 
 /**
+ * For an application whose `access-log` record has a `pageKey` — it routes
+ * pages by a query key — the tag names that key, so the script tells its
+ * pages apart as the log does. Only that key's value is ever sent.
+ */
+export const SCRIPT_PAGE_KEY = `An application whose access-log record has a pageKey (it routes pages by a query key, like WordPress's p) adds ${PAGE_KEY_ATTRIBUTE}="<that key>" to the tag, in every line below: <script defer src="${SCRIPT_PATH}" ${PAGE_KEY_ATTRIBUTE}="p"></script>. The script then sends that key's value, and nothing else of the query, so its pages are named as the log names them. Any other application leaves the attribute out.`;
+
+/**
  * Where the tag goes for the stacks Pi meets most: the layout every page
  * shares, as early as the page allows. A site that sends a nonce-based
  * Content-Security-Policy gives the tag its nonce the way its other scripts
- * get one.
+ * get one. `SCRIPT_PAGE_KEY` says when it also names a page key.
  */
 export const SCRIPT_INCLUDES: readonly {
   stack: string;

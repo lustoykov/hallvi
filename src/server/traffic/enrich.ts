@@ -343,12 +343,22 @@ export function pageName(path: string) {
   // is where tokens live, and it goes.
   let name = path.replace(/[?#][\s\S]*$/, "");
   try {
-    name = decodeURI(path);
+    name = decodeURI(name);
   } catch {
     // Not valid percent-encoding: keep it as it was sent.
   }
   if (name.length > 1) name = name.replace(/\/+$/, "") || "/";
   return name.slice(0, 300);
+}
+
+/**
+ * A page of an application that routes by a query key (WordPress's `p`): its
+ * path and that key's value, the same whether the log's kept fields or the
+ * script's event said it. Without a key, or without a value, the path alone.
+ */
+export function keyedPage(path: string, key?: string, value?: string) {
+  const page = pageName(path);
+  return key && value ? `${page}?${key}=${value.slice(0, 100)}` : page;
 }
 
 /**

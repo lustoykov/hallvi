@@ -89,10 +89,25 @@ export const PING_SECONDS = 30;
 export type VitalName = "LCP" | "INP" | "CLS";
 
 /**
- * What the script sends. `s` is a random id for one page view — it joins a
- * `leave` to its `view` and identifies nobody. `p` is the page's path.
+ * The attribute on the script's tag that names an application's page key
+ * (`<script defer src="/_hv/s.js" data-hv-page-key="p">`), for one that
+ * routes pages by a query key as the `access-log` record's `pageKey` says.
  */
-export type ScriptEvent =
+export const PAGE_KEY_ATTRIBUTE = "data-hv-page-key";
+/**
+ * A page key's value as an event may carry it: the value only, never the key
+ * or any other part of a query. The script checks the same.
+ */
+export const PAGE_KEY_VALUE = /^[^\u0000-\u001f\u007f?#&=]{1,100}$/u;
+
+/**
+ * What the script sends. `s` is a random id for one page view — it joins a
+ * `leave` to its `view` and identifies nobody. `p` is the page's path, and
+ * `k` the value of the page key its tag names, when it has one and the
+ * address carries it: the only part of a query an event holds. A count uses
+ * it only for an application whose record names a page key.
+ */
+export type ScriptEvent = { k?: string } & (
   | {
       t: "view";
       s: string;
@@ -125,7 +140,8 @@ export type ScriptEvent =
       /** LCP and INP in milliseconds; CLS as the score times 1000. */
       v: number;
     }
-  | { t: "error"; s: string; p: string };
+  | { t: "error"; s: string; p: string }
+);
 
 const LIMITS = {
   path: 300,
@@ -178,7 +194,12 @@ export function eventOf(path: string): ScriptEvent | null {
     /[?#]/.test(p as string)
   )
     return null;
-  const base = { s, p: p as string };
+  const base: { s: string; p: string; k?: string } = { s, p: p as string };
+  if (value.k !== undefined) {
+    if (typeof value.k !== "string" || !PAGE_KEY_VALUE.test(value.k))
+      return null;
+    base.k = value.k;
+  }
   switch (t) {
     case "view": {
       const event: Extract<ScriptEvent, { t: "view" }> = { t, ...base };

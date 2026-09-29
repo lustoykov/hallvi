@@ -40,6 +40,11 @@ const pages: Record<string, string> = {
     <button onclick="history.pushState({}, '', '/app/settings#billing')">Billing</button>
     <button onclick="history.pushState({}, '', '/app/promo?utm_source=mail&password=hunter2')">Promo</button>
   </nav>`),
+  // Routed by a query key, as WordPress routes by ?p=, and says so on the tag.
+  "/blog": `<!doctype html><html><head><meta charset="utf-8">${SCRIPT_TAG.replace("<script ", '<script data-hv-page-key="p" ')}</head><body><nav>
+    <button onclick="history.pushState({}, '', '/blog?p=13&token=secret')">Next post</button>
+    <button onclick="history.replaceState({}, '', '/blog?p=13&sort=new')">Sort</button>
+  </nav></body></html>`,
 };
 
 let servers: Server[] = [];
@@ -232,6 +237,23 @@ test("a single-page application: a new path is a new view, the same path is not"
   expect(leaves.map((leave) => [leave.s, leave.p])).toEqual(
     views.slice(0, 3).map((view) => [view.s, view.p]),
   );
+});
+
+test("a query-routed application: its page key names pages, and nothing else of the query", async ({
+  page,
+}) => {
+  await page.goto(`${site}/blog?p=12&utm_source=news`);
+  await page.getByRole("button", { name: "Next post" }).click();
+  await page.getByRole("button", { name: "Sort" }).click();
+  const views = await until("view", 2);
+  await until("leave", 1);
+  expect(views.map((view) => [view.p, view.k])).toEqual([
+    ["/blog", "12"],
+    ["/blog", "13"],
+  ]);
+  expect(ofType("leave").map((leave) => leave.k)).toEqual(["12"]);
+  expect(ofType("view")).toHaveLength(2);
+  expect(JSON.stringify(events())).not.toMatch(/secret|token|sort/);
 });
 
 test("pings while the tab is visible, and visible time keeps adding up after a return", async ({
