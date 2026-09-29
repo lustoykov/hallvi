@@ -17,6 +17,7 @@ import {
   LOG_SETUP,
   setupVariant,
   trafficReading,
+  trafficSetup,
 } from "@/server/traffic/pi-tools";
 
 const ZONE = "Europe/Sofia";
@@ -33,7 +34,7 @@ const collection: Collection = {
   oldestRetainedAt: null,
   scriptSince: null,
   scriptSilentSince: null,
-  source: { proxy: "Caddy", format: "caddy-json" },
+  source: { proxy: "Caddy", format: "caddy-json", queries: "removed" },
   storedFrom: "2026-09-25",
   logMisses: [],
 };
@@ -278,6 +279,21 @@ describe("traffic_setup", () => {
       kept: { utm_campaign: "spring", ref: "hn", utm_source: "news" },
     });
     expect(filtered("/?token=reset-secret")).toBe("/?");
+  });
+
+  it("has each setup's record say what it removes, and Caddy 2.5 say less", () => {
+    for (const [proxy, version, queries] of [
+      ["caddy", "v2.11.4", "removed"],
+      ["caddy", "v2.6.2", "removed"],
+      ["nginx", "nginx/1.30.5", "removed"],
+      ["traefik", "3.7.13", "kept"],
+    ] as const)
+      expect(trafficSetup(proxy, version)).toMatchObject({
+        record: expect.stringContaining(`queries:'${queries}'`),
+      });
+    expect(trafficSetup("caddy", "v2.5.2")).toMatchObject({
+      note: expect.stringContaining("queries:'path-only'"),
+    });
   });
 
   it("gives each installed version its own text, never an upgrade", () => {

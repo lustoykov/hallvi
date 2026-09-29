@@ -234,7 +234,7 @@ export function scenarios(now: number): Scenario[] {
     oldestRetainedAt: iso(now - 14 * DAY),
     scriptSince: null,
     scriptSilentSince: null,
-    source: { proxy: "Caddy", format: "caddy-json" },
+    source: { proxy: "Caddy", format: "caddy-json", queries: "removed" },
     storedFrom: iso(midnight - 54 * DAY),
     logMisses: [],
     ...input,

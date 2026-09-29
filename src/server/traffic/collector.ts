@@ -735,7 +735,7 @@ async function connection(target: Target, first: boolean) {
 async function collect(target: Target) {
   const { applicationId, log, signal } = target;
   recordCollector(applicationId, {
-    source: { proxy: log.proxy, format: log.format },
+    source: sourceOf(log),
   });
   let failures = 0;
   let moves = 0;
@@ -770,6 +770,19 @@ async function collect(target: Target) {
 
 // ---------------------------------------------------------------------------
 // Every application
+
+/**
+ * What wrote the log, as the record says. Traefik cannot rewrite its log,
+ * so that it keeps queries is known from the format alone; anything else is
+ * what the record claims, or unknown.
+ */
+function sourceOf(log: AccessLogRecord): Collection["source"] {
+  return {
+    proxy: log.proxy,
+    format: log.format,
+    queries: log.queries ?? (log.format === "traefik-json" ? "kept" : null),
+  };
+}
 
 /** Why history cannot be read, in the words the Traffic page shows. */
 function blocked(
@@ -812,7 +825,7 @@ export function trafficCollector(signal: AbortSignal) {
       )
         recordCollector(applicationId, {
           ...reason,
-          source: log ? { proxy: log.proxy, format: log.format } : null,
+          source: log ? sourceOf(log) : null,
         });
       return;
     }

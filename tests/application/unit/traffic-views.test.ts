@@ -17,6 +17,7 @@ import {
   momentsOf,
   quietLine,
   scriptOffer,
+  serverLogWords,
   trafficListed,
   usualDay,
 } from "../../../src/components/hallvi/traffic/model";
@@ -222,6 +223,23 @@ describe("Little Server's moments", () => {
     expect(momentsOf({ month: first, day: null, collection: older })).toEqual(
       [],
     );
+  });
+});
+
+describe("the privacy line", () => {
+  it("claims only what the setup's record says the server's log removes", () => {
+    const words = (
+      queries: "removed" | "path-only" | "kept" | null,
+      format: "caddy-json" | "traefik-json" = "caddy-json",
+    ) => serverLogWords({ proxy: "Caddy", format, queries });
+    expect(words("removed")).toMatch(/removed — from the address asked for and from the referrer/);
+    // Caddy 2.5 keeps referrers' queries: never "removed" for them.
+    expect(words("path-only")).toMatch(/referrers keep theirs/);
+    expect(words("path-only")).not.toMatch(/and from the referrer/);
+    expect(words("kept", "traefik-json")).toMatch(/Traefik's log cannot be rewritten/);
+    // A record that does not say: nothing is claimed either way.
+    for (const unknown of [words(null), serverLogWords(null)])
+      expect(unknown).not.toMatch(/removed/);
   });
 });
 

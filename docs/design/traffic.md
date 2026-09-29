@@ -230,9 +230,12 @@ automatic deploys, and stays on until they turn it off.
 "Hallvi keeps totals on this computer. The server keeps its access log for N
 days, as web servers do; Hallvi removes query strings — from the address asked
 for and from the referrer — before the line is written, and keeps only
-campaign tags." Behind Traefik, whose log cannot be rewritten, the page says
-the server's log keeps full addresses. Hallvi makes no claim about consent: it says
-what it collects and leaves that judgement to the owner.
+campaign tags." The page says only what the setup's record says the log
+removes (`queries`): with Caddy 2.5, whose header filters do nothing, that
+referrers keep their queries; behind Traefik, whose log cannot be rewritten,
+that it keeps full addresses; and with a record that does not say, nothing
+either way. Hallvi makes no claim about consent: it says what it collects and
+leaves that judgement to the owner.
 
 The query string is where password-reset links, sign-in codes, invitations and
 search terms live — and a same-site `Referer` carries the previous page's, so
@@ -287,7 +290,10 @@ live view reads it. When the proxy serves other applications, every approval
 says so and names what is host-wide.
 
 - **The record** points at the **host** path:
-  `{kind:'access-log', proxy, format, source:{type:'file', path}, hosts, pageKey?, retainDays}`.
+  `{kind:'access-log', proxy, format, source:{type:'file', path}, hosts, queries, pageKey?, retainDays}`,
+  where `queries` is what that setup removes before a line is written:
+  `removed` (address and referrer), `path-only` (Caddy 2.5) or `kept`
+  (Traefik).
   `hosts` lists every name the application answers on (lower case, no port),
   so one proxy can serve several applications. A file source is preferred:
   `docker logs` history ends when the container is recreated. A proxy in a

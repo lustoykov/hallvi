@@ -19,6 +19,7 @@ import {
   eventPath,
   type Collection,
   type Gap,
+  type LogQueries,
   type Ranked,
   type RangeTotals,
   type ReleaseImpact,
@@ -139,6 +140,16 @@ function collectionOf(collection: Collection) {
     stoppedAt: collection.disabledAt,
     log: collection.source
       ? `${collection.source.proxy} (${collection.source.format})`
+      : null,
+    serverLogKeeps: collection.source
+      ? {
+          removed:
+            "no query strings: they are removed from the address and the referrer before a line is written",
+          "path-only":
+            "the referrer's query string; the address's is removed before a line is written",
+          kept: "full addresses, query strings included",
+          unknown: "whatever its setup keeps: the record does not say",
+        }[collection.source.queries ?? "unknown"]
       : null,
     lastLineAt: collection.lastLineAt,
     serverLogReachesBackTo: collection.oldestRetainedAt,
@@ -388,8 +399,13 @@ ${
 }
 }`;
 
-const RECORD = (proxy: string, format: string, path: string) =>
-  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], retainDays:30} — add pageKey:'p' only where the application routes by that query key`;
+const RECORD = (
+  proxy: string,
+  format: string,
+  path: string,
+  queries: LogQueries,
+) =>
+  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], queries:'${queries}', retainDays:30} — add pageKey:'p' only where the application routes by that query key. queries says what this setup removes before a line is written, and the Traffic page tells the owner exactly that`;
 
 const CADDY_LOG = "/var/log/caddy/hallvi/access.log";
 
@@ -513,7 +529,7 @@ export const LOG_SETUP = {
 			dir_mode 0755`),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
   },
   "caddy-2.8": {
     tested: "Caddy 2.8.4, 2.9.1 and 2.10.2",
@@ -530,7 +546,7 @@ export const LOG_SETUP = {
       "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
     loses: CADDY_OLDER_LOSES,
   },
   "caddy-2.6": {
@@ -550,7 +566,7 @@ export const LOG_SETUP = {
       "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
     loses: `${CADDY_OLDER_LOSES} Campaign tags stay in the logged path's query instead of fields of their own (the same keys, nothing else).`,
   },
   nginx: {
@@ -579,7 +595,12 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
         '[ ! -f /run/nginx.pid ] || kill -USR1 "$(cat /run/nginx.pid)"',
       check: CHECK,
     },
-    record: RECORD("nginx", "hallvi-json", "/var/log/nginx/hallvi/access.log"),
+    record: RECORD(
+      "nginx",
+      "hallvi-json",
+      "/var/log/nginx/hallvi/access.log",
+      "removed",
+    ),
   },
   traefik: {
     tested: "Traefik 2.0 to 3.7",
@@ -616,7 +637,12 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
       ),
       check: CHECK,
     },
-    record: RECORD("Traefik", "traefik-json", "/var/log/traefik/access.log"),
+    record: RECORD(
+      "Traefik",
+      "traefik-json",
+      "/var/log/traefik/access.log",
+      "kept",
+    ),
   },
 } satisfies Record<string, Setup>;
 export type SetupVariant = keyof typeof LOG_SETUP;
@@ -658,7 +684,7 @@ export function setupVariant(
     if (at >= v(2, 5))
       return {
         variant: "caddy-2.6",
-        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
+        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so, and save the record with queries:'path-only' rather than 'removed'. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
       };
     // No distribution in support ships these: the oldest found is 2.6.2.
     return {

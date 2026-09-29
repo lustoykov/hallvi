@@ -46,6 +46,7 @@ import {
   quietLine,
   quietWhere,
   scriptDraft,
+  serverLogWords,
   scriptOffer,
   storedFrom,
   todayCovered,
@@ -396,11 +397,7 @@ function Foot({
       {asked}
       <p className="tf-foot-quiet">
         Hallvi keeps totals on this computer, never an address.{" "}
-        {collection.source?.format === "traefik-json"
-          ? "The server keeps its own access log, as web servers do. Traefik's log cannot be rewritten, so it keeps full addresses, query strings included; Hallvi keeps only campaign tags from them."
-          : collection.source
-            ? "The server keeps its own access log, as web servers do, with the query string removed before it is written."
-            : "The server keeps its own access log, as web servers do."}{" "}
+        {serverLogWords(collection.source)}{" "}
         <a href="https://db-ip.com" target="_blank" rel="noreferrer">
           Country data by DB-IP
         </a>

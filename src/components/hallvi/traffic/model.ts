@@ -377,6 +377,27 @@ export function momentsOf({
 }
 
 /**
+ * What the server's own log keeps, said only as far as the setup's record
+ * says: a variant that keeps referrers' queries, or a record that does not
+ * say, is never described as removing them.
+ */
+export function serverLogWords(source: Collection["source"]) {
+  const log = "The server keeps its own access log, as web servers do";
+  switch (source?.queries ?? null) {
+    case "removed":
+      return `${log}, with query strings removed — from the address asked for and from the referrer — before a line is written.`;
+    case "path-only":
+      return `${log}, with the query string removed from the address asked for before a line is written; referrers keep theirs there. Hallvi keeps only campaign tags from them.`;
+    case "kept":
+      return `${log}${source?.format === "traefik-json" ? ". Traefik's log cannot be rewritten, so it" : ", and it"} keeps full addresses, query strings included; Hallvi keeps only campaign tags from them.`;
+    default:
+      return source
+        ? `${log}. What it keeps of each address depends on how it was set up; Hallvi keeps only campaign tags.`
+        : `${log}.`;
+  }
+}
+
+/**
  * The hours a release's line compares, as the owner's clock reads them:
  * "15:00–17:00 against 12:00–14:00". The hour the release fell in is in
  * neither.

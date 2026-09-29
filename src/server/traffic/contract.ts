@@ -18,6 +18,17 @@ export const LOG_FORMATS = [
 export type LogFormat = (typeof LOG_FORMATS)[number];
 
 /**
+ * What the proxy removes before it writes a line, as the setup that was
+ * applied does (`traffic_setup` says which): `removed` — the query string of
+ * the address and of the referrer; `path-only` — the address's, while
+ * referrers keep theirs (Caddy 2.5); `kept` — nothing (Traefik). Hallvi drops
+ * what is left when it reads, but only the proxy decides what the server's
+ * own log holds, so the privacy line says only what the record does.
+ */
+export const LOG_QUERIES = ["removed", "path-only", "kept"] as const;
+export type LogQueries = (typeof LOG_QUERIES)[number];
+
+/**
  * The query keys Hallvi keeps. Everything else in a query string is removed
  * before the proxy writes the line (Caddy, nginx) or when it is read
  * (Traefik). An application that routes by query string may add its own page
@@ -416,8 +427,16 @@ export interface Collection {
   scriptSince: string | null;
   /** Browsers were served pages and no event arrived since this moment. */
   scriptSilentSince: string | null;
-  /** What wrote the log, in words and format, from the `access-log` record. */
-  source: { proxy: string; format: LogFormat } | null;
+  /**
+   * What wrote the log, in words and format, and what it removes before a
+   * line is written (`LogQueries`), from the `access-log` record.
+   */
+  source: {
+    proxy: string;
+    format: LogFormat;
+    /** Null when the record does not say: nothing is claimed. */
+    queries: LogQueries | null;
+  } | null;
   /** The first day with stored totals; null when nothing is stored. */
   storedFrom: string | null;
   /**
