@@ -29,6 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { TrafficLine } from "@/server/traffic/contract";
 import {
+  containerOf,
   followLogCommand,
   listLog,
   listLogCommand,
@@ -310,6 +311,33 @@ describe("the access log on the server", () => {
       "2026-09-29T00:03:00.000Z",
       "2026-09-29T06:00:00.000Z",
     ]);
+  });
+
+  it("reads a container's reach from docker's own times, and docker's refusals as words", () => {
+    // Real `docker logs --timestamps` lines from Caddy's container.
+    const lines = readFileSync(
+      new URL(
+        "../../fixtures/access-logs/caddy-2.11.4-container.log",
+        import.meta.url,
+      ),
+      "utf8",
+    ).split("\n");
+    const [file] = containerOf("shop-caddy-1", [
+      "hallvi-now 1790694200",
+      `hallvi-first ${lines[0]}`,
+      `hallvi-last ${lines[7]}`,
+    ]);
+    expect(iso(file.from)).toBe("2026-09-29T14:39:57.555Z");
+    expect(iso(file.to)).toBe("2026-09-29T15:03:21.000Z");
+    expect(
+      containerOf("shop-caddy-1", ["hallvi-now 1", "hallvi-first "]),
+    ).toEqual([]);
+    expect(() =>
+      containerOf("shop-caddy-1", [
+        "hallvi-now 1790694200",
+        "hallvi-first Error response from daemon: No such container: shop-caddy-1",
+      ]),
+    ).toThrow("No such container: shop-caddy-1");
   });
 
   it("builds every command from fixed text and closed-shape values", () => {

@@ -254,11 +254,7 @@ interface Found {
  * time between them unless one is missing between them: logrotate's numbers
  * skip one, or Caddy's next file began well after the moment it rolled.
  */
-export function filesOf(
-  path: string,
-  format: LogFormat,
-  output: string[],
-): LogFile[] {
+function filesOf(path: string, format: LogFormat, output: string[]): LogFile[] {
   const base = baseOf(path);
   let now: number | null = null;
   const found = new Map<string, Found>();
