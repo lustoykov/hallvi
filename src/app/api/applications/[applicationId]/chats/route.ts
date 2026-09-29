@@ -15,7 +15,7 @@ export async function POST(
   return handle(async () => {
     const { applicationId } = await context.params;
     const body = await parseJsonRequest(request, createChatRequestSchema);
-    const chat = createChat(applicationId, body.title);
+    const chat = await createChat(applicationId, body.title);
     return NextResponse.json(await getOperatorView(applicationId, chat.id), {
       status: 201,
     });

@@ -38,7 +38,7 @@ export default async function ApplicationPage({
       // Only the QA fixture runs under a fixture root: its repositories are
       // synthetic, so GitHub links are shown but never followed.
       demo={Boolean(process.env.HALLVI_QA_ROOT)}
-      applications={listApplications().map(
+      applications={(await listApplications()).map(
         ({ id, repositoryOwner, repositoryName }) => ({
           id,
           repositoryOwner,

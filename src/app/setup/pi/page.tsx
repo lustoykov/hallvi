@@ -21,7 +21,7 @@ export default async function PiSetupPage({
       initialStatus={initialStatus}
       // Checked against the records here, so the only thing a query string
       // can do is name a conversation that exists.
-      returnTo={setupReturnDestination(params) ?? undefined}
+      returnTo={(await setupReturnDestination(params)) ?? undefined}
     />
   );
 }

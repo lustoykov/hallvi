@@ -4,7 +4,6 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   renameSync,
   writeFileSync,
 } from "node:fs";
@@ -20,9 +19,7 @@ import { ExecutionReader } from "./execution-reader";
 
 import { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
 export { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
-import { db } from "./db";
-import { applications } from "./db-schema";
-import { eq } from "drizzle-orm";
+import { updateOperatorSettings } from "./db";
 export interface ExecutionRecord {
   id: string;
   applicationId: string;
@@ -66,29 +63,26 @@ function write(path: string, value: unknown) {
   writeFileSync(tmp, JSON.stringify(value), { mode: 0o600 });
   renameSync(tmp, path);
 }
-export function operatorSettings(applicationId: string): OperatorSettings {
-  const application = loadApplication(applicationId);
+export async function operatorSettings(
+  applicationId: string,
+): Promise<OperatorSettings> {
+  const application = await loadApplication(applicationId);
   return operatorSettingsSchema.parse({
     permissionMode: application.permissionMode,
     host: application.host,
   });
 }
-export function saveOperatorSettings(
+export async function saveOperatorSettings(
   applicationId: string,
   value: OperatorSettings,
 ) {
-  loadApplication(applicationId);
+  await loadApplication(applicationId);
   const settings = operatorSettingsSchema.parse(value);
-  db()
-    .update(applications)
-    .set({ ...settings, updatedAt: new Date().toISOString() })
-    .where(eq(applications.id, applicationId))
-    .run();
+  await updateOperatorSettings(applicationId, settings);
   return settings;
 }
-export function isMainChat(applicationId: string, chatId: string) {
-  loadChat(applicationId, chatId);
-  return loadChat(applicationId, chatId).chat.kind === "main";
+export async function isMainChat(applicationId: string, chatId: string) {
+  return (await loadChat(applicationId, chatId)).chat.kind === "main";
 }
 function executionDirectory(applicationId: string) {
   return join(directory(applicationId), "executions");
@@ -105,31 +99,11 @@ export function invalidateExecutionReads(applicationId?: string) {
   );
 }
 
-export async function listExecutions(applicationId: string) {
-  loadApplication(applicationId);
+export async function listExecutions(
+  applicationId: string,
+): Promise<ExecutionRecord[]> {
+  await loadApplication(applicationId);
   return executionReader.list(executionDirectory(applicationId));
-}
-
-// Recovery runs synchronously while worker ownership is acquired, before any
-// request can start a new command. Keep that ordering and the writer unchanged.
-function executionsForRecovery(applicationId: string): ExecutionRecord[] {
-  loadApplication(applicationId);
-  let files: string[];
-  try {
-    files = readdirSync(executionDirectory(applicationId));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
-  return files
-    .filter((name) => /^[0-9a-f-]{36}\.json$/.test(name))
-    .map((name) => {
-      return read<ExecutionRecord>(
-        join(executionDirectory(applicationId), name),
-      );
-    })
-    .filter((record): record is ExecutionRecord => record !== undefined)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 /**
  * Whether this call still waits for a person. The owner's decision is written
@@ -145,15 +119,15 @@ export function awaitingDecision(record: ExecutionRecord) {
 
 /** One execution record as the executor wrote it, or nothing. */
 export async function readExecution(applicationId: string, id: string) {
-  loadApplication(applicationId);
+  await loadApplication(applicationId);
   return executionReader.read(recordPath(applicationId, id));
 }
-export function decideExecution(
+export async function decideExecution(
   applicationId: string,
   id: string,
   approved: boolean,
 ) {
-  loadApplication(applicationId);
+  await loadApplication(applicationId);
   const record = read<ExecutionRecord>(recordPath(applicationId, id));
   if (!record || record.status !== "awaiting-approval")
     throw new Error("This request is no longer waiting for approval.");
@@ -187,11 +161,14 @@ function cleanResult<T>(value: T, clean: (text: string) => string): T {
  * What a worker that went away, or a stretch that ended, left unsettled. The
  * record says so; nothing is resumed or replayed from this log.
  */
-export function settleRunningExecutions(
+export async function settleRunningExecutions(
   applicationId: string,
   chatId: string | null,
 ) {
-  for (const record of executionsForRecovery(applicationId))
+  // The owner has stopped driving this scope. Settlement must not join a
+  // reader's older scan and overwrite a command that has since completed.
+  invalidateExecutionReads(applicationId);
+  for (const record of await listExecutions(applicationId))
     if (
       ["running", "awaiting-approval"].includes(record.status) &&
       (chatId === null || record.chatId === chatId)
@@ -230,11 +207,11 @@ export function executionContext(
       [closing, stopped].filter((each): each is AbortSignal => Boolean(each)),
     );
     signal.throwIfAborted();
-    if (!isMainChat(run.applicationId, run.chatId))
+    if (!(await isMainChat(run.applicationId, run.chatId)))
       throw new Error(
         "Side chats are read-only. Send this work to the main operator.",
       );
-    const mode = operatorSettings(run.applicationId).permissionMode;
+    const mode = (await operatorSettings(run.applicationId)).permissionMode;
     const needsApproval =
       mode === "always-ask" || (mode === "pi-decides" && ask);
     const record: ExecutionRecord = {

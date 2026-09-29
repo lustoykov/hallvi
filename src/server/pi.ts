@@ -301,7 +301,7 @@ export async function openPiSession(
     const { configuration, modelRuntime, model } =
       await configuredPiRuntime(sdk);
     options.signal?.throwIfAborted();
-    const main = isMainChat(scope.applicationId, scope.chatId);
+    const main = await isMainChat(scope.applicationId, scope.chatId);
     const execution = executionContext(scope, options.signal);
     const json = (value: unknown) => ({
       content: [{ type: "text" as const, text: JSON.stringify(value) }],
@@ -319,7 +319,7 @@ export async function openPiSession(
         }),
         async execute(_id, params) {
           return json(
-            listInformation(
+            await listInformation(
               scope.applicationId,
               params.query,
               params.includeRetired,
@@ -347,7 +347,7 @@ export async function openPiSession(
                 if (params.action === "retire") {
                   if (!params.id) throw new Error("A record ID is required.");
                   return json(
-                    retireInformation(scope.applicationId, params.id),
+                    await retireInformation(scope.applicationId, params.id),
                   );
                 }
                 const record = await saveInformation(
@@ -367,9 +367,9 @@ export async function openPiSession(
           "Read application identity, host address, permission mode and recent execution evidence. Does not check live health.",
         parameters: Type.Object({}, { additionalProperties: false }),
         async execute() {
-          const settings = operatorSettings(scope.applicationId);
-          const application = loadApplication(scope.applicationId);
-          const access = repositoryAccess(application);
+          const settings = await operatorSettings(scope.applicationId);
+          const application = await loadApplication(scope.applicationId);
+          const access = await repositoryAccess(application);
           return json({
             application: {
               id: application.id,
@@ -572,7 +572,7 @@ export async function openPiSession(
               // not data. Refuse it here, before the record is written, with
               // a message saying what to do instead.
               refuseSecretHandles(params.command);
-              const host = operatorSettings(scope.applicationId).host;
+              const host = (await operatorSettings(scope.applicationId)).host;
               if (!host)
                 throw new Error(
                   "No server is connected. Inspect the repository, prepare a suitable Hetzner server or obtain existing-machine access, then use connect_server and continue with the deployment.",
@@ -618,7 +618,7 @@ export async function openPiSession(
               ]),
             }),
             async execute(_id, params) {
-              const host = operatorSettings(scope.applicationId).host;
+              const host = (await operatorSettings(scope.applicationId)).host;
               if (host)
                 return json({
                   attached: true,
@@ -640,7 +640,7 @@ export async function openPiSession(
               "Ask the owner how this application should deploy from now on, during its first deployment. It puts one card in the conversation: automatically when the branch changes, or only when they ask, with the branch editable and what automatic authorizes spelled out. `branch` is the repository's default branch unless the owner already named another. Then end your turn: a message arrives with their choice. If they have already chosen, nothing is asked and the current configuration comes back.",
             parameters: Type.Object({ branch: Type.String() }),
             async execute(_id, params) {
-              const before = deploymentStatus(scope.applicationId);
+              const before = await deploymentStatus(scope.applicationId);
               if (before.mode)
                 return json({
                   asked: false,
@@ -670,7 +670,7 @@ export async function openPiSession(
             async execute(_id, params, signal) {
               if (Object.values(params).some((value) => value !== undefined))
                 await chooseDeployment(scope.applicationId, params, signal);
-              return json(deploymentStatus(scope.applicationId));
+              return json(await deploymentStatus(scope.applicationId));
             },
           }),
           defineTool({

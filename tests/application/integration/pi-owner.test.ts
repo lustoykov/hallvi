@@ -316,7 +316,8 @@ async function loseWorker() {
 }
 
 beforeEach(async () => {
-  store.db().$client.exec("DELETE FROM applications");
+  for (const application of await store.listApplications())
+    await store.deleteApplication(application.id);
   requests = [];
   contextUsed = 10;
   synthetic.authFails = false;
@@ -326,28 +327,27 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   synthetic.release?.();
-  for (const { id } of store.listApplications())
-    for (const chat of store.listApplicationChats(id))
+  for (const { id } of await store.listApplications())
+    for (const chat of await store.listApplicationChats(id))
       await stopConversation(id, chat.id).catch(() => undefined);
   await loseWorker();
 });
-afterAll(() => {
-  globalThis.__hallviDb?.$client.close();
-  delete globalThis.__hallviDb;
+afterAll(async () => {
+  await store.closeDatabase();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
 
-function application(name: string, address?: string) {
-  const app = store.insertApplication({
+async function application(name: string, address?: string) {
+  const app = await store.insertApplication({
     name,
     repositoryUrl: `https://github.com/test/${name}`,
     repositoryOwner: "test",
     repositoryName: name,
   });
-  const main = store.insertChat(app.id, "Main operator");
+  const main = await store.insertChat(app.id, "Main operator");
   if (address)
-    saveOperatorSettings(app.id, {
+    await saveOperatorSettings(app.id, {
       permissionMode: "pi-decides",
       host: {
         address,
@@ -377,7 +377,7 @@ function application(name: string, address?: string) {
   return {
     id: app.id,
     ...conversation(main.id),
-    side: () => conversation(store.insertChat(app.id, "Side").id),
+    side: async () => conversation((await store.insertChat(app.id, "Side")).id),
   };
 }
 
@@ -400,7 +400,7 @@ const outcome = (app: { id: string; chat: string }, key: string) =>
   requestOutcome(app.id, app.chat, key);
 
 it("accepts nothing while no worker answers, and the same send succeeds once when one does", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await loseWorker();
   const key = randomUUID();
   await expect(a.send("deploy it", "next", key)).rejects.toBeInstanceOf(
@@ -420,7 +420,7 @@ it("accepts nothing while no worker answers, and the same send succeeds once whe
 });
 
 it("a send repeated after a lost answer is one instruction, read once", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   const first = randomUUID();
   await a.send("[approve] restart it", "next", first);
   await a.send("[approve] restart it", "next", first);
@@ -432,7 +432,7 @@ it("a send repeated after a lost answer is one instruction, read once", async ()
   await a.send("and then check it", "next", next);
   expect((await a.transcript()).at(-1)).toBe("you [waiting] and then check it");
 
-  decideExecution(a.id, (await approval(a.id))!.id, true);
+  await decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   // And once it has been read: Pi's history still has it.
   await a.send("and then check it", "next", next);
@@ -445,7 +445,7 @@ it("a send repeated after a lost answer is one instruction, read once", async ()
 });
 
 it("hands Pi the images a message carries, and reads them back by message", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   const image = (text: string) => ({
     mimeType: "image/png",
     data: Buffer.from(text).toString("base64"),
@@ -486,8 +486,8 @@ it("hands Pi the images a message carries, and reads them back by message", asyn
 });
 
 it("asks before it executes, places the evidence in Pi's transcript, and runs two applications on one server at once", async () => {
-  const a = application("shop", "203.0.113.7");
-  const b = application("blog", "203.0.113.7");
+  const a = await application("shop", "203.0.113.7");
+  const b = await application("blog", "203.0.113.7");
   await a.send("[approve] restart it");
   await until(async () => expect(await approval(a.id)).toBeTruthy());
   expect(await a.status()).toBe("working");
@@ -495,7 +495,7 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
   // Another application on the same server, and a read-only conversation of
   // the same application, answer while the main one waits for its owner.
   await b.send("how is it going?");
-  const side = a.side();
+  const side = await a.side();
   await side.send("what is running?");
   await until(async () => expect(await b.status()).toBe("idle"));
   await until(async () => expect(await side.status()).toBe("idle"));
@@ -509,7 +509,7 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
   ]);
   expect(await approval(a.id)).toMatchObject({ tool: "request_approval" });
 
-  decideExecution(a.id, (await approval(a.id))!.id, true);
+  await decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   const snapshot = await a.snapshot();
   const reply = snapshot.messages.at(-1)!;
@@ -538,7 +538,7 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
 });
 
 it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("[approve] restart it");
   await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.send("then check the logs");
@@ -548,7 +548,7 @@ it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", asy
     { status: "waiting", delivery: "steer", body: "use the staging server" },
   ]);
 
-  decideExecution(a.id, (await approval(a.id))!.id, true);
+  await decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   expect(await a.transcript()).toEqual([
     "you [delivered] [approve] restart it",
@@ -561,8 +561,8 @@ it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", asy
 });
 
 it("a request's outcome is the operation Pi read it in: what Pi read together shares one result, and later work stays out", async () => {
-  const a = application("shop");
-  const b = application("blog");
+  const a = await application("shop");
+  const b = await application("blog");
   const [first, second, third, later] = [0, 1, 2, 3].map(() => randomUUID());
   await sendChatMessage(
     a.id,
@@ -589,7 +589,7 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
   // Another application's work, at the same time.
   await b.send("how is it going?");
 
-  decideExecution(a.id, (await approval(a.id))!.id, true);
+  await decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   await until(async () => expect(await b.status()).toBe("idle"));
   // Pi read both follow-ups inside the operation it was already running, so
@@ -636,7 +636,7 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
 });
 
 it("waits for input only on the card its own operation asked for", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   const [first, second] = [randomUUID(), randomUUID()];
   await a.send("[dns] publish it", "next", first);
   await until(async () => expect(await a.status()).toBe("idle"));
@@ -663,7 +663,7 @@ it("waits for input only on the card its own operation asked for", async () => {
 });
 
 it("Stop ends an approval wait and a streaming answer, drops what waited, and says what is true", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   const stopped = randomUUID();
   const dropped = randomUUID();
   await a.send("[approve] restart it", "next", stopped);
@@ -705,7 +705,7 @@ it("Stop ends an approval wait and a streaming answer, drops what waited, and sa
 });
 
 it("after a restart nothing runs; history and evidence stay; Continue carries on without repeating, and a new question is refused until then", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   const first = randomUUID();
   const waiting = randomUUID();
   await a.send("[approve] restart it", "next", first);
@@ -765,7 +765,7 @@ it("after a restart nothing runs; history and evidence stay; Continue carries on
 });
 
 it("after a restart Stop is there with nothing queued, and ends what Pi held", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("[approve] restart it");
   await until(async () => expect(await approval(a.id)).toBeTruthy());
   await loseWorker();
@@ -784,7 +784,7 @@ it("after a restart Stop is there with nothing queued, and ends what Pi held", a
 });
 
 it("a message Pi queued on an idle lane is read from Pi's queue, once, when its owner continues", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("hello");
   await until(async () => expect(await a.status()).toBe("idle"));
   // What a worker leaves when it dies in the instant after Pi finished and
@@ -826,7 +826,7 @@ it("a message Pi queued on an idle lane is read from Pi's queue, once, when its 
 });
 
 it("leaves retrying, compaction and failure to Pi, and gives the page advice instead of the provider's words", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("[flaky] first");
   await until(async () => expect(await a.status()).toBe("idle"));
   expect((await a.transcript()).at(-1)).toBe(
@@ -857,7 +857,7 @@ it("leaves retrying, compaction and failure to Pi, and gives the page advice ins
 });
 
 it("Stop after continuing an idle lane's queue says stopped, from the result of the operation Pi read the queue in", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("hello");
   await until(async () => expect(await a.status()).toBe("idle"));
   await loseWorker();
@@ -901,7 +901,7 @@ it("Stop after continuing an idle lane's queue says stopped, from the result of 
 });
 
 it("a second worker steps aside without touching what the first is doing", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("[approve] restart it");
   await until(async () => expect(await approval(a.id)).toBeTruthy());
   const waiting = (await approval(a.id))!.id;
@@ -911,7 +911,7 @@ it("a second worker steps aside without touching what the first is doing", async
   expect((await approval(a.id))?.id).toBe(waiting);
   expect((await a.snapshot()).worker).toEqual({ alive: true });
 
-  decideExecution(a.id, waiting, true);
+  await decideExecution(a.id, waiting, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   expect((await a.transcript()).at(-1)).toBe("pi [completed] finished");
 });
@@ -919,8 +919,8 @@ it("a second worker steps aside without touching what the first is doing", async
 it.each([false, true])(
   "stays the owner until every session cleanup settles (one fails: %s)",
   async (failCleanup) => {
-    const a = application("shop");
-    const b = application("notes");
+    const a = await application("shop");
+    const b = await application("notes");
     // Both conversations are open because Pi is holding work in them:
     // reading one opens nothing.
     await a.send("[approve] restart it");
@@ -1033,7 +1033,7 @@ it("of workers starting in the same instant over a dead worker's socket, exactly
 }, 120_000);
 
 it("a call the worker never finished reads as interrupted, from Pi's own history", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   synthetic.hanging = true;
   await a.send("[domain] check the name");
   await until(() => expect(synthetic.release).toBeTruthy());
@@ -1058,7 +1058,7 @@ it("a call the worker never finished reads as interrupted, from Pi's own history
 });
 
 it("reads a conversation nobody is running without asking the model provider", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("[domain] check the name");
   await until(async () => expect(await a.status()).toBe("idle"));
   await loseWorker();
@@ -1082,7 +1082,7 @@ it("reads a conversation nobody is running without asking the model provider", a
 });
 
 it("keeps an older stopped reply stopped, and its calls with it, after a later turn", async () => {
-  const a = application("shop");
+  const a = await application("shop");
   await a.send("[approve] restart it");
   await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.stop();
@@ -1115,7 +1115,7 @@ it("keeps an older stopped reply stopped, and its calls with it, after a later t
 });
 
 it("an update's hold stops new work, counts an approval wait as work, and lets go", async () => {
-  const a = application("shop", "203.0.113.7");
+  const a = await application("shop", "203.0.113.7");
   const hold = (minutes?: number) =>
     askWorker<{ held: boolean; busy: number }>("hold", {
       message: minutes === undefined ? {} : { minutes },
@@ -1139,7 +1139,7 @@ it("an update's hold stops new work, counts an approval wait as work, and lets g
   expect(await hold()).toMatchObject({ busy: 1 });
   await release();
 
-  decideExecution(a.id, (await approval(a.id))!.id, true);
+  await decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   expect(await hold()).toMatchObject({ busy: 0 });
   await release();
@@ -1152,7 +1152,7 @@ it("an update's hold stops new work, counts an approval wait as work, and lets g
 });
 
 it("a deployment wakeup cannot queue behind an owner message that is still opening", async () => {
-  const app = application("wakeup-race");
+  const app = await application("wakeup-race");
   const outcomes = await Promise.allSettled([
     worker!.owner.handle("send", {
       scope: { applicationId: app.id, chatId: app.chat },

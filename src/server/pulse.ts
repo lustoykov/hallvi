@@ -35,7 +35,7 @@ export function serverBeat(applicationId: string): Promise<Beat> {
 
 async function ask(applicationId: string): Promise<Beat> {
   try {
-    const host = operatorSettings(applicationId).host;
+    const host = (await operatorSettings(applicationId)).host;
     if (!host) return "unknown";
     const { exitCode } = await runHostCommand(
       host,

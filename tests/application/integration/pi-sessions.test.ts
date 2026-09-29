@@ -4,7 +4,6 @@ import {
 } from "@earendil-works/pi-agent-core";
 import { createModels } from "@earendil-works/pi-ai";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { eq } from "drizzle-orm";
 import {
   existsSync,
   mkdirSync,
@@ -19,7 +18,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
-import { chats } from "../../../src/server/db-schema";
 import {
   openNativeChatSession,
   removeNativeSessions,
@@ -32,30 +30,28 @@ let chatId: string;
 let otherChatId: string;
 const pathFor = (chat = chatId) =>
   join(root, "pi-sessions", applicationId, `${chat}.jsonl`);
-const association = () =>
-  store.db().select().from(chats).where(eq(chats.id, chatId)).get()!
-    .nativeSessionId;
+const association = async () => (await store.getChat(chatId))!.nativeSessionId;
 
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hallvi-native-sessions-"));
   vi.stubEnv("HALLVI_DB_PATH", join(root, "test.db"));
   pushTestDatabase(store.databasePath());
 });
-beforeEach(() => {
-  store.db().$client.exec("DELETE FROM applications");
-  const application = store.insertApplication({
+beforeEach(async () => {
+  for (const application of await store.listApplications())
+    await store.deleteApplication(application.id);
+  const application = await store.insertApplication({
     name: "test",
     repositoryUrl: "https://github.com/qa/test",
     repositoryOwner: "qa",
     repositoryName: "test",
   });
   applicationId = application.id;
-  chatId = store.insertChat(applicationId, "Main").id;
-  otherChatId = store.insertChat(applicationId, "Other").id;
+  chatId = (await store.insertChat(applicationId, "Main")).id;
+  otherChatId = (await store.insertChat(applicationId, "Other")).id;
 });
-afterAll(() => {
-  globalThis.__hallviDb?.$client.close();
-  delete globalThis.__hallviDb;
+afterAll(async () => {
+  await store.closeDatabase();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
@@ -75,11 +71,10 @@ it("keeps one private history per conversation, tied to its chat, and reopens it
   const first = await openNativeChatSession(applicationId, chatId);
   const id = first.session.metadata.id;
   await first.release();
-  expect(association()).toBe(id);
+  expect(await association()).toBe(id);
   const [file] = historyFiles();
   expect(statSync(file).mode & 0o077).toBe(0);
-  globalThis.__hallviDb?.$client.close();
-  delete globalThis.__hallviDb;
+  await store.closeDatabase();
   const reopened = await openNativeChatSession(applicationId, chatId);
   expect(reopened.session.metadata.id).toBe(id);
   await reopened.release();
@@ -151,12 +146,7 @@ it("opens a history written before the upgrade through Pi's own repository, and 
   });
   earlier.appendCompaction("Deployed the application.", kept, 1_000);
   earlier.appendMessage(assistant([{ type: "text", text: "It is up." }]));
-  store
-    .db()
-    .update(chats)
-    .set({ nativeSessionId: earlier.getSessionId() })
-    .where(eq(chats.id, chatId))
-    .run();
+  await store.setNativeSessionId(chatId, earlier.getSessionId());
   const original = readFileSync(pathFor());
 
   const opened = await openNativeChatSession(applicationId, chatId);

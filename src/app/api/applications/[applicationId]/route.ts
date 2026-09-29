@@ -51,6 +51,6 @@ export async function PATCH(
       z.strictObject({ name: z.string().trim().min(1).max(120) }),
     );
     const { applicationId } = await context.params;
-    return { application: renameApplication(applicationId, name) };
+    return { application: await renameApplication(applicationId, name) };
   });
 }

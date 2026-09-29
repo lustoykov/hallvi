@@ -123,14 +123,17 @@ const firstLine = (text: string) => {
  * The applications, as the home page lists them, with where work is sent and
  * which permission mode it will meet.
  */
-export function applicationSummaries() {
-  return listApplicationItems().map((item) => ({
-    ...item,
-    permissionMode: loadApplication(item.id).permissionMode ?? null,
-    mainChatId:
-      listApplicationChats(item.id).find((chat) => chat.kind === "main")?.id ??
-      null,
-  }));
+export async function applicationSummaries() {
+  return Promise.all(
+    (await listApplicationItems()).map(async (item) => ({
+      ...item,
+      permissionMode: (await loadApplication(item.id)).permissionMode ?? null,
+      mainChatId:
+        (await listApplicationChats(item.id)).find(
+          (chat) => chat.kind === "main",
+        )?.id ?? null,
+    })),
+  );
 }
 
 /** One call that asked the owner for something, and when it returned. */
@@ -152,7 +155,7 @@ interface Asking {
  * after the call returned belongs to later work, so an answered question never
  * reopens because somebody asked a new one.
  */
-function openInputs(applicationId: string, asked?: Asking[]) {
+async function openInputs(applicationId: string, asked?: Asking[]) {
   const askedFor = (tool: string, openedAt: string | null, name?: string) =>
     !asked ||
     (openedAt !== null &&
@@ -181,7 +184,7 @@ function openInputs(applicationId: string, asked?: Asking[]) {
         `How to reach the DNS of ${request.progress.name || "the domain"}.`,
       );
   }
-  const deployment = deploymentStatus(applicationId);
+  const deployment = await deploymentStatus(applicationId);
   if (
     deployment.askedAt &&
     !deployment.mode &&
@@ -307,7 +310,7 @@ export async function requestOutcome(
         executionId: asking.executionId ?? undefined,
       };
   } else if (operation.status === "completed") {
-    const open = openInputs(
+    const open = await openInputs(
       applicationId,
       calls.map((call) => {
         const name = (
@@ -372,9 +375,9 @@ export type RequestOutcome = Awaited<ReturnType<typeof requestOutcome>>;
  * Pi presented and the latest executions.
  */
 export async function inspectApplication(applicationId: string) {
-  const application = loadApplication(applicationId);
-  const records = listInformation(applicationId);
-  const chats = listApplicationChats(applicationId);
+  const application = await loadApplication(applicationId);
+  const records = await listInformation(applicationId);
+  const chats = await listApplicationChats(applicationId);
   const main = chats.find((chat) => chat.kind === "main") ?? null;
   // Without a worker the conversation's state is not known, and is said so
   // rather than read as idle.
@@ -397,7 +400,7 @@ export async function inspectApplication(applicationId: string) {
       page,
       executionId: record.id,
     })),
-    ...openInputs(applicationId).map((reason) => ({
+    ...(await openInputs(applicationId)).map((reason) => ({
       kind: "input" as const,
       reason,
       page,
@@ -406,7 +409,7 @@ export async function inspectApplication(applicationId: string) {
       ? [{ kind: "interrupted" as const, reason: INTERRUPTED, page }]
       : []),
   ];
-  const deployment = deploymentStatus(applicationId);
+  const deployment = await deploymentStatus(applicationId);
   const presented = records.filter((record) => record.presentation);
   const host = application.host;
   return {

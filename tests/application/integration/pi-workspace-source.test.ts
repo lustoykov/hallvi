@@ -37,27 +37,29 @@ beforeAll(() => {
   vi.stubEnv("HALLVI_CONFIG_DIR", join(root, "config"));
   pushTestDatabase(process.env.HALLVI_DB_PATH!);
 });
-beforeEach(() => {
-  store.db().$client.exec("DELETE FROM applications");
-  app = store.insertApplication({
-    name: "source",
-    repositoryUrl: "https://github.com/qa/source",
-    repositoryOwner: "qa",
-    repositoryName: "source",
-  }).id;
+beforeEach(async () => {
+  for (const application of await store.listApplications())
+    await store.deleteApplication(application.id);
+  app = (
+    await store.insertApplication({
+      name: "source",
+      repositoryUrl: "https://github.com/qa/source",
+      repositoryOwner: "qa",
+      repositoryName: "source",
+    })
+  ).id;
   github.repositoryId = 10;
 });
-afterAll(() => {
-  globalThis.__hallviDb?.$client.close();
-  delete globalThis.__hallviDb;
+afterAll(async () => {
+  await store.closeDatabase();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
-const check = (
+const check = async (
   status: "passed" | "failed" | "unavailable",
   raw: Record<string, unknown>,
 ) =>
-  store.insertObservation({
+  await store.insertObservation({
     applicationId: app,
     kind: "github-repository-identity",
     status,
@@ -68,8 +70,8 @@ const check = (
   });
 
 it("keeps the identity a successful check pinned after a later check could not record one", async () => {
-  check("passed", { connectionId: "connection", repositoryId: 10 });
-  check("unavailable", { connectionId: "connection", error: "timeout" });
+  await check("passed", { connectionId: "connection", repositoryId: 10 });
+  await check("unavailable", { connectionId: "connection", error: "timeout" });
   await expect(applicationWorkspaceSource(app)).resolves.toMatchObject({
     description: expect.stringContaining(`qa/source@${"c".repeat(40)}`),
   });
@@ -81,7 +83,7 @@ it("keeps the identity a successful check pinned after a later check could not r
 });
 
 it("reads the default branch before any successful check has pinned an identity", async () => {
-  check("failed", { connectionId: "connection" });
+  await check("failed", { connectionId: "connection" });
   github.repositoryId = 11;
   await expect(applicationWorkspaceSource(app)).resolves.toMatchObject({
     files: [],

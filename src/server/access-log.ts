@@ -35,8 +35,10 @@ export interface AccessLine {
 }
 
 /** Where the newest current record says the log is, if any record does. */
-export function accessLogSource(applicationId: string): AccessLogSource | null {
-  for (const record of listInformation(applicationId)) {
+export async function accessLogSource(
+  applicationId: string,
+): Promise<AccessLogSource | null> {
+  for (const record of await listInformation(applicationId)) {
     const content = record.presentation?.content;
     if (content?.kind === "access-log") return content.source;
   }

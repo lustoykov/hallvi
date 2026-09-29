@@ -31,9 +31,8 @@ vi.mock("../../../src/server/github", async (original) => ({
 let root: string;
 let app: string;
 let chat: string;
-function reopen() {
-  store.db().$client.close();
-  delete globalThis.__hallviDb;
+async function reopen() {
+  await store.closeDatabase();
 }
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hv-storage-"));
@@ -42,24 +41,25 @@ beforeAll(() => {
   pushTestDatabase(process.env.HALLVI_DB_PATH!);
 });
 beforeEach(async () => {
-  store.db().$client.exec("DELETE FROM applications");
+  for (const application of await store.listApplications())
+    await store.deleteApplication(application.id);
   app = (
     await createApplication({ repositoryUrl: "https://github.com/example/app" })
   ).application.id;
-  chat = store.listApplicationChats(app)[0].id;
+  chat = (await store.listApplicationChats(app))[0].id;
 });
-afterAll(() => {
-  reopen();
+afterAll(async () => {
+  await reopen();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
-it("loads creation and settings after reopening the database", () => {
-  expect(store.getApplication(app)?.repositoryId).toBe(123);
-  expect(store.getChat(chat)?.kind).toBe("main");
-  expect(operatorSettings(app).permissionMode).toBe("pi-decides");
-  saveOperatorSettings(app, { permissionMode: "always-ask", host: null });
-  reopen();
-  expect(operatorSettings(app).permissionMode).toBe("always-ask");
+it("loads creation and settings after reopening the database", async () => {
+  expect((await store.getApplication(app))?.repositoryId).toBe(123);
+  expect((await store.getChat(chat))?.kind).toBe("main");
+  expect((await operatorSettings(app)).permissionMode).toBe("pi-decides");
+  await saveOperatorSettings(app, { permissionMode: "always-ask", host: null });
+  await reopen();
+  expect((await operatorSettings(app)).permissionMode).toBe("always-ask");
 });
 it("shares one outcome between views while keeping working knowledge unsurfaced", async () => {
   const hidden = await saveInformation(app, {
@@ -88,10 +88,10 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
       ],
     },
   });
-  reopen();
+  await reopen();
   const view = await getOperatorView(app, chat);
   expect(view.information?.map((r) => r.id)).toEqual([record.id]);
-  expect(listInformation(app, "lockfile").map((r) => r.id)).toEqual([
+  expect((await listInformation(app, "lockfile")).map((r) => r.id)).toEqual([
     hidden.id,
   ]);
   await saveInformation(
@@ -99,9 +99,9 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
     { title: hidden.title, body: "Use npm ci." },
     hidden.id,
   );
-  expect(listInformation(app, "npm ci")).toHaveLength(1);
-  retireInformation(app, record.id);
-  expect(listInformation(app).map((r) => r.id)).toEqual([hidden.id]);
+  expect(await listInformation(app, "npm ci")).toHaveLength(1);
+  await retireInformation(app, record.id);
+  expect((await listInformation(app)).map((r) => r.id)).toEqual([hidden.id]);
   expect(
     (await getOperatorView(app, chat)).information?.[0].retiredAt,
   ).toBeTruthy();
@@ -114,7 +114,7 @@ it("tells an author who invented an ID what to do instead, and never touches ano
   await expect(
     saveInformation(app, { title: "Deployed", body: "It runs." }, invented),
   ).rejects.toThrow(/Omit id to create a record/);
-  expect(listInformation(app)).toHaveLength(0);
+  expect(await listInformation(app)).toHaveLength(0);
 
   // Creating without an ID works and hands back the ID to update with.
   const created = await saveInformation(app, {
@@ -126,7 +126,7 @@ it("tells an author who invented an ID what to do instead, and never touches ano
     { title: "Deployed", body: "It runs, and the data survived." },
     created.id,
   );
-  const records = listInformation(app);
+  const records = await listInformation(app);
   expect(records).toHaveLength(1);
   expect(records[0].body).toBe("It runs, and the data survived.");
 
@@ -144,8 +144,10 @@ it("tells an author who invented an ID what to do instead, and never touches ano
       created.id,
     ),
   ).rejects.toThrow(/Omit id to create a record/);
-  expect(listInformation(other)).toHaveLength(0);
-  expect(listInformation(app)[0].body).toBe("It runs, and the data survived.");
+  expect(await listInformation(other)).toHaveLength(0);
+  expect((await listInformation(app))[0].body).toBe(
+    "It runs, and the data survived.",
+  );
 });
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
   await saveInformation(app, { title: "Note", body: "Saved" });
@@ -153,21 +155,20 @@ it("removal goes through the worker that owns the histories, and cascades only a
   await expect(removeApplication(app, "example/app")).rejects.toThrow(
     /worker is not running/,
   );
-  expect(store.getApplication(app)).toBeTruthy();
+  expect(await store.getApplication(app)).toBeTruthy();
   const worker = (await ownSessions())!;
   try {
     await removeApplication(app, "example/app");
   } finally {
     await worker.close();
   }
-  for (const table of ["applications", "conversations", "saved_information"])
-    expect(
-      store.db().$client.prepare(`SELECT count(*) AS n FROM ${table}`).get(),
-    ).toEqual({ n: 0 });
+  expect(await store.listApplications()).toEqual([]);
+  expect(await store.listApplicationChats(app)).toEqual([]);
+  expect(await listInformation(app, "", true)).toEqual([]);
 });
 
 it("persists typed deployment/access facts and shares edits without duplicating records", async () => {
-  const deployment = await saveInformation(app, {
+  const deployment = (await saveInformation(app, {
     title: "Application deployed",
     body: "The deployment is recorded.",
     presentation: {
@@ -192,8 +193,8 @@ it("persists typed deployment/access facts and shares edits without duplicating 
         changes: ["Added container packaging"],
       },
     },
-  })!;
-  const access = await saveInformation(app, {
+  }))!;
+  const access = (await saveInformation(app, {
     title: "Private access ready",
     body: "Open on the controller PC.",
     presentation: {
@@ -208,16 +209,16 @@ it("persists typed deployment/access facts and shares edits without duplicating 
         remotePort: 80,
       },
     },
-  })!;
+  }))!;
   expect(
-    listInformation(app).find((r) => r.id === deployment.id)?.presentation
-      ?.content,
+    (await listInformation(app)).find((r) => r.id === deployment.id)
+      ?.presentation?.content,
   ).toMatchObject({ kind: "deployment", image: "app:candidate" });
   // What the check was about survives the round trip, which is what places
   // it on a lane; `subject` used to carry this and named a column instead.
   expect(
-    listInformation(app).find((r) => r.id === deployment.id)?.presentation
-      ?.checks[0].about,
+    (await listInformation(app)).find((r) => r.id === deployment.id)
+      ?.presentation?.checks[0].about,
   ).toEqual({ kind: "application", id: "qa-app" });
   await saveInformation(
     app,
@@ -238,12 +239,13 @@ it("persists typed deployment/access facts and shares edits without duplicating 
     access.id,
   );
   expect(
-    listInformation(app).filter(
+    (await listInformation(app)).filter(
       (r) => r.presentation?.content?.kind === "application-access",
     ),
   ).toHaveLength(1);
   expect(
-    listInformation(app).find((r) => r.id === access.id)?.presentation?.url,
+    (await listInformation(app)).find((r) => r.id === access.id)?.presentation
+      ?.url,
   ).toBe("http://127.0.0.1:8081");
 });
 
@@ -286,5 +288,5 @@ it("rejects malformed typed records before saving them", async () => {
       },
     }),
   ).rejects.toThrow();
-  expect(listInformation(app)).toHaveLength(0);
+  expect(await listInformation(app)).toHaveLength(0);
 });

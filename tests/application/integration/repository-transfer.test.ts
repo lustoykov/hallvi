@@ -50,20 +50,20 @@ let chatId: string;
 let tip = "a".repeat(40);
 const staged: string[] = [];
 const binary = Buffer.from([0, 255, 1, 129]);
-beforeAll(() => {
+beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), "hallvi-source-test-"));
   vi.stubEnv("HALLVI_DB_PATH", join(root, "test.db"));
   vi.stubEnv("HALLVI_CONFIG_DIR", join(root, "config"));
   pushTestDatabase(process.env.HALLVI_DB_PATH!);
-  const app = store.insertApplication({
+  const app = await store.insertApplication({
     name: "Private app",
     repositoryUrl: "https://github.com/qa/private",
     repositoryOwner: "qa",
     repositoryName: "private",
   });
   applicationId = app.id;
-  chatId = store.insertChat(app.id, "Main operator").id;
-  saveOperatorSettings(app.id, {
+  chatId = (await store.insertChat(app.id, "Main operator")).id;
+  await saveOperatorSettings(app.id, {
     permissionMode: "bypass",
     host: {
       address: "fixture.invalid",
@@ -101,10 +101,9 @@ beforeAll(() => {
     );
   });
 });
-afterAll(() => {
+afterAll(async () => {
   for (const path of staged) rmSync(path, { recursive: true, force: true });
-  globalThis.__hallviDb?.$client.close();
-  delete globalThis.__hallviDb;
+  await store.closeDatabase();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });

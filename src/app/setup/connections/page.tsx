@@ -29,7 +29,8 @@ export default async function ConnectionsPage({
     chat?: string | string[];
   }>;
 }) {
-  const returnTo = setupReturnDestination(await searchParams) ?? undefined;
+  const returnTo =
+    (await setupReturnDestination(await searchParams)) ?? undefined;
   const cloudflare = await verifyCloudflare();
   // Listing buckets proves the token manages R2. It proves nothing about
   // being able to put an object in one, which is a separate credential, and
@@ -78,7 +79,10 @@ export default async function ConnectionsPage({
         // What the owner saved for backups, Hallvi's own copies included.
         storage: backupDestination(),
         uploadGaps: r2UploadGaps(),
-        applications: listApplications().map(({ id, name }) => ({ id, name })),
+        applications: (await listApplications()).map(({ id, name }) => ({
+          id,
+          name,
+        })),
       })}
     />
   );
