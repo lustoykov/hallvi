@@ -443,25 +443,44 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       }
       if (
         request.method === "GET" &&
-        ["/guide", "/feedback"].includes(url.pathname)
+        ["/guide", "/feedback", "/features"].includes(url.pathname)
       ) {
         const feedback = url.pathname === "/feedback";
-        const path = feedback ? "AGENT_FEEDBACK.md" : "tests/acceptance.md";
-        const title = feedback ? "Agent feedback" : "Acceptance guide";
+        const features = url.pathname === "/features";
+        const repositoryDocument = feedback || features;
+        const path = feedback
+          ? "AGENT_FEEDBACK.md"
+          : features
+            ? "AGENT_FEATURES.md"
+            : "tests/acceptance.md";
+        const title = feedback
+          ? "Agent feedback"
+          : features
+            ? "Agent features"
+            : "Acceptance guide";
         response.setHeader("Content-Type", "text/html; charset=utf-8");
         let body: string;
         try {
           body = renderMarkdown(
             readFileSync(join(root, path), "utf8"),
-            feedback
+            repositoryDocument
               ? `https://github.com/${REPOSITORY}/blob/main/`
               : undefined,
           );
-          if (feedback)
+          if (repositoryDocument) {
+            // Agent documents keep closed entries in a final Archive section.
+            body = body.replace(
+              /<h2 id="archive">Archive<\/h2>([\s\S]*)$/,
+              (_section, archive: string) => {
+                const count = (archive.match(/<h3\b/g) ?? []).length;
+                return `<details class="document-archive" id="archive"><summary>Archive (${count})</summary>${archive}</details>`;
+              },
+            );
             body = body.replace(
               "</h1>",
-              '</h1><p class="footnote">Read-only view of <code>AGENT_FEEDBACK.md</code> in this checkout. Reload to see local edits. Feedback is shared between worktrees through merges; repository links open GitHub main.</p>',
+              `</h1><p class="footnote">Read-only view of <code>${path}</code> in this checkout. Reload to see local edits. Changes are shared between worktrees through merges; repository links open GitHub main.</p>`,
             );
+          }
         } catch (error) {
           const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
           response.statusCode = missing ? 404 : 500;

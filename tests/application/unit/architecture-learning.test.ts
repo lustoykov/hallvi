@@ -64,6 +64,7 @@ function commit(root: string) {
   }).trim();
 }
 
+// This exercises several real Git snapshots and publications, not a latency budget.
 it("publishes scheduled reviews of merged main while preserving unchanged progress and obsolete history", () => {
   const root = fixture();
   const initialRevision = commit(root);
@@ -183,7 +184,7 @@ it("publishes scheduled reviews of merged main while preserving unchanged progre
     expect(createLearning(root).state().sourceVersion).toBe(catalogVersion);
     expect(createLearning(root).state().history).toEqual(changed.history);
   }
-});
+}, 15_000);
 
 it("rejects overlapping stale reviews and publishing into a different progress store", () => {
   const root = fixture();

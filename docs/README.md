@@ -16,6 +16,8 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Beta precautions](beta-safety.md) | Practical risks and safeguards for the current alpha when granting server and repository access. |
 | [Development setup](development.md) | Run a checkout locally, open its paired dashboard and database viewer, inspect diagnostics and choose proportionate checks. |
 | [Verification workflow](verification.md) | The shared repository skill's executable path from environment selection through CLI evidence, useful behavior and task-owned cleanup. |
+| [Agent feedback](../AGENT_FEEDBACK.md) | Bugs, friction and wishes captured during ordinary development, with no research prerequisite. |
+| [Agent features](../AGENT_FEATURES.md) | Researched product proposals, the discovery workflow and owner-selected assignments. |
 | [Publishing a release](releases.md) | The maintainer's side: the signed release manifest and what trusts it, the one secret the owner supplies, and the version → build → verify → publish → discover sequence. |
 | [Changelog](../CHANGELOG.md) | What changed in each release, newest first. Installations show it under What's new, and each release's GitHub notes come from it. |
 | [Beta walkthrough](beta-walkthrough.md) | Fresh-user acceptance: install the exact candidate, inspect a repository, connect a test server, use the app and return after restart. |
