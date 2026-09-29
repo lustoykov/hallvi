@@ -69,6 +69,15 @@ If there are no material findings, say so directly.
 
 ## Verification proportional to risk
 
+Check meaningful use of [verify-hallvi](.agents/skills/verify-hallvi/SKILL.md)
+through the selected environment, actual behavior/evidence and stated limits
+in the PR's existing verification section. A declaration that the skill was
+used is not evidence. If the task exposed inaccurate instructions, broken
+examples, missing steps or recurring friction, expect a narrow validated
+correction under [AGENTS.md](AGENTS.md); do not demand edits to guidance that
+worked. Larger proposals stay in agent feedback for owner decision. This
+adds neither a reporting checklist nor a mandatory live-model run.
+
 Choose verification by consequences, blast radius and complexity, not diff
 size. A one-line permission change can need more proof than a large styling
 change. Briefly explain the risk and point reviewers at consequential decisions.

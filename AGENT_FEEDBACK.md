@@ -2,8 +2,8 @@
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-
-No requests recorded yet.
+| [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
+| [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 
 ## How to contribute
 
@@ -51,3 +51,20 @@ What you would like or what bothered you, in your own words.
 
 **+1:** YYYY-MM-DD — task ID or PR reference
 ```
+
+### AF-001 — Record the waiting messages Stop drops
+
+Stop empties Pi's queue and nothing keeps which messages it removed. `hallvi
+wait` can only call a request cancelled if the same process saw it waiting; a
+fresh `wait` finds nothing and has to say "never accepted, or dropped". A small
+durable note of the keys Stop removed would let every caller say `cancelled`.
+
+**+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+
+### AF-002 — Record a workspace command's exit code
+
+`server_bash` records a numeric exit code; a repository workspace `bash` records
+only succeeded or failed. Evidence from `hallvi exec` would read the same for
+both if the workspace kept the code too.
+
+**+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
