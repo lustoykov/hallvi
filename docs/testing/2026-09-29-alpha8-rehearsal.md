@@ -60,6 +60,12 @@ Three focused disposable browser journeys passed, reusing existing assertions wi
 
 The mutation/restart journeys used installed Pi packages with scripted model responses. They did not execute real provider work. The copied-history screenshot and raw profiles remain local because retained history can be private; only aggregate measurements are included here.
 
+## Cleanup and source-preservation limits
+
+All snapshot web/Pi/launcher processes exited, the credential-free snapshot was removed, and fixture ports 3760–3763 and 3790–3791 were free. Private raw evidence remains only in the ignored local work directory.
+
+A final comparison found three changed files among 184 original database/history/execution files checked. Another retained runtime had attached after the snapshot was taken and its history grew during this run. Database-file changes near snapshot creation may be SQLite checkpointing; that attribution is not established. Logical application, conversation, message and saved-information rows for the unaffected application matched its snapshot after normalizing copied key paths. This is not a claim of byte-for-byte preservation of all originals, and unrelated runtime activity was left alone.
+
 ## Beta boundary
 
 No provider deployment or installed-service upgrade was performed. A dedicated test server has not been selected for the live rehearsal. The full [beta walkthrough](../beta-walkthrough.md) requires a fresh user to deploy a useful application, verify stored application data after refresh/restart, and report friction. Agent fixture checks do not complete that acceptance step.
