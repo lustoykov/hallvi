@@ -18,6 +18,13 @@ import {
   saveOperatorSettings,
   operatorSettings,
 } from "../../../src/server/operator-execution";
+import { countDay } from "../../../src/server/traffic/count";
+import {
+  collectionOf,
+  readDays,
+  setCollection,
+  writeDay,
+} from "../../../src/server/traffic/store";
 import { pushTestDatabase } from "../../test-database";
 vi.mock("../../../src/server/github", async (original) => ({
   ...(await original<typeof import("../../../src/server/github")>()),
@@ -50,6 +57,8 @@ beforeEach(async () => {
 });
 afterAll(() => {
   reopen();
+  globalThis.__hallviTraffic?.client.close();
+  globalThis.__hallviTraffic = undefined;
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
@@ -145,11 +154,23 @@ it("tells an author who invented an ID what to do instead, and never touches ano
 });
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
   saveInformation(app, { title: "Note", body: "Saved" });
+  // Traffic totals live in traffic.db, where no foreign key reaches.
+  setCollection(app, "keep");
+  writeDay(
+    app,
+    countDay([], {
+      day: "2026-09-28",
+      timeZone: "UTC",
+      scriptSince: null,
+      coverage: { from: null, to: null, gaps: [] },
+    }),
+  );
   // Without the owner nothing is removed: a history must not be orphaned.
   await expect(removeApplication(app, "example/app")).rejects.toThrow(
     /worker is not running/,
   );
   expect(store.getApplication(app)).toBeTruthy();
+  expect(readDays(app, "2026-09-28", "2026-09-28")).toHaveLength(1);
   const worker = (await ownSessions())!;
   try {
     await removeApplication(app, "example/app");
@@ -160,6 +181,8 @@ it("removal goes through the worker that owns the histories, and cascades only a
     expect(
       store.db().$client.prepare(`SELECT count(*) AS n FROM ${table}`).get(),
     ).toEqual({ n: 0 });
+  expect(readDays(app, "2026-09-28", "2026-09-28")).toEqual([]);
+  expect(collectionOf(app).enabledAt).toBeNull();
 });
 
 it("persists typed deployment/access facts and shares edits without duplicating records", () => {

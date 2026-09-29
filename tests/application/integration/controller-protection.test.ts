@@ -30,6 +30,8 @@ import {
 } from "../../../src/server/controller-protection";
 import * as secrets from "../../../src/server/application-secrets";
 import { readTar } from "../../../src/server/tar";
+import { countDay } from "../../../src/server/traffic/count";
+import { setCollection, writeDay } from "../../../src/server/traffic/store";
 import { pushTestDatabase } from "../../test-database";
 
 let root: string;
@@ -85,6 +87,8 @@ beforeAll(async () => {
 
 afterAll(() => {
   store.db().$client.close();
+  globalThis.__hallviTraffic?.client.close();
+  globalThis.__hallviTraffic = undefined;
   storage.close();
   rmSync(root, { recursive: true, force: true });
   vi.unstubAllEnvs();
@@ -448,4 +452,45 @@ it("archives only the authoritative account files when a legacy controller copy 
     for (const name of names)
       rmSync(join(root, "state", name), { force: true });
   }
+});
+
+it("carries traffic history, and it opens again from the copy", async () => {
+  // Without it a recovered controller could recount only what the server's
+  // log still holds; the months before would be gone.
+  const { app } = application("Counted");
+  setCollection(app.id, "keep");
+  const counted = countDay([], {
+    day: "2026-09-28",
+    timeZone: "UTC",
+    scriptSince: null,
+    coverage: {
+      from: "2026-09-28T00:00:00.000Z",
+      to: "2026-09-29T00:00:00.000Z",
+      gaps: [],
+    },
+    now: Date.parse("2026-09-29T01:00:00.000Z"),
+  });
+  expect(writeDay(app.id, counted)).toBe(true);
+  const copy = await protectController("daily", { access });
+  expect(copy?.outcome).toBe("succeeded");
+  const opened = openControllerCopy(
+    objects.get(`/controller-copies/${copy!.objectKey}`)!,
+    recoveryKit()!.passphrase,
+  );
+  expect(opened.manifest.files).toHaveProperty(["database/traffic.db"]);
+  const entry = opened.entries.find(
+    (item) => item.path === "payload/database/traffic.db",
+  );
+  const restoredPath = join(root, "restored-traffic.db");
+  writeFileSync(restoredPath, entry!.content);
+  const restored = new Database(restoredPath, { readonly: true });
+  expect(restored.prepare("PRAGMA integrity_check").get()).toEqual({
+    integrity_check: "ok",
+  });
+  expect(
+    restored
+      .prepare("SELECT day FROM days WHERE application_id = ?")
+      .all(app.id),
+  ).toEqual([{ day: "2026-09-28" }]);
+  restored.close();
 });
