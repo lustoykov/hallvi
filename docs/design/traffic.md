@@ -66,9 +66,9 @@ it. A parser boundary, not a plugin framework.
 
 | Proxy | Format | What Pi configures |
 | --- | --- | --- |
-| Caddy | `caddy-json` (Caddy's own JSON access log) | The `log` directive to a rotated file; a `regexp` filter that removes the query string from `request>uri`; `log_append` fields for the kept query keys |
-| nginx (and Nginx Proxy Manager, SWAG, OpenResty) | `hallvi-json` | A `log_format hallvi escape=json` emitting Hallvi's line, and an `access_log` of its own beside any the owner already has |
-| Traefik | `traefik-json` | JSON access log to a file, keeping the headers Hallvi needs; Traefik cannot rewrite fields, so the query string is dropped when read |
+| Caddy | `caddy-json` (Caddy's own JSON access log) | The `log` directive to a rotated file readable by Hallvi's SSH user (`mode 0640`, or read through `sudo -n`); `regexp` filters that remove the query string from `request>uri` and from the `Referer` header; `log_append` fields for the kept query keys |
+| nginx (and Nginx Proxy Manager, SWAG, OpenResty) | `hallvi-json` | A `log_format hallvi escape=json` emitting Hallvi's line — path and referrer without their query strings, kept keys as fields — and an `access_log` of its own beside any the owner already has |
+| Traefik | `traefik-json` | JSON access log to a file, keeping the headers Hallvi needs; Traefik cannot rewrite fields, so its raw log keeps full URLs and the query strings are dropped when read |
 
 Anything else is shown as unavailable. A proxy the owner already had keeps its
 own log untouched: Hallvi adds its own beside it.
@@ -196,13 +196,17 @@ automatic deploys, and stays on until they turn it off.
 ### Privacy, in the words the product uses
 
 "Hallvi keeps totals on this computer. The server keeps its access log for N
-days, as web servers do; Hallvi removes the query string before it is written
-and keeps only campaign tags." Hallvi makes no claim about consent: it says
+days, as web servers do; Hallvi removes query strings — from the address asked
+for and from the referrer — before the line is written, and keeps only
+campaign tags." Behind Traefik, whose log cannot be rewritten, the page says
+the server's log keeps full addresses. Hallvi makes no claim about consent: it says
 what it collects and leaves that judgement to the owner.
 
 The query string is where password-reset links, sign-in codes, invitations and
-search terms live, and Pi reads server logs when it investigates, so removing it
-at the source also keeps those out of Pi's context and execution evidence. The
+search terms live — and a same-site `Referer` carries the previous page's, so
+`/reset?token=…` reaches the log through the next request's referrer. Pi reads
+server logs when it investigates, so removing both at the source also keeps
+them out of Pi's context and execution evidence. The
 kept keys are `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`,
 `utm_content`, `ref`, and a page key for an application that routes by query
 string (WordPress's `p`, for example) when Pi knows it.
