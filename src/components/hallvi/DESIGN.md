@@ -322,6 +322,13 @@ what it cancels ("Stop + cancel 1 waiting"). Chosen from a switchable prototype
 on the real shell; the options and the verdict are on the
 `prototype/ux-sidebar-and-working` branch.
 
+The line uses the active reply's execution intent and recorded host when
+available: “Running: Build the application image · On the server · 203.0.113.7”.
+This describes work in flight, not a completed effect. Missing intent keeps
+the generic command/location wording; shell text is not a substitute for an
+intent. Approval waits remain authoritative. Useful findings stay in ordinary
+intermediate Pi replies, in their original order and through refresh.
+
 ## Conversation-first design language from Fable
 
 Imported from commit `017d656`. These interaction and visual rules supersede older context-pane descriptions above. The exploration that produced them is retired; the living source is the product itself: `npm run scenarios -- <port>` serves every state through the shipping pages from the records in `tests/fixtures/scenario-records.ts`. The reference shell that used to hold invented data under `/prototype` has been retired. Reference chips lead to one approval at the originating message. The earlier source is archived in [explore/DESIGN.md](https://github.com/lustoykov/hallvi/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/previous-direction/explore-DESIGN.md).
