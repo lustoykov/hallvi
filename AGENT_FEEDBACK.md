@@ -5,7 +5,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Accepted |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 2 | Accepted |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
@@ -72,38 +71,6 @@ What you would like or what bothered you, in your own words.
 
 **+1:** YYYY-MM-DD — task ID or PR reference
 ```
-
-### AF-006 — Reduce full-history response serialization
-
-After execution reads are cached, serializing the complete execution history
-still blocks the event loop: ten readers of a synthetic 2,000-record history
-showed about 82 ms maximum delay from the warm response path. Change
-notifications will remove idle polling; consider bounded or incremental
-evidence responses if long histories still make active chats slow. The
-[measurement](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-execution-reader.md) separates file reads
-from this remaining cost.
-
-**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
-
-**+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
-Idle reads now stop; active updates still serialize full histories. Keep the
-500 ms sustained cadence until a measured response-shape change improves it.
-
-**+1:** 2026-09-29 — long-history responses (`codex/long-history-responses`),
-owner-authorized implementation in review. Incremental SSE retains a full
-initial/reconnect snapshot and all recorded evidence, then sends changed
-records only. A warm 240-call fixture updating answer text and live output
-reduces each active payload from about 2.28 MB to 10.8 KB; ten-reader frame
-construction plus encoding falls from about 24.4 ms to 2.4 ms. A bounded
-2,000-call stress case still spends about 134 ms projecting ten snapshots,
-separately from the remaining 20 ms diff cost. Worker-link transcript encoding,
-first-connect costs and full-history projection remain; this change does not
-claim to eliminate them. Reproduce with `scripts/benchmark-chat-responses.ts`;
-the production browser comparison retains all six updates in 1/5/10 readers.
-At ten readers, 240 calls produce about 2.31 MB per full response versus 10.7 KB
-per incremental response, with maximum loop delay 201 ms versus 76 ms. These
-bounded synthetic measurements are not latency guarantees; verification and
-the earlier unattributed development-mode miss belong in the implementation PR.
 
 ### AF-001 — Record the waiting messages Stop drops
 
@@ -197,6 +164,7 @@ without losing unsent work, or make the required reload clear.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
 | [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
 | [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Resolved in #266 |
 | [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Resolved in #265 |
@@ -205,6 +173,39 @@ without losing unsent work, or make the required reload clear.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-006 — Reduce full-history response serialization
+
+After execution reads are cached, serializing the complete execution history
+still blocks the event loop: ten readers of a synthetic 2,000-record history
+showed about 82 ms maximum delay from the warm response path. Change
+notifications will remove idle polling; consider bounded or incremental
+evidence responses if long histories still make active chats slow. The
+[measurement](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-execution-reader.md) separates file reads
+from this remaining cost.
+
+**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
+
+**+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
+Idle reads now stop; active updates still serialize full histories. Keep the
+500 ms sustained cadence until a measured response-shape change improves it.
+
+**+1:** 2026-09-29 — long-history responses, merged in
+[PR #272](https://github.com/lustoykov/hallvi/pull/272) as
+[25491cde](https://github.com/lustoykov/hallvi/commit/25491cde10fa8161d6f122a3ed76c1d9d6dd98ff). Incremental SSE retains a full
+initial/reconnect snapshot and all recorded evidence, then sends changed
+records only. A warm 240-call fixture updating answer text and live output
+reduces each active payload from about 2.28 MB to 10.8 KB; ten-reader frame
+construction plus encoding falls from about 24.4 ms to 2.4 ms. A bounded
+2,000-call stress case still spends about 134 ms projecting ten snapshots,
+separately from the remaining 20 ms diff cost. Worker-link transcript encoding,
+first-connect costs and full-history projection remain; this change does not
+claim to eliminate them. Reproduce with `scripts/benchmark-chat-responses.ts`;
+the production browser comparison retains all six updates in 1/5/10 readers.
+At ten readers, 240 calls produce about 2.31 MB per full response versus 10.7 KB
+per incremental response, with maximum loop delay 201 ms versus 76 ms. These
+bounded synthetic measurements are not latency guarantees; verification and
+the earlier unattributed development-mode miss belong in the implementation PR.
 
 ### AF-016 — Keep traffic counting consistent with owner choices and page routes
 
