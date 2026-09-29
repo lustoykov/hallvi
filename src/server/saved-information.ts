@@ -1,4 +1,4 @@
-import { listExecutions } from "./operator-execution";
+import { readExecution } from "./operator-execution";
 import { getApplication, saveInformationRow } from "./db";
 import { informationInputSchema } from "./operator-data";
 import { requireReadableRecord } from "./record-contract";
@@ -16,9 +16,6 @@ export async function saveInformation(
   // cannot be drawn is refused here with what to change, so Pi corrects it
   // in the same turn rather than the page rendering a lie later.
   requireReadableRecord(value);
-  const executions = value.evidence.some((e) => e.type === "execution")
-    ? await listExecutions(applicationId)
-    : [];
   for (const evidence of value.evidence) {
     // Earlier records may cite a message. Pi keeps the conversation now, and
     // what it did is cited by execution or URL.
@@ -26,7 +23,7 @@ export async function saveInformation(
       throw new Error("Cite an execution or a URL as evidence, not a message.");
     if (
       evidence.type === "execution" &&
-      !executions.some((e) => e.id === evidence.id)
+      (await readExecution(applicationId, evidence.id))?.id !== evidence.id
     )
       throw new Error("Evidence execution not found in this application.");
   }

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { promises as fs, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
@@ -17,6 +17,8 @@ import {
 import {
   saveOperatorSettings,
   operatorSettings,
+  executionContext,
+  listExecutions,
 } from "../../../src/server/operator-execution";
 import { pushTestDatabase } from "../../test-database";
 vi.mock("../../../src/server/github", async (original) => ({
@@ -60,6 +62,67 @@ it("loads creation and settings after reopening the database", async () => {
   await saveOperatorSettings(app, { permissionMode: "always-ask", host: null });
   await reopen();
   expect((await operatorSettings(app)).permissionMode).toBe("always-ask");
+});
+it("validates new execution evidence while an older history scan is in flight", async () => {
+  await saveOperatorSettings(app, { permissionMode: "bypass", host: null });
+  mkdirSync(join(root, "config", "operator", app, "executions"), {
+    recursive: true,
+  });
+  let release!: () => void;
+  let started!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const enumerated = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const readdir = fs.readdir.bind(fs);
+  const scan = vi
+    .spyOn(fs, "readdir")
+    .mockImplementationOnce(async (...args) => {
+      const names = await readdir(...args);
+      started();
+      await held;
+      return names;
+    });
+  const older = listExecutions(app);
+  try {
+    await enumerated;
+    await executionContext({ applicationId: app, chatId: chat }).execute(
+      "fixture",
+      "local",
+      "read fixture",
+      async () => "verified",
+      false,
+      "new-evidence",
+    );
+    const [name] = await readdir(
+      join(root, "config", "operator", app, "executions"),
+    );
+    const executionId = name.replace(/\.json$/, "");
+    // The held scan enumerated no files. Evidence validation must read the
+    // cited record independently, without waiting for that stale listing.
+    const saving = saveInformation(app, {
+      title: "New evidence",
+      body: "The command completed.",
+      evidence: [{ type: "execution", id: executionId }],
+    });
+    let saved = false;
+    void saving.then(
+      () => {
+        saved = true;
+      },
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(saved).toBe(true), { timeout: 2000 });
+    expect((await saving).evidence).toEqual([
+      { type: "execution", id: executionId },
+    ]);
+  } finally {
+    release();
+    await older;
+    scan.mockRestore();
+  }
 });
 it("shares one outcome between views while keeping working knowledge unsurfaced", async () => {
   const hidden = await saveInformation(app, {
