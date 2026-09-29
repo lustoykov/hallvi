@@ -2350,7 +2350,8 @@ function caddyLine(plan: Plan, hit: Hit) {
   return JSON.stringify({
     level: hit.status >= 500 ? "error" : "info",
     ts: hit.at / 1000,
-    logger: "http.log.access.log0",
+    // Pi's own `log hallvi` block names the logger.
+    logger: "http.log.access.hallvi",
     msg: "handled request",
     request: {
       remote_ip: hit.address,
