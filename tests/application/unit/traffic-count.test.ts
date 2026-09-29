@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { classify } from "@/server/traffic/classify";
 import {
   eventPath,
+  STORED_PER_LIST,
   type ScriptEvent,
   type TrafficLine,
 } from "@/server/traffic/contract";
@@ -162,9 +163,18 @@ describe("what a logged request is", () => {
       kind: "own",
     });
     expect(classify(page({ path: "/_hv/s.js" }))).toEqual({ kind: "own" });
-    expect(classify(page({ path: "/_hv/e/1/not-an-event" }))).toEqual({
-      kind: "own",
-    });
+    // The events' endpoint answered something that is no event.
+    expect(
+      classify(
+        page({
+          path: "/_hv/e/1/not-an-event",
+          method: "POST",
+          status: 204,
+          fetchDest: "empty",
+          fetchMode: "no-cors",
+        }),
+      ),
+    ).toEqual({ kind: "own" });
   });
 
   it("counts an event only from a browser that could have sent it", () => {
@@ -185,6 +195,39 @@ describe("what a logged request is", () => {
         sent(view, { userAgent: OLD_SAFARI, fetchDest: null, fetchMode: null }),
       ),
     ).toMatchObject({ kind: "event" });
+  });
+
+  it("takes only a beacon the proxy answered for an event, and anything else for a request", () => {
+    const ping: ScriptEvent = { t: "ping", s: "a1b2c3d4e5f6a7b8", p: "/" };
+    // Where the proxy does not serve the events, the application answers:
+    // a request like any other, never an event and never a page.
+    for (const overrides of [
+      { method: "GET", status: 404 },
+      {
+        method: "GET",
+        status: 200,
+        fetchDest: "document",
+        fetchMode: "navigate",
+      },
+      { method: "POST", status: 200 },
+      { status: 204, fetchDest: "document", fetchMode: "navigate" },
+    ])
+      expect(classify(sent(ping, overrides))).toMatchObject({
+        kind: "request",
+        view: false,
+      });
+    // Such a request never switches counting to a script nobody serves.
+    const day = countDay(
+      [
+        page({ at: at(9) }),
+        sent(ping, { at: at(9, 1), method: "GET", status: 404 }),
+        page({ at: at(10), path: "/pricing" }),
+      ],
+      options,
+    );
+    expect(day.viewSource).toBe("log");
+    expect(day.pages.map((row) => row.key)).toEqual(["/", "/pricing"]);
+    expect(day.hours[9].requests).toBe(2);
   });
 });
 
@@ -361,6 +404,91 @@ describe("a day", () => {
     expect(tomorrow.hours.reduce((sum, one) => sum + one.requests, 0)).toBe(2);
   });
 
+  it("takes the first script view for the page load it came from, however late it arrives", () => {
+    const view = (s: string, p = "/") => ({ t: "view" as const, s, p });
+    // A deferred script on a slow phone reports its view 11 seconds late.
+    const slow = [
+      page({ at: at(12) }),
+      sent(view("aaaaaaaa11111111"), { at: at(12, 0, 11) }),
+    ];
+    expect(countDay(slow, options).hours[12].views).toBe(1);
+    // Another page in between: the late view is not that load's.
+    expect(
+      countDay(
+        [
+          page({ at: at(12) }),
+          page({ at: at(12, 0, 5), path: "/pricing" }),
+          sent(view("aaaaaaaa11111111"), { at: at(12, 0, 11) }),
+        ],
+        options,
+      ).hours[12].views,
+    ).toBe(3);
+    // The load just before midnight, its view just after: one view, counted
+    // on the day the log counted the load. The day after reads the minutes
+    // before its midnight only to know that.
+    const next = "2026-09-30";
+    const lines = [
+      page({ at: end - 100 }),
+      sent(view("bbbbbbbb22222222"), { at: end + 100 }),
+      page({ at: end + 60_000, path: "/pricing" }),
+      sent(view("cccccccc33333333", "/pricing"), { at: end + 61_000 }),
+    ];
+    const tomorrow = {
+      ...options,
+      day: next,
+      coverage: { from: null, to: null, gaps: [] },
+    };
+    const views = (day: ReturnType<typeof countDay>) =>
+      day.hours.reduce((sum, one) => sum + one.views, 0);
+    const today = countDay(lines, options);
+    const after = countDay(lines, tomorrow);
+    expect(views(today) + views(after)).toBe(2);
+    expect(after.pages).toEqual([{ key: "/pricing", count: 1, visitors: 1 }]);
+    // Following the log gives the same, and so does a recount with the
+    // switch point on record.
+    const counter = new DayCounter(tomorrow);
+    for (const line of lines) counter.add(line);
+    expect(counter.day({ now: options.now })).toEqual(after);
+    expect(counter.switchAt).toBe(end + 100);
+    expect(
+      countDay(lines, {
+        ...tomorrow,
+        scriptSince: new Date(end + 100).toISOString(),
+      }),
+    ).toEqual(after);
+  });
+
+  it("is one visitor across an application's names, and keeps a campaign's odd words as words", () => {
+    const day = countDay(
+      [
+        page({ kept: { utm_source: "__proto__" } }),
+        page({
+          at: at(10, 1),
+          host: "www.shop.example",
+          path: "/pricing",
+          kept: { utm_source: "constructor", utm_campaign: "toString" },
+        }),
+        page({ at: at(10, 2), kept: { utm_source: "hasOwnProperty" } }),
+      ],
+      { ...options, hosts: ["shop.example", "www.shop.example"] },
+    );
+    expect(day.visitors).toBe(1);
+    expect(day.hours[10].visitors).toBe(1);
+    expect(day.sources.map((row) => row.key).sort()).toEqual([
+      "__proto__",
+      "constructor",
+      "hasOwnProperty",
+    ]);
+    expect(day.campaigns).toEqual([{ key: "toString", count: 1, visitors: 1 }]);
+    // It survives being stored and read back as the same strings.
+    expect(JSON.parse(JSON.stringify(day.sources))).toEqual(day.sources);
+    // A page key named like something every object has is only a key.
+    expect(
+      countDay([page({ at: at(11) })], { ...options, pageKey: "constructor" })
+        .pages,
+    ).toEqual([{ key: "/", count: 1, visitors: 1 }]);
+  });
+
   it("says the script is silent only on evidence", () => {
     const since = new Date(at(8)).toISOString();
     const served = (minute: number, address: string) =>
@@ -435,9 +563,9 @@ describe("a day", () => {
     ).toBe(0);
   });
 
-  it("keeps 200 entries a list and folds the rest into one row of distinct visitors", () => {
+  it("keeps its top entries a list and folds the rest into one row of distinct visitors", () => {
     const lines: TrafficLine[] = [];
-    for (let index = 0; index < 250; index++)
+    for (let index = 0; index < STORED_PER_LIST + 50; index++)
       lines.push(
         page({
           at: at(10) + index,
@@ -447,7 +575,7 @@ describe("a day", () => {
         }),
       );
     const day = countDay(lines, options);
-    expect(day.pages).toHaveLength(201);
+    expect(day.pages).toHaveLength(STORED_PER_LIST + 1);
     expect(day.pages.at(-1)).toEqual({
       key: "(other)",
       count: 50,
