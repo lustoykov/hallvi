@@ -36,7 +36,7 @@ Hallvi: light, calm, a little delightful — not a dashboard of zeros.
 | With the script | Page changes inside single-page applications, pages served from a CDN cache, time on page, open right now, goals, page speed (LCP, INP, CLS) and JavaScript error counts per page |
 | Operations | Deploy markers on every chart, a before/after line on each release, Monitoring's traffic numbers from the same totals |
 | Sources of truth | Caddy, nginx and Traefik access logs; Hallvi's script through the same log |
-| Pi | A read-only tool over the totals, and the instructions to set logging and the script up |
+| Pi | `read_traffic` over the totals (main and side conversations); `traffic_setup` and `traffic_script`, read-only text for setting the log and the script up |
 
 Later, because each needs something else first: revenue (a Stripe connection),
 alerts that wake Pi (the deferred heartbeat), CDN cache statistics (the CDN's
@@ -155,6 +155,10 @@ internet, no cookies and nothing stored in the browser.
   INP, CLS) and `error` (a count, never the message). Each carries a random id
   for that one page view, so a `leave` joins its `view` without identifying
   anyone.
+- **Installing it:** Pi's read-only `traffic_script` tool returns the file,
+  its sha256, the proxy's serving snippet and the include line per stack
+  ([`script.ts`](../../src/server/traffic/script.ts)); Pi writes the file and
+  the proxy change through its server tools, under the permission modes.
 - **Getting it into the application:** a one-line pull request that puts
   `<script defer src="/_hv/s.js"></script>` in the layout every page shares,
   through Hallvi's existing operability pull requests; for software the owner
@@ -218,8 +222,9 @@ origin and are counted; the visitor's address and country come from
 `CF-Connecting-IP` and `CF-IPCountry` in the log. Where a CDN caches pages, only
 the script counts those views — its events are never cached. Cloudflare's raw
 request logs are Enterprise-only, so CDN logs are not how visitors are counted.
-When Pi sets up caching it records whether pages are cached, so the Traffic
-page can say what the log cannot see.
+When Pi sets up caching it records whether pages are cached — the fact
+`caches-pages`, "yes" or "no", on the `cdn` subject — so the Traffic page can
+say what the log cannot see.
 
 ### If a machine is lost
 
@@ -234,7 +239,12 @@ page can say what the log cannot see.
 ### Setting up the log
 
 Tested on Caddy 2.11.4, nginx 1.30.5 and Traefik 3.7.13 over real SSH as
-root, a sudo user and a user without sudo. This is what Pi's instructions say.
+root, a sudo user and a user without sudo. This is what Pi's instructions say:
+the rules are in its system prompt ([`pi.ts`](../../src/server/pi.ts)), and the
+exact configuration, steps, checks and record for each proxy come from its
+read-only `traffic_setup` tool (`LOG_SETUP` in
+[`pi-tools.ts`](../../src/server/traffic/pi-tools.ts)), so the long text is read
+only when a log is being set up. Change the tested text there.
 
 - **The record** points at the **host** path:
   `{kind:'access-log', proxy, format, source:{type:'file', path}, hosts, pageKey?, retainDays}`.
