@@ -94,7 +94,11 @@ export type ScriptEvent =
       t: "view";
       s: string;
       p: string;
-      /** The referrer's origin, when it is another site. */
+      /**
+       * The referrer's origin whenever there is one — this site's own origin
+       * for internal navigations and route changes — so an internal view is
+       * never taken for a direct landing. Absent only with no referrer.
+       */
       r?: string;
       /** Campaign tags read from the landing URL in the browser. */
       u?: Partial<Record<KeptQueryKey, string>>;
@@ -300,6 +304,8 @@ export interface TrafficDay {
   hours: HourTotals[];
   /** Distinct browsers across the day — an estimate, never summed. */
   visitors: number;
+  /** Distinct browsers that got a 5xx across the day, estimated alike. */
+  errorVisitors: number;
   pages: Ranked[];
   sources: Ranked[];
   campaigns: Ranked[];
@@ -382,6 +388,7 @@ export interface RangeTotals {
   requests: number;
   views: number;
   errors: number;
+  /** Like `visitors`: today's for 24 h, else the average per covered day. */
   errorVisitors: number;
   bots: number;
   p95Ms: number | null;
