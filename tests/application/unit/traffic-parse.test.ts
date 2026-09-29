@@ -29,22 +29,107 @@ const proxies: [LogFormat, string[]][] = [
 ];
 
 // What the nineteen requests were, as every proxy must hand them on.
+interface Request {
+  method: string;
+  path: string;
+  status?: number;
+  host?: string;
+  kept?: Record<string, string>;
+  fetchDest?: string | null;
+  fetchMode?: string;
+  purpose?: string;
+  referrer?: string;
+  address?: string;
+  cdnCountry?: string;
+  contentType?: string | null;
+  userAgent?: string;
+}
 const document = { fetchDest: "document", fetchMode: "navigate" };
-const expected = [
-  { method: "GET", path: "/", status: 200, ...document, kept: { utm_source: "hn", utm_medium: "social", utm_campaign: "launch" } },
-  { method: "GET", path: "/pricing", status: 200, ...document, referrer: "https://news.ycombinator.com/item" },
-  { method: "GET", path: "/about", status: 200, ...document, referrer: "/reset" },
-  { method: "GET", path: "/assets/app.js", status: 200, fetchDest: "script", fetchMode: "no-cors", contentType: "text/javascript" },
-  { method: "GET", path: "/api/items", status: 200, fetchDest: "empty", fetchMode: "cors", contentType: "application/json", kept: { ref: "newsletter" } },
+const expected: Request[] = [
+  {
+    method: "GET",
+    path: "/",
+    status: 200,
+    ...document,
+    kept: { utm_source: "hn", utm_medium: "social", utm_campaign: "launch" },
+  },
+  {
+    method: "GET",
+    path: "/pricing",
+    status: 200,
+    ...document,
+    referrer: "https://news.ycombinator.com/item",
+  },
+  {
+    method: "GET",
+    path: "/about",
+    status: 200,
+    ...document,
+    referrer: "/reset",
+  },
+  {
+    method: "GET",
+    path: "/assets/app.js",
+    status: 200,
+    fetchDest: "script",
+    fetchMode: "no-cors",
+    contentType: "text/javascript",
+  },
+  {
+    method: "GET",
+    path: "/api/items",
+    status: 200,
+    fetchDest: "empty",
+    fetchMode: "cors",
+    contentType: "application/json",
+    kept: { ref: "newsletter" },
+  },
   { method: "HEAD", path: "/", status: 200, fetchDest: null },
-  { method: "GET", path: "/wp-login.php", status: 404, fetchDest: null, userAgent: "Mozilla/5.0 zgrab/0.x" },
+  {
+    method: "GET",
+    path: "/wp-login.php",
+    status: 404,
+    fetchDest: null,
+    userAgent: "Mozilla/5.0 zgrab/0.x",
+  },
   { method: "GET", path: "/boom", status: 500, ...document },
-  { method: "GET", path: "/pricing", status: 200, ...document, purpose: "prefetch" },
-  { method: "GET", path: "/about", status: 200, fetchDest: "empty", purpose: "prefetch" },
-  { method: "GET", path: "/index.php", status: 200, ...document, kept: { utm_campaign: "autumn sale", p: "42" } },
-  { method: "GET", path: "/", status: 200, ...document, address: "203.0.113.9", cdnCountry: "NL" },
+  {
+    method: "GET",
+    path: "/pricing",
+    status: 200,
+    ...document,
+    purpose: "prefetch",
+  },
+  {
+    method: "GET",
+    path: "/about",
+    status: 200,
+    fetchDest: "empty",
+    purpose: "prefetch",
+  },
+  {
+    method: "GET",
+    path: "/index.php",
+    status: 200,
+    ...document,
+    kept: { utm_campaign: "autumn sale", p: "42" },
+  },
+  {
+    method: "GET",
+    path: "/",
+    status: 200,
+    ...document,
+    address: "203.0.113.9",
+    cdnCountry: "NL",
+  },
   // Hallvi's own access check is left out.
-  { method: "GET", path: "/_hv/e/1/", status: 204, fetchDest: "empty", contentType: null },
+  {
+    method: "GET",
+    path: "/_hv/e/1/",
+    status: 204,
+    fetchDest: "empty",
+    contentType: null,
+  },
   { method: "POST", path: "/checkout/pay", status: 200, ...document },
   { method: "GET", host: "blog.localhost", path: "/", status: 200 },
   // nginx served this route of a single-page application itself; the app
@@ -56,7 +141,9 @@ const expected = [
 
 describe("an access log line", () => {
   it.each(proxies)("reads the same requests from %s", (format, lines) => {
-    const parsed = lines.map((text) => parseLine(format, text, { pageKey: "p" }));
+    const parsed = lines.map((text) =>
+      parseLine(format, text, { pageKey: "p" }),
+    );
     expect(parsed[12]).toBeNull();
     const requests = parsed.filter((line) => line !== null);
     expect(requests).toHaveLength(expected.length);
@@ -64,7 +151,8 @@ describe("an access log line", () => {
       const want = expected[index];
       expect(line.host).toBe(want.host ?? "shop.localhost");
       expect(line.method).toBe(want.method);
-      if (want.path.startsWith("/_hv/")) expect(line.path).toMatch(/^\/_hv\/e\/1\//);
+      if (want.path.startsWith("/_hv/"))
+        expect(line.path).toMatch(/^\/_hv\/e\/1\//);
       else expect(line.path).toBe(want.path);
       if (want.status) expect(line.status).toBe(want.status);
       expect(line.kept).toEqual(want.kept ?? {});
@@ -73,9 +161,11 @@ describe("an access log line", () => {
       expect(line.purpose).toBe(want.purpose ?? null);
       expect(line.address).toBe(want.address ?? "172.19.0.1");
       expect(line.cdnCountry).toBe(want.cdnCountry ?? null);
-      if ("contentType" in want) expect(line.contentType).toBe(want.contentType);
+      if ("contentType" in want)
+        expect(line.contentType).toBe(want.contentType);
       if (want.userAgent) expect(line.userAgent).toBe(want.userAgent);
-      if (want.referrer) expect(line.referrer?.endsWith(want.referrer)).toBe(true);
+      if (want.referrer)
+        expect(line.referrer?.endsWith(want.referrer)).toBe(true);
       expect(line.ms).toBeGreaterThanOrEqual(0);
     });
     // The page view's content type, without its charset.
@@ -133,7 +223,11 @@ describe("an access log line", () => {
     // through its error loggers, with the query string still in them.
     const lines = fixture("caddy-2.11.4-container.log");
     const parsed = lines.map((text) => parseLine("caddy-json", text));
-    expect(parsed.filter((line) => line !== null).map((line) => [line.path, line.status])).toEqual([
+    expect(
+      parsed
+        .filter((line) => line !== null)
+        .map((line) => [line.path, line.status]),
+    ).toEqual([
       ["/", 200],
       ["/", 200],
       ["/checkout", 502],

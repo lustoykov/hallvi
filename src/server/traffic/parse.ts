@@ -44,7 +44,7 @@ export interface ParseOptions {
 
 type Entry = Record<string, unknown>;
 
-/** One request, or null for anything that is not one this application served. */
+/** One request, or null for anything but a request this application served. */
 export function parseLine(
   format: LogFormat,
   text: string,
@@ -130,7 +130,8 @@ function caddy(entry: Entry, at: number, options: ParseOptions) {
   const header = (name: string) => firstOf(headers[name]);
   const target = request.uri;
   const kept = keptIn(target, options.pageKey);
-  for (const key of KEPT_QUERY_KEYS) keep(kept, key, entry[caddyKeptField(key)]);
+  for (const key of KEPT_QUERY_KEYS)
+    keep(kept, key, entry[caddyKeptField(key)]);
   if (options.pageKey) keep(kept, options.pageKey, entry[CADDY_PAGE_FIELD]);
   return line({
     at,

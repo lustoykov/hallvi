@@ -29,6 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { TrafficLine } from "@/server/traffic/contract";
 import {
+  followLogCommand,
   listLog,
   listLogCommand,
   readLog,
@@ -70,7 +71,7 @@ const log = (
   source: { type: "file", path },
 });
 
-/** A file of lines, gzip'd when its name says so, last written at `modified`. */
+/** A file of lines, gzip'd when its name says so, last written `modified`. */
 function file(path: string, lines: string[], modified: string) {
   const text = lines.map((line) => `${line}\n`).join("");
   writeFileSync(path, path.endsWith(".gz") ? gzipSync(text) : text);
@@ -187,7 +188,9 @@ describe("the access log on the server", () => {
     ]);
     // The file being written covers until now.
     expect(iso(files[3].from)).toBe("2026-09-28T16:00:00.000Z");
-    expect(files[3].to).toBeGreaterThanOrEqual(Math.floor(before / 1000) * 1000);
+    expect(files[3].to).toBeGreaterThanOrEqual(
+      Math.floor(before / 1000) * 1000,
+    );
     // Nothing a name held ran, anywhere.
     for (const dir of [root, caddyDir, process.cwd()])
       expect(readdirSync(dir)).not.toContain("PWNED");
@@ -265,11 +268,14 @@ describe("the access log on the server", () => {
     const file = { type: "file" as const, path: "/var/log/caddy/access.log" };
     const container = { type: "container" as const, name: "shop-caddy-1" };
     const range = { from: 1790692978288, to: 1790696578288 };
+    const rotated = ["access-2026-09-28T10-00-00.000-size.log.gz"];
     for (const command of [
       listLogCommand(file),
       listLogCommand(container),
-      readLogCommand(file, ["access-2026-09-28T10-00-00.000-size.log.gz", "access.log"], range),
+      readLogCommand(file, [...rotated, "access.log"], range),
       readLogCommand(container, [], range),
+      followLogCommand(file, rotated, range.from),
+      followLogCommand(container, [], range.from),
     ])
       expect(command).toMatch(shape);
     expect(readLogCommand(container, [], range)).toMatch(
@@ -281,6 +287,8 @@ describe("the access log on the server", () => {
       () => readLogCommand(file, ["access.log.1;reboot"], range),
       () => readLogCommand(file, ["../../../etc/shadow"], range),
       () => readLogCommand(file, ["other.log"], range),
+      // The file being written is followed, never read first as rotated.
+      () => followLogCommand(file, ["access.log"], range.from),
     ])
       expect(hostile).toThrow();
   });
@@ -288,11 +296,19 @@ describe("the access log on the server", () => {
   it("says in words when there is no log to list", () => {
     const result = spawnSync(
       "/bin/sh",
-      ["-c", listLogCommand({ type: "file", path: "/hallvi-review-nonexistent/access.log" })],
+      [
+        "-c",
+        listLogCommand({
+          type: "file",
+          path: "/hallvi-review-nonexistent/access.log",
+        }),
+      ],
       { encoding: "utf8", timeout: 5000 },
     );
     expect(result.status).toBe(4);
-    expect(result.stdout).toContain("/hallvi-review-nonexistent/ is not readable by");
+    expect(result.stdout).toContain(
+      "/hallvi-review-nonexistent/ is not readable by",
+    );
     expect(existsSync("/hallvi-review-nonexistent")).toBe(false);
   });
 });

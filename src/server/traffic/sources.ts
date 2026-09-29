@@ -216,10 +216,10 @@ function rotatedOnly(path: string, names: string[], current: boolean) {
 const baseOf = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
 
-/** The file being written, a numbered rotation, or one stamped when it rolled. */
+/** The file being written, logrotate's numbered one, or Caddy's stamped one. */
 type Rotation = { current: true } | { number: number } | { rolledAt: number };
 
-/** How a name beside the log came to be there, or null if it is not the log's. */
+/** How a name beside the log came to be there; null if it is not the log's. */
 function rotationOf(base: string, name: string): Rotation | null {
   if (name === base) return { current: true };
   const numbered = new RegExp(`^${escaped(base)}\\.(\\d{1,5})(\\.gz)?$`).exec(
@@ -312,7 +312,8 @@ function adjacent(file: Found, next: Found, nextFrom: number) {
   if ("number" in rotation)
     return "current" in next.rotation
       ? rotation.number === 1
-      : "number" in next.rotation && next.rotation.number === rotation.number - 1;
+      : "number" in next.rotation &&
+          next.rotation.number === rotation.number - 1;
   // Caddy rolls on the write that would not fit, and that write opens the
   // next file: its first line is the moment in this file's name.
   if ("rolledAt" in rotation) return nextFrom <= rotation.rolledAt + 2000;
@@ -526,9 +527,10 @@ export function onServer(
       let rest = "";
       let said = "";
       child.stdout.on("data", (chunk: Buffer) => {
-        // A terminal ends its lines with a carriage return as well.
+        // A terminal ends its lines with a carriage return as well. A line
+        // that never ends is cut rather than held without limit.
         const lines = (rest + chunk.toString("utf8")).split(/\r?\n/);
-        rest = (lines.pop() ?? "").slice(-20_000);
+        rest = (lines.pop() ?? "").slice(-256_000);
         for (const text of lines) {
           if (text.trim() === READY) {
             onReady();
