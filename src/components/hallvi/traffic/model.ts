@@ -8,7 +8,9 @@
 // design; src/server/traffic/contract.ts owns the shapes.
 
 import {
+  DIRECT,
   OTHER,
+  UNKNOWN,
   type Collection,
   type Gap,
   type ReleaseImpact,
@@ -17,23 +19,11 @@ import {
   type TrafficRange,
 } from "@/server/traffic/contract";
 
-// Mirrors of claude/traffic-v1's contract (6557b872), which has not been
-// merged into this branch. Swap each for the contract's own export once it
-// is: `UNKNOWN`, `DIRECT`, and the two `Collection` fields read below.
-/** The key for what could not be told: a country, a browser, a system. */
-export const UNKNOWN = "(unknown)";
-/** The source of a view with no referrer and no campaign. */
-export const DIRECT = "Direct";
-type Contracted = Collection & {
-  storedFrom?: string | null;
-  logMisses?: ("browser-pages" | "cached-pages")[];
-};
+export { DIRECT, UNKNOWN };
 /** The first day with stored totals; null when nothing is stored. */
-export const storedFrom = (collection: Collection) =>
-  (collection as Contracted).storedFrom ?? null;
+export const storedFrom = (collection: Collection) => collection.storedFrom;
 /** What the log alone cannot see, from evidence. */
-export const logMisses = (collection: Collection) =>
-  (collection as Contracted).logMisses ?? [];
+export const logMisses = (collection: Collection) => collection.logMisses;
 
 // ---------------------------------------------------------------------------
 // Words and numbers
