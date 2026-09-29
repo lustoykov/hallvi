@@ -84,9 +84,16 @@ const nginxDir = join(root, "nginx");
 const path = process.env.PATH;
 beforeAll(() => {
   mkdirSync(join(root, "bin"));
+  // Before a read, it can also run what happens on the server meanwhile.
   writeFileSync(
     join(root, "bin", "ssh"),
-    '#!/bin/sh\neval "last=\\${$#}"\nexec /bin/sh -c "$last"\n',
+    [
+      "#!/bin/sh",
+      'eval "last=\\${$#}"',
+      'case $last in *hallvi-unreadable*) [ -f "$BEFORE_READ" ] && . "$BEFORE_READ" ;; esac',
+      'exec /bin/sh -c "$last"',
+      "",
+    ].join("\n"),
   );
   chmodSync(join(root, "bin", "ssh"), 0o755);
   process.env.PATH = `${join(root, "bin")}:${path}`;
@@ -261,6 +268,48 @@ describe("the access log on the server", () => {
       ["2026-09-28T00:05:00.000Z", "2026-09-29T00:00:00.000Z"],
     ]);
     expect(lines.at(-1)?.at).toBe(Date.parse("2026-09-28T23:55:00Z"));
+  });
+
+  it("does not trust a file that rotated between the listing and the read", async () => {
+    // logrotate's nightly run meeting the recount of the day that just ended.
+    const dir = join(root, "rotating");
+    mkdirSync(dir);
+    file(
+      join(dir, "hallvi.log.1"),
+      [nginx("2026-09-28T00:05:00Z"), nginx("2026-09-28T23:55:00Z")],
+      "2026-09-28T23:55:00Z",
+    );
+    file(
+      join(dir, "hallvi.log"),
+      [nginx("2026-09-29T00:03:00Z"), nginx("2026-09-29T06:00:00Z")],
+      "2026-09-29T06:00:00Z",
+    );
+    const rotate = join(root, "rotate.sh");
+    writeFileSync(
+      rotate,
+      `cd '${dir}' && mv hallvi.log.1 hallvi.log.2 && mv hallvi.log hallvi.log.1 && : > hallvi.log\n`,
+    );
+    process.env.BEFORE_READ = rotate;
+    const lines: TrafficLine[] = [];
+    const result = await readLog(
+      host,
+      log("hallvi-json", join(dir, "hallvi.log")),
+      {
+        from: Date.parse("2026-09-28T00:00:00Z"),
+        to: Date.parse("2026-09-29T12:00:00Z"),
+      },
+      (line) => lines.push(line),
+    );
+    delete process.env.BEFORE_READ;
+    // Nothing is claimed as read in full, and nothing was counted twice.
+    expect(result.covered).toEqual([]);
+    expect(spans(result.unreadable)).toEqual([
+      ["2026-09-28T00:05:00.000Z", "2026-09-29T12:00:00.000Z"],
+    ]);
+    expect(lines.map((line) => iso(line.at))).toEqual([
+      "2026-09-29T00:03:00.000Z",
+      "2026-09-29T06:00:00.000Z",
+    ]);
   });
 
   it("builds every command from fixed text and closed-shape values", () => {

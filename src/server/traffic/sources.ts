@@ -46,8 +46,9 @@ export interface Span {
 export interface LogFile extends Span {
   /** The file's name beside the log, or the container's name. */
   name: string;
-  /** Null for a container. */
+  /** The file's size and last write, epoch ms; null for a container. */
   bytes: number | null;
+  modified: number | null;
 }
 
 export interface ReadResult {
@@ -102,16 +103,16 @@ const LIST_FILES = [
   "done",
 ].join("\n");
 
-// $1 is the log's path; the rest are files beside it, oldest first. A file
-// that ends part way through a line gets its line ended, so the next file's
-// first line is never glued to it. One that has gone since it was listed —
-// rotated on, or removed — is said to be unreadable, and a later read finds
-// it under its new name.
+// $1 is the log's path; the rest are files beside it, oldest first. Each is
+// preceded by its size and last write, so a file that rotated on between the
+// listing and the read shows it. A file that ends part way through a line
+// gets its line ended, so the next file's first line is never glued to it.
 const READ_FILES = [
   ...UNREADABLE,
   "shift",
   'for f in "$@"; do [ ! -e "$f" ] || [ -r "$f" ] || unreadable "$f"; done',
   'for f in "$@"; do',
+  '  echo "hallvi-file $f $(wc -c < "$f" 2>/dev/null) $(date -r "$f" +%s 2>/dev/null)"',
   '  gzip -cdf -- "$f"; s=$?; echo',
   '  [ "$s" = 0 ] || echo "hallvi-unreadable $f"',
   "done",
@@ -301,6 +302,7 @@ export function filesOf(
     return {
       name: file.name,
       bytes: file.bytes,
+      modified: file.modified,
       from: from(file),
       to: Math.max(to, from(file)),
     };
@@ -344,6 +346,7 @@ export function containerOf(name: string, output: string[]): LogFile[] {
     {
       name,
       bytes: null,
+      modified: null,
       from,
       to: Math.max(Number.isFinite(now) ? now + 1000 : last + 1, from),
     },
@@ -394,6 +397,17 @@ export async function readLog(
   if (!files.length) return { covered: [], unreadable: [] };
   const options = optionsOf(log);
   const failed = new Set<string>();
+  const listed = new Map(files.map((file) => [file.name, file]));
+  const current = log.source.type === "file" ? baseOf(log.source.path) : "";
+  // Rotation at the moment of reading — logrotate's nightly run meets the
+  // recount of the day that just ended — leaves a name on another file: the
+  // one being written starts again, a numbered one moves up. The file being
+  // written only grows and a rotated one never changes, so either shows it,
+  // and what it held is read again later under its new name.
+  const moved = (file: LogFile, bytes: number, modified: number) =>
+    file.name === current
+      ? !(bytes >= (file.bytes ?? 0))
+      : bytes !== file.bytes || modified !== file.modified;
   const { exitCode, said } = await onServer(
     host,
     readLogCommand(
@@ -402,8 +416,14 @@ export async function readLog(
       range,
     ),
     (text) => {
-      if (text.startsWith("hallvi-unreadable ")) {
-        failed.add(text.slice(18).trim());
+      if (text.startsWith("hallvi-")) {
+        const [marker, name = "", bytes, modified] = text.trim().split(/\s+/);
+        const file = listed.get(name);
+        if (
+          marker === "hallvi-unreadable" ||
+          (file && moved(file, Number(bytes), Number(modified) * 1000))
+        )
+          failed.add(name);
         return;
       }
       const line = parseLine(log.format, text, options);
