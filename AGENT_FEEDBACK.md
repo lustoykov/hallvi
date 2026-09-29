@@ -1,5 +1,8 @@
 # Agent feedback
 
+Observations, friction and wishes from agents doing ordinary work. Researched
+product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
+
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 2 | New |
@@ -8,17 +11,22 @@
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-007 — Reopen a known private application directly](#af-007--reopen-a-known-private-application-directly) | 1 | New |
 | [AF-008 — Make agreed ongoing care visible](#af-008--make-agreed-ongoing-care-visible) | 1 | New |
-| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
-| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
-| [AF-009 — Avoid rereading unchanged execution history](#af-009--avoid-rereading-unchanged-execution-history) | 1 | Resolved in #252 |
+
+[Archive](#archive) keeps resolved and declined requests out of the active list.
 
 ## How to contribute
 
-Write down bugs, friction and ideas you would like to see in Hallvi or its
-development workflow. A short note is enough: “I want this”, “this feels better”
+During implementation, testing and review, write down useful bugs, friction and
+ideas you encounter in Hallvi or its development workflow. A short note is enough:
+“I want this”, “this feels better”
 or “this would make life easier” are all valid feedback. No required justification,
-evidence, impact rating or questionnaire. Add context or reproduction steps if
-you have them and they help. No feedback quota or separate audit is needed.
+evidence, research, impact rating or questionnaire. Before finishing an ordinary
+task, record useful observations you made; no feedback quota or separate audit
+is needed. Add context or reproduction steps if you have them and they help.
+
+Feedback can inspire a researched feature proposal. Link the proposal back to
+the original entry without deleting it or making every feedback item go through
+research. Small authorized fixes can proceed in their existing task scope.
 
 Include feedback in your current PR, or open a feedback-only PR whenever you
 wish, including after a read-only review or when there are no code changes.
@@ -37,14 +45,17 @@ Keep credentials and private application data out of entries and linked material
    the same task do not add votes.
 3. Give a new request the next unused `AF-NNN` ID, a short title and a brief
    description. Add a linked overview row with count `1` and status `New`.
-4. Recount +1s from the task references and sort active requests by count, with
-   closed requests below. Count is interest, not priority. Reconcile duplicate
-   requests and ID collisions before merging; never reuse a merged ID.
+4. Recount +1s from the task references and sort active requests by count.
+   Move resolved or declined requests out of the active overview and into the
+   final Archive section, including their overview rows, full entries, votes
+   and fix/decision references. Count is interest, not priority. Reconcile
+   duplicate requests and ID collisions before merging; never reuse a merged ID.
 
 **Status:** New (awaiting owner review), Accepted (owner wants it), Declined
-(owner passed on it), Resolved (done, with a fix reference). Preserve closed
-entries. If you want to revisit one, add your feedback and flag it for the owner
-rather than changing their decision.
+(owner passed on it), Resolved (done, with a fix reference). The dashboard
+collapses the Archive by default. Preserve closed entries there; if you want
+to revisit one, add your feedback and flag it for the owner rather than
+changing their decision.
 
 ## Requests
 
@@ -58,6 +69,22 @@ What you would like or what bothered you, in your own words.
 
 **+1:** YYYY-MM-DD — task ID or PR reference
 ```
+
+### AF-006 — Reduce full-history response serialization
+
+After execution reads are cached, serializing the complete execution history
+still blocks the event loop: ten readers of a synthetic 2,000-record history
+showed about 82 ms maximum delay from the warm response path. Change
+notifications will remove idle polling; consider bounded or incremental
+evidence responses if long histories still make active chats slow. The
+[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
+from this remaining cost.
+
+**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
+
+**+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
+Idle reads now stop; active updates still serialize full histories. Keep the
+500 ms sustained cadence until a measured response-shape change improves it.
 
 ### AF-001 — Record the waiting messages Stop drops
 
@@ -75,6 +102,42 @@ only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+
+### AF-005 — Let the browser suite use a preinstalled Chromium
+
+The cloud container ships Playwright's Chromium 1194 and does not allow
+downloading browsers, while the repository pins `@playwright/test` 1.62.1,
+which expects Chromium 1234. Running the suite there took a wrapper config
+that sets `launchOptions.executablePath`. An environment variable read in
+`tests/browser/playwright.config.ts` would make that one setting.
+
+**+1:** 2026-09-29 — typed-information smoke fix, PR #245
+
+### AF-007 — Reopen a known private application directly
+
+I would like a clear Open/Reconnect action for an application's previously
+established private route, so returning to use it does not require a free-form
+conversation. The [proposal](docs/research/2026-09-29-product-opportunities.md#2-make-open-work-after-the-owner-comes-back)
+identifies the permission-contract decision this would require.
+
+**+1:** 2026-09-29 — task `codex/hallvi-product-research`
+
+### AF-008 — Make agreed ongoing care visible
+
+When Hallvi agrees to check something later, I want to see what it will check,
+where it runs, its last result, its next due time, and how to pause it. Start
+with one quiet care loop after the current beta gate. The [proposal](docs/research/2026-09-29-product-opportunities.md#6-prove-one-quiet-ongoing-care-loop)
+keeps this separate from approval of background collection or repair.
+
+**+1:** 2026-09-29 — task `codex/hallvi-product-research`
+
+## Archive
+
+| Request ID / title | +1 | Status |
+| --- | --- | --- |
+| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
+| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+| [AF-009 — Avoid rereading unchanged execution history](#af-009--avoid-rereading-unchanged-execution-history) | 1 | Resolved in #252 |
 
 ### AF-003 — Open-link checks in the shared-information smoke match nothing
 
@@ -104,50 +167,6 @@ and the badge showed 0.9 s after load. GitHub Actions passed the spec in
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
 Resolved in #245: warm the five existing read routes before interaction deadlines begin.
-
-### AF-005 — Let the browser suite use a preinstalled Chromium
-
-The cloud container ships Playwright's Chromium 1194 and does not allow
-downloading browsers, while the repository pins `@playwright/test` 1.62.1,
-which expects Chromium 1234. Running the suite there took a wrapper config
-that sets `launchOptions.executablePath`. An environment variable read in
-`tests/browser/playwright.config.ts` would make that one setting.
-
-**+1:** 2026-09-29 — typed-information smoke fix, PR #245
-
-### AF-006 — Reduce full-history response serialization
-
-After execution reads are cached, serializing the complete execution history
-still blocks the event loop: ten readers of a synthetic 2,000-record history
-showed about 82 ms maximum delay from the warm response path. Change
-notifications will remove idle polling; consider bounded or incremental
-evidence responses if long histories still make active chats slow. The
-[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
-from this remaining cost.
-
-**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
-
-**+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
-Idle reads now stop; active updates still serialize full histories. Keep the
-500 ms sustained cadence until a measured response-shape change improves it.
-
-### AF-007 — Reopen a known private application directly
-
-I would like a clear Open/Reconnect action for an application's previously
-established private route, so returning to use it does not require a free-form
-conversation. The [proposal](docs/research/2026-09-29-product-opportunities.md#2-make-open-work-after-the-owner-comes-back)
-identifies the permission-contract decision this would require.
-
-**+1:** 2026-09-29 — task `codex/hallvi-product-research`
-
-### AF-008 — Make agreed ongoing care visible
-
-When Hallvi agrees to check something later, I want to see what it will check,
-where it runs, its last result, its next due time, and how to pause it. Start
-with one quiet care loop after the current beta gate. The [proposal](docs/research/2026-09-29-product-opportunities.md#6-prove-one-quiet-ongoing-care-loop)
-keeps this separate from approval of background collection or repair.
-
-**+1:** 2026-09-29 — task `codex/hallvi-product-research`
 
 ### AF-009 — Avoid rereading unchanged execution history
 

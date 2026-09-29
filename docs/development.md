@@ -106,12 +106,18 @@ standing use and maintenance rule lives in [AGENTS.md](../AGENTS.md).
 
 These are available checks, not a requirement to rerun every suite for every change. Select checks proportionate to the implementation stage; documentation-only edits need document/link checks rather than deployment proofs.
 
-Record bugs, friction and ideas in [Agent feedback](../AGENT_FEEDBACK.md#how-to-contribute).
-A short note about what you want is enough; no justification or evidence is
-required. Include it in your current PR or open a feedback-only PR whenever you
-wish, even if the task has no code changes. That file owns deduplication and +1
-counting; the owner decides what is worth doing. It is contributor guidance,
-not a Pi product workflow.
+Record useful bugs, friction and wishes encountered during ordinary development
+in [Agent feedback](../AGENT_FEEDBACK.md#how-to-contribute), including when there
+are no code changes. A short note is enough; no research or evidence is required.
+Capture useful observations before finishing and include them in your current
+PR or a feedback-only PR. Invent nothing when there is no feedback to add.
+That file owns deduplication and +1 counting.
+
+[Agent features](../AGENT_FEATURES.md) separately holds researched product
+proposals, selection and assignment. It owns the initial, weekly and targeted
+research workflow. The developer dashboard exposes both documents as separate
+read-only pages. The owner selects features; the roadmap owns delivery order.
+Neither contributor workflow belongs in Pi's product sessions.
 
 ```sh
 npm test
