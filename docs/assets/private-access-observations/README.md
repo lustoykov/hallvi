@@ -9,7 +9,8 @@ read errors and edited routes cannot retain an earlier green answer.
 
 - Baseline product: `d9ecaf1ae5cdb2535ef41ba84942d568a979b598` (#255).
 - Candidate product and browser harness: `e3610c9c07bcf50c73ce512dd93dffe5411e118b`.
-  Subsequent evidence/document commits do not change this product source.
+  Subsequent evidence/document/workflow commits do not change these product
+  components or access implementation.
 - Captured on 29 September 2026 with the disposable browser QA controller,
   Playwright Chromium, Node 22.23.2; no account or retained application state.
 - Both versions render the actual product components with the same synthetic
@@ -64,7 +65,11 @@ visible difference is a product correction, not a retouched baseline image.
   contrast and horizontal overflow. The one manual design scan reported only
   existing declarations in `journey-v2.css` (1 warning, 103 advisories), outside
   the two changed token fallbacks. No theme redesign is part of this increment.
-- The existing verify-hallvi workflow worked for this scope and needed no change.
+- Baseline archives in ignored `work/` exposed duplicate TypeScript globals in
+  the compiler's source glob. The narrow workflow correction excludes `work/`
+  and documents archive cleanup. TypeScript and the production build pass with
+  a deliberately invalid scratch TypeScript file present; product source and
+  tests remain in the compiler's file list.
 
 Reproduce the screenshots with
 `HALLVI_E2E_PORT=3670 HALLVI_ACCESS_CAPTURE=candidate npm run test:e2e -- tests/browser/private-access.spec.ts`.
