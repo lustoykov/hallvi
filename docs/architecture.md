@@ -16,7 +16,7 @@ from Pi's session on every view, and the database holds only the
 conversation's title, its application and the id of that session. Evidence
 records still call the place they are shown a "run"; it is the reply Pi's
 transcript puts the tool call under. Permissions and the host reference live
-on the application; execution evidence lives in files. See the storage [verification](testing/2026-09-12-operator-execution.md).
+on the application; execution evidence lives in files. See the storage [verification](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-12-operator-execution.md).
 
 ## The shape of it
 
@@ -102,7 +102,7 @@ chat summaries, deployment, secrets metadata and controller-protection facts.
 The permission control reads settings only; the logs view takes execution
 records from SSE. Existing access observations and traffic subscriptions
 keep their own cadence. No periodic background path reconstructs idle chat
-history. See the [notification measurements](testing/2026-09-29-chat-notifications.md).
+history. See the [notification measurements](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-chat-notifications.md).
 
 ## Asynchronous SQLite boundary
 
@@ -219,7 +219,7 @@ recovery before accepting socket requests and for settlement before a live
 stretch stops driving. Settlement starts a fresh scan after the scope stops
 executing, so it cannot join an older read and overwrite a completed command.
 Transcript projection and response serialization still run on the main thread.
-The [synthetic measurement](testing/2026-09-29-execution-reader.md) separates
+The [synthetic measurement](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-execution-reader.md) separates
 file-read counts from response cost and these remaining limits.
 
 ## What Pi can do
@@ -410,7 +410,7 @@ the internet. It adds two tools and no workflow, table or approval type. The
 public request path is browser → DNS → a reverse proxy on the deployment server
 → the application → its private dependencies; the controller is on none of it.
 See the [decision diagram](architecture/publishing-evidence.html) and the
-[evidence](testing/2026-09-15-publish-custom-domain.md).
+[evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-15-publish-custom-domain.md).
 
 `set_domain_record` writes one exact name of one exact type per call at the DNS
 provider, so no request it can make touches a record it was not given. It
@@ -455,7 +455,7 @@ claims to have observed a renewal.
 
 ## Provisioning
 
-Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation; since 18 September the [host request card](design/onboarding.md) gathers both with one command the owner pastes on the machine, and `connection-checks.ts` also requires passwordless administrator rights and a 64-bit Linux before the host is saved. The same card proves a Hetzner token can write by registering the application's public SSH key. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
+Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation; since 18 September the [host request card](design/onboarding.md) gathers both with one command the owner pastes on the machine, and `connection-checks.ts` also requires passwordless administrator rights and a 64-bit Linux before the host is saved. The same card proves a Hetzner token can write by registering the application's public SSH key. No schema table, workflow engine or approval mode is added. See the [evidence and limits](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-12-hetzner-provisioning.md).
 
 ## Protecting the controller
 
@@ -483,7 +483,7 @@ controller stays manual; see
   Hallvi's own commands printed, and says so.
 - Live requests need Caddy writing JSON access logs and a record saying where.
   Other proxies and formats are not read. Both sources were
-  [run on a rented server](testing/2026-09-19-overview-live.md) with a record
+  [run on a rented server](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-19-overview-live.md) with a record
   Pi wrote. A private application has no proxy until the owner asks for this,
   and a dead connection takes about fifteen seconds to notice.
 - One conversation per application runs at a time, and applications run
@@ -504,6 +504,6 @@ Core source: [Pi runtime](../src/server/pi.ts),
 [secrets](../src/server/application-secrets.ts) and
 [controller protection](../src/server/controller-protection.ts).
 
-[Evidence](testing/README.md) distinguishes actual model runs, scripted tests,
-local Docker and live-host observations. Documentation does not establish
+The [verification guide](verification.md) distinguishes actual model runs,
+scripted tests, local Docker and live-host observations. Documentation does not establish
 shipped support.

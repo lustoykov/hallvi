@@ -446,9 +446,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         ["/guide", "/feedback"].includes(url.pathname)
       ) {
         const feedback = url.pathname === "/feedback";
-        const path = feedback
-          ? "AGENT_FEEDBACK.md"
-          : "docs/testing/phase-one-acceptance.md";
+        const path = feedback ? "AGENT_FEEDBACK.md" : "tests/acceptance.md";
         const title = feedback ? "Agent feedback" : "Acceptance guide";
         response.setHeader("Content-Type", "text/html; charset=utf-8");
         let body: string;

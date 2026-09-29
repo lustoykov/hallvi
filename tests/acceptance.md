@@ -4,7 +4,7 @@ This stable path is loaded by the local testing dashboard. The complete phase-er
 
 ## Current redesign acceptance
 
-[Roadmap](../../ROADMAP.md) owns the stages; [operator design](../operator-design.md) owns the new behavior. Review each stage with a focused diff, something the user can try, and evidence proportional to that stage.
+[Roadmap](../ROADMAP.md) owns the stages; [operator design](../docs/operator-design.md) owns the new behavior. Review each stage with a focused diff, something the user can try, and evidence proportional to that stage.
 
 | Stage | Evidence to establish |
 | --- | --- |
@@ -17,7 +17,7 @@ These are development checkpoints, not a promise of universal support. Exact exa
 
 ## Regression and execution
 
-Existing development data is explicitly disposable; migration and legacy-history compatibility are not redesign acceptance requirements. Keep focused checks for behavior the new design requires; delete or rewrite obsolete workflow and hardening expectations. Schema 14 migration and retired-record evidence describe the old implementation; its code and tests can be removed. Unreviewed model answers remain unreviewed; passing schema checks do not establish semantic quality.
+Use task-owned disposable fixtures for destructive checks. Retained development applications and their history follow the [compatibility and ownership rules](../docs/development-environment.md). Keep focused checks for behavior the current design requires; historical reports do not override those rules. Unreviewed model answers remain unreviewed; passing schema checks do not establish semantic quality.
 
 Use the dashboard suite picker or these local commands:
 
@@ -27,6 +27,6 @@ npm run test:e2e:smoke
 npm run test:e2e
 ```
 
-The smoke subset is not the full browser suite. Real Docker tests and real-model evals require explicit opt-in; [test runner instructions](../../tests/README.md) document those commands. [Dated evidence](README.md#dated-evidence) applies only to the candidate/configuration recorded there.
+The smoke subset is not the full browser suite. Real Docker tests and real-model evals require explicit opt-in; [test runner instructions](README.md) document those commands. [Dated evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/README.md#dated-evidence) applies only to the candidate/configuration recorded there.
 
 The repository links in this guide are for a Markdown viewer; the local testing dashboard renders this document but does not serve the rest of the repository. Use the Git permalink for the full historical casebook.

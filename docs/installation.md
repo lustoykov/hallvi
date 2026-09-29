@@ -73,13 +73,13 @@ Installing does not need a source checkout, Node.js, npm, Python or a compiler.
 
 | Platform | Current evidence |
 | --- | --- |
-| macOS, Apple silicon | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, and an earlier archive passed a same-schema upgrade |
-| Ubuntu 24.04, x64 | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md) installed, reinstalled and survived reboot |
+| macOS, Apple silicon | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-19-integrated-prebuilt-installation.md) installed, and an earlier archive passed a same-schema upgrade |
+| Ubuntu 24.04, x64 | [Published alpha draft installed and started on a clean runner](https://github.com/lustoykov/hallvi/actions/runs/35583807718); [19 September integrated candidate](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-19-integrated-prebuilt-installation.md) installed, reinstalled and survived reboot |
 | macOS, Intel; other Linux architectures/distributions | No prebuilt release target yet |
 
 Alpine/musl Linux and Windows are not supported. The
-[earlier installation evidence](testing/2026-09-17-installation.md) and
-[beta rehearsal](testing/2026-09-18-beta-rehearsal.md) used the former
+[earlier installation evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-17-installation.md) and
+[beta rehearsal](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-18-beta-rehearsal.md) used the former
 source-plus-compile archive and do not certify a new prebuilt archive.
 
 ## macOS
@@ -493,7 +493,7 @@ the same "Dev" chip. The installed Hallvi has none of these.
   On stock macOS the signature check runs after unpacking with Node.js from
   the archive, so the archive itself is part of the verifier. See
   [what is actually checked](#what-is-actually-checked).
-- The [19 September integrated candidate](testing/2026-09-19-integrated-prebuilt-installation.md)
+- The [19 September integrated candidate](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-19-integrated-prebuilt-installation.md)
   was installed on Apple-silicon macOS and Ubuntu 24.04 x64. A fresh ChatGPT
   connection on the installed Ubuntu controller drove real public-repository
   inspection and private deployment to a separate test host. External-user

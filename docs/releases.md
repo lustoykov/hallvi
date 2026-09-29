@@ -251,5 +251,5 @@ at a release source of your own:
 
 An installation trusting a key from its own settings says so wherever it offers
 an update, in Settings and in `hallvi update`, because that is not the same
-promise. [The 20 September proof](testing/2026-09-20-downloads-and-updates.md)
+promise. [The 20 September proof](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-20-downloads-and-updates.md)
 used both against a disposable release source.

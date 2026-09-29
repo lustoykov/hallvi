@@ -245,7 +245,7 @@ browser smoke suite — on Node 22, and ends with a summary naming the revision
 and each step's result. While that workflow is disabled, the summary is how a
 pull request records them.
 
-[tests/README.md](../tests/README.md) describes browser journeys, synthetic fixtures, Docker checks and the limits of archived evals. `npm run dev` starts the local testing workbench beside the app; `npm run test:dashboard` can still run it alone on <http://127.0.0.1:4317> when that port is free. Synthetic tests are not provider or deployment evidence. See the [testing index](testing/README.md) for acceptance coverage and known limits.
+[tests/README.md](../tests/README.md) describes browser journeys, synthetic fixtures, Docker checks and the limits of archived evals. `npm run dev` starts the local testing workbench beside the app; `npm run test:dashboard` can still run it alone on <http://127.0.0.1:4317> when that port is free. Synthetic tests are not provider or deployment evidence. See the [acceptance guide](../tests/acceptance.md) for review criteria; record run-specific observations and limits in the PR.
 
 ### Shared agent skill discovery
 

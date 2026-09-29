@@ -120,7 +120,7 @@ still blocks the event loop: ten readers of a synthetic 2,000-record history
 showed about 82 ms maximum delay from the warm response path. Change
 notifications will remove idle polling; consider bounded or incremental
 evidence responses if long histories still make active chats slow. The
-[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
+[measurement](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-execution-reader.md) separates file reads
 from this remaining cost.
 
 **+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
