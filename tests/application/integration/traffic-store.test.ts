@@ -42,13 +42,15 @@ afterAll(() => {
 
 /** A day as counted, covering its first `hours` hours. */
 function counted(hours: number, final: boolean): TrafficDay {
-  return countDay([], {
+  const day = countDay([], {
     day: DAY,
     timeZone: ZONE,
     scriptSince: null,
     coverage: { from: iso(start), to: iso(start + hours * HOUR), gaps: [] },
     now: final ? end + HOUR : start + hours * HOUR,
   });
+  // Final as the collector's recount from the files stores it.
+  return { ...day, final };
 }
 
 function view(at: number, address: string): TrafficLine {

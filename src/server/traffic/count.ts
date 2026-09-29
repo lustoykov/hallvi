@@ -56,7 +56,7 @@ import {
   type Arrival,
 } from "./enrich";
 
-/** A day is final this long after it ends: lines still being written. */
+/** A day is recounted this long after it ends: lines still being written. */
 export const FINAL_AFTER_MS = 10 * 60_000;
 /** Paths kept per hour for the errors they answered, worst first. */
 const ERROR_PATHS = 20;
@@ -87,7 +87,7 @@ export interface CountOptions {
   pageKey?: string;
   /** What the log covered of the day, as the collector measured it. */
   coverage: Coverage;
-  /** When the count is taken: its `computedAt`, and whether it is final. */
+  /** When the count is taken: its `computedAt`. */
   now?: number;
 }
 
@@ -440,7 +440,9 @@ export class DayCounter {
       day: this.options.day,
       timeZone: this.options.timeZone,
       computedAt: new Date(now).toISOString(),
-      final: now >= this.end + FINAL_AFTER_MS,
+      // A count is never final by the clock: the collector makes a day final
+      // once it has counted it again from the files.
+      final: false,
       coverage: at.coverage ?? this.options.coverage,
       viewSource:
         switchAt === null || switchAt >= this.end

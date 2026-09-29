@@ -87,11 +87,18 @@ A day's numbers are a function of that day's log lines and nothing else.
 
 - **Finished days** are recounted from the retained files once the day is over
   (after a short grace for requests still being written) and stored as final,
-  with their coverage. A recount replaces a stored day only when it covers at
-  least as much of it.
+  with their coverage. Only that recount makes a day final. A recount and a
+  stored day are compared by the stretches of the day each covers, never by
+  how long: the recount replaces a stored day it covers all of; a stored day
+  that covers all of the recount and more (the log has since rotated part of
+  it away) is kept; otherwise each hour comes from whichever covers it, with
+  that side's gaps, and figures that are not hourly — visitors, lists, time on
+  page, page speed — take the larger of the two counts: a floor, never a sum.
 - **Today** is recounted from the log whenever the collector starts or
   reconnects, then kept current in memory from the follow and written as
-  provisional every few seconds.
+  provisional every few seconds. The follow reads exactly the files it
+  measured coverage by; a rotation between the listing and the follow starts
+  it over, and a file it cannot read is a gap.
 - Nothing is ever added to a saved number, so a restart cannot count twice. A
   glitch in the live follow only touches today's provisional numbers and is
   corrected when the day is recounted.
@@ -269,7 +276,8 @@ says so and names what is host-wide.
   `docker logs` history ends when the container is recreated. A proxy in a
   container bind-mounts the host directory at the same path. Hallvi's SSH user
   must be root, have passwordless sudo, or be able to read the files; reads
-  fall back to `sudo -n` and otherwise say which file is unreadable.
+  and the live follow fall back to `sudo -n` and otherwise say which file is
+  unreadable.
 - **Caddy 2.11:** a `log hallvi` of its own beside the owner's, imported into each
   counted site, writing `/var/log/caddy/hallvi/access.log` with
   `roll_interval 24h`, `roll_keep 1000`, `roll_keep_for 30d`, `roll_size 100MiB`,

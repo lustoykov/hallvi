@@ -275,7 +275,8 @@ describe("a day", () => {
       ],
       options,
     );
-    expect(day.final).toBe(true);
+    // Only the collector's recount from the files makes a day final.
+    expect(day.final).toBe(false);
     expect(day.hours).toHaveLength(24);
     expect(day.hours.reduce((sum, one) => sum + one.requests, 0)).toBe(7);
     expect(day.hours.reduce((sum, one) => sum + one.views, 0)).toBe(3);
