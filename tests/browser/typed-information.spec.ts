@@ -26,7 +26,7 @@ test("records render in chat and their views, survive refresh, and update by rec
     )
     .get(appId) as { id: string };
   const now = new Date().toISOString();
-  let closeWorker: (() => Promise<unknown>) | undefined;
+  let closeWorker: Awaited<ReturnType<typeof scriptWorker>> | undefined;
   const deployment = randomUUID(),
     access = randomUUID(),
     failed = randomUUID();
@@ -265,8 +265,8 @@ test("records render in chat and their views, survive refresh, and update by rec
         new Date().toISOString(),
         deployment,
       );
-    // The idle page polls every 15 seconds. Observe the update without
-    // a reload.
+    closeWorker.changed({ kind: "information", applicationId: appId });
+    // A saved-information change reaches the idle page without a reload.
     await expect(releaseRow("Rebuilt from the same source")).toBeVisible({
       timeout: 20_000,
     });

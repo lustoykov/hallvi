@@ -90,14 +90,14 @@ export async function GET(
 ) {
   const { applicationId } = await context.params;
   return handle(async () => {
-    const settings = operatorSettings(applicationId);
+    const settings = await operatorSettings(applicationId);
     return {
       requests: listConnectionRequests(applicationId),
       mode: settings.permissionMode,
       hostAddress: settings.host?.address ?? null,
       hetznerConnected: Boolean(hetznerConnectionId()),
       publicKey: (await serverPublicKey(applicationId)).publicKey,
-      deployment: deploymentStatus(applicationId),
+      deployment: await deploymentStatus(applicationId),
     };
   });
 }
@@ -114,7 +114,7 @@ export async function POST(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId } = await context.params;
-    operatorSettings(applicationId);
+    await operatorSettings(applicationId);
     const body = await parseJsonRequest(request, action);
     switch (body.action) {
       case "progress":

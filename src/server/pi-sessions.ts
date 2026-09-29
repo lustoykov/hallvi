@@ -13,7 +13,6 @@ import {
 } from "@earendil-works/pi-agent-core";
 import { operationResults } from "./pi-transcript";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import { and, eq, isNull } from "drizzle-orm";
 import {
   chmodSync,
   constants,
@@ -26,8 +25,7 @@ import {
   rmSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { databasePath, db } from "./db";
-import { chats } from "./db-schema";
+import { databasePath, getChat, setNativeSessionId } from "./db";
 
 // Only the worker calls into this file. It is the one owner of session
 // storage: the app asks it over the worker link and never opens a history.
@@ -57,17 +55,13 @@ function validatedId(id: string) {
   return id;
 }
 
-function ownedChat(applicationId: string, chatId: string) {
+async function ownedChat(applicationId: string, chatId: string) {
   validatedId(applicationId);
   validatedId(chatId);
-  const row = db()
-    .select({ chat: chats })
-    .from(chats)
-    .where(and(eq(chats.id, chatId), eq(chats.applicationId, applicationId)))
-    .get();
-  if (!row)
+  const chat = await getChat(chatId);
+  if (!chat || chat.applicationId !== applicationId)
     throw new NativeSessionError("not-found", "Conversation not found.");
-  return row.chat;
+  return chat;
 }
 
 function privateDirectory(path: string) {
@@ -139,7 +133,7 @@ export async function openNativeChatSession(
   applicationId: string,
   chatId: string,
 ) {
-  const chat = ownedChat(applicationId, chatId);
+  const chat = await ownedChat(applicationId, chatId);
   const root = privateDirectory(
     join(applicationDirectory(applicationId), validatedId(chatId)),
   );
@@ -171,12 +165,8 @@ export async function openNativeChatSession(
     if (chat.nativeSessionId && session.metadata.id !== chat.nativeSessionId)
       throw unavailable();
     if (!chat.nativeSessionId) {
-      const changed = db()
-        .update(chats)
-        .set({ nativeSessionId: session.metadata.id })
-        .where(and(eq(chats.id, chatId), isNull(chats.nativeSessionId)))
-        .run();
-      if (changed.changes !== 1) throw unavailable();
+      const changed = await setNativeSessionId(chatId, session.metadata.id);
+      if (changed !== 1) throw unavailable();
     }
     // Pi writes its files readable by everyone. The directory is private; the
     // file is made so too, again after Pi has rewritten it.

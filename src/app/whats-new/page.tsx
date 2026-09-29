@@ -17,7 +17,7 @@ export default async function WhatsNewPage({
       releases={changelog()}
       // Opened from an application's sidebar, it goes back to that
       // conversation the way Settings does.
-      returnTo={setupReturnDestination(await searchParams) ?? undefined}
+      returnTo={(await setupReturnDestination(await searchParams)) ?? undefined}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { promises as fs, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
@@ -17,6 +17,8 @@ import {
 import {
   saveOperatorSettings,
   operatorSettings,
+  executionContext,
+  listExecutions,
 } from "../../../src/server/operator-execution";
 import { pushTestDatabase } from "../../test-database";
 vi.mock("../../../src/server/github", async (original) => ({
@@ -31,9 +33,8 @@ vi.mock("../../../src/server/github", async (original) => ({
 let root: string;
 let app: string;
 let chat: string;
-function reopen() {
-  store.db().$client.close();
-  delete globalThis.__hallviDb;
+async function reopen() {
+  await store.closeDatabase();
 }
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hv-storage-"));
@@ -42,31 +43,93 @@ beforeAll(() => {
   pushTestDatabase(process.env.HALLVI_DB_PATH!);
 });
 beforeEach(async () => {
-  store.db().$client.exec("DELETE FROM applications");
+  for (const application of await store.listApplications())
+    await store.deleteApplication(application.id);
   app = (
     await createApplication({ repositoryUrl: "https://github.com/example/app" })
   ).application.id;
-  chat = store.listApplicationChats(app)[0].id;
+  chat = (await store.listApplicationChats(app))[0].id;
 });
-afterAll(() => {
-  reopen();
+afterAll(async () => {
+  await reopen();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
-it("loads creation and settings after reopening the database", () => {
-  expect(store.getApplication(app)?.repositoryId).toBe(123);
-  expect(store.getChat(chat)?.kind).toBe("main");
-  expect(operatorSettings(app).permissionMode).toBe("pi-decides");
-  saveOperatorSettings(app, { permissionMode: "always-ask", host: null });
-  reopen();
-  expect(operatorSettings(app).permissionMode).toBe("always-ask");
+it("loads creation and settings after reopening the database", async () => {
+  expect((await store.getApplication(app))?.repositoryId).toBe(123);
+  expect((await store.getChat(chat))?.kind).toBe("main");
+  expect((await operatorSettings(app)).permissionMode).toBe("pi-decides");
+  await saveOperatorSettings(app, { permissionMode: "always-ask", host: null });
+  await reopen();
+  expect((await operatorSettings(app)).permissionMode).toBe("always-ask");
+});
+it("validates new execution evidence while an older history scan is in flight", async () => {
+  await saveOperatorSettings(app, { permissionMode: "bypass", host: null });
+  mkdirSync(join(root, "config", "operator", app, "executions"), {
+    recursive: true,
+  });
+  let release!: () => void;
+  let started!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const enumerated = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const readdir = fs.readdir.bind(fs);
+  const scan = vi
+    .spyOn(fs, "readdir")
+    .mockImplementationOnce(async (...args) => {
+      const names = await readdir(...args);
+      started();
+      await held;
+      return names;
+    });
+  const older = listExecutions(app);
+  try {
+    await enumerated;
+    await executionContext({ applicationId: app, chatId: chat }).execute(
+      "fixture",
+      "local",
+      "read fixture",
+      async () => "verified",
+      false,
+      "new-evidence",
+    );
+    const [name] = await readdir(
+      join(root, "config", "operator", app, "executions"),
+    );
+    const executionId = name.replace(/\.json$/, "");
+    // The held scan enumerated no files. Evidence validation must read the
+    // cited record independently, without waiting for that stale listing.
+    const saving = saveInformation(app, {
+      title: "New evidence",
+      body: "The command completed.",
+      evidence: [{ type: "execution", id: executionId }],
+    });
+    let saved = false;
+    void saving.then(
+      () => {
+        saved = true;
+      },
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(saved).toBe(true), { timeout: 2000 });
+    expect((await saving).evidence).toEqual([
+      { type: "execution", id: executionId },
+    ]);
+  } finally {
+    release();
+    await older;
+    scan.mockRestore();
+  }
 });
 it("shares one outcome between views while keeping working knowledge unsurfaced", async () => {
-  const hidden = saveInformation(app, {
+  const hidden = await saveInformation(app, {
     title: "Build note",
     body: "Use the repository lockfile.",
   });
-  const record = saveInformation(app, {
+  const record = await saveInformation(app, {
     title: "Application verified",
     body: "HTTP check passed.",
     evidence: [{ type: "url", url: "https://example.com" }],
@@ -88,16 +151,20 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
       ],
     },
   });
-  reopen();
+  await reopen();
   const view = await getOperatorView(app, chat);
   expect(view.information?.map((r) => r.id)).toEqual([record.id]);
-  expect(listInformation(app, "lockfile").map((r) => r.id)).toEqual([
+  expect((await listInformation(app, "lockfile")).map((r) => r.id)).toEqual([
     hidden.id,
   ]);
-  saveInformation(app, { title: hidden.title, body: "Use npm ci." }, hidden.id);
-  expect(listInformation(app, "npm ci")).toHaveLength(1);
-  retireInformation(app, record.id);
-  expect(listInformation(app).map((r) => r.id)).toEqual([hidden.id]);
+  await saveInformation(
+    app,
+    { title: hidden.title, body: "Use npm ci." },
+    hidden.id,
+  );
+  expect(await listInformation(app, "npm ci")).toHaveLength(1);
+  await retireInformation(app, record.id);
+  expect((await listInformation(app)).map((r) => r.id)).toEqual([hidden.id]);
   expect(
     (await getOperatorView(app, chat)).information?.[0].retiredAt,
   ).toBeTruthy();
@@ -107,22 +174,22 @@ it("tells an author who invented an ID what to do instead, and never touches ano
   // only that they were not found. Record IDs are unique across every
   // application, so an invented one is a mistake worth naming precisely.
   const invented = "deployment";
-  expect(() =>
+  await expect(
     saveInformation(app, { title: "Deployed", body: "It runs." }, invented),
-  ).toThrow(/Omit id to create a record/);
-  expect(listInformation(app)).toHaveLength(0);
+  ).rejects.toThrow(/Omit id to create a record/);
+  expect(await listInformation(app)).toHaveLength(0);
 
   // Creating without an ID works and hands back the ID to update with.
-  const created = saveInformation(app, {
+  const created = await saveInformation(app, {
     title: "Deployed",
     body: "It runs.",
   });
-  saveInformation(
+  await saveInformation(
     app,
     { title: "Deployed", body: "It runs, and the data survived." },
     created.id,
   );
-  const records = listInformation(app);
+  const records = await listInformation(app);
   expect(records).toHaveLength(1);
   expect(records[0].body).toBe("It runs, and the data survived.");
 
@@ -133,37 +200,38 @@ it("tells an author who invented an ID what to do instead, and never touches ano
       repositoryUrl: "https://github.com/example/other",
     })
   ).application.id;
-  expect(() =>
+  await expect(
     saveInformation(
       other,
       { title: "Mine now", body: "Overwritten." },
       created.id,
     ),
-  ).toThrow(/Omit id to create a record/);
-  expect(listInformation(other)).toHaveLength(0);
-  expect(listInformation(app)[0].body).toBe("It runs, and the data survived.");
+  ).rejects.toThrow(/Omit id to create a record/);
+  expect(await listInformation(other)).toHaveLength(0);
+  expect((await listInformation(app))[0].body).toBe(
+    "It runs, and the data survived.",
+  );
 });
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
-  saveInformation(app, { title: "Note", body: "Saved" });
+  await saveInformation(app, { title: "Note", body: "Saved" });
   // Without the owner nothing is removed: a history must not be orphaned.
   await expect(removeApplication(app, "example/app")).rejects.toThrow(
     /worker is not running/,
   );
-  expect(store.getApplication(app)).toBeTruthy();
+  expect(await store.getApplication(app)).toBeTruthy();
   const worker = (await ownSessions())!;
   try {
     await removeApplication(app, "example/app");
   } finally {
     await worker.close();
   }
-  for (const table of ["applications", "conversations", "saved_information"])
-    expect(
-      store.db().$client.prepare(`SELECT count(*) AS n FROM ${table}`).get(),
-    ).toEqual({ n: 0 });
+  expect(await store.listApplications()).toEqual([]);
+  expect(await store.listApplicationChats(app)).toEqual([]);
+  expect(await listInformation(app, "", true)).toEqual([]);
 });
 
-it("persists typed deployment/access facts and shares edits without duplicating records", () => {
-  const deployment = saveInformation(app, {
+it("persists typed deployment/access facts and shares edits without duplicating records", async () => {
+  const deployment = (await saveInformation(app, {
     title: "Application deployed",
     body: "The deployment is recorded.",
     presentation: {
@@ -188,8 +256,8 @@ it("persists typed deployment/access facts and shares edits without duplicating 
         changes: ["Added container packaging"],
       },
     },
-  })!;
-  const access = saveInformation(app, {
+  }))!;
+  const access = (await saveInformation(app, {
     title: "Private access ready",
     body: "Open on the controller PC.",
     presentation: {
@@ -204,18 +272,18 @@ it("persists typed deployment/access facts and shares edits without duplicating 
         remotePort: 80,
       },
     },
-  })!;
+  }))!;
   expect(
-    listInformation(app).find((r) => r.id === deployment.id)?.presentation
-      ?.content,
+    (await listInformation(app)).find((r) => r.id === deployment.id)
+      ?.presentation?.content,
   ).toMatchObject({ kind: "deployment", image: "app:candidate" });
   // What the check was about survives the round trip, which is what places
   // it on a lane; `subject` used to carry this and named a column instead.
   expect(
-    listInformation(app).find((r) => r.id === deployment.id)?.presentation
-      ?.checks[0].about,
+    (await listInformation(app)).find((r) => r.id === deployment.id)
+      ?.presentation?.checks[0].about,
   ).toEqual({ kind: "application", id: "qa-app" });
-  saveInformation(
+  await saveInformation(
     app,
     {
       ...access,
@@ -234,16 +302,17 @@ it("persists typed deployment/access facts and shares edits without duplicating 
     access.id,
   );
   expect(
-    listInformation(app).filter(
+    (await listInformation(app)).filter(
       (r) => r.presentation?.content?.kind === "application-access",
     ),
   ).toHaveLength(1);
   expect(
-    listInformation(app).find((r) => r.id === access.id)?.presentation?.url,
+    (await listInformation(app)).find((r) => r.id === access.id)?.presentation
+      ?.url,
   ).toBe("http://127.0.0.1:8081");
 });
 
-it("rejects malformed typed records before saving them", () => {
+it("rejects malformed typed records before saving them", async () => {
   const base = {
     title: "Access",
     body: "",
@@ -260,20 +329,20 @@ it("rejects malformed typed records before saving them", () => {
       },
     },
   };
-  expect(() => saveInformation(app, base)).toThrow("127.0.0.1");
-  expect(() =>
+  await expect(saveInformation(app, base)).rejects.toThrow("127.0.0.1");
+  await expect(
     saveInformation(app, {
       ...base,
       presentation: { ...base.presentation, url: "http://127.0.0.1:8081" },
     }),
-  ).toThrow("localPort");
-  expect(() =>
+  ).rejects.toThrow("localPort");
+  await expect(
     saveInformation(app, {
       ...base,
       presentation: { ...base.presentation, url: undefined },
     }),
-  ).toThrow("browser URL");
-  expect(() =>
+  ).rejects.toThrow("browser URL");
+  await expect(
     saveInformation(app, {
       ...base,
       presentation: {
@@ -281,6 +350,6 @@ it("rejects malformed typed records before saving them", () => {
         content: { kind: "arbitrary-html", html: "<script>" },
       },
     }),
-  ).toThrow();
-  expect(listInformation(app)).toHaveLength(0);
+  ).rejects.toThrow();
+  expect(await listInformation(app)).toHaveLength(0);
 });

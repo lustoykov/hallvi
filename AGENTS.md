@@ -37,7 +37,7 @@ automation prompts into product sessions.
   or an explicitly assigned feature. Ordinary coding tasks still contribute
   feedback; they do not need a broad product research pass. The owner selects
   work, and [ROADMAP.md](ROADMAP.md) owns delivery order.
-- For automated and scheduled work in this repository, default to
+- For worker agents and automated or scheduled work in this repository, default to
   `gpt-6-sol` with `high` reasoning unless the owner requests otherwise.
 - When a boundary or a flow changes, draw it as a Mermaid block in the pull
   request.

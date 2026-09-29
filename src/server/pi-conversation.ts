@@ -90,13 +90,17 @@ function placeEvidence(
  * an absent worker for an empty conversation: without one this throws.
  */
 export async function readConversation(applicationId: string, chatId: string) {
-  loadChat(applicationId, chatId);
+  await loadChat(applicationId, chatId);
   const transcript = await askWorker<Transcript>("transcript", {
     scope: { applicationId, chatId },
   });
   return {
     transcript,
-    ...placeEvidence(applicationId, transcript, listExecutions(applicationId)),
+    ...placeEvidence(
+      applicationId,
+      transcript,
+      await listExecutions(applicationId),
+    ),
   };
 }
 
@@ -104,7 +108,7 @@ export async function chatSnapshot(
   applicationId: string,
   chatId: string,
 ): Promise<ChatSnapshot> {
-  const { application, chat } = loadChat(applicationId, chatId);
+  const { application, chat } = await loadChat(applicationId, chatId);
   let worker = true;
   const transcript = await askWorker<Transcript>("transcript", {
     scope: { applicationId, chatId },
@@ -116,7 +120,7 @@ export async function chatSnapshot(
   const placed = placeEvidence(
     applicationId,
     transcript,
-    listExecutions(applicationId),
+    await listExecutions(applicationId),
   );
   return {
     worker: { alive: worker },
@@ -130,7 +134,7 @@ export async function chatSnapshot(
     ],
     executions: placed.executions,
     piActivity: placed.piActivity,
-    information: listInformation(applicationId, "", true).filter(
+    information: (await listInformation(applicationId, "", true)).filter(
       (r) => r.presentation,
     ),
   };
@@ -157,7 +161,7 @@ export async function sendChatMessage(
     images,
     origin,
   });
-  assertChatWritable(loadChat(applicationId, chatId).chat);
+  assertChatWritable((await loadChat(applicationId, chatId)).chat);
   await askWorker("send", {
     scope: { applicationId, chatId },
     message: {
@@ -168,7 +172,7 @@ export async function sendChatMessage(
       origin: input.origin,
     },
   });
-  touchChat(chatId);
+  await touchChat(chatId);
   return chatSnapshot(applicationId, chatId);
 }
 
@@ -182,7 +186,7 @@ export async function chatImage(
   messageId: string,
   index: number,
 ) {
-  loadChat(applicationId, chatId);
+  await loadChat(applicationId, chatId);
   const image = await askWorker<{ mimeType: string; data: string }>("image", {
     scope: { applicationId, chatId },
     message: { id: messageId, index },
@@ -199,14 +203,14 @@ export async function continueConversation(
   applicationId: string,
   chatId: string,
 ) {
-  assertChatWritable(loadChat(applicationId, chatId).chat);
+  assertChatWritable((await loadChat(applicationId, chatId)).chat);
   await askWorker("continue", { scope: { applicationId, chatId } });
   return chatSnapshot(applicationId, chatId);
 }
 
 /** Pi ends its operation and drops what it had queued. */
 export async function stopConversation(applicationId: string, chatId: string) {
-  loadChat(applicationId, chatId);
+  await loadChat(applicationId, chatId);
   await askWorker("stop", { scope: { applicationId, chatId } });
   return chatSnapshot(applicationId, chatId);
 }

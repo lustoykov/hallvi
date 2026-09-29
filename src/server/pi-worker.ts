@@ -58,6 +58,7 @@ export async function runPiWorker(signal: AbortSignal) {
       "A Pi worker is already running for this database.",
     );
   const { owner } = owned;
+  let watching: Promise<void> | undefined;
   try {
     // A send is answered once Pi has the message, so the first one should
     // not also wait for the SDK to load.
@@ -75,15 +76,21 @@ export async function runPiWorker(signal: AbortSignal) {
     // Looking at GitHub waits on the network, so it never holds this loop:
     // one round at a time, started again a few seconds after it ends. Each
     // application decides inside whether its own minute has passed.
-    let watching = false;
     let nextWatch = 0;
     while (!signal.aborted) {
       if (!watching && Date.now() >= nextWatch) {
-        watching = true;
-        void watch.tick().finally(() => {
-          watching = false;
-          nextWatch = Date.now() + 5_000;
-        });
+        watching = watch
+          .tick()
+          .catch((error) => {
+            console.warn(
+              "The deployment watch could not read application records:",
+              error,
+            );
+          })
+          .finally(() => {
+            watching = undefined;
+            nextWatch = Date.now() + 5_000;
+          });
       }
       if (owner.live()) worked = true;
       else if (worked) {
@@ -106,6 +113,12 @@ export async function runPiWorker(signal: AbortSignal) {
     }
   } finally {
     // Ownership is held until every session is let go, or the process ends.
-    await owned.close();
+    try {
+      await owned.close();
+    } finally {
+      // An aborted branch lookup can still be unwinding. Let it finish before
+      // worker.ts drains/closes the database connection.
+      await watching;
+    }
   }
 }

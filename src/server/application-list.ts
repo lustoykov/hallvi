@@ -24,21 +24,23 @@ import { listInformation } from "./saved-information";
  * and the same reader's clock. Nothing here invents a state, and an application
  * nobody has checked says so.
  */
-export function listApplicationItems(): ApplicationListItem[] {
+export async function listApplicationItems(): Promise<ApplicationListItem[]> {
   const now = Date.now();
-  return listApplications().map((application) => {
-    const records = listInformation(application.id).filter(
-      (record) => !record.retiredAt,
-    );
-    return {
-      id: application.id,
-      name: application.name,
-      source: `${application.repositoryOwner}/${application.repositoryName}`,
-      condition: applicationListCondition(records, application.id, now),
-      stack: stackOf(records),
-      address: addressOf(records),
-    };
-  });
+  return Promise.all(
+    (await listApplications()).map(async (application) => {
+      const records = (await listInformation(application.id)).filter(
+        (record) => !record.retiredAt,
+      );
+      return {
+        id: application.id,
+        name: application.name,
+        source: `${application.repositoryOwner}/${application.repositoryName}`,
+        condition: applicationListCondition(records, application.id, now),
+        stack: stackOf(records),
+        address: addressOf(records),
+      };
+    }),
+  );
 }
 
 /** "19 h ago", for a card. */

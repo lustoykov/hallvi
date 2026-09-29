@@ -20,7 +20,8 @@ These are candidates from the [29 September intake](docs/research/2026-09-29-fea
 which rechecked the existing research in [PR #246](https://github.com/lustoykov/hallvi/pull/246)
 against current code and open work. The detailed plans remain in that PR; this
 list indexes their selection and assignment instead of copying the plans.
-Performance work already underway in #248/#249 is not proposed again. The
+Performance work from #248/#249 merged through [#252](https://github.com/lustoykov/hallvi/pull/252)
+and is not proposed again. The
 fresh-user beta walkthrough remains open; these ideas add no beta prerequisites.
 
 ### Reconnect to a known private application
@@ -61,7 +62,7 @@ can identify the action, target, pending decision and unknown outcome. Verify
 matching evidence and existing continuation behavior on disposable state.
 
 **Open decisions:** Owner selection and wording; user benefit is not yet measured.
-**Assignment:** Unassigned. Coordinate shared code with #248/#249.
+**Assignment:** Unassigned. Build on the merged performance changes from #252.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 

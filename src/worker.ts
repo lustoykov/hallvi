@@ -5,6 +5,8 @@ import {
 } from "./server/pi-worker";
 import { shutdownTracing } from "./server/tracing";
 
+import { closeDatabase } from "./server/db";
+
 const controller = new AbortController();
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => {
@@ -24,4 +26,7 @@ runPiWorker(controller.signal)
     process.exitCode =
       error instanceof PiWorkerBusyError ? WORKER_BUSY_EXIT : 1;
   })
-  .finally(shutdownTracing);
+  .finally(async () => {
+    await closeDatabase();
+    await shutdownTracing();
+  });

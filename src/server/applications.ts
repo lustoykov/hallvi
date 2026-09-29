@@ -3,13 +3,12 @@ import {
   deleteApplication,
   getApplication,
   getChat,
-  insertApplication,
   insertChat,
   insertObservation,
   latestObservation,
   listApplicationChats,
   listApplications,
-  withTransaction,
+  createApplicationRecords,
   renameApplicationRow,
 } from "./db";
 import {
@@ -30,15 +29,17 @@ export class NotFoundError extends Error {}
 /** The recorded GitHub access check of an application's repository. */
 export const REPOSITORY_OBSERVATION = "github-repository-identity";
 
-export function loadApplication(applicationId: string): ApplicationRecord {
-  const application = getApplication(applicationId);
+export async function loadApplication(
+  applicationId: string,
+): Promise<ApplicationRecord> {
+  const application = await getApplication(applicationId);
   if (!application) throw new NotFoundError("Application not found.");
   return application;
 }
 
-export function loadChat(applicationId: string, chatId: string) {
-  const application = loadApplication(applicationId);
-  const chat = getChat(chatId);
+export async function loadChat(applicationId: string, chatId: string) {
+  const application = await loadApplication(applicationId);
+  const chat = await getChat(chatId);
   if (!chat || chat.applicationId !== application.id)
     throw new NotFoundError("Chat not found.");
   return { application, chat };
@@ -51,36 +52,31 @@ export function assertChatWritable(chat: Chat) {
 export async function createApplication(input: CreateApplicationInput) {
   const repository = parseGithubRepository(input.repositoryUrl);
   const name = input.name?.trim() || repository.name;
-  const existing = input.requestKey ? getApplication(input.requestKey) : null;
-  if (existing) {
+  const { application, created } = await createApplicationRecords(
+    {
+      name,
+      repositoryUrl: repository.canonicalUrl,
+      repositoryOwner: repository.owner,
+      repositoryName: repository.name,
+    },
+    input.requestKey,
+  );
+  if (!created) {
     if (
-      existing.repositoryUrl !== repository.canonicalUrl ||
-      existing.name !== name
+      application.repositoryUrl !== repository.canonicalUrl ||
+      application.name !== name
     )
       throw new ExistingApplicationConflictError(
         "This creation request was already used with different application settings. Open the existing application or start a new creation request.",
       );
-    return { application: existing, created: false };
+    return { application, created };
   }
-  const application = withTransaction(() => {
-    const application = insertApplication(
-      {
-        name,
-        repositoryUrl: repository.canonicalUrl,
-        repositoryOwner: repository.owner,
-        repositoryName: repository.name,
-      },
-      input.requestKey,
-    );
-    insertChat(application.id, "Main operator");
-    return application;
-  });
   await observeRepository(application.id);
   return { application, created: true };
 }
 
-export function recordedRepositoryId(applicationId: string) {
-  return getApplication(applicationId)?.repositoryId ?? undefined;
+export async function recordedRepositoryId(applicationId: string) {
+  return (await getApplication(applicationId))?.repositoryId ?? undefined;
 }
 
 function connectionIdOf(observation: { raw: unknown }) {
@@ -117,17 +113,18 @@ export async function observeRepository(
     currentGithubConnectionId() !== expectedConnectionId
   )
     throw changed();
-  const application = loadApplication(applicationId);
+  const application = await loadApplication(applicationId);
   const result = await inspectGithubRepository(
     {
       owner: application.repositoryOwner,
       name: application.repositoryName,
       canonicalUrl: application.repositoryUrl,
     },
-    recordedRepositoryId(application.id),
+    await recordedRepositoryId(application.id),
   );
   if (
-    loadApplication(applicationId).repositoryUrl !== application.repositoryUrl
+    (await loadApplication(applicationId)).repositoryUrl !==
+    application.repositoryUrl
   )
     throw new Error(
       "The repository changed during its access check. Check the current repository again.",
@@ -139,7 +136,7 @@ export async function observeRepository(
     readGithubConnection()?.id !== expectedConnectionId
   )
     throw changed();
-  const observation = insertObservation({
+  const observation = await insertObservation({
     applicationId: application.id,
     kind: REPOSITORY_OBSERVATION,
     status: result.status,
@@ -153,8 +150,8 @@ export async function observeRepository(
 }
 
 /** Whether the latest repository check counts with the current login. */
-export function repositoryAccess(application: ApplicationRecord) {
-  const latest = latestObservation(application.id);
+export async function repositoryAccess(application: ApplicationRecord) {
+  const latest = await latestObservation(application.id);
   const connectionId = currentGithubConnectionId();
   // A check that used no login belongs to no login: what it established about
   // a public repository does not change when one is connected or dropped. A
@@ -208,12 +205,12 @@ export async function recheckGithubRepositories(connectionId: string) {
   if (pending) return pending;
   const work = (async () => {
     const results: GithubRepositoryCheckResult[] = [];
-    for (const application of listApplications()) {
+    for (const application of await listApplications()) {
       if (readGithubConnection()?.id !== connectionId)
         throw new Error(
           "The GitHub connection changed. Check repositories with the current login.",
         );
-      const previous = latestObservation(application.id);
+      const previous = await latestObservation(application.id);
       // A failed check is still a completed attempt. Only explicit Retry runs
       // it again.
       if (
@@ -221,7 +218,7 @@ export async function recheckGithubRepositories(connectionId: string) {
         (!previous || connectionIdOf(previous) !== connectionId)
       )
         await observeRepository(application.id, connectionId);
-      const { status, result } = repositoryAccess(application);
+      const { status, result } = await repositoryAccess(application);
       results.push({
         applicationId: application.id,
         repository: `${application.repositoryOwner}/${application.repositoryName}`,
@@ -247,20 +244,20 @@ export async function withGithubConnectionTransition<T>(
 }
 
 /** The name is the owner's label and nothing else: no record is keyed on it. */
-export function renameApplication(applicationId: string, name: string) {
-  loadApplication(applicationId);
+export async function renameApplication(applicationId: string, name: string) {
+  await loadApplication(applicationId);
   const next = name.trim();
   if (!next || next.length > 120)
     throw new Error("Give the application a name of up to 120 characters.");
-  renameApplicationRow(applicationId, next);
-  return loadApplication(applicationId);
+  await renameApplicationRow(applicationId, next);
+  return await loadApplication(applicationId);
 }
 
 export async function removeApplication(
   applicationId: string,
   repository: string,
 ) {
-  const application = loadApplication(applicationId);
+  const application = await loadApplication(applicationId);
   if (
     repository !==
     `${application.repositoryOwner}/${application.repositoryName}`
@@ -273,27 +270,23 @@ export async function removeApplication(
   // The worker owns the histories, so it removes them; it refuses while one
   // of them is running.
   await askWorker("forget", { scope: { applicationId: application.id } });
-  deleteApplication(application.id);
+  await deleteApplication(application.id);
   return { removedApplicationId: application.id };
 }
 
 /** A new conversation about the application, with its own transcript. */
-export function createChat(applicationId: string, title?: string) {
-  const application = loadApplication(applicationId);
-  const chatNumber = listApplicationChats(application.id).length + 1;
-  const chat = insertChat(
-    application.id,
-    title?.trim() || `Conversation ${chatNumber}`,
-  );
+export async function createChat(applicationId: string, title?: string) {
+  const application = await loadApplication(applicationId);
+  const chat = await insertChat(application.id, title?.trim() || undefined);
   // Chat administration is visible in the chat list; it is not an application
   // event.
   return chat;
 }
 
-export function archiveChat(applicationId: string, chatId: string) {
-  const { application, chat } = loadChat(applicationId, chatId);
+export async function archiveChat(applicationId: string, chatId: string) {
+  const { application, chat } = await loadChat(applicationId, chatId);
   assertChatWritable(chat);
-  if (listApplicationChats(application.id)[0]?.id === chatId)
+  if ((await listApplicationChats(application.id))[0]?.id === chatId)
     throw new Error("The main operator conversation cannot be archived.");
-  archiveChatRecord(chat.id);
+  await archiveChatRecord(chat.id);
 }
