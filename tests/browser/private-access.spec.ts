@@ -183,7 +183,7 @@ test("private route observations stay with their route, survive refresh and lose
     ).toBeVisible();
     if (capture) {
       await expect(page.getByText("No server is connected")).toBeVisible();
-      const dir = join("docs/assets/private-access-observations", capture);
+      const dir = join("work/private-access/evidence", capture);
       mkdirSync(dir, { recursive: true });
       for (const [state, answer] of [
         [

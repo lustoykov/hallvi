@@ -170,6 +170,13 @@ run `npm run format`, and review the final diff.
 In the PR, state the tested revision and environment (real model/provider,
 local container or scripted fixture), request/operation/execution identities,
 observations, independent behavior check and relevant screenshot links.
+Keep screenshots, logs and per-run reports in ignored `tests/results/` or
+`work/`; attach useful captures to the PR rather than committing them. Do not
+add new evidence files under `docs/testing/`. Durable testing instructions
+belong in the existing guides; run-specific results belong in the PR.
+Never force-add ignored artifacts. After review, remove this task's temporary
+captures and reports when they are no longer needed; never clean another
+task's files.
 Separate historical evidence from this run and say what was blocked, simulated
 or unverified. Use [the PR template](../.github/pull_request_template.md);
 documentation-only changes do not require a broad suite or a new deployment.

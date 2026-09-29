@@ -12,6 +12,8 @@ out/
 dist/
 coverage/
 tests/results/
+# Review evidence belongs in ignored tests/results/ or work/, never docs.
+docs/testing/
 .impeccable/
 *.tsbuildinfo
 .env.local

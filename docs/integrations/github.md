@@ -197,7 +197,7 @@ an older cached tip. Pause holds deployments and keeps looking,
 so the page still shows what is waiting. In Always ask, automatic deployment
 still asks before each command; the card says so.
 
-[22 September 2026 verification](../testing/2026-09-22-automatic-deployment.md):
+[22 September 2026 verification](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-22-automatic-deployment.md):
 five pushes to a private repository reached a real host with no chat message.
 
 ## Proposing a change
