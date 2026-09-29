@@ -7,7 +7,7 @@
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
-| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 1 | New |
+| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 2 | New |
 
 ## How to contribute
 
