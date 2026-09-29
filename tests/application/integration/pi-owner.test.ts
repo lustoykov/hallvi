@@ -108,6 +108,11 @@ import { openPiSession } from "../../../src/server/pi";
 import { ownSessions } from "../../../src/server/pi-owner";
 import { MESSAGE_TAG } from "../../../src/server/pi-transcript";
 import {
+  RequestNotFoundError,
+  requestOutcome,
+} from "../../../src/server/requests";
+import { settleDomain } from "../../../src/server/connection-requests";
+import {
   askWorker,
   WorkerRefusal,
   WorkerUnavailableError,
@@ -232,30 +237,45 @@ beforeAll(async () => {
               ],
               "toolUse",
             )
-          : text.includes("[approve]")
+          : text.includes("[dns]")
             ? assistant(
                 model,
                 [
-                  { type: "text", text: "I will ask first." },
+                  { type: "text", text: "I need the name's DNS." },
                   {
                     type: "toolCall",
                     id: `call-${++calls}`,
-                    name: "request_approval",
-                    arguments: { action: "Restart the service" },
+                    name: "request_domain_access",
+                    arguments: { name: "shop.test" },
                   },
                 ],
                 "toolUse",
               )
-            : assistant(
-                model,
-                [
-                  {
-                    type: "text",
-                    text: last.role === "user" ? `reply: ${text}` : "finished",
-                  },
-                ],
-                "stop",
-              );
+            : text.includes("[approve]")
+              ? assistant(
+                  model,
+                  [
+                    { type: "text", text: "I will ask first." },
+                    {
+                      type: "toolCall",
+                      id: `call-${++calls}`,
+                      name: "request_approval",
+                      arguments: { action: "Restart the service" },
+                    },
+                  ],
+                  "toolUse",
+                )
+              : assistant(
+                  model,
+                  [
+                    {
+                      type: "text",
+                      text:
+                        last.role === "user" ? `reply: ${text}` : "finished",
+                    },
+                  ],
+                  "stop",
+                );
       stream.push({ type: "start", partial: message });
       stream.push(
         message.stopReason === "error"
@@ -373,6 +393,9 @@ async function until(check: () => unknown, ticks = 400) {
 }
 const approval = (applicationId: string) =>
   listExecutions(applicationId).find((e) => e.status === "awaiting-approval");
+/** What a caller outside the page reads about one request. */
+const outcome = (app: { id: string; chat: string }, key: string) =>
+  requestOutcome(app.id, app.chat, key);
 
 it("accepts nothing while no worker answers, and the same send succeeds once when one does", async () => {
   const a = application("shop");
@@ -535,11 +558,115 @@ it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", asy
   ]);
 });
 
+it("a request's outcome is the operation Pi read it in: what Pi read together shares one result, and later work stays out", async () => {
+  const a = application("shop");
+  const b = application("blog");
+  const [first, second, third, later] = [0, 1, 2, 3].map(() => randomUUID());
+  await sendChatMessage(
+    a.id,
+    a.chat,
+    "[approve] restart it",
+    first,
+    "next",
+    undefined,
+    "cli",
+  );
+  await until(() => expect(approval(a.id)).toBeTruthy());
+  expect(await outcome(a, first)).toMatchObject({
+    status: "waiting-for-approval",
+    operation: { id: first, status: "open" },
+    attention: { kind: "approval", executionId: approval(a.id)!.id },
+    evidence: [{ status: "awaiting-approval", exitCode: null, output: "" }],
+  });
+  await a.send("then check the logs", "next", second);
+  await a.send("and the disk", "next", third);
+  expect(await outcome(a, second)).toMatchObject({
+    status: "queued",
+    operation: null,
+  });
+  // Another application's work, at the same time.
+  await b.send("how is it going?");
+
+  decideExecution(a.id, approval(a.id)!.id, true);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  await until(async () => expect(await b.status()).toBe("idle"));
+  // Pi read both follow-ups inside the operation it was already running, so
+  // all three requests have that operation's result, whole.
+  const results = await Promise.all(
+    [first, second, third].map((key) => outcome(a, key)),
+  );
+  for (const result of results)
+    expect(result).toMatchObject({
+      status: "completed",
+      operation: {
+        id: first,
+        status: "completed",
+        requestKeys: [first, second, third],
+      },
+      answer: "reply: and the disk",
+      evidence: [
+        {
+          tool: "request_approval",
+          status: "succeeded",
+          executionId: listExecutions(a.id)[0].id,
+        },
+      ],
+    });
+
+  // A later request is its own operation, and does not change the earlier one.
+  await a.send("hello", "next", later);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(await outcome(a, first)).toEqual(results[0]);
+  expect(await outcome(a, later)).toMatchObject({
+    operation: { id: later, requestKeys: [later] },
+    answer: "reply: hello",
+    evidence: [],
+  });
+  // Where it was sent from is Pi's to keep, so it survives a new worker.
+  await loseWorker();
+  await startWorker();
+  expect(
+    (await a.snapshot()).messages.find((m) => m.id === first)?.origin,
+  ).toBe("cli");
+  expect(
+    (await a.snapshot()).messages.find((m) => m.id === later)?.origin,
+  ).toBeUndefined();
+});
+
+it("waits for input only on the card its own operation asked for", async () => {
+  const a = application("shop");
+  const [first, second] = [randomUUID(), randomUUID()];
+  await a.send("[dns] publish it", "next", first);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(await outcome(a, first)).toMatchObject({
+    status: "waiting-for-input",
+    attention: { kind: "input", reason: expect.stringMatching(/shop\.test/) },
+  });
+  settleDomain(a.id, "manual");
+  expect(await outcome(a, first)).toMatchObject({
+    status: "completed",
+    attention: null,
+  });
+
+  // A later request opens a card of the same kind: it is that request's.
+  await a.send("[dns] and publish it again", "next", second);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(await outcome(a, second)).toMatchObject({
+    status: "waiting-for-input",
+  });
+  expect(await outcome(a, first)).toMatchObject({
+    status: "completed",
+    attention: null,
+  });
+});
+
 it("Stop ends an approval wait and a streaming answer, drops what waited, and says what is true", async () => {
   const a = application("shop");
-  await a.send("[approve] restart it");
+  const stopped = randomUUID();
+  const dropped = randomUUID();
+  await a.send("[approve] restart it", "next", stopped);
   await until(() => expect(approval(a.id)).toBeTruthy());
-  await a.send("then check the logs");
+  await a.send("then check the logs", "next", dropped);
   await a.stop();
   await until(async () => expect(await a.status()).toBe("idle"));
   // Pi's last words were a finished message and a tool call; that the reply
@@ -551,6 +678,11 @@ it("Stop ends an approval wait and a streaming answer, drops what waited, and sa
   // Nothing was approved, so nothing ran, and the record says it was cut.
   expect(listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
   expect(requests).toEqual(["[approve] restart it"]);
+  expect(await outcome(a, stopped)).toMatchObject({ status: "cancelled" });
+  // Pi keeps no record of a waiting message Stop dropped.
+  await expect(outcome(a, dropped)).rejects.toBeInstanceOf(
+    RequestNotFoundError,
+  );
 
   await a.send("[slow] look at it");
   await until(async () =>
@@ -572,12 +704,20 @@ it("Stop ends an approval wait and a streaming answer, drops what waited, and sa
 
 it("after a restart nothing runs; history and evidence stay; Continue carries on without repeating, and a new question is refused until then", async () => {
   const a = application("shop");
-  await a.send("[approve] restart it");
+  const first = randomUUID();
+  const waiting = randomUUID();
+  await a.send("[approve] restart it", "next", first);
   await until(() => expect(approval(a.id)).toBeTruthy());
-  await a.send("then check the logs");
+  await a.send("then check the logs", "next", waiting);
   await loseWorker();
   await startWorker();
   await delay(300);
+  // Neither request is running, and neither is said to be finished.
+  for (const key of [first, waiting])
+    expect(await outcome(a, key)).toMatchObject({
+      status: "interrupted",
+      attention: { kind: "interrupted" },
+    });
 
   expect(requests).toEqual(["[approve] restart it"]);
   const interrupted = await a.snapshot();
@@ -615,6 +755,11 @@ it("after a restart nothing runs; history and evidence stay; Continue carries on
     "you [delivered] then check the logs",
     "pi [completed] reply: then check the logs",
   ]);
+  // Continuing resumed the same operation, which then read what waited.
+  expect(await outcome(a, waiting)).toMatchObject({
+    status: "completed",
+    operation: { id: first, requestKeys: [first, waiting] },
+  });
 });
 
 it("after a restart Stop is there with nothing queued, and ends what Pi held", async () => {
@@ -669,6 +814,12 @@ it("a message Pi queued on an idle lane is read from Pi's queue, once, when its 
   expect((await a.snapshot()).messages.at(-2)).toMatchObject({
     id: "late-message",
     status: "delivered",
+  });
+  // Pi read it in an operation of its own, named after its queue entry.
+  expect(await outcome(a, "late-message")).toMatchObject({
+    status: "completed",
+    operation: { id: expect.stringMatching(/^queue:/) },
+    answer: "reply: one more thing",
   });
 });
 

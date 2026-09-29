@@ -77,6 +77,11 @@ export interface MessageHighlight {
   nonce: number;
 }
 
+/** Where a message was written, when it was not this page. */
+const ORIGIN_LABELS: Record<NonNullable<ChatMessage["origin"]>, string> = {
+  cli: "CLI",
+};
+
 const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   completed: "Saved",
   delivered: "Saved",
@@ -664,6 +669,12 @@ export function ChatPane({
             // engineer's words.
             const engineer =
               message.role === "user" && message.source === "user";
+            // Sent from elsewhere on the owner's behalf: said where, not who.
+            const author = engineer
+              ? message.origin
+                ? ORIGIN_LABELS[message.origin]
+                : "You"
+              : "Hallvi";
             return (
               <Fragment key={message.id}>
                 <Message
@@ -686,12 +697,12 @@ export function ChatPane({
                   <div className="hv-message-heading">
                     {engineer ? (
                       <span className="hv-avatar user" aria-hidden="true">
-                        You
+                        {author}
                       </span>
                     ) : (
                       <HallviMark />
                     )}
-                    <strong>{engineer ? "You" : "Hallvi"}</strong>
+                    <strong>{author}</strong>
                     {message.source === "hallvi" && (
                       <span className="hv-source-tag">
                         {message.role === "user"

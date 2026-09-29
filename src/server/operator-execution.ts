@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
+  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -112,6 +113,23 @@ export function listExecutions(applicationId: string): ExecutionRecord[] {
       return record;
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+/**
+ * Whether this call still waits for a person. The owner's decision is written
+ * beside the record, and the waiting call reads it a moment later; in that
+ * moment the record still says it is waiting, and nobody is.
+ */
+export function awaitingDecision(record: ExecutionRecord) {
+  return (
+    record.status === "awaiting-approval" &&
+    !existsSync(`${recordPath(record.applicationId, record.id)}.decision`)
+  );
+}
+
+/** One execution record as the executor wrote it, or nothing. */
+export function readExecution(applicationId: string, id: string) {
+  loadApplication(applicationId);
+  return read<ExecutionRecord>(recordPath(applicationId, id));
 }
 export function decideExecution(
   applicationId: string,

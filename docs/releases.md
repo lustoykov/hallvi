@@ -162,9 +162,13 @@ the service on clean macOS arm64 and Ubuntu 24.04 x64 runners. Both jobs must
 pass before publishing. The
 [beta walkthrough](beta-walkthrough.md) is the fuller acceptance.
 
-**Publish.** The workflow leaves a **draft** prerelease. GitHub does not serve
-a draft to a reader without a token, so nothing discovers it. Pressing publish
-is the release.
+**Publish.** The workflow leaves a **draft**. GitHub does not serve a draft to
+a reader without a token, so nothing discovers it. Publishing it as the
+**latest** release is the release: the dashboard's **Review and publish**, or
+`gh release edit v<version> --draft=false --latest`. Every install line, in
+the README, these docs and on hallvi.com, fetches
+`releases/latest/download/install-hallvi.sh`, so a release that is not latest
+leaves new installations on the previous release's installer.
 
 **Discover.** Installations following `alpha` find it at their next check, or
 when the owner presses **Check for updates**. Each checks once an hour at most,
@@ -230,8 +234,10 @@ describes what happens to the records.
 `alpha` is the only channel. It exists so that "which releases is this
 installation willing to see" is a deliberate answer rather than whatever is
 newest: a signed release naming a different channel is refused, not ranked.
-Releases on it are GitHub prereleases, and discovery accepts prereleases
-because that is what the channel is for.
+The channel lives in the signed manifest, not in GitHub's release flags.
+Releases are published as ordinary releases, never prereleases, because GitHub
+never makes a prerelease "latest" and the install line depends on it; the
+version still says alpha. Discovery reads neither flag.
 
 ## Testing a release without publishing one
 

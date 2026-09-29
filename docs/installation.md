@@ -16,16 +16,16 @@ signed release manifest before changing the installed program.
 
 ## Download
 
-**The first alpha release is available:**
-[Hallvi 0.1.1-alpha.1](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1).
 Paste this one line into Terminal from a directory you can write to, as your
 normal user and without `sudo`:
 
 ```bash
-curl -fsSLo ./install-hallvi.sh https://github.com/lustoykov/hallvi/releases/download/v0.1.1-alpha.1/install-hallvi.sh && sh ./install-hallvi.sh
+curl -fsSLo ./install-hallvi.sh https://github.com/lustoykov/hallvi/releases/latest/download/install-hallvi.sh && sh ./install-hallvi.sh
 ```
 
-This fetches the installer script from the published release and runs it. The
+This fetches the installer script from the
+[newest release](https://github.com/lustoykov/hallvi/releases/latest) and runs
+it. The address names no version, so the line never has to change. The
 script works out whether this is an Apple-silicon Mac or an Ubuntu 24.04 x64
 machine, finds the newest published alpha release, and downloads that
 release's signed manifest and the archive for this platform. It saves the
@@ -57,7 +57,7 @@ build. It keeps the old behaviour: the archive next to its `.tgz.sha256`,
 checked against it.
 
 ```bash
-sh install-hallvi.sh ./hallvi-0.1.1-alpha.1-darwin-arm64.tgz
+sh install-hallvi.sh ./hallvi-<version>-darwin-arm64.tgz
 ```
 
 That checksum catches a damaged download and nothing more, because it came
@@ -197,6 +197,11 @@ hallvi logs -f
 
 `start` and `stop` are the only two states. There is no state in which Hallvi
 is stopped now and comes back by itself later.
+
+The same command also sends work to an application from a terminal, for you or
+for a coding agent: `hallvi exec <app> "request"` with the controller named by
+`--controller` or `HALLVI_CONTROLLER_URL`. [Working from a terminal](cli.md)
+describes `apps`, `exec`, `wait` and `inspect`.
 
 - **macOS** runs it as a launchd agent. It starts when you log in, which on a
   personal Mac is when the machine is usable at all. It pauses while the Mac
@@ -452,7 +457,7 @@ Run `npm run package` once on Apple-silicon macOS and once on Ubuntu 24.04
 x64. It downloads pinned Node.js 22 from nodejs.org, checks its published
 SHA-256 value, builds the app and installs locked production dependencies on
 that platform. It verifies the native modules load, then writes
-`dist/hallvi-0.1.1-alpha.1-<platform>.tgz`, its `.sha256`, and
+`dist/hallvi-<version>-<platform>.tgz`, its `.sha256`, and
 `dist/install-hallvi.sh`. A published release carries those plus the signed
 `hallvi-release.json` and its `.sig`, which is what a plain
 `sh install-hallvi.sh` finds and checks; record the source revision and the

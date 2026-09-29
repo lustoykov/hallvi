@@ -148,7 +148,7 @@ test("records render in chat and their views, survive refresh, and update by rec
     // than offering an address that would fail in the reader's browser.
     await expect(chat.getByText("Tunnel closed")).toBeVisible();
     await expect(
-      chat.getByRole("link", { name: /Open app(?:lication)?/ }),
+      chat.locator(`a[href="${accessPresentation.url}"]`),
     ).toHaveCount(0);
     await expect(chat.getByText("Inspect application logs.")).toBeVisible();
     // Reload: the cards are read back from the records, not from the turn.
@@ -179,7 +179,7 @@ test("records render in chat and their views, survive refresh, and update by rec
       overview.getByRole("button", { name: /Access Tunnel is closed/ }),
     ).toBeVisible();
     await expect(
-      overview.getByRole("link", { name: /Open app(?:lication)?/ }),
+      page.locator(`a[href="${accessPresentation.url}"]`),
     ).toHaveCount(0);
     // And a map nothing describes is missing, which is not the same as an
     // application with no parts.

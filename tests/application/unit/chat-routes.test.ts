@@ -112,6 +112,8 @@ describe("Chat request validation", () => {
       // Left to the domain, which sends it after Pi's current work.
       undefined,
       undefined,
+      // Written in the page: no other origin is claimed.
+      undefined,
     );
   });
 

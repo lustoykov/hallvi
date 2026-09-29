@@ -21,6 +21,20 @@ export class WorkerUnavailableError extends Error {
   }
 }
 
+/**
+ * The worker was asked and its answer never came back. Whatever was asked may
+ * or may not have happened; for a message, sending it again under the same
+ * request key is how to find out, because Pi never takes one twice.
+ */
+export class WorkerLostError extends Error {
+  constructor(options?: ErrorOptions) {
+    super(
+      "Hallvi's worker stopped answering. If this was a message, sending it again is safe: Pi never takes the same one twice.",
+      options,
+    );
+  }
+}
+
 /** The worker answered with a refusal the owner should read. */
 export class WorkerRefusal extends Error {
   constructor(
@@ -63,10 +77,7 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
       reject(
         ["ENOENT", "ECONNREFUSED"].includes(error.code ?? "")
           ? new WorkerUnavailableError()
-          : new Error(
-              "Hallvi's worker stopped answering. If this was a message, sending it again is safe: Pi never takes the same one twice.",
-              { cause: error },
-            ),
+          : new WorkerLostError({ cause: error }),
       ),
     );
     asked.end(JSON.stringify(body));

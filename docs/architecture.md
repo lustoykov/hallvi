@@ -44,6 +44,15 @@ and the conversation shown is what Pi holds. That separation is why a crash
 takes one process rather than the server, and why the product says so, and
 accepts nothing, when no worker is running.
 
+The `hallvi` command's request commands use the same loopback API from outside
+the page: they send an ordinary follow-up under the caller's request key and
+read back what became of it. What became of it is the Pi operation that took
+the key — each message and reply in the projected transcript names its
+operation, from Pi's records of where each began and ended — with its answer
+and bounded, redacted evidence ([requests.ts](../src/server/requests.ts)).
+Nothing is stored for a request. [Working from a terminal](cli.md) owns the
+contract.
+
 ## What is stored
 
 Three tables, in [db-schema.ts](../src/server/db-schema.ts), at schema 18:
