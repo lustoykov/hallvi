@@ -167,6 +167,14 @@ export function trafficReading(
   const visitors = perDay
     ? "estimatedVisitorsPerDay"
     : "estimatedVisitorsToday";
+  // A bucket named as the owner's clock reads it: a day that starts at
+  // 21:00Z is still that local day, not the one before.
+  const clock = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: history.timeZone,
+    dateStyle: "short",
+    ...(history.range === "24h" && { timeStyle: "short" }),
+  });
+  const local = (at: string) => clock.format(Date.parse(at));
   const nothing = history.series.every((point) => point.covered === 0);
   const notes = [
     perDay
@@ -221,7 +229,7 @@ export function trafficReading(
       : "not comparable: the log did not cover enough of it",
     series: {
       columns: [
-        history.range === "24h" ? "hour" : "day",
+        history.range === "24h" ? "local hour" : "local day",
         "covered (0-1)",
         "requests",
         "page views",
@@ -235,9 +243,9 @@ export function trafficReading(
       ],
       rows: history.series.map((point) =>
         point.covered === 0
-          ? [point.at, 0, "gap: not counted"]
+          ? [local(point.at), 0, "gap: not counted"]
           : [
-              point.at,
+              local(point.at),
               Math.round(point.covered * 100) / 100,
               point.requests,
               point.views,
@@ -499,6 +507,8 @@ export function trafficScriptFor(proxy: Proxy) {
     serving: SCRIPT_SERVING[proxy],
     tag: SCRIPT_TAG,
     includes: SCRIPT_INCLUDES,
+    goals:
+      "Goals are the owner's to mark in their own code: window.hv?.('signup') after the action, or data-hv-goal=\"signup\" on a link or button (letters, digits, _ and -, up to 40). That is application code, outside the operability pull request: tell the owner how rather than writing it, and keep anything personal out of a goal's name.",
     check: [
       `curl -sS -A 'Hallvi access check' https://<host>/_hv/s.js | sha256sum — the same sha256.`,
       `curl -sS -o /dev/null -w '%{http_code}\\n' -A 'Hallvi access check' 'https://<host>${check}' — 204, and the newest log line has that ${EVENT_PREFIX} path whole. Hallvi's user agent keeps it from being counted.`,

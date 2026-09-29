@@ -107,10 +107,9 @@ describe("read_traffic", () => {
     });
     const rows = reading.series.rows;
     expect(rows).toHaveLength(7);
-    expect(
-      rows.find((row) => row[0] === iso(dayBounds("2026-09-26", ZONE).start)),
-    ).toEqual([
-      iso(dayBounds("2026-09-26", ZONE).start),
+    // Named by the local day, and a gap rather than a quiet day.
+    expect(rows.find((row) => row[0] === "2026-09-26")).toEqual([
+      "2026-09-26",
       0,
       "gap: not counted",
     ]);
