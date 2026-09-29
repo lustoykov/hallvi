@@ -427,7 +427,7 @@ interface Stretch {
   series: SeriesPoint[];
   totals: RangeTotals;
   previous: RangeTotals | null;
-  /** The days the lists come from, and how many whole days they span. */
+  /** The days the lists come from, and how many of them the log covered. */
   listed: TrafficDay[];
   perDay: number;
   /** The local days the range touches, and its first moment. */
@@ -511,17 +511,19 @@ function lastDays(
   const before = run(count);
   const from = dayBounds(names[0], timeZone).start;
   const earlier = dayBounds(before[0], timeZone).start;
-  // How many whole days the log covered: a day half covered counts half, so
-  // a partly read day neither vanishes from an average nor drags it down.
-  const wholeDays = (list: string[]) =>
-    list.reduce((sum, name) => {
+  // How many days the log covered any of. A visitor estimate is a distinct
+  // count, which does not grow with the time it was counted over: ten
+  // browsers seen in half an hour are not five hundred a day. So a day read
+  // in part counts as a whole day, and can only understate the average.
+  const coveredDays = (list: string[]) =>
+    list.filter((name) => {
       const day = byName.get(name);
-      if (!day) return sum;
+      if (!day) return false;
       const { start, end } = dayBounds(day.day, day.timeZone);
-      return sum + share(coveredMs(day.coverage, start, end), end - start);
-    }, 0);
+      return coveredMs(day.coverage, start, Math.min(end, now)) > 0;
+    }).length;
   const perDay = (list: string[], field: "visitors" | "errorVisitors") => {
-    const whole = wholeDays(list);
+    const whole = coveredDays(list);
     const sum = list.reduce(
       (total, name) => total + (byName.get(name)?.[field] ?? 0),
       0,
@@ -556,7 +558,7 @@ function lastDays(
         ? totals(before)
         : null,
     listed: names.flatMap((name) => byName.get(name) ?? []),
-    perDay: wholeDays(names) || 1,
+    perDay: coveredDays(names) || 1,
     names,
     from,
   };

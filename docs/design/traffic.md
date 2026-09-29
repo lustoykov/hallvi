@@ -146,7 +146,11 @@ away, the log was unreadable). Charts draw a gap as a gap, never as zero.
   any range.
 - **Visitor estimates exist per day only.** 7 d and 30 d show the daily series
   and "about N a day"; they never add days into a number presented as unique
-  people. The 24 h chart shows hourly estimates; its headline is today's.
+  people. "About N a day" is the days' estimates over the days the log covered
+  any of: a day read in part counts as a whole one, because a distinct count
+  does not grow with the time it was counted over (ten browsers in half an
+  hour are not five hundred a day), so a partial day can only understate it.
+  The 24 h chart shows hourly estimates; its headline is today's.
 - **Response times** are stored as a fixed-bucket histogram per hour
   (`LATENCY_BUCKETS_MS`); a range's percentile comes from the merged
   histogram, never from averaging percentiles. Page speed works the same way.
