@@ -77,7 +77,7 @@ The owner runs the beta. On 29 September 2026, the owner authorized publication 
 
 ## Traffic
 
-- [ ] **Who uses the application, and how it is doing — in progress on `claude/traffic-v1`.** Asked for by the owner on 28–29 September 2026: live arrivals, a world map, 24 h/7 d/30 d history, pages, sources, countries and devices, errors with the visitors they reached, deploy markers and a before/after line per release, shown in Traffic, Overview, Deployment and Monitoring without a model call. Counted from Caddy, nginx or Traefik access logs, and from Hallvi's optional script through the same log; recounted from the log so a restart cannot count twice. [Design](docs/design/traffic.md). Not a prerequisite for the beta.
+- [x] **Who uses the application, and how it is doing — [PR #259](https://github.com/lustoykov/hallvi/pull/259).** Asked for by the owner on 28–29 September 2026: live arrivals, a world map, 24 h/7 d/30 d history, pages, sources, countries and devices, errors with the visitors they reached, deploy markers and a before/after line per release, shown in Traffic, Overview, Deployment and Monitoring without a model call. Counted from Caddy, nginx or Traefik access logs, and from Hallvi's optional script through the same log; recounted from the log so a restart cannot count twice. The review fixes preserve Stop/Forget across concurrent writes, configured query page routes, and one initial live arrival. [Design](docs/design/traffic.md). Dev-app seeding and live existing-nginx/Cloudflare verification remain follow-up work. Not a prerequisite for the beta.
 
 ## Later milestone: Pi heartbeat and state synchronization
 

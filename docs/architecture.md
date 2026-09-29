@@ -55,6 +55,16 @@ and bounded, redacted evidence ([requests.ts](../src/server/requests.ts)).
 Nothing is stored for a request. [Working from a terminal](cli.md) owns the
 contract.
 
+Native model failures and Pi's terminal operation errors are read from that
+same history. The transcript supplies a typed diagnostic with its source,
+category and at most 400 characters of redacted reason; chat and CLI show the
+same explanation. Only a first prose line is eligible: appended payloads,
+headers, stacks, URLs and local paths are omitted, and held application values
+and credential-shaped text are redacted before bounding it. A missing reason
+says so, and an open operation without a driving worker remains interrupted.
+Neither a failed model call nor a successful status read establishes a provider
+outage or the outcome of a command with no reported exit code.
+
 ### Conversation change delivery
 
 The worker's existing Unix socket also carries ephemeral invalidations. Pi

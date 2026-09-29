@@ -11,8 +11,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | New |
-| [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -154,38 +152,13 @@ initial runs which only isolated Hallvi's account were excluded.
 
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
 
-### AF-014 — Preserve why an operator turn ended early
-
-During an installed alpha.8 deployment, connecting an existing machine started
-an operator turn that ended after a successful status read. The conversation
-said the turn ended before it finished with no command recording why; the CLI
-only suggested checking Settings or retrying. Keep a useful, redacted reason
-for an early model/worker turn exit, including whether the cause is known,
-so the owner can distinguish an account/provider problem from interruption
-without guessing. This observation does not establish the underlying cause.
-A following queued request successfully continued deployment.
-
-**+1:** 2026-09-29 — installed Mac mini beta verification
-(`codex/installed-beta-feedback`).
-
-### AF-015 — Clear stale fetch errors after reconnection
-
-After restarting an idle installed alpha.8 controller, the open conversation
-reconnected: its worker-unavailable panel disappeared and its deployment
-records returned. The composer still displayed “Failed to fetch”, even though
-the CLI confirmed the worker was alive and idle and the private application
-continued working. Refreshing the page cleared the error. Clear a transient
-read error when the corresponding connection/read has recovered, while keeping
-failed writes or uncertain submissions visible until their outcome is known.
-
-**+1:** 2026-09-29 — installed Mac mini beta verification
-(`codex/installed-beta-feedback`).
-
 ## Archive
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
+| [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Implemented in #266 (pending merge) |
+| [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Implemented (in review) |
 | [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
@@ -204,6 +177,38 @@ first event with its already counted log view.
 
 **Status:** Fixed in #259, with a competing SQLite writer regression, a real
 browser query-navigation test, and live-arrival counting coverage.
+
+### AF-014 — Preserve why an operator turn ended early
+
+During an installed alpha.8 deployment, connecting an existing machine started
+an operator turn that ended after a successful status read. The conversation
+said the turn ended before it finished with no command recording why; the CLI
+only suggested checking Settings or retrying. Keep a useful, redacted reason
+for an early model/worker turn exit, including whether the cause is known,
+so the owner can distinguish an account/provider problem from interruption
+without guessing. This observation does not establish the underlying cause.
+A following queued request successfully continued deployment.
+
+**+1:** 2026-09-29 — installed Mac mini beta verification
+(`codex/installed-beta-feedback`).
+
+**Status:** Implemented in [#266](https://github.com/lustoykov/hallvi/pull/266), pending merge. Native failures now retain a bounded redacted reason in chat and CLI; unknown reasons and worker interruption stay distinct. The historical turn's cause remains unknown.
+
+### AF-015 — Clear stale fetch errors after reconnection
+
+After restarting an idle installed alpha.8 controller, the open conversation
+reconnected: its worker-unavailable panel disappeared and its deployment
+records returned. The composer still displayed “Failed to fetch”, even though
+the CLI confirmed the worker was alive and idle and the private application
+continued working. Refreshing the page cleared the error. Clear a transient
+read error when the corresponding connection/read has recovered, while keeping
+failed writes or uncertain submissions visible until their outcome is known.
+
+**+1:** 2026-09-29 — installed Mac mini beta verification
+(`codex/installed-beta-feedback`).
+
+**Status:** Implemented in review. Successful settings polls and refreshes clear
+their read error; failed or uncertain settings and approval writes stay visible.
 
 ### AF-012 — Keep private access observations truthful and on one route
 
