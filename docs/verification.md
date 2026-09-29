@@ -46,8 +46,10 @@ node scripts/retained-application.mjs status
 node scripts/retained-application.mjs attach <name>
 ```
 
-Say which application you are taking. Keep attach in the foreground; it starts
-the controller on that application's port. Do not run a second `npm run dev`
+Say which application you are taking. Attach starts the controller on that
+application's port and stays in the foreground. Keep it in one terminal or a
+tracked background session and read its startup output; run checks in a second
+terminal/session. Do not run a second `npm run dev`
 on its state. An occupied lock or unclean previous runtime is a reason to
 coordinate/investigate, not to force takeover. The lock protects controller
 state, not neighbours on a shared server; stay within the selected application.
@@ -169,7 +171,10 @@ documentation-only changes do not require a broad suite or a new deployment.
 
 Detach only the retained application this task attached with
 `node scripts/retained-application.mjs detach <name>`; keep its history, data
-and verified backups. Stop your own previews by recorded PID, run
+and verified backups. Detach waits for Pi and stops the controller, dashboard
+and Studio it started. Development/build commands may rewrite tracked
+`next-env.d.ts`; inspect the diff and restore only generated changes caused by
+this task, preserving any prior edits. Stop your own previews by recorded PID, run
 `node scripts/check-preview-processes.mjs`, and confirm their ports closed.
 Remove only your exact disposable fixtures/snapshots after preserving needed
 redacted evidence. Follow [resource cleanup](development-resources.md) for

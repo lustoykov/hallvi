@@ -211,48 +211,14 @@ flowchart LR
 
 ## From a development checkout
 
-A checkout checks its work against a really deployed application from the
-[development environment](development-environment.md): it attaches one, which
-runs that application's Hallvi in the checkout, and names that controller.
-
-1. `npm ci`, with Node 22.
-2. `node scripts/retained-application.mjs status` lists the applications, who
-   holds each, and the Pi and schema they record. Take a free one. `whoami` has
-   nothing to lose; `uptime-kuma` keeps its own data.
-3. In one terminal, `node scripts/retained-application.mjs attach <name>`. It
-   takes a verified copy of the records first, then prints the controller's
-   address — `Attached … http://127.0.0.1:<port>. Ctrl-C detaches.`, each
-   application on its own port — and stays in the foreground; with one
-   terminal, start it in the background and read what it printed. When it refuses because the histories were written by
-   another Pi, look at a snapshot with this checkout first (below); if it reads
-   them, attach again with `--accept-format`.
-4. In a second terminal, name the controller at the address it printed and work:
-
-   ```sh
-   export HALLVI_CONTROLLER_URL=http://127.0.0.1:<port>
-   node scripts/cli.mjs apps
-   node scripts/cli.mjs inspect <app>
-   node scripts/cli.mjs exec <app> "Report … without changing anything"
-   node scripts/cli.mjs inspect <app> --execution <id>
-   ```
-
-5. `node scripts/retained-application.mjs detach <name>`, or Ctrl-C in the first
-   terminal, when done. It lets Pi finish, then stops everything attach started.
-
-These applications are really deployed, on a host they share. Ask for
-read-only work unless changing that application is the task, and say which one
-you took. A result is about the application you meant when its `controller`
-and `applicationId` are the ones you named. `completed` means Pi finished
-answering: what happened is in the evidence, and anything that matters can be
-looked at again independently.
-
-**A snapshot needs no attaching.** `node scripts/retained-application.mjs
-snapshot <directory> <name>` copies an application's records and histories
-without keys, secrets or logins and prints the one line that runs them on a
-port of its own. `apps`, `inspect` and `wait` read it. `exec` is refused there,
-because a snapshot cannot start a turn. It is also where a new Pi is tried on
-recorded histories before `--accept-format`: a conversation that reads as it
-did, with its requests found and nothing rewritten, is the evidence.
+Run this checkout's `node scripts/cli.mjs` against the app controller printed
+by the launcher. For contributor verification, use the shared
+[verify-hallvi skill](../.agents/skills/verify-hallvi/SKILL.md) and its
+[workflow](verification.md): choose the environment, check retained-history
+compatibility, attach exclusively when real Pi work is needed, match the
+request to its evidence, verify useful behavior and detach.
+[The development environment](development-environment.md) owns retained state
+and the attach/snapshot commands. This document owns the CLI contract.
 
 ## Limits
 
