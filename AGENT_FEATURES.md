@@ -9,7 +9,7 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 
 | Proposal | +1 | Status | Intended result |
 | --- | --- | --- | --- |
-| [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | Proposed | Return to the same private route in one action |
+| [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | In progress (partial) | Return to the same private route in one action |
 | [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | In progress (partial) | Understand the action, target and unknown outcome |
 | [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | Proposed | Hand over enough evidence to reproduce and repair a defect |
 
@@ -26,7 +26,7 @@ fresh-user beta walkthrough remains open; these ideas add no beta prerequisites.
 
 ### Reconnect to a known private application
 
-**Status:** Proposed
+**Status:** In progress (partial)
 
 **Problem and intended result:** Returning to a private app currently prepares
 a conversation draft. Offer one Reconnect action for its established route.
@@ -40,8 +40,15 @@ mode, keep the saved host/ports, and show truthful tunnel and HTTP observations.
 actual device and use a named saved item while preserving private exposure.
 Distinguish closed tunnel, SSH failure and an application that does not answer.
 
-**Open decisions:** Owner selection; bypassing Pi would require a separate contract.
-**Assignment:** Unassigned.
+**Open decisions:** Bypassing Pi would require a separate contract. Direct
+submission, the saved-route tool form and the real return/remote-device
+acceptance remain unimplemented and unassigned.
+**Assignment:** On 2026-09-29 the owner selected plan 02 increment 1: truthful
+access observations and one current saved-route selector. Assigned to
+`codex/private-access-observations`, based on #255. Existing reopen actions
+still prepare a main-conversation draft; they do not submit or reconnect.
+The full feature remains partial. [Verification and matched captures](docs/assets/private-access-observations/README.md)
+cover this increment only.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 

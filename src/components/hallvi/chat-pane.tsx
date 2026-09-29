@@ -1,5 +1,7 @@
 "use client";
 
+import { currentAccessRecord } from "@/server/access-record";
+
 import { HallviMark } from "./hallvi-mark";
 import {
   Archive,
@@ -297,6 +299,10 @@ export function ChatPane({
    */
   workerAlive?: boolean;
 }) {
+  const currentAccessId = currentAccessRecord(
+    view.information ?? [],
+    view.application?.id,
+  )?.id;
   const chatId = activeChat?.id ?? null;
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
@@ -900,7 +906,14 @@ export function ChatPane({
                           key={block.id}
                           record={record}
                           onOpen={openDestination}
-                          reachable={reachable}
+                          reachable={
+                            record.presentation?.content?.kind ===
+                              "application-access" &&
+                            record.presentation.content.mode === "private" &&
+                            record.id !== currentAccessId
+                              ? "unknown"
+                              : reachable
+                          }
                           superseded={
                             firstShown.get(record.id) !==
                             `${message.id}:${index}`

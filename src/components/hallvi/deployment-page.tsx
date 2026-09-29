@@ -1,5 +1,7 @@
 "use client";
 
+import { currentAccessRecord } from "@/server/access-record";
+
 // Deployment, on real records and real executions.
 //
 // The selected design (the register): one inventory of releases, newest
@@ -64,11 +66,7 @@ export function DeploymentPage({
   onAsk: (draft: string) => void;
   onOpenDestination?: (destination: ApplicationSection) => void;
 }) {
-  const access = records
-    .filter((record) => !record.retiredAt)
-    .find(
-      (record) => record.presentation?.content?.kind === "application-access",
-    );
+  const access = currentAccessRecord(records);
   const content = access?.presentation?.content;
   const restricted =
     content?.kind === "application-access" ? content.mode === "private" : false;

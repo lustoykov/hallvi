@@ -129,6 +129,23 @@ tool disclosures are insufficient.
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
+| [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in this increment |
+
+### AF-012 — Keep private access observations truthful and on one route
+
+An open SSH master promoted application HTTP health, a missing or failed
+controller read could retain a green access state, and the check, Open links
+and reopen draft could select different saved routes. Bind observations to the
+same current route, keep SSH and HTTP evidence separate, and discard older
+poll responses. Visual QA also found the shared header Open button's background
+token missing on Overview; it now falls back to the existing shell token.
+
+**+1:** 2026-09-29 — private-access increment 1 task
+(`codex/private-access-observations`).
+
+**Status:** Resolved in this increment. [Verification and matched captures](docs/assets/private-access-observations/README.md)
+show the modeled states and limitations. Reopen remains draft-only; the full
+reconnect feature is partial.
 
 ### AF-003 — Open-link checks in the shared-information smoke match nothing
 
