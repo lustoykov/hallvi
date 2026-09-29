@@ -1,0 +1,545 @@
+// The access log on the server, read with fixed commands.
+//
+// Traffic history needs three things of every log it counts: the files the
+// server still holds and the time each covers, the lines of a stretch of time,
+// and new lines as they are written. A log that cannot do all three gives live
+// data and no history.
+//
+// Every command here is Hallvi's own text and only reads. A record supplies
+// closed-shape values — a path or a container name — and the rest are whole
+// seconds and file names the server listed, which are used only once they
+// match a rotation pattern. Like the live follow on Overview these are
+// observations, outside the permission boundary: there is no model-authored
+// text in them to decide about. Where Hallvi's user cannot read the log, a
+// command runs itself again through `sudo -n`, as the docker variant always
+// has, and says so in words when that is not allowed either.
+
+import { spawn } from "node:child_process";
+
+import { managedSshOptions } from "../managed-ssh";
+import {
+  accessLogSourceSchema,
+  type InformationContent,
+  type OperatorSettings,
+} from "../operator-data";
+import type { LogFormat, TrafficLine } from "./contract";
+import { lineTime, parseLine, type ParseOptions } from "./parse";
+
+export type AccessLogRecord = Extract<
+  InformationContent,
+  { kind: "access-log" }
+>;
+export type LogSource = AccessLogRecord["source"];
+type Host = NonNullable<OperatorSettings["host"]>;
+
+/** A stretch of time in epoch milliseconds, from included, to excluded. */
+export interface Span {
+  from: number;
+  to: number;
+}
+
+/**
+ * A file the server still holds, or a container's whole log, with the time it
+ * holds every request of. Quiet time counts: a file covers until the next one
+ * began, and the file being written covers until now.
+ */
+export interface LogFile extends Span {
+  /** The file's name beside the log, or the container's name. */
+  name: string;
+  /** Null for a container. */
+  bytes: number | null;
+}
+
+export interface ReadResult {
+  /** The parts of the range the log held and was read in full. */
+  covered: Span[];
+  /** The parts a retained file held but could not be read. */
+  unreadable: Span[];
+}
+
+/** Printed once the log is open, so "live" means connected and reading. */
+export const READY = "hallvi-following";
+
+// Every command is `bash -c '<script>' hallvi <values>`. The script is fixed
+// text in single quotes, so the login shell hands it to bash untouched, and
+// each value arrives as a positional parameter: data to bash, never script.
+// Values are closed shapes, and are quoted as well.
+function command(script: string, values: string[]) {
+  for (const value of values)
+    if (!/^[A-Za-z0-9_.\/-]+$/.test(value))
+      throw new Error(`Not a value a log command takes: ${value}`);
+  return `bash -c '${script}' hallvi ${values.map((value) => `'${value}'`).join(" ")}`;
+}
+
+// A log Hallvi's user cannot read is read again as root when sudo allows it
+// without a password, and not otherwise.
+const AS_ROOT_IF_NEEDED =
+  'if [ ! -r "$1" ] && [ "$(id -u)" != 0 ] && sudo -n true 2>/dev/null; then exec sudo -n bash -c "$BASH_EXECUTION_STRING" hallvi "$@"; fi';
+const DOCKER = 'd=docker; docker ps >/dev/null 2>&1 || d="sudo -n docker"';
+
+// $1 is the log's path. Its rotated files sit beside it: logrotate's
+// access.log.1 and access.log.2.gz, Caddy's access-<UTC time>[-reason].log.gz.
+// A name with anything but letters, digits, dots, dashes and underscores is
+// skipped here and refused again when read back.
+const LIST_FILES = [
+  AS_ROOT_IF_NEEDED,
+  'cd -- "${1%/*}/" || exit 3',
+  'name=${1##*/}; stem=${name%.*}; ext=${name#"$stem"}',
+  'echo "hallvi-now $(date +%s)"',
+  'for f in "$name".[0-9]* "$stem"-[0-9]*"$ext" "$stem"-[0-9]*"$ext".gz "$name"; do',
+  '  [ -f "$f" ] || continue',
+  "  case $f in *[^A-Za-z0-9._-]*) continue ;; esac",
+  '  echo "hallvi-file $f $(wc -c < "$f") $(date -r "$f" +%s)"',
+  '  gzip -cdf -- "$f" 2>/dev/null | head -n 3; echo',
+  "done",
+].join("\n");
+
+// $1 is the log's path; the rest are files beside it, oldest first. A file
+// that ends part way through a line gets its line ended, so the next file's
+// first line is never glued to it.
+const READ_FILES = [
+  AS_ROOT_IF_NEEDED,
+  'cd -- "${1%/*}/" || exit 3',
+  "shift",
+  'for f in "$@"; do',
+  '  gzip -cdf -- "$f"; s=$?; echo',
+  '  [ "$s" = 0 ] || echo "hallvi-unreadable $f"',
+  "done",
+].join("\n");
+
+// The rotated files first, then the file being written from its first line,
+// following it by name through the next rotation. One command, so no line
+// written between a read and a follow can fall between them.
+const FOLLOW_FILES = [
+  AS_ROOT_IF_NEEDED,
+  '[ -r "$1" ] || { echo "The access log is not readable."; exit 1; }',
+  'cd -- "${1%/*}/" || exit 1',
+  "name=${1##*/}",
+  `echo ${READY}`,
+  "shift",
+  'for f in "$@"; do gzip -cdf -- "$f"; echo; done',
+  'exec tail -n +1 -F -- "$name"',
+].join("\n");
+
+// A container's output, with docker's own time on every line: what `--since`
+// and `--until` choose by. Docker's complaints have no time, which is how
+// they are told apart from the log.
+const LIST_CONTAINER = [
+  DOCKER,
+  'echo "hallvi-now $(date +%s)"',
+  'echo "hallvi-first $($d logs --timestamps "$1" 2>&1 | head -n 1)"',
+  'echo "hallvi-last $($d logs --timestamps --tail 1 "$1" 2>&1 | tail -n 1)"',
+].join("\n");
+const READ_CONTAINER = [
+  DOCKER,
+  'exec $d logs --timestamps --since "$2" --until "$3" "$1" 2>&1',
+].join("\n");
+const FOLLOW_CONTAINER = [
+  DOCKER,
+  `echo ${READY}`,
+  'exec $d logs --timestamps --since "$2" --follow "$1" 2>&1',
+].join("\n");
+
+const valuesOf = (source: LogSource) => {
+  const checked = accessLogSourceSchema.parse(source);
+  return checked.type === "file" ? [checked.path] : [checked.name];
+};
+const seconds = (ms: number) => String(Math.max(0, Math.floor(ms / 1000)));
+// Docker picks lines by its own clock, the proxy stamps them by the
+// request's end; a minute either side, and the lines choose themselves.
+const SLACK = 60_000;
+
+export function listLogCommand(source: LogSource) {
+  return command(
+    source.type === "file" ? LIST_FILES : LIST_CONTAINER,
+    valuesOf(source),
+  );
+}
+
+/** Files are named as `listLog` found them; a container is read by time. */
+export function readLogCommand(
+  source: LogSource,
+  files: string[],
+  range: Span,
+) {
+  if (source.type === "container")
+    return command(READ_CONTAINER, [
+      ...valuesOf(source),
+      seconds(range.from - SLACK),
+      seconds(range.to + SLACK),
+    ]);
+  return command(READ_FILES, [
+    ...valuesOf(source),
+    ...rotatedOnly(source.path, files, true),
+  ]);
+}
+
+/** Rotated files to read first, then the file being written, followed. */
+export function followLogCommand(
+  source: LogSource,
+  rotated: string[],
+  since: number,
+) {
+  if (source.type === "container")
+    return command(FOLLOW_CONTAINER, [
+      ...valuesOf(source),
+      seconds(since - SLACK),
+    ]);
+  return command(FOLLOW_FILES, [
+    ...valuesOf(source),
+    ...rotatedOnly(source.path, rotated, false),
+  ]);
+}
+
+// A name read back from the server is used only if it is the log or one of
+// its rotations, whatever else the directory holds.
+function rotatedOnly(path: string, names: string[], current: boolean) {
+  const base = baseOf(path);
+  for (const name of names) {
+    const rotation = rotationOf(base, name);
+    if (!rotation || (!current && "current" in rotation))
+      throw new Error(`Not a file of this log: ${name}`);
+  }
+  return names;
+}
+
+const baseOf = (path: string) => path.slice(path.lastIndexOf("/") + 1);
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+
+/** The file being written, a numbered rotation, or one stamped when it rolled. */
+type Rotation = { current: true } | { number: number } | { rolledAt: number };
+
+/** How a name beside the log came to be there, or null if it is not the log's. */
+function rotationOf(base: string, name: string): Rotation | null {
+  if (name === base) return { current: true };
+  const numbered = new RegExp(`^${escaped(base)}\\.(\\d{1,5})(\\.gz)?$`).exec(
+    name,
+  );
+  if (numbered) return { number: Number(numbered[1]) };
+  const dot = base.lastIndexOf(".");
+  const stem = dot >= 0 ? base.slice(0, dot) : base;
+  const ext = dot >= 0 ? base.slice(dot) : "";
+  // Caddy 2.11 adds why it rolled (size, time, manual); older Caddy does not.
+  const stamped = new RegExp(
+    `^${escaped(stem)}-(\\d{4}-\\d\\d-\\d\\d)T(\\d\\d)-(\\d\\d)-(\\d\\d\\.\\d{3})(?:-[a-z]+)?${escaped(ext)}(\\.gz)?$`,
+  ).exec(name);
+  if (!stamped) return null;
+  const rolledAt = Date.parse(
+    `${stamped[1]}T${stamped[2]}:${stamped[3]}:${stamped[4]}Z`,
+  );
+  return Number.isFinite(rolledAt) ? { rolledAt } : null;
+}
+
+interface Found {
+  name: string;
+  bytes: number | null;
+  modified: number;
+  first: number | null;
+  rotation: Rotation;
+}
+
+/**
+ * What a file listing says, oldest first. Two neighbouring files cover the
+ * time between them unless one is missing between them: logrotate's numbers
+ * skip one, or Caddy's next file began well after the moment it rolled.
+ */
+export function filesOf(
+  path: string,
+  format: LogFormat,
+  output: string[],
+): LogFile[] {
+  const base = baseOf(path);
+  let now: number | null = null;
+  const found = new Map<string, Found>();
+  let reading: Found | null = null;
+  for (const text of output) {
+    const said = /^hallvi-(now|file) (.*)$/.exec(text.trim());
+    if (said?.[1] === "now") {
+      now = Number(said[2]) * 1000;
+    } else if (said?.[1] === "file") {
+      const [name = "", bytes, modified] = said[2].trim().split(/\s+/);
+      const rotation = rotationOf(base, name);
+      reading =
+        rotation && !found.has(name) && Number.isFinite(Number(modified))
+          ? {
+              name,
+              bytes: Number.isFinite(Number(bytes)) ? Number(bytes) : null,
+              modified: Number(modified) * 1000,
+              first: null,
+              rotation,
+            }
+          : null;
+      if (reading) found.set(name, reading);
+    } else if (reading && reading.first === null) {
+      reading.first = lineTime(format, text);
+    }
+  }
+  const from = (file: Found) => file.first ?? file.modified;
+  const files = [...found.values()].sort((a, b) =>
+    "current" in a.rotation
+      ? 1
+      : "current" in b.rotation
+        ? -1
+        : from(a) - from(b),
+  );
+  return files.map((file, index) => {
+    const next = files[index + 1];
+    // The end of the second the file was last written in.
+    let to = file.modified + 1000;
+    if ("current" in file.rotation && now !== null) to = now + 1000;
+    else if (next && adjacent(file, next, from(next))) to = from(next);
+    return {
+      name: file.name,
+      bytes: file.bytes,
+      from: from(file),
+      to: Math.max(to, from(file)),
+    };
+  });
+}
+
+function adjacent(file: Found, next: Found, nextFrom: number) {
+  const { rotation } = file;
+  if ("number" in rotation)
+    return "current" in next.rotation
+      ? rotation.number === 1
+      : "number" in next.rotation && next.rotation.number === rotation.number - 1;
+  // Caddy rolls on the write that would not fit, and that write opens the
+  // next file: its first line is the moment in this file's name.
+  if ("rolledAt" in rotation) return nextFrom <= rotation.rolledAt + 2000;
+  return true;
+}
+
+const STAMP = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z)(?:\s|$)/;
+const stampOf = (text: string) => {
+  const stamp = STAMP.exec(text)?.[1];
+  return stamp ? Date.parse(stamp) : null;
+};
+
+/** What a container listing says: its oldest retained line to now. */
+export function containerOf(name: string, output: string[]): LogFile[] {
+  const said = (key: string) =>
+    output
+      .find((text) => text.startsWith(`hallvi-${key} `))
+      ?.slice(key.length + 8)
+      .trim() ?? "";
+  const first = said("first");
+  if (!first) return [];
+  const from = stampOf(first);
+  // Without a time it is docker speaking: no such container, no permission.
+  if (from === null) throw new Error(first.slice(0, 200));
+  const now = Number(said("now")) * 1000;
+  const last = stampOf(said("last")) ?? from;
+  return [
+    {
+      name,
+      bytes: null,
+      from,
+      to: Math.max(Number.isFinite(now) ? now + 1000 : last + 1, from),
+    },
+  ];
+}
+
+const optionsOf = (log: AccessLogRecord): ParseOptions => ({
+  pageKey: log.pageKey,
+  hosts: log.hosts,
+});
+
+/** The files the server still holds, oldest first, and what each covers. */
+export async function listLog(
+  host: Host,
+  log: AccessLogRecord,
+  signal?: AbortSignal,
+) {
+  const output: string[] = [];
+  const { exitCode, said } = await onServer(
+    host,
+    listLogCommand(log.source),
+    (text) => output.push(text),
+    { signal },
+  );
+  signal?.throwIfAborted();
+  if (exitCode !== 0)
+    throw new Error(said || "The access log could not be listed.");
+  return log.source.type === "file"
+    ? filesOf(log.source.path, log.format, output)
+    : containerOf(log.source.name, output);
+}
+
+/**
+ * Every request of a range, in the order the log holds them, and how much of
+ * the range the log could answer for. A range is `from` included, `to`
+ * excluded, so neighbouring days never share a line.
+ */
+export async function readLog(
+  host: Host,
+  log: AccessLogRecord,
+  range: Span,
+  onLine: (line: TrafficLine) => void,
+  signal?: AbortSignal,
+): Promise<ReadResult> {
+  const files = (await listLog(host, log, signal)).filter(
+    (file) => file.from < range.to && file.to > range.from,
+  );
+  if (!files.length) return { covered: [], unreadable: [] };
+  const options = optionsOf(log);
+  const failed = new Set<string>();
+  const { exitCode, said } = await onServer(
+    host,
+    readLogCommand(
+      log.source,
+      files.map((file) => file.name),
+      range,
+    ),
+    (text) => {
+      if (text.startsWith("hallvi-unreadable ")) {
+        failed.add(text.slice(18).trim());
+        return;
+      }
+      const line = parseLine(log.format, text, options);
+      if (line && line.at >= range.from && line.at < range.to) onLine(line);
+    },
+    { signal },
+  );
+  signal?.throwIfAborted();
+  if (exitCode !== 0)
+    throw new Error(said || "The access log could not be read.");
+  const within = (file: Span) => ({
+    from: Math.max(file.from, range.from),
+    to: Math.min(file.to, range.to),
+  });
+  return {
+    covered: joined(files.filter((f) => !failed.has(f.name)).map(within)),
+    unreadable: joined(files.filter((f) => failed.has(f.name)).map(within)),
+  };
+}
+
+/**
+ * Every request from `since` on, then each new one as it is written, until
+ * the signal aborts or the connection ends. What went wrong is in `said`.
+ */
+export async function followLog(
+  host: Host,
+  log: AccessLogRecord,
+  since: number,
+  onLine: (line: TrafficLine) => void,
+  signal: AbortSignal,
+  onReady: () => void = () => {},
+) {
+  const { source } = log;
+  const rotated =
+    source.type === "file"
+      ? (await listLog(host, log, signal))
+          .filter(
+            (file) => file.name !== baseOf(source.path) && file.to > since,
+          )
+          .map((file) => file.name)
+      : [];
+  const options = optionsOf(log);
+  return onServer(
+    host,
+    followLogCommand(source, rotated, since),
+    (text) => {
+      const line = parseLine(log.format, text, options);
+      if (line && line.at >= since) onLine(line);
+    },
+    { follow: true, signal, onReady },
+  );
+}
+
+function joined(spans: Span[]) {
+  const sorted = spans
+    .filter((span) => span.to > span.from)
+    .sort((a, b) => a.from - b.from);
+  const out: Span[] = [];
+  for (const span of sorted) {
+    const last = out.at(-1);
+    if (last && span.from <= last.to) last.to = Math.max(last.to, span.to);
+    else out.push({ ...span });
+  }
+  return out;
+}
+
+/**
+ * Runs one of these commands on the server and hands on its output line by
+ * line. What went wrong is said in words by ssh, sudo, docker or tail; a line
+ * of the log itself is never an explanation — on a real server the last
+ * unread line was Caddy's error entry, address and all.
+ */
+export function onServer(
+  host: Host,
+  remote: string,
+  onText: (text: string) => void,
+  {
+    follow = false,
+    signal,
+    onReady = () => {},
+  }: { follow?: boolean; signal?: AbortSignal; onReady?: () => void } = {},
+) {
+  return new Promise<{ exitCode: number | null; said: string }>(
+    (resolve, reject) => {
+      const child = spawn(
+        "ssh",
+        [
+          ...managedSshOptions(host),
+          // A follow gets a terminal, and the command as an argument rather
+          // than on stdin. Without one, closing the page ended the SSH
+          // session and left the follow running on the server until its next
+          // write — on a quiet site, indefinitely. With one, the server hangs
+          // the process up when the connection goes. A read that ends by
+          // itself needs none, and its JSON compresses well on the way.
+          ...(follow ? ["-tt"] : ["-o", "Compression=yes"]),
+          "-o",
+          "ConnectTimeout=10",
+          // A page that says "live" has to find out quickly that it is not:
+          // three missed answers, five seconds apart. At the shell's 15 and 2
+          // a blackholed connection went on claiming live for 40 seconds.
+          "-o",
+          "ServerAliveInterval=5",
+          "-o",
+          "ServerAliveCountMax=3",
+          "-o",
+          "LogLevel=ERROR",
+          `${host.user}@${host.address}`,
+          remote,
+        ],
+        { signal, stdio: ["pipe", "pipe", "pipe"] },
+      );
+      // Left open and unused for a follow: end-of-input on a terminal is a
+      // keystroke. A read has nothing to say to the server.
+      child.stdin.on("error", () => {});
+      if (!follow) child.stdin.end();
+      let rest = "";
+      let said = "";
+      child.stdout.on("data", (chunk: Buffer) => {
+        // A terminal ends its lines with a carriage return as well.
+        const lines = (rest + chunk.toString("utf8")).split(/\r?\n/);
+        rest = (lines.pop() ?? "").slice(-20_000);
+        for (const text of lines) {
+          if (text.trim() === READY) {
+            onReady();
+            continue;
+          }
+          if (
+            text.trim() &&
+            !text.includes("{") &&
+            !text.startsWith("hallvi-") &&
+            !STAMP.test(text)
+          )
+            said = text.trim().slice(0, 200);
+          onText(text);
+        }
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        said = chunk.toString("utf8").trim().slice(-300) || said;
+      });
+      child.on("error", (error) =>
+        signal?.aborted ? resolve({ exitCode: null, said }) : reject(error),
+      );
+      child.on("close", (exitCode) => {
+        // What was written last, without an end of line, is still a line.
+        if (rest.trim() && rest.trim() !== READY) onText(rest);
+        resolve({ exitCode, said });
+      });
+    },
+  );
+}
