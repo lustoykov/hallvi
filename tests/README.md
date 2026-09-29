@@ -135,6 +135,9 @@ Answers saved by earlier runs are untouched and still readable: the dashboard's 
 
 Install Chromium with `npx playwright install chromium`. Browser fixtures run on 3180+ with synthetic credentials; they never open the normal application database. Failure artifacts and the rich-card screenshots are under `tests/results/`. The workspace Docker test is opt-in and requires a reachable engine.
 
+For a concurrent worktree, set `HALLVI_E2E_PORT` to a free port from **3100 to
+3999**; the fixture rejects ports outside that range before starting a test.
+
 **Learn Hallvi** (`/learn`) is the dashboard's architecture map and learning
 queue. A separate daily Codex task reviews merged `main` and publishes an
 incremental update. The page only reads saved content and records answers; it
