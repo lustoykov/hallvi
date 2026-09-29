@@ -91,15 +91,22 @@ export function OperatorConsole({
     settingsOnly || suppliedRecords ? `${url}?settingsOnly=1` : url;
   const [settings, setSettings] = useState<OperatorSettings | null>(null);
   const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
+  const [readError, setReadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const refresh = useCallback(async () => {
-    const state = await request<{
-      settings: OperatorSettings;
-      executions?: ExecutionRecord[];
-    }>(readUrl);
-    setSettings(state.settings);
-    if (state.executions) setExecutions(state.executions);
+    try {
+      const state = await request<{
+        settings: OperatorSettings;
+        executions?: ExecutionRecord[];
+      }>(readUrl);
+      setSettings(state.settings);
+      if (state.executions) setExecutions(state.executions);
+      setReadError(null);
+    } catch (error) {
+      // The write has already succeeded; a failed refresh is a read failure.
+      setReadError((error as Error).message);
+    }
   }, [readUrl]);
   useEffect(() => {
     if (suppliedRecords && !settingsOnly) return;
@@ -118,6 +125,7 @@ export function OperatorConsole({
         if (alive) {
           setSettings(state.settings);
           if (state.executions) setExecutions(state.executions);
+          setReadError(null);
         }
         if (
           state.executions?.some(
@@ -128,7 +136,9 @@ export function OperatorConsole({
         )
           again = 1000;
       } catch (error) {
-        if (alive) setError((error as Error).message);
+        // A recovered observation says nothing about a failed or uncertain
+        // settings/approval write. Keep those errors until another action.
+        if (alive) setReadError((error as Error).message);
       }
       if (alive) timer = setTimeout(poll, again);
     }
@@ -342,7 +352,7 @@ export function OperatorConsole({
               </article>
             );
           })}
-      {error && <p role="alert">{error}</p>}
+      {(error || readError) && <p role="alert">{error || readError}</p>}
     </div>
   );
 }
