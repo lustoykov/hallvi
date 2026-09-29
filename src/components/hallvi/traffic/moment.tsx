@@ -91,9 +91,9 @@ export function Visit({
   place: "corner" | "beside" | "row" | "line";
 }) {
   return (
-    <div className="tf-visit" data-place={place} role="status">
+    <span className="tf-visit" data-place={place} role="status">
       <WorkingMascot />
       <span className="tf-visit-words">{moment.words}</span>
-    </div>
+    </span>
   );
 }

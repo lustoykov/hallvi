@@ -541,6 +541,7 @@ export function scenarios(now: number): Scenario[] {
       profile: {
         ...busyProfile,
         daily: 360,
+        newCountry: undefined,
         pages: [
           ["/", 26],
           ["/products", 18],
@@ -689,8 +690,13 @@ function hourOf(scenario: Scenario, at: number, now: number): Hour {
     (isToday ? (profile.today ?? 1) : 1) *
     CURVE[date.getHours()] *
     wobble(Math.floor(at / HOUR) * 7 + scenario.id.length, 0.18);
-  const visitors = Math.round(expected * 1.18 * covered);
-  const views = Math.round(expected * profile.viewsPerVisitor * covered);
+  // Rounded by chance rather than to the nearest, so a small application
+  // gets its occasional visitor instead of a flat zero.
+  const chance = seeded(Math.floor(at / HOUR) * 13 + scenario.id.length)();
+  const visitors = Math.floor(expected * 1.18 * covered + chance);
+  const views = visitors
+    ? Math.max(visitors, Math.round(visitors * profile.viewsPerVisitor))
+    : 0;
   const bots = Math.round(
     (views * profile.requestsPerView + 30) * profile.botShare * covered,
   );
@@ -1068,7 +1074,7 @@ export function fixtureSource(scenario: Scenario): TrafficSource {
               send({
                 type: "arrivals",
                 arrivals: Array.from(
-                  { length: Math.min(14, Math.ceil(240 / state.every)) },
+                  { length: Math.min(14, Math.ceil(120 / state.every)) },
                   (_, index) => arrival(now - (index + 1) * 17_000),
                 ).flat(),
               }),

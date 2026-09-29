@@ -35,12 +35,12 @@ export function Errors({
     ? null
     : oneDay || !worst
       ? `${plural(history.totals.errors, "server error")}, hitting about ${plural(history.totals.errorVisitors, "visitor")}.`
-      : `${plural(history.totals.errors, "server error")} reached visitors on ${plural(days.length, "day")}, most on ${new Date(worst.at).toLocaleDateString("en-GB", { weekday: "long", timeZone: history.timeZone })} (about ${plural(worst.errorVisitors, "visitor")}).`;
+      : `${plural(history.totals.errors, "server error")} reached visitors on ${plural(days.length, "day")}, most ${worst === history.series.at(-1) ? "today" : `on ${new Date(worst.at).toLocaleDateString("en-GB", { weekday: "long", timeZone: history.timeZone })}`} (about ${plural(worst.errorVisitors, "visitor")}).`;
   const top = failing[0];
   return (
     <section className="tf-card tf-errors" data-wide aria-label="Errors">
       <header className="tf-card-head">
-        <h3>Errors visitors hit</h3>
+        <h3>{hit ? "Errors visitors hit" : "Errors in the browser"}</h3>
       </header>
       {says && <p className="tf-card-say">{says}</p>}
       {failing.length > 0 && (
@@ -92,7 +92,9 @@ export function Responses({ history }: { history: TrafficHistory }) {
     point.covered > 0 ? point.p95Ms : null,
   );
   const measured = values.filter((value): value is number => value !== null);
-  const top = Math.max(1, ...measured);
+  // From the fastest to the slowest reading, so a change shows as a change.
+  const low = Math.min(...measured) * 0.8;
+  const high = Math.max(low + 1, ...measured);
   const span = Math.max(1, points.length - 1);
   // One line per stretch the log covered; a gap stays a gap.
   const runs: string[] = [];
@@ -104,7 +106,7 @@ export function Responses({ history }: { history: TrafficHistory }) {
       return;
     }
     run.push(
-      `${((index / span) * 100).toFixed(2)},${(38 - (value / top) * 34).toFixed(2)}`,
+      `${((index / span) * 100).toFixed(2)},${(38 - ((value - low) / (high - low)) * 34).toFixed(2)}`,
     );
   });
   if (run.length) runs.push(run.join(" "));
