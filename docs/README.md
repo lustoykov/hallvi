@@ -11,15 +11,17 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Diagrams](architecture/README.md) | Every diagram under `docs/architecture/`, which document owns each one, and which are historical. |
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
+| [Working from a terminal](cli.md) | `hallvi apps`, `exec`, `wait` and `inspect`: sending work to an application of a named, running controller and reading what was recorded; the JSON, exit codes and limits. |
 | [Installing Hallvi](installation.md) | The installed background service on macOS and Linux: building the package, install paths, `hallvi start/stop/status`, startup behavior, using an installation on a virtual machine from a laptop, upgrade, uninstall and current limits. |
 | [Beta precautions](beta-safety.md) | Practical risks and safeguards for the current alpha when granting server and repository access. |
 | [Development setup](development.md) | Run a checkout locally, open its paired dashboard and database viewer, inspect diagnostics and choose proportionate checks. |
+| [Verification workflow](verification.md) | The shared repository skill's executable path from environment selection through CLI evidence, useful behavior and task-owned cleanup. |
 | [Publishing a release](releases.md) | The maintainer's side: the signed release manifest and what trusts it, the one secret the owner supplies, and the version → build → verify → publish → discover sequence. |
 | [Changelog](../CHANGELOG.md) | What changed in each release, newest first. Installations show it under What's new, and each release's GitHub notes come from it. |
 | [Beta walkthrough](beta-walkthrough.md) | Fresh-user acceptance: install the exact candidate, inspect a repository, connect a test server, use the app and return after restart. |
 | [Always-on concept](design/always-on-concept.md) | Where Hallvi itself runs, as a ladder the user climbs: their own Mac or Linux PC first, then a virtual machine they provide and reach through their own SSH connection, later a hosted service; the failure table behind each rung and the packaging decisions. The first two rungs are implemented. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
-| [Development environment](development-environment.md) | What `npm run dev` opens in the designated checkout: four really deployed applications and their retained records, how to upgrade them, back them up and get them back. |
+| [Development environment](development-environment.md) | Discover, snapshot, exclusively attach and detach retained applications; check compatibility, upgrade their records and recover them. |
 | [Development resources](development-resources.md) | Resource ownership, cloud fixtures and cleanup when a task finishes. |
 | [GitHub setup](integrations/github.md) | Connection and credential setup that still applies. |
 | [Testing and evidence](testing/README.md) | What has actually been proved, coverage gaps and links to dated source accounts. |

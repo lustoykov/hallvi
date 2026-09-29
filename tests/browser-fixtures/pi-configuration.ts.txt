@@ -9,7 +9,7 @@ import {
   type Api,
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -79,6 +79,36 @@ function streamSynthetic(
       const userMessage =
         userIndex < 0 ? "" : textOf(context.messages[userIndex]);
       const answer = `[QA fixture reply] ${userMessage}`;
+
+      // One command in the repository workspace, so the request has execution
+      // evidence. It leaves a mark only if it really ran, prints something
+      // credential-shaped for redaction to catch, and with [long] prints more
+      // than one answer carries.
+      if (
+        userMessage.includes("[mark]") &&
+        context.messages.at(-1)?.role === "user"
+      ) {
+        const mark = join(
+          root,
+          `mark-${createHash("sha256").update(userMessage).digest("hex").slice(0, 16)}`,
+        );
+        message.stopReason = "toolUse";
+        message.content = [
+          { type: "text", text: "Leaving a mark." },
+          {
+            type: "toolCall",
+            id: `qa-call-${randomUUID()}`,
+            name: "bash",
+            arguments: {
+              intent: "Leave a mark",
+              command: `printf ran > '${mark}'${userMessage.includes("[long]") ? " && seq 1 5000" : ""} && echo marked ghp_QAsyntheticTokenValue0123456789`,
+            },
+          },
+        ];
+        stream.push({ type: "start", partial: message });
+        stream.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
 
       stream.push({ type: "start", partial: message });
       // Stream a genuine prefix of the final response; interrupted drafts are

@@ -170,6 +170,10 @@ a change needs a real application with real history, attach one; the worktree
 then runs *that* application, on that application's port, and nothing else
 retained.
 
+The attached application answers the `hallvi` request commands at the address
+`attach` prints, so a change can be checked against it from a terminal:
+[From a development checkout](cli.md#from-a-development-checkout).
+
 Its Pi can create its own labelled resources in the provider project. Fixtures
 of its own go either on a disposable server (hard isolation, for anything meant
 to break) or, for ordinary work, as separate Compose projects on the
