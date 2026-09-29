@@ -383,6 +383,14 @@ ${writer}
 		format filter {
 			request>uri regexp \\?.*$ ""
 			request>headers>Referer regexp [?#].*$ ""
+			resp_headers>Location regexp [?#].*$ ""
+			resp_headers>Content-Location delete
+			resp_headers>Link delete
+			resp_headers>Refresh delete
+			resp_headers>Hx-Location delete
+			resp_headers>Hx-Redirect delete
+			resp_headers>Hx-Push-Url delete
+			resp_headers>Hx-Replace-Url delete
 			wrap json
 		}
 	}
@@ -423,6 +431,14 @@ const CADDY_26 = `{
 			fields {
 				request>uri regexp ^([^?]*)|([?&](?:${KEPT_QUERY_KEYS.join("|")})=[^&]*)|(\\?)[^&]*|&[^&]* $1$2$3
 				request>headers>Referer regexp [?#].*$ ""
+				resp_headers>Location regexp [?#].*$ ""
+				resp_headers>Content-Location delete
+				resp_headers>Link delete
+				resp_headers>Refresh delete
+				resp_headers>Hx-Location delete
+				resp_headers>Hx-Redirect delete
+				resp_headers>Hx-Push-Url delete
+				resp_headers>Hx-Replace-Url delete
 			}
 		}
 		include http.log.access
@@ -620,7 +636,7 @@ export function setupVariant(
     if (at >= v(2, 5))
       return {
         variant: "caddy-2.6",
-        note: "Caddy 2.5 accepts the Referer filter but does not apply it: the server's file keeps each referrer's query string, and Hallvi removes it when it reads. Say so. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
+        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
       };
     // No distribution in support ships these: the oldest found is 2.6.2.
     return {
