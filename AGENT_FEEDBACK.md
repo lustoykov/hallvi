@@ -227,16 +227,23 @@ Idle reads now stop; active updates still serialize full histories. Keep the
 initial/reconnect snapshot and all recorded evidence, then sends changed
 records only. A warm 240-call fixture updating answer text and live output
 reduces each active payload from about 2.28 MB to 10.8 KB; ten-reader frame
-construction plus encoding falls from about 24.4 ms to 2.4 ms. A bounded
-2,000-call stress case still spends about 134 ms projecting ten snapshots,
+construction plus encoding falls from about 24.4 ms to 2.4 ms. At that checkpoint, a bounded
+2,000-call stress case spent about 134 ms projecting ten snapshots,
 separately from the remaining 20 ms diff cost. Worker-link transcript encoding,
-first-connect costs and full-history projection remain; this change does not
+first-connect costs and full-history projection remained; that change did not
 claim to eliminate them. Reproduce with `scripts/benchmark-chat-responses.ts`;
 the production browser comparison retains all six updates in 1/5/10 readers.
 At ten readers, 240 calls produce about 2.31 MB per full response versus 10.7 KB
 per incremental response, with maximum loop delay 201 ms versus 76 ms. These
 bounded synthetic measurements are not latency guarantees; verification and
 the earlier unattributed development-mode miss belong in the implementation PR.
+Overlapping same-chat SSE refreshes now share only pending reads; activity
+projection uses one reply-position map. Settled reads are never cached.
+The development profile also needs durable per-reader milestones: its ten-reader
+case can exhaust the total setup budget before recording any update result,
+with teardown then erasing client evidence. The profile now writes milestones
+as they occur and keeps fixture compilation logs; the ten-second update assertion
+is unchanged. The original missed wave remains unattributed.
 
 ### AF-016 — Keep traffic counting consistent with owner choices and page routes
 

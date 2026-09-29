@@ -9,9 +9,9 @@ export function instrumentNotifications(app) {
     modulePath,
     `
 declare global {
-  var __hallviQaReads: { snapshots: number; scans: number; parses: number } | undefined;
+  var __hallviQaReads: { snapshots: number; scans: number; parses: number; projections: number[]; workerReads: { bytes: number; parseMs: number; elapsedMs: number }[] } | undefined;
 }
-export const reads = globalThis.__hallviQaReads ??= { snapshots: 0, scans: 0, parses: 0 };
+export const reads = globalThis.__hallviQaReads ??= { snapshots: 0, scans: 0, parses: 0, projections: [], workerReads: [] };
 `,
   );
   const responseMetrics = join(app, "src/server/qa-chat-response-metrics.ts");
@@ -82,6 +82,39 @@ export function serialize(frame: object, incremental: boolean, diffMs = 0) {
       ),
     );
   }
+  const replace = (source, anchor, replacement) => {
+    if (source.split(anchor).length !== 2)
+      throw new Error(`QA projection/transport anchor changed: ${anchor}`);
+    return source.replace(anchor, replacement);
+  };
+  const conversationPath = join(app, "src/server/pi-conversation.ts");
+  let conversation = readFileSync(conversationPath, "utf8");
+  conversation = replace(
+    conversation,
+    "const { calls } = transcript;",
+    "const atProjection = performance.now();\n  const { calls } = transcript;",
+  );
+  conversation = replace(
+    conversation,
+    "  return {\n    piActivity,",
+    "  reads.projections.push(performance.now() - atProjection);\n  return {\n    piActivity,",
+  );
+  writeFileSync(conversationPath, conversation);
+  const workerPath = join(app, "src/server/worker-link.ts");
+  let worker =
+    'import { reads } from "./qa-notification-metrics";\n' +
+    readFileSync(workerPath, "utf8");
+  worker = replace(
+    worker,
+    "return new Promise<T>((resolve, reject) => {",
+    "const atWorker = performance.now();\n  return new Promise<T>((resolve, reject) => {",
+  );
+  worker = replace(
+    worker,
+    "const answer = JSON.parse(text);",
+    'const atParse = performance.now();\n            const answer = JSON.parse(text);\n            const parseMs = performance.now() - atParse;\n            if (action === "transcript") reads.workerReads.push({ bytes: Buffer.byteLength(text), parseMs, elapsedMs: performance.now() - atWorker });',
+  );
+  writeFileSync(workerPath, worker);
   const route = join(app, "src/app/api/qa-notification-metrics/route.ts");
   mkdirSync(dirname(route), { recursive: true });
   writeFileSync(
@@ -93,7 +126,7 @@ export function GET(request: Request) {
   const query = new URL(request.url).searchParams;
   if (!query.has("responses")) return Response.json(reads);
   const result = { ...reads, frames: [...responses.frames], maxLoopDelayMs: responses.loop.max / 1e6 };
-  if (query.has("reset")) { responses.frames.length = 0; responses.loop.reset(); }
+  if (query.has("reset")) { responses.frames.length = 0; reads.projections.length = 0; reads.workerReads.length = 0; responses.loop.reset(); }
   return Response.json(result);
 }
 `,
