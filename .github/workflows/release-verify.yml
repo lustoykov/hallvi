@@ -173,6 +173,11 @@ jobs:
         run: |
           node scripts/verify-installed-upgrade.mjs verify candidate/hallvi-release.json upgrade-state.json
 
+      - name: Restart candidate while a chat event stream is open
+        if: matrix.journey == 'upgrade'
+        run: |
+          node scripts/verify-installed-upgrade.mjs restart candidate/hallvi-release.json upgrade-state.json
+
       - name: Stop the test service
         if: always() && steps.isolation.outcome == 'success'
         run: |
