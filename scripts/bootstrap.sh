@@ -66,7 +66,7 @@ done
 # the same way the program replaces it, so a test release source can be used
 # end to end; see docs/releases.md.
 release_key_base64=${HALLVI_RELEASE_KEY:-zAij7gWKCYN0dTMzbMURpCh/pxVoqPglUHgzIXtEsJE=}
-releases_url=${HALLVI_RELEASE_SOURCE:-https://api.github.com/repos/lustoykov/hallvi/releases?per_page=20}
+releases_url=${HALLVI_RELEASE_SOURCE:-https://api.github.com/repos/lustoykov/hallvi/releases/latest}
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/hallvi-install.XXXXXXXX") ||
   fail "could not create a temporary directory."
@@ -152,10 +152,10 @@ else
   curl -fsSL "$releases_url" -o "$work/releases.json" ||
     fail "the release list could not be reached. Check the network, or pass a downloaded archive."
 
-  # The newest release that actually published a signed manifest. GitHub
-  # returns newest first and hides drafts from an unauthenticated listing, and
-  # every asset URL of a release shares one directory, so this one match gives
-  # the location of all of them without parsing JSON.
+  # GitHub's default latest-release response names one published release;
+  # its asset URLs pin the manifest and archive to that immutable tag. A
+  # custom source may still serve an exact release or a newest-first list.
+  # Every asset URL shares one directory, so no JSON parser is needed here.
   manifest_url=$(
     tr ',' '\n' < "$work/releases.json" |
       awk '/https:\/\/[^"]*\/releases\/download\/[^"]*\/hallvi-release\.json"/ {

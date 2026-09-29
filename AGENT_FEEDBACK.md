@@ -170,6 +170,7 @@ noting on the other which findings are taken, would save that merge.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-023 — Discover newer releases despite GitHub listing order](#af-023--discover-newer-releases-despite-github-listing-order) | 1 | Fixed in #285 |
 | [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fixed in #282 |
 | [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
 | [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fixed in #280 |
@@ -184,6 +185,19 @@ noting on the other which findings are taken, would save that merge.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-023 — Discover newer releases despite GitHub listing order
+
+After alpha.10 publication, GitHub listed alpha.9, alpha.8, then alpha.10.
+The installed updater stopped at its cached alpha.9 and said nothing newer was
+available; the official bootstrap also chose the first manifest. Rank update
+candidates before the cache shortcut and use GitHub's latest-release object
+for the default bootstrap, while preserving signed manifest verification.
+
+**+1:** 2026-09-29 — published alpha.10 updater acceptance
+(`codex/release-discovery-order`).
+
+**Disposition:** Fixed in [#285](https://github.com/lustoykov/hallvi/pull/285). The running updater ranks version tags before its verified-cache shortcut; the normal installer selects GitHub’s latest published release. Signature and archive checks remain unchanged. A real public-feed check found and verified alpha.10 despite the older cached tag. Older affected installations need the corrected official installer to recover.
 
 ### AF-021 — Let manual public deployment proceed without GitHub login
 

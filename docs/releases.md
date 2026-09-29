@@ -182,6 +182,15 @@ leaves new installations on the previous release's installer.
 when the owner presses **Check for updates**. Each checks once an hour at most,
 from the last answer in between.
 
+Discovery considers version tags in descending order before its verified-tag
+cache shortcut; GitHub's release-list order is not an update decision. Tags
+only decide which manifest to fetch first: the signed manifest still owns the
+version, channel and package details. The official bootstrap instead reads
+GitHub's latest-release object and follows its immutable asset URLs. For
+bootstrap, a custom `HALLVI_RELEASE_SOURCE` can serve an exact release object
+or a newest-first list; bootstrap does not sort custom lists or require a JSON
+parser before downloading the runtime.
+
 Merging a pull request never reaches any of this.
 
 ## The manifest
