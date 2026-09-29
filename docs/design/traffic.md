@@ -231,6 +231,53 @@ page can say what the log cannot see.
 - Raw logs are not copied off the server: that would put visitor addresses in
   a second place to cover a rare case.
 
+### Setting up the log
+
+Tested on Caddy 2.11.4, nginx 1.30.5 and Traefik 3.7.13 over real SSH as
+root, a sudo user and a user without sudo. This is what Pi's instructions say.
+
+- **The record** points at the **host** path:
+  `{kind:'access-log', proxy, format, source:{type:'file', path}, hosts, pageKey?, retainDays}`.
+  `hosts` lists every name the application answers on (lower case, no port),
+  so one proxy can serve several applications. A file source is preferred:
+  `docker logs` history ends when the container is recreated. A proxy in a
+  container bind-mounts the host directory at the same path. Hallvi's SSH user
+  must be root, have passwordless sudo, or be able to read the files; reads
+  fall back to `sudo -n` and otherwise say which file is unreadable.
+- **Caddy:** a `log hallvi` of its own beside the owner's, imported into each
+  counted site, writing `/var/log/caddy/hallvi/access.log` with
+  `roll_interval 24h`, `roll_keep 1000`, `roll_keep_for 30d`, `roll_size 100MiB`,
+  `mode 0640`, `dir_mode 0755`; a `format filter` with
+  `request>uri regexp \?.*$ ""` and `request>headers>Referer regexp [?#].*$ ""`
+  wrapping json; `log_append hv_<key> {query.<key>}` for each kept key, and
+  `hv_page` only where the application routes by a query key. Rotated names
+  carry the reason (`access-<UTC ms>-size|time|manual.log.gz`), rotation is
+  lazy, and `.zst` is not read.
+- **nginx:** Hallvi's log in **its own directory** (`install -d -m 0755
+  /var/log/nginx/hallvi` first), a `conf.d/hallvi-log.conf` with maps that cut
+  `$request_uri` and `$http_referer` at `?`/`#` and pick each host's page key,
+  `log_format hallvi escape=json` emitting the `hallvi-json` line, and an
+  `access_log … hallvi;` in every `server` block that already has its own
+  (such a block inherits none from `http`). Retention in
+  `/etc/logrotate.d/hallvi-nginx` (root-owned, 0644): daily, 30 kept,
+  compress + delaycompress, `nodateext`, `create 0640 root adm`, and a
+  postrotate USR1 to nginx — without it nginx keeps writing into the renamed
+  file.
+- **Traefik:** JSON access log to `/var/log/traefik/access.log` with header
+  mode `drop` except User-Agent, Referer, Sec-Fetch-Dest, Sec-Fetch-Mode,
+  Sec-Purpose, Purpose, Content-Type, CF-Connecting-IP and CF-IPCountry; the
+  same logrotate block with a USR1 to Traefik.
+
+What went wrong when it was tried, so Pi does not repeat it: a Hallvi file
+inside `/var/log/nginx/*.log` duplicates Debian's own logrotate entry and makes
+logrotate skip the owner's whole nginx configuration; logrotate ignores a
+configuration not owned by root; nginx's `$uri` is rewritten by `try_files`
+(an SPA route was logged as `/spa/index.html`), so the path comes from
+`$request_uri`; Caddy without `mode`/`dir_mode` writes files only root can read;
+Caddy still writes a failed request's error entries, **with the full query
+string**, to its default logger (stderr, `docker logs`), which Pi may read; a
+single-file bind mount goes stale when the file is replaced.
+
 ## Where it shows
 
 All of it reads stored totals immediately; none of it waits for Pi.
