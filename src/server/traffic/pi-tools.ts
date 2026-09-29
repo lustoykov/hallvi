@@ -16,12 +16,17 @@ import {
   EVENT_PREFIX,
   KEPT_QUERY_KEYS,
   OTHER,
+  PAGE_KEY_ATTRIBUTE,
+  PAGE_KEY_NAME,
   eventPath,
   type Collection,
   type Gap,
+  type LogQueries,
   type Ranked,
+  type RangeTotals,
   type ReleaseImpact,
   type TrafficHistory,
+  type TrafficList,
   type TrafficRange,
 } from "./contract";
 import { currentCollection } from "./collection";
@@ -68,7 +73,7 @@ const STATE_WORDS: Record<Collection["state"], string> = {
 };
 
 /** What each list counts, beside distinct browsers. */
-const LIST_COUNTS: Record<ListName, string> = {
+const LIST_COUNTS: Record<TrafficList, string> = {
   pages: "page views",
   sources: "page views arriving from the source",
   campaigns: "page views arriving from the campaign",
@@ -80,17 +85,6 @@ const LIST_COUNTS: Record<ListName, string> = {
   goals: "goal events",
   bots: "bot and scanner requests",
 };
-type ListName =
-  | "pages"
-  | "sources"
-  | "campaigns"
-  | "countries"
-  | "devices"
-  | "browsers"
-  | "systems"
-  | "errors"
-  | "goals"
-  | "bots";
 
 /** The top of a list, the rest folded into `(other)`, as compact rows. */
 function top(list: Ranked[]) {
@@ -113,18 +107,27 @@ function top(list: Ranked[]) {
   );
 }
 
+/**
+ * A figure that is only a floor says so itself, "at least 10000", so that
+ * no reading can quote it as exact.
+ */
+const floor = (value: number | null, atLeast: boolean) =>
+  value !== null && atLeast ? `at least ${value}` : value;
+
 function totalsOf(
-  totals: Omit<TrafficHistory["totals"], "visitorsPer">,
+  totals: Omit<RangeTotals, "visitorsPer" | "visitorsAtLeast"> &
+    Partial<Pick<RangeTotals, "visitorsAtLeast">>,
   visitors: string,
 ) {
+  const partial = Boolean(totals.visitorsAtLeast);
   return {
     requests: totals.requests,
     pageViews: totals.views,
     errors5xx: totals.errors,
     botRequests: totals.bots,
-    p95ResponseMs: totals.p95Ms,
-    [visitors]: totals.visitors,
-    [`${visitors}HitByErrors`]: totals.errorVisitors,
+    p95ResponseMs: floor(totals.p95Ms, totals.p95AtLeast),
+    [visitors]: floor(totals.visitors, partial),
+    [`${visitors}HitByErrors`]: floor(totals.errorVisitors, partial),
   };
 }
 
@@ -138,6 +141,16 @@ function collectionOf(collection: Collection) {
     stoppedAt: collection.disabledAt,
     log: collection.source
       ? `${collection.source.proxy} (${collection.source.format})`
+      : null,
+    serverLogKeeps: collection.source
+      ? {
+          removed:
+            "no query strings: they are removed from the address and the referrer before a line is written",
+          "path-only":
+            "the referrer's query string; the address's is removed before a line is written",
+          kept: "full addresses, query strings included",
+          unknown: "whatever its setup keeps: the record does not say",
+        }[collection.source.queries ?? "unknown"]
       : null,
     lastLineAt: collection.lastLineAt,
     serverLogReachesBackTo: collection.oldestRetainedAt,
@@ -199,12 +212,26 @@ export function trafficReading(
     );
   if (releases.length)
     notes.push(
-      `Release windows compare ${RELEASE_WINDOW} minutes before with ${RELEASE_WINDOW} after; their visitor figures are hourly estimates added together, so they can overstate.`,
+      `Each release compares the whole stored hours in its compared.before with those in compared.after, ${RELEASE_WINDOW} minutes each; the hour the release fell in is in neither, so quote those times, not the release's own. Their visitor figures are hourly estimates added together, so they can overstate.`,
+    );
+  if (
+    history.totals.visitorsAtLeast ||
+    history.series.some((point) => point.visitorsAtLeast || point.p95AtLeast) ||
+    history.totals.p95AtLeast ||
+    history.partialLists.length ||
+    history.vitals.some((row) => row.atLeast)
+  )
+    notes.push(
+      'A figure written "at least N" is only a floor, and so is every count of a list marked atLeast: a response time or page speed past the slowest bucket Hallvi keeps, a day kept only its busiest entries, or part of a day was counted apart from the rest once the log no longer held all of it. Say "at least" whenever you quote one.',
+    );
+  if (history.partialSamples.length)
+    notes.push(
+      `${history.partialSamples.map((name) => (name === "engagement" ? "Time on page" : "Page speed")).join(" and ")}: some day's figures come from part of its views only, a sample rather than every view.`,
     );
 
   const lists: Record<string, unknown> = {};
   const empty: string[] = [];
-  for (const name of Object.keys(LIST_COUNTS) as ListName[]) {
+  for (const name of Object.keys(LIST_COUNTS) as TrafficList[]) {
     const list = history[name];
     if (!list.length) {
       empty.push(name);
@@ -217,6 +244,7 @@ export function trafficReading(
         perDay ? "estimated visitors per day" : "estimated visitors today",
       ],
       rows: top(list),
+      ...(history.partialLists.includes(name) && { atLeast: true }),
     };
   }
 
@@ -250,11 +278,11 @@ export function trafficReading(
               Math.round(point.covered * 100) / 100,
               point.requests,
               point.views,
-              point.visitors,
+              floor(point.visitors, point.visitorsAtLeast),
               point.errors,
-              point.errorVisitors,
+              floor(point.errorVisitors, point.visitorsAtLeast),
               point.bots,
-              point.p95Ms,
+              floor(point.p95Ms, point.p95AtLeast),
             ],
       ),
     },
@@ -269,14 +297,19 @@ export function trafficReading(
       pageSpeedP75: history.vitals.map((row) => [
         row.path,
         row.metric,
-        row.p75,
+        floor(row.p75, row.atLeast),
         row.samples,
       ]),
     }),
     ...(history.scriptErrors.length > 0 && {
-      javascriptErrors: history.scriptErrors
-        .slice(0, LISTED)
-        .map((row) => [row.path, row.count]),
+      javascriptErrors: {
+        rows: history.scriptErrors
+          .slice(0, LISTED)
+          .map((row) => [row.path, row.count]),
+        ...(history.partialLists.includes("scriptErrors") && {
+          atLeast: true,
+        }),
+      },
     }),
     coverage: {
       from: history.coverage.from,
@@ -290,6 +323,7 @@ export function trafficReading(
     ...(releases.length > 0 && {
       releases: releases.map((impact) => ({
         releaseAt: impact.releaseAt,
+        compared: impact.compared,
         notable: impact.notable,
         covered: Math.round(impact.covered * 100) / 100,
         before: totalsOf(impact.before, "estimatedVisitors"),
@@ -366,8 +400,13 @@ ${
 }
 }`;
 
-const RECORD = (proxy: string, format: string, path: string) =>
-  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], retainDays:30} — add pageKey:'p' only where the application routes by that query key`;
+const RECORD = (
+  proxy: string,
+  format: string,
+  path: string,
+  queries: LogQueries,
+) =>
+  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], queries:'${queries}', retainDays:30} — add pageKey:'p' only where the application routes by that query key. queries says what this setup removes before a line is written, and the Traffic page tells the owner exactly that`;
 
 const CADDY_LOG = "/var/log/caddy/hallvi/access.log";
 
@@ -491,7 +530,7 @@ export const LOG_SETUP = {
 			dir_mode 0755`),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
   },
   "caddy-2.8": {
     tested: "Caddy 2.8.4, 2.9.1 and 2.10.2",
@@ -508,7 +547,7 @@ export const LOG_SETUP = {
       "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
     loses: CADDY_OLDER_LOSES,
   },
   "caddy-2.6": {
@@ -528,7 +567,7 @@ export const LOG_SETUP = {
       "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
     loses: `${CADDY_OLDER_LOSES} Campaign tags stay in the logged path's query instead of fields of their own (the same keys, nothing else).`,
   },
   nginx: {
@@ -557,7 +596,12 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
         '[ ! -f /run/nginx.pid ] || kill -USR1 "$(cat /run/nginx.pid)"',
       check: CHECK,
     },
-    record: RECORD("nginx", "hallvi-json", "/var/log/nginx/hallvi/access.log"),
+    record: RECORD(
+      "nginx",
+      "hallvi-json",
+      "/var/log/nginx/hallvi/access.log",
+      "removed",
+    ),
   },
   traefik: {
     tested: "Traefik 2.0 to 3.7",
@@ -594,7 +638,12 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
       ),
       check: CHECK,
     },
-    record: RECORD("Traefik", "traefik-json", "/var/log/traefik/access.log"),
+    record: RECORD(
+      "Traefik",
+      "traefik-json",
+      "/var/log/traefik/access.log",
+      "kept",
+    ),
   },
 } satisfies Record<string, Setup>;
 export type SetupVariant = keyof typeof LOG_SETUP;
@@ -636,7 +685,7 @@ export function setupVariant(
     if (at >= v(2, 5))
       return {
         variant: "caddy-2.6",
-        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
+        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so, and save the record with queries:'path-only' rather than 'removed'. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
       };
     // No distribution in support ships these: the oldest found is 2.6.2.
     return {
@@ -695,11 +744,13 @@ export function trafficSetup(proxy: Proxy, version: string) {
 // traffic_script
 
 export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
-  if (pageKey !== undefined && !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(pageKey))
+  if (pageKey !== undefined && !PAGE_KEY_NAME.test(pageKey))
     throw new Error("Invalid traffic page key.");
+  // An application that routes pages by a query key names it on its tag, so
+  // the script sends that key's value and the log and script agree on pages.
   const configuredTag = (text: string) =>
     pageKey
-      ? text.replaceAll("<script", `<script data-hv-page-key="${pageKey}"`)
+      ? text.replaceAll("<script", `<script ${PAGE_KEY_ATTRIBUTE}="${pageKey}"`)
       : text;
   const script = trafficScript();
   const check = eventPath({ t: "ping", s: "hallvicheck1", p: "/" });

@@ -452,13 +452,29 @@ describe("a day", () => {
       sent(view("aaaaaaaa11111111"), { at: at(12, 0, 11) }),
     ];
     expect(countDay(slow, options).hours[12].views).toBe(1);
-    // Another page in between: the late view is not that load's.
+    // Two tabs load two pages, and the first tab's view comes after the
+    // second load: each view is its own tab's load. Two documents, two
+    // views, whichever order the views arrive in.
+    const tabs = [
+      page({ at: at(12) }),
+      page({ at: at(12, 0, 5), path: "/pricing" }),
+      sent(view("aaaaaaaa11111111"), { at: at(12, 0, 8) }),
+      sent(view("dddddddd44444444", "/pricing"), { at: at(12, 0, 9) }),
+    ];
+    expect(countDay(tabs, options).hours[12].views).toBe(2);
+    expect(countDay(tabs, options).pages).toEqual([
+      { key: "/", count: 1, visitors: 1 },
+      { key: "/pricing", count: 1, visitors: 1 },
+    ]);
+    // A route change to a page the browser has not loaded is a view of its
+    // own, and a load pairs with one script view at most.
     expect(
       countDay(
         [
           page({ at: at(12) }),
-          page({ at: at(12, 0, 5), path: "/pricing" }),
-          sent(view("aaaaaaaa11111111"), { at: at(12, 0, 11) }),
+          sent(view("aaaaaaaa11111111"), { at: at(12, 0, 2) }),
+          sent(view("eeeeeeee55555555", "/pricing"), { at: at(12, 0, 30) }),
+          sent(view("ffffffff66666666"), { at: at(12, 1) }),
         ],
         options,
       ).hours[12].views,
@@ -496,6 +512,53 @@ describe("a day", () => {
         scriptSince: new Date(end + 100).toISOString(),
       }),
     ).toEqual(after);
+  });
+
+  it("names query-routed pages the same from the log and from the script", () => {
+    const keyed = { ...options, pageKey: "p" };
+    const load = (value: string, second: number) =>
+      page({ at: at(12, 0, second), kept: { p: value } });
+    const view = (s: string, v?: string, k = "p"): ScriptEvent => ({
+      t: "view",
+      s,
+      p: "/",
+      ...(v && { q: { k, v } }),
+    });
+    // Before the script: the log tells ?p=1 from ?p=2.
+    expect(countDay([load("1", 0), load("2", 10)], keyed).pages).toEqual([
+      { key: "/?p=1", count: 1, visitors: 1 },
+      { key: "/?p=2", count: 1, visitors: 1 },
+    ]);
+    // The first script views pair with their loads, and a change of the
+    // page key alone, which the log never sees, is a view of its own.
+    const day = countDay(
+      [
+        load("1", 0),
+        sent(view("aaaaaaaa11111111", "1"), { at: at(12, 0, 1) }),
+        sent(view("bbbbbbbb22222222", "2"), { at: at(12, 0, 20) }),
+        sent(view("cccccccc33333333", "2"), {
+          at: at(12, 1),
+          address: "81.2.69.142",
+        }),
+      ],
+      keyed,
+    );
+    expect(day.pages).toEqual([
+      { key: "/?p=2", count: 2, visitors: 2 },
+      { key: "/?p=1", count: 1, visitors: 1 },
+    ]);
+    // Without a page key on record, or with an event naming another key,
+    // an event's value is never shown.
+    expect(
+      countDay([sent(view("aaaaaaaa11111111", "1"), { at: at(12) })], options)
+        .pages,
+    ).toEqual([{ key: "/", count: 1, visitors: 1 }]);
+    expect(
+      countDay(
+        [sent(view("aaaaaaaa11111111", "1", "token"), { at: at(12) })],
+        keyed,
+      ).pages,
+    ).toEqual([{ key: "/", count: 1, visitors: 1 }]);
   });
 
   it("is one visitor across an application's names, and keeps a campaign's odd words as words", () => {

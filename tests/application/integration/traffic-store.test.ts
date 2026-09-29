@@ -200,6 +200,25 @@ describe("traffic.db", () => {
       beacon(event({ t: "view", s, p: "/reset?token=x#y" }), 1000),
       beacon(event({ t: "leave", s, p: "/reset#token=x", e: 5000 }), 2000),
       beacon(event({ t: "error", s, p: "/reset?token=x" }), 3000),
+      // Well formed, but not sent the way the script sends: a GET that
+      // reached the application and failed, and a POST that failed. Each is
+      // an ordinary request, and its error is kept under the events' path.
+      {
+        ...view(at + 4000, "203.0.113.9"),
+        path: event({ t: "view", s, p: "/reset?token=x" }),
+        status: 502,
+        fetchDest: "empty",
+      },
+      {
+        ...beacon(event({ t: "view", s, p: "/reset?token=x" }), 5000),
+        status: 500,
+      },
+      // No event at all.
+      {
+        ...view(at + 6000, "203.0.113.9"),
+        path: `/_hv/e/1/${Buffer.from('{"p":"/reset?token=x"').toString("base64url")}`,
+        status: 503,
+      },
     ];
     const options = {
       day: DAY,
@@ -213,7 +232,8 @@ describe("traffic.db", () => {
     // Malformed events are nothing at all: not a view, not a switch.
     expect(kept.viewSource).toBe("log");
     expect(kept.pages).toEqual([{ key: "/", count: 1, visitors: 1 }]);
-    expect(JSON.stringify(kept)).not.toMatch(/token|reset/);
+    expect(kept.errors).toEqual([{ key: "/_hv/e/1/", count: 3, visitors: 1 }]);
+    expect(JSON.stringify(kept)).not.toMatch(/token|reset|cmVzZXQ/);
   });
 
   it("writes nothing while collection is off, and forgetting ends it", () => {

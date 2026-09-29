@@ -14,7 +14,10 @@ import {
 } from "./backup-store";
 import {
   cloudflareDomain,
+  readCacheRule,
+  removeCacheRule,
   removeDomainRecord,
+  setCacheRule,
   writeDomainRecord,
 } from "./cloudflare";
 import { checkPublicAccess } from "./public-access";
@@ -134,9 +137,11 @@ Then verify from outside with check_public_access, passing the server's public a
 
 To make it private again, undo only what publishing did: bind the application's ports back to loopback, remove the route or proxy site you added, close the public firewall ports you opened, and take the record away with set_domain_record's remove action, which needs the address you expect to find and refuses anything else. Do not reverse a firewall rule or a DNS record you did not create, and never remove SSH, another application's route or a shared rule. Then reopen private access with open_server_port, record it as mode private again, and check from outside that the name no longer reaches the application.
 
-Traffic is counted from the proxy's access log: Overview follows it while open, and when the owner turns on Keep traffic history on the Traffic page — their standing choice, like automatic deployment — Hallvi follows it with a fixed read-only command and keeps totals per day on this computer, never an address, a user agent or a query string. Following needs no approval; setting the log up is your work on the server under the permission mode. Hallvi reads three logs: Caddy's own JSON, Hallvi's JSON line from nginx, and Traefik's JSON; for any other proxy, say it cannot be counted. Read the installed version (caddy version, nginx -v or traefik version), call traffic_setup with the proxy and that version, and apply what it returns exactly, because it is tested text for that version and its warnings each broke a real server. Setting the log up never upgrades, replaces or restarts a proxy a reload can serve: an older version has its own text and gives up only what the tool says, and an upgrade is at most an optional suggestion you put to the owner once. When the proxy serves other applications too, say so in any approval you ask for, name what is host-wide, and prefer changes inside this application's own site block. In short: Hallvi's log goes beside any log the owner already has, to a file on the host in a directory of its own, rotated and kept 30 days, readable by Hallvi's SSH user or through passwordless sudo, with the query string removed from the path and from the referrer before the line is written and only utm_source, utm_medium, utm_campaign, utm_term, utm_content, ref and an application's own page key (WordPress's p) kept. Traefik cannot remove them, so its own log keeps full addresses: say so. An existing access-log record stays untouched while you work, because Overview's live view reads it: set up and check the new log first, and once a request of your own shows up in it, correctly stripped, update that same record in place — or save one if the application has none — never retiring it first and never saving a second; if the setup fails or is declined, the existing record stays as it was. The record has content {kind:'access-log',proxy,format:'caddy-json'|'hallvi-json'|'traefik-json',source:{type:'file',path},hosts,pageKey?,retainDays} and views ['overview'], where path is the host's path, hosts every name the application answers on in lower case without a port, and retainDays what you configured. Use source {type:'container',name} only when no file can be had: docker's history ends when the container is recreated. When history is on and there is no log it can read, the Traffic page drafts that request for you.
+Traffic is counted from the proxy's access log: Overview follows it while open, and when the owner turns on Keep traffic history on the Traffic page — their standing choice, like automatic deployment — Hallvi follows it with a fixed read-only command and keeps totals per day on this computer, never an address, a user agent or a query string. Following needs no approval; setting the log up is your work on the server under the permission mode. Hallvi reads three logs: Caddy's own JSON, Hallvi's JSON line from nginx, and Traefik's JSON; for any other proxy, say it cannot be counted. Read the installed version (caddy version, nginx -v or traefik version), call traffic_setup with the proxy and that version, and apply what it returns exactly, because it is tested text for that version and its warnings each broke a real server. Setting the log up never upgrades, replaces or restarts a proxy a reload can serve: an older version has its own text and gives up only what the tool says, and an upgrade is at most an optional suggestion you put to the owner once. When the proxy serves other applications too, say so in any approval you ask for, name what is host-wide, and prefer changes inside this application's own site block. In short: Hallvi's log goes beside any log the owner already has, to a file on the host in a directory of its own, rotated and kept 30 days, readable by Hallvi's SSH user or through passwordless sudo, with the query string removed from the path and from the referrer before the line is written and only utm_source, utm_medium, utm_campaign, utm_term, utm_content, ref and an application's own page key (WordPress's p) kept. Traefik cannot remove them, so its own log keeps full addresses: say so. An existing access-log record stays untouched while you work, because Overview's live view reads it: set up and check the new log first, and once a request of your own shows up in it, correctly stripped, update that same record in place — or save one if the application has none — never retiring it first and never saving a second; if the setup fails or is declined, the existing record stays as it was. The record has content {kind:'access-log',proxy,format:'caddy-json'|'hallvi-json'|'traefik-json',source:{type:'file',path},hosts,pageKey?,retainDays,queries} and views ['overview'], where path is the host's path, hosts every name the application answers on in lower case without a port, retainDays what you configured, and queries what traffic_setup says this setup does with query strings ('removed', 'path-only' or 'kept'), because the Traffic page tells the owner exactly that and nothing more. When the application routes by a query key, the script's tag carries it as data-hv-page-key, as traffic_script says. Use source {type:'container',name} only when no file can be had: docker's history ends when the container is recreated. When history is on and there is no log it can read, the Traffic page drafts that request for you.
 
-Hallvi's traffic script sees what the log cannot — pages a single-page application changes in the browser, pages a CDN serves from its cache, time on page, goals and page speed. It is offered, never pushed: say nothing about it during a deployment unless the owner asks for analytics then; the Traffic page offers it when the evidence calls for it. When asked, call traffic_script, write the file it gives and check its sha256, add its serving snippet to the proxy, and put the one include line in the layout every page shares with open_pull_request — or, for software the owner does not change, its own code-injection setting such as Ghost's — never by rewriting pages at the proxy. Then check the script is served and one /_hv/e/ event reaches the log; the first real event after the owner merges and it is released is the switch point Traffic shows. When you set up caching at a CDN, record on the cdn subject whether it caches pages, as the fact caches-pages "yes" or "no".
+Hallvi's traffic script sees what the log cannot — pages a single-page application changes in the browser, pages a CDN serves from its cache, time on page, goals and page speed. It is offered, never pushed: say nothing about it during a deployment unless the owner asks for analytics then; the Traffic page offers it when the evidence calls for it. When asked, call traffic_script, write the file it gives and check its sha256, add its serving snippet to the proxy, and put the one include line in the layout every page shares with open_pull_request — or, for software the owner does not change, its own code-injection setting such as Ghost's — never by rewriting pages at the proxy. Then check the script is served and one /_hv/e/ event reaches the log; the first real event after the owner merges and it is released is the switch point Traffic shows.
+
+Cloudflare caches no HTML by default, so a proxied name still sends every page to the origin and the log counts it. When the owner asks for pages to be cached, or a CDN you set up should cache them, use set_cache_rule for that one hostname. It makes the name's responses eligible for the cache and leaves the application's own Cache-Control headers deciding what is kept, as the proxy does. Say so before you set it: a personal page — anything after sign-in, a basket, an account — must send private or no-store, because a cached one is handed to the next visitor; a page that sends no header is not cached, so an application whose public pages should be cached needs those headers in its repository, an operability change for open_pull_request. The rule does nothing unless the name is proxied. Check with read_cache_rules, request one public page twice and read cf-cache-status, and record on the cdn subject the fact caches-pages "yes" only once a page came back HIT, otherwise "no" — again after removing the rule. Tell the owner that page views served from the cache never reach the server's log, so only Hallvi's traffic script counts them, and the Traffic page offers it. Stop caching with set_cache_rule's remove action, which removes only Hallvi's rule; never change or remove a cache rule the owner wrote.
 
 Read the numbers with read_traffic and keep its labels: visitors are estimates per day, never added across days into a number of people, and a gap was not counted, which is not the same as nobody came. When the owner asks what is collected, say: Hallvi keeps totals on this computer; the server keeps its access log for the days you configured, as web servers do; query strings are removed before the line is written, and only campaign tags are kept (behind Traefik, the server's own log keeps full addresses). Make no claim about consent or legal compliance: say what is collected and leave that judgement to the owner.
 
@@ -351,7 +356,7 @@ export async function openPiSession(
               name: "save_information",
               label: "Save application information",
               description:
-                "Save/update a record, or retire one by ID. Omit id to create a record; the save returns the ID it was given. Supply id only to update or retire a record whose ID a previous save returned — never an ID of your own invention. record: {title, body, evidence:[{type:'execution',id} or {type:'url',url}], establishedAt:ISO timestamp|null, presentation:null or {about?:[{kind,id}],states?:{ref:{kind,id},presence:'present'|'absent'},views:string[],role:'recommendation'|'status'|'outcome',status:'info'|'verified'|'failed'|'warning',checks:[{key,label,status:'passed'|'failed'|'info',claim,basis,about?:{kind,id},detail?,freshFor?}],facts:[{key,label,value,claim,basis,mono?,freshFor?}],nextStep?:string,url?:http URL,content?:{kind:'deployment',repositoryUrl,revision,server,changes:string[],image?,services?:[{process,image,digest?}]}|{kind:'application-access',mode:'private'|'public',server,localPort?:number,remotePort?:number}|{kind:'topology',from:'observed'|'plan',parts:[{id,kind,name,role,plain,owner?}],edges:[{from,to,network,label?}]}|{kind:'access-log',proxy,format:'caddy-json'|'hallvi-json'|'traefik-json',source:{type:'file',path}|{type:'container',name},hosts?:string[],pageKey?,retainDays?:number}}}. Private access requires a 127.0.0.1 URL matching localPort and a remotePort. Omit presentation for knowledge kept for future work. showInChat renders a surfaced record in this response. Never store secrets.",
+                "Save/update a record, or retire one by ID. Omit id to create a record; the save returns the ID it was given. Supply id only to update or retire a record whose ID a previous save returned — never an ID of your own invention. record: {title, body, evidence:[{type:'execution',id} or {type:'url',url}], establishedAt:ISO timestamp|null, presentation:null or {about?:[{kind,id}],states?:{ref:{kind,id},presence:'present'|'absent'},views:string[],role:'recommendation'|'status'|'outcome',status:'info'|'verified'|'failed'|'warning',checks:[{key,label,status:'passed'|'failed'|'info',claim,basis,about?:{kind,id},detail?,freshFor?}],facts:[{key,label,value,claim,basis,mono?,freshFor?}],nextStep?:string,url?:http URL,content?:{kind:'deployment',repositoryUrl,revision,server,changes:string[],image?,services?:[{process,image,digest?}]}|{kind:'application-access',mode:'private'|'public',server,localPort?:number,remotePort?:number}|{kind:'topology',from:'observed'|'plan',parts:[{id,kind,name,role,plain,owner?}],edges:[{from,to,network,label?}]}|{kind:'access-log',proxy,format:'caddy-json'|'hallvi-json'|'traefik-json',source:{type:'file',path}|{type:'container',name},hosts?:string[],pageKey?,retainDays?:number,queries?:'removed'|'path-only'|'kept'}}}. Private access requires a 127.0.0.1 URL matching localPort and a remotePort. Omit presentation for knowledge kept for future work. showInChat renders a surfaced record in this response. Never store secrets.",
               parameters: Type.Object({
                 action: Type.Union([
                   Type.Literal("save"),
@@ -955,6 +960,49 @@ export async function openPiSession(
                       ? removeDomainRecord(params)
                       : writeDomainRecord({
                           ...params,
+                          owner: scope.applicationId,
+                        }),
+                  false,
+                  id,
+                  signal,
+                ),
+              );
+            },
+          }),
+          defineTool({
+            name: "read_cache_rules",
+            label: "Read cache rules",
+            description:
+              "Read what the DNS provider's cache rules say about one hostname: whether Hallvi's rule is there, every other cache rule in the zone in the order they run (a later rule wins where two match), and whether the name is proxied, since no rule applies to a name the provider does not answer for. This is configuration: whether pages are actually served from the cache is what a page response's cf-cache-status says on a second request.",
+            parameters: Type.Object({ hostname: Type.String() }),
+            async execute(_id, params) {
+              const [rules, domain] = await Promise.all([
+                readCacheRule(params.hostname),
+                cloudflareDomain(params.hostname).catch(() => null),
+              ]);
+              return json({ ...rules, proxied: domain?.proxied ?? null });
+            },
+          }),
+          defineTool({
+            name: "set_cache_rule",
+            label: "Cache pages at the CDN",
+            description:
+              "Add or remove Hallvi's one cache rule for one hostname at the DNS provider, so nothing else in the zone can be touched. action 'set' makes the hostname's responses eligible for the provider's cache, with the application's own Cache-Control deciding what is kept and for how long: a response that says nothing is not cached, and Hallvi's traffic events never are. It goes first in the zone's list, so every rule the owner wrote still wins over it, and it never replaces or reorders their rules. action 'remove' deletes only Hallvi's rule and refuses a rule for the name that Hallvi did not write. The result says what stood there before and lists the zone's other rules. Writing a rule is configuration, never evidence that pages are cached.",
+            parameters: Type.Object({
+              action: Type.Union([Type.Literal("set"), Type.Literal("remove")]),
+              hostname: Type.String(),
+            }),
+            async execute(id, params, signal) {
+              return json(
+                await execution.execute(
+                  "set_cache_rule",
+                  `${params.action === "remove" ? "Stop caching" : "Cache"} pages on ${params.hostname}`,
+                  params,
+                  () =>
+                    params.action === "remove"
+                      ? removeCacheRule(params)
+                      : setCacheRule({
+                          hostname: params.hostname,
                           owner: scope.applicationId,
                         }),
                   false,

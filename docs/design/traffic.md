@@ -86,19 +86,29 @@ supplies only closed-shape values (a path, a container name, a time).
 A day's numbers are a function of that day's log lines and nothing else.
 
 - **Finished days** are recounted from the retained files once the day is over
-  (after a short grace for requests still being written) and stored as final,
-  with their coverage. Only that recount makes a day final. A recount and a
+  (after a short grace for requests still being written, with the log listed
+  again then, so a log that was empty when the follow began is not
+  forgotten) and stored as final, with their coverage. Only that recount
+  makes a day final. A recount and a
   stored day are compared by the stretches of the day each covers, never by
   how long: the recount replaces a stored day it covers all of; a stored day
   that covers all of the recount and more (the log has since rotated part of
   it away) is kept; otherwise each hour comes from whichever covers it, with
   that side's gaps, and figures that are not hourly — visitors, lists, time on
   page, page speed — take the larger of the two counts: a floor, never a sum.
+  The day names those figures (`partial`), and every page and Pi read them
+  so: counts as "at least", time on page and page speed as measured on part
+  of the views.
 - **Today** is recounted from the log whenever the collector starts or
   reconnects, then kept current in memory from the follow and written as
   provisional every few seconds. The follow reads exactly the files it
-  measured coverage by; a rotation between the listing and the follow starts
-  it over, and a file it cannot read is a gap.
+  measured coverage by — the file being written checked again once `tail`
+  holds it; a rotation between the listing and the follow starts it over,
+  and a file it cannot read is a gap. The follow says where its backlog ends,
+  and until that much is read the collection says it is catching up, with
+  what it is reading, and writes nothing: a half-counted today is never shown
+  as live. The follow is compressed, since its backlog is most of a day of
+  JSON.
 - Nothing is ever added to a saved number, so a restart cannot count twice. A
   glitch in the live follow only touches today's provisional numbers and is
   corrected when the day is recounted.
@@ -141,14 +151,22 @@ away, the log was unreadable). Charts draw a gap as a gap, never as zero.
   any range.
 - **Visitor estimates exist per day only.** 7 d and 30 d show the daily series
   and "about N a day"; they never add days into a number presented as unique
-  people. The 24 h chart shows hourly estimates; its headline is today's.
+  people. "About N a day" is the days' estimates over the days the log covered
+  any of: a day read in part counts as a whole one, because a distinct count
+  does not grow with the time it was counted over (ten browsers in half an
+  hour are not five hundred a day), so a partial day can only understate it.
+  The 24 h chart shows hourly estimates; its headline is today's.
 - **Response times** are stored as a fixed-bucket histogram per hour
   (`LATENCY_BUCKETS_MS`); a range's percentile comes from the merged
   histogram, never from averaging percentiles. Page speed works the same way.
   A percentile past the last bound is only a floor and reads "at least".
 - Top lists are stored per day with up to 1,000 entries and an "other" row,
   so a range merges them exactly — except a list the history names in
-  `partialLists`, whose figures are floors and read "at least".
+  `partialLists` (a day kept only its busiest, or was counted in parts),
+  whose figures are floors and read "at least". A day counted in parts makes
+  its visitor estimate a floor too (`visitorsAtLeast`), and its time on page
+  and page speed a sample (`partialSamples`). Pi's `read_traffic` writes a
+  floor into the figure itself: "at least 10000".
 - Days are cut in the controller's time zone, recorded with each day.
 
 ### The script
@@ -161,11 +179,12 @@ every proxy records it. No collector service, no endpoint of Hallvi's on the
 internet, no cookies and nothing stored in the browser.
 
 - **Events:** `view` (including single-page route changes), `ping` (every 30 s
-  while the tab is visible — what "open right now" counts), `leave` (visible
-  time on the page), `goal` (`hv('signup')` or `data-hv-goal`), `vital` (LCP,
-  INP, CLS) and `error` (a count, never the message). Each carries a random id
-  for that one page view, so a `leave` joins its `view` without identifying
-  anyone.
+  while the tab is visible — what "open right now" counts, until the view's
+  `leave`), `leave` (visible time on the page), `goal` (`hv('signup')` or
+  `data-hv-goal`), `vital` (LCP, INP, CLS) and `error` (a count, never the
+  message). Each carries a random id for that one page view, so a `leave`
+  joins its `view` without identifying anyone, and the page's path — never
+  its query, except for a query-routed page's key (below).
 - **Installing it:** Pi's read-only `traffic_script` tool returns the file,
   its sha256, the proxy's serving snippet and the include line per stack
   ([`script.ts`](../../src/server/traffic/script.ts)); Pi writes the file and
@@ -177,12 +196,16 @@ internet, no cookies and nothing stored in the browser.
   rewriting HTML at the proxy: that changes what the application serves
   without the owner merging anything, which the
   [operating boundary](../../PRODUCT.md#operating-boundary) rules out.
-- **Query-routed pages:** when the application's access-log record has a
-  `pageKey`, `traffic_script` adds `data-hv-page-key="p"` (using that key) to
-  each include example. The shared script sends only this key and its value,
-  separately from the path, and treats a changed value as a new page. The
-  counter and live stream keep it only when it matches the record's key;
-  other query values remain excluded.
+- **Query-routed pages:** an application that routes pages by a query key
+  (WordPress's `p`) has it as the access-log record's `pageKey`, and
+  `traffic_script` adds `data-hv-page-key="p"` (that key) to the tag and to
+  every include line. The shared script then sends that key and its value
+  (`q`), separately from the path and nothing else of the query, and a change
+  of the value alone is a new view. A value is at most 100 characters with
+  no `?`, `#`, `&`, `=` or control character; the script leaves out one that
+  is not, and Hallvi refuses an event carrying one. The count and the live
+  view keep the value only when `q`'s key is the record's, so pages are named
+  as the log names them; any other key names the page by its path alone.
 - **Offered, not pushed.** Nothing is said about the script during deployment
   unless the owner asks for analytics then. The Traffic page offers it, once,
   when the evidence says the log misses something: the application changes
@@ -193,8 +216,14 @@ internet, no cookies and nothing stored in the browser.
 - **No double counting.** The log and the script are never added together.
   Each application has one switch point, the first script event Hallvi
   counts: before it, views and visitors come from the log; after it, only from
-  the script. Requests, errors, response times and bots always come from the
-  log. The chart marks the switch. If events stop while browsers are still
+  the script. A page load the log counted just before the switch point and
+  its own script view, up to three minutes later, are one view, paired by
+  browser and page, so two tabs are never taken for one; the live view pairs
+  them the same way, so an arrival is not shown twice. Requests, errors,
+  response times and bots always come from the log. A request to the events'
+  path that is no valid event — a failure, a forgery — is counted and shown
+  as that path alone, never with its payload. The chart marks the
+  switch. If events stop while browsers are still
   being served pages, the page says "script silent since …" rather than
   quietly falling back.
 
@@ -223,9 +252,12 @@ automatic deploys, and stays on until they turn it off.
 "Hallvi keeps totals on this computer. The server keeps its access log for N
 days, as web servers do; Hallvi removes query strings — from the address asked
 for and from the referrer — before the line is written, and keeps only
-campaign tags." Behind Traefik, whose log cannot be rewritten, the page says
-the server's log keeps full addresses. Hallvi makes no claim about consent: it says
-what it collects and leaves that judgement to the owner.
+campaign tags." The page says only what the setup's record says the log
+removes (`queries`): with Caddy 2.5, whose header filters do nothing, that
+referrers keep their queries; behind Traefik, whose log cannot be rewritten,
+that it keeps full addresses; and with a record that does not say, nothing
+either way. Hallvi makes no claim about consent: it says what it collects and
+leaves that judgement to the owner.
 
 The query string is where password-reset links, sign-in codes, invitations and
 search terms live — and a same-site `Referer` carries the previous page's, so
@@ -243,9 +275,14 @@ origin and are counted; the visitor's address and country come from
 `CF-Connecting-IP` and `CF-IPCountry` in the log. Where a CDN caches pages, only
 the script counts those views — its events are never cached. Cloudflare's raw
 request logs are Enterprise-only, so CDN logs are not how visitors are counted.
-When Pi sets up caching it records whether pages are cached — the fact
-`caches-pages`, "yes" or "no", on the `cdn` subject — so the Traffic page can
-say what the log cannot see.
+Pi caches pages at Cloudflare with `set_cache_rule`: one rule per hostname,
+recognisably Hallvi's, placed first so the owner's own rules still win, and
+leaving the application's `Cache-Control` headers to decide what is kept
+(a page without one is not cached; Hallvi's events never are). It never
+replaces or reorders the zone's other rules and removes only its own.
+It then records whether pages are cached — the fact `caches-pages`, "yes"
+only once a page came back as a cache hit, otherwise "no", on the `cdn`
+subject — so the Traffic page can say what the log cannot see.
 
 ### If a machine is lost
 
@@ -280,7 +317,10 @@ live view reads it. When the proxy serves other applications, every approval
 says so and names what is host-wide.
 
 - **The record** points at the **host** path:
-  `{kind:'access-log', proxy, format, source:{type:'file', path}, hosts, pageKey?, retainDays}`.
+  `{kind:'access-log', proxy, format, source:{type:'file', path}, hosts, queries, pageKey?, retainDays}`,
+  where `queries` is what that setup removes before a line is written:
+  `removed` (address and referrer), `path-only` (Caddy 2.5) or `kept`
+  (Traefik).
   `hosts` lists every name the application answers on (lower case, no port),
   so one proxy can serve several applications. A file source is preferred:
   `docker logs` history ends when the container is recreated. A proxy in a
@@ -375,7 +415,8 @@ All of it reads stored totals immediately; none of it waits for Pi.
 - **Deployment:** on each release, what changed in the two hours after it
   against the two before, leaving out the hour the release fell in so a
   failure before it is never counted after it — "errors on /checkout 0 → 14, about 9 visitors" —
-  and nothing when nothing changed.
+  and nothing when nothing changed. The hours actually compared travel with
+  it (`compared`), to the line's title, the question it asks and Pi.
 - **Monitoring:** requests, errors and response times from the same totals,
   instead of asking Pi to read a day.
 

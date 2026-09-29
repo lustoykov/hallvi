@@ -145,6 +145,42 @@ describe("a range", () => {
     expect(history.previous).toBeNull();
   });
 
+  it("never scales a day read in part up to a whole day of visitors", () => {
+    // Proof B: collection began mid-day, and the log covered 28 minutes of
+    // it, in which 10 browsers came. That is at least 10 that day, never
+    // "~520 a day" — a distinct count does not grow with time.
+    const { start } = dayBounds("2026-09-28", ZONE);
+    const from = start + 15 * HOUR;
+    const partly = stored("2026-09-28", {
+      visitors: 10,
+      coverage: {
+        from: iso(from),
+        to: iso(from + 28 * 60_000),
+        gaps: [],
+      },
+      hourly: { 15: { requests: 40, views: 14, visitors: 10 } },
+      pages: [{ key: "/", count: 14, visitors: 10 }],
+    });
+    // Today, read from midnight to now: only the hours that have happened.
+    const now = local("2026-09-29", 6);
+    const today = stored("2026-09-29", {
+      visitors: 4,
+      coverage: {
+        from: iso(dayBounds("2026-09-29", ZONE).start),
+        to: iso(now),
+        gaps: [],
+      },
+      hourly: { 2: { requests: 9, views: 6, visitors: 4 } },
+      pages: [{ key: "/", count: 6, visitors: 4 }],
+    });
+    const history = historyOf([partly, today], "7d", now, collection, ZONE);
+    expect(history.totals).toMatchObject({ visitors: 7, visitorsPer: "day" });
+    expect(history.pages).toEqual([{ key: "/", count: 20, visitors: 7 }]);
+    const month = historyOf([partly], "30d", now, collection, ZONE);
+    expect(month.totals.visitors).toBe(10);
+    expect(month.pages).toEqual([{ key: "/", count: 14, visitors: 10 }]);
+  });
+
   it("takes a response time from the merged histogram, never an average of percentiles", () => {
     const history = historyOf(
       [
@@ -226,6 +262,33 @@ describe("a range", () => {
     );
     expect(history.partialLists).toEqual(["pages"]);
     expect(history.sources[0].count).toBe(12);
+    expect(history.partialSamples).toEqual([]);
+    expect(history.totals.visitorsAtLeast).toBe(false);
+
+    // A day put together from two partial counts: its figures that are not
+    // hourly are floors, or samples, however complete its lists look.
+    const parts = historyOf(
+      [
+        stored("2026-09-28", {
+          visitors: 4,
+          sources: [{ key: "Direct", count: 5, visitors: 4 }],
+          scriptErrors: [{ path: "/", count: 2 }],
+          engagement: [{ path: "/", ms: 10_000, samples: 1 }],
+          partial: ["visitors", "sources", "scriptErrors", "engagement"],
+        }),
+        stored("2026-09-29", { visitors: 6 }),
+      ],
+      "7d",
+      local("2026-09-29", 12),
+      collection,
+      ZONE,
+    );
+    expect(parts.partialLists).toEqual(["sources", "scriptErrors"]);
+    expect(parts.partialSamples).toEqual(["engagement"]);
+    expect(parts.totals.visitorsAtLeast).toBe(true);
+    expect(
+      parts.series.map((point) => [point.visitors, point.visitorsAtLeast]),
+    ).toEqual([...Array(5).fill([0, false]), [4, true], [6, false]]);
   });
 
   it("draws the last 24 hours across midnight, with today's visitors, and a gap as a gap", () => {

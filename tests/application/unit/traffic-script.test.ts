@@ -14,7 +14,7 @@ import {
 } from "@/server/traffic/contract";
 import { trafficScript } from "@/server/traffic/script";
 
-function browse(address: string, referrer: string) {
+function browse(address: string, referrer: string, pageKey?: string) {
   const sent: string[] = [];
   const handlers: Record<string, () => void> = {};
   const on = (type: string, handler: () => void) => {
@@ -27,7 +27,15 @@ function browse(address: string, referrer: string) {
   let every = 0;
   const window: Record<string, unknown> = {
     location,
-    document: { visibilityState: "visible", referrer, addEventListener: on },
+    document: {
+      visibilityState: "visible",
+      referrer,
+      addEventListener: on,
+      currentScript: {
+        getAttribute: (name: string) =>
+          name === "data-hv-page-key" ? (pageKey ?? null) : null,
+      },
+    },
     history: { pushState: go, replaceState: go },
     navigator: { sendBeacon: (url: string) => sent.push(url) > 0 },
     screen: { width: 390 },
@@ -43,7 +51,10 @@ function browse(address: string, referrer: string) {
   window.window = window;
   runInNewContext(trafficScript().content, window);
   return {
-    history: window.history as { pushState: typeof go },
+    history: window.history as {
+      pushState: typeof go;
+      replaceState: typeof go;
+    },
     fire: (type: string) => handlers[type](),
     every: () => every,
     events: () =>
@@ -101,4 +112,52 @@ it("sends only events Hallvi accepts, whatever the address holds", () => {
     "leave",
   ]);
   expect(page.every()).toBe(PING_SECONDS * 1000);
+});
+
+it("sends an application's page key and nothing else of the query", () => {
+  const page = browse(
+    "https://blog.example/?p=12&token=secret&utm_source=news",
+    "",
+    "p",
+  );
+  // Another key changing is the same page; the page key changing is a new
+  // one, though the path stays.
+  page.history.replaceState({}, "", "/?p=12&sort=new");
+  page.history.pushState({}, "", "/?p=13");
+  // A value Hallvi would refuse is left out, never sent to be refused.
+  page.history.pushState({}, "", "/?p=a%26b");
+  const events = page.events();
+  expect(events.map((event) => [event.t, event.p, event.q])).toEqual([
+    ["view", "/", { k: "p", v: "12" }],
+    ["leave", "/", { k: "p", v: "12" }],
+    ["view", "/", { k: "p", v: "13" }],
+    ["leave", "/", { k: "p", v: "13" }],
+    ["view", "/", undefined],
+  ]);
+  expect(JSON.stringify(events)).not.toMatch(/secret|token|sort/);
+  // A key the tag does not name is never read.
+  const plain = browse("https://blog.example/?p=12", "", "p;x");
+  expect(plain.events()[0].q).toBeUndefined();
+});
+
+it("accepts a page key and its value alone", () => {
+  const path = (v: unknown, k: unknown = "p") =>
+    `/_hv/e/1/${Buffer.from(JSON.stringify({ t: "view", s: "abcdefgh12", p: "/", q: { k, v } })).toString("base64url")}`;
+  expect(eventOf(path("12"))).toMatchObject({ q: { k: "p", v: "12" } });
+  expect(eventOf(path("héllo wörld"))).toMatchObject({
+    q: { k: "p", v: "héllo wörld" },
+  });
+  for (const key of ["", "p&x", "1p", "p=1", "x".repeat(41), 1])
+    expect(eventOf(path("12", key)), String(key)).toBeNull();
+  for (const bad of [
+    "",
+    "1&token=x",
+    "1?x",
+    "a=b",
+    "1#x",
+    "a\nb",
+    "x".repeat(101),
+    12,
+  ])
+    expect(eventOf(path(bad)), String(bad)).toBeNull();
 });
