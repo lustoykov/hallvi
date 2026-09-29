@@ -119,7 +119,8 @@ The overview diagram and tools paragraph disagreed about the tool count, and
 both lagged the registered tools. Extracting documentation cannot establish
 that it is current; the stale counts were removed in this task.
 
-The owner chose a daily Codex review of merged main plus Rebuild now, rather
-than adding per-PR review requirements. That approach is in review in #247.
+The owner chose a separate daily Codex task to review merged main, with manual
+updates requested in Codex. The dashboard only reads saved content; it has no
+agent launcher or per-PR review requirement. That approach is in review in #247.
 
 **+1:** 2026-09-29 — `codex/architecture-learning`

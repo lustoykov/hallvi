@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
 import { z } from "zod";
 import {
@@ -9,7 +9,7 @@ import {
   learningSources,
   type Question,
 } from "./learning-catalog.ts";
-import { createRebuild, type RebuildOptions } from "./learning-rebuild.ts";
+import { learningPath, readLearningContent } from "./learning-update.ts";
 export { buildLearningCatalog, learningSources } from "./learning-catalog.ts";
 export type { Question } from "./learning-catalog.ts";
 type Saved = {
@@ -44,15 +44,11 @@ const actionSchema = z.discriminatedUnion("action", [
 ]);
 const key = (q: { id: string; version: string }) => `${q.id}@${q.version}`;
 
-export function createLearning(root: string, options: RebuildOptions = {}) {
+export function createLearning(root: string) {
   let cached: ReturnType<typeof buildLearningCatalog> | undefined;
   let sourceVersion = "";
-  let storePath = process.env.HALLVI_LEARNING_DB_PATH
-    ? resolve(root, process.env.HALLVI_LEARNING_DB_PATH)
-    : "";
-  const rebuild = createRebuild(root, path, options);
-  function catalog() {
-    const published = rebuild.published();
+  const path = () => learningPath(root);
+  function catalog(published = readLearningContent(root).published) {
     if (published) {
       sourceVersion = digest(published.catalog);
       return published.catalog;
@@ -76,17 +72,6 @@ export function createLearning(root: string, options: RebuildOptions = {}) {
     }
     return cached;
   }
-  function path() {
-    if (!storePath) {
-      const common = execFileSync("git", ["rev-parse", "--git-common-dir"], {
-        cwd: root,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      }).trim();
-      storePath = join(resolve(root, common), "hallvi-learning.sqlite");
-    }
-    return storePath;
-  }
   function read(): Saved[] {
     if (!existsSync(path())) return [];
     const db = new Database(path(), { readonly: true });
@@ -103,7 +88,8 @@ export function createLearning(root: string, options: RebuildOptions = {}) {
     }
   }
   function state() {
-    const current = catalog();
+    const { published, checked } = readLearningContent(root);
+    const current = catalog(published);
     const saved = read();
     const byKey = new Map(saved.map((row) => [key(row), row]));
     const questions = current.questions.map((q) => {
@@ -168,7 +154,13 @@ export function createLearning(root: string, options: RebuildOptions = {}) {
         dirty: Boolean(git("status", "--porcelain", "--", ...learningSources)),
       },
       progressPath: path(),
-      refresh: rebuild.state(),
+      review: {
+        revision: published?.revision ?? null,
+        builtAt: published?.builtAt ?? null,
+        summary: published?.summary ?? null,
+        lastCheckedAt: checked?.at ?? null,
+        checkedRevision: checked?.revision ?? null,
+      },
     };
   }
   function act(body: unknown) {
@@ -238,7 +230,7 @@ export function createLearning(root: string, options: RebuildOptions = {}) {
         throw new LearningError("Unknown learning source", 404);
       return readFileSync(join(root, file), "utf8");
     }
-    const published = rebuild.published();
+    const { published } = readLearningContent(root);
     const cited = [
       ...(published?.catalog.questions ?? []),
       ...read().map((row) => JSON.parse(row.question) as Question),
@@ -264,8 +256,5 @@ export function createLearning(root: string, options: RebuildOptions = {}) {
     state,
     act,
     source,
-    rebuild: rebuild.start,
-    stop: rebuild.stop,
-    settled: rebuild.settled,
   };
 }

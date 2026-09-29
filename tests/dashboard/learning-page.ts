@@ -17,12 +17,10 @@ export function learningPage(appUrl: string, token: string) {
       <button id="continue" class="primary" disabled>Start learning</button>
     </header>
     <section class="learn-refresh" aria-label="Architecture freshness">
-      <div><p id="checkout" class="learn-checkout">Reading architecture…</p>
-        <p id="rebuild-status" class="footnote" role="status">Checking rebuild status…</p></div>
-      <div class="learn-rebuild-action"><button id="rebuild" class="secondary" type="button" disabled>Rebuild now</button>
-        <span class="footnote">Counts toward Codex usage</span></div>
+      <p id="checkout" class="learn-checkout">Reading architecture…</p>
+      <p id="review-status" class="footnote" role="status">Loading saved review…</p>
     </section>
-    <details id="rebuild-summary" class="learn-rebuild-summary" hidden><summary>What changed in the last rebuild</summary><p></p></details>
+    <details id="review-summary" class="learn-review-summary" hidden><summary>What changed in the last review</summary><p></p></details>
     <div id="learning-error" class="error" role="alert" hidden></div>
     <div class="learn-toolbar">
       <nav class="learn-views" aria-label="Learning views">
@@ -47,10 +45,10 @@ export function learningPage(appUrl: string, token: string) {
         <div id="topics"></div>
       </section>
       <details class="learn-about"><summary>How this stays current</summary>
-        <p>Once a day while this page is open, the dashboard checks <code>origin/main</code>. If merged code has changed, a temporary Codex CLI job reads a fixed snapshot of the code and documentation, updates the map and questions, then exits. If the dashboard was closed, it catches up when you open this page. <strong>Rebuild now</strong> runs the review immediately, even if main has not changed.</p>
-        <p>The job uses <code>gpt-5.6-sol</code> with medium reasoning and your Codex CLI sign-in. It consumes your Codex usage; it does not run Hallvi’s Pi operator. Install the CLI and run <code>codex login</code> on this machine if needed. Before the first successful rebuild, you can learn from starter questions extracted from this checkout.</p>
-        <p>Unchanged questions keep their answers. Changed knowledge becomes a new version, and removed concepts leave your queue but stay in your saved history. The previous catalog stays available during a rebuild or if a rebuild fails. Source links in a rebuilt catalog open the cited commit, so you can check the explanation against the code. Model-generated explanations can be wrong; the sources are there to inspect.</p>
-        <p>Progress and rebuilt content are saved on this machine, shared by this repository’s worktrees. They are separate from Hallvi application data and are not committed to Git.</p>
+        <p>A scheduled Codex task reviews merged <code>main</code> daily and saves updated questions and the architecture map. The dashboard reads that saved content automatically; it can be closed during the review. The computer and Codex app need to be running for the local task.</p>
+        <p>For an update before the next scheduled run, ask Codex to update the learning dashboard now. Review status and failures appear in Codex. Opening this page and answering questions do not start an agent or spend model usage.</p>
+        <p>Unchanged questions keep their answers. Changed knowledge becomes a new version, and removed concepts leave your queue but stay in your saved history. The previous catalog stays available if a review fails. Source links open the cited commit so you can check the explanation against the code. Model-generated explanations can be wrong; the sources are there to inspect.</p>
+        <p>Before the first successful review, starter questions come from this checkout. Progress and reviewed content are saved on this machine, shared by this repository’s worktrees. They are separate from Hallvi application data and are not committed to Git.</p>
         <p id="progress-location" class="footnote"></p>
       </details>
     </section>

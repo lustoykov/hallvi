@@ -22,12 +22,11 @@ import { suiteGuides } from "./suite-guides.ts";
 import { guidePage, renderMarkdown } from "./markdown.ts";
 import { checkout, developmentState, releasesState } from "./development.ts";
 import { createLearning, LearningError } from "./learning.ts";
-import type { RebuildOptions } from "./learning-rebuild.ts";
 import { learningPage, learningSourcePage } from "./learning-page.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
-export const API_VERSION = 9;
+export const API_VERSION = 10;
 
 const REPOSITORY = "lustoykov/hallvi";
 
@@ -231,12 +230,8 @@ export type Launch = (
   args: string[],
   options: SpawnOptions,
 ) => ChildProcess;
-export function createDashboard(
-  root: string,
-  launch: Launch = spawn,
-  learningOptions: RebuildOptions = {},
-) {
-  const learning = createLearning(root, learningOptions);
+export function createDashboard(root: string, launch: Launch = spawn) {
+  const learning = createLearning(root);
   const pairedAppPort = Number(process.env.HALLVI_DEV_APP_PORT) || undefined;
   const appUrl = `http://127.0.0.1:${pairedAppPort ?? 3000}`;
   const storage = directory(join(root, "tests/results"));
@@ -528,7 +523,6 @@ export function createDashboard(
           "/api/releases/build",
           "/api/releases/publish",
           "/api/learning",
-          "/api/learning/rebuild",
         ].includes(url.pathname)
       ) {
         json({ error: "Not found" }, 404);
@@ -548,11 +542,6 @@ export function createDashboard(
           throw new Error("Request too large");
       }
       const body = JSON.parse(text);
-      if (url.pathname === "/api/learning/rebuild") {
-        const { force } = z.strictObject({ force: z.boolean() }).parse(body);
-        json(learning.rebuild(force), 202);
-        return;
-      }
       if (url.pathname === "/api/learning") {
         json(learning.act(body));
         return;
@@ -667,7 +656,6 @@ export function createDashboard(
     token,
     stop: () => {
       cancelActive?.();
-      learning.stop();
       server.close();
     },
   };

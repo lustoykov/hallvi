@@ -19,40 +19,21 @@
   color: var(--muted);
 }
 .learn-refresh {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
   margin: 20px 0 16px;
-}
-.learn-refresh > div {
-  min-width: 0;
-}
-.learn-rebuild-action {
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.learn-refresh button {
-  flex-shrink: 0;
 }
 .learn-refresh .learn-checkout {
   margin: 0 0 6px;
   color: var(--ink);
 }
-.learn-refresh .learn-refresh-error {
-  color: var(--red);
-}
-.learn-rebuild-summary {
+.learn-review-summary {
   margin: 0 0 16px;
   font-size: 13px;
 }
-.learn-rebuild-summary summary {
+.learn-review-summary summary {
   cursor: pointer;
   color: var(--muted);
 }
-.learn-rebuild-summary p {
+.learn-review-summary p {
   margin-top: 10px;
   max-width: 75ch;
   line-height: 1.6;
@@ -511,16 +492,5 @@ body:has(.learn-source) .topbar .pages {
   }
   .learn-history-row summary > span:first-of-type {
     flex: 1;
-  }
-}
-
-@media (max-width: 760px) {
-  .learn-rebuild-action {
-    justify-items: start;
-  }
-  .learn-refresh {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
   }
 }

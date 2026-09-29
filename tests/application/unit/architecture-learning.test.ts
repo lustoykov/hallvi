@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -15,7 +16,11 @@ import {
   learningSources,
 } from "../../dashboard/learning.ts";
 import { createDashboard } from "../../dashboard/server";
-import type { RebuildInput } from "../../dashboard/learning-rebuild.ts";
+import {
+  learningPath,
+  prepareLearningUpdate,
+  publishLearningUpdate,
+} from "../../dashboard/learning-update.ts";
 
 const temporary: string[] = [];
 const sources = () =>
@@ -59,83 +64,83 @@ function commit(root: string) {
   }).trim();
 }
 
-it("rebuilds merged main daily, preserves mastery, retires old facts, and publishes only valid output", async () => {
+it("publishes scheduled reviews of merged main while preserving unchanged progress and obsolete history", () => {
   const root = fixture();
   const initialRevision = commit(root);
   execFileSync("git", ["branch", "-M", "main"], { cwd: root });
   execFileSync("git", ["remote", "add", "origin", root], { cwd: root });
-  let now = Date.now();
-  let mode = "unchanged";
-  const run = vi.fn(async ({ previous, snapshot }: RebuildInput) => {
-    // Agent gets immutable tracked code, never a dirty checkout or app state.
-    expect(readFileSync(join(snapshot, "CONTEXT.md"), "utf8")).not.toContain(
-      "LOCAL_ONLY",
-    );
-    expect(() => readFileSync(join(snapshot, ".env"))).toThrow();
-    if (mode === "invalid") return { summary: "missing catalog" };
-    const newer = buildLearningCatalog(
-      Object.fromEntries(
-        learningSources.map((file) => [
-          file,
-          readFileSync(join(snapshot, file), "utf8"),
-        ]),
-      ),
-    );
-    const changed = newer.questions.find(
-      (q) => q.id === "concept:session-owner",
-    )!;
-    const draft = Object.fromEntries(
-      Object.entries(changed).filter(([key]) => key !== "version"),
-    );
-    return {
-      summary: "Reviewed code.",
-      graph: previous.graph,
-      upsert: mode === "changed" ? [draft] : [],
-      retire: mode === "changed" ? ["tool:save_information"] : [],
-    };
-  });
-  const first = createLearning(root, { now: () => now, run });
-  const initial = first.state();
+  const learning = createLearning(root);
+  const initial = learning.state();
+  // Opening the dashboard only reads; it never creates a review or a database.
+  expect(existsSync(learningPath(root))).toBe(false);
   for (const id of [
     "concept:session-owner",
     "table:conversations",
     "tool:save_information",
   ]) {
     const q = initial.questions.find((q) => q.id === id)!;
-    first.act({ action: "answer", id, version: q.version, selected: q.answer });
+    learning.act({
+      action: "answer",
+      id,
+      version: q.version,
+      selected: q.answer,
+    });
   }
   writeFileSync(join(root, ".env"), "PRIVATE_FIXTURE=not-a-real-secret");
   const originalContext = readFileSync(join(root, "CONTEXT.md"), "utf8");
   writeFileSync(join(root, "CONTEXT.md"), originalContext + "\nLOCAL_ONLY\n");
-  first.rebuild(false);
-  await first.settled();
-  expect(first.state().refresh.revision).toBe(initialRevision);
+  const prepared = prepareLearningUpdate(root);
+  if (prepared.status !== "review") throw new Error("Expected review");
   expect(
-    first.state().questions.filter((q) => q.status === "learned"),
+    readFileSync(join(prepared.snapshot, "CONTEXT.md"), "utf8"),
+  ).not.toContain("LOCAL_ONLY");
+  expect(existsSync(join(prepared.snapshot, ".env"))).toBe(false);
+  const patch = {
+    summary: "Reviewed code.",
+    graph: initial.graph,
+    upsert: [],
+    retire: [],
+  };
+  writeFileSync(prepared.patch, JSON.stringify(patch));
+  expect(publishLearningUpdate(root, prepared.directory).revision).toBe(
+    initialRevision,
+  );
+  expect(
+    learning.state().questions.filter((q) => q.status === "learned"),
   ).toHaveLength(3);
-  first.rebuild(false);
-  await first.settled();
-  expect(run).toHaveBeenCalledTimes(1);
-  now += 24 * 60 * 60 * 1000 + 1;
-  first.rebuild(false);
-  await first.settled();
-  // Unchanged main never spends a model call.
-  expect(run).toHaveBeenCalledTimes(1);
-  expect(first.state().refresh.message).toMatch(/not changed/);
-  first.rebuild(true);
-  await first.settled();
-  // Manual rebuild is always a fresh review.
-  expect(run).toHaveBeenCalledTimes(2);
+  expect(prepareLearningUpdate(root).status).toBe("unchanged");
+  expect(learning.state().review.lastCheckedAt).toBeTruthy();
+  expect(prepareLearningUpdate(root, true).status).toBe("review");
+
   writeFileSync(
     join(root, "CONTEXT.md"),
     originalContext.replace("worker.sock", "new-owner.sock"),
   );
   const changedRevision = commit(root);
-  mode = "changed";
-  first.rebuild(true);
-  await first.settled();
-  const changed = first.state();
-  expect(changed.refresh.revision).toBe(changedRevision);
+  const newer = prepareLearningUpdate(root);
+  if (newer.status !== "review") throw new Error("Expected review");
+  const changedQuestion = buildLearningCatalog(
+    Object.fromEntries(
+      learningSources.map((file) => [
+        file,
+        readFileSync(join(newer.snapshot, file), "utf8"),
+      ]),
+    ),
+  ).questions.find((q) => q.id === "concept:session-owner")!;
+  const draft = Object.fromEntries(
+    Object.entries(changedQuestion).filter(([key]) => key !== "version"),
+  );
+  writeFileSync(
+    newer.patch,
+    JSON.stringify({
+      ...patch,
+      upsert: [draft],
+      retire: ["tool:save_information"],
+    }),
+  );
+  publishLearningUpdate(root, newer.directory);
+  const changed = learning.state();
+  expect(changed.review.revision).toBe(changedRevision);
   expect(
     changed.questions.find((q) => q.id === "concept:session-owner")?.status,
   ).toBe("changed");
@@ -146,54 +151,78 @@ it("rebuilds merged main daily, preserves mastery, retires old facts, and publis
     changed.history.find((row) => row.question.id === "tool:save_information")
       ?.reason,
   ).toBe("removed");
-  expect(first.source("CONTEXT.md", changedRevision)).toContain(
+  expect(learning.source("CONTEXT.md", changedRevision)).toContain(
     "new-owner.sock",
   );
-  expect(() => first.source(".env", changedRevision)).toThrow(/Unknown/);
-  expect(() => first.source("package.json", changedRevision)).toThrow(
-    /Unknown/,
+  expect(() => learning.source(".env", changedRevision)).toThrow(/Unknown/);
+  // Previously learned sources remain accessible at their original commit.
+  expect(learning.source("CONTEXT.md", initialRevision)).toContain(
+    "worker.sock",
   );
   const catalogVersion = changed.sourceVersion;
-  mode = "invalid";
-  first.rebuild(true);
-  await first.settled();
-  expect(first.state().refresh.status).toBe("failed");
-  expect(first.state().sourceVersion).toBe(catalogVersion);
-  // Restart sees the last good catalog and an error, not half a replacement.
-  expect(createLearning(root).state().sourceVersion).toBe(catalogVersion);
-  first.rebuild(false);
-  await first.settled();
-  // A failed check does not retry every poll.
-  expect(run).toHaveBeenCalledTimes(4);
+  const invalid = prepareLearningUpdate(root, true);
+  if (invalid.status !== "review") throw new Error("Expected review");
+  for (const output of [
+    { summary: "missing catalog" },
+    { ...patch, upsert: [{ ...draft, source: { path: ".env", line: 1 } }] },
+    {
+      ...patch,
+      upsert: [{ ...draft, source: { path: "CONTEXT.md", line: 999999 } }],
+    },
+    { ...patch, upsert: [{ ...draft, options: ["wrong", "also wrong"] }] },
+    {
+      ...patch,
+      graph: {
+        ...patch.graph,
+        edges: [{ from: "missing", to: "missing", label: "invalid" }],
+      },
+    },
+  ]) {
+    writeFileSync(invalid.patch, JSON.stringify(output));
+    expect(() => publishLearningUpdate(root, invalid.directory)).toThrow();
+    expect(createLearning(root).state().sourceVersion).toBe(catalogVersion);
+    expect(createLearning(root).state().history).toEqual(changed.history);
+  }
 });
 
-it("shares a rebuild lock across servers and stops a job without publishing partial output", async () => {
+it("rejects overlapping stale reviews and publishing into a different progress store", () => {
   const root = fixture();
   commit(root);
   execFileSync("git", ["branch", "-M", "main"], { cwd: root });
   execFileSync("git", ["remote", "add", "origin", root], { cwd: root });
-  let entered!: () => void;
-  const started = new Promise<void>((resolve) => {
-    entered = resolve;
+  const first = prepareLearningUpdate(root);
+  const second = prepareLearningUpdate(root);
+  if (first.status !== "review" || second.status !== "review")
+    throw new Error("Expected reviews");
+  const learning = createLearning(root);
+  const state = learning.state();
+  const patch = {
+    summary: "Reviewed code.",
+    graph: state.graph,
+    upsert: [],
+    retire: [],
+  };
+  for (const prepared of [first, second])
+    writeFileSync(prepared.patch, JSON.stringify(patch));
+  // An answer saved while the scheduled review is working survives publication.
+  const q = state.questions[0];
+  learning.act({
+    action: "answer",
+    id: q.id,
+    version: q.version,
+    selected: q.answer,
   });
-  const run = vi.fn(async ({ signal }: RebuildInput) => {
-    entered();
-    await new Promise<void>((resolve) =>
-      signal.addEventListener("abort", () => resolve(), { once: true }),
-    );
-    return {};
-  });
-  const first = createLearning(root, { run });
-  const other = createLearning(root, { run });
-  first.rebuild(true);
-  await started;
-  expect(other.rebuild(true).status).toBe("running");
-  expect(run).toHaveBeenCalledTimes(1);
-  first.stop();
-  await first.settled();
-  expect(other.state().refresh.status).toBe("failed");
-  expect(other.state().refresh.revision).toBeNull();
-  expect(other.state().refresh.message).toMatch(/stopped/);
+  vi.stubEnv("HALLVI_LEARNING_DB_PATH", "work/wrong-store.sqlite");
+  expect(() => publishLearningUpdate(root, first.directory)).toThrow(
+    /different learning store/,
+  );
+  expect(existsSync(learningPath(root))).toBe(false);
+  vi.stubEnv("HALLVI_LEARNING_DB_PATH", "");
+  publishLearningUpdate(root, second.directory);
+  expect(() => publishLearningUpdate(root, first.directory)).toThrow(
+    /catalog changed/,
+  );
+  expect(learning.state().questions[0].status).toBe("learned");
 });
 
 it("derives current contracts without execution and versions only changed knowledge", () => {
@@ -369,6 +398,15 @@ it("serves a protected, live quiz and grades answers against the current source"
         })
       ).status,
     ).toBe(403);
+    expect(
+      (
+        await fetch(origin + "/api/learning/rebuild", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ force: true }),
+        })
+      ).status,
+    ).toBe(404);
     const page = await (await fetch(origin + "/learn")).text();
     expect(page).toContain("Learn Hallvi");
     const state = await (

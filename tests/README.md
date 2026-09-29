@@ -111,24 +111,23 @@ only it renders, carry no tests. A real application's destinations are the
 `*-page.tsx` components, and what they may claim is settled by the record
 projections behind them; that is where this coverage lives.
 
-The live model evals are gone. Their runner was retired with the workflow it tested and had been a stub that printed an error for some time; its saved answers could only be judged by a second command whose results live in `tests/results/`, which is local and never committed, so on any fresh checkout there was nothing to run and nothing to judge. `eval:pi`, `eval:judge` and `tests/evals/` are removed, and the test runners make no model calls. Learn Hallvi has a separate, opt-in-by-opening-the-page Codex rebuild, described below.
+The live model evals are gone. Their runner was retired with the workflow it tested and had been a stub that printed an error for some time; its saved answers could only be judged by a second command whose results live in `tests/results/`, which is local and never committed, so on any fresh checkout there was nothing to run and nothing to judge. `eval:pi`, `eval:judge` and `tests/evals/` are removed, and the test runners make no model calls. Learn Hallvi displays content maintained by a separate scheduled Codex task, described below.
 
 Answers saved by earlier runs are untouched and still readable: the dashboard's Eval archive reads them, shows the judgments that were made at the time, and takes your own verdict. New live deployment evals follow provisioning and will be written against the operator that exists.
 
-`npm run dev` starts a local testing dashboard paired with that checkout's app; each worktree gets its own local ports, printed at startup, and the two interfaces link to each other. `npm run test:dashboard` remains available for running the dashboard alone on port 4317. It starts the application tests, the browser smoke subset and the browser journeys, and those check runners make no model calls. Learn Hallvi's daily/manual rebuild is a separate Codex CLI job that consumes Codex usage. Three further pages report rather than run: **Agent feedback** reads this checkout’s `AGENT_FEEDBACK.md`, including request counts, statuses and notes; reload after local edits, and merge/update worktrees to share feedback. Repository links on that page open GitHub main. **Development** says which checkout the paired Hallvi is actually serving, which database it opened and at what schema, the retained sample applications registered on this machine and the copies taken of their records; **Releases** says what a release would be built from, what a built archive actually contains, and which draft is waiting. Building and publishing there are narrow wrappers around the `gh` login already on this machine, and these pages do not exist in a packaged Hallvi: `scripts/package.mjs` copies an allowlist, and `tests/` is not on it. Local tooling can still fail silently or affect data, credentials and spending: its location is not an exemption from the 80/20 bar. Check the relevant behavior when changing these tools; add a focused regression only when a concrete risk warrants it.
+`npm run dev` starts a local testing dashboard paired with that checkout's app; each worktree gets its own local ports, printed at startup, and the two interfaces link to each other. `npm run test:dashboard` remains available for running the dashboard alone on port 4317. It starts the application tests, the browser smoke subset and the browser journeys, and those check runners make no model calls. Learn Hallvi reads a saved catalog; its scheduled maintenance task runs separately in Codex and consumes Codex usage. Three further pages report rather than run: **Agent feedback** reads this checkout’s `AGENT_FEEDBACK.md`, including request counts, statuses and notes; reload after local edits, and merge/update worktrees to share feedback. Repository links on that page open GitHub main. **Development** says which checkout the paired Hallvi is actually serving, which database it opened and at what schema, the retained sample applications registered on this machine and the copies taken of their records; **Releases** says what a release would be built from, what a built archive actually contains, and which draft is waiting. Building and publishing there are narrow wrappers around the `gh` login already on this machine, and these pages do not exist in a packaged Hallvi: `scripts/package.mjs` copies an allowlist, and `tests/` is not on it. Local tooling can still fail silently or affect data, credentials and spending: its location is not an exemption from the 80/20 bar. Check the relevant behavior when changing these tools; add a focused regression only when a concrete risk warrants it.
 
 Install Chromium with `npx playwright install chromium`. Browser fixtures run on 3180+ with synthetic credentials; they never open the normal application database. Failure artifacts and the rich-card screenshots are under `tests/results/`. The workspace Docker test is opt-in and requires a reachable engine.
 
 **Learn Hallvi** (`/learn`) is the dashboard's architecture map and learning
-queue. It checks merged `main` daily while open and offers Rebuild now. A
-temporary Codex CLI run reviews code and documentation only when needed, or
-when manually requested. It saves progress and rebuilt content separately from
-test results and product data. [Development](../docs/development.md#learn-the-current-architecture)
-owns its schedule, authentication, source and progress lifecycle.
-`unit/architecture-learning.test.ts` uses disposable Git repositories and a
-scripted reviewer to cover persistent mastery, changed/retired versions,
-unchanged-main skips, forced reviews, invalid-output rollback and concurrent-job
-exclusion. The ordinary suite never runs Codex. Verify changes to the runner with
-one real Codex rebuild using `HALLVI_LEARNING_DB_PATH=work/learning-check.sqlite`,
-then exercise the button, source links and status in the browser. Keep fixture
+queue. A separate daily Codex task reviews merged `main` and publishes an
+incremental update. The page only reads saved content and records answers; it
+never launches an agent. [Development](../docs/development.md#learn-the-current-architecture)
+owns the task workflow, source and progress lifecycle.
+`unit/architecture-learning.test.ts` uses disposable Git repositories to cover
+persistent mastery, changed/retired versions, unchanged-main skips, forced
+preparation, invalid-output rollback, overlapping reviews and store identity.
+The ordinary suite never runs Codex. For updater changes, exercise prepare and
+publish on a fixture using `HALLVI_LEARNING_DB_PATH=work/learning-check.sqlite`,
+and verify the saved content and source links in the browser. Keep fixture
 answers out of the owner's progress file and remove only your verification data.

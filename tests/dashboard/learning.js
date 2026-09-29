@@ -31,8 +31,6 @@ let loading = false;
 let connected = false;
 let selectedNode = "";
 let mutation = 0;
-let rebuilding = false;
-let autoRetryAfter = 0;
 const deferred = new Set();
 const groups = () => [...new Set(state.questions.map((q) => q.topic))];
 const queue = () =>
@@ -44,8 +42,8 @@ const queue = () =>
         Number(b.status === "changed") - Number(a.status === "changed"),
     );
 
-async function request(body, path = "/api/learning") {
-  const response = await fetch(path, {
+async function request(body) {
+  const response = await fetch("/api/learning", {
     method: body ? "POST" : "GET",
     headers: {
       "X-Hallvi-Testing-Token": token,
@@ -68,9 +66,9 @@ async function refresh() {
   const readingAt = mutation;
   try {
     const next = await request();
-    if (!next.refresh)
+    if (!next.review)
       throw new Error(
-        "Restart the local dashboard to enable architecture rebuilds.",
+        "Restart the local dashboard to load saved architecture reviews.",
       );
     if (readingAt !== mutation) return;
     connected = true;
@@ -82,6 +80,7 @@ async function refresh() {
       next.checkout,
     ]);
     if (signature !== nextSignature) {
+      const restoreFocus = retainFocus();
       const previous = state;
       state = next;
       signature = nextSignature;
@@ -90,13 +89,12 @@ async function refresh() {
           "Sources changed. Your progress on unchanged questions is kept.";
       }
       render();
+      restoreFocus();
     } else if ($("question").querySelector("button:disabled")) {
       renderQuestion();
     }
-    state.refresh = next.refresh;
-    renderRefresh();
-    if (next.refresh.due && !document.hidden && Date.now() >= autoRetryAfter)
-      void rebuild(false);
+    state.review = next.review;
+    renderReview();
   } catch (error) {
     connected = false;
     fail(error);
@@ -106,61 +104,57 @@ async function refresh() {
     loading = false;
   }
 }
-function renderRefresh() {
+// Catalog publication replaces view markup. Keep the same logical control
+// focused when it survives, including an answer on an unchanged question.
+function retainFocus() {
+  const focused = document.activeElement;
+  const container = focused?.closest("[id]");
+  if (!container) return () => {};
+  const questionKey = activeKey;
+  const inQuestion = Boolean(focused.closest("#question"));
+  const details = focused.closest("details[data-topic], details[data-key]");
+  const identity = (element) =>
+    [...element.attributes]
+      .filter(({ name }) => /^(data-.*|type|name|value|href)$/.test(name))
+      .map(({ name, value }) => `[${name}="${CSS.escape(value)}"]`)
+      .join("");
+  const selector = `#${CSS.escape(container.id)} ${details ? `details${identity(details)} ` : ""}${focused.tagName.toLowerCase()}${identity(focused)}`;
+  return () => {
+    if (focused.isConnected) return;
+    const replacement = document.querySelector(selector);
+    const target =
+      inQuestion &&
+      (activeKey !== questionKey ||
+        !replacement ||
+        replacement.matches(":disabled"))
+        ? $("question").querySelector("h2")
+        : replacement;
+    target?.focus({ preventScroll: true });
+  };
+}
+function renderReview() {
   if (!state) return;
-  const refresh = state.refresh;
-  const running = refresh.status === "running";
+  const review = state.review;
   const time = (value) =>
     new Date(value).toLocaleString(undefined, {
       dateStyle: "medium",
       timeStyle: "short",
     });
-  $("checkout").textContent = refresh.revision
-    ? `Merged main · ${refresh.revision.slice(0, 8)} · rebuilt ${time(refresh.builtAt)}`
-    : `Starter content from ${state.checkout.branch || "this checkout"} · awaiting first Codex rebuild`;
+  $("checkout").textContent = review.revision
+    ? `Merged main · ${review.revision.slice(0, 8)} · reviewed ${time(review.builtAt)}`
+    : `Starter content from ${state.checkout.branch || "this checkout"} · awaiting first Codex review`;
   $("checkout").title = state.checkout.root;
-  const elapsed = Math.max(
-    0,
-    Math.floor((Date.now() - Date.parse(refresh.startedAt)) / 1000),
-  );
-  $("rebuild-status").textContent = running
-    ? `${refresh.message} · ${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
-    : refresh.status === "failed"
-      ? refresh.message
-      : `${refresh.lastCheckedAt ? `Main checked ${time(refresh.lastCheckedAt)}. ` : ""}${refresh.nextCheckAt ? `Next daily check ${time(refresh.nextCheckAt)}.` : "Daily refresh will start shortly."}`;
-  $("rebuild-status").classList.toggle(
-    "learn-refresh-error",
-    refresh.status === "failed",
-  );
-  $("rebuild").disabled = !connected || rebuilding || running;
-  $("rebuild").textContent =
-    running || rebuilding
-      ? "Rebuilding…"
-      : refresh.status === "failed"
-        ? "Retry rebuild"
-        : "Rebuild now";
-  $("rebuild-summary").hidden = !refresh.summary;
-  $("rebuild-summary").querySelector("p").textContent = refresh.summary ?? "";
+  const pending =
+    review.checkedRevision && review.checkedRevision !== review.revision;
+  $("review-status").textContent =
+    `${review.lastCheckedAt ? `Main checked ${time(review.lastCheckedAt)}. ` : ""}${pending ? "New content is awaiting review in Codex." : "Updates come from your daily Codex task."}`;
+  $("review-summary").hidden = !review.summary;
+  $("review-summary").querySelector("p").textContent = review.summary ?? "";
   $("architecture-source").href = sourceLink({
     path: "docs/architecture.md",
     line: 1,
-    revision: refresh.revision,
+    revision: review.revision,
   });
-}
-async function rebuild(force) {
-  if (rebuilding) return;
-  rebuilding = true;
-  renderRefresh();
-  try {
-    state.refresh = await request({ force }, "/api/learning/rebuild");
-    $("learning-error").hidden = true;
-  } catch (error) {
-    autoRetryAfter = Date.now() + 60_000;
-    fail(error);
-  } finally {
-    rebuilding = false;
-    renderRefresh();
-  }
 }
 function view() {
   const chosen = location.hash.slice(1);
@@ -207,7 +201,7 @@ function render() {
   renderQuiz();
   renderHistory();
   renderView();
-  renderRefresh();
+  renderReview();
 }
 function wrapLabel(text, measure, width) {
   const lines = [""];
@@ -230,7 +224,7 @@ function renderMap() {
   const { nodes, edges } = state.graph;
   if (!nodes.length) {
     $("architecture-map").textContent =
-      "The first Codex rebuild will create your architecture map and questions.";
+      "The first Codex review will create your architecture map and questions.";
     $("map-detail").textContent = "";
     return;
   }
@@ -394,7 +388,7 @@ function renderQuestion() {
   }
   if (!state.questions.length) {
     $("question").innerHTML =
-      '<h2 tabindex="-1">Your learning catalog is being prepared.</h2><p>Use Rebuild now above to retry if the first rebuild has failed. Your saved progress is kept.</p>';
+      '<h2 tabindex="-1">Your learning catalog is being prepared.</h2><p>Ask Codex to update the learning dashboard, or check the daily task in Codex if a review failed. Your saved progress is kept.</p>';
     return;
   }
   if (!question) {
@@ -533,7 +527,6 @@ async function save(action) {
     }
   }
 }
-$("rebuild").addEventListener("click", () => void rebuild(true));
 $("continue").addEventListener("click", () => openQuiz());
 $("concept-search").addEventListener("input", renderTopics);
 $("history-filter").addEventListener("change", renderHistory);
