@@ -2547,53 +2547,45 @@ function splitName(name: string) {
 const ROLL_BYTES = 100 * 1024 * 1024;
 
 /**
- * Caddy 2.11 as Pi sets it up rolls every 24 hours, renaming the file
- * <stem>-<time>-time<ext>.gz, and sooner, -size, if a day passes 100 MiB.
- * The days are counted back from the window's end, so the newest file ends
- * exactly where the live log takes over.
+ * Caddy 2.11 as Pi sets it up rolls every 24 hours, and sooner if the file
+ * passes 100 MiB. It rolls on the first write that is due — that write opens
+ * the next file — and names the old one <stem>-<time>-time|size<ext>.gz for
+ * that moment, which is how Hallvi tells neighbouring files apart from a gap.
+ * The days are counted back from the window's end, and the newest file is
+ * named for it: that is where the live log's first line must be.
  */
 function caddyFiles(plan: Plan, hits: Hit[], name: string) {
   const [stem, ext] = splitName(name);
-  const files: { name: string; hits: Hit[]; text: string[]; rolled: number }[] =
-    [];
   const cuts: number[] = [];
-  for (let cut = plan.end; cut > plan.start; cut -= DAY) cuts.unshift(cut);
-  let index = 0;
-  for (const cut of cuts) {
-    let [text, group, bytes] = [[] as string[], [] as Hit[], 0];
-    for (; index < hits.length && hits[index].at < cut; index++) {
-      const line = `${caddyLine(plan, hits[index])}\n`;
-      const length = Buffer.byteLength(line);
-      if (bytes + length > ROLL_BYTES && text.length) {
-        // Rolled as the line that no longer fits comes in.
-        const rolled = hits[index].at;
-        files.push({
-          name: `${stem}-${caddyStamp(rolled)}-size${ext}.gz`,
-          hits: group,
-          text,
-          rolled,
-        });
-        [text, group, bytes] = [[], [], 0];
-      }
-      text.push(line);
-      group.push(hits[index]);
-      bytes += length;
+  for (let cut = plan.end - DAY; cut > plan.start; cut -= DAY)
+    cuts.unshift(cut);
+  const files: { hits: Hit[]; text: string[]; why: string }[] = [];
+  let file = { hits: [] as Hit[], text: [] as string[], why: "time" };
+  let [bytes, cut] = [0, 0];
+  for (const hit of hits) {
+    const line = `${caddyLine(plan, hit)}\n`;
+    const length = Buffer.byteLength(line);
+    const due = cut < cuts.length && hit.at >= cuts[cut];
+    while (cut < cuts.length && hit.at >= cuts[cut]) cut++;
+    if ((due || bytes + length > ROLL_BYTES) && file.hits.length) {
+      files.push({ ...file, why: due ? "time" : "size" });
+      [file, bytes] = [{ hits: [], text: [], why: "time" }, 0];
     }
-    if (group.length)
-      files.push({
-        name: `${stem}-${caddyStamp(cut)}-time${ext}.gz`,
-        hits: group,
-        text,
-        rolled: cut,
-      });
+    file.hits.push(hit);
+    file.text.push(line);
+    bytes += length;
   }
-  return files.map((file) => ({
-    name: file.name,
-    hits: file.hits,
-    body: gzipSync(file.text.join("")),
-    // Compressed right after the rename.
-    mtime: file.rolled + 40,
-  }));
+  if (file.hits.length) files.push(file);
+  return files.map(({ hits, text, why }, index) => {
+    const rolled = files[index + 1]?.hits[0].at ?? plan.end;
+    return {
+      name: `${stem}-${caddyStamp(rolled)}-${why}${ext}.gz`,
+      hits,
+      body: gzipSync(text.join("")),
+      // Compressed right after the rename.
+      mtime: rolled + 40,
+    };
+  });
 }
 
 /**
