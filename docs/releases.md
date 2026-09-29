@@ -254,7 +254,8 @@ newest: a signed release naming a different channel is refused, not ranked.
 The channel lives in the signed manifest, not in GitHub's release flags.
 Releases are published as ordinary releases, never prereleases, because GitHub
 never makes a prerelease "latest" and the install line depends on it; the
-version still says alpha. Discovery reads neither flag.
+version still says alpha. The updater accepts the signed alpha channel; the
+official bootstrap follows GitHub’s designated latest release.
 
 ## Testing a release without publishing one
 
