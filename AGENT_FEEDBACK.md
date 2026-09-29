@@ -5,13 +5,12 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 2 | Accepted |
+| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 3 | Partially improved; pause remains |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | New |
-| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | New |
+| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
 | [AF-019 — Send one review's findings to one branch](#af-019--send-one-reviews-findings-to-one-branch) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
@@ -125,8 +124,25 @@ SSR chunk initialization. Setup loads the full Pi coding-agent entry, and
 model validation also imports Pi AI. Standalone asynchronous SDK imports have
 substantial wall/CPU cost but do not reproduce the page's large event-loop
 delay, so import duration alone does not attribute the whole stall. The pinned
-SDK has no supported narrow model-runtime export; no small supported production
-reduction was established. No runtime optimization was added.
+SDK has no supported narrow model-runtime export.
+
+Next's supported default bundling of Pi AI's public imports reduces a separate
+external module-loading cost. On current main, five fresh production processes
+per build, including a reversed-order repeat, showed a median usable chat opening
+of 894 ms before and 782 ms after (ranges 866–977 ms and 762–799 ms). Readiness
+required an enabled composer and an initial full SSE snapshot. Median document
+TTFB fell from 659 ms to 562 ms, while maximum web event-loop delay stayed around
+300 ms. This is a modest loading improvement, not a fix for the pause. The full
+coding SDK remains external; duplicate model-catalog creation measured under a
+millisecond and was left alone.
+
+These runs used an unsigned assembled production program with Node 22.23.2 on
+the shared Mac, isolated Hallvi and standalone Pi accounts, synthetic OAuth
+credentials, and no model calls. All eight model/effort choices matched between
+builds; preference changes and fresh setup choice worked without a deferred
+first-action delay. This establishes the local loading improvement, not native
+release acceptance or provider authentication. The first-open harness and raw
+results are kept under ignored `work/first-open-runtime/` in the owning worktree.
 
 The earlier [release verification](https://github.com/lustoykov/hallvi/pull/254)
 observed 687 ms after histories were warmed. The packaged investigation confirms
@@ -138,6 +154,8 @@ initial runs which only isolated Hallvi's account were excluded.
 
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
 
+**+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
+
 ### AF-017 — Make record validation easier for Pi to recover from
 
 During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
@@ -146,17 +164,7 @@ explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
 the calls and finished, but saving the useful result added avoidable churn.
 Make the tool contract easier to follow without relaxing record validation.
 
-**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
-[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
-
-### AF-018 — Load the updated interface after an installed upgrade
-
-The normal alpha.8-to-alpha.9 browser update finished and restored the
-conversation, but the page already open from alpha.8 retained its old
-“Failed to fetch” warning until reload. Reloading loaded the new recovery code;
-a subsequent alpha.9 restart cleared its temporary warning automatically and
-preserved the draft. Help an open page adopt the installed frontend version
-without losing unsent work, or make the required reload clear.
+**Status:** Owner-authorized correction in review on `codex/record-basis-contract`: explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. Archive after the fix merges.
 
 **+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
 [release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
@@ -177,6 +185,7 @@ noting on the other which findings are taken, would save that merge.
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
+| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fix in review #276 |
 | [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
 | [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Resolved in #266 |
 | [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Resolved in #265 |
@@ -185,6 +194,28 @@ noting on the other which findings are taken, would save that merge.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-018 — Load the updated interface after an installed upgrade
+
+The normal alpha.8-to-alpha.9 browser update finished and restored the
+conversation, but the page already open from alpha.8 retained its old
+“Failed to fetch” warning until reload. Reloading loaded the new recovery code;
+a subsequent alpha.9 restart cleared its temporary warning automatically and
+preserved the draft. Help an open page adopt the installed frontend version
+without losing unsent work, or make the required reload clear.
+
+**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
+[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
+
+**Disposition:** Fix in review in [#276](https://github.com/lustoykov/hallvi/pull/276).
+An open page that observes completion offers an explicit, confirmed Reload page
+action. The warning asks the owner to keep unsent work, images and unsaved
+settings first. Existing browser recovery preserves text drafts and pending
+text request keys; reload does not resend work or settle unknown writes.
+The isolated production browser fixture checks cancellation with an attached
+image, one document reload, the newer draft and same-key retry. Already loaded
+older release code still needs a manual browser reload: the new control is
+prospective, not a retroactive repair of alpha.8's JavaScript.
 
 ### AF-006 — Reduce full-history response serialization
 
@@ -208,16 +239,23 @@ Idle reads now stop; active updates still serialize full histories. Keep the
 initial/reconnect snapshot and all recorded evidence, then sends changed
 records only. A warm 240-call fixture updating answer text and live output
 reduces each active payload from about 2.28 MB to 10.8 KB; ten-reader frame
-construction plus encoding falls from about 24.4 ms to 2.4 ms. A bounded
-2,000-call stress case still spends about 134 ms projecting ten snapshots,
+construction plus encoding falls from about 24.4 ms to 2.4 ms. At that checkpoint, a bounded
+2,000-call stress case spent about 134 ms projecting ten snapshots,
 separately from the remaining 20 ms diff cost. Worker-link transcript encoding,
-first-connect costs and full-history projection remain; this change does not
+first-connect costs and full-history projection remained; that change did not
 claim to eliminate them. Reproduce with `scripts/benchmark-chat-responses.ts`;
 the production browser comparison retains all six updates in 1/5/10 readers.
 At ten readers, 240 calls produce about 2.31 MB per full response versus 10.7 KB
 per incremental response, with maximum loop delay 201 ms versus 76 ms. These
 bounded synthetic measurements are not latency guarantees; verification and
 the earlier unattributed development-mode miss belong in the implementation PR.
+Overlapping same-chat SSE refreshes now share only pending reads; activity
+projection uses one reply-position map. Settled reads are never cached.
+The development profile also needs durable per-reader milestones: its ten-reader
+case can exhaust the total setup budget before recording any update result,
+with teardown then erasing client evidence. The profile now writes milestones
+as they occur and keeps fixture compilation logs; the ten-second update assertion
+is unchanged. The original missed wave remains unattributed.
 
 ### AF-016 — Keep traffic counting consistent with owner choices and page routes
 

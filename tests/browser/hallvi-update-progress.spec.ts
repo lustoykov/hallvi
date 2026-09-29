@@ -1,8 +1,8 @@
 import { expect, test } from "./fixtures";
 
-test("Hallvi update stays visible through installation, reconnect, and completion", async ({
+test("Hallvi update stays visible and reload preserves drafts and uncertain message keys", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(120_000);
   let phase: "available" | "downloading" | "installing" | "completed" =
     "available";
@@ -72,8 +72,33 @@ test("Hallvi update stays visible through installation, reconnect, and completio
     },
   });
   expect(created.status()).toBe(201);
-  const { application } = await created.json();
+  const { application, selectedChatId } = await created.json();
+  const attempts: { message: string; requestKey: string }[] = [];
+  await page.route(
+    `**/api/applications/${application.id}/chats/${selectedChatId}/messages`,
+    (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      attempts.push(route.request().postDataJSON());
+      return route.abort("failed");
+    },
+  );
   await page.goto(`/applications/${application.id}`);
+  // This version comes from a client effect, so the composer is hydrated too.
+  await expect(
+    page.getByRole("button", { name: /Hallvi 0\.1\.1-alpha\.1/ }),
+  ).toBeVisible();
+  const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+  const message = "An uncertain message must keep its request key.";
+  await composer.fill(message);
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect.poll(() => attempts.length).toBe(1);
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Failed to fetch" }),
+  ).toBeVisible();
+  await expect(composer).toHaveValue(message);
+  expect(attempts).toHaveLength(1);
+  const draft = "Keep my newer draft through the interface reload.";
+  await composer.fill(draft);
   await page.getByRole("button", { name: /Hallvi 0\.1\.1-alpha\.1/ }).click();
   await page.getByRole("button", { name: "Update", exact: true }).click();
 
@@ -124,6 +149,70 @@ test("Hallvi update stays visible through installation, reconnect, and completio
   ).toBeVisible({
     timeout: 10_000,
   });
+  const completedNotice = page.getByRole("status").filter({
+    hasText: "Hallvi updated",
+  });
+  await expect(completedNotice).toContainText("Reload this page");
+  await expect(composer).toHaveValue(draft);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "unsent-image.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await expect(page.getByAltText("Attached image 1")).toBeVisible();
+  const reload = completedNotice.getByRole("button", { name: "Reload page" });
+  let documents = 0;
+  page.on("request", (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+      documents += 1;
+  });
+  await page.screenshot({
+    path: testInfo.outputPath("update-complete-reload-offered.png"),
+    fullPage: true,
+  });
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("attached images");
+    await dialog.dismiss();
+  });
+  await reload.click();
+  expect(documents).toBe(0);
+  await expect(composer).toHaveValue(draft);
+  await expect(page.getByAltText("Attached image 1")).toBeVisible();
+  // The owner removes the unsent image before choosing the warned-about reload.
+  await page.getByRole("button", { name: "Remove image 1" }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await Promise.all([page.waitForNavigation(), reload.click()]);
+  expect(documents).toBe(1);
+  await expect(composer).toHaveValue(draft);
+  expect(attempts).toHaveLength(1); // Reload must never resend uncertain work.
+  const submissionKey = `hv:submission:${application.id}:${selectedChatId}`;
+  expect(
+    await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)!),
+      submissionKey,
+    ),
+  ).toMatchObject({
+    message: attempts[0].message,
+    key: attempts[0].requestKey,
+  });
+  await expect(page.getByRole("button", { name: "Reload page" })).toHaveCount(
+    0,
+  );
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(
+    page.getByRole("button", { name: /Hallvi 0\.1\.1-alpha\.2/ }),
+  ).toBeAttached();
+  await page.screenshot({
+    path: testInfo.outputPath("updated-page-draft-restored.png"),
+    fullPage: true,
+  });
+  await composer.fill(message);
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect.poll(() => attempts.length).toBe(2);
+  expect(attempts[1]).toMatchObject(attempts[0]);
   await page
     .getByRole("status")
     .getByRole("button", { name: "Dismiss" })
