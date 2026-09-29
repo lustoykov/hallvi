@@ -131,6 +131,13 @@ const READ_FILES = [
 // that file and says `hallvi-moved`, and the collector lists again and starts
 // over rather than lose what the name no longer holds. A file that cannot be
 // read says `hallvi-unreadable`, and its time is a gap.
+//
+// The file being written is checked again once `tail` has it open, because
+// a rotation between the check by name and `tail` opening that name would
+// otherwise hand it the new file unnoticed. `tail` replaces the shell, as
+// before, so it ends with the connection; a check beside it looks at the
+// very file `tail` holds (/proc/<pid>/fd on Linux; elsewhere the name, a
+// moment after), and on a mismatch says `hallvi-moved` and ends `tail`.
 const FOLLOW_FILES = [
   ...UNREADABLE,
   "name=${1##*/}",
@@ -138,10 +145,15 @@ const FOLLOW_FILES = [
   "shift",
   'for ((k = 1; k <= $#; k += 3)); do f=${!k}; [ ! -e "$f" ] || [ -r "$f" ] || unreadable "$f"; done',
   'same() { local i s; [ -e "$1" ] || return 1; read -r i _ < <(ls -di -- "$1"); s=$(wc -c < "$1") || return 1; [ "$i" = "$2" ] || return 1; if [ "$1" = "$name" ]; then [ "$s" -ge "$3" ]; else [ "$s" -eq "$3" ]; fi; }',
+  // 0: the process holds the listed file; 1: another; 2: none yet.
+  'held() { local l i s; [ -d "/proc/$$/fd" ] || { sleep 1; same "$@"; return; }; for l in /proc/$$/fd/*; do [ -f "$l" ] || continue; read -r i _ < <(ls -diL -- "$l"); s=$(wc -c < "$l") || return 1; [ "$i" = "$2" ] && [ "$s" -ge "$3" ]; return; done; return 2; }',
   `echo ${READY}`,
   "while [ $# -ge 3 ]; do",
   '  same "$1" "$2" "$3" 2>/dev/null || { echo "hallvi-moved $1"; exit 5; }',
-  '  [ "$1" != "$name" ] || exec tail -n +1 -F -- "$name"',
+  '  if [ "$1" = "$name" ]; then',
+  '    { for _ in {1..50}; do held "$1" "$2" "$3" 2>/dev/null; r=$?; [ "$r" = 2 ] || break; sleep 0.1; done; [ "$r" = 0 ] || { echo; echo "hallvi-moved $1"; kill $$; }; } &',
+  '    exec tail -n +1 -F -- "$name"',
+  "  fi",
   '  gzip -cdf -- "$1"; s=$?; echo',
   '  [ "$s" = 0 ] || echo "hallvi-unreadable $1"',
   "  shift 3",

@@ -100,6 +100,18 @@ beforeAll(() => {
     ].join("\n"),
   );
   chmodSync(join(root, "bin", "ssh"), 0o755);
+  // And what happens on the server in the instant before `tail` opens the
+  // file it follows.
+  writeFileSync(
+    join(root, "bin", "tail"),
+    [
+      "#!/bin/sh",
+      '[ -f "$BEFORE_TAIL" ] && . "$BEFORE_TAIL"',
+      'for tail in /usr/bin/tail /bin/tail; do [ -x "$tail" ] && exec "$tail" "$@"; done',
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(root, "bin", "tail"), 0o755);
   process.env.PATH = `${join(root, "bin")}:${path}`;
 
   // Caddy: a file from the day before, then a gap where one was deleted,
@@ -460,6 +472,41 @@ describe("the access log on the server", () => {
     expect(unreadable).toEqual([rolled]);
     expect(seen).toContain("2026-09-29T08:00:00.000Z");
     expect(seen.at(-1)).toBe("2026-09-29T09:00:00.000Z");
+  });
+
+  it("notices a rotation between its last check and tail opening the file", async () => {
+    const dir = join(root, "instant");
+    mkdirSync(dir);
+    file(
+      join(dir, "access.log"),
+      [caddy("2026-09-29T08:00:00Z"), caddy("2026-09-29T08:30:00Z")],
+      "2026-09-29T09:00:00Z",
+    );
+    const source = log("caddy-json", join(dir, "access.log"));
+    const files = await listLog(host, source);
+    // Checked by name, then rolled before tail opens that name: tail would
+    // follow only the new file, and the two lines above would be lost.
+    const rotate = join(root, "roll-instant.sh");
+    writeFileSync(
+      rotate,
+      `cd '${dir}' && mv access.log access-2026-09-29T09-00-00.000-size.log && printf '%s\\n' '${caddy("2026-09-29T09:00:00Z")}' > access.log\n`,
+    );
+    process.env.BEFORE_TAIL = rotate;
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), 4_000);
+    const ended = await followLog(
+      host,
+      source,
+      files,
+      Date.parse("2026-09-29T00:00:00Z"),
+      { line: () => {} },
+      stop.signal,
+    ).finally(() => {
+      clearTimeout(timer);
+      delete process.env.BEFORE_TAIL;
+    });
+    expect(stop.signal.aborted).toBe(false);
+    expect(ended.moved).toBe("access.log");
   });
 
   it("keeps a character whole when the connection splits it", async () => {
