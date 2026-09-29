@@ -97,6 +97,51 @@ Recorded messages, reasoning and tool results refresh automatically. The current
 
 Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `HALLVI_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Implementation: [local diagnostics](../src/server/diagnostics.ts) and [trace configuration](../src/server/tracing-config.ts).
 
+## Learn the current architecture
+
+Open **Learn Hallvi** in the developer dashboard, or its `/learn` address.
+The overview is the Mermaid flowchart under **The shape of it** in
+`docs/architecture.md`. Selecting a component traces its incoming and outgoing
+connections. The quiz reads definitions from `CONTEXT.md`, tool descriptions
+from `defineTool` calls in `src/server/pi.ts`, and table fields from
+`src/server/db-schema.ts`. It parses TypeScript without importing the operator.
+Sources are checked every five seconds while the page is visible, including
+uncommitted edits; each source link opens the local file with line numbers.
+
+Correct answers leave the queue. A changed definition, tool description or table field list
+gets a new question version; moving a definition or changing its formatting
+does not reset progress. Removed questions and previous versions remain in
+Your progress, with the question and answer saved at the time. Archive removes
+a current question from the queue, and Restore brings it back. Wrong answers
+save the attempt and remain in the queue.
+
+Progress is single-user and local to this repository, in
+`<git-common-dir>/hallvi-learning.sqlite`, shared by its worktrees. Switching
+branches compares progress against that checkout's sources without retiring
+questions in another branch. It survives dashboard restarts and worktree
+removal, is never committed, and is separate from the controller's database
+and account files. Back up this file to preserve learning progress when
+removing a repository. `HALLVI_LEARNING_DB_PATH` selects another progress file,
+which is useful for a disposable preview or test.
+
+Keep the canonical documentation and tool descriptions current when changing
+behavior. This is automatic extraction of their content, not an independent
+audit of implementation behavior. The map supports one directed Mermaid edge
+per line with rectangular or database nodes; unsupported source shapes fail
+visibly and do not erase progress. The dashboard does not generate questions
+with a model, invoke Pi, or inspect managed applications.
+
+```mermaid
+flowchart LR
+    Sources[Local definitions, architecture, tool and schema source]
+    Sources --> Extract[Read and version the current learning material]
+    Extract --> View[Architecture map and quiz]
+    View -->|Answer or archive a current version| Progress[(Shared repository learning progress)]
+    Progress -->|Match question ID and content version| View
+    Extract -->|Changed or removed version| History[Earlier questions stay in history]
+    Progress --> History
+```
+
 ## Verify
 
 Use the repository [verify-hallvi skill](../.agents/skills/verify-hallvi/SKILL.md)

@@ -26,6 +26,7 @@ Each of these is linked from the document that owns its decision.
 | [Cleanup scope](cleanup-scope.md) | [Development resources](../development-resources.md#discarding-development-data) |
 | [Where a check belongs, and where it does not](where-coverage-lives.md) | [Testing](../../tests/README.md#the-8020-bar) |
 | [Select tests by the behavior they protect](test-selection.md) | [Testing](../../tests/README.md#the-8020-bar) |
+| [Architecture learning and saved progress](../development.md#learn-the-current-architecture) | [Development](../development.md) |
 | [What counts as published](publishing-evidence.html) | [Architecture](../architecture.md#publishing-at-a-domain) |
 | [What a record is allowed to claim](recovery-claims.html) | [Presentation contract](../presentation-contract.md) |
 | [Wording that outruns its record](wording-and-records.html) | [Presentation contract](../presentation-contract.md) |

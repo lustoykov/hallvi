@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
+| [AF-003 — Keep architecture explanations in step with code](#af-003--keep-architecture-explanations-in-step-with-code) | 1 | New |
 
 ## How to contribute
 
@@ -68,3 +69,13 @@ only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+
+### AF-003 — Keep architecture explanations in step with code
+
+I want architecture and domain explanations reviewed alongside behavior
+changes. The overview diagram and tools paragraph disagreed about the tool
+count, and both lagged the registered tools. The learning view now makes this
+drift visible; extracting documentation cannot establish that it is current.
+The stale counts were removed in this task.
+
+**+1:** 2026-09-29 — `codex/architecture-learning`

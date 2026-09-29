@@ -26,7 +26,7 @@ flowchart TD
     API --> DB[(SQLite: applications, conversations,<br/>saved information)]
     API -->|worker.sock: send, continue, stop, read| Worker
     Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] --> DB
-    Worker --> Tools[Twenty tools]
+    Worker --> Tools[Operator tools]
     Tools --> Host[Application server over SSH]
     Tools --> Providers[Hetzner, Cloudflare, GitHub, object storage]
     Tools -->|save_information| DB
@@ -76,7 +76,7 @@ output is large and append-only. And local diagnostics, under `diagnostics/`.
 
 ## What Pi can do
 
-Twenty-three tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
+Tools are registered in [pi.ts](../src/server/pi.ts). There is no workflow
 engine behind them: Pi reads the repository, decides what to do and does it,
 and the tools are the only things that can reach outside.
 

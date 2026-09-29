@@ -1,6 +1,6 @@
 ---
 name: Hallvi testing dashboard
-description: Desktop-only local developer checks and a review queue for saved live eval answers.
+description: Local developer checks, saved eval review, and source-based architecture learning.
 colors:
   blue: "#285ad8"
   blue-deep: "#204ab5"
@@ -30,6 +30,7 @@ rounded:
   control: "7px"
   chip: "5px"
   card: "12px"
+  surface: "10px"
   row: "6px"
 components:
   button-primary: { backgroundColor: "{colors.blue}", textColor: "{colors.surface}", rounded: "{rounded.control}", padding: "7px 14px" }
@@ -43,17 +44,25 @@ components:
 
 This document applies only to the loopback developer dashboard in `tests/dashboard/`, not the Hallvi product UI. It is an Operate surface: an engineer runs fixed checks and grades saved answers, so scanability and a fast review loop outrank expression. Implementation authority: [styles](dashboard.css), [markup](dashboard.html), and [behavior](dashboard.js).
 
+Learn Hallvi (`/learn`) extends that same world with a Read and Operate destination for understanding the checkout. Its [page](learning-page.ts), [styles](learning.css), [interactions](learning.js) and [source/progress model](learning.ts) own the learning-specific details below. It reads repository sources and writes only local learning progress; it does not operate Hallvi applications or establish runtime health.
+
 ## Colors
 
 Blue marks primary actions, links, the selected tab, the open run/answer, and keyboard focus. Ink and muted text set hierarchy on paper, panel and white surfaces; shell navy anchors the topbar. Verdicts use one vocabulary everywhere: green pass, red fail, amber needs-discussion, and a dashed outline for "to review". A human verdict is a filled chip; LLM advice is the same color as an outline-only chip, so advisory output never looks like sign-off. Automatic outcomes reuse green/red for checks passed/failed.
+
+Learning reuses blue for selected topics, map components, connected edges and answers. Learned status is green; changed material is blue; other learning statuses stay muted. Grading adds the existing green/red fills to correct/incorrect options and an explicit result sentence, so color never carries the answer alone.
 
 ## Typography
 
 System stack only. UI chrome runs at 14px, labels and chips at 12px, and the material a reviewer reads (rubric, engineer message, answer, advice) at 15px with a 78ch measure. Section titles are 20px; the open answer's title is 20px so the case name, not the run, is the largest thing on screen. Tabular numerals throughout.
 
+Learning keeps this stack and quiet metadata. The question and its definition lead the reading hierarchy; explanations and concept descriptions keep a bounded measure. Source paths use the existing monospace treatment where rendered as code, and long paths wrap rather than widen the page.
+
 ## Layout
 
-Desktop only: a 56px navy topbar: the brand as a home link with a small uppercase "Testing" tag, a hairline divider, the page switch (Run checks / Eval runs / How it works as pill links, the current one on a translucent background, with an amber count of answers needing attention), then on the right the local origin in muted tabular figures, the Acceptance guide (rendered in the same shell at `/guide`, underlined when current) and the external Open app link with a small arrow icon and a hidden new-tab hint; centered content (1440px maximum), 36px side padding. Each page opens with its h1 and a one-line description. Run checks is a suite table, then a recent-runs list with an inline output panel. How it works (`/about`) is a Read page: one comparison table across the four suites (rows are the guide's fields, columns the suites), then the AI-usage notes and the file map, with no disclosures. Review is a two-column grid: a 380px sidebar (runs, then the open run's answer queue) and a flexible main column holding the run panel (tinted, with the run's actions and triage bar) above one white answer card, so run-level and answer-level controls never sit on the same surface. The sidebar is sized to the viewport space below the page heading and sticks while the page scrolls; it scrolls in two regions, runs (capped near a third of the viewport) and the answer queue (the remaining height), so nothing runs below the fold and the open answer stays in view while browsing the queue. The answer header wraps long titles without overlapping Previous/Next; longer evidence uses the page scroll. There is no mobile layout contract.
+Desktop baseline: a 56px navy topbar: the brand as a home link with a small uppercase "Testing" tag, a hairline divider, the page switch (Run checks / Eval runs / How it works and the other destinations, including Learn Hallvi, as pill links, the current one on a translucent background, with an amber count of answers needing attention), then on the right the local origin in muted tabular figures, the Acceptance guide (rendered in the same shell at `/guide`, underlined when current) and the external Open app link with a small arrow icon and a hidden new-tab hint; centered content (1440px maximum), 36px side padding. Each page opens with its h1 and a one-line description. Run checks is a suite table, then a recent-runs list with an inline output panel. How it works (`/about`) is a Read page: one comparison table across the four suites (rows are the guide's fields, columns the suites), then the AI-usage notes and the file map, with no disclosures. Review is a two-column grid: a 380px sidebar (runs, then the open run's answer queue) and a flexible main column holding the run panel (tinted, with the run's actions and triage bar) above one white answer card, so run-level and answer-level controls never sit on the same surface. The sidebar is sized to the viewport space below the page heading and sticks while the page scrolls; it scrolls in two regions, runs (capped near a third of the viewport) and the answer queue (the remaining height), so nothing runs below the fold and the open answer stays in view while browsing the queue. The answer header wraps long titles without overlapping Previous/Next; longer evidence uses the page scroll. Check-running and eval-review flows have no mobile layout contract.
+
+Learn Hallvi is the responsive exception. Its Architecture / Quiz / Your progress links sit below the heading and checkout identity, opposite source freshness. Architecture places the map above a flat list of topic disclosures. Quiz uses a 260px topic queue and one flexible question column with a 40px gap. At 760px and below, headings and toolbars stack, side padding becomes 18px, and a labeled native Topic select replaces the queue. Question actions wrap without losing their order. The map keeps readable node labels inside its own horizontal scroll region; its connection details stack below it. History summaries wrap their title, state and date. On the learning and local-source routes, the shell can wrap at laptop widths; on narrow screens its page navigation occupies a horizontally scrollable row. These accommodations do not extend the learning layout contract to other dashboard flows.
 
 ## Elevation & Depth
 
@@ -62,6 +71,8 @@ Flat surfaces: borders and tonal fills, no shadows, except a faint offset shadow
 ## Shapes
 
 Cards, the answer card and dialogs use 12px radii; controls 7px; chips 5px; queue rows 6px. Segmented verdict controls are one bordered pill divided by hairlines.
+
+The existing report surface, also used for the learning map and question, has a 10px radius. Learning answer options and map nodes use the control radius. Topic and history disclosures remain flat rows separated by hairlines.
 
 ## Components
 
@@ -80,6 +91,16 @@ Cards, the answer card and dialogs use 12px radii; controls 7px; chips 5px; queu
 - Pickers: suite scope selection uses native dialogs with one-column checklists, a scrollable body and a visible footer; closing keeps selections. Eval cases have searchable, collapsible categories; a tri-state checkbox beside each category name selects that group's visible cases without expanding it, and rows carry compact names plus their last outcome and date (Failed, Needs review, Not judged, LLM-cleared or Human pass, with "rubric changed" when today's wording differs); expected behavior and input sit behind a disclosure. Only cases without a saved attempt are selected by default, including archived history; skipped or merely planned cases remain unrun. Polling updates this default until the user makes a manual selection; Select unrun restores it. Select failed last time and Select rubric changed are the other presets; each carries its count and is disabled at zero. Categories containing unrun cases start expanded. Eval repetitions default to one, with 2–5 available explicitly.
 - Single-case rerun: "Run case again…" sits under the answer title, separate from the saved-answer judge. It always runs once, using current code/case definitions in a new run with fresh spending consent. Original answers and verdicts stay intact. Cases that failed before replying can rerun; a removed case has a disabled button and explanation.
 
+### Learn Hallvi
+
+- Navigation and source identity: `/learn` opens Architecture, with hash links for Quiz and Your progress and `aria-current` on the selected view. The heading shows Start learning or Continue learning outside Quiz; Quiz reserves the primary action for the current question. Branch, short revision and a local-source-edits marker identify the checkout; the path is available on the identity line. A visible checked time reports source refresh, not a claim that documentation matches the running application.
+- Source transparency: the map links to `docs/architecture.md`, and each concept/question links to the current local file and line, including uncommitted edits. The source reader numbers lines, highlights the linked line and preserves a route back to Learn Hallvi. "How this stays current" explains the five-second visible-page refresh, canonical sources, no model calls, and the machine-local progress location shared by this repository's worktrees. A changed definition, tool description or table field list can create a new question version; contributors still own documentation accuracy. Planned concepts retain the qualifications in their source.
+- Architecture map: selectable nodes expose their pressed state and highlight their incoming/outgoing edges. Connection names appear in text below the diagram as "Receives from" and "Connects to"; selecting one selects that component. Labels wrap to fit the node interior, and node height accommodates the longest label. Tab reaches the scroll region and each node; Enter and Space select a node, with focus retained on that node after redraw. The connection details announce changes politely.
+- Concept list: searchable, native topic disclosures show learned/total counts and one Learn this topic action. Definitions and explanations remain readable without starting a quiz. Every concept carries a source link and a text status. Search reveals matching topics and gives an explicit empty result.
+- Single-question loop: a topic queue shows due counts and prioritizes changed material. Learned and archived questions leave that queue. Native radio options support one answer, with Check answer as the single primary action; Later and Archive question are quiet alternatives. Grading then reveals the answer, explanation and source, replaces the action with Next question, and keeps incorrect answers in the queue. Later defers a question within the current session; Archive removes that version until restored or its learned material changes. A completed queue links to the architecture and saved progress.
+- Progress and history: flat disclosures preserve the original question, answer, attempts, last selected answer and completion date. Filters distinguish Learned, Still learning, Archived, and Changed or removed. Earlier versions and removed concepts are labeled as history and cannot be restored into the current quiz; current archived questions offer Restore question. Learning progress stays separate from Hallvi application data and Git-tracked files.
+- Focus and recovery: use the inherited visible blue focus outline, with white focus in the navy shell. Starting a topic or moving to another question focuses its heading; grading focuses the result heading, and a history action retains focus on that row. Result/status messages use live regions. A save is presented as successful only after read-back; a failure focuses the error, preserves saved progress and gives retry guidance. Unavailable or saving states disable answer mutations instead of implying they succeeded.
+
 ## Do's and Don'ts
 
 - "Run new evals only (N)…" is prominent on both Run checks and Eval runs. It uses only case IDs with no saved attempt on this machine (archived runs count), one repetition, and the normal confirmation with automatic judging enabled. With zero eligible cases it gives way to a status line ("All N cases have a saved answer"); it never falls back to the full suite. Choose cases remains available for explicit reruns. This is history-based, not a diff of case revisions or a branch comparison.
@@ -87,7 +108,9 @@ Cards, the answer card and dialogs use 12px radii; controls 7px; chips 5px; queu
 - Do keep human verdict, LLM advice and automatic checks separately labeled and differently styled.
 - Do keep the queue on the left, one answer on the right, and the verdict at the bottom of the card; the queue scrolls inside the sticky sidebar so the open answer stays in view.
 - Do state costs next to paid actions; reading and grading spend nothing.
-- Don't add a mobile layout, a new visual identity, or product-wide design rules from this tool.
+- Do keep learning source identity, freshness and source links visible, and distinguish documented knowledge from runtime verification.
+- Do keep one primary action in the quiz and retain the original content of earlier question versions in history.
+- Don't extend the learning-only responsive exception into a new mobile contract for check-running or eval-review flows, a new visual identity, or product-wide design rules.
 - Don't default the verdict control; a saved verdict must be an explicit choice.
 
 ## Development and Releases
