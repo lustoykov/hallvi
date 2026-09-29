@@ -1,6 +1,9 @@
 import { handle } from "@/server/http";
 import { chatSnapshot } from "@/server/pi-conversation";
 import { assertSameOrigin } from "@/server/schemas";
+import { loadChat } from "@/server/applications";
+import { subscribeChanges } from "@/server/change-notifications";
+import { invalidateExecutionReads } from "@/server/operator-execution";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,56 +15,111 @@ export async function GET(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
-    let latest = JSON.stringify(await chatSnapshot(applicationId, chatId));
-    let timer: ReturnType<typeof setInterval> | undefined;
+    await loadChat(applicationId, chatId);
+    let latest = "";
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let closed = false;
-    let close: () => void = () => {};
+    let reading = false;
+    let lastReadAt = 0;
+    let generation = 0;
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const encoder = new TextEncoder();
     const clean = () => {
       closed = true;
-      clearInterval(timer);
+      clearTimeout(timer);
       clearInterval(heartbeat);
+      subscription.close();
       request.signal.removeEventListener("abort", close);
     };
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        close = () => {
-          if (!closed) {
-            clean();
-            controller.close();
-          }
-        };
-        request.signal.addEventListener("abort", close, { once: true });
-        if (request.signal.aborted) {
+    const close = () => {
+      if (closed) return;
+      clean();
+      controller?.close();
+    };
+    const send = (text: string) => {
+      if (closed || !controller) return;
+      // Keep at most the current frame. A stalled reader reconnects for full
+      // state instead of retaining every snapshot in an unbounded queue.
+      if ((controller.desiredSize ?? 0) <= 0) {
+        close();
+        return;
+      }
+      controller.enqueue(encoder.encode(text));
+    };
+    const schedule = () => {
+      if (closed || reading || timer || !controller) return;
+      // A short leading delay batches one mutation's notices; sustained
+      // output never rebuilds a long history faster than the former 500ms poll.
+      timer = setTimeout(
+        () => {
+          timer = undefined;
+          void refresh();
+        },
+        Math.max(100, 500 - (Date.now() - lastReadAt)),
+      );
+    };
+    const refresh = async () => {
+      reading = true;
+      lastReadAt = Date.now();
+      const at = generation;
+      try {
+        const next = JSON.stringify(await chatSnapshot(applicationId, chatId));
+        if (next !== latest) {
+          latest = next;
+          send(`data: ${next}\n\n`);
+        }
+      } catch {
+        close();
+      } finally {
+        reading = false;
+        // A notification arriving during an async read must survive it.
+        if (generation !== at) schedule();
+      }
+    };
+    const subscription = subscribeChanges(
+      { applicationId, chatId },
+      (notice) => {
+        if (notice.kind === "error") {
           close();
+          return;
+        }
+        if (notice.kind === "execution" || notice.kind === "connection")
+          invalidateExecutionReads(applicationId);
+        generation++;
+        schedule();
+      },
+    );
+    request.signal.addEventListener("abort", close, { once: true });
+    let initialGeneration: number;
+    try {
+      // Register first, then read. An initial failure to connect still allows
+      // the existing worker-unavailable snapshot; reconnect reads again.
+      await subscription.ready;
+      request.signal.throwIfAborted();
+      // Another chat may have kept the shared connection alive while this
+      // reader was away. Never join its abandoned pre-disconnect scan.
+      invalidateExecutionReads(applicationId);
+      initialGeneration = generation;
+      lastReadAt = Date.now();
+      latest = JSON.stringify(await chatSnapshot(applicationId, chatId));
+    } catch (error) {
+      clean();
+      throw error;
+    }
+    const stream = new ReadableStream<Uint8Array>({
+      start(opened) {
+        controller = opened;
+        if (closed || request.signal.aborted) {
+          clean();
+          opened.close();
           return;
         }
         // Reconnect always starts with authoritative latest state; no token
         // history, cursor retention, or missed frame can lose an accepted run.
-        controller.enqueue(encoder.encode(`data: ${latest}\n\n`));
-        let reading = false;
-        timer = setInterval(async () => {
-          if (reading) return;
-          reading = true;
-          try {
-            const next = JSON.stringify(
-              await chatSnapshot(applicationId, chatId),
-            );
-            if (next !== latest && !closed) {
-              latest = next;
-              controller.enqueue(encoder.encode(`data: ${next}\n\n`));
-            }
-          } catch {
-            close();
-          } finally {
-            reading = false;
-          }
-        }, 500);
-        heartbeat = setInterval(
-          () => controller.enqueue(encoder.encode(": keep-alive\n\n")),
-          15_000,
-        );
+        send(`data: ${latest}\n\n`);
+        if (generation !== initialGeneration) schedule();
+        heartbeat = setInterval(() => send(": keep-alive\n\n"), 15_000);
       },
       cancel: clean,
     });

@@ -13,6 +13,6 @@ export function POST(
       z.object({ approved: z.boolean() }),
     );
     const { applicationId, executionId } = await context.params;
-    return decideExecution(applicationId, executionId, approved);
+    return await decideExecution(applicationId, executionId, approved);
   });
 }

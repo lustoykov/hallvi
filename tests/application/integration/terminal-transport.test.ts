@@ -2,8 +2,23 @@
 // here asserts that a rejected attach leaves no session — the ssh child is the
 // thing that must never exist for an unauthorized caller.
 
-import { afterAll, expect, it } from "vitest";
+import { once } from "node:events";
+import { setImmediate as turn } from "node:timers/promises";
+import { afterAll, expect, it, vi } from "vitest";
 import WebSocket from "ws";
+import type { OperatorSettings } from "@/server/operator-data";
+
+const pending = vi.hoisted(() => ({
+  settings: vi.fn<() => Promise<OperatorSettings>>(async () => ({
+    host: null,
+    permissionMode: "pi-decides",
+  })),
+  spawn: vi.fn(),
+}));
+vi.mock("@/server/operator-execution", () => ({
+  operatorSettings: pending.settings,
+}));
+vi.mock("node-pty", () => ({ spawn: pending.spawn }));
 
 import {
   issueTerminalTicket,
@@ -117,4 +132,42 @@ it("serves nothing but the terminal path", async () => {
   );
   expect(answer.ok).toBe(false);
   expect(answer.status).toBe(404);
+});
+
+it("starts no shell when the socket closes while its database read is waiting", async () => {
+  let release!: (settings: OperatorSettings) => void;
+  let reading!: () => void;
+  const started = new Promise<void>((done) => {
+    reading = done;
+  });
+  pending.settings.mockImplementationOnce(() => {
+    reading();
+    return new Promise((done) => {
+      release = done;
+    });
+  });
+  const { ticket, port } = await issueTerminalTicket({
+    applicationId: APPLICATION,
+    origin: ORIGIN,
+    size,
+  });
+  await attach(`ws://127.0.0.1:${port}/terminal?ticket=${ticket}`, ORIGIN);
+  await started;
+  const socket = open.at(-1)!;
+  const closed = once(socket, "close");
+  socket.close();
+  await closed;
+  release({
+    permissionMode: "pi-decides",
+    host: {
+      address: "fixture.invalid",
+      user: "root",
+      port: 22,
+      privateKeyPath: "/fixture/key",
+      knownHostsPath: "/fixture/hosts",
+    },
+  });
+  await turn();
+  expect(pending.spawn).not.toHaveBeenCalled();
+  expect(await terminalSessionCount()).toBe(0);
 });

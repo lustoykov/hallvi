@@ -70,6 +70,7 @@ test("server output streams inline, preserves reading position and stays readabl
     record = { ...record, ...next };
     writeFileSync(`${path}.tmp`, JSON.stringify(record));
     renameSync(`${path}.tmp`, path);
+    closeWorker.changed({ kind: "execution", applicationId: appId });
   }
   try {
     // A command earns a card once there is output to watch.

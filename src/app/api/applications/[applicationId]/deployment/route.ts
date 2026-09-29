@@ -26,9 +26,9 @@ export async function GET(
   context: { params: Promise<{ applicationId: string }> },
 ) {
   const { applicationId } = await context.params;
-  return handle(() => {
-    loadApplication(applicationId);
-    return deploymentStatus(applicationId);
+  return handle(async () => {
+    await loadApplication(applicationId);
+    return await deploymentStatus(applicationId);
   });
 }
 
@@ -44,7 +44,7 @@ export async function POST(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId } = await context.params;
-    loadApplication(applicationId);
+    await loadApplication(applicationId);
     const message = await parseJsonRequest(request, action);
     return askWorker("deployment", { scope: { applicationId }, message });
   });

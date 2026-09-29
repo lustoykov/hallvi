@@ -9,6 +9,7 @@ import { realpathSync, rmSync } from "node:fs";
 import { request, createServer, type Server } from "node:http";
 import { workerSocketPath } from "../../scripts/worker-socket.mjs";
 import { databasePath } from "./db";
+import { ownChangeNotifications } from "./change-notifications";
 
 const socketPath = () => workerSocketPath(databasePath());
 
@@ -101,7 +102,7 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
  */
 export async function serveWorker(
   handle: (action: string, body: unknown) => Promise<unknown>,
-  owned?: () => void,
+  owned?: () => void | Promise<void>,
 ): Promise<{ server: Server; release: () => void } | null> {
   const lock = new Database(`${realpathSync(databasePath())}.worker-lock`, {
     timeout: 0,
@@ -112,9 +113,19 @@ export async function serveWorker(
     lock.close();
     return null;
   }
+  const changes = ownChangeNotifications();
+  try {
+    // Recovery is part of taking ownership, before any request can arrive.
+    await owned?.();
+  } catch (error) {
+    changes.close();
+    lock.close();
+    throw error;
+  }
   const path = socketPath();
   rmSync(path, { force: true });
   const server = createServer((incoming, outgoing) => {
+    if (changes.handle(incoming, outgoing)) return;
     let text = "";
     incoming.setEncoding("utf8");
     incoming.on("data", (chunk) => (text += chunk));
@@ -144,6 +155,7 @@ export async function serveWorker(
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", (error) => {
+      changes.close();
       lock.close();
       reject(error);
     });
@@ -151,11 +163,16 @@ export async function serveWorker(
     const mask = process.umask(0o177);
     server.listen(path, () => {
       process.umask(mask);
-      owned?.();
       resolve();
     });
   });
   // The lock is referenced from what is returned, so it is not collected
   // while this process is the owner.
-  return { server, release: () => lock.close() };
+  return {
+    server,
+    release: () => {
+      changes.close();
+      lock.close();
+    },
+  };
 }

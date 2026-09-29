@@ -88,7 +88,7 @@ export async function openServerPort(
 ) {
   const parsed = optionsSchema.parse(options);
   const { remotePort } = parsed;
-  const host = operatorSettings(applicationId).host;
+  const host = (await operatorSettings(applicationId)).host;
   if (!host) throw new Error("Connect a server before opening private access.");
   signal?.throwIfAborted();
   mkdirSync(`/tmp/hallvi-ssh-${process.getuid!()}`, {
@@ -221,7 +221,7 @@ export async function privateAccessOpen(
   remotePort: number,
   localPort: number,
 ) {
-  const host = operatorSettings(applicationId).host;
+  const host = (await operatorSettings(applicationId)).host;
   if (!host) return false;
   return masterAlive(
     controlSocket(applicationId, host, remotePort, localPort),

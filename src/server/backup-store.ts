@@ -72,7 +72,7 @@ export async function fetchBackupCopy(
   input: z.input<typeof optionsSchema>,
 ) {
   const { remotePath, covers } = optionsSchema.parse(input);
-  const host = operatorSettings(applicationId).host;
+  const host = (await operatorSettings(applicationId)).host;
   if (!host)
     throw new Error("Connect a server before copying anything off it.");
 

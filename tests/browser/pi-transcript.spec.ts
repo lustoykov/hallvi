@@ -62,8 +62,10 @@ test("Pi text stays once in order through completion and reload @journey-streami
     const text = await message.innerText();
     expect(text.indexOf("package.json")).toBeLessThan(text.indexOf(body));
     said = true;
+    closeWorker.changed({ kind: "chat", applicationId: appId, chatId });
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
     status = "completed";
+    closeWorker.changed({ kind: "chat", applicationId: appId, chatId });
     await page.reload();
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
     await expect(group).toBeVisible();
