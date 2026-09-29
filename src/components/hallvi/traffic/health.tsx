@@ -15,6 +15,7 @@ import {
   errorsHitVisitors,
   milliseconds,
   plural,
+  todayCovered,
 } from "./model";
 
 export function Errors({
@@ -50,7 +51,7 @@ export function Errors({
     : split
       ? split.todayHit
         ? `${plural(split.today, "server error")} today, hitting about ${plural(history.totals.errorVisitors, "visitor")}.${split.earlier ? ` ${count(split.earlier)} more before midnight.` : ""}`
-        : `${plural(split.earlier, "server error")} before midnight reached visitors; none has today.`
+        : `${plural(split.earlier, "server error")} before midnight reached visitors; ${todayCovered(history) ? "none has today" : "today has not been counted yet"}.`
       : !worst
         ? `${plural(history.totals.errors, "server error")}, hitting about ${plural(history.totals.errorVisitors, "visitor")}.`
         : `${plural(history.totals.errors, "server error")} reached visitors on ${plural(days.length, "day")}, most ${worst === history.series.at(-1) ? "today" : `on ${new Date(worst.at).toLocaleDateString("en-GB", { weekday: "long", timeZone: history.timeZone })}`} (about ${plural(worst.errorVisitors, "visitor")}).`;
@@ -84,7 +85,10 @@ export function Errors({
           In the browser, Hallvi&apos;s script counted JavaScript errors on{" "}
           {script
             .slice(0, 3)
-            .map((row) => `${row.path} (${count(row.count)})`)
+            .map(
+              (row) =>
+                `${row.path} (${atLeast(count(row.count), history.partialLists.includes("scriptErrors"))})`,
+            )
             .join(", ")}
           .
         </p>

@@ -226,6 +226,33 @@ describe("a range", () => {
     );
     expect(history.partialLists).toEqual(["pages"]);
     expect(history.sources[0].count).toBe(12);
+    expect(history.partialSamples).toEqual([]);
+    expect(history.totals.visitorsAtLeast).toBe(false);
+
+    // A day put together from two partial counts: its figures that are not
+    // hourly are floors, or samples, however complete its lists look.
+    const parts = historyOf(
+      [
+        stored("2026-09-28", {
+          visitors: 4,
+          sources: [{ key: "Direct", count: 5, visitors: 4 }],
+          scriptErrors: [{ path: "/", count: 2 }],
+          engagement: [{ path: "/", ms: 10_000, samples: 1 }],
+          partial: ["visitors", "sources", "scriptErrors", "engagement"],
+        }),
+        stored("2026-09-29", { visitors: 6 }),
+      ],
+      "7d",
+      local("2026-09-29", 12),
+      collection,
+      ZONE,
+    );
+    expect(parts.partialLists).toEqual(["sources", "scriptErrors"]);
+    expect(parts.partialSamples).toEqual(["engagement"]);
+    expect(parts.totals.visitorsAtLeast).toBe(true);
+    expect(
+      parts.series.map((point) => [point.visitors, point.visitorsAtLeast]),
+    ).toEqual([...Array(5).fill([0, false]), [4, true], [6, false]]);
   });
 
   it("draws the last 24 hours across midnight, with today's visitors, and a gap as a gap", () => {

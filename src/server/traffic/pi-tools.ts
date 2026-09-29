@@ -20,8 +20,10 @@ import {
   type Collection,
   type Gap,
   type Ranked,
+  type RangeTotals,
   type ReleaseImpact,
   type TrafficHistory,
+  type TrafficList,
   type TrafficRange,
 } from "./contract";
 import { currentCollection } from "./collection";
@@ -69,7 +71,7 @@ const STATE_WORDS: Record<Collection["state"], string> = {
 };
 
 /** What each list counts, beside distinct browsers. */
-const LIST_COUNTS: Record<ListName, string> = {
+const LIST_COUNTS: Record<TrafficList, string> = {
   pages: "page views",
   sources: "page views arriving from the source",
   campaigns: "page views arriving from the campaign",
@@ -81,17 +83,6 @@ const LIST_COUNTS: Record<ListName, string> = {
   goals: "goal events",
   bots: "bot and scanner requests",
 };
-type ListName =
-  | "pages"
-  | "sources"
-  | "campaigns"
-  | "countries"
-  | "devices"
-  | "browsers"
-  | "systems"
-  | "errors"
-  | "goals"
-  | "bots";
 
 /** The top of a list, the rest folded into `(other)`, as compact rows. */
 function top(list: Ranked[]) {
@@ -114,18 +105,27 @@ function top(list: Ranked[]) {
   );
 }
 
+/**
+ * A figure that is only a floor says so itself, "at least 10000", so that
+ * no reading can quote it as exact.
+ */
+const floor = (value: number | null, atLeast: boolean) =>
+  value !== null && atLeast ? `at least ${value}` : value;
+
 function totalsOf(
-  totals: Omit<TrafficHistory["totals"], "visitorsPer">,
+  totals: Omit<RangeTotals, "visitorsPer" | "visitorsAtLeast"> &
+    Partial<Pick<RangeTotals, "visitorsAtLeast">>,
   visitors: string,
 ) {
+  const partial = Boolean(totals.visitorsAtLeast);
   return {
     requests: totals.requests,
     pageViews: totals.views,
     errors5xx: totals.errors,
     botRequests: totals.bots,
-    p95ResponseMs: totals.p95Ms,
-    [visitors]: totals.visitors,
-    [`${visitors}HitByErrors`]: totals.errorVisitors,
+    p95ResponseMs: floor(totals.p95Ms, totals.p95AtLeast),
+    [visitors]: floor(totals.visitors, partial),
+    [`${visitors}HitByErrors`]: floor(totals.errorVisitors, partial),
   };
 }
 
@@ -200,12 +200,26 @@ export function trafficReading(
     );
   if (releases.length)
     notes.push(
-      `Release windows compare ${RELEASE_WINDOW} minutes before with ${RELEASE_WINDOW} after; their visitor figures are hourly estimates added together, so they can overstate.`,
+      `Each release compares the whole stored hours in its compared.before with those in compared.after, ${RELEASE_WINDOW} minutes each; the hour the release fell in is in neither, so quote those times, not the release's own. Their visitor figures are hourly estimates added together, so they can overstate.`,
+    );
+  if (
+    history.totals.visitorsAtLeast ||
+    history.series.some((point) => point.visitorsAtLeast || point.p95AtLeast) ||
+    history.totals.p95AtLeast ||
+    history.partialLists.length ||
+    history.vitals.some((row) => row.atLeast)
+  )
+    notes.push(
+      'A figure written "at least N" is only a floor, and so is every count of a list marked atLeast: a response time or page speed past the slowest bucket Hallvi keeps, a day kept only its busiest entries, or part of a day was counted apart from the rest once the log no longer held all of it. Say "at least" whenever you quote one.',
+    );
+  if (history.partialSamples.length)
+    notes.push(
+      `${history.partialSamples.map((name) => (name === "engagement" ? "Time on page" : "Page speed")).join(" and ")}: some day's figures come from part of its views only, a sample rather than every view.`,
     );
 
   const lists: Record<string, unknown> = {};
   const empty: string[] = [];
-  for (const name of Object.keys(LIST_COUNTS) as ListName[]) {
+  for (const name of Object.keys(LIST_COUNTS) as TrafficList[]) {
     const list = history[name];
     if (!list.length) {
       empty.push(name);
@@ -218,6 +232,7 @@ export function trafficReading(
         perDay ? "estimated visitors per day" : "estimated visitors today",
       ],
       rows: top(list),
+      ...(history.partialLists.includes(name) && { atLeast: true }),
     };
   }
 
@@ -251,11 +266,11 @@ export function trafficReading(
               Math.round(point.covered * 100) / 100,
               point.requests,
               point.views,
-              point.visitors,
+              floor(point.visitors, point.visitorsAtLeast),
               point.errors,
-              point.errorVisitors,
+              floor(point.errorVisitors, point.visitorsAtLeast),
               point.bots,
-              point.p95Ms,
+              floor(point.p95Ms, point.p95AtLeast),
             ],
       ),
     },
@@ -270,14 +285,19 @@ export function trafficReading(
       pageSpeedP75: history.vitals.map((row) => [
         row.path,
         row.metric,
-        row.p75,
+        floor(row.p75, row.atLeast),
         row.samples,
       ]),
     }),
     ...(history.scriptErrors.length > 0 && {
-      javascriptErrors: history.scriptErrors
-        .slice(0, LISTED)
-        .map((row) => [row.path, row.count]),
+      javascriptErrors: {
+        rows: history.scriptErrors
+          .slice(0, LISTED)
+          .map((row) => [row.path, row.count]),
+        ...(history.partialLists.includes("scriptErrors") && {
+          atLeast: true,
+        }),
+      },
     }),
     coverage: {
       from: history.coverage.from,
@@ -291,6 +311,7 @@ export function trafficReading(
     ...(releases.length > 0 && {
       releases: releases.map((impact) => ({
         releaseAt: impact.releaseAt,
+        compared: impact.compared,
         notable: impact.notable,
         covered: Math.round(impact.covered * 100) / 100,
         before: totalsOf(impact.before, "estimatedVisitors"),

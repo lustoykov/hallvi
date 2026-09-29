@@ -96,6 +96,9 @@ A day's numbers are a function of that day's log lines and nothing else.
   it away) is kept; otherwise each hour comes from whichever covers it, with
   that side's gaps, and figures that are not hourly — visitors, lists, time on
   page, page speed — take the larger of the two counts: a floor, never a sum.
+  The day names those figures (`partial`), and every page and Pi read them
+  so: counts as "at least", time on page and page speed as measured on part
+  of the views.
 - **Today** is recounted from the log whenever the collector starts or
   reconnects, then kept current in memory from the follow and written as
   provisional every few seconds. The follow reads exactly the files it
@@ -150,7 +153,11 @@ away, the log was unreadable). Charts draw a gap as a gap, never as zero.
   A percentile past the last bound is only a floor and reads "at least".
 - Top lists are stored per day with up to 1,000 entries and an "other" row,
   so a range merges them exactly — except a list the history names in
-  `partialLists`, whose figures are floors and read "at least".
+  `partialLists` (a day kept only its busiest, or was counted in parts),
+  whose figures are floors and read "at least". A day counted in parts makes
+  its visitor estimate a floor too (`visitorsAtLeast`), and its time on page
+  and page speed a sample (`partialSamples`). Pi's `read_traffic` writes a
+  floor into the figure itself: "at least 10000".
 - Days are cut in the controller's time zone, recorded with each day.
 
 ### The script
@@ -375,7 +382,8 @@ All of it reads stored totals immediately; none of it waits for Pi.
 - **Deployment:** on each release, what changed in the two hours after it
   against the two before, leaving out the hour the release fell in so a
   failure before it is never counted after it — "errors on /checkout 0 → 14, about 9 visitors" —
-  and nothing when nothing changed.
+  and nothing when nothing changed. The hours actually compared travel with
+  it (`compared`), to the line's title, the question it asks and Pi.
 - **Monitoring:** requests, errors and response times from the same totals,
   instead of asking Pi to read a day.
 

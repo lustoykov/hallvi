@@ -30,6 +30,7 @@ import {
   LOG_FORMATS,
   OTHER,
   STORED_PER_LIST,
+  TRAFFIC_LISTS,
   type Collection,
   type Coverage,
   type Gap,
@@ -346,7 +347,7 @@ function largerList(a: Ranked[], b: Ranked[]) {
  *   hourly — visitors, lists, time on page, page speed — cannot be split by
  *   hour, so each is the larger of the two counts, per entry. Each count saw
  *   only part of the day, so that is a floor, never a sum: a browser seen by
- *   both would be counted twice by adding.
+ *   both would be counted twice by adding. The day says so in `partial`.
  */
 export function combined(
   stored: TrafficDay,
@@ -380,18 +381,6 @@ export function combined(
       ? { day: recount, spans: a, from, to }
       : { day: stored, spans: b, from, to };
   });
-  const lists = [
-    "pages",
-    "sources",
-    "campaigns",
-    "countries",
-    "devices",
-    "browsers",
-    "systems",
-    "errors",
-    "goals",
-    "bots",
-  ] as const;
   return {
     ...recount,
     computedAt: now,
@@ -402,7 +391,10 @@ export function combined(
     visitors: Math.max(stored.visitors, recount.visitors),
     errorVisitors: Math.max(stored.errorVisitors, recount.errorVisitors),
     ...Object.fromEntries(
-      lists.map((list) => [list, largerList(stored[list], recount[list])]),
+      TRAFFIC_LISTS.map((list) => [
+        list,
+        largerList(stored[list], recount[list]),
+      ]),
     ),
     browserOnlyPages: Math.max(
       stored.browserOnlyPages,
@@ -426,6 +418,8 @@ export function combined(
       (entry) => entry.path,
       (entry) => entry.count,
     ),
+    // Each of those saw part of the day: say so, wherever they are read.
+    partial: ["visitors", ...TRAFFIC_LISTS, "engagement", "vitals", "scriptErrors"],
   };
 }
 

@@ -377,12 +377,28 @@ export function momentsOf({
 }
 
 /**
+ * The hours a release's line compares, as the owner's clock reads them:
+ * "15:00–17:00 against 12:00–14:00". The hour the release fell in is in
+ * neither.
+ */
+export function comparedWords(impact: ReleaseImpact) {
+  const time = (at: string) =>
+    new Date(at).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  const { before, after } = impact.compared;
+  return `${time(after.from)}–${time(after.to)} against ${time(before.from)}–${time(before.to)}`;
+}
+
+/**
  * The line a release row wears when what followed it is worth saying.
  * Nothing at all when it is not: a quiet release is quiet.
  */
 export function impactLine(impact: ReleaseImpact, now: number) {
   if (!impact.notable) return null;
-  const young = now - Date.parse(impact.releaseAt) < impact.windowMinutes * 6e4;
+  // Still inside the hours it is compared by.
+  const young = now < Date.parse(impact.compared.after.to);
   const lead = young ? "Since this release" : "After this release";
   const [worst, ...rest] = impact.paths;
   const { before, after } = impact;

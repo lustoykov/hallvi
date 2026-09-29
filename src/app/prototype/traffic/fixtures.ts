@@ -751,6 +751,7 @@ function pointOf(hours: Hour[], at: number): SeriesPoint {
     ),
     errors: sum(hours, "errors"),
     errorVisitors: sum(hours, "errorVisitors"),
+    visitorsAtLeast: false,
     bots: sum(hours, "bots"),
     p95Ms: timed.length
       ? Math.round(Math.max(...timed.map((hour) => hour.p95)) * 0.92)
@@ -858,6 +859,7 @@ function rangeOf(
               )
             : 0,
       visitorsPer: range === "24h" ? ("today" as const) : ("day" as const),
+      visitorsAtLeast: false,
     },
     today,
   };
@@ -937,6 +939,7 @@ export function historyOf(
     errors,
     goals: script ? lists(scenario.script!.goals).slice(0, 5) : [],
     partialLists: [],
+    partialSamples: [],
     bots: current.totals.bots
       ? spread(
           [

@@ -312,6 +312,29 @@ export const DEVICES = ["desktop", "mobile", "tablet"] as const;
  */
 export const STORED_PER_LIST = 1000;
 
+/** The breakdowns a day stores, each a `Ranked[]`. */
+export const TRAFFIC_LISTS = [
+  "pages",
+  "sources",
+  "campaigns",
+  "countries",
+  "devices",
+  "browsers",
+  "systems",
+  "errors",
+  "goals",
+  "bots",
+] as const;
+export type TrafficList = (typeof TRAFFIC_LISTS)[number];
+
+/** A day's figures that are not kept by the hour. */
+export type DayFigure =
+  | "visitors"
+  | TrafficList
+  | "engagement"
+  | "vitals"
+  | "scriptErrors";
+
 export interface Gap {
   from: string;
   to: string;
@@ -361,6 +384,16 @@ export interface TrafficDay {
   engagement: { path: string; ms: number; samples: number }[];
   vitals: { path: string; metric: VitalName; buckets: number[] }[];
   scriptErrors: { path: string; count: number }[];
+  /**
+   * Figures counted from part of the day only. A finished day is put
+   * together from two counts that each missed part of it when the log no
+   * longer holds all of it (collector.ts, `combined`): its hours are exact,
+   * and each figure here is the larger of the two counts. Counts —
+   * `visitors` (and `errorVisitors`), the lists, `scriptErrors` — are then
+   * floors; `engagement` and `vitals` are from part of the day's views.
+   * Absent or empty: every figure is the whole day's.
+   */
+  partial?: DayFigure[];
 }
 
 // ---------------------------------------------------------------------------
@@ -412,6 +445,11 @@ export interface SeriesPoint {
   visitors: number;
   errors: number;
   errorVisitors: number;
+  /**
+   * The day was counted in parts (`TrafficDay.partial`): `visitors` and
+   * `errorVisitors` are only floors. An hour's never are.
+   */
+  visitorsAtLeast: boolean;
   bots: number;
   /** From the bucket's merged histogram; null with no requests. */
   p95Ms: number | null;
@@ -434,6 +472,11 @@ export interface RangeTotals {
   /** Today's estimate for 24 h; the average per covered day otherwise. */
   visitors: number;
   visitorsPer: "today" | "day";
+  /**
+   * A day behind `visitors` was counted in parts: it and `errorVisitors`
+   * are only floors.
+   */
+  visitorsAtLeast: boolean;
 }
 
 /**
@@ -470,21 +513,17 @@ export interface TrafficHistory {
     samples: number;
   }[];
   /**
-   * Lists a day stored only in part (past `STORED_PER_LIST`), so a range's
-   * figures for them are floors, not exact merges.
+   * Lists whose figures are floors, not exact merges: a day stored the list
+   * only in part (past `STORED_PER_LIST`), or counted it from part of the
+   * day (`TrafficDay.partial`).
    */
-  partialLists: (
-    | "pages"
-    | "sources"
-    | "campaigns"
-    | "countries"
-    | "devices"
-    | "browsers"
-    | "systems"
-    | "errors"
-    | "goals"
-    | "bots"
-  )[];
+  partialLists: (TrafficList | "scriptErrors")[];
+  /**
+   * Time on page and page speed measured on part of some day's views only
+   * (`TrafficDay.partial`): a sample, not every view — neither higher nor
+   * lower for it, but less than the whole.
+   */
+  partialSamples: ("engagement" | "vitals")[];
   scriptErrors: { path: string; count: number }[];
   coverage: Coverage;
   viewSource: "log" | "script" | "switch";
@@ -506,8 +545,9 @@ export interface ReleaseImpact {
     before: { from: string; to: string };
     after: { from: string; to: string };
   };
-  before: Omit<RangeTotals, "visitorsPer">;
-  after: Omit<RangeTotals, "visitorsPer">;
+  /** Hours added up: visitor figures are the hours' estimates summed. */
+  before: Omit<RangeTotals, "visitorsPer" | "visitorsAtLeast">;
+  after: Omit<RangeTotals, "visitorsPer" | "visitorsAtLeast">;
   /** Paths whose errors rose, worst first. */
   paths: {
     path: string;

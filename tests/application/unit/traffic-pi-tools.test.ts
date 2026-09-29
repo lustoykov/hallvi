@@ -11,7 +11,7 @@ import {
   type TrafficDay,
 } from "@/server/traffic/contract";
 import { dayBounds } from "@/server/traffic/days";
-import { historyOf } from "@/server/traffic/merge";
+import { historyOf, releaseImpact } from "@/server/traffic/merge";
 import { caddyKeptField, parseLine } from "@/server/traffic/parse";
 import {
   LOG_SETUP,
@@ -118,6 +118,66 @@ describe("read_traffic", () => {
       "gap: not counted",
     ]);
     expect(reading.notes.join(" ")).toMatch(/Never add days together/);
+  });
+
+  it("keeps every floor a floor, and says which hours a release compared", () => {
+    const slow = new Array<number>(LATENCY_BUCKETS_MS.length + 1).fill(0);
+    slow[LATENCY_BUCKETS_MS.length] = 50;
+    const whole = stored("2026-09-28", 10);
+    // Counted in parts: its visitors, lists and page speed are floors or
+    // samples; one list also kept only its busiest entries on another day.
+    const parts: TrafficDay = {
+      ...stored("2026-09-27", 30),
+      hours: whole.hours.map((one, index) =>
+        index === 15 ? { ...one, requests: 50, latency: slow } : one,
+      ),
+      vitals: [
+        { path: "/", metric: "LCP", buckets: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4] },
+      ],
+      engagement: [{ path: "/", ms: 60_000, samples: 2 }],
+      partial: ["visitors", "pages", "engagement", "vitals"],
+    };
+    const history = historyOf(
+      [parts, whole],
+      "7d",
+      noon("2026-09-29"),
+      collection,
+      ZONE,
+    );
+    const release = releaseImpact(
+      [parts],
+      new Date(dayBounds("2026-09-27", ZONE).start + 14 * HOUR + 20 * 60_000)
+        .toISOString(),
+      120,
+      noon("2026-09-29"),
+    );
+    const reading = trafficReading(history, [release]);
+    expect(reading.totals).toMatchObject({
+      p95ResponseMs: "at least 10000",
+      estimatedVisitorsPerDay: "at least 20",
+    });
+    const row = reading.series.rows.find((one) => one[0] === "2026-09-27");
+    expect(row?.[4]).toBe("at least 30");
+    expect(row?.[8]).toBe("at least 10000");
+    expect(reading.lists.pages).toMatchObject({ atLeast: true });
+    expect(reading.pageSpeedP75).toEqual([["/", "LCP", "at least 10000", 4]]);
+    expect(reading.releases?.[0]).toMatchObject({
+      compared: {
+        before: {
+          from: iso(dayBounds("2026-09-27", ZONE).start + 12 * HOUR),
+          to: iso(dayBounds("2026-09-27", ZONE).start + 14 * HOUR),
+        },
+        after: {
+          from: iso(dayBounds("2026-09-27", ZONE).start + 15 * HOUR),
+          to: iso(dayBounds("2026-09-27", ZONE).start + 17 * HOUR),
+        },
+      },
+      after: { p95ResponseMs: "at least 10000" },
+    });
+    const notes = reading.notes.join(" ");
+    expect(notes).toMatch(/only a floor/);
+    expect(notes).toMatch(/Time on page and Page speed.*part of its views/);
+    expect(notes).toMatch(/compared\.before/);
   });
 
   it("says nothing counted means nobody was counting", () => {

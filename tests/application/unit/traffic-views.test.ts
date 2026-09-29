@@ -9,7 +9,9 @@ import {
   standings,
   visibleSections,
 } from "../../../src/components/hallvi/application-sections";
+import { impactQuestion } from "../../../src/components/hallvi/traffic/release-impact";
 import {
+  comparedWords,
   impactLine,
   isQuiet,
   momentsOf,
@@ -51,6 +53,7 @@ const day = (ago: number, visitors: number, covered = 1): SeriesPoint => ({
   visitors,
   errors: 0,
   errorVisitors: 0,
+  visitorsAtLeast: false,
   bots: 0,
   p95Ms: 200,
   p95AtLeast: false,
@@ -286,5 +289,27 @@ describe("a release's line in Deployment", () => {
       tone: "bad",
       says: "After this release: errors on /checkout 0 → 14, about 9 visitors",
     });
+  });
+
+  it("goes by the hours it compared, not the release's own time", () => {
+    // A release at 12:20: 11:00–13:00 was compared with 13:00 onwards, and
+    // at 15:00 the hours after it are not over yet.
+    const late = (hour: number) =>
+      new Date(Date.parse("2026-09-29T00:00:00.000Z") + hour * 3_600_000)
+        .toISOString();
+    const straddling = impact({
+      releaseAt: late(12.3333),
+      compared: {
+        before: { from: late(10), to: late(12) },
+        after: { from: late(13), to: late(15.5) },
+      },
+      notable: true,
+      before: { ...impact({}).before, errors: 1 },
+      after: { ...impact({}).after, errors: 9, errorVisitors: 3 },
+    });
+    expect(impactLine(straddling, NOW)?.says).toMatch(/^Since this release/);
+    const words = comparedWords(straddling);
+    expect(words).toMatch(/^\d\d:\d\d–\d\d:\d\d against \d\d:\d\d–\d\d:\d\d$/);
+    expect(impactQuestion(straddling, NOW)).toContain(`(${words})`);
   });
 });
