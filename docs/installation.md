@@ -495,9 +495,15 @@ the same "Dev" chip. The installed Hallvi has none of these.
 
 ## Limits today
 
-- The [first signed alpha release](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1)
-  is published. External-user installation and deployment acceptance on that
-  exact release remains open; see [the roadmap](../ROADMAP.md#public-self-service-beta-preparation).
+- [Alpha.11](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.11)
+  passed native clean-install and upgrade checks on both supported platforms, and
+  the existing Mac mini installation upgraded with its retained records intact.
+  A fresh isolated account completed ChatGPT sign-in, public-repository inspection
+  and manual deployment on a real host, with API behavior checked. Chrome returned
+  `ERR_BLOCKED_BY_CLIENT` when opening that private route, so complete fresh-user
+  browser acceptance and independent external onboarding remain unverified. See
+  [release acceptance](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065) and
+  [the roadmap](../ROADMAP.md#public-self-service-beta-preparation).
 - A first installation trusts github.com over HTTPS for the installer script.
   The script carries the public release key and checks the signed manifest.
   On stock macOS the signature check runs after unpacking with Node.js from

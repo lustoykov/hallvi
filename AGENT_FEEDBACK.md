@@ -11,6 +11,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
+| [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -165,6 +166,17 @@ and port the tests. Naming one branch as the owner of a review's findings, or
 noting on the other which findings are taken, would save that merge.
 
 **+1:** 2026-09-29 — traffic follow-up (`claude/traffic-v1-followup`)
+
+### AF-024 — Explain local leftovers after Forget
+
+In the release rehearsal, forgetting the idle test application removed its
+registration and history but left its managed SSH tunnel and application-specific
+operator configuration on the controller. Cleanup needed a separate exact-process
+and exact-directory check. I would like Forget to explain those retained local
+resources and provide a clear scoped cleanup path. This is not a request to delete
+remote deployments or shared credentials automatically.
+
+**+1:** 2026-09-30 — factory coordinator, task `01a0e897-125b-7fb2-82c5-0da106e25ea1`
 
 ## Archive
 
