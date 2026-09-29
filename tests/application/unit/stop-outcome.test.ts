@@ -1,7 +1,7 @@
 // What stopping actually did.
 //
 // Stopping ends the reply; it does not undo the work. Status alone does not
-// prove a command reached the server. The existing tool evidence keeps its results and gaps.
+// prove a command reached the server. Tool evidence keeps results and gaps.
 
 import { describe, expect, it } from "vitest";
 
