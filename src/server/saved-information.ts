@@ -2,6 +2,8 @@ import { readExecution } from "./operator-execution";
 import { getApplication, saveInformationRow } from "./db";
 import { informationInputSchema } from "./operator-data";
 import { requireReadableRecord } from "./record-contract";
+import { redactHeldSecrets } from "./application-secrets";
+import { redactSecrets } from "./secrets";
 export { listInformation, retireInformation } from "./db";
 
 export async function saveInformation(
@@ -12,6 +14,13 @@ export async function saveInformation(
   if (!(await getApplication(applicationId)))
     throw new Error("Application not found.");
   const value = informationInputSchema.parse(input);
+  // A saved account of a problem can quote tool output or owner-supplied
+  // evidence. Keep its prose safe before persistence and before the save
+  // result is handed back to Pi to repeat in a copyable reply.
+  const clean = (text: string) =>
+    redactSecrets(redactHeldSecrets(applicationId, text)).text;
+  value.title = informationInputSchema.shape.title.parse(clean(value.title));
+  value.body = informationInputSchema.shape.body.parse(clean(value.body));
   // Shape is Zod's; readability is the contract's. A record that parses but
   // cannot be drawn is refused here with what to change, so Pi corrects it
   // in the same turn rather than the page rendering a lie later.
