@@ -117,6 +117,7 @@ that sets `launchOptions.executablePath`. An environment variable read in
 | --- | --- | --- |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+| [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 
 ### AF-003 — Open-link checks in the shared-information smoke match nothing
 
@@ -146,3 +147,16 @@ and the badge showed 0.9 s after load. GitHub Actions passed the spec in
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
 Resolved in #245: warm the five existing read routes before interaction deadlines begin.
+
+### AF-011 — Keep elapsed time together on narrow work lines
+
+At 390px, the work line split `2m 0s` across two lines. Keep each elapsed phrase
+together while the surrounding status wraps.
+
+**+1:** 2026-09-29 — clear-progress increment 1 task (`codex/clear-progress`),
+[PR #255](https://github.com/lustoykov/hallvi/pull/255)
+
+**Status:** Resolved in [#255](https://github.com/lustoykov/hallvi/pull/255).
+The [390px capture](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/candidate/finding-narrow.png)
+and [verification report](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md)
+show `2m 0s` and the longer quiet-time phrase together without page overflow.
