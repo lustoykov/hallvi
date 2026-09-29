@@ -90,6 +90,11 @@ Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and 
 
 ## Verify
 
+Use the repository [verify-hallvi skill](../.agents/skills/verify-hallvi/SKILL.md)
+and its [verification guide](verification.md) to select an environment, follow
+a CLI request to its evidence, check useful behavior and clean up. The
+standing use and maintenance rule lives in [AGENTS.md](../AGENTS.md).
+
 These are available checks, not a requirement to rerun every suite for every change. Select checks proportionate to the implementation stage; documentation-only edits need document/link checks rather than deployment proofs.
 
 Record bugs, friction and ideas in [Agent feedback](../AGENT_FEEDBACK.md#how-to-contribute).
@@ -112,4 +117,21 @@ browser smoke suite — on Node 22, and ends with a summary naming the revision
 and each step's result. While that workflow is disabled, the summary is how a
 pull request records them.
 
-[tests/README.md](../tests/README.md) describes full browser journeys, synthetic fixtures, Docker checks and opt-in real-model evals. `npm run dev` starts the local testing workbench beside the app; `npm run test:dashboard` can still run it alone on <http://127.0.0.1:4317> when that port is free. Synthetic tests are not provider or deployment evidence. See the [testing index](testing/README.md) for acceptance coverage and known limits.
+[tests/README.md](../tests/README.md) describes browser journeys, synthetic fixtures, Docker checks and the limits of archived evals. `npm run dev` starts the local testing workbench beside the app; `npm run test:dashboard` can still run it alone on <http://127.0.0.1:4317> when that port is free. Synthetic tests are not provider or deployment evidence. See the [testing index](testing/README.md) for acceptance coverage and known limits.
+
+### Shared agent skill discovery
+
+The canonical skill is `.agents/skills/verify-hallvi/SKILL.md`, discovered by
+[Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
+[Claude Code](https://code.claude.com/docs/en/skills#choose-where-skills-load)
+discovers the relative `.claude/skills/verify-hallvi` symlink to that directory.
+Root `CLAUDE.md` [imports](https://code.claude.com/docs/en/memory#share-one-file-with-other-coding-tools)
+`AGENTS.md`, so both tools receive the same contributor policy. Automatic
+selection remains enabled; no personal installation or runtime configuration
+is needed. Start a fresh session in the checkout to verify discovery, using
+`$verify-hallvi` in Codex or `/verify-hallvi` in Claude if checking it explicitly.
+Keep Git symlinks enabled when checking out the repository; local overrides
+that disable skills or project instructions can prevent discovery.
+
+The next three real development tasks are the trial of this default workflow.
+Use their existing PR evidence to assess it; no extra report or automation.

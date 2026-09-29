@@ -1,5 +1,9 @@
 # Testing Hallvi
 
+For a task's end-to-end verification path, use the shared
+[verify-hallvi skill](../.agents/skills/verify-hallvi/SKILL.md) and
+[guide](../docs/verification.md). This document owns the testing bar and runners.
+
 ## The 80/20 bar
 
 We are discovering and polishing the product. Tests should help us change it
