@@ -170,7 +170,14 @@ export function eventOf(path: string): ScriptEvent | null {
   }
   const { t, s, p } = value;
   if (typeof s !== "string" || !LIMITS.view.test(s)) return null;
-  if (!text(p, LIMITS.path) || !(p as string).startsWith("/")) return null;
+  // A page is a path and nothing else: a query or fragment is where reset
+  // tokens live, and an event is anyone's to forge.
+  if (
+    !text(p, LIMITS.path) ||
+    !(p as string).startsWith("/") ||
+    /[?#]/.test(p as string)
+  )
+    return null;
   const base = { s, p: p as string };
   switch (t) {
     case "view": {
@@ -383,6 +390,8 @@ export interface SeriesPoint {
   bots: number;
   /** From the bucket's merged histogram; null with no requests. */
   p95Ms: number | null;
+  /** The percentile fell past the last bound: `p95Ms` is only a floor. */
+  p95AtLeast: boolean;
   /** How much of the bucket the log covered, 0 to 1. Zero is a gap. */
   covered: number;
 }
@@ -395,6 +404,8 @@ export interface RangeTotals {
   errorVisitors: number;
   bots: number;
   p95Ms: number | null;
+  /** The percentile fell past the last bound: `p95Ms` is only a floor. */
+  p95AtLeast: boolean;
   /** Today's estimate for 24 h; the average per covered day otherwise. */
   visitors: number;
   visitorsPer: "today" | "day";
@@ -425,7 +436,30 @@ export interface TrafficHistory {
   bots: Ranked[];
   engagement: { path: string; averageMs: number; samples: number }[];
   /** The 75th percentile per page and metric, the page-speed convention. */
-  vitals: { path: string; metric: VitalName; p75: number; samples: number }[];
+  vitals: {
+    path: string;
+    metric: VitalName;
+    p75: number;
+    /** Past the last bound: `p75` is only a floor. */
+    atLeast: boolean;
+    samples: number;
+  }[];
+  /**
+   * Lists a day stored only in part (past `STORED_PER_LIST`), so a range's
+   * figures for them are floors, not exact merges.
+   */
+  partialLists: (
+    | "pages"
+    | "sources"
+    | "campaigns"
+    | "countries"
+    | "devices"
+    | "browsers"
+    | "systems"
+    | "errors"
+    | "goals"
+    | "bots"
+  )[];
   scriptErrors: { path: string; count: number }[];
   coverage: Coverage;
   viewSource: "log" | "script" | "switch";
@@ -460,6 +494,11 @@ export interface ReleaseImpact {
 export interface Arrival {
   at: number;
   kind: "view" | "request" | "bot";
+  /**
+   * Built from a script event rather than a request the application served:
+   * a view to show, never a request to count.
+   */
+  script: boolean;
   path: string;
   status: number;
   ms: number;
