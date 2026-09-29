@@ -21,6 +21,7 @@ import {
   currentGithubConnectionId,
   readGithubConnection,
 } from "./github-connection";
+import { forget as forgetTraffic } from "./traffic/store";
 import { askWorker } from "./worker-link";
 import type { ApplicationRecord, Chat, CreateApplicationInput } from "./types";
 
@@ -273,6 +274,9 @@ export async function removeApplication(
   // The worker owns the histories, so it removes them; it refuses while one
   // of them is running.
   await askWorker("forget", { scope: { applicationId: application.id } });
+  // Its traffic totals go with it. They live in traffic.db, which no foreign
+  // key reaches; removed first, so a failure leaves the application to retry.
+  forgetTraffic(application.id);
   deleteApplication(application.id);
   return { removedApplicationId: application.id };
 }

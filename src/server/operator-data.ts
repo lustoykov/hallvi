@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { LOG_FORMATS } from "./traffic/contract";
+
 export const operatorSettingsSchema = z.object({
   permissionMode: z.enum(["always-ask", "pi-decides", "bypass"]),
   host: z
@@ -109,6 +111,26 @@ export const partKinds = [
 ] as const;
 export type PartKind = (typeof partKinds)[number];
 
+/**
+ * Where a proxy's access log is: a container's output, or a file whose
+ * rotated siblings sit beside it. Both are closed shapes — no quote, `$`,
+ * backtick, space or parent segment can get in — because the controller puts
+ * them into the commands it runs.
+ */
+export const accessLogSourceSchema = z.discriminatedUnion("type", [
+  z.strictObject({
+    type: z.literal("container"),
+    name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/),
+  }),
+  z.strictObject({
+    type: z.literal("file"),
+    path: z
+      .string()
+      .regex(/^\/[A-Za-z0-9_.\/-]{1,300}$/)
+      .refine((value) => !value.includes(".."), "No parent segments."),
+  }),
+]);
+
 export const informationContentSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("deployment"),
@@ -204,27 +226,36 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
     kind: z.literal("access-log"),
     /**
      * Where the proxy writes one line per request, so the controller can
-     * follow it while Overview is open. The controller builds the command
-     * itself from these fields and nothing else: a container name or a file
-     * path, each a closed shape with no room for shell. Pi never supplies
-     * command text here, which is why following it needs no approval.
+     * follow it while Overview is open and count it for traffic history.
+     * The controller builds every command itself from these fields and
+     * nothing else: a container name or a file path, each a closed shape
+     * with no room for shell. Pi never supplies command text here, which is
+     * why reading it needs no approval.
      */
     proxy: z.string().trim().min(1).max(80),
-    /** The only format the controller can read today. */
-    format: z.literal("caddy-json"),
-    source: z.discriminatedUnion("type", [
-      z.strictObject({
-        type: z.literal("container"),
-        name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/),
-      }),
-      z.strictObject({
-        type: z.literal("file"),
-        path: z
-          .string()
-          .regex(/^\/[A-Za-z0-9_.\/-]{1,300}$/)
-          .refine((value) => !value.includes(".."), "No parent segments."),
-      }),
-    ]),
+    /** Caddy's own JSON, Hallvi's line from nginx, or Traefik's JSON. */
+    format: z.enum(LOG_FORMATS),
+    source: accessLogSourceSchema,
+    /**
+     * The names this application answers to, in lower case. A proxy that
+     * serves several applications writes one log for all of them, and the
+     * other hosts' lines are theirs. Absent: every line is this one's.
+     */
+    hosts: z
+      .array(z.string().regex(/^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/))
+      .min(1)
+      .max(20)
+      .optional(),
+    /** A query key the application routes by, such as WordPress's `p`. */
+    pageKey: z
+      .string()
+      .regex(/^[A-Za-z_][A-Za-z0-9_]{0,39}$/)
+      .optional(),
+    /**
+     * How many days Pi set the server to keep the log. What it actually
+     * still holds is measured from the files, never taken from this.
+     */
+    retainDays: z.number().int().min(1).max(3650).optional(),
   }),
   z.strictObject({
     kind: z.literal("usage"),

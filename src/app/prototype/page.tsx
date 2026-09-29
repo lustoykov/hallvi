@@ -35,6 +35,11 @@ export default function PrototypeIndexPage() {
           <Link href="/prototype/little-server">Little Server</Link> — the
           mascot in every mood, which no record produces.
         </li>
+        <li>
+          <Link href="/prototype/traffic">Traffic</Link> — the destination and
+          its lines on Overview, Deployment and Monitoring, on invented numbers
+          until the collector&apos;s routes exist.
+        </li>
       </ul>
     </main>
   );

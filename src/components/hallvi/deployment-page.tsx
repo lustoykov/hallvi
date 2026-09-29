@@ -30,6 +30,7 @@ import { EmptySketch } from "./empty-sketch";
 export function DeploymentPage({
   records,
   executions,
+  applicationId = null,
   applicationName,
   source,
   now,
@@ -42,6 +43,8 @@ export function DeploymentPage({
 }: {
   records: SavedInformation[];
   executions: ExecutionRecord[];
+  /** Whose traffic to set beside each release; absent draws none. */
+  applicationId?: string | null;
   applicationName: string;
   /**
    * How it deploys and what the branch watch has seen. Absent where the page
@@ -138,6 +141,7 @@ export function DeploymentPage({
         {hasReleases ? (
           <ReleasesPanel
             view={releases}
+            applicationId={applicationId}
             records={records}
             executions={executions}
             now={now}

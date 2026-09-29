@@ -4,18 +4,80 @@
 //
 // No analytics service: the proxy's access log says who asked for what and
 // how it went, and the host's own samples say how hard the machine worked.
-// Hallvi reads a window of both when it looks, so the section says when
-// that was — a chart that looks live but stopped at the last read would be
-// the Monitoring page implying a watch that does not exist.
+// Where the owner keeps traffic history, the traffic card reads those stored
+// totals, which are kept current. Otherwise Hallvi reads a window of both
+// when it looks, so the section says when that was — a chart that looks
+// live but stopped at the last read would be the Monitoring page implying a
+// watch that does not exist.
 
 import { useState, type PointerEvent, type ReactNode } from "react";
+
+import { OTHER, type TrafficHistory } from "@/server/traffic/contract";
 
 import { Tag } from "./deployment-prototype/tag";
 import { EmptySketch } from "./empty-sketch";
 import type { Usage } from "./monitoring-records";
 import { AskButton, toneOf } from "./monitoring-watching";
 import { ago, clock } from "./stack-prototype/stack-model";
+import { hasTotals } from "./traffic/model";
 import "./monitoring-usage.css";
+
+/** The traffic card's numbers, whichever way they were read. */
+interface Counted {
+  /** Bucket `i` starts at `start + i * stepMinutes`. */
+  start: string;
+  stepMinutes: number;
+  source: string;
+  requests: number[];
+  serverErrors: number[];
+  p95Ms?: number[];
+  /** How much of each bucket the log covered; absent when all was read. */
+  covered?: number[];
+  /** Distinct addresses across the window, when Pi read one. */
+  visitors?: number;
+  paths: { path: string; requests: number; serverErrors: number }[];
+  /** What the list of paths counts. */
+  pathsAre: "Most requested" | "Most viewed";
+}
+
+function fromUsage(usage: Usage): Counted | null {
+  if (!usage.traffic) return null;
+  return {
+    start: usage.start,
+    stepMinutes: usage.stepMinutes,
+    ...usage.traffic,
+    pathsAre: "Most requested",
+  };
+}
+
+/** The last 24 hours of stored totals, hour by hour; gaps stay gaps. */
+function fromHistory(history: TrafficHistory): Counted {
+  const points = [...history.series].sort(
+    (a, b) => Date.parse(a.at) - Date.parse(b.at),
+  );
+  const source = history.collection.source;
+  return {
+    start: points[0].at,
+    stepMinutes: 60,
+    source: source
+      ? `${source.proxy} access log, counted as it is written`
+      : "Counted from the access log as it is written",
+    requests: points.map((point) => (point.covered ? point.requests : 0)),
+    serverErrors: points.map((point) => (point.covered ? point.errors : 0)),
+    p95Ms: points.map((point) => point.p95Ms ?? 0),
+    covered: points.map((point) => point.covered),
+    paths: history.pages
+      .filter((page) => page.key !== OTHER)
+      .slice(0, 5)
+      .map((page) => ({
+        path: page.key,
+        requests: page.count,
+        serverErrors:
+          history.errors.find((error) => error.key === page.key)?.count ?? 0,
+      })),
+    pathsAre: "Most viewed",
+  };
+}
 
 const count = (n: number) => n.toLocaleString("en-US");
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
@@ -38,7 +100,7 @@ const ceiling = (max: number) => {
 };
 
 /** Bucket `index` as a clock time, and the six-hour ticks under a chart. */
-function clockOf(usage: Usage) {
+function clockOf(usage: Pick<Usage, "start" | "stepMinutes">) {
   const startMs = Date.parse(usage.start);
   const stepMs = usage.stepMinutes * 60_000;
   const at = (index: number) =>
@@ -146,19 +208,17 @@ function Stat({
 }
 
 function Traffic({
-  usage,
   traffic,
   name,
   onAsk,
 }: {
-  usage: Usage;
-  traffic: NonNullable<Usage["traffic"]>;
+  traffic: Counted;
   name: string;
   onAsk: (draft: string) => void;
 }) {
-  const { requests, serverErrors, p95Ms } = traffic;
+  const { requests, serverErrors, p95Ms, covered } = traffic;
   const length = requests.length;
-  const { at, ticks } = clockOf(usage);
+  const { at, ticks } = clockOf(traffic);
   const { hover, handlers } = useHover(length);
   const total = sum(requests);
   const failed = sum(serverErrors);
@@ -166,9 +226,12 @@ function Traffic({
   const worst = peakOf(serverErrors);
   const top = ceiling(Math.max(...requests));
   const rate = total ? (failed / total) * 100 : 0;
-  const typical = p95Ms?.length ? median(p95Ms) : null;
+  // An hour with no requests has no response time, not a fast one.
+  const timed = (p95Ms ?? []).filter((value) => value > 0);
+  const typical = timed.length ? median(timed) : null;
   const paths = traffic.paths.slice(0, 5);
   const pathTop = Math.max(1, ...paths.map((path) => path.requests));
+  const gap = (index: number) => covered !== undefined && !covered[index];
 
   const say = [
     `${count(total)} requests`,
@@ -218,11 +281,21 @@ function Traffic({
         <div
           className="axmu-plot axmu-bars"
           role="img"
-          aria-label={`Requests every ${usage.stepMinutes} minutes over the last 24 hours. ${say}`}
+          aria-label={`Requests every ${traffic.stepMinutes} minutes over the last 24 hours. ${say}`}
           {...handlers}
         >
           {requests.map((value, index) => {
             const errors = serverErrors[index] ?? 0;
+            // A stretch the log did not cover is hatched, never a zero.
+            if (gap(index))
+              return (
+                <span
+                  key={index}
+                  className="axmu-bar"
+                  data-gap
+                  data-hover={hover === index || undefined}
+                />
+              );
             return (
               <span
                 key={index}
@@ -241,18 +314,26 @@ function Traffic({
               <time>
                 {clock(at(hover))}–{clock(at(hover + 1))}
               </time>
-              <span>
-                <i data-series="requests" />
-                {count(requests[hover])} requests
-              </span>
-              <span>
-                <i data-series="errors" />
-                {count(serverErrors[hover] ?? 0)} server errors
-              </span>
-              {p95Ms?.[hover] !== undefined && (
+              {gap(hover) ? (
                 <span className="axmu-tip-quiet">
-                  p95 {duration(p95Ms[hover])}
+                  Not counted: the log did not cover it
                 </span>
+              ) : (
+                <>
+                  <span>
+                    <i data-series="requests" />
+                    {count(requests[hover])} requests
+                  </span>
+                  <span>
+                    <i data-series="errors" />
+                    {count(serverErrors[hover] ?? 0)} server errors
+                  </span>
+                  {p95Ms?.[hover] ? (
+                    <span className="axmu-tip-quiet">
+                      p95 {duration(p95Ms[hover])}
+                    </span>
+                  ) : null}
+                </>
               )}
             </Tip>
           )}
@@ -265,18 +346,25 @@ function Traffic({
         <figcaption className="axmu-legend">
           <span>
             <i data-series="requests" />
-            Requests per {usage.stepMinutes} min
+            Requests per{" "}
+            {traffic.stepMinutes === 60 ? "hour" : `${traffic.stepMinutes} min`}
           </span>
           <span>
             <i data-series="errors" />
             Server errors
           </span>
+          {covered?.some((share) => !share) && (
+            <span>
+              <i data-series="gap" />
+              Not counted
+            </span>
+          )}
         </figcaption>
       </figure>
 
       {paths.length > 0 && (
         <div className="axmu-paths">
-          <h4>Most requested</h4>
+          <h4>{traffic.pathsAre}</h4>
           <ol>
             {paths.map((path) => (
               <li key={path.path}>
@@ -468,12 +556,18 @@ function Host({
 
 export function MonitoringUsage({
   usage,
+  history = null,
   followed = false,
   name,
   now,
   onAsk,
 }: {
   usage: Usage | null;
+  /**
+   * The last 24 hours of the traffic history the owner keeps. Where it has
+   * anything counted, the traffic card reads it instead of Pi's last read.
+   */
+  history?: TrafficHistory | null;
   /** Whether a record says where the access log is, so Overview follows it. */
   followed?: boolean;
   name: string;
@@ -481,6 +575,43 @@ export function MonitoringUsage({
   onAsk: (draft: string) => void;
 }) {
   const read = `Read the last 24 hours of ${name}'s access log and its server's CPU and memory, and tell me anything unusual.`;
+  const kept = history && hasTotals(history) ? fromHistory(history) : null;
+
+  if (kept) {
+    const load = `Read the last 24 hours of ${name}'s server CPU and memory, and tell me anything unusual.`;
+    const fresh = usage?.host && toneOf(usage.at, now) === "verified";
+    return (
+      <section className="axmu" aria-labelledby="axmu-title">
+        <header className="axmw-section-head">
+          <div>
+            <h2 id="axmu-title">Traffic and load</h2>
+            <p>
+              The last 24 hours of traffic, from the history Hallvi keeps.
+              {usage?.host
+                ? ` CPU and memory as read from the server${usage.at && fresh ? ` ${ago(usage.at, now)}` : ""}.`
+                : ""}
+            </p>
+          </div>
+          {usage?.host && usage.at && !fresh && (
+            <Tag tone="stale">CPU read {ago(usage.at, now)}</Tag>
+          )}
+          <AskButton onClick={() => onAsk(load)}>
+            {usage?.host ? "Read CPU and memory again" : "Read CPU and memory"}
+          </AskButton>
+        </header>
+        <div className="axmu-cards">
+          <Traffic traffic={kept} name={name} onAsk={onAsk} />
+          {usage?.host ? (
+            <Host usage={usage} host={usage.host} name={name} onAsk={onAsk} />
+          ) : (
+            <div className="axmu-sketches axmu-sketch-one">
+              <EmptySketch kind="lines" caption="CPU and memory, once read" />
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
 
   if (!usage?.traffic && !usage?.host)
     return (
@@ -531,12 +662,7 @@ export function MonitoringUsage({
       </header>
       <div className="axmu-cards">
         {usage.traffic && (
-          <Traffic
-            usage={usage}
-            traffic={usage.traffic}
-            name={name}
-            onAsk={onAsk}
-          />
+          <Traffic traffic={fromUsage(usage)!} name={name} onAsk={onAsk} />
         )}
         {usage.host && (
           <Host usage={usage} host={usage.host} name={name} onAsk={onAsk} />
