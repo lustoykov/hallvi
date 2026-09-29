@@ -28,6 +28,12 @@ in the normal checks. Remove task-owned archives after retaining the evidence.
 | Old conversations or several real applications rendered together | `node scripts/retained-application.mjs snapshot work/verify-snapshot <name>` (add names as needed). Run the exact environment assignments it prints, choosing a free port. The empty account directory is deliberate: histories are readable, new Pi turns are unavailable. |
 | Real Pi work against an existing application, history or data | Check `node scripts/retained-application.mjs status` and the register described in [the development environment](development-environment.md). Choose a free application that exercises your criterion; attach it as below. Registration is not evidence of live host health. |
 
+For a credential-free fixture that renders Pi setup, set `PI_CODING_AGENT_DIR`
+to its empty account directory as well as `HALLVI_PI_CONFIG_DIR`.
+Hallvi's account override does not redirect standalone Pi's directory: setup
+detects a reusable Pi login through the SDK's `getAgentDir()`. Isolate both
+paths before opening the browser so detection cannot read the owner's Pi login.
+
 For an ordinary fresh development controller, `npm run db:push` then
 `npm run dev` starts the app, worker and paired development tools. Add an
 application through Hallvi's page if the controller is empty; `apps` only lists

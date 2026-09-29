@@ -277,4 +277,7 @@ it("copies the histories into a snapshot and says to run the pair on it, with no
   expect(made.out).toMatch(
     new RegExp(`HALLVI_PI_CONFIG_DIR=${join(into, "account")}`),
   );
+  expect(made.out).toMatch(
+    new RegExp(`PI_CODING_AGENT_DIR=${join(into, "account")}`),
+  );
 });
