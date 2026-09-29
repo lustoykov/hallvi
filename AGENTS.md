@@ -45,9 +45,9 @@ automation prompts into product sessions.
   of appending handoffs.
 - Keep verification screenshots, logs and per-run reports in ignored
   `tests/results/` or `work/`. Summarize checks in the PR; do not commit review
-  artifacts or add reports under `docs/testing/`. `npm run lint` rejects tracked
-  files in artifact folders, including force-added files. After review, remove
-  only this task's temporary artifacts that are no longer needed.
+  artifacts or add reports under `docs/testing/`. Never force-add ignored
+  artifacts. After review, remove only this task's temporary artifacts that
+  are no longer needed.
 - Never commit `.hallvi/`, `.next/` or `tests/results/`. Never print
   credentials or copy them into code, artifacts, commits or pull requests.
 - Clean up what your task created and nothing else, as
