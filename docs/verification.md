@@ -129,11 +129,13 @@ Full execution data is under `execution` (including `id`, `toolCallId`,
 limited to the last 100,000 recorded output characters. The outcome holds
 the last 40 calls; `inspect` holds the newest 20 executions and 25 presented
 records. Check `evidenceOmitted`, `executionsOmitted`, `recordsOmitted` and
-`answerTruncated`. For missing calls or answer text, use the matching
-conversation/tool disclosures or the existing
-[conversation inspector](development.md#diagnostics); do not treat omitted
-evidence as a clean run. A call with no execution ID has no full execution to
-fetch; state the gap if its recorded result is insufficient.
+`answerTruncated`. For calls or answer text omitted from those lists, open the
+matching [conversation and tool disclosures](development.md#diagnostics).
+The page's arguments and results are also bounded, redacted previews; it cannot
+recover output beyond the execution recorder's limit. Raw reasoning export is
+currently unavailable. A call with no execution ID has no full execution to
+fetch. State the gap if the available evidence is insufficient; do not treat
+omitted evidence as a clean run.
 
 ## 3. Respond to the actual outcome
 

@@ -19,7 +19,6 @@
     "test:e2e": "playwright test --config tests/browser/playwright.config.ts",
     "test:e2e:smoke": "npm run test:e2e -- --grep @smoke",
     "test:e2e:ui": "npm run test:e2e -- --ui",
-    "inspect:conversation": "node scripts/inspect-conversation.mjs",
     "retained": "node scripts/retained-application.mjs",
     "scenarios": "node --import tsx scripts/scenarios.ts",
     "test:operator": "python3 -m unittest discover -s tests/application/operator -t tests/application/operator",

@@ -67,7 +67,15 @@ describe("what a turn in flight says it is doing", () => {
     // "Working" said the opposite for as long as they did not notice.
     const said = ask({
       executions: [
-        execution({ status: "awaiting-approval", createdAt: ago(200) }),
+        execution({
+          status: "awaiting-approval",
+          createdAt: ago(200),
+          input: '{"intent":"Restart the application"}',
+        }),
+        execution({
+          id: "e2",
+          input: '{"intent":"Build the application image"}',
+        }),
       ],
     });
     expect(said.says).toBe("Waiting for you to approve a command");
@@ -77,9 +85,43 @@ describe("what a turn in flight says it is doing", () => {
 
   it("names the machine a running command is running on", () => {
     const said = ask({ executions: [execution({ createdAt: ago(75) })] });
-    expect(said.says).toBe("Running a command on the server");
+    expect(said.says).toBe("Running a command on the server · 203.0.113.7");
     expect(said.since).toBe("1m 15s");
     expect(said.waitingOnYou).toBe(false);
+  });
+
+  it("uses the active execution's intent and target without claiming completion", () => {
+    const said = ask({
+      executions: [
+        execution({
+          runId: "another-run",
+          input: '{"intent":"Restart production"}',
+          target: "root@203.0.113.99:22",
+        }),
+        execution({
+          input:
+            '{"intent":"Build the application image","command":"docker compose build web"}',
+        }),
+      ],
+    });
+    expect(said.says).toBe(
+      "Running: Build the application image · On the server · 203.0.113.7",
+    );
+    expect(said.waitingOnYou).toBe(false);
+  });
+
+  it("keeps missing or malformed intent and unknown locations neutral", () => {
+    for (const input of [
+      '{"command":"docker compose build"}',
+      '{"intent":',
+      '{"intent":"  "}',
+      "docker compose build",
+    ]) {
+      const said = ask({
+        executions: [execution({ input, tool: "unfamiliar_tool", target: "" })],
+      });
+      expect(said.says).toBe("Running a command");
+    }
   });
 
   it("does not call a workspace command a command on the server", () => {

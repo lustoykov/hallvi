@@ -85,15 +85,21 @@ Native conversation histories live beside the database in `pi-sessions/<applicat
 
 Server commands show a live output block inside their chat message. The block follows new output until you scroll back; **Follow latest** resumes following, and **Copy** copies the command and recorded output. Completion keeps the block open and shows the exit code. Output remains redacted and limited to the most recent 100,000 characters by the existing execution recorder.
 
-For a live, read-only view of Pi's full recorded conversation, run this in another terminal using Node 22:
+For answer text or calls omitted by the bounded [request commands](cli.md),
+open the matching application and conversation on the controller being checked.
+Expand the call's disclosure and, when it has execution evidence, its command
+output. The page uses the worker's current conversation projection and shows
+recorded messages, calls and live output. Tool arguments and results remain
+redacted, bounded previews; command output is limited to the most recent
+100,000 recorded characters. Opening the page cannot recover output discarded
+by the execution recorder.
 
-```sh
-npm run inspect:conversation
-```
-
-Open <http://127.0.0.1:3001>. The viewer opens on the newest application's main conversation, and the **Application** and **Conversation** menus in its bar switch to any other without a restart. The choice is the address — `?application=<id>&chat=<id>` — so a conversation can be linked to directly: in development the application top bar carries a **Transcript** link that opens the conversation you are reading. Startup flags still choose the first view: `-- --application <id> --chat <id> --port 3001`. It respects `HALLVI_DB_PATH` and `HALLVI_CONFIG_DIR` when exported in that terminal.
-
-Recorded messages, reasoning and tool results refresh automatically. The current response text and running-command output update from the controller's saved state about every 750 ms. This is not a raw model-network capture: reasoning appears when Pi saves the assistant message. **Follow latest** scrolls to new content; turn it off to read earlier entries, or **Pause updates** to freeze the view. The inspector reads SQLite, native history and execution files without invoking Pi or running commands. Keep it local: conversation exports can contain private application data.
+Raw recorded reasoning and Pi's session tree currently have no supported
+developer export. The old standalone inspector was removed because it read
+retired database fields and the pre-upgrade session format. Do not open current
+Pi files with the legacy HTML exporter or treat missing evidence as a clean
+run. If the page and execution record still omit what a check needs, report
+the verification gap.
 
 Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `HALLVI_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Implementation: [local diagnostics](../src/server/diagnostics.ts) and [trace configuration](../src/server/tracing-config.ts).
 
@@ -106,12 +112,18 @@ standing use and maintenance rule lives in [AGENTS.md](../AGENTS.md).
 
 These are available checks, not a requirement to rerun every suite for every change. Select checks proportionate to the implementation stage; documentation-only edits need document/link checks rather than deployment proofs.
 
-Record bugs, friction and ideas in [Agent feedback](../AGENT_FEEDBACK.md#how-to-contribute).
-A short note about what you want is enough; no justification or evidence is
-required. Include it in your current PR or open a feedback-only PR whenever you
-wish, even if the task has no code changes. That file owns deduplication and +1
-counting; the owner decides what is worth doing. It is contributor guidance,
-not a Pi product workflow.
+Record useful bugs, friction and wishes encountered during ordinary development
+in [Agent feedback](../AGENT_FEEDBACK.md#how-to-contribute), including when there
+are no code changes. A short note is enough; no research or evidence is required.
+Capture useful observations before finishing and include them in your current
+PR or a feedback-only PR. Invent nothing when there is no feedback to add.
+That file owns deduplication and +1 counting.
+
+[Agent features](../AGENT_FEATURES.md) separately holds researched product
+proposals, selection and assignment. It owns the initial, weekly and targeted
+research workflow. The developer dashboard exposes both documents as separate
+read-only pages. The owner selects features; the roadmap owns delivery order.
+Neither contributor workflow belongs in Pi's product sessions.
 
 ```sh
 npm test
