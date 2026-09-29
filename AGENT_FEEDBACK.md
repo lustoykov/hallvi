@@ -12,7 +12,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
 | [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fix in review |
-| [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | New |
+| [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -67,10 +67,13 @@ changing their decision.
 The same rehearsal's app timeline shows a red failed moment labelled “7 checks
 passed”. `lane-rails.tsx` turns every counted check group into that phrase,
 including groups containing failures. Keep a failed group's label consistent
-with its recorded outcomes; this observation does not authorize another fix.
+with its recorded outcomes.
 
 **+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
 (`codex/overview-subject-verdict`), observed again in its isolated browser proof.
+
+**Disposition:** The same bounded correction labels only passing groups as
+passed; failed, informational and planned groups keep a neutral check count.
 
 ### AF-019 — Keep deployment failures out of passing server checks
 
