@@ -165,9 +165,10 @@ internet, no cookies and nothing stored in the browser.
 - **Offered, not pushed.** Nothing is said about the script during deployment
   unless the owner asks for analytics then. The Traffic page offers it, once,
   when the evidence says the log misses something: the application changes
-  pages in the browser, a CDN caches its pages, or the owner opens something
-  only the script measures (time on page, goals, page speed). Otherwise at most
-  a quiet link.
+  pages in the browser (in-page requests name pages, in their referrer, that
+  were never loaded as a document), a CDN caches its pages (a `cdn` record
+  with `caches-pages`), or the owner opens something only the script measures
+  (time on page, goals, page speed). Otherwise at most a quiet link.
 - **No double counting.** The log and the script are never added together.
   Each application has one switch point, the first script event Hallvi
   counts: before it, views and visitors come from the log; after it, only from

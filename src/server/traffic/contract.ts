@@ -264,6 +264,12 @@ export interface Ranked {
 
 /** The name every list uses for what did not fit. */
 export const OTHER = "(other)";
+/** The key for what could not be told: a country, a browser, a system. */
+export const UNKNOWN = "(unknown)";
+/** The source of a view that arrived with no referrer and no campaign. */
+export const DIRECT = "Direct";
+/** Device keys. Countries are ISO 3166-1 alpha-2, upper case, or UNKNOWN. */
+export const DEVICES = ["desktop", "mobile", "tablet"] as const;
 /** Entries stored per list per day; a range merges these exactly. */
 export const STORED_PER_LIST = 200;
 
@@ -304,6 +310,12 @@ export interface TrafficDay {
   errors: Ranked[];
   goals: Ranked[];
   bots: Ranked[];
+  /**
+   * Distinct same-site pages named only in the referrer of in-page requests
+   * and never loaded as a document: the evidence that the application
+   * changes pages in the browser, where the log cannot see them.
+   */
+  browserOnlyPages: number;
   /** Visible time per page, from `leave` events. */
   engagement: { path: string; ms: number; samples: number }[];
   vitals: { path: string; metric: VitalName; buckets: number[] }[];
@@ -332,6 +344,16 @@ export interface Collection {
   scriptSilentSince: string | null;
   /** What wrote the log, in words and format, from the `access-log` record. */
   source: { proxy: string; format: LogFormat } | null;
+  /** The first day with stored totals; null when nothing is stored. */
+  storedFrom: string | null;
+  /**
+   * What the log alone cannot see, from evidence — what the script offer
+   * answers. `browser-pages`: recent days have `browserOnlyPages`, so the
+   * application changes pages in the browser. `cached-pages`: a current
+   * `cdn` record carries the fact `caches-pages` = "yes". Empty once the
+   * script has passed its switch point.
+   */
+  logMisses: ("browser-pages" | "cached-pages")[];
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +390,11 @@ export interface RangeTotals {
   visitorsPer: "today" | "day";
 }
 
+/**
+ * `GET …/traffic/history?range=` answers with this. An application with
+ * nothing stored gets an empty history — every bucket `covered: 0` — never
+ * an error: nothing stored is unassessed, not absent.
+ */
 export interface TrafficHistory {
   range: TrafficRange;
   timeZone: string;
@@ -394,7 +421,11 @@ export interface TrafficHistory {
   viewSource: "log" | "script" | "switch";
 }
 
-/** What changed in the window after a release against the one before it. */
+/**
+ * What changed in the window after a release against the one before it.
+ * `GET …/traffic/impact?at=…&at=…` answers with one per `at`, in the order
+ * asked, `releaseAt` echoing it.
+ */
 export interface ReleaseImpact {
   releaseAt: string;
   windowMinutes: number;
