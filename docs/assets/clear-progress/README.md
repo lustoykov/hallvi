@@ -7,8 +7,14 @@ and private-input cards keep their existing behavior.
 ## Revisions and capture method
 
 - Baseline product: `a81b6953ed3d3929393382662640e56a1ca5cd7c` (includes #252).
-- Tested candidate: `59b01a1d7e615c9d2d036c9df5e0c451a9855406`. Captured from the
-  working tree that became this commit; subsequent changes add review artifacts only.
+- Original tested candidate: `59b01a1d7e615c9d2d036c9df5e0c451a9855406`. Captured
+  from the working tree that became this commit; `49fac0db` added the original
+  review artifacts.
+- Later integration merged main `bb4819701b4fe52ce17016e2f0974a5dfb7ea87b` into
+  code revision `cef37a04f9ad53a30d6337750cd8baf15b829e9f`, preserving #253's
+  feature/feedback separation and #250's development Transcript-link removal.
+  These historical captures predate that unrelated shell change; the final shell
+  is not pixel-identical. No additional real-Pi trial was performed.
 - Chromium, Node 22.23.2; desktop 1440 × 1000 and narrow 390 × 844. Both use the
   same synthetic application, commands, finding, target, Always ask permission
   mode and fixed elapsed clock. Incidental greeting times and loading of the
@@ -42,12 +48,19 @@ PNG captures provide the full-resolution text; the recordings are 800 × 554.
 
 ## Verification
 
+- After main integration at `cef37a04`: the same 4 focused browser checks and
+  TypeScript passed. Four existing developer-dashboard tests passed during
+  integration; `/features` and `/feedback` returned HTTP 200 with valid anchors,
+  consistent votes/statuses and a collapsed Archive containing 3 entries. Other
+  entries/counts were preserved. Formatting and diff checks passed. GitHub's
+  `Hallvi checks` workflow is `disabled_manually`; local checks are the evidence.
+  This follow-up did not repeat the real-Pi trial or replace the historical media.
 - `npm test -- tests/application/unit/run-activity.test.ts tests/application/unit/execution-text.test.ts`:
   44 tests passed. Covers action/target, neutral missing or malformed intent,
   exclusion of another reply's evidence, authoritative approval, and existing
   elapsed/model/failure behavior.
 - `HALLVI_E2E_PORT=3380 npm run test:e2e -- tests/browser/clear-progress.spec.ts tests/browser/still-working.spec.ts tests/browser/pi-transcript.spec.ts`:
-  4 tests passed on the final candidate, including ordered text once, refresh,
+  4 tests passed on the captured candidate, including ordered text once, refresh,
   waiting/input states, narrow visibility and a long quiet timer.
 - `npx tsc --noEmit`, `npm run lint`, `npm run format`, `git diff --check` passed.
   Lint reported 35 warnings in unchanged files. Impeccable's targeted detector
