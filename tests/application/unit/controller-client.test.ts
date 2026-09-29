@@ -36,13 +36,22 @@ async function standIn(
       const answer = (answers[seen.length - 1] ?? answers.at(-1)!)(
         request,
         body,
-      ) as { status: number; json?: unknown; headers?: object } | null;
+      ) as {
+        status: number;
+        json?: unknown;
+        headers?: object;
+        /** Answer this long after asking, as a busy controller does. */
+        afterMs?: number;
+      } | null;
       if (!answer) return request.socket.destroy();
-      response.writeHead(answer.status, {
-        "content-type": "application/json",
-        ...answer.headers,
-      });
-      response.end(JSON.stringify(answer.json ?? {}));
+      setTimeout(() => {
+        if (response.destroyed) return;
+        response.writeHead(answer.status, {
+          "content-type": "application/json",
+          ...answer.headers,
+        });
+        response.end(JSON.stringify(answer.json ?? {}));
+      }, answer.afterMs ?? 0);
     });
   });
   servers.push(server);
@@ -127,7 +136,28 @@ it("asks again under the same key when an answer is lost, and never after a refu
   ).rejects.toMatchObject({ code: "acceptance-unknown" });
   expect(silent.seen).toHaveLength(2);
 
-  // A refusal is the controller's answer: nothing is sent again.
+  // Taken, answer lost, and the retry refused: the refusal is the retry's,
+  // so whether Pi has the first send is still not known.
+  const unsure = await standIn([
+    () => null,
+    () => ({ status: 503, json: { error: "The worker is not running." } }),
+  ]);
+  await expect(
+    controllerClient(unsure.url).send(request, { pauseMs: 1 }),
+  ).rejects.toMatchObject({ code: "acceptance-unknown" });
+  expect(new Set(unsure.seen.map(({ body }) => body)).size).toBe(1);
+  // …until a later attempt settles it.
+  const settled = await standIn([
+    () => null,
+    () => ({ status: 503, json: { error: "The worker is not running." } }),
+    () => ({ status: 202 }),
+  ]);
+  await expect(
+    controllerClient(settled.url).send(request, { pauseMs: 1 }),
+  ).resolves.toEqual({ accepted: true });
+
+  // A refusal with nothing sent before it is the controller's answer: nothing
+  // is sent again.
   for (const [status, code] of [
     [409, "refused"],
     [503, "worker-unavailable"],
@@ -197,6 +227,41 @@ it("never reads a failed read as a state, and says a request Pi dropped was canc
       options,
     ),
   ).rejects.toMatchObject({ code: "request-not-found" });
+
+  // A slow answer does not hold the wait past its time: the watch ends as a
+  // timeout, and Pi's work is not touched.
+  const slow = await standIn([
+    () => ({ ...outcome("working"), afterMs: 1_000 }),
+  ]);
+  const client = controllerClient(slow.url);
+  const began = Date.now();
+  await expect(
+    observe(client, { ...target, controller: slow.url }, { timeoutMs: 20 }),
+  ).resolves.toEqual({ outcome: null, stopped: "timeout" });
+  expect(Date.now() - began).toBeLessThan(500);
+  // Zero asks for the state once, so that one read is let finish.
+  await expect(
+    observe(client, { ...target, controller: slow.url }, { timeoutMs: 0 }),
+  ).resolves.toMatchObject({
+    outcome: { status: "working" },
+    stopped: "timeout",
+  });
+  // Out of time while reads fail: said, not passed off as the last state.
+  const failing = await standIn([
+    outcome.bind(null, "working"),
+    () => ({ status: 503, json: { error: "The worker is not running." } }),
+  ]);
+  await expect(
+    observe(
+      controllerClient(failing.url),
+      { ...target, controller: failing.url },
+      { timeoutMs: 200, pollMs: 1 },
+    ),
+  ).resolves.toMatchObject({
+    outcome: { status: "working" },
+    stopped: "timeout",
+    problem: { code: "worker-unavailable" },
+  });
 
   // Still failing after the patience runs out: not known, never a state.
   const down = await standIn([() => null]);

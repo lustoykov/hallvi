@@ -306,7 +306,7 @@ function flat(result) {
  */
 async function follow(client, target, options, io) {
   try {
-    const { outcome, stopped } = await observe(client, target, {
+    const { outcome, stopped, problem } = await observe(client, target, {
       ...options,
       signal: io.signal,
       onChange: io.json ? undefined : narrator(io.say),
@@ -315,6 +315,9 @@ async function follow(client, target, options, io) {
       accepted: options.known || outcome ? true : null,
       outcome,
       stopped,
+      // Out of time while reads were failing: said, so the state is not taken
+      // for the one last read.
+      error: problem,
     });
   } catch (error) {
     return requestResult(target, {

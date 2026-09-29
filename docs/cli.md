@@ -51,9 +51,10 @@ hallvi inspect <app> --execution <id>         # one execution in full
 ```
 
 `<app>` is an ID `hallvi apps` prints. Every command takes `--json`. `exec` and
-`wait` take `--timeout <seconds>`, which limits how long they watch and never
-the work; without it they watch until the request settles. `--background` does
-not watch, so it takes no timeout. A request is limited as the page's are, to
+`wait` take `--timeout <seconds>`, which limits how long they watch, every read
+included, and never the work; `0` reads the state once, and without a timeout
+they watch until the request settles. `--background` does not watch, so it
+takes no timeout. A request is limited as the page's are, to
 5,000 characters.
 
 `apps` and `inspect` read recorded state only: no model call and no look at a
@@ -67,10 +68,12 @@ the request as a follow-up (`next`), never as a steer. It says the request is
 accepted only once Pi has durably taken it. If the controller's answer is lost,
 it sends the same request again under the same key, a few times; Pi never takes
 one key twice, so this cannot duplicate the work, and the same key with
-different text is refused. If no answer arrives at all, whether Pi has the
-request is not known, and the result says that and keeps the handle and key:
-sending again with `--request-key` is how to find out. A prompt is never sent
-again under a new key.
+different text is refused. A refusal settles it only when nothing was sent
+before it: after a lost answer, a refused retry says nothing about the first
+send. If no attempt settles it, whether Pi has the request is not known, and
+the result says that and keeps the handle and key: sending again with
+`--request-key` is how to find out. A prompt is never sent again under a new
+key.
 
 The handle is the address the request's outcome is read from:
 
@@ -88,7 +91,8 @@ A timeout or Ctrl-C stops only the command. Pi keeps the request, and the
 command prints the handle and says so. A read that fails is never taken for
 idle, finished or cancelled: a controller or worker that is restarting is asked
 again for about fifteen seconds, and then the command stops with the state not
-known.
+known. Time that runs out while reads are failing is reported the same way
+(exit 1), not as the last state that was read.
 
 ## What a request becomes
 
@@ -104,7 +108,7 @@ application's, is never read into it.
 | `queued` | Pi holds it and has not read it yet. | 3 if the wait ended |
 | `working` | The operation that took it is running. | 3 if the wait ended |
 | `waiting-for-approval` | A call is waiting for the owner's decision and has not run. | 2 |
-| `waiting-for-input` | The operation ended asking the owner for something through one of Hallvi's cards. | 2 |
+| `waiting-for-input` | The operation ended asking the owner for something through one of Hallvi's cards, and that card is still open. A card opened after the asking call returned belongs to later work. | 2 |
 | `completed` | Pi finished answering. | 0 |
 | `failed` | Pi could not finish. | 1 |
 | `cancelled` | Stopped in Hallvi, or dropped by Stop before Pi read it. | 4 |

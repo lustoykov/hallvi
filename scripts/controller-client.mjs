@@ -246,15 +246,19 @@ export function controllerClient(controller) {
     /**
      * Hand a request to Pi as an ordinary follow-up, and resolve once Pi has
      * durably taken it. An answer lost on the way back is asked again under
-     * the same key, which Pi recognises and never takes twice; a refusal is
-     * final. When no answer arrives at all, acceptance is not known, and that
-     * is what is thrown.
+     * the same key, which Pi recognises and never takes twice. A refusal is
+     * final only while nothing sent before it could have been taken: after a
+     * lost answer, a refused retry says only that the retry was refused, so
+     * acceptance stays not known unless a later attempt settles it.
      */
     async send(
       { applicationId, chatId, requestKey, message },
       { signal, attempts = 3, pauseMs = 1_000 } = {},
     ) {
+      /** Why an earlier attempt may have been taken with nobody told. */
       let lost = "";
+      /** What the latest attempt got, when it was not an answer either way. */
+      let latest = "";
       for (let attempt = 1; attempt <= attempts; attempt++) {
         if (attempt > 1)
           await sleep(pauseMs * (attempt - 1), undefined, { signal });
@@ -271,8 +275,11 @@ export function controllerClient(controller) {
             },
           );
         } catch (error) {
-          if (!(error instanceof ClientError) || !error.transient) throw error;
-          lost = error.message;
+          // Stopped by the caller, which says what that means for it.
+          if (!(error instanceof ClientError)) throw error;
+          if (!error.transient && !lost) throw error;
+          lost ||= error.message;
+          latest = error.message;
           continue;
         }
         if (answer.status === 202) return { accepted: true };
@@ -282,12 +289,13 @@ export function controllerClient(controller) {
           answer.data,
           answer.text,
         );
-        if (!refusal.transient) throw refusal;
-        lost = refusal.message;
+        if (!refusal.transient && !lost) throw refusal;
+        if (refusal.transient) lost ||= refusal.message;
+        latest = refusal.message;
       }
       throw new ClientError(
         "acceptance-unknown",
-        `Whether Pi accepted this request is not known: ${lost} Sending it again with the same request key is safe; Pi never takes one twice.`,
+        `Whether Pi accepted this request is not known: ${lost}${latest !== lost ? ` The last attempt got: ${latest}` : ""} Sending it again with the same request key is safe; Pi never takes one twice.`,
       );
     },
   };
@@ -295,6 +303,11 @@ export function controllerClient(controller) {
 
 /**
  * Follow a request until it settles, the time runs out or the signal fires.
+ *
+ * A positive `timeoutMs` bounds every read as well as the pauses between
+ * them, so a slow answer cannot hold the wait past its deadline; running out
+ * mid-read is a timeout like any other, and stops only the watching. `0` asks
+ * for the state once, so that one read is allowed to finish.
  *
  * Only the controller's own answers decide: a read that fails is never taken
  * for idle, finished or cancelled. Failures that may pass — a restarting
@@ -318,16 +331,40 @@ export async function observe(
   const deadline = timeoutMs === undefined ? Infinity : Date.now() + timeoutMs;
   let last = null;
   let failing = null;
+  /** The latest read's failure, until a read succeeds again. */
+  let problem = null;
+  // Out of time with reads failing: the state at the end is not known, and
+  // the last one read is not passed off as current.
+  const timedOut = () =>
+    problem
+      ? {
+          outcome: last,
+          stopped: "timeout",
+          problem: new ClientError(
+            problem.code,
+            `${problem.message} What became of the request is not known; it may still be running.`,
+          ),
+        }
+      : { outcome: last, stopped: "timeout" };
   for (;;) {
+    const watch =
+      timeoutMs > 0
+        ? AbortSignal.timeout(Math.max(0, deadline - Date.now()))
+        : undefined;
+    const bounds = [signal, watch].filter(Boolean);
     try {
-      const outcome = await client.outcome(target, { signal });
+      const outcome = await client.outcome(target, {
+        signal: bounds.length > 1 ? AbortSignal.any(bounds) : bounds[0],
+      });
       failing = null;
+      problem = null;
       last = outcome;
       known = true;
       onChange?.(outcome);
       if (SETTLED.includes(outcome.status)) return { outcome, stopped: null };
     } catch (error) {
       if (signal?.aborted) return { outcome: last, stopped: "signal" };
+      if (watch?.aborted) return timedOut();
       // Only a waiting message can leave: what Pi has read stays in its
       // history.
       if (
@@ -338,6 +375,7 @@ export async function observe(
         return { outcome: dropped(target, last), stopped: null };
       if (!error.transient) throw Object.assign(error, { outcome: last });
       failing ??= Date.now();
+      problem = error;
       if (Date.now() - failing >= patienceMs)
         throw Object.assign(
           new ClientError(
@@ -347,7 +385,7 @@ export async function observe(
           { outcome: last },
         );
     }
-    if (Date.now() >= deadline) return { outcome: last, stopped: "timeout" };
+    if (Date.now() >= deadline) return timedOut();
     try {
       await sleep(Math.min(pollMs, deadline - Date.now()), undefined, {
         signal,

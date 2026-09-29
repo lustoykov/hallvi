@@ -95,4 +95,9 @@ export function observe(
     pollMs?: number;
     patienceMs?: number;
   },
-): Promise<{ outcome: Outcome | null; stopped: "timeout" | "signal" | null }>;
+): Promise<{
+  outcome: Outcome | null;
+  stopped: "timeout" | "signal" | null;
+  /** Set when the time ran out while reads were failing. */
+  problem?: ClientError;
+}>;

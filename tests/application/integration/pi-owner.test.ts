@@ -111,6 +111,7 @@ import {
   RequestNotFoundError,
   requestOutcome,
 } from "../../../src/server/requests";
+import { settleDomain } from "../../../src/server/connection-requests";
 import {
   askWorker,
   WorkerRefusal,
@@ -236,30 +237,45 @@ beforeAll(async () => {
               ],
               "toolUse",
             )
-          : text.includes("[approve]")
+          : text.includes("[dns]")
             ? assistant(
                 model,
                 [
-                  { type: "text", text: "I will ask first." },
+                  { type: "text", text: "I need the name's DNS." },
                   {
                     type: "toolCall",
                     id: `call-${++calls}`,
-                    name: "request_approval",
-                    arguments: { action: "Restart the service" },
+                    name: "request_domain_access",
+                    arguments: { name: "shop.test" },
                   },
                 ],
                 "toolUse",
               )
-            : assistant(
-                model,
-                [
-                  {
-                    type: "text",
-                    text: last.role === "user" ? `reply: ${text}` : "finished",
-                  },
-                ],
-                "stop",
-              );
+            : text.includes("[approve]")
+              ? assistant(
+                  model,
+                  [
+                    { type: "text", text: "I will ask first." },
+                    {
+                      type: "toolCall",
+                      id: `call-${++calls}`,
+                      name: "request_approval",
+                      arguments: { action: "Restart the service" },
+                    },
+                  ],
+                  "toolUse",
+                )
+              : assistant(
+                  model,
+                  [
+                    {
+                      type: "text",
+                      text:
+                        last.role === "user" ? `reply: ${text}` : "finished",
+                    },
+                  ],
+                  "stop",
+                );
       stream.push({ type: "start", partial: message });
       stream.push(
         message.stopReason === "error"
@@ -615,6 +631,33 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
   expect(
     (await a.snapshot()).messages.find((m) => m.id === later)?.origin,
   ).toBeUndefined();
+});
+
+it("waits for input only on the card its own operation asked for", async () => {
+  const a = application("shop");
+  const [first, second] = [randomUUID(), randomUUID()];
+  await a.send("[dns] publish it", "next", first);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(await outcome(a, first)).toMatchObject({
+    status: "waiting-for-input",
+    attention: { kind: "input", reason: expect.stringMatching(/shop\.test/) },
+  });
+  settleDomain(a.id, "manual");
+  expect(await outcome(a, first)).toMatchObject({
+    status: "completed",
+    attention: null,
+  });
+
+  // A later request opens a card of the same kind: it is that request's.
+  await a.send("[dns] and publish it again", "next", second);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(await outcome(a, second)).toMatchObject({
+    status: "waiting-for-input",
+  });
+  expect(await outcome(a, first)).toMatchObject({
+    status: "completed",
+    attention: null,
+  });
 });
 
 it("Stop ends an approval wait and a streaming answer, drops what waited, and says what is true", async () => {

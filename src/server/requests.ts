@@ -133,26 +133,50 @@ export function applicationSummaries() {
   }));
 }
 
+/** One call that asked the owner for something, and when it returned. */
+interface Asking {
+  tool: string;
+  returnedAt: number;
+  /** For a secret, which one. */
+  name?: string;
+}
+
 /**
  * What the owner has been asked for and has not answered yet, read from the
  * records the asking tools wrote. The card is the structured form of the
- * question, so nothing here reads Pi's prose. With `asked`, only what those
- * calls asked for.
+ * question, so nothing here reads Pi's prose.
+ *
+ * With `asked`, only the cards those calls asked for: a card of the same kind
+ * that was open by the time one of them returned, having been opened by it or
+ * already waiting. Asking again keeps a card's opening time, and a card opened
+ * after the call returned belongs to later work, so an answered question never
+ * reopens because somebody asked a new one.
  */
-function openInputs(
-  applicationId: string,
-  asked?: { tools: Set<string>; secrets: Set<string> },
-) {
-  const wanted = (tool: string) => !asked || asked.tools.has(tool);
+function openInputs(applicationId: string, asked?: Asking[]) {
+  const askedFor = (tool: string, openedAt: string | null, name?: string) =>
+    !asked ||
+    (openedAt !== null &&
+      asked.some(
+        (call) =>
+          call.tool === tool &&
+          call.name === name &&
+          Date.parse(openedAt) <= call.returnedAt,
+      ));
   const clean = cleaner(applicationId);
   const open: string[] = [];
   const connections = listConnectionRequests(applicationId).filter(
     (request) => !request.settledAt,
   );
   for (const request of connections) {
-    if (request.kind === "host" && wanted("request_connection"))
+    if (
+      request.kind === "host" &&
+      askedFor("request_connection", request.requestedAt)
+    )
       open.push(`Where it should run: ${clean(request.needs)}`);
-    if (request.kind === "domain" && wanted("request_domain_access"))
+    if (
+      request.kind === "domain" &&
+      askedFor("request_domain_access", request.requestedAt)
+    )
       open.push(
         `How to reach the DNS of ${request.progress.name || "the domain"}.`,
       );
@@ -161,11 +185,14 @@ function openInputs(
   if (
     deployment.askedAt &&
     !deployment.mode &&
-    wanted("request_deployment_choice")
+    askedFor("request_deployment_choice", deployment.askedAt)
   )
     open.push("How it should deploy.");
   for (const secret of listSecrets(applicationId))
-    if (!secret.establishedAt && (!asked || asked.secrets.has(secret.name)))
+    if (
+      !secret.establishedAt &&
+      askedFor("request_secret", secret.requestedAt, secret.name)
+    )
       open.push(`A value for ${secret.name}: ${clean(secret.why)}`);
   return open;
 }
@@ -280,19 +307,23 @@ export async function requestOutcome(
         executionId: asking.executionId ?? undefined,
       };
   } else if (operation.status === "completed") {
-    const open = openInputs(applicationId, {
-      tools: new Set(calls.map((call) => call.tool)),
-      secrets: new Set(
-        calls.flatMap((call) => {
-          const name = (
-            transcript.calls[call.id]?.args as { name?: unknown } | undefined
-          )?.name;
-          return call.tool === "request_secret" && typeof name === "string"
-            ? [name]
-            : [];
-        }),
-      ),
-    });
+    const open = openInputs(
+      applicationId,
+      calls.map((call) => {
+        const name = (
+          transcript.calls[call.id]?.args as { name?: unknown } | undefined
+        )?.name;
+        return {
+          tool: call.tool,
+          // Pi writes a call's result after the tool returns.
+          returnedAt: Date.parse(call.finishedAt ?? operation.endedAt!),
+          name:
+            call.tool === "request_secret" && typeof name === "string"
+              ? name
+              : undefined,
+        };
+      }),
+    );
     status = open.length ? "waiting-for-input" : "completed";
     if (open.length)
       attention = { kind: "input", reason: open.join(" "), page };
