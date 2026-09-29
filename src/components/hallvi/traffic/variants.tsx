@@ -29,6 +29,8 @@ export const VARIANTS = [
   },
 ] as const;
 export type Variant = (typeof VARIANTS)[number]["id"];
+/** The owner chose the country tint on 29 September 2026. */
+const DEFAULT: Variant = "tint";
 
 const CHANGED = "hv-traffic-variant";
 
@@ -45,18 +47,18 @@ const read = () => {
   const wanted = new URLSearchParams(window.location.search).get("variant");
   return VARIANTS.some((variant) => variant.id === wanted)
     ? (wanted as Variant)
-    : "map";
+    : DEFAULT;
 };
 
 /** The treatment in the address, or the default. */
 export function useVariant(): Variant {
-  const variant = useSyncExternalStore(subscribe, read, () => "map" as const);
-  return process.env.NODE_ENV === "production" ? "map" : variant;
+  const variant = useSyncExternalStore(subscribe, read, () => DEFAULT);
+  return process.env.NODE_ENV === "production" ? DEFAULT : variant;
 }
 
 function choose(variant: Variant) {
   const url = new URL(window.location.href);
-  if (variant === "map") url.searchParams.delete("variant");
+  if (variant === DEFAULT) url.searchParams.delete("variant");
   else url.searchParams.set("variant", variant);
   window.history.replaceState(window.history.state, "", url);
   window.dispatchEvent(new Event(CHANGED));
