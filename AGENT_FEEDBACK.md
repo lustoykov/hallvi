@@ -12,6 +12,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | New |
 | [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | New |
+| [AF-019 — Send one review's findings to one branch](#af-019--send-one-reviews-findings-to-one-branch) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -159,6 +160,17 @@ without losing unsent work, or make the required reload clear.
 
 **+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
 [release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
+
+### AF-019 — Send one review's findings to one branch
+
+The traffic v1 review findings were fixed twice in parallel: on main (c0e4bf05)
+and on the feature branch (round 2). Both fixed query-routed pages with
+different event shapes (`q: {k, v}` against `k`), the first live script
+arrival and serialization, and the follow-up merge had to pick one of each
+and port the tests. Naming one branch as the owner of a review's findings, or
+noting on the other which findings are taken, would save that merge.
+
+**+1:** 2026-09-29 — traffic follow-up (`claude/traffic-v1-followup`)
 
 ## Archive
 
