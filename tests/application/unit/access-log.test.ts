@@ -145,6 +145,80 @@ describe("the access log", () => {
     });
   });
 
+  it("counts a page open until it leaves, and one tab changing pages as one", () => {
+    const now = Date.now();
+    const sent = (
+      window: LiveWindow,
+      event: Parameters<typeof eventPath>[0],
+      at: number,
+      address = "203.0.113.9",
+    ) =>
+      window.arrival(
+        request(eventPath(event), at, { beacon: true, address }),
+      );
+    // One tab: a page, then a route change — the first page's leave may be
+    // logged after the next view, and it still closes it.
+    const one = new LiveWindow({ hosts: ["shop.example"], script: true });
+    sent(one, { t: "view", s: "aaaaaaaa11", p: "/" }, now - 20_000);
+    sent(one, { t: "view", s: "bbbbbbbb22", p: "/next" }, now - 10_000);
+    sent(one, { t: "leave", s: "aaaaaaaa11", p: "/", e: 10_000 }, now - 9_000);
+    expect(one.now(now)).toMatchObject({ openNow: 1, recentVisitors: 1 });
+    // Hidden, then shown again: its leave closes it, the next ping reopens.
+    sent(one, { t: "leave", s: "bbbbbbbb22", p: "/next", e: 5_000 }, now - 5_000);
+    expect(one.now(now)).toMatchObject({ openNow: 0 });
+    sent(one, { t: "ping", s: "bbbbbbbb22", p: "/next" }, now - 1_000);
+    expect(one.now(now)).toMatchObject({ openNow: 1 });
+    // Two tabs of one browser are two open pages.
+    const two = new LiveWindow({ hosts: ["shop.example"], script: true });
+    sent(two, { t: "view", s: "aaaaaaaa11", p: "/" }, now - 20_000);
+    sent(two, { t: "view", s: "bbbbbbbb22", p: "/next" }, now - 10_000);
+    expect(two.now(now)).toMatchObject({ openNow: 2, recentVisitors: 1 });
+  });
+
+  it("never shows what a failed or forged event carried", () => {
+    const now = Date.now();
+    const window = new LiveWindow({ hosts: ["shop.example"], script: false });
+    const secret = eventPath({
+      t: "view",
+      s: "abcdefgh12",
+      p: "/reset?token=REVIEW_SECRET#private",
+    });
+    const bare = (path: string) =>
+      Buffer.from(path.slice("/_hv/e/1/".length), "base64url").toString();
+    expect(bare(secret)).toContain("REVIEW_SECRET");
+    // A GET that reached the application, a failure, and a payload that is
+    // no event at all: each an ordinary request, none showing its payload.
+    const shown = [
+      window.arrival(request(secret, now)),
+      window.arrival(
+        parseLine(
+          "caddy-json",
+          line
+            .replace("/checkout/pay?token=secret#x", secret)
+            .replace(
+              '"headers":{}',
+              `"headers":{"User-Agent":["${chrome}"],"Sec-Fetch-Dest":["empty"]}`,
+            ),
+          { hosts: ["shop.example"] },
+        )!,
+      ),
+      window.arrival(
+        request(
+          `/_hv/e/1/${Buffer.from('{"p":"/reset?token=REVIEW_SECRET"').toString("base64url")}`,
+          now,
+        ),
+      ),
+    ];
+    expect(shown).toMatchObject([
+      { kind: "request", path: "/_hv/e/1/" },
+      { kind: "request", path: "/_hv/e/1/", status: 500 },
+      { kind: "request", path: "/_hv/e/1/" },
+    ]);
+    const text = JSON.stringify(shown);
+    expect(text).not.toContain(secret.slice(9, 40));
+    expect(text).not.toMatch(/REVIEW_SECRET|cmVzZXQ/);
+  });
+
   it("accepts a record that says where the log is", () => {
     for (const source of [
       { type: "container", name: "shop-caddy-1" },

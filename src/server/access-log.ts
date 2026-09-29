@@ -19,7 +19,11 @@ import { createHmac, randomBytes } from "node:crypto";
 import type { OperatorSettings } from "./operator-data";
 import { listInformation } from "./saved-information";
 import { classify, hasFetchMetadata, IMITATION } from "./traffic/classify";
-import type { Arrival, TrafficLine } from "./traffic/contract";
+import {
+  EVENT_PREFIX,
+  type Arrival,
+  type TrafficLine,
+} from "./traffic/contract";
 import {
   agentOf,
   arrivalOf,
@@ -53,7 +57,11 @@ export const followCommand = liveLogCommand;
 /** How far back "recent visitors" reach, and the backlog a page is sent. */
 export const LIVE_WINDOW_MINUTES = 5;
 const WINDOW_MS = LIVE_WINDOW_MINUTES * 60_000;
-/** A page is open while its script pinged within this; a view is a ping. */
+/**
+ * A page is open while its script pinged within this and has not left since:
+ * a view is a ping, its `leave` closes it (a route change, the tab hidden),
+ * and a later ping — the tab shown again — opens it again.
+ */
 const OPEN_MS = 60_000;
 
 /**
@@ -73,8 +81,11 @@ export class LiveWindow {
   private readonly withMetadata = new Set<string>();
   /** Browsers, by label, and when each was last seen. */
   private readonly browsers = new Map<string, number>();
-  /** Page views, by the script's id, and when each last pinged. */
-  private readonly open = new Map<string, number>();
+  /**
+   * Page views, by the script's id: when each last pinged and last left.
+   * Events arrive in any order, so a view is open when its ping is later.
+   */
+  private readonly open = new Map<string, { seen: number; left: number }>();
   private script: boolean;
 
   constructor(options: {
@@ -108,8 +119,12 @@ export class LiveWindow {
       const { event } = kind;
       this.script = true;
       this.seen(this.browsers, visitor, line.at);
-      if (event.t === "view" || event.t === "ping")
-        this.seen(this.open, event.s, line.at);
+      if (event.t === "view" || event.t === "ping" || event.t === "leave") {
+        const page = this.open.get(event.s) ?? { seen: 0, left: 0 };
+        if (event.t === "leave") page.left = Math.max(page.left, line.at);
+        else page.seen = Math.max(page.seen, line.at);
+        this.open.set(event.s, page);
+      }
       if (event.t !== "view") return null;
       return {
         at: line.at,
@@ -142,7 +157,14 @@ export class LiveWindow {
       at: line.at,
       kind: bot ? "bot" : view ? "view" : "request",
       script: false,
-      path: view ? this.pageOf(line) : line.path.slice(0, 200),
+      // Sent to the events' path but no event — the wrong method, a failure,
+      // a forgery — it still carries a payload that may hold a whole address
+      // (a reset link's token): it is shown as where it was sent, no more.
+      path: view
+        ? this.pageOf(line)
+        : line.path.startsWith(EVENT_PREFIX)
+          ? EVENT_PREFIX
+          : line.path.slice(0, 200),
       status: line.status,
       ms: line.ms,
       country: country(),
@@ -163,11 +185,13 @@ export class LiveWindow {
   now(at = Date.now()) {
     for (const [key, seen] of this.browsers)
       if (seen < at - WINDOW_MS) this.browsers.delete(key);
-    for (const [id, seen] of this.open)
-      if (seen < at - OPEN_MS) this.open.delete(id);
+    let open = 0;
+    for (const [id, page] of this.open)
+      if (Math.max(page.seen, page.left) < at - OPEN_MS) this.open.delete(id);
+      else if (page.seen >= at - OPEN_MS && page.seen > page.left) open += 1;
     return {
       type: "now" as const,
-      openNow: this.script ? this.open.size : null,
+      openNow: this.script ? open : null,
       recentVisitors: this.browsers.size,
       windowMinutes: LIVE_WINDOW_MINUTES,
     };
