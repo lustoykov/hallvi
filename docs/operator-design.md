@@ -355,7 +355,7 @@ In that first checkpoint, permission settings and per-call execution JSON files 
 
 The old deployment/operation workers, mutation endpoints and approval cards have been deleted. Remaining workflow modules and tables are transitional implementation to remove as the new deployment path replaces them; they are not constraints on that path. No compatibility migration is required.
 
-Verification and limits are recorded in the [checkpoint evidence](testing/2026-09-12-operator-execution.md). This is an execution checkpoint, not a completed deployment journey.
+Verification and limits are recorded in the [checkpoint evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-12-operator-execution.md). This is an execution checkpoint, not a completed deployment journey.
 
 
 ### Server setup belongs in the deployment journey
@@ -403,6 +403,6 @@ Delete decisions, observations, activity events, deployment/operation records an
 
 After the owner accepted the storage UI, PR #55 was merged as `95b3829`. The separate provisioning implementation follows the existing model-owned judgment and permission rules: a general Hetzner REST tool, an application public-key tool, and a connection tool that resolves the provider address, verifies SSH and saves controller credential references. Pi chooses server type, location and image from current evidence and saves its recommendation or preparation outcome through the existing cards.
 
-Bring-your-own-machine setup stays in the conversation. The owner installs the controller-generated public key through their trusted terminal and supplies public connection details plus an ED25519 host-key fingerprint. No secret is pasted into chat and no standalone file-path form returns. Hetzner can pin the host key on first use at the provider-reported address; a supplied fingerprint is checked when available. This limit is explicit in the [checkpoint evidence](testing/2026-09-12-hetzner-provisioning.md).
+Bring-your-own-machine setup stays in the conversation. The owner installs the controller-generated public key through their trusted terminal and supplies public connection details plus an ED25519 host-key fingerprint. No secret is pasted into chat and no standalone file-path form returns. Hetzner can pin the host key on first use at the provider-reported address; a supplied fingerprint is checked when available. This limit is explicit in the [checkpoint evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-12-hetzner-provisioning.md).
 
 Provisioning stops at an SSH-verified host for review. Software installation, application deployment and its reachable URL belong to the next increment. No generic monitoring or recovery machinery is required first.

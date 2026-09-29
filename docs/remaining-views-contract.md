@@ -564,5 +564,5 @@ call, refuses to take a name from whatever already holds it without `replace`,
 and refuses to remove a record whose address is not the one it expects. The
 publishing path it belongs to is described in
 [Architecture](architecture.md#publishing-at-a-domain), and what it was proved
-against is in [that evidence](testing/2026-09-15-publish-custom-domain.md).
+against is in [that evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-15-publish-custom-domain.md).
 The read path above still needs no writes.
