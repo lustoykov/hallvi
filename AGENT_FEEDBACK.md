@@ -12,6 +12,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 1 | New |
 | [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | New |
+| [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -147,6 +148,19 @@ for an early model/worker turn exit, including whether the cause is known,
 so the owner can distinguish an account/provider problem from interruption
 without guessing. This observation does not establish the underlying cause.
 A following queued request successfully continued deployment.
+
+**+1:** 2026-09-29 — installed Mac mini beta verification
+(`codex/installed-beta-feedback`).
+
+### AF-015 — Clear stale fetch errors after reconnection
+
+After restarting an idle installed alpha.8 controller, the open conversation
+reconnected: its worker-unavailable panel disappeared and its deployment
+records returned. The composer still displayed “Failed to fetch”, even though
+the CLI confirmed the worker was alive and idle and the private application
+continued working. Refreshing the page cleared the error. Clear a transient
+read error when the corresponding connection/read has recovered, while keeping
+failed writes or uncertain submissions visible until their outcome is known.
 
 **+1:** 2026-09-29 — installed Mac mini beta verification
 (`codex/installed-beta-feedback`).
