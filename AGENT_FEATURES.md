@@ -48,7 +48,8 @@ selector landed in [PR #256](https://github.com/lustoykov/hallvi/pull/256).
 [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
 cover that increment only. On 2026-09-29 the owner selected increment 2:
 direct main-operator submission and the saved-route tool form. Assigned to
-`codex/reconnect-saved-route`; implementation is in review. It preserves the
+`codex/reconnect-saved-route`, in draft
+[PR #263](https://github.com/lustoykov/hallvi/pull/263). It preserves the
 existing permission, queue and execution evidence contracts and does not add
 an automatic recovery service. The full feature remains partial.
 
