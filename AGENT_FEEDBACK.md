@@ -5,7 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 2 | Accepted |
+| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 3 | Partially improved; pause remains |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
@@ -124,8 +124,25 @@ SSR chunk initialization. Setup loads the full Pi coding-agent entry, and
 model validation also imports Pi AI. Standalone asynchronous SDK imports have
 substantial wall/CPU cost but do not reproduce the page's large event-loop
 delay, so import duration alone does not attribute the whole stall. The pinned
-SDK has no supported narrow model-runtime export; no small supported production
-reduction was established. No runtime optimization was added.
+SDK has no supported narrow model-runtime export.
+
+Next's supported default bundling of Pi AI's public imports reduces a separate
+external module-loading cost. On current main, five fresh production processes
+per build, including a reversed-order repeat, showed a median usable chat opening
+of 894 ms before and 782 ms after (ranges 866–977 ms and 762–799 ms). Readiness
+required an enabled composer and an initial full SSE snapshot. Median document
+TTFB fell from 659 ms to 562 ms, while maximum web event-loop delay stayed around
+300 ms. This is a modest loading improvement, not a fix for the pause. The full
+coding SDK remains external; duplicate model-catalog creation measured under a
+millisecond and was left alone.
+
+These runs used an unsigned assembled production program with Node 22.23.2 on
+the shared Mac, isolated Hallvi and standalone Pi accounts, synthetic OAuth
+credentials, and no model calls. All eight model/effort choices matched between
+builds; preference changes and fresh setup choice worked without a deferred
+first-action delay. This establishes the local loading improvement, not native
+release acceptance or provider authentication. The first-open harness and raw
+results are kept under ignored `work/first-open-runtime/` in the owning worktree.
 
 The earlier [release verification](https://github.com/lustoykov/hallvi/pull/254)
 observed 687 ms after histories were warmed. The packaged investigation confirms
@@ -136,6 +153,8 @@ initial runs which only isolated Hallvi's account were excluded.
 **+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
 
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
+
+**+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
 
 ### AF-017 — Make record validation easier for Pi to recover from
 
