@@ -201,10 +201,10 @@ export async function lookAtBranch(
   applicationId: string,
   signal?: AbortSignal,
 ) {
-  const { branch } = deploymentState(applicationId);
+  const { branch, mode } = deploymentState(applicationId);
   if (!branch) return deploymentState(applicationId);
   try {
-    const tip = await branchTip(applicationId, branch, signal);
+    const tip = await branchTip(applicationId, branch, mode, signal);
     const now = new Date().toISOString();
     return changeDeploymentState(applicationId, (state) =>
       // The owner changed branch while GitHub was answering about the old one.
@@ -236,11 +236,14 @@ export async function lookAtBranch(
 async function branchTip(
   applicationId: string,
   branch: string,
+  mode: DeploymentState["mode"],
   signal?: AbortSignal,
 ) {
   const application = await loadApplication(applicationId);
   const { token } = await repositoryCredential();
-  if (!token)
+  // Public source can be deployed manually without a GitHub connection.
+  // The recurring watch still requires the authenticated rate-limit budget.
+  if (!token && mode !== "manual")
     throw new GithubAccessError(
       "Connect GitHub in Settings → GitHub so Hallvi can watch this branch.",
       "auth",
@@ -274,9 +277,10 @@ export const deploymentChoiceSchema = z.strictObject({
 });
 
 /**
- * Save the owner's choice, having first asked GitHub about that branch the
- * way the watch will. A branch GitHub does not have, or a login it refuses,
- * is refused here rather than saved as a preference nothing can act on.
+ * Save the owner's choice after reading the branch: public manual source
+ * can be read anonymously, while automatic watching requires a connection.
+ * An unreadable branch or a required login that is missing is refused here
+ * rather than saved as a preference nothing can act on.
  */
 export async function chooseDeployment(
   applicationId: string,
@@ -288,17 +292,20 @@ export async function chooseDeployment(
   const branch = choice.branch ?? before.branch;
   const mode = choice.mode ?? before.mode;
   if (mode && !branch) throw new Error("Say which branch to deploy from.");
-  if (branch && (branch !== before.branch || !before.mode)) {
+  if (
+    branch &&
+    (branch !== before.branch || mode !== before.mode || !before.mode)
+  ) {
     etags.delete(applicationId);
     try {
-      await branchTip(applicationId, branch, signal);
+      await branchTip(applicationId, branch, mode, signal);
     } catch (error) {
       // Only GitHub being away is let through: the look below records it and
       // the watch keeps trying. Anything else would never start working.
       if (!(error instanceof GithubAccessError) || error.kind !== "unavailable")
         throw error instanceof GithubAccessError && error.kind === "access"
           ? new GithubAccessError(
-              `GitHub has no branch “${branch}” that this login can read. Check the name, and the repository's access on GitHub.`,
+              `GitHub has no branch “${branch}” that Hallvi can read. Check the name, and the repository's access on GitHub. Private repositories need a GitHub connection in Settings.`,
               "access",
             )
           : error;
