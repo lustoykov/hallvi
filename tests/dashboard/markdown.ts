@@ -1,4 +1,4 @@
-// A small Markdown renderer for the acceptance guide: headings, paragraphs,
+// A small Markdown renderer for developer documents: headings, paragraphs,
 // flat lists, pipe tables, fenced code,
 // bold, italics, code spans and links. Every character of source text is
 // HTML-escaped; raw HTML never passes through.
@@ -14,14 +14,14 @@ const escape = (text: string) =>
 const slug = (text: string) =>
   text
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .replace(/\s/g, "-");
 const safeHref = (href: string) =>
   /^(https?:\/\/|mailto:|#|\/|\.{0,2}\/|[a-z0-9_.-]+(\/|\.md|#|$))/i.test(
     href,
   ) && !/^[a-z]+:/i.test(href.replace(/^https?:|^mailto:/i, ""));
 
-function inline(text: string): string {
+function inline(text: string, linkBase?: string): string {
   return text
     .split(/(`[^`]+`)/)
     .map((part) => {
@@ -31,7 +31,9 @@ function inline(text: string): string {
       html = html.replace(
         /\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g,
         (_match, label: string, href: string) =>
-          safeHref(href) ? `<a href="${href}">${label}</a>` : label,
+          safeHref(href)
+            ? `<a href="${linkBase && !/^(#|https?:|mailto:)/i.test(href) ? escape(new URL(href.replace(/&amp;/g, "&"), linkBase).href) : href}">${label}</a>`
+            : label,
       );
       html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
       html = html.replace(
@@ -55,13 +57,14 @@ const cells = (row: string) =>
     .map((cell) => cell.trim());
 const listItem = /^(\s*)([-*]|\d+\.)\s+(.*)$/;
 
-export function renderMarkdown(source: string): string {
+export function renderMarkdown(source: string, linkBase?: string): string {
+  const renderInline = (text: string) => inline(text, linkBase);
   const lines = source.replace(/\r\n?/g, "\n").split("\n");
   const out: string[] = [];
   const paragraph: string[] = [];
   const flush = () => {
     if (paragraph.length) {
-      out.push(`<p>${inline(paragraph.join(" "))}</p>`);
+      out.push(`<p>${renderInline(paragraph.join(" "))}</p>`);
       paragraph.length = 0;
     }
   };
@@ -86,7 +89,9 @@ export function renderMarkdown(source: string): string {
       flush();
       const level = heading[1].length;
       const text = heading[2].trim();
-      out.push(`<h${level} id="${slug(text)}">${inline(text)}</h${level}>`);
+      out.push(
+        `<h${level} id="${slug(text)}">${renderInline(text)}</h${level}>`,
+      );
       index++;
       continue;
     }
@@ -98,7 +103,7 @@ export function renderMarkdown(source: string): string {
       while (index < lines.length && /^\|/.test(lines[index]))
         rows.push(cells(lines[index++]));
       out.push(
-        `<table><thead><tr>${header.map((cell) => `<th>${inline(cell)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${inline(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`,
+        `<table><thead><tr>${header.map((cell) => `<th>${renderInline(cell)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${renderInline(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`,
       );
       continue;
     }
@@ -117,7 +122,7 @@ export function renderMarkdown(source: string): string {
           !listItem.test(lines[index])
         )
           text += ` ${lines[index++].trim()}`;
-        items.push(`<li>${inline(text)}</li>`);
+        items.push(`<li>${renderInline(text)}</li>`);
       }
       out.push(
         `<${ordered ? "ol" : "ul"}>${items.join("")}</${ordered ? "ol" : "ul"}>`,
@@ -129,7 +134,9 @@ export function renderMarkdown(source: string): string {
       const quote: string[] = [];
       while (index < lines.length && /^>\s?/.test(lines[index]))
         quote.push(lines[index++].replace(/^>\s?/, ""));
-      out.push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`);
+      out.push(
+        `<blockquote>${renderMarkdown(quote.join("\n"), linkBase)}</blockquote>`,
+      );
       continue;
     }
     if (/^(-{3,}|\*{3,})\s*$/.test(line)) {
@@ -151,16 +158,21 @@ export function renderMarkdown(source: string): string {
 }
 
 /**
- * The guide inside the dashboard shell: same stylesheet and topbar, no script.
+ * Read-only documents inside the dashboard shell, without a client script.
  */
-export function guidePage(body: string, title: string) {
+export function guidePage(
+  body: string,
+  title: string,
+  appUrl: string,
+  page = "/guide",
+) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(title)} · Hallvi Testing</title><link rel="stylesheet" href="/dashboard.css"></head>
 <body>
   <header class="topbar">
     <a class="brand" href="/"><strong>Hallvi</strong><span class="brand-tag">Testing</span></a>
-    <nav class="pages" aria-label="Pages"><a href="/">Run checks</a><a href="/evals">Eval runs</a><a href="/about">How it works</a></nav>
-    <nav class="resources" aria-label="Resources"><a href="/guide" aria-current="page">Acceptance guide</a><a href="http://127.0.0.1:3000/applications" target="_blank" rel="noreferrer">Open app</a></nav>
+    <nav class="pages" aria-label="Pages"><a href="/">Run checks</a><a href="/evals">Eval archive</a><a href="/development">Development</a><a href="/feedback"${page === "/feedback" ? ' aria-current="page"' : ""}>Agent feedback</a><a href="/releases">Releases</a><a href="/about">How it works</a></nav>
+    <nav class="resources" aria-label="Resources"><a href="/guide"${page === "/guide" ? ' aria-current="page"' : ""}>Acceptance guide</a><a href="${escape(appUrl)}/applications" target="_blank" rel="noreferrer">Open app</a></nav>
   </header>
   <main class="guide"><article class="markdown">${body}</article></main>
 </body></html>`;

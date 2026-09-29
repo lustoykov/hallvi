@@ -114,3 +114,11 @@ Three rules they follow, which are the reason they are worth having:
 They are read when their page is opened rather than polled: nothing on them
 changes by itself except a workflow run, and `gh` every 2.5 seconds would be
 rude to the laptop and to GitHub.
+
+Agent feedback (`/feedback`) is a separate read-only document page in the same
+topbar and Acceptance guide typography. It renders the canonical local
+`AGENT_FEEDBACK.md` on every request, preserving its request table, +1 counts,
+status text and fragment links to request headings. Reloading shows local edits;
+feedback moves between worktrees through merges. Repository links open GitHub
+main. A missing file keeps the shell and shows a recovery message to check the
+file and reload. The page adds no editing controls or visual system changes.
