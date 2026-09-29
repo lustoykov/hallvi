@@ -72,7 +72,7 @@ with its recorded outcomes.
 **+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
 (`codex/overview-subject-verdict`), observed again in its isolated browser proof.
 
-**Disposition:** The same bounded correction labels only passing groups as
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) labels only passing groups as
 passed; failed, informational and planned groups keep a neutral check count.
 
 ### AF-019 — Keep deployment failures out of passing server checks
@@ -87,7 +87,7 @@ host checks must still report failure.
 **+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
 (`codex/overview-subject-verdict`).
 
-**Disposition:** A bounded projection correction is in review; the regression
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) corrects the projection; the regression
 keeps the application failure visible and the passed host checks consistent
 with the timeline. Verification workflow guidance worked as written.
 
