@@ -1,5 +1,9 @@
 # Testing Hallvi
 
+For a task's end-to-end verification path, use the shared
+[verify-hallvi skill](../.agents/skills/verify-hallvi/SKILL.md) and
+[guide](../docs/verification.md). This document owns the testing bar and runners.
+
 ## The 80/20 bar
 
 We are discovering and polishing the product. Tests should help us change it
@@ -66,7 +70,8 @@ Use a small representative set of redacted transcripts and execution records, wi
 ## Commands and limits
 
 `npm test` runs the application tests; `npm run test:e2e:smoke` runs the browser
-smoke subset; `npm run test:operator` runs the Python checks for the host-side
+smoke subset; `npm run checks` runs everything the GitHub checks workflow runs and
+prints a summary to put in a pull request; `npm run test:operator` runs the Python checks for the host-side
 scripts under `scripts/` — the scheduled-backup runner's bounded failures,
 receipts and recovery path, and the SQLite backup proof. They need
 `python3` 3.11 or newer — the runner hashes with `hashlib.file_digest` — and
@@ -79,7 +84,7 @@ default. Tests use disposable databases and synthetic provider/model responses.
 The shared-information browser case covers rich cards in chat and Deployment
 after refresh. `npx tsc --noEmit` and `npm run build` check the application bundle.
 
-Conversation coverage runs against the installed Pi packages with only the model scripted. `integration/pi-owner.test.ts` runs the app and the worker's session owner over the real socket, with Hallvi's real tools and database: no acceptance without a worker, a repeated send being one instruction, approval before execution with evidence placed by Pi's tool-call id, two applications on one server and a side conversation at once, follow-up and steer order, Stop, restart with explicit Continue or Stop, an idle lane's queue, and retry, compaction and failure left to Pi. It is also where the undocumented Pi behaviour Hallvi depends on is pinned. `integration/pi-sessions.test.ts` covers opening an earlier history with its original kept, `integration/db-upgrade.test.ts` the database upgrade and its rollback copy, `integration/pi-shared-account.test.ts` authentication through Pi's own `ModelRuntime`, and `integration/operator-execution.test.ts` permissions and approvals. `tests/browser/worker-restart.spec.ts` kills the real worker process mid-answer. Journeys that are about the page rather than Pi (`pi-transcript`, `streaming-output`, `still-working`, `typed-information`) stand in for the worker on its socket with a scripted transcript (`tests/browser/scripted-worker.ts`); evidence on disk is still placed by the real app. `tests/application/unit/chat-recovery.test.tsx` covers the recovery UI.
+Conversation coverage runs against the installed Pi packages with only the model scripted. `integration/pi-owner.test.ts` runs the app and the worker's session owner over the real socket, with Hallvi's real tools and database: no acceptance without a worker, a repeated send being one instruction, approval before execution with evidence placed by Pi's tool-call id, two applications on one server and a side conversation at once, follow-up and steer order, Stop, restart with explicit Continue or Stop, an idle lane's queue, retry, compaction and failure left to Pi, and a request's outcome being the Pi operation that read it, shared by what Pi read together. It is also where the undocumented Pi behaviour Hallvi depends on is pinned. `integration/pi-sessions.test.ts` covers opening an earlier history with its original kept, `integration/db-upgrade.test.ts` the database upgrade and its rollback copy, `integration/pi-shared-account.test.ts` authentication through Pi's own `ModelRuntime`, and `integration/operator-execution.test.ts` permissions and approvals. `tests/browser/worker-restart.spec.ts` kills the real worker process mid-answer. `tests/browser/cli.spec.ts` runs the `hallvi` request commands as separate processes against the real app and worker: one request's identity through apps, exec, wait and inspect, background, timeout and Ctrl-C leaving the work with Pi, a lost acknowledgement, and an Always ask approval given in the page; `unit/controller-client.test.ts` covers choosing the controller, resending under the same key and refusing redirects against stand-ins. Journeys that are about the page rather than Pi (`pi-transcript`, `streaming-output`, `still-working`, `typed-information`) stand in for the worker on its socket with a scripted transcript (`tests/browser/scripted-worker.ts`); evidence on disk is still placed by the real app. `tests/application/unit/chat-recovery.test.tsx` covers the recovery UI.
 
 A browser case asserts what the product says, not what a past layout said. Scope
 by landmark and accessible name rather than by layout class: a routine record is

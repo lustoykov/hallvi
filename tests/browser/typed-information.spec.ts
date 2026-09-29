@@ -209,21 +209,20 @@ test("records render in chat and their views, survive refresh, and update by rec
     // a page composed from the same records. What it owes the reader is the
     // release that is running and an honest account of the way in.
     //
-    // The live strip names the running revision and host. Image evidence
-    // belongs to the release's expandable register row.
+    // The status line names the running revision; the full commit, the host
+    // and the image evidence belong to the release's expandable row below.
     await expect(
-      view.getByText("Running abcdef0", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      view.getByText(/abcdef012345 on fixture-server/),
-    ).toBeVisible();
+      view.getByRole("region", { name: "What is running" }),
+    ).toContainText("Running abcdef0");
     const releaseRow = (change: string) =>
       view.getByRole("row").filter({
         has: page.getByRole("cell", { name: change, exact: true }),
       });
     await expect(releaseRow("Added container packaging")).toBeVisible();
-    // The address is named, and named as not answering, rather than offered.
-    await expect(view.getByText(/The tunnel is closed, so/)).toBeVisible();
+    // A way in that is closed is said, with how to reopen it, never offered.
+    await expect(
+      view.getByText("The tunnel is closed", { exact: true }),
+    ).toBeVisible();
     await expect(
       view.getByRole("button", { name: "Open the connection again" }),
     ).toBeVisible();
