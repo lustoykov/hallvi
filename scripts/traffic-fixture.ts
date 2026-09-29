@@ -9,7 +9,7 @@
 //     --shape spa --rate 20 [--minutes 10] [--seed 7]
 //   node --import tsx scripts/traffic-fixture.ts verify --format caddy-json
 //     [--time-zone Europe/Sofia] <files…>
-//   node --import tsx scripts/traffic-fixture.ts ranges <dbip-country.csv.gz>
+//   node --import tsx scripts/traffic-fixture.ts ranges [<dbip-country.mmdb>]
 //
 // The design forbids writing numbers into databases: realistic traffic has
 // to reach Hallvi the way real traffic does. So `backfill` writes history as
@@ -46,6 +46,7 @@ import {
   inflateSync,
   zstdDecompressSync,
 } from "node:zlib";
+import { Reader, type Response } from "mmdb-lib";
 
 import {
   EVENT_PREFIX,
@@ -117,8 +118,9 @@ const HELP = `Realistic traffic through the real pipeline, and an independent co
       prints JSON: requests, views, 5xx errors, bots, events by type and
       distinct address and user agent. It imports none of Hallvi's counting.
 
-  ranges <dbip-country-lite.csv.gz>
-      Checks every address block against DB-IP Lite's countries.
+  ranges [<dbip-country.mmdb>]
+      Checks that every address block lies in one country, the one meant,
+      in the DB-IP Lite database Hallvi ships (or the one named).
 
 Every line carries an X-Hallvi-Fixture header: browser, bot, client or hallvi.
 `;
@@ -2028,6 +2030,10 @@ function probe(
     const [path, query = ""] = probe.split("?");
     const post = /xmlrpc|cgi-bin|\/_hv\/e\//.test(path) && random.chance(0.7);
     const event = path.startsWith(EVENT_PREFIX);
+    // A probe for one of the site's pages gets the page, and a single-page
+    // application answers everything with its index.html.
+    const page = !post && (plan.shape === "spa" || sectionOf(plan, path));
+    const [bytes] = DOCUMENT[sectionOf(plan, path) ?? "home"];
     const hit = day.emit(
       "bot",
       connection,
@@ -2050,10 +2056,10 @@ function probe(
       event
         ? { status: 204, size: 0, type: null, ms: 0.1, proxy: true }
         : {
-            status: 404,
-            size: 6_120,
+            status: page ? 200 : 404,
+            size: page ? (plan.shape === "spa" ? 1_120 : bytes) : 6_120,
             type: "text/html; charset=utf-8",
-            ms: random.around(6, 0.5),
+            ms: random.around(page ? 25 : 6, 0.5),
           },
     );
     at = hit.at + random.around(250, 0.8);
@@ -3588,9 +3594,6 @@ function finishDay({ sets, ...day }: ReturnType<typeof emptyDay>) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Ranges: every block against DB-IP Lite's countries.
-
 /** A log file's text, whether gzipped or not. */
 function readLog(file: string) {
   let raw: Buffer;
@@ -3603,69 +3606,65 @@ function readLog(file: string) {
   return (zipped ? gunzipSync(raw) : raw).toString("utf8");
 }
 
+// ---------------------------------------------------------------------------
+// Ranges: every block against the country database Hallvi looks up in.
+
+/** The DB-IP Lite database Hallvi ships (src/server/traffic/enrich.ts). */
+const COUNTRY_DATABASE =
+  "node_modules/@ip-location-db/dbip-country-mmdb/dbip-country.mmdb";
+
 function ranges(files: string[]) {
-  if (!files[0])
-    fail("Give the DB-IP Lite country CSV (dbip-country-lite-YYYY-MM.csv.gz).");
-  const text = readLog(files[0]);
-  // Both families as one number line: v4 below 2^32, v6 far above it.
-  const number = (address: string) =>
-    address.includes(":")
-      ? (1n << 64n) + parseV6(address)
-      : BigInt(parseV4(address));
-  const entries: [bigint, bigint, string][] = [];
-  for (const row of text.split("\n")) {
-    const [from, to, country] = row.trim().split(",");
-    if (country) entries.push([number(from), number(to), country]);
+  const file = files[0] ?? COUNTRY_DATABASE;
+  let reader: Reader<Response>;
+  try {
+    reader = new Reader(readFileSync(file));
+  } catch {
+    fail(`Cannot read ${file}: run npm ci, or name a DB-IP country .mmdb.`);
   }
-  entries.sort((a, b) => (a[0] < b[0] ? -1 : 1));
-  // A block is right when every entry that overlaps it names its country
-  // and together they cover it without a hole.
-  const check = (low: bigint, high: bigint, country: string) => {
-    let lo = 0;
-    let hi = entries.length - 1;
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2);
-      if (entries[mid][0] <= low) lo = mid;
-      else hi = mid - 1;
-    }
-    const seen = new Set<string>();
-    let next = low;
-    for (
-      let index = lo;
-      index < entries.length && entries[index][0] <= high;
-      index++
-    ) {
-      const [from, to, name] = entries[index];
-      if (to < low) continue;
-      if (from > next) seen.add("(none)");
-      seen.add(name);
-      next = to + 1n;
-    }
-    if (next <= high) seen.add("(none)");
-    return seen.size === 1 && seen.has(country) ? null : [...seen].join(" ");
-  };
-  const blocks: [string, string][] = [];
-  for (const [country, place] of Object.entries(COUNTRIES))
-    for (const block of [...place.v4, ...place.v6])
-      blocks.push([block, country]);
-  for (const network of Object.values(NETWORKS))
-    for (const block of [...network.v4, ...network.v6])
-      blocks.push([block, network.country]);
+  const places = [
+    ...Object.entries(COUNTRIES).map(([country, place]) => ({
+      country,
+      ...place,
+    })),
+    ...Object.values(NETWORKS),
+  ];
+  let blocks = 0;
   let wrong = 0;
-  for (const [block, country] of blocks) {
-    const [base, bits] = block.split("/");
-    const low = number(base);
-    const span = BigInt(base.includes(":") ? 128 : 32) - BigInt(bits);
-    const found = check(low, low + (1n << span) - 1n, country);
-    if (found !== null) {
+  for (const { country, v4, v6 } of places)
+    for (const block of [...v4, ...v6]) {
+      blocks++;
+      const found = countriesIn(reader, block);
+      if (found.size === 1 && found.has(country)) continue;
       wrong++;
-      console.log(`${block}: meant ${country}, DB-IP says ${found}`);
+      console.log(`${block}: meant ${country}, DB-IP says ${[...found]}`);
     }
-  }
   console.log(
-    `${blocks.length - wrong} of ${blocks.length} blocks lie wholly in the country meant.`,
+    `${blocks - wrong} of ${blocks} blocks lie wholly in the country meant.`,
   );
   if (wrong) process.exitCode = 1;
+}
+
+/** Every country the database gives inside a block, network by network. */
+function countriesIn(reader: Reader<Response>, block: string) {
+  const [base, prefix] = block.split("/");
+  const v6 = base.includes(":");
+  const bits = v6 ? 128 : 32;
+  const first = v6 ? parseV6(base) : BigInt(parseV4(base));
+  const last = first + (1n << BigInt(bits - Number(prefix))) - 1n;
+  const found = new Set<string>();
+  for (let at = first; at <= last;) {
+    const [record, length] = reader.getWithPrefixLength(
+      v6 ? formatV6(at) : formatV4(Number(at)),
+    );
+    found.add(
+      (record as { country_code?: string } | null)?.country_code ?? "(none)",
+    );
+    // A v4 address sits 96 bits deep in the database's v6 tree.
+    const own = !v6 && length > 32 ? length - 96 : length;
+    const size = 1n << BigInt(bits - own);
+    at = (at / size + 1n) * size;
+  }
+  return found;
 }
 
 // ---------------------------------------------------------------------------

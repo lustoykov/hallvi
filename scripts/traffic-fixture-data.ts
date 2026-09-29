@@ -7,9 +7,10 @@
 // in autumn 2026.
 //
 // Every address block is a residential, mobile or hosting network that DB-IP
-// Lite (CC BY 4.0, September 2026) places in one country across the whole
-// block, so the country Hallvi looks up is the one the generator meant. After
-// a DB-IP update, check them again with the fixture's `ranges` command.
+// Lite (CC BY 4.0) places in one country across the whole block — in the
+// database Hallvi ships and in September 2026's — so the country Hallvi looks
+// up is the one the generator meant. After a DB-IP update, check them again
+// with the fixture's `ranges` command.
 
 export const SHAPES = ["busy", "spa", "tiny", "api"] as const;
 export type Shape = (typeof SHAPES)[number];
@@ -85,7 +86,7 @@ export const COUNTRIES: Record<string, Country> = {
     offset: 10,
     language: "en-AU,en;q=0.9",
     v4: ["1.120.0.0/16", "1.40.0.0/16", "106.68.0.0/16"],
-    v6: ["2001:8000::/32"],
+    v6: ["2001:8003::/32"],
   },
   ES: {
     offset: 2,
@@ -395,7 +396,7 @@ export const NETWORKS: Record<
   ovh: { country: "FR", v4: ["37.187.0.0/17", "5.135.128.0/19"], v6: [] },
   hetzner: {
     country: "DE",
-    v4: ["5.9.0.0/17", "2.28.0.0/16"],
+    v4: ["5.9.0.0/17", "46.4.0.0/16"],
     v6: ["2a06:be80::/32"],
   },
   selectel: { country: "RU", v4: ["87.228.0.0/17"], v6: [] },

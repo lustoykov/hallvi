@@ -1,9 +1,9 @@
 // The traffic fixture (scripts/traffic-fixture.ts) writes the history the
 // traffic pages are judged on, so it has to come out the same every time and
 // read like each proxy's own log. What matters here: one seed writes the
-// same bytes, files are named as the real rotation names them, and every
-// line is one the reader for its format can take, with script events the
-// contract's own decoder accepts.
+// same bytes, files are named as the real rotation names them, and Hallvi's
+// own reader takes every line of every format — all but Hallvi's own checks,
+// which it leaves out on purpose — with script events the contract decodes.
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,13 +11,17 @@ import { join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { parseCaddyLine } from "@/server/access-log";
-import { EVENT_PREFIX, eventOf } from "@/server/traffic/contract";
+import {
+  EVENT_PREFIX,
+  eventOf,
+  type LogFormat,
+} from "@/server/traffic/contract";
+import { parseLine } from "@/server/traffic/parse";
 
 const root = mkdtempSync(join(tmpdir(), "hallvi-traffic-fixture-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-function backfill(format: string, out: string, seed = "3") {
+function backfill(format: LogFormat, out: string, seed = "3") {
   const dir = join(root, out);
   const result = spawnSync(
     process.execPath,
@@ -39,13 +43,21 @@ function backfill(format: string, out: string, seed = "3") {
   return files.map((name) => ({ name, bytes: readFileSync(join(dir, name)) }));
 }
 
-function linesOf(files: { name: string; bytes: Buffer }[]) {
+/** Each line, what the fixture marked it as, and what Hallvi reads. */
+function read(format: LogFormat, files: { name: string; bytes: Buffer }[]) {
   return files.flatMap(({ name, bytes }) =>
     (name.endsWith(".gz") ? gunzipSync(bytes) : bytes)
       .toString("utf8")
       .trimEnd()
       .split("\n")
-      .map((line) => ({ line, entry: JSON.parse(line) })),
+      .map((text) => {
+        const entry = JSON.parse(text);
+        const kind: string =
+          entry.request?.headers?.["X-Hallvi-Fixture"]?.[0] ??
+          entry["request_X-Hallvi-Fixture"] ??
+          entry.fixture;
+        return { kind, line: parseLine(format, text) };
+      }),
   );
 }
 
@@ -58,60 +70,39 @@ describe("the traffic fixture", () => {
       expect(name).toMatch(
         /^access-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d\.\d{3}-size\.log\.gz$/,
       );
-
-    const caddy = linesOf(first);
-    const kinds = new Set(
-      caddy.map(({ entry }) => entry.request.headers["X-Hallvi-Fixture"]?.[0]),
-    );
-    expect(["bot", "browser", "client", "hallvi"]).toEqual(
-      expect.arrayContaining([...kinds]),
-    );
-    // Pi's filter leaves no query string; today's live reader takes every
-    // line but Hallvi's own checks.
-    expect(
-      caddy.filter(
-        ({ line, entry }) =>
-          entry.request.uri.includes("?") ||
-          (parseCaddyLine(line) === null) !==
-            (entry.request.headers["X-Hallvi-Fixture"][0] === "hallvi"),
-      ),
-    ).toEqual([]);
-    const events = caddy.filter(
-      ({ entry }) =>
-        entry.request.uri.startsWith(EVENT_PREFIX) &&
-        entry.request.headers["X-Hallvi-Fixture"][0] === "browser",
-    );
-    expect(events.length).toBeGreaterThan(100);
-    expect(
-      events.filter(({ entry }) => eventOf(entry.request.uri) === null),
-    ).toEqual([]);
   }, 60_000);
 
-  it("writes lines Traefik's and nginx's readers can take", () => {
-    const traefik = backfill("traefik-json", "traefik");
-    // logrotate with delaycompress, as Traefik's logs are rotated.
-    expect(traefik.map((file) => file.name)).toEqual([
+  it("writes lines Hallvi reads, in every format", () => {
+    const files = {
+      "caddy-json": backfill("caddy-json", "caddy"),
+      "traefik-json": backfill("traefik-json", "traefik"),
+      "hallvi-json": backfill("hallvi-json", "nginx"),
+    };
+    // logrotate with delaycompress, as nginx's and Traefik's logs rotate.
+    expect(files["traefik-json"].map((file) => file.name)).toEqual([
       "access.log.1",
       "access.log.2.gz",
     ]);
-    expect(
-      linesOf(traefik).filter(
-        ({ entry }) =>
-          Object.keys(entry).join() !== Object.keys(entry).sort().join() ||
-          !entry["request_X-Hallvi-Fixture"] ||
-          !Number.isFinite(Date.parse(entry.StartUTC)) ||
-          typeof entry.DownstreamStatus !== "number",
-      ),
-    ).toEqual([]);
-
-    // Hallvi's own nginx line: every value a string, no query anywhere.
-    expect(
-      linesOf(backfill("hallvi-json", "nginx")).filter(
-        ({ entry: { hallvi, ...fields } }) =>
-          hallvi !== 1 ||
-          Object.values(fields).some((value) => typeof value !== "string") ||
-          /[?#]/.test(fields.path + fields.referrer),
-      ),
-    ).toEqual([]);
+    for (const format of Object.keys(files) as LogFormat[]) {
+      const lines = read(format, files[format]);
+      expect(
+        lines.filter(
+          ({ kind, line }) =>
+            !["browser", "bot", "client", "hallvi"].includes(kind) ||
+            (line === null) !== (kind === "hallvi") ||
+            line?.path.includes("?"),
+        ),
+        format,
+      ).toEqual([]);
+      const events = lines.filter(
+        ({ kind, line }) =>
+          kind === "browser" && line?.path.startsWith(EVENT_PREFIX),
+      );
+      expect(events.length, format).toBeGreaterThan(100);
+      expect(
+        events.filter(({ line }) => eventOf(line!.path) === null),
+        format,
+      ).toEqual([]);
+    }
   }, 60_000);
 });
