@@ -11,7 +11,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Diagrams](architecture/README.md) | Every diagram under `docs/architecture/`, which document owns each one, and which are historical. |
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
-| [Working from a terminal](cli.md) | `hallvi apps`, `exec`, `wait` and `inspect`: sending work to an application of a named, running controller and reading what was recorded; the JSON, exit codes and limits. |
+| [Working from a terminal](cli.md) | `hallvi apps`, `exec`, `wait` and `inspect`: sending work to an application of a named, running controller and reading what was recorded; a [worked coding-agent example](cli.md#from-your-coding-agent), JSON, exit codes and limits. |
 | [Installing Hallvi](installation.md) | The installed background service on macOS and Linux: building the package, install paths, `hallvi start/stop/status`, startup behavior, using an installation on a virtual machine from a laptop, upgrade, uninstall and current limits. |
 | [Beta precautions](beta-safety.md) | Practical risks and safeguards for the current alpha when granting server and repository access. |
 | [Development setup](development.md) | Run a checkout locally, open its paired dashboard and database viewer, inspect diagnostics and choose proportionate checks. |

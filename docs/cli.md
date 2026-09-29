@@ -61,6 +61,77 @@ takes no timeout. A request is limited as the page's are, to
 server. `inspect` is bounded: the 25 newest records Pi presented and the 20
 newest executions, with counts of the rest.
 
+## From your coding agent
+
+Give your existing local coding agent the controller URL, the application to
+work on and a bounded request. It uses the installed `hallvi` command on the
+controller machine; [development checkouts](#from-a-development-checkout) use
+`node scripts/cli.mjs` instead. For example, ask it to check an existing whoami
+application without changing it.
+
+Replace the URL and IDs with the ones you verified. Keep request/output files
+in a new task folder; output may contain private application data.
+
+```sh
+export HALLVI_CONTROLLER_URL='http://127.0.0.1:<controller-port>'
+hallvi apps --json
+APP_ID='<UUID for the intended application from applications[]>'
+hallvi inspect "$APP_ID" --json
+```
+
+Confirm the returned `controller`, application/repository, host, `mainChatId`
+and `permissionMode`. Check `main` and `attention` before sending: an unavailable
+worker or existing interrupted work needs attention, not another request.
+These reads describe recorded state; the request below asks Pi to make a fresh
+observation.
+
+Write `request.txt` with the actual application URL, expected name and a unique
+marker:
+
+```text
+Read-only check: GET <application URL>/api with the header
+X-Hallvi-Verification: <unique marker>. Report the HTTP status, the application
+name against <expected name>, and whether that same marker was echoed.
+Report the running commit or immutable image identity if it can be established,
+and which evidence establishes it. Do not redeploy, restart, change configuration,
+create resources or alter application data. Report missing or failed checks.
+```
+
+Send it once, keeping its text and a fresh lowercase UUID for retries:
+
+```sh
+REQUEST_KEY='<fresh lowercase UUID>'
+hallvi exec "$APP_ID" - --request-key "$REQUEST_KEY" --background --json \
+  < request.txt > accepted.json
+HANDLE='<handle returned in accepted.json>'
+hallvi wait "$HANDLE" --timeout 120 --json > outcome.json
+hallvi inspect "$APP_ID" --json
+```
+
+Read the JSON even when a command exits nonzero; continue only with a returned
+handle. Background `accepted: true` with `status: null` means Pi has the request,
+not that the check passed. For an approval wait, the owner acts at
+`attention.page` in Hallvi, then the agent runs `wait` on the same handle.
+An input card starts new work when answered; the original handle still describes
+its original operation. Follow the [status contract](#what-a-request-becomes)
+for input, interrupted or unknown outcomes. A timeout stops observation only;
+follow the handle again. To settle unknown acceptance, resend the unchanged
+file with the same `--request-key`, as [sending and following](#sending-and-following)
+describes. Never switch permission modes or invent a new key to get past a wait.
+
+Match `REQUEST_KEY` in `outcome.json` to `operation.requestKeys` and use that
+operation's `evidence`, rather than the newest execution from `inspect`.
+If a relevant excerpt is truncated and has a non-null `executionId`, read it:
+
+```sh
+hallvi inspect "$APP_ID" --execution '<executionId from outcome.evidence>' --json
+```
+
+The agent's final explanation should name what was observed, when, and what
+failed or remains unknown. HTTP 200 alone does not satisfy this example: the
+expected name and fresh echoed marker must match. Read the answer and the
+[evidence/omission flags](#output) even when the status is `completed`.
+
 ## Sending and following
 
 `exec` makes the request key first, fetches the main conversation, and sends
