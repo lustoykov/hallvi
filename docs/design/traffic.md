@@ -138,8 +138,10 @@ away, the log was unreadable). Charts draw a gap as a gap, never as zero.
 - **Response times** are stored as a fixed-bucket histogram per hour
   (`LATENCY_BUCKETS_MS`); a range's percentile comes from the merged
   histogram, never from averaging percentiles. Page speed works the same way.
-- Top lists are stored per day with enough entries (and an "other" row) that a
-  range merges them exactly for everything shown.
+  A percentile past the last bound is only a floor and reads "at least".
+- Top lists are stored per day with up to 1,000 entries and an "other" row,
+  so a range merges them exactly — except a list the history names in
+  `partialLists`, whose figures are floors and read "at least".
 - Days are cut in the controller's time zone, recorded with each day.
 
 ### The script
@@ -353,7 +355,8 @@ All of it reads stored totals immediately; none of it waits for Pi.
 - **Overview:** a small tile — today's estimated visitors against a usual day,
   a live pulse, errors visitors hit only when there are some.
 - **Deployment:** on each release, what changed in the two hours after it
-  against the two before — "errors on /checkout 0 → 14, about 9 visitors" —
+  against the two before, leaving out the hour the release fell in so a
+  failure before it is never counted after it — "errors on /checkout 0 → 14, about 9 visitors" —
   and nothing when nothing changed.
 - **Monitoring:** requests, errors and response times from the same totals,
   instead of asking Pi to read a day.
