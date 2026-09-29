@@ -87,6 +87,10 @@ Jev is a viable candidate to test for ambiguous-signal triage and wakeup recomme
 
 Pi login and model preferences use a persistent machine account directory across default development previews; application data remains separate. Explicit controller directories stay isolated unless a shared Pi directory is selected. See [setup](README.md).
 
+## Development tools
+
+- [x] **Architecture learning — [PR #247](https://github.com/lustoykov/hallvi/pull/247).** The local dashboard has a source-linked architecture map, quiz and persistent progress. A separate daily Codex task reviews merged main; changed questions return and obsolete questions leave the queue without erasing history. Verification artifacts stay in ignored local folders under contributor instructions; historical reports are removed from the current tree. [Learning workflow](docs/development.md#learn-the-current-architecture).
+
 ## Verification and deletion
 
 Exercise actual Pi behavior and the user journey, inspect execution evidence and check the resulting application. Use focused tests for consequential changed behavior. A passing mock, completed command or dated proof is not a verified current deployment. Keep claims explicit about real models, simulated providers, local Docker and real hosts.

@@ -64,7 +64,7 @@ function commit(root: string) {
   }).trim();
 }
 
-// This exercises several real Git snapshots and publications, not a latency budget.
+// Real Git snapshots and publications; this is not a latency test.
 it("publishes scheduled reviews of merged main while preserving unchanged progress and obsolete history", () => {
   const root = fixture();
   const initialRevision = commit(root);

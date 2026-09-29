@@ -9,8 +9,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
-
-| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Accepted; in review #247 |
+| [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -43,8 +42,9 @@ Keep credentials and private application data out of entries and linked material
 2. Count one +1 per independent task, including the initial request. Record the
    task ID or PR reference; retries, multiple agents and multiple PRs within
    the same task do not add votes.
-3. Give a new request the next unused `AF-NNN` ID, a short title and a brief
-   description. Add a linked overview row with count `1` and status `New`.
+3. Check merged requests and open feedback PRs before choosing the next unused
+   `AF-NNN` ID. Give it a short title and a brief description. Add a linked
+   overview row with count `1` and status `New`.
 4. Recount +1s from the task references and sort active requests by count.
    Move resolved or declined requests out of the active overview and into the
    final Archive section, including their overview rows, full entries, votes
@@ -113,23 +113,21 @@ that sets `launchOptions.executablePath`. An environment variable read in
 
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
-### AF-007 — Keep architecture explanations in step with code
 
-I want architecture and domain explanations kept current as behavior changes.
-The overview diagram and tools paragraph disagreed about the tool count, and
-both lagged the registered tools. Extracting documentation cannot establish
-that it is current; the stale counts were removed in this task.
+### AF-010 — Read Pi's recorded reasoning through a supported export
 
-The owner chose a separate daily Codex task to review merged main, with manual
-updates requested in Codex. The dashboard only reads saved content; it has no
-agent launcher or per-PR review requirement. That approach is in review in #247.
+The old standalone inspector cannot read the current database or Pi session
+format and has been removed. I would like a supported way to inspect recorded
+reasoning and the native session tree when the conversation's messages and
+tool disclosures are insufficient.
 
-**+1:** 2026-09-29 — `codex/architecture-learning`
+**+1:** 2026-09-29 — Hallvi software factory task, codex/factory-verification-fixes
 
 ## Archive
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 
@@ -161,3 +159,16 @@ and the badge showed 0.9 s after load. GitHub Actions passed the spec in
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
 Resolved in #245: warm the five existing read routes before interaction deadlines begin.
+
+### AF-007 — Keep architecture explanations in step with code
+
+I want architecture and domain explanations kept current as behavior changes.
+The overview diagram and tools paragraph disagreed about the tool count, and
+both lagged the registered tools. Extracting documentation cannot establish
+that it is current; the stale counts were removed in this task.
+
+The owner chose a separate daily Codex task to review merged main, with manual
+updates requested in Codex. The dashboard only reads saved content; it has no
+agent launcher or per-PR review requirement. That approach is implemented in #247.
+
+**+1:** 2026-09-29 — `codex/architecture-learning`
