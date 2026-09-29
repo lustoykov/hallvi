@@ -625,7 +625,6 @@ function hashed(plan: Plan, path: string, at: number) {
 }
 
 class Day {
-  readonly random: Random;
   /** Decides which requests a release's bug breaks. */
   private readonly fate: Random;
 
@@ -635,7 +634,6 @@ class Day {
     readonly start: number,
     readonly out: Hit[],
   ) {
-    this.random = new Random(`${plan.seed}/day/${start}`);
     this.fate = new Random(`${plan.seed}/fate/${start}`);
   }
 
@@ -748,12 +746,8 @@ function startVisit(
   };
 }
 
-function pagesIn(plan: Plan, section: string) {
-  return plan.data.pages.filter((page) => page.section === section);
-}
-
 function pickPage(plan: Plan, random: Random, section: string) {
-  const pages = pagesIn(plan, section);
+  const pages = plan.data.pages.filter((page) => page.section === section);
   if (!pages.length) return "/";
   const page = random.weighted(pages.map((item) => [item, item.weight]));
   return page.path.replace("{id}", String(random.int(1, 60)));
@@ -961,7 +955,7 @@ function loadFiles(
         headers: browserHeaders(
           visit.person,
           {
-            dest: asset.dest === "manifest" ? "empty" : asset.dest,
+            dest: asset.dest,
             mode: asset.dest === "font" ? "cors" : "no-cors",
             site: "same-origin",
             referrer,
@@ -1350,9 +1344,7 @@ function browseApp(day: Day, visit: Visit, start: number, landing: Landing) {
     );
 
   let view = random.id(16);
-  const tags: Record<string, string> = {};
-  for (const [key, value] of new URLSearchParams(query))
-    if ((KEPT_QUERY_KEYS as readonly string[]).includes(key)) tags[key] = value;
+  const tags = keptOf(query);
   const first: ScriptEvent = { t: "view", s: view, p: path, w: person.width };
   if (landing.referrer) first.r = originOf(landing.referrer);
   if (Object.keys(tags).length) first.u = tags;
@@ -1996,7 +1988,7 @@ function render(
         headers: browserHeaders(
           person,
           {
-            dest: asset.dest === "manifest" ? "empty" : asset.dest,
+            dest: asset.dest,
             mode: asset.dest === "font" ? "cors" : "no-cors",
             site: "same-origin",
             referrer: pageUrl(plan, target.path, ""),
@@ -2101,11 +2093,19 @@ function monitor(day: Day, bot: Bot, random: Random) {
     );
 }
 
+/** How often a day the owner has this application open in Hallvi. */
+const LOOKS: Record<Shape, number> = {
+  busy: 1.6,
+  spa: 1.2,
+  tiny: 0.3,
+  api: 0.8,
+};
+
 /** The owner has a Hallvi page open now and then; it checks the site. */
 function hallviChecks(day: Day) {
   const { plan } = day;
   const random = new Random(`${plan.seed}/hallvi/${day.start}`);
-  const sessions = random.poisson(1.6);
+  const sessions = random.poisson(LOOKS[plan.shape]);
   for (let session = 0; session < sessions; session++) {
     const begin = day.localTime(random, "BG");
     const minutes = random.int(5, 50);
@@ -3073,6 +3073,8 @@ async function live(flags: Record<string, string>) {
             w: person.width,
           };
           if (referrer) first.r = originOf(referrer);
+          const tags = keptOf(landing.query);
+          if (views === 0 && Object.keys(tags).length) first.u = tags;
           await event(page, first);
         }
         // Stay a while; the script pings while the tab is open.

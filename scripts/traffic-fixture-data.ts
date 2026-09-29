@@ -1094,7 +1094,7 @@ export interface Page {
 
 export interface Asset {
   path: string;
-  dest: "style" | "script" | "font" | "image" | "manifest";
+  dest: "style" | "script" | "font" | "image";
   type: string;
   /** Bytes as sent: compressed for text. */
   size: number;
@@ -1235,6 +1235,7 @@ export const SHAPE_DATA: Record<Shape, ShapeData> = {
       { source: "bluesky", weight: 1.5, lands: { blog: 3 } },
       { source: "devto", weight: 1, lands: { blog: 3 } },
       { source: "newsletter", weight: 1.5, lands: { blog: 4, pricing: 1 } },
+      { source: "instagram", weight: 1, lands: { blog: 2, home: 1 } },
       { source: "reset", weight: 0.4, lands: { reset: 1 } },
     ],
     pages: [
@@ -1398,8 +1399,8 @@ export const SHAPE_DATA: Record<Shape, ShapeData> = {
       },
     ],
     upstream: [["X-Powered-By", "Express"]],
-    // A release breaks the pricing page's new template for a while.
-    bug: ["/pricing", "/checkout", "/api/checkout"],
+    // A release breaks the new post template, and checkout, for a while.
+    bug: ["/blog/", "/checkout", "/api/checkout"],
   },
   spa: {
     describe:
@@ -1573,11 +1574,11 @@ export const SHAPE_DATA: Record<Shape, ShapeData> = {
   tiny: {
     describe: "a personal site: a few pages, some posts and a CV",
     audience: "personal",
-    visitors: 1.1,
+    visitors: 0.55,
     growth: 1.0,
     weekday: [0.9, 1.05, 1.05, 1.05, 1.05, 1.0, 0.85],
     hours: evening,
-    regulars: { count: 4, chance: 0.12 },
+    regulars: { count: 4, chance: 0.1 },
     sources: [
       { source: "direct", weight: 40, lands: { home: 3, posts: 1 } },
       { source: "google", weight: 28, lands: { posts: 4, home: 1 } },
