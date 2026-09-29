@@ -666,6 +666,7 @@ export function ChatPane({
             const failure = runFailure({
               runId: message.id,
               error: message.error,
+              failure: message.failure,
               executions: view.executions ?? [],
             });
             const historyUnavailable =

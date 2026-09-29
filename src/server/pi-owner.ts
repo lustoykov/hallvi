@@ -41,6 +41,7 @@ import { beginRunDiagnostics } from "./tracing";
 import type { PiReply } from "./types";
 import { serveWorker, WorkerRefusal } from "./worker-link";
 import { notifyChange } from "./change-notifications";
+import { redactHeldSecrets } from "./application-secrets";
 
 export interface Scope {
   applicationId: string;
@@ -363,6 +364,7 @@ export function sessionOwner(
         results,
         laneView(open.snapshot()),
         open.driving,
+        (text) => redactHeldSecrets(open.applicationId, text),
       ),
       open.previews,
     );
@@ -413,6 +415,7 @@ export function sessionOwner(
           stored.results,
           stored.lane,
           false,
+          (text) => redactHeldSecrets(scope.applicationId, text),
         );
       }).catch(async (error) => ({
         // A history that cannot be opened is said where it would have been.
