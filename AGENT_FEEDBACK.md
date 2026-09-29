@@ -101,7 +101,7 @@ first-connect costs and full-history projection remain; this change does not
 claim to eliminate them. Reproduce with `scripts/benchmark-chat-responses.ts`;
 the production browser comparison retains all six updates in 1/5/10 readers.
 At ten readers, 240 calls produce about 2.31 MB per full response versus 10.7 KB
-per incremental response, with maximum loop delay 635 ms versus 103 ms. These
+per incremental response, with maximum loop delay 201 ms versus 76 ms. These
 bounded synthetic measurements are not latency guarantees; verification and
 the earlier unattributed development-mode miss belong in the implementation PR.
 
