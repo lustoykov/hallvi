@@ -1,4 +1,5 @@
 import { isControllerHost } from "./controller-origin";
+import { MESSAGE_ORIGINS } from "./pi-transcript";
 import { z } from "zod";
 
 export const createApplicationRequestSchema = z.strictObject({
@@ -55,6 +56,8 @@ export const sendChatMessageRequestSchema = z
       )
       .max(MAX_IMAGES, `Attach at most ${MAX_IMAGES} images.`)
       .optional(),
+    /** Where it was written, when not in Hallvi's page: provenance only. */
+    origin: z.enum(MESSAGE_ORIGINS).optional(),
   })
   .refine((input) => input.message || input.images?.length, {
     error: "Write a message first.",

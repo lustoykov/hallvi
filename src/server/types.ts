@@ -45,6 +45,8 @@ export interface ChatMessage {
    * so messages already saved under it read the same way.
    */
   source: "user" | "pi" | "hallvi";
+  /** Where the owner's message was written, when not in this page. */
+  origin?: import("./pi-transcript").MessageOrigin;
   createdAt: string;
   /**
    * The owner's message waits until Pi reads it (`delivered`), unless it is
@@ -68,6 +70,11 @@ export interface ChatMessage {
   requestKey?: string | null;
   /** The owner's message this reply was written under. */
   responseTo?: string | null;
+  /**
+   * The Pi operation that took this message, or wrote this reply. Absent
+   * while a message waits, and for history Pi kept no operation record of.
+   */
+  operationId?: string | null;
   error?: string | null;
   startedAt?: string | null;
   finishedAt?: string | null;

@@ -42,6 +42,10 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Waiting message**: A message Pi has durably taken and not read yet: an entry in Pi's queue, under the id its sender gave it. Pi orders it, reads it, or drops it on Stop. After a worker goes away it keeps waiting until the owner continues or stops the conversation.
 
+**Request handle** (`controller-client.mjs`): The address a request's outcome is read from, naming its controller, application, conversation and request key and holding no credential. A request's outcome is the Pi operation that took its message: several requests Pi read in one operation share its result.
+
+**Origin**: Where a message was written when it was not Hallvi's page, such as the `hallvi` command, shown as its label instead of "You". Provenance kept with the message in Pi's history; it names no identity and grants no authority.
+
 **Session owner** (`pi-owner.ts`, `worker-link.ts`): The worker, as the only process that opens a Pi session: the one holding the owner's lock, which the operating system releases when it ends. The app asks it over `worker.sock` to read, send, continue, stop or forget; a send is answered once Pi has durably taken the message. **Interrupted** means Pi holds an open operation or a queue that this worker is not running: nothing runs until the owner chooses Continue or Stop.
 
 ## Execution and evidence

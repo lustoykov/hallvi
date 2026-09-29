@@ -198,6 +198,11 @@ hallvi logs -f
 `start` and `stop` are the only two states. There is no state in which Hallvi
 is stopped now and comes back by itself later.
 
+The same command also sends work to an application from a terminal, for you or
+for a coding agent: `hallvi exec <app> "request"` with the controller named by
+`--controller` or `HALLVI_CONTROLLER_URL`. [Working from a terminal](cli.md)
+describes `apps`, `exec`, `wait` and `inspect`.
+
 - **macOS** runs it as a launchd agent. It starts when you log in, which on a
   personal Mac is when the machine is usable at all. It pauses while the Mac
   sleeps and continues on wake.

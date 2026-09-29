@@ -10,6 +10,7 @@ import {
   type AgentMessage,
   type Entry,
   type LaneSnapshot,
+  type OperationResultRecord,
 } from "@earendil-works/pi-agent-core";
 import { existsSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -23,14 +24,16 @@ import {
   removeNativeSessions,
 } from "./pi-sessions";
 import {
-  abortedTips,
   holds,
   imageOf,
   laneView,
   MESSAGE_TAG,
+  operationResults,
+  ORIGIN_TAG,
   projectTranscript,
   queueOperation,
   unfinished,
+  type MessageOrigin,
   type Transcript,
 } from "./pi-transcript";
 import { settleRunningExecutions } from "./operator-execution";
@@ -50,6 +53,8 @@ export interface SentMessage {
   delivery: "next" | "steer";
   /** Attached for the model to see, after the words. */
   images?: { mimeType: string; data: string }[];
+  /** Where it was written, when not in Hallvi's page. Never shown to Pi. */
+  origin?: MessageOrigin;
 }
 
 interface Opened extends Scope {
@@ -58,10 +63,13 @@ interface Opened extends Scope {
   snapshot: () => LaneSnapshot;
   fresh: () => Promise<LaneSnapshot>;
   /**
-   * Pi's whole branch, and where Pi says an operation was aborted: both read
-   * again only when the branch's tip has moved.
+   * Pi's whole branch, and how Pi says each operation in it ended: both read
+   * again only when the tip has moved or another operation has ended.
    */
-  history: () => Promise<{ entries: Entry[]; abortedAt: Set<string> }>;
+  history: () => Promise<{
+    entries: Entry[];
+    results: OperationResultRecord[];
+  }>;
   /** One trace per stretch of work, ended with how Pi says it ended. */
   trace(id: string | null, outcome?: PiReply["status"]): void;
   close: () => Promise<void>;
@@ -104,6 +112,7 @@ const toPi = (message: SentMessage): AgentMessage =>
     ],
     timestamp: Date.now(),
     [MESSAGE_TAG]: message.id,
+    ...(message.origin && { [ORIGIN_TAG]: message.origin }),
   }) as AgentMessage;
 
 const NOTHING: Transcript = {
@@ -111,6 +120,7 @@ const NOTHING: Transcript = {
   messages: [],
   calls: {},
   said: [],
+  operations: {},
 };
 
 export function sessionOwner(
@@ -145,20 +155,27 @@ export function sessionOwner(
       if (reduceLaneSnapshot(snapshot, event)) void fresh();
     });
     let read:
-      | { tipId: string | null; entries: Entry[]; abortedAt: Set<string> }
+      | {
+          at: string;
+          entries: Entry[];
+          results: OperationResultRecord[];
+        }
       | undefined;
     const history = async () => {
-      const { tipId } = snapshot;
-      if (read?.tipId !== tipId) {
+      // An operation can end without moving the tip, so its result is part of
+      // what says the history has changed.
+      const { tipId, lastResult } = snapshot;
+      const at = `${tipId}:${lastResult?.operationId}:${lastResult?.endedAt}`;
+      if (read?.at !== at) {
         const entries = await session.lane.findEntries(
           { order: "oldestFirst" },
           ctx,
         );
-        // Pi keeps how each operation ended, and the entry it ended at.
-        const abortedAt = await abortedTips(entries, (id) =>
+        // Pi keeps how each operation ended, and where it began and ended.
+        const results = await operationResults(entries, (id) =>
           session.lane.getResult(id, ctx),
         );
-        read = { tipId, entries, abortedAt };
+        read = { at, entries, results };
       }
       return read;
     };
@@ -314,12 +331,12 @@ export function sessionOwner(
   }
 
   const project = async (open: Opened) => {
-    const { entries, abortedAt } = await open.history();
+    const { entries, results } = await open.history();
     return withPreviews(
       projectTranscript(
         open.chatId,
         entries,
-        abortedAt,
+        results,
         laneView(open.snapshot()),
         open.driving,
       ),
@@ -369,7 +386,7 @@ export function sessionOwner(
         return projectTranscript(
           scope.chatId,
           stored.entries,
-          stored.abortedAt,
+          stored.results,
           stored.lane,
           false,
         );

@@ -8,9 +8,10 @@ import {
   type Entry,
   type JsonlSessionMetadata,
   type LaneQueuedItem,
+  type OperationResultRecord,
   type Session,
 } from "@earendil-works/pi-agent-core";
-import { abortedTips } from "./pi-transcript";
+import { operationResults } from "./pi-transcript";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import { and, eq, isNull } from "drizzle-orm";
 import {
@@ -215,9 +216,13 @@ export async function readNativeConversation(
   chatId: string,
 ): Promise<{
   entries: Entry[];
-  abortedAt: Set<string>;
+  results: OperationResultRecord[];
   lane: {
-    operation: { id: string; startedAt: number } | null;
+    operation: {
+      id: string;
+      startedAt: number;
+      fromTipId: string | null;
+    } | null;
     queues: LaneQueuedItem[];
   };
 }> {
@@ -252,16 +257,20 @@ export async function readNativeConversation(
     // Every operation in the branch, not only the newest: a reply stopped
     // three turns ago is still stopped, and reading only the current and last
     // operation turned it into a completed one as soon as another turn ran.
-    const abortedAt = await abortedTips(
+    const results = await operationResults(
       entries,
       async (id) => (await session.getValue(operationResult(id), ctx))?.value,
     );
     return {
       entries,
-      abortedAt,
+      results,
       lane: {
         operation: open
-          ? { id: open, startedAt: meta?.startedAt ?? Date.now() }
+          ? {
+              id: open,
+              startedAt: meta?.startedAt ?? Date.now(),
+              fromTipId: meta?.sourceTipId ?? null,
+            }
           : null,
         queues,
       },

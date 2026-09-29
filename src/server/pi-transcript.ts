@@ -8,6 +8,8 @@ import type {
   Entry,
   LaneQueuedItem,
   LaneSnapshot,
+  OperationResultRecord,
+  TerminalStatus,
 } from "@earendil-works/pi-agent-core";
 
 import type { ConversationStatus } from "./operator-data";
@@ -26,6 +28,20 @@ export const tagOf = (message: unknown) =>
     string | undefined;
 const sourceOf = (message: unknown): "hallvi" | "user" =>
   tagOf(message)?.startsWith(WAKEUP_PREFIX) ? "hallvi" : "user";
+
+/**
+ * Where a message was written when it was not Hallvi's own composer: the
+ * `hallvi` command today, an agent's adapter later. It travels on the message
+ * into Pi's history, so the label survives a reload. It is provenance only: it
+ * names no identity and grants no authority.
+ */
+export const ORIGIN_TAG = "hallviOrigin";
+export const MESSAGE_ORIGINS = ["cli"] as const;
+export type MessageOrigin = (typeof MESSAGE_ORIGINS)[number];
+const originOf = (message: unknown) => {
+  const said = (message as Record<string, unknown> | undefined)?.[ORIGIN_TAG];
+  return MESSAGE_ORIGINS.find((origin) => origin === said);
+};
 
 /**
  * One of Pi's tool calls, as Pi recorded it: where it sits, what it was, and
@@ -49,6 +65,13 @@ export interface TranscriptCall {
   preview?: string;
 }
 
+/** One of Pi's operations: how Pi says it ended, or that it is still open. */
+export interface TranscriptOperation {
+  status: "open" | TerminalStatus;
+  startedAt: string;
+  endedAt: string | null;
+}
+
 export interface Transcript {
   status: ConversationStatus;
   messages: ChatMessage[];
@@ -56,6 +79,12 @@ export interface Transcript {
   calls: Record<string, TranscriptCall>;
   /** What Pi said between its calls, in the same sequence. */
   said: { replyId: string; sequence: number; text: string; at: string }[];
+  /**
+   * Pi's operations, by the id each message and reply names as the one it
+   * was taken in. Several messages share one when Pi read them in one go.
+   * Always there from the worker; a page's stand-in may leave it out.
+   */
+  operations?: Record<string, TranscriptOperation>;
 }
 
 type Part = {
@@ -132,6 +161,8 @@ export interface LaneView {
   operation: {
     id: string;
     startedAt: number;
+    /** Where the branch stood when it began: what it takes comes after. */
+    fromTipId: string | null;
     streamingMessage?: { content: unknown; timestamp?: number };
   } | null;
   queues: LaneQueuedItem[];
@@ -146,7 +177,7 @@ export const laneView = (snapshot: LaneSnapshot): LaneView => ({
 export const queueOperation = (entryId: string) => `queue:${entryId}`;
 
 /**
- * The entries at which Pi says an operation was aborted.
+ * How Pi says each operation in the branch ended.
  *
  * An operation begins at one of the owner's messages and is named after it:
  * a prompt's after the message's own id, a queue read's after the entry id of
@@ -158,22 +189,53 @@ export const queueOperation = (entryId: string) => `queue:${entryId}`;
  * The caller says how a result is fetched: a driving worker asks its lane, a
  * reader asks Pi's stored session. The derivation is the same either way.
  */
-export async function abortedTips(
+export async function operationResults(
   history: Entry[],
-  resultOf: (
-    operationId: string,
-  ) => Promise<{ status: string; tipId?: string | null } | undefined>,
+  resultOf: (operationId: string) => Promise<OperationResultRecord | undefined>,
 ) {
-  const abortedAt = new Set<string>();
+  const results: OperationResultRecord[] = [];
   for (const entry of history) {
     if (entry.type !== "message" || entry.message.role !== "user") continue;
     for (const id of [tagOf(entry.message), queueOperation(entry.id)]) {
       const result = id ? await resultOf(id) : undefined;
-      if (result?.status === "aborted" && result.tipId)
-        abortedAt.add(result.tipId);
+      if (result) results.push(result);
     }
   }
-  return abortedAt;
+  return results;
+}
+
+/**
+ * Which of Pi's operations took each entry of the branch.
+ *
+ * Pi records where on the branch every operation began and where it ended, so
+ * an entry belongs to the operation whose stretch it falls in, and one still
+ * open runs to the tip. A message Pi read while already working — a follow-up
+ * or a steer — is therefore in the operation that read it, not one of its own.
+ */
+function operationsOfEntries(
+  history: Entry[],
+  results: OperationResultRecord[],
+  open: LaneView["operation"],
+) {
+  const index = new Map(history.map((entry, at) => [entry.id, at]));
+  // A tip that is not on this branch places nothing: NaN matches no index.
+  const at = (id: string | null) => (id === null ? -1 : (index.get(id) ?? NaN));
+  const stretches = results.map((result) => ({
+    id: result.operationId,
+    from: at(result.fromTipId),
+    to: at(result.tipId),
+  }));
+  if (open)
+    stretches.push({
+      id: open.id,
+      from: at(open.fromTipId),
+      to: history.length - 1,
+    });
+  const taken = new Map<string, string>();
+  for (const { id, from, to } of stretches)
+    for (let position = from + 1; position <= to; position++)
+      taken.set(history[position].id, id);
+  return taken;
 }
 
 /** True while anything of Pi's is unfinished: an operation, or a queue. */
@@ -191,8 +253,8 @@ export function unfinished(lane: LaneView) {
 export function projectTranscript(
   chatId: string,
   history: Entry[],
-  /** Entries at which Pi says an operation was aborted. */
-  abortedAt: ReadonlySet<string>,
+  /** How Pi says each operation in the branch ended. */
+  results: OperationResultRecord[],
   lane: LaneView,
   driving: boolean,
 ): Transcript {
@@ -203,8 +265,32 @@ export function projectTranscript(
   let sequence = 0;
   /** save_information calls that asked to be shown, until their result. */
   const shown = new Set<string>();
+  /** Entries at which Pi says an operation was aborted. */
+  const abortedAt = new Set(
+    results.flatMap((result) =>
+      result.status === "aborted" && result.tipId ? [result.tipId] : [],
+    ),
+  );
+  const operationOf = operationsOfEntries(history, results, lane.operation);
+  const operations: Transcript["operations"] = {};
+  for (const result of results)
+    operations[result.operationId] = {
+      status: result.status,
+      startedAt: at(result.startedAt),
+      endedAt: at(result.endedAt),
+    };
+  if (lane.operation)
+    operations[lane.operation.id] = {
+      status: "open",
+      startedAt: at(lane.operation.startedAt),
+      endedAt: null,
+    };
 
-  const replyFor = (entryId: string, timestamp: number) => {
+  const replyFor = (
+    entryId: string,
+    timestamp: number,
+    operationId = operationOf.get(entryId) ?? null,
+  ) => {
     if (reply) return reply;
     sequence = 0;
     const asked = messages.findLast((m) => m.role === "user")?.id;
@@ -220,6 +306,7 @@ export function projectTranscript(
       createdAt: at(timestamp),
       startedAt: at(timestamp),
       responseTo: asked ?? null,
+      operationId,
       revision: 0,
     };
     messages.push(reply);
@@ -286,8 +373,10 @@ export function projectTranscript(
         body: textOf(message.content),
         images: imageCount(message.content),
         source: sourceOf(message),
+        origin: originOf(message),
         status: "delivered",
         createdAt: at(message.timestamp ?? entry.timestamp),
+        operationId: operationOf.get(entry.id) ?? null,
         revision: 0,
       });
     } else if (message.role === "assistant") {
@@ -323,6 +412,7 @@ export function projectTranscript(
     replyFor(
       `${lane.operation!.id}:streaming`,
       streaming.timestamp ?? lane.operation!.startedAt,
+      lane.operation!.id,
     ).body = textOf(streaming.content);
 
   const status: ConversationStatus = driving
@@ -333,7 +423,12 @@ export function projectTranscript(
   if (lane.operation) {
     // The operation is Pi's; whether anyone is driving it is the worker's.
     const open =
-      reply ?? replyFor(`${lane.operation.id}:open`, lane.operation.startedAt);
+      reply ??
+      replyFor(
+        `${lane.operation.id}:open`,
+        lane.operation.startedAt,
+        lane.operation.id,
+      );
     open.status = driving ? "running" : "interrupted";
     open.finishedAt = null;
     open.error = driving
@@ -351,13 +446,14 @@ export function projectTranscript(
       body: textOf((item.message as { content: unknown }).content),
       images: imageCount((item.message as { content: unknown }).content),
       source: sourceOf(item.message),
+      origin: originOf(item.message),
       status: "waiting",
       delivery: item.kind === "steer" ? "steer" : "next",
       createdAt: at((item.message as { timestamp?: number }).timestamp),
       revision: 0,
     });
   }
-  return { status, messages, calls, said };
+  return { status, messages, calls, said, operations };
 }
 
 /** The owner's message Pi holds under this id, read or still queued. */
