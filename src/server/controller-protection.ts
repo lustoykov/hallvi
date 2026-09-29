@@ -245,7 +245,7 @@ export async function captureControllerPayload(): Promise<{
       ["traffic.db", trafficDatabasePath()],
     ]) {
       if (name === "traffic.db" && !existsSync(source)) continue;
-      const target = join(staging, name);
+      const target = join(/* turbopackIgnore: true */ staging, name);
       const reader = new Database(source, { readonly: true });
       try {
         await reader.backup(target);
@@ -260,7 +260,7 @@ export async function captureControllerPayload(): Promise<{
       }
       entries.push({
         path: `payload/database/${name}`,
-        content: readFileSync(target),
+        content: readFileSync(/* turbopackIgnore: true */ target),
         mode: 0o600,
       });
     }

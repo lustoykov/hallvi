@@ -182,8 +182,9 @@ export function setCollection(applicationId: string, choice: "keep" | "stop") {
 }
 
 /**
- * What the collector saw, merged into the record. While collection is off
- * the state stays off, whatever a collector that has not yet stopped says.
+ * What the collector saw, merged into the record. Nothing is recorded while
+ * collection is off: a collector that has not stopped yet cannot say it is
+ * live, nor bring back the record of an application that was removed.
  */
 export function recordCollector(
   applicationId: string,
@@ -201,9 +202,7 @@ export function recordCollector(
   >,
 ) {
   const current = recorded(applicationId);
-  const next = { ...current, ...seen };
-  if (!current.enabledAt) next.state = "off";
-  save(applicationId, next);
+  if (current.enabledAt) save(applicationId, { ...current, ...seen });
   return collectionOf(applicationId);
 }
 
