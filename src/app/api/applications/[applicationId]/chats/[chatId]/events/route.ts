@@ -1,5 +1,9 @@
 import { handle } from "@/server/http";
 import { chatSnapshot } from "@/server/pi-conversation";
+import {
+  invalidateSnapshotRead,
+  refreshSnapshot,
+} from "@/server/chat-snapshot-reads";
 import { assertSameOrigin } from "@/server/schemas";
 import { loadChat } from "@/server/applications";
 import { subscribeChanges } from "@/server/change-notifications";
@@ -84,7 +88,7 @@ export async function GET(
       lastReadAt = Date.now();
       const at = generation;
       try {
-        const snapshot = await chatSnapshot(applicationId, chatId);
+        const snapshot = await refreshSnapshot(applicationId, chatId);
         if (closed) return;
         const next = encode(snapshot);
         if (next) send(`data: ${next}\n\n`);
@@ -99,6 +103,7 @@ export async function GET(
     const subscription = subscribeChanges(
       { applicationId, chatId },
       (notice) => {
+        invalidateSnapshotRead(applicationId, chatId);
         if (notice.kind === "error") {
           close();
           return;
@@ -119,6 +124,7 @@ export async function GET(
       // Another chat may have kept the shared connection alive while this
       // reader was away. Never join its abandoned pre-disconnect scan.
       invalidateExecutionReads(applicationId);
+      invalidateSnapshotRead(applicationId, chatId);
       initialGeneration = generation;
       lastReadAt = Date.now();
       const snapshot = await chatSnapshot(applicationId, chatId);

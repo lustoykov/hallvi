@@ -199,6 +199,26 @@ it("has nothing to say about a conversation with no calls", () => {
   expect(read(transcript({}))).toEqual([]);
 });
 
+it("keeps first occurrence ordering and places unknown replies last in sequence order", () => {
+  const rows = read(
+    transcript(
+      {
+        unknown: { replyId: "missing", sequence: 3 },
+        second: { replyId: "second", sequence: 1 },
+        first: { replyId: "first", sequence: 2 },
+        alsoUnknown: { replyId: "also-missing", sequence: 1 },
+      },
+      { messages: [reply("first"), reply("second"), reply("first")] },
+    ),
+  );
+  expect(rows.map((row) => row.id)).toEqual([
+    "first",
+    "second",
+    "alsoUnknown",
+    "unknown",
+  ]);
+});
+
 it("leaves an older unfinished call alone while a newer reply runs", () => {
   // The old reply was stopped with a call still open; the new one is being
   // written now. Reading the conversation's status made both read "running".

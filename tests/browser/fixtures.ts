@@ -1,7 +1,7 @@
 import { test as base, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { removeTemporaryRoot } from "../temporary-root.mjs";
 
@@ -134,6 +134,14 @@ export const test = base.extend<
         // The fixture deletes its own root as it exits; this only matters if
         // the SIGKILL fallback above fired.
         if (root) removeTemporaryRoot(root);
+        mkdirSync(workerInfo.project.outputDir, { recursive: true });
+        writeFileSync(
+          join(
+            workerInfo.project.outputDir,
+            `qa-fixture-${workerInfo.workerIndex}.log`,
+          ),
+          output,
+        );
       }
     },
     { scope: "worker", timeout: 180_000 },

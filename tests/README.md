@@ -112,6 +112,14 @@ Choose a free QA port. Fixture build and first-connect work are outside the
 measured update interval. Production QA uses webpack because its dependency
 symlink crosses the disposable root; optimization and type checks stay enabled.
 Check the shipping build separately with `npm run build` and its normal bundler.
+The profile also records worker transcript bytes, parse/response time and evidence
+projection time. For a bounded development diagnostic, omit
+`HALLVI_QA_PRODUCTION` and choose `HALLVI_RESPONSE_MODE=changes` or `full`; this
+opens one set of readers instead of both modes within the case's setup budget.
+The update assertion remains ten seconds. Reader setup, SSE events and update
+visibility milestones are written as they happen to `reader-events.jsonl`, so
+a case timeout can be distinguished from a missed update. Fixture startup and
+Next compilation output is kept in the run's `qa-fixture-*.log`.
 `node --import tsx scripts/benchmark-chat-responses.ts`
 separates cached file scans, activity projection, frame construction and JSON
 encoding for 240 and 2,000 synthetic calls; it excludes database, worker socket,
