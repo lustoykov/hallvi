@@ -5,6 +5,7 @@ import { deploymentWatch } from "./deployment-watch";
 import { dirname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ownSessions } from "./pi-owner";
+import { TICK_MS, trafficCollector } from "./traffic/collector";
 
 /**
  * Another worker already serves this database. Not a failure: it answers the
@@ -77,7 +78,16 @@ export async function runPiWorker(signal: AbortSignal) {
     // application decides inside whether its own minute has passed.
     let watching = false;
     let nextWatch = 0;
+    // Traffic history: a quick synchronous look at each application's choice
+    // and records; the follows it starts run on their own and never hold
+    // this loop.
+    const traffic = trafficCollector(signal);
+    let nextTraffic = 0;
     while (!signal.aborted) {
+      if (Date.now() >= nextTraffic) {
+        nextTraffic = Date.now() + TICK_MS;
+        traffic.tick();
+      }
       if (!watching && Date.now() >= nextWatch) {
         watching = true;
         void watch.tick().finally(() => {

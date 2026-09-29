@@ -9,7 +9,6 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-import type { TrafficEvent } from "@/server/access-log";
 import type {
   Collection,
   LiveEvent,
@@ -23,8 +22,8 @@ import { trafficListed } from "./model";
 
 export type CollectionAction = "keep" | "stop" | "forget";
 
-/** What the live stream sends: today's request lines, or the contract's. */
-export type StreamEvent = TrafficEvent | LiveEvent;
+/** What the live stream sends. */
+export type StreamEvent = LiveEvent;
 
 export interface TrafficSource {
   history(applicationId: string, range: TrafficRange): Promise<TrafficHistory>;
