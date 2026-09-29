@@ -4,7 +4,7 @@
 
 Requested on 29 September 2026, following the [product research](../../research/2026-09-29-product-opportunities.md). The plans inspect main snapshot `cc7e9179`; refresh the relevant source before implementation. They are proposals for review, not completed capabilities or a replacement for the [Roadmap](../../../ROADMAP.md).
 
-**Implementation status, 29 September:** performance integration [PR #252](https://github.com/lustoykov/hallvi/pull/252) is merged into main at `a81b6953`. Its local fixture measurements and verification limits are recorded in the PR; merging does not establish deployment. Plan 03's first increment is being implemented from that baseline with matched before/after evidence for owner review. The other feature plans remain proposals.
+**Implementation status, 29 September:** performance integration [PR #252](https://github.com/lustoykov/hallvi/pull/252) is merged into main at `a81b6953`. Its local fixture measurements and verification limits are recorded in the PR; merging does not establish deployment. Plan 03's first increment is in [draft PR #255](https://github.com/lustoykov/hallvi/pull/255), with matched before/after screenshots and recordings for owner review. The status line and mobile wrapping are verified; a bounded real-Pi check completed, but it reported findings only in its final reply, so earlier reporting remains unproven. The UI increment is unmerged. The other feature plans remain proposals.
 
 ## TL;DR for Lyubomir
 
