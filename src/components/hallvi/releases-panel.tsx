@@ -30,7 +30,10 @@ import type { DeploymentAttempt } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
-import type { Reachability } from "./deployment-prototype/page-head";
+import {
+  accessStateText,
+  type Reachability,
+} from "./deployment-prototype/page-head";
 import { LocalTime } from "./local-time";
 import {
   Ask,
@@ -442,6 +445,10 @@ export function ReleasesPanel({
                 Open the connection again
               </button>
             )}
+          </span>
+        ) : access?.localOnly && reachable !== "open" ? (
+          <span className="rp-way rp-muted">
+            {accessStateText(reachable ?? "checking")}
           </span>
         ) : access ? (
           <span className="rp-way">

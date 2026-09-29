@@ -1,12 +1,13 @@
 "use client";
 
-import { PulseContext, QUIET_PULSE, type Pulse } from "./pulse";
+import { PulseContext } from "./pulse";
 import { ArrowLeft, TerminalWindow } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { Reachability } from "./deployment-prototype/page-head";
+import { currentAccessRecord } from "@/server/access-record";
+import { useAccessObservation } from "./use-access-observation";
 
 import type { ApplicationFacts } from "@/server/application-facts";
 
@@ -262,85 +263,18 @@ export function OperatorShell({
       clearInterval(timer);
     };
   }, [refreshDeployment, working]);
-  // Which hideable destinations the records establish.
-  // Whether the tunnel behind a private access record is still open. The
-  // record is a claim about a moment; the tunnel is a process, and it dies
-  // with a restart.
-  //
-  // It starts as "checking" rather than as "open". Starting at open meant
-  // every page claimed a working way in for the frame before the answer
-  // arrived — a false frame on every single load, and the loudest one, since
-  // it is the link a reader is most likely to click.
-  //
-  // The answer is stored with the application it is about, so switching
-  // applications reads as "checking" without the effect having to set state
-  // on the way in — the last one's answer simply is not an answer to this
-  // one's question.
-  const [answered, setAnswered] = useState<{
-    id: string;
-    state: Reachability;
-    pulse: Pulse;
-  } | null>(null);
-  const applicationIdForAccess = view.application?.id;
-  const reachable: Reachability =
-    answered && answered.id === applicationIdForAccess
-      ? answered.state
-      : "checking";
-  const pulse: Pulse =
-    answered && answered.id === applicationIdForAccess
-      ? answered.pulse
-      : QUIET_PULSE;
-  useEffect(() => {
-    if (!applicationIdForAccess) return;
-    let cancelled = false;
-    const read = async () => {
-      try {
-        const response = await fetch(
-          `/api/applications/${applicationIdForAccess}/access`,
-        );
-        if (!response.ok) return;
-        const body = await response.json();
-        if (cancelled) return;
-        // A published address is asked the same question a tunnel is. It
-        // used to be assumed open because it was public, which is the
-        // unchecked claim the tunnel side exists to avoid. `open` is absent
-        // only when there is no address to ask about, and then nothing is
-        // offered to click either.
-        setAnswered({
-          id: applicationIdForAccess,
-          state: body.open === false ? "closed" : "open",
-          // Stricter than `state`: only an address that was asked and
-          // answered vouches for anything. No address at all is `unknown`.
-          pulse: {
-            app:
-              body.open === true
-                ? "answering"
-                : body.open === false
-                  ? "silent"
-                  : "unknown",
-            server: body.server ?? "unknown",
-          },
-        });
-      } catch {
-        // A page that cannot reach its own controller has louder problems,
-        // and saying the tunnel is open is not one of the answers.
-      }
-    };
-    void read();
-    const timer = window.setInterval(read, 30_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [applicationIdForAccess]);
+  const accessRecord = currentAccessRecord(
+    view.information ?? [],
+    view.application?.id,
+  );
+  const { reachable, pulse } = useAccessObservation(
+    view.application?.id,
+    accessRecord,
+  );
 
   /** Asks Pi, in the main conversation, about a way in that stopped working. */
   const askToReopen = useCallback(() => {
-    const record = view.information
-      ?.filter((item) => !item.retiredAt)
-      .find(
-        (item) => item.presentation?.content?.kind === "application-access",
-      );
+    const record = accessRecord;
     const url = record?.presentation?.url ?? null;
     const content = record?.presentation?.content;
     const name = application?.name ?? "this application";
@@ -356,7 +290,7 @@ export function OperatorShell({
           }. Reopen private access and tell me the URL.`,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view.information, view.chats, application?.name]);
+  }, [accessRecord, view.chats, application?.name]);
 
   const listedHere = useMemo(
     () =>

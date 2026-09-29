@@ -229,6 +229,18 @@ Pi decides what a view says. This decides how it is said, so a destination nobod
 
 **Typed content keeps meaning separate from layout.** Deployment results expose source, running image, material changes and checks; application access exposes the entry point and, for private access, the SSH route. Chat folds deployment details. Overview gives the application link prominence; destination views expand the relevant details. Both render the same saved record and reuse the certainty tag, body disclosure, timestamps and tone tokens. `presentation.content.kind` selects these product-owned components; Pi never supplies layout or styling.
 
+**Current access is an observation about one saved route.** The controller
+check, destination Open links, release strip, Access address and existing reopen
+draft select the most recently updated non-retired application-access record.
+An incomplete newer private route does not revive an older one. Answers carry
+that route's identity, including its revision; a replaced or edited route starts
+checking and cannot borrow the earlier answer. Private SSH liveness establishes
+only that the connection is open, never application HTTP health. Missing or
+failed observations are neutral and withhold private Open links; controller
+transport loss says “Cannot reach Hallvi,” while a negative tunnel check says
+“The tunnel is closed.” Historical saved checks retain their recorded meaning.
+Reopening still prepares a draft for the main operator.
+
 **Adding a destination** means rendering `InformationCard` from the sorted records with `currentView` set, and nothing else until that destination earns more. The content contract Pi writes against lives with the `save_information` tool in `src/server/pi.ts`; when a component needs a field the records do not carry, the fix is that contract, not a component that invents one.
 
 

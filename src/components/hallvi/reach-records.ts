@@ -1,5 +1,7 @@
 "use client";
 
+import { currentAccessRecord } from "@/server/access-record";
+
 // Access, built from what Pi recorded.
 //
 // One question, asked three ways: what a visitor sees, which ports are open,
@@ -420,9 +422,7 @@ export function reachFromRecords({
   const live = records.filter((record) => !record.retiredAt);
   const map = topologyOf(live, applicationId)?.value ?? null;
 
-  const accessRecord = live.find(
-    (record) => record.presentation?.content?.kind === "application-access",
-  );
+  const accessRecord = currentAccessRecord(live, applicationId);
   const access = accessRecord?.presentation?.content;
   const audience: ReachView["audience"] =
     access?.kind !== "application-access"

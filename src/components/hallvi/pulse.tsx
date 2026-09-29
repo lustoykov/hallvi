@@ -24,7 +24,7 @@ import { createContext, useContext } from "react";
 export type Beat = "checking" | "answering" | "silent" | "unknown";
 
 export interface Pulse {
-  /** The application's own address, asked over HTTP or through its tunnel. */
+  /** HTTP reachability; private SSH liveness does not establish this. */
   app: Beat;
   /** The server, asked over SSH. */
   server: Beat;

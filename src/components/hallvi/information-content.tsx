@@ -10,7 +10,10 @@ import {
 } from "@phosphor-icons/react";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationSection } from "./application-sections";
-import type { Reachability } from "./deployment-prototype/page-head";
+import {
+  accessStateText,
+  type Reachability,
+} from "./deployment-prototype/page-head";
 import { Tag, toneOf } from "./presentation";
 import { recordDestination } from "./application-sections";
 import { LocalTime } from "./local-time";
@@ -42,6 +45,12 @@ export function InformationContent({
   const { tone, word } = toneOf(record);
   const compact = !currentView;
   const access = content.kind === "application-access";
+  const canOpen =
+    content.kind === "application-access" &&
+    (content.mode === "public" || reachable === "open");
+  const compactCanOpen =
+    content.kind === "application-access" &&
+    (content.mode === "public" ? reachable !== "closed" : canOpen);
   const primary = access && currentView === "overview";
   const recommendation = presentation.role === "recommendation";
   const attention =
@@ -182,7 +191,7 @@ export function InformationContent({
         <div className="hv-result-head">
           <Check className="hv-result-mark" aria-hidden="true" weight="bold" />
           <h3 title={record.title}>{record.title}</h3>
-          {access && presentation.url && reachable !== "closed" && (
+          {access && presentation.url && compactCanOpen && (
             <a
               className="hv-result-open"
               href={presentation.url}
@@ -192,8 +201,12 @@ export function InformationContent({
               Open <ArrowUpRight aria-hidden="true" weight="bold" />
             </a>
           )}
-          {access && presentation.url && reachable === "closed" && (
-            <span className="hv-result-shut">Tunnel closed</span>
+          {access && presentation.url && !compactCanOpen && (
+            <span className="hv-result-shut">
+              {reachable === "closed"
+                ? "Tunnel closed"
+                : accessStateText(reachable ?? "unknown")}
+            </span>
           )}
         </div>
         {/* The limitation stays on the face. Compactness must not hide the
@@ -286,14 +299,23 @@ export function InformationContent({
               {content.mode === "private" ? "Only on this PC" : "Public access"}
             </span>
             <code>{presentation.url}</code>
-            <a
-              className="hv-info-open"
-              href={presentation.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open application <ArrowUpRight aria-hidden="true" weight="bold" />
-            </a>
+            {canOpen ? (
+              <a
+                className="hv-info-open"
+                href={presentation.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open application{" "}
+                <ArrowUpRight aria-hidden="true" weight="bold" />
+              </a>
+            ) : (
+              <span className="hv-result-shut">
+                {reachable === "closed"
+                  ? "Tunnel closed"
+                  : accessStateText(reachable ?? "unknown")}
+              </span>
+            )}
           </div>
           {!compact && content.mode === "private" && (
             <>

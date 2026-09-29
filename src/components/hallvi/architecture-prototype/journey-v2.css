@@ -1077,7 +1077,7 @@
   height: 34px;
   padding: 0 15px;
   border-radius: 999px;
-  background: var(--ax-ink);
+  background: var(--ax-ink, var(--ink));
   color: #ffffff;
   font-size: 13px;
   font-weight: 560;
@@ -1087,7 +1087,7 @@
     background-color var(--ax-base);
 }
 .axj3-open a:hover {
-  background: var(--ax-blue);
+  background: var(--ax-blue, var(--blue));
 }
 .axj3-open a:active {
   transform: scale(0.97);

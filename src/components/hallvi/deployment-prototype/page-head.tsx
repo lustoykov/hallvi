@@ -15,7 +15,7 @@ import {
 import type { ReactNode } from "react";
 
 /**
- * Whether the way in works. Three states, not two.
+ * Whether the way in works, or why it is currently unknown.
  *
  * A private URL lives inside an SSH tunnel this controller holds, and that
  * tunnel dies with a restart. Defaulting to "it works" meant every page
@@ -68,7 +68,16 @@ export interface PageContext {
   earlier: number;
 }
 
-export type Reachability = "checking" | "open" | "closed";
+export type Reachability =
+  "checking" | "open" | "closed" | "unknown" | "unavailable";
+
+export function accessStateText(state: Reachability) {
+  return state === "unavailable"
+    ? "Cannot reach Hallvi"
+    : state === "unknown"
+      ? "Access has not been checked"
+      : "Checking the way in…";
+}
 
 export function PageHead({
   bar,
@@ -144,10 +153,14 @@ export function AccessLink({
     <div className="axj3-open" data-reach={reachable}>
       {reachable === "open" ? (
         <>
-          {restricted && (
-            <small>
-              <ShieldCheck weight="bold" /> Only from your network
-            </small>
+          {tunnelled ? (
+            <small>Private connection open</small>
+          ) : (
+            restricted && (
+              <small>
+                <ShieldCheck weight="bold" /> Only from your network
+              </small>
+            )
           )}
           <a href={openUrl} target="_blank" rel="noreferrer">
             Open {name}
@@ -182,8 +195,10 @@ export function AccessLink({
       ) : (
         // Nothing is claimed yet, and nothing is offered to click.
         <small className="axj3-checking">
-          <SpinnerGap weight="bold" className="ax-spin" />
-          Checking the way in…
+          {reachable === "checking" && (
+            <SpinnerGap weight="bold" className="ax-spin" />
+          )}
+          {accessStateText(reachable)}
         </small>
       )}
     </div>
