@@ -372,11 +372,11 @@ export class DayCounter {
     if (kind.kind === "own") return;
     const hour = Math.floor((line.at - this.start) / HOUR_MS);
     const key = this.keyOf(line);
+    if (hasFetchMetadata(line)) this.decide(line.host);
     if (kind.kind === "event") {
       this.event(line, kind.event, hour, key);
       return;
     }
-    if (hasFetchMetadata(line)) this.decide(line.host);
     if (!kind.imitation) {
       this.request(this.main, line, hour, key, kind, kind.bot);
       if (kind.view) this.served(line, key);
