@@ -25,6 +25,7 @@ import { ProcessesPage } from "./processes-page";
 import { AccessPage } from "./access-page";
 import { SupplyPageView, type SupplyPage } from "./supply-pages";
 import { StoragePage } from "./storage-page";
+import { TrafficPage } from "./traffic/traffic-page";
 
 // The line under each destination's heading, and the first sentence a reader
 // gets about a page. So it may not describe a page that no longer exists.
@@ -40,6 +41,7 @@ const descriptions: Record<ApplicationSection, string> = {
   architecture: "How your source, application, host and data fit together.",
   deployment:
     "What is running, what ran before it, and how the latest attempt went.",
+  traffic: "Who uses the application, where they came from, and what they hit.",
   processes:
     "The web and worker processes that make up your application on its instance.",
   database:
@@ -184,6 +186,19 @@ export function ApplicationSectionView({
         onOpenDestination={onOpenDestination}
       />
     );
+  if (section === "traffic")
+    return (
+      <TrafficPage
+        applicationId={app.id}
+        applicationName={app.name}
+        records={information}
+        now={now}
+        chrome={{ bar, header: null, activity: null }}
+        reachable={reachable}
+        onReopen={onReopen}
+        onAsk={(draft) => onAsk(null, draft)}
+      />
+    );
   if (section === "deployment")
     return (
       <DeploymentPage
@@ -191,6 +206,7 @@ export function ApplicationSectionView({
         onReopen={onReopen}
         records={information}
         executions={view.executions ?? []}
+        applicationId={app.id}
         applicationName={app.name}
         source={
           view.deployment && {
