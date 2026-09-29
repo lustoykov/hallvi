@@ -45,7 +45,10 @@ export interface TrafficLine {
   /** Lower-case host without a port; "" when the log does not say. */
   host: string;
   method: string;
-  /** The path only, never a query string. At most 300 characters. */
+  /**
+   * The path only, never a query string. At most 300 characters, except a
+   * script event's (`EVENT_PREFIX`), kept whole up to 2,000 so it decodes.
+   */
   path: string;
   /** Kept query keys the line carried, and an application's page key. */
   kept: Record<string, string>;
