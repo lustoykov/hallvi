@@ -84,29 +84,39 @@ const tenths = (value: number) => Math.round(value * 10) / 10;
 
 /**
  * A percentile from a histogram, interpolated within its bucket. Slower than
- * the last bound reads as the last bound: "at least this".
+ * the last bound reads as the last bound, and says it is only a floor.
  */
 export function percentile(
   counts: readonly number[],
   bounds: readonly number[],
   q: number,
-) {
+): { value: number; atLeast: boolean } | null {
   const total = counts.reduce((sum, count) => sum + count, 0);
   if (!total) return null;
   const target = q * total;
+  const past = { value: bounds[bounds.length - 1], atLeast: true };
   let below = 0;
   for (let index = 0; index < counts.length; index++) {
     const count = counts[index];
     if (count && below + count >= target) {
-      if (index >= bounds.length) return bounds[bounds.length - 1];
+      if (index >= bounds.length) return past;
       const lower = index === 0 ? 0 : bounds[index - 1];
-      return Math.round(
-        lower + (bounds[index] - lower) * ((target - below) / count),
-      );
+      return {
+        value: Math.round(
+          lower + (bounds[index] - lower) * ((target - below) / count),
+        ),
+        atLeast: false,
+      };
     }
     below += count;
   }
-  return bounds[bounds.length - 1];
+  return past;
+}
+
+/** The 95th percentile response time, and whether it is only a floor. */
+function p95(latency: readonly number[]) {
+  const found = percentile(latency, LATENCY_BUCKETS_MS, 0.95);
+  return { p95Ms: found?.value ?? null, p95AtLeast: found?.atLeast ?? false };
 }
 
 /** Hours added up, their visitor estimates too: say so where shown. */
@@ -152,7 +162,7 @@ function point(
     errors: total.errors,
     errorVisitors: estimate ? estimate.errorVisitors : total.errorVisitors,
     bots: total.bots,
-    p95Ms: percentile(total.latency, LATENCY_BUCKETS_MS, 0.95),
+    ...p95(total.latency),
     covered,
   };
 }
@@ -170,7 +180,7 @@ function totalsOf(
     errors: total.errors,
     errorVisitors,
     bots: total.bots,
-    p95Ms: percentile(total.latency, LATENCY_BUCKETS_MS, 0.95),
+    ...p95(total.latency),
     visitors,
     visitorsPer,
   };
@@ -217,6 +227,20 @@ function mergedLists(lists: Ranked[][], perDay: number): Ranked[] {
     ...row,
     visitors: perDay === 1 ? row.visitors : tenths(row.visitors / perDay),
   }));
+}
+
+/**
+ * Whether a merged list shows floors: a day stored only its top entries
+ * (it has an `OTHER` row) and a shown entry is not among them, so that day's
+ * share of the entry is lost in its `OTHER`. Otherwise the merge is exact.
+ */
+function partial(lists: Ranked[][], shown: Ranked[]) {
+  const cut = lists
+    .filter((list) => list.some((row) => row.key === OTHER))
+    .map((list) => new Set(list.map((row) => row.key)));
+  return shown.some(
+    (row) => row.key !== OTHER && cut.some((keys) => !keys.has(row.key)),
+  );
 }
 
 function mergedEngagement(days: TrafficDay[]) {
@@ -276,13 +300,16 @@ function mergedVitals(days: TrafficDay[]) {
       buckets.forEach((count, index) => (other[index] += count));
     const kept: [string, number[]][] = rows.slice(0, SHOWN);
     if (samples(other)) kept.push([OTHER, other]);
-    for (const [path, buckets] of kept)
+    for (const [path, buckets] of kept) {
+      const found = percentile(buckets, bounds, 0.75);
       shown.push({
         path,
         metric,
-        p75: percentile(buckets, bounds, 0.75) ?? 0,
+        p75: found?.value ?? 0,
+        atLeast: found?.atLeast ?? false,
         samples: samples(buckets),
       });
+    }
   }
   return shown;
 }
@@ -568,6 +595,12 @@ export function historyOf(
       ),
     ]),
   ) as Record<(typeof LISTS)[number], Ranked[]>;
+  const partialLists = LISTS.filter((name) =>
+    partial(
+      listed.map((day) => day[name]),
+      lists[name],
+    ),
+  );
   const inRange = all.filter(({ day }) => names.includes(day.day));
   return {
     range,
@@ -577,6 +610,7 @@ export function historyOf(
     totals: stretch.totals,
     previous: stretch.previous,
     ...lists,
+    partialLists,
     engagement: mergedEngagement(listed),
     vitals: mergedVitals(listed),
     scriptErrors: mergedScriptErrors(listed),
@@ -599,9 +633,11 @@ export function impactDays(
 }
 
 /**
- * What a release changed: the hours after it against the hours before, cut
- * at the hour boundary nearest the release, because totals are kept by the
- * hour. Visitor figures here are the hours' estimates added together.
+ * What a release changed: the hours after it against the hours before.
+ * Totals are kept by the hour, and the hour the release fell in holds some
+ * of each side, so it is left out: before ends where that hour begins, and
+ * after starts where it ends — or at the release, when it came on the hour.
+ * Visitor figures here are the hours' estimates added together.
  *
  * `notable` follows fixed rules, and only when the log covered the window
  * before (there is nothing to compare against otherwise):
@@ -629,11 +665,12 @@ export function releaseImpact(
   const hour = home
     ? home.start + Math.floor((at - home.start) / HOUR_MS) * HOUR_MS
     : hourStart(at, controllerTimeZone());
-  const cut = at - hour < HOUR_MS / 2 ? hour : hour + HOUR_MS;
+  const beforeTo = hour;
+  const afterFrom = at === hour ? hour : hour + HOUR_MS;
   const window = (from: number, to: number) =>
     hours.filter((one) => one.start >= from && one.start < to);
-  const before = window(cut - span, cut).map((one) => one.totals);
-  const after = window(cut, cut + span).map((one) => one.totals);
+  const before = window(beforeTo - span, beforeTo).map((one) => one.totals);
+  const after = window(afterFrom, afterFrom + span).map((one) => one.totals);
   const side = (list: HourTotals[]) => {
     const total = summed(list);
     return {
@@ -643,7 +680,7 @@ export function releaseImpact(
         errors: total.errors,
         errorVisitors: total.errorVisitors,
         bots: total.bots,
-        p95Ms: percentile(total.latency, LATENCY_BUCKETS_MS, 0.95),
+        ...p95(total.latency),
         visitors: total.visitors,
       },
       timed: total.latency.reduce((sum, count) => sum + count, 0),
@@ -678,9 +715,9 @@ export function releaseImpact(
         (a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
     )
     .slice(0, SHOWN);
-  const coveredBefore = share(coveredIn(all, cut - span, cut), span);
+  const coveredBefore = share(coveredIn(all, beforeTo - span, beforeTo), span);
   const coveredAfter = share(
-    coveredIn(all, cut, Math.min(cut + span, now)),
+    coveredIn(all, afterFrom, Math.min(afterFrom + span, now)),
     span,
   );
   const newlyFailing = paths.some(
@@ -694,16 +731,25 @@ export function releaseImpact(
     later.totals.errorVisitors >= 2 * earlier.totals.errorVisitors;
   const p95Before = earlier.totals.p95Ms;
   const p95After = later.totals.p95Ms;
+  // A floor after is still at least that slow; a floor before could be
+  // anything slower, so nothing can be said to have doubled.
   const slower =
     earlier.timed >= 30 &&
     later.timed >= 30 &&
+    !earlier.totals.p95AtLeast &&
     p95Before !== null &&
     p95After !== null &&
     p95After >= 2 * p95Before &&
     p95After - p95Before >= 500;
+  const stamp = (ms: number) =>
+    Number.isFinite(ms) ? new Date(ms).toISOString() : releaseAt;
   return {
     releaseAt,
     windowMinutes: span / 60_000,
+    compared: {
+      before: { from: stamp(beforeTo - span), to: stamp(beforeTo) },
+      after: { from: stamp(afterFrom), to: stamp(afterFrom + span) },
+    },
     before: earlier.totals,
     after: later.totals,
     paths,

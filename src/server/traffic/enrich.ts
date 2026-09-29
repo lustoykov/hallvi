@@ -231,28 +231,32 @@ const SOURCES: [RegExp, string][] = [
   [/(^|\.)pinterest\.[a-z.]+$/, "Pinterest"],
 ];
 
-/** Campaign-tag spellings of the same sites, so a tag and a referrer agree. */
-const TAGGED: Record<string, string> = {
-  google: "Google",
-  bing: "Bing",
-  duckduckgo: "DuckDuckGo",
-  hn: "Hacker News",
-  hackernews: "Hacker News",
-  twitter: "X",
-  x: "X",
-  reddit: "Reddit",
-  github: "GitHub",
-  linkedin: "LinkedIn",
-  facebook: "Facebook",
-  fb: "Facebook",
-  instagram: "Instagram",
-  youtube: "YouTube",
-  chatgpt: "ChatGPT",
-  perplexity: "Perplexity",
-  claude: "Claude",
-  bluesky: "Bluesky",
-  producthunt: "Product Hunt",
-};
+/**
+ * Campaign-tag spellings of the same sites, so a tag and a referrer agree. A
+ * `Map`, because a tag is anyone's to write: `__proto__` or `constructor`
+ * must read as the text it is, not as something every object inherits.
+ */
+const TAGGED = new Map<string, string>([
+  ["google", "Google"],
+  ["bing", "Bing"],
+  ["duckduckgo", "DuckDuckGo"],
+  ["hn", "Hacker News"],
+  ["hackernews", "Hacker News"],
+  ["twitter", "X"],
+  ["x", "X"],
+  ["reddit", "Reddit"],
+  ["github", "GitHub"],
+  ["linkedin", "LinkedIn"],
+  ["facebook", "Facebook"],
+  ["fb", "Facebook"],
+  ["instagram", "Instagram"],
+  ["youtube", "YouTube"],
+  ["chatgpt", "ChatGPT"],
+  ["perplexity", "Perplexity"],
+  ["claude", "Claude"],
+  ["bluesky", "Bluesky"],
+  ["producthunt", "Product Hunt"],
+]);
 
 const TAG_LIMIT = 100;
 
@@ -281,10 +285,16 @@ function sourceNamed(host: string) {
   );
 }
 
+/** A tag the line carried, as its own text, or undefined. */
+export function tagOf(tags: Partial<Record<string, string>>, key: string) {
+  const value = Object.hasOwn(tags, key) ? tags[key] : undefined;
+  return typeof value === "string" ? value : undefined;
+}
+
 function tagged(value: string) {
   const tag = value.trim().slice(0, TAG_LIMIT);
   if (!tag) return null;
-  const known = TAGGED[tag.toLowerCase()];
+  const known = TAGGED.get(tag.toLowerCase());
   if (known) return known;
   if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(tag))
     return sourceNamed(tag.toLowerCase());
@@ -313,10 +323,11 @@ export interface Arrival {
 export function arrivalOf({ referrer, host, hosts, tags }: Arrival) {
   const from = referrer ? hostOf(referrer) : null;
   if (from && sameSite(from, host, hosts)) return null;
-  const campaign = tags.utm_campaign?.trim().slice(0, TAG_LIMIT) || null;
+  const campaign =
+    tagOf(tags, "utm_campaign")?.trim().slice(0, TAG_LIMIT) || null;
   const source =
-    tagged(tags.utm_source ?? "") ??
-    tagged(tags.ref ?? "") ??
+    tagged(tagOf(tags, "utm_source") ?? "") ??
+    tagged(tagOf(tags, "ref") ?? "") ??
     (from ? sourceNamed(from) : campaign ? UNKNOWN : DIRECT);
   return { source, campaign };
 }
@@ -328,7 +339,9 @@ export function arrivalOf({ referrer, host, hosts, tags }: Arrival) {
  * switch point.
  */
 export function pageName(path: string) {
-  let name = path;
+  // A path never carries a query or a fragment; should one slip through, it
+  // is where tokens live, and it goes.
+  let name = path.replace(/[?#][\s\S]*$/, "");
   try {
     name = decodeURI(path);
   } catch {

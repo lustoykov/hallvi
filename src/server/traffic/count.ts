@@ -7,15 +7,21 @@
 // numbers can follow the log and still equal a recount of the same lines.
 // Lines are counted in the order the log holds them.
 //
-// Who is who lives only in this pass. A browser is its address, user agent
-// and host, hashed under a salt made for the pass and gone with it. What
-// comes out is counts and the keys of the lists — pages, sources, countries —
-// never an address, an agent or a referrer.
+// Who is who lives only in this pass. A browser is its address and user
+// agent — one application, whichever of its names it was reached by —
+// hashed under a salt made for the pass and gone with it. What comes out is
+// counts and the keys of the lists — pages, sources, countries — never an
+// address, an agent or a referrer.
 //
 // Views and visitors come from the log until the switch point, the first
 // script event counted, and only from the script after it. Requests, errors,
 // response times and bots always come from the log, and Hallvi's own
 // requests and the script's events are never requests.
+//
+// A page load the log counted just before the switch point sends its own
+// script view a moment after it, perhaps just past midnight: the two are one
+// view. So a pass also reads the last `LOOKBACK_MS` before its day, only to
+// know what the log counted there.
 
 import { createHmac, randomBytes } from "node:crypto";
 
@@ -26,6 +32,7 @@ import {
   type Request,
 } from "./classify";
 import {
+  EVENT_PREFIX,
   LATENCY_BUCKETS_MS,
   OTHER,
   STORED_PER_LIST,
@@ -45,6 +52,7 @@ import {
   deviceOf,
   pageName,
   referringPage,
+  tagOf,
   type Arrival,
 } from "./enrich";
 
@@ -60,11 +68,12 @@ const ERROR_PATHS = 20;
 const SILENT_BROWSERS = 3;
 const SILENT_AFTER_MS = 10 * 60_000;
 /**
- * How far apart a page load and the script's view of it can be. The first
- * view the script sends is the switch point, and the log has already counted
- * the load that sent it, a moment before.
+ * How far apart a page load and the script's view of it can be: a deferred
+ * script on a slow phone. The two are paired only when the browser viewed
+ * nothing in between, so the window can be generous. A pass reads this far
+ * into the day before its own, and nothing from there is counted.
  */
-const OVERLAP_MS = 10_000;
+export const LOOKBACK_MS = 3 * 60_000;
 
 export interface CountOptions {
   /** `YYYY-MM-DD` in `timeZone`. */
@@ -309,8 +318,11 @@ export class DayCounter {
     { path: string; metric: VitalName; value: number }
   >();
   private readonly scriptErrors = new Map<string, number>();
-  /** The last few seconds of page loads the log counted, by browser, page. */
-  private readonly loaded = new Map<string, number>();
+  /**
+   * Each browser's latest view, when it was a page load the log counted: the
+   * one its script view can still be. Any other view replaces it.
+   */
+  private readonly pending = new Map<string, { page: string; at: number }>();
   private switchPoint: number | null;
   private lastEvent: number | null = null;
   private lastLine: number | null = null;
@@ -362,10 +374,18 @@ export class DayCounter {
       : null;
   }
 
+  /**
+   * Counts a line of the day. A line from the `LOOKBACK_MS` before it only
+   * says what the log counted there; anything else is not this day's.
+   */
   add(line: TrafficLine) {
-    if (!(line.at >= this.start && line.at < this.end)) return;
+    if (!(line.at >= this.start - LOOKBACK_MS && line.at < this.end)) return;
     if (line.host && this.hosts.length && !this.hosts.includes(line.host))
       return;
+    if (line.at < this.start) {
+      this.before(line);
+      return;
+    }
     if (this.lastLine === null || line.at > this.lastLine)
       this.lastLine = line.at;
     const kind = classify(line);
@@ -481,14 +501,17 @@ export class DayCounter {
 
   private keyOf(line: TrafficLine) {
     return createHmac("sha256", this.salt)
-      .update(`${line.address}\n${line.userAgent}\n${line.host}`)
+      .update(`${line.address}\n${line.userAgent}`)
       .digest("base64url")
       .slice(0, 16);
   }
 
   private pageOf(line: TrafficLine) {
+    // Something sent to the events' path that was no event: not a page, and
+    // its payload is nobody's business.
+    if (line.path.startsWith(EVENT_PREFIX)) return EVENT_PREFIX;
     const key = this.options.pageKey;
-    const value = key ? line.kept[key]?.slice(0, 100) : undefined;
+    const value = key ? tagOf(line.kept, key)?.slice(0, 100) : undefined;
     const page = pageName(line.path);
     return value ? `${page}?${key}=${value}` : page;
   }
@@ -555,29 +578,65 @@ export class DayCounter {
       const page = referringPage(line.referrer, line.host, this.hosts);
       if (page) into.referred.add(page);
     }
-    if (
-      !kind.view ||
-      (this.switchPoint !== null && line.at >= this.switchPoint)
-    )
-      return;
+    if (!kind.view) return;
+    const counted = this.loadCounted(line);
+    if (into === this.main) this.loaded(line, key, counted);
+    if (!counted) return;
     this.view(into, hour, key, this.pageOf(line), this.viewer(key, line), {
       referrer: line.referrer,
       host: line.host,
       hosts: this.hosts,
       tags: line.kept,
     });
-    if (into === this.main)
-      this.remember(`${key} ${pageName(line.path)}`, line.at);
   }
 
-  /** Keeps a counted page load for as long as its script view can follow. */
-  private remember(load: string, at: number) {
-    this.loaded.delete(load);
-    this.loaded.set(load, at);
-    for (const [oldest, when] of this.loaded) {
-      if (when >= at - OVERLAP_MS) break;
-      this.loaded.delete(oldest);
+  /** Whether the log counts this page load: before the switch point. */
+  private loadCounted(line: TrafficLine) {
+    return this.switchPoint === null || line.at < this.switchPoint;
+  }
+
+  /** A page load: the browser's latest view, pending its script view. */
+  private loaded(line: TrafficLine, key: string, counted: boolean) {
+    if (counted)
+      this.pending.set(key, { page: pageName(line.path), at: line.at });
+    else this.pending.delete(key);
+  }
+
+  /**
+   * Whether a script view is the page load the log already counted: the
+   * same browser and page, the load a little before it, and no other view
+   * of that browser's in between. Either way it is now the latest view.
+   */
+  private paired(key: string, page: string, at: number) {
+    const load = this.pending.get(key);
+    this.pending.delete(key);
+    return (
+      load !== undefined &&
+      load.page === page &&
+      load.at <= at &&
+      at - load.at <= LOOKBACK_MS &&
+      this.switchPoint !== null &&
+      load.at < this.switchPoint
+    );
+  }
+
+  /**
+   * A line from just before the day, read only for what the log counted
+   * there: a page load its script view may pair with past midnight, the
+   * views that would come between, and an earlier switch point.
+   */
+  private before(line: TrafficLine) {
+    const kind = classify(line);
+    if (kind.kind === "own") return;
+    const key = this.keyOf(line);
+    if (kind.kind === "event") {
+      if (this.switchPoint === null || line.at < this.switchPoint)
+        this.switchPoint = line.at;
+      if (kind.event.t === "view") this.pending.delete(key);
+      return;
     }
+    if (kind.view && !kind.imitation)
+      this.loaded(line, key, this.loadCounted(line));
   }
 
   private view(
@@ -627,18 +686,7 @@ export class DayCounter {
     const page = pageName(event.p);
     switch (event.t) {
       case "view": {
-        // A load the log counted just before the switch point, which the
-        // script now reports: one view, already counted.
-        const load = `${key} ${page}`;
-        const loadedAt = this.loaded.get(load);
-        if (
-          loadedAt !== undefined &&
-          loadedAt < this.switchPoint! &&
-          line.at - loadedAt <= OVERLAP_MS
-        ) {
-          this.loaded.delete(load);
-          return;
-        }
+        if (this.paired(key, page, line.at)) return;
         this.view(this.main, hour, key, page, this.viewer(key, line, event.w), {
           referrer: event.r ?? null,
           host: line.host,
