@@ -66,7 +66,8 @@ Use a small representative set of redacted transcripts and execution records, wi
 ## Commands and limits
 
 `npm test` runs the application tests; `npm run test:e2e:smoke` runs the browser
-smoke subset; `npm run test:operator` runs the Python checks for the host-side
+smoke subset; `npm run checks` runs everything the GitHub checks workflow runs and
+prints a summary to put in a pull request; `npm run test:operator` runs the Python checks for the host-side
 scripts under `scripts/` — the scheduled-backup runner's bounded failures,
 receipts and recovery path, and the SQLite backup proof. They need
 `python3` 3.11 or newer — the runner hashes with `hashlib.file_digest` — and

@@ -13,7 +13,8 @@ checkouts. If you keep a [development environment](development-environment.md)
 — applications really deployed and kept between tasks — look there before
 building a fixture: `node scripts/retained-application.mjs attach <name>` runs
 that application in your worktree until it detaches, and a second checkout is
-refused. Clean up what a task creates as
+refused. To send it work and read what it recorded from a terminal, use the
+[request commands](cli.md#from-a-development-checkout). Clean up what a task creates as
 [development resources](development-resources.md) describes.
 
 Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, the account level — the ChatGPT login and model preferences, and the GitHub, Hetzner and Cloudflare connections — lives in `~/.config/hallvi/pi`, so every checkout and preview port on the machine reuses the same logins and none of them copies one (a copied GitHub login dies when either copy renews). Application databases, executions, SSH keys and secrets remain local to each controller. Set `HALLVI_PI_CONFIG_DIR` to choose another account directory. An explicit `HALLVI_CONFIG_DIR` isolates the account level too unless `HALLVI_PI_CONFIG_DIR` is also supplied, which is what keeps test fixtures apart. Disconnecting or changing anything at the account level affects every controller using that directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](integrations/github.md).
@@ -104,5 +105,11 @@ npm run lint
 npm run build
 npm run test:e2e:smoke
 ```
+
+`npm run checks` runs what the `Hallvi checks` GitHub workflow runs — the
+application tests, lint and formatting, types, the production build and the
+browser smoke suite — on Node 22, and ends with a summary naming the revision
+and each step's result. While that workflow is disabled, the summary is how a
+pull request records them.
 
 [tests/README.md](../tests/README.md) describes full browser journeys, synthetic fixtures, Docker checks and opt-in real-model evals. `npm run dev` starts the local testing workbench beside the app; `npm run test:dashboard` can still run it alone on <http://127.0.0.1:4317> when that port is free. Synthetic tests are not provider or deployment evidence. See the [testing index](testing/README.md) for acceptance coverage and known limits.

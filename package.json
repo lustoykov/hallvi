@@ -11,6 +11,7 @@
     "start": "node scripts/serve.mjs",
     "package": "node scripts/package.mjs",
     "lint": "eslint . && prettier --check .",
+    "checks": "node scripts/checks.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run --config tests/application/vitest.config.mjs",
