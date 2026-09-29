@@ -2,14 +2,15 @@
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
-| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
-| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
-| [AF-006 — Avoid rereading unchanged execution history](#af-006--avoid-rereading-unchanged-execution-history) | 1 | New |
 | [AF-007 — Reopen a known private application directly](#af-007--reopen-a-known-private-application-directly) | 1 | New |
 | [AF-008 — Make agreed ongoing care visible](#af-008--make-agreed-ongoing-care-visible) | 1 | New |
+| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
+| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+| [AF-009 — Avoid rereading unchanged execution history](#af-009--avoid-rereading-unchanged-execution-history) | 1 | Resolved in #252 |
 
 ## How to contribute
 
@@ -114,15 +115,21 @@ that sets `launchOptions.executablePath`. An environment variable read in
 
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
 
-### AF-006 — Avoid rereading unchanged execution history
+### AF-006 — Reduce full-history response serialization
 
-Each open chat rebuilds its snapshot every 500 ms and reads all application
-execution files before suppressing unchanged output. I would like long-history
-return visits to avoid this repeated work. The [product research](docs/research/2026-09-29-product-opportunities.md#1-make-the-interface-fast-by-avoiding-work-that-has-not-changed)
-includes an isolated measurement and a proposed multi-chat check; it does not
-establish a production slowdown or justify a database replacement.
+After execution reads are cached, serializing the complete execution history
+still blocks the event loop: ten readers of a synthetic 2,000-record history
+showed about 82 ms maximum delay from the warm response path. Change
+notifications will remove idle polling; consider bounded or incremental
+evidence responses if long histories still make active chats slow. The
+[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
+from this remaining cost.
 
-**+1:** 2026-09-29 — task `codex/hallvi-product-research`
+**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
+
+**+1:** 2026-09-29 — change-notification task (`codex/chat-change-notifications`).
+Idle reads now stop; active updates still serialize full histories. Keep the
+500 ms sustained cadence until a measured response-shape change improves it.
 
 ### AF-007 — Reopen a known private application directly
 
@@ -141,3 +148,15 @@ with one quiet care loop after the current beta gate. The [proposal](docs/resear
 keeps this separate from approval of background collection or repair.
 
 **+1:** 2026-09-29 — task `codex/hallvi-product-research`
+
+### AF-009 — Avoid rereading unchanged execution history
+
+At the research baseline, each open chat rebuilt its snapshot every 500 ms
+and read all application execution files before suppressing unchanged output.
+The request was to avoid this repeated work on long-history return visits. The [product research](docs/research/2026-09-29-product-opportunities.md#1-make-the-interface-fast-by-avoiding-work-that-has-not-changed)
+includes an isolated measurement and a proposed multi-chat check; it does not
+establish a production slowdown or justify a database replacement.
+
+**+1:** 2026-09-29 — task `codex/hallvi-product-research`
+
+Resolved in [#252](https://github.com/lustoykov/hallvi/pull/252): cached asynchronous execution reads and change notifications avoid unchanged history rereads. The PR records local fixture checks and their limits; active response serialization remains AF-006.

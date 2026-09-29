@@ -4,11 +4,13 @@
 
 Requested on 29 September 2026, following the [product research](../../research/2026-09-29-product-opportunities.md). The plans inspect main snapshot `cc7e9179`; refresh the relevant source before implementation. They are proposals for review, not completed capabilities or a replacement for the [Roadmap](../../../ROADMAP.md).
 
+**Implementation status, 29 September:** performance integration [PR #252](https://github.com/lustoykov/hallvi/pull/252) is merged into main at `a81b6953`. Its local fixture measurements and verification limits are recorded in the PR; merging does not establish deployment. Plan 03's first increment is being implemented from that baseline with matched before/after evidence for owner review. The other feature plans remain proposals.
+
 ## TL;DR for Lyubomir
 
 | Plan | Smallest useful release | What establishes success |
 | --- | --- | --- |
-| [01 — Fast history](01-fast-history.md) | Integrate the performance work already underway in **Hallvi: SQLite blocking and chat performance**. | Responsive 1/5/10-chat browser sessions with fresh approvals/output, reconnect and restart. |
+| [01 — Fast history](01-fast-history.md) | Performance integration merged in [#252](https://github.com/lustoykov/hallvi/pull/252); see its measured results and limits. | Responsive 1/5/10-chat browser sessions with fresh approvals/output, reconnect and restart. |
 | [02 — Open and reconnect](02-open-reconnect.md) | One-click request to reopen the same private route through Pi. A model turn remains initially. | Open the app from the owner's laptop after disconnect/restart; distinguish access trouble from app failure. |
 | [03 — Clear progress and results](03-work-and-results.md) | Improve the work line, approval consequences, interruption explanations and compact handover. | An unfamiliar owner understands what is happening and what was actually checked. |
 | [04 — Return brief](04-return-brief.md) | Up to three meaningful changes or pending matters, with browser-local read state. | Correct understanding after returning; reading never resolves or approves work. |
@@ -36,7 +38,7 @@ Use the existing [visual verification guidance](../../../REVIEW.md#visual-verifi
 
 ## Recommended implementation order
 
-1. **Complete the existing performance integration.** Prepare 11's documentation independently. Establish the combined baseline before concurrent edits to storage, snapshots and the shell.
+1. **Use the merged performance integration as the baseline.** PR #252 completed that integration. Prepare 11's documentation independently and preserve the combined behavior when editing storage, snapshots and the shell.
 2. **Improve everyday use in small PRs:** 03's work line, then 02's access journey and 04's return brief. Coordinate shared projections and shell edits.
 3. **Add useful retained knowledge:** 05's packet and 08's procedures. Sequence edits to `pi.ts`, record contracts and information cards under one integration owner.
 4. **Prove operational capabilities:** 07's application restore before 10's update rehearsal. Resolve 06's observation contract and receipt source separately. Plan 09's broader intake/data-model change follows the core return journey.

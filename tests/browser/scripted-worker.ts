@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 
 import { workerSocketPath } from "../../scripts/worker-socket.mjs";
 import type { Transcript } from "../../src/server/pi-transcript";
+import { ownChangeNotifications } from "../../src/server/change-notifications";
 
 /**
  * Stand in for the worker on its own socket, answering with a transcript the
@@ -30,9 +31,25 @@ export async function scriptWorker(
     // Already gone: an earlier journey in this worker scripted it too.
   }
   const path = workerSocketPath(join(fixture.state, "qa.db"));
+  const changes = ownChangeNotifications({
+    database: join(fixture.state, "qa.db"),
+    config: fixture.state,
+  });
+  let transcriptReads = 0;
+  let subscriptions = 0;
+  let activeSubscriptions = 0;
+  let relays = 0;
   const server = createServer((incoming, outgoing) => {
+    if (incoming.url === "/changes") {
+      subscriptions++;
+      activeSubscriptions++;
+      outgoing.on("close", () => activeSubscriptions--);
+    }
+    if (incoming.url === "/changed") relays++;
+    if (changes.handle(incoming, outgoing)) return;
     incoming.resume();
     incoming.on("end", () => {
+      if (incoming.url === "/transcript") transcriptReads++;
       outgoing.writeHead(200, { "Content-Type": "application/json" });
       outgoing.end(
         JSON.stringify(incoming.url === "/transcript" ? transcript() : {}),
@@ -52,7 +69,21 @@ export async function scriptWorker(
       await new Promise((wait) => setTimeout(wait, 100));
     }
   }
-  return () => new Promise((done) => server.close(done));
+  return Object.assign(
+    () =>
+      new Promise<void>((done) => {
+        changes.close();
+        server.closeAllConnections();
+        server.close(() => done());
+      }),
+    {
+      changed: changes.notify,
+      reads: () => transcriptReads,
+      connections: () => subscriptions,
+      subscribers: () => activeSubscriptions,
+      relays: () => relays,
+    },
+  );
 }
 
 /** One time for everything scripted: a transcript at rest does not change. */

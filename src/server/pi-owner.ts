@@ -40,6 +40,7 @@ import { settleRunningExecutions } from "./operator-execution";
 import { beginRunDiagnostics } from "./tracing";
 import type { PiReply } from "./types";
 import { serveWorker, WorkerRefusal } from "./worker-link";
+import { notifyChange } from "./change-notifications";
 
 export interface Scope {
   applicationId: string;
@@ -151,8 +152,20 @@ export function sessionOwner(
     const watch = await session.lane.watch(ctx);
     let snapshot = watch.snapshot;
     const fresh = async () => (snapshot = await watch.resnapshot(ctx));
-    watch.start((event) => {
-      if (reduceLaneSnapshot(snapshot, event)) void fresh();
+    watch.start(async (event) => {
+      if (reduceLaneSnapshot(snapshot, event)) await fresh();
+      // The reducer returns undefined for ordinary changes, including tokens.
+      // Publish after applying them, not just when it requests a resnapshot.
+      if (
+        ![
+          "usage",
+          "handler_error",
+          "config_update",
+          "value_update",
+          "lane_created",
+        ].includes(event.type)
+      )
+        notifyChange({ kind: "chat", ...scope });
     });
     let read:
       | {
@@ -193,6 +206,7 @@ export function sessionOwner(
         else if (event.type === "update")
           previews.set(event.id, partialText(event.partial));
         else if (event.type === "end") previews.delete(event.id);
+        notifyChange({ kind: "chat", ...scope });
       },
     });
     let diagnostics: ReturnType<typeof beginRunDiagnostics> | undefined;
@@ -232,6 +246,11 @@ export function sessionOwner(
   async function shut(conversation: Opened) {
     opened.delete(conversation.chatId);
     await conversation.close();
+    notifyChange({
+      kind: "chat",
+      applicationId: conversation.applicationId,
+      chatId: conversation.chatId,
+    });
   }
 
   /** The conversation as it stands, opened for reading if it was not open. */
@@ -256,6 +275,11 @@ export function sessionOwner(
     first: () => Promise<unknown>,
   ) {
     conversation.driving = true;
+    notifyChange({
+      kind: "chat",
+      applicationId: conversation.applicationId,
+      chatId: conversation.chatId,
+    });
     conversation.trace(operationId);
     conversation.done = (async () => {
       let step = first;
@@ -277,7 +301,7 @@ export function sessionOwner(
           // Whatever a command never reported ending did not survive the
           // stretch. Pi's own calls need no sweep: one with no result in Pi's
           // history, with nobody driving, reads as interrupted.
-          settleRunningExecutions(
+          await settleRunningExecutions(
             conversation.applicationId,
             conversation.chatId,
           );
@@ -323,8 +347,8 @@ export function sessionOwner(
     if (!admitted.ok) throw new Error(admitted.error.message);
   }
 
-  function hasHistory(scope: Scope) {
-    const { chat } = loadChat(scope.applicationId, scope.chatId);
+  async function hasHistory(scope: Scope) {
+    const { chat } = await loadChat(scope.applicationId, scope.chatId);
     return (
       Boolean(chat.nativeSessionId) || existsSync(earlierHistoryPath(scope))
     );
@@ -374,7 +398,7 @@ export function sessionOwner(
       // is read again below, from Pi's stored session.
       const read = open && (await project(open).catch(() => undefined));
       if (read) return read;
-      if (!hasHistory(scope)) return NOTHING;
+      if (!(await hasHistory(scope))) return NOTHING;
       // Nobody is running this conversation, so reading it needs nothing of
       // Pi's runtime: not the model, not credentials, not a workspace. Pi
       // wrote everything a reader needs, and this reads it and nothing else.
@@ -390,7 +414,7 @@ export function sessionOwner(
           stored.lane,
           false,
         );
-      }).catch((error) => ({
+      }).catch(async (error) => ({
         // A history that cannot be opened is said where it would have been.
         ...NOTHING,
         messages: [
@@ -402,7 +426,7 @@ export function sessionOwner(
             source: "pi" as const,
             status: "failed" as const,
             error: error instanceof Error ? error.message : String(error),
-            createdAt: loadChat(scope.applicationId, scope.chatId).chat
+            createdAt: (await loadChat(scope.applicationId, scope.chatId)).chat
               .createdAt,
             revision: 0,
           },
@@ -416,7 +440,7 @@ export function sessionOwner(
       const open = opened.get(scope.chatId);
       const image = open
         ? imageOf((await open.history()).entries, open.snapshot(), id, index)
-        : hasHistory(scope)
+        : (await hasHistory(scope))
           ? await inLine(scope.chatId, async () => {
               const stored = await readNativeConversation(
                 scope.applicationId,
@@ -437,8 +461,10 @@ export function sessionOwner(
     send: (scope: Scope, message: SentMessage, onlyIfIdle = false) => (
       assertTaking(),
       inLine(scope.chatId, async () => {
-        assertChatWritable(loadChat(scope.applicationId, scope.chatId).chat);
-        const conversation = hasHistory(scope)
+        assertChatWritable(
+          (await loadChat(scope.applicationId, scope.chatId)).chat,
+        );
+        const conversation = (await hasHistory(scope))
           ? await ensure(scope)
           : undefined;
         const snapshot = await conversation?.fresh();
@@ -532,7 +558,7 @@ export function sessionOwner(
 
     /** Pi's abort ends its operation and empties its queues. */
     async stop(scope: Scope) {
-      if (!hasHistory(scope)) return {};
+      if (!(await hasHistory(scope))) return {};
       const stopped = inLine(scope.chatId, async () => {
         const conversation = await ensure(scope);
         if ((await conversation.fresh()).operation)
@@ -584,9 +610,9 @@ export function sessionOwner(
      * would be settling that worker's live approvals. Pi's sessions are left
      * as they are: nothing is opened, and nothing runs, until somebody asks.
      */
-    recover() {
-      for (const { id } of listApplications())
-        settleRunningExecutions(id, null);
+    async recover() {
+      for (const { id } of await listApplications())
+        await settleRunningExecutions(id, null);
     },
     handle(action: string, body: unknown) {
       const act = (actions[action as keyof typeof actions] ??

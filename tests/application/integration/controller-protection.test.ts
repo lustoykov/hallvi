@@ -83,8 +83,8 @@ beforeAll(async () => {
   };
 });
 
-afterAll(() => {
-  store.db().$client.close();
+afterAll(async () => {
+  await store.closeDatabase();
   storage.close();
   rmSync(root, { recursive: true, force: true });
   vi.unstubAllEnvs();
@@ -99,19 +99,19 @@ beforeEach(() => {
   });
 });
 
-function application(name = "Notes") {
-  const app = store.insertApplication({
+async function application(name = "Notes") {
+  const app = await store.insertApplication({
     name,
     repositoryUrl: "https://github.com/owner/notes",
     repositoryOwner: "owner",
     repositoryName: "notes",
   });
-  const chat = store.insertChat(app.id, "Main");
+  const chat = await store.insertChat(app.id, "Main");
   return { app, chat };
 }
 
 it("copies the controller while it runs, including committed WAL data", async () => {
-  application();
+  await application();
   mkdirSync(join(root, "state", "backup-destinations"), { recursive: true });
   writeFileSync(
     join(root, "state", "backup-destinations", "default.json"),
@@ -199,7 +199,7 @@ it("uploads a copy the owner can open, and offers the kit once", async () => {
 });
 
 it("skips a copy while a change is running and says so", async () => {
-  application();
+  await application();
   const skipped = await protectController("after-change", {
     access,
     changeRunning: true,
@@ -258,7 +258,7 @@ it("records a failure without claiming protection", async () => {
 });
 
 it("opens a copy again through the recovery command, and refuses a damaged one", async () => {
-  application("Something worth keeping");
+  await application("Something worth keeping");
   const copy = await protectController("daily", { access });
   expect(copy?.outcome).toBe("succeeded");
   const stored = objects.get(`/controller-copies/${copy!.objectKey}`)!;
@@ -312,7 +312,7 @@ it("carries the application secret store, and the values resolve after restore",
   // every digest matched, and the recovered controller could not authenticate
   // to a single database it had deployed. A copy that restores the
   // deployments and not the passwords is not a recovery copy.
-  const { app } = application();
+  const { app } = await application();
   const generatedName = "POSTGRES_PASSWORD";
   const suppliedName = "GF_SECURITY_ADMIN_PASSWORD";
   secrets.generateSecret(app.id, {

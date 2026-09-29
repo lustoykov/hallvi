@@ -157,6 +157,12 @@ export interface OperatorView {
   facts?: import("./application-facts").ApplicationFacts;
 }
 
+/** Periodic application facts; conversation state arrives through SSE. */
+export type OperatorMetadata = Omit<
+  OperatorView,
+  "messages" | "executions" | "piActivity" | "worker" | "information"
+>;
+
 export interface CreateApplicationInput {
   /** Stable identity for one creation attempt, retained across HTTP retries. */
   requestKey?: string;

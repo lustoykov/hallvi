@@ -149,6 +149,8 @@ try {
     "scripts/pi-workspace",
     "dist/worker.mjs",
     "dist/worker.mjs.map",
+    "dist/database-worker.mjs",
+    "dist/database-worker.mjs.map",
     "dist/schema.sql",
     "dist/schema-version.json",
   ])
@@ -176,7 +178,36 @@ try {
     [
       "--input-type=module",
       "-e",
-      "import Database from 'better-sqlite3'; import pty from 'node-pty'; new Database(':memory:').close(); pty.spawn('/bin/sh', ['-c', 'exit'], {});",
+      `import Database from "better-sqlite3";
+import pty from "node-pty";
+import { once } from "node:events";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { Worker } from "node:worker_threads";
+pty.spawn("/bin/sh", ["-c", "exit"], {});
+const directory = mkdtempSync(join(tmpdir(), "hallvi-package-db-"));
+let worker;
+try {
+  const path = join(directory, "hallvi.db");
+  const fixture = new Database(path);
+  fixture.exec(readFileSync("dist/schema.sql", "utf8"));
+  fixture.pragma("user_version = " + JSON.parse(readFileSync("dist/schema-version.json", "utf8")).version);
+  fixture.close();
+  worker = new Worker(resolve("dist/database-worker.mjs"), { workerData: { path }, execArgv: [] });
+  const answer = once(worker, "message");
+  worker.postMessage({ id: 1, operation: "listApplications", args: [] });
+  const [result] = await answer;
+  if (result.error || !Array.isArray(result.result) || result.result.length)
+    throw new Error("Packaged database worker could not read its fixture: " + JSON.stringify(result));
+  const exited = once(worker, "exit");
+  worker.postMessage({ id: 2, operation: "close", args: [] });
+  const [code] = await exited;
+  if (code !== 0) throw new Error("Packaged database worker did not close cleanly.");
+} finally {
+  await worker?.terminate();
+  rmSync(directory, { recursive: true, force: true });
+}`,
     ],
     { cwd: target, stdio: "inherit" },
   );

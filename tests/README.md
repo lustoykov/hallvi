@@ -84,7 +84,23 @@ default. Tests use disposable databases and synthetic provider/model responses.
 The shared-information browser case covers rich cards in chat and Deployment
 after refresh. `npx tsc --noEmit` and `npm run build` check the application bundle.
 
+`integration/database-worker.test.ts` uses a real temporary SQLite file and a competing writer to compare timer delay with direct synchronous access, checks an unrelated HTTP request while a write waits, and verifies transaction rollback, concurrent creation keys, close/reopen, worker loss and retained ownership. This proves responsiveness under a forced lock, not production throughput. [29 September evidence](../docs/testing/2026-09-29-async-sqlite.md) records the runtime and package checks.
+
 Conversation coverage runs against the installed Pi packages with only the model scripted. `integration/pi-owner.test.ts` runs the app and the worker's session owner over the real socket, with Hallvi's real tools and database: no acceptance without a worker, a repeated send being one instruction, approval before execution with evidence placed by Pi's tool-call id, two applications on one server and a side conversation at once, follow-up and steer order, Stop, restart with explicit Continue or Stop, an idle lane's queue, retry, compaction and failure left to Pi, and a request's outcome being the Pi operation that read it, shared by what Pi read together. It is also where the undocumented Pi behaviour Hallvi depends on is pinned. `integration/pi-sessions.test.ts` covers opening an earlier history with its original kept, `integration/db-upgrade.test.ts` the database upgrade and its rollback copy, `integration/pi-shared-account.test.ts` authentication through Pi's own `ModelRuntime`, and `integration/operator-execution.test.ts` permissions and approvals. `tests/browser/worker-restart.spec.ts` kills the real worker process mid-answer. `tests/browser/cli.spec.ts` runs the `hallvi` request commands as separate processes against the real app and worker: one request's identity through apps, exec, wait and inspect, background, timeout and Ctrl-C leaving the work with Pi, a lost acknowledgement, and an Always ask approval given in the page; `unit/controller-client.test.ts` covers choosing the controller, resending under the same key and refusing redirects against stand-ins. Journeys that are about the page rather than Pi (`pi-transcript`, `streaming-output`, `still-working`, `typed-information`) stand in for the worker on its socket with a scripted transcript (`tests/browser/scripted-worker.ts`); evidence on disk is still placed by the real app. `tests/application/unit/chat-recovery.test.tsx` covers the recovery UI.
+
+Change delivery is checked at its boundaries: `integration/change-notifications.test.ts`
+runs a separate socket-owner process for shared subscriptions, scoped fanout,
+web relays and storage identity. `unit/pi-stream.test.ts` covers idle reads,
+burst coalescing, changes arriving during reads and disconnect cleanup;
+`integration/pi-stream-reconnect.test.ts` holds an older execution scan across
+a disconnect while another chat keeps the hub connected. The browser
+`change-notifications.spec.ts` exercises a real Next mutation and worker
+loss/reconnect, and measures 1/5/10 open chats with 2,000 execution records.
+Its counters and metrics route are injected only into the disposable QA copy
+by `notification-metrics.mjs`, never the product. Scripted-worker journeys
+must emit `changed(...)` after writing fixture records or transcripts; there
+is no periodic snapshot poll to discover an unannounced fixture edit.
+See [29 September measurements](../docs/testing/2026-09-29-chat-notifications.md).
 
 A browser case asserts what the product says, not what a past layout said. Scope
 by landmark and accessible name rather than by layout class: a routine record is
