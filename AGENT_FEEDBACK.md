@@ -10,7 +10,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -155,25 +154,13 @@ initial runs which only isolated Hallvi's account were excluded.
 
 **+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
 
-### AF-017 — Make record validation easier for Pi to recover from
-
-During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
-then nine save calls failed because `presentation.checks[].basis` contained
-explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
-the calls and finished, but saving the useful result added avoidable churn.
-Make the tool contract easier to follow without relaxing record validation.
-
-**Status:** Owner-authorized correction in review on `codex/record-basis-contract`: explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. Archive after the fix merges.
-
-**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
-[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
-
 ## Archive
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Fixed in #275 |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
-| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fix in review #276 |
+| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fixed in #276 |
 | [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
 | [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Resolved in #266 |
 | [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Resolved in #265 |
@@ -182,6 +169,19 @@ Make the tool contract easier to follow without relaxing record validation.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-017 — Make record validation easier for Pi to recover from
+
+During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
+then nine save calls failed because `presentation.checks[].basis` contained
+explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
+the calls and finished, but saving the useful result added avoidable churn.
+Make the tool contract easier to follow without relaxing record validation.
+
+**Status:** Fixed in [#275](https://github.com/lustoykov/hallvi/pull/275): explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. A bounded real-Pi trial saved valid observed, planned and reported values; future retry-free behavior is not guaranteed.
+
+**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
+[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
 
 ### AF-018 — Load the updated interface after an installed upgrade
 
@@ -195,7 +195,7 @@ without losing unsent work, or make the required reload clear.
 **+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
 [release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
 
-**Disposition:** Fix in review in [#276](https://github.com/lustoykov/hallvi/pull/276).
+**Disposition:** Fixed in [#276](https://github.com/lustoykov/hallvi/pull/276).
 An open page that observes completion offers an explicit, confirmed Reload page
 action. The warning asks the owner to keep unsent work, images and unsaved
 settings first. Existing browser recovery preserves text drafts and pending
