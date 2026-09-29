@@ -96,7 +96,11 @@ export async function readConversation(applicationId: string, chatId: string) {
   });
   return {
     transcript,
-    ...placeEvidence(applicationId, transcript, listExecutions(applicationId)),
+    ...placeEvidence(
+      applicationId,
+      transcript,
+      await listExecutions(applicationId),
+    ),
   };
 }
 
@@ -116,7 +120,7 @@ export async function chatSnapshot(
   const placed = placeEvidence(
     applicationId,
     transcript,
-    listExecutions(applicationId),
+    await listExecutions(applicationId),
   );
   return {
     worker: { alive: worker },

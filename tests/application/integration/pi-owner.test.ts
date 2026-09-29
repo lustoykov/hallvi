@@ -391,8 +391,10 @@ async function until(check: () => unknown, ticks = 400) {
     await delay(10);
   }
 }
-const approval = (applicationId: string) =>
-  listExecutions(applicationId).find((e) => e.status === "awaiting-approval");
+const approval = async (applicationId: string) =>
+  (await listExecutions(applicationId)).find(
+    (e) => e.status === "awaiting-approval",
+  );
 /** What a caller outside the page reads about one request. */
 const outcome = (app: { id: string; chat: string }, key: string) =>
   requestOutcome(app.id, app.chat, key);
@@ -422,7 +424,7 @@ it("a send repeated after a lost answer is one instruction, read once", async ()
   const first = randomUUID();
   await a.send("[approve] restart it", "next", first);
   await a.send("[approve] restart it", "next", first);
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
 
   // The same for a message queued behind running work.
   const next = randomUUID();
@@ -430,7 +432,7 @@ it("a send repeated after a lost answer is one instruction, read once", async ()
   await a.send("and then check it", "next", next);
   expect((await a.transcript()).at(-1)).toBe("you [waiting] and then check it");
 
-  decideExecution(a.id, approval(a.id)!.id, true);
+  decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   // And once it has been read: Pi's history still has it.
   await a.send("and then check it", "next", next);
@@ -487,7 +489,7 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
   const a = application("shop", "203.0.113.7");
   const b = application("blog", "203.0.113.7");
   await a.send("[approve] restart it");
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   expect(await a.status()).toBe("working");
 
   // Another application on the same server, and a read-only conversation of
@@ -505,9 +507,9 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
     "you [delivered] what is running?",
     "pi [completed] reply: what is running?",
   ]);
-  expect(approval(a.id)).toMatchObject({ tool: "request_approval" });
+  expect(await approval(a.id)).toMatchObject({ tool: "request_approval" });
 
-  decideExecution(a.id, approval(a.id)!.id, true);
+  decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   const snapshot = await a.snapshot();
   const reply = snapshot.messages.at(-1)!;
@@ -532,13 +534,13 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
     [reply.id, 2, "tool", "request_approval"],
     [reply.id, 3, "message", "finished"],
   ]);
-  expect(listExecutions(b.id)).toEqual([]);
+  expect(await listExecutions(b.id)).toEqual([]);
 });
 
 it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", async () => {
   const a = application("shop");
   await a.send("[approve] restart it");
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.send("then check the logs");
   await a.send("use the staging server", "steer");
   expect((await a.snapshot()).messages.slice(-2)).toMatchObject([
@@ -546,7 +548,7 @@ it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", asy
     { status: "waiting", delivery: "steer", body: "use the staging server" },
   ]);
 
-  decideExecution(a.id, approval(a.id)!.id, true);
+  decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   expect(await a.transcript()).toEqual([
     "you [delivered] [approve] restart it",
@@ -571,11 +573,11 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
     undefined,
     "cli",
   );
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   expect(await outcome(a, first)).toMatchObject({
     status: "waiting-for-approval",
     operation: { id: first, status: "open" },
-    attention: { kind: "approval", executionId: approval(a.id)!.id },
+    attention: { kind: "approval", executionId: (await approval(a.id))!.id },
     evidence: [{ status: "awaiting-approval", exitCode: null, output: "" }],
   });
   await a.send("then check the logs", "next", second);
@@ -587,7 +589,7 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
   // Another application's work, at the same time.
   await b.send("how is it going?");
 
-  decideExecution(a.id, approval(a.id)!.id, true);
+  decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   await until(async () => expect(await b.status()).toBe("idle"));
   // Pi read both follow-ups inside the operation it was already running, so
@@ -608,7 +610,7 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
         {
           tool: "request_approval",
           status: "succeeded",
-          executionId: listExecutions(a.id)[0].id,
+          executionId: (await listExecutions(a.id))[0].id,
         },
       ],
     });
@@ -665,7 +667,7 @@ it("Stop ends an approval wait and a streaming answer, drops what waited, and sa
   const stopped = randomUUID();
   const dropped = randomUUID();
   await a.send("[approve] restart it", "next", stopped);
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.send("then check the logs", "next", dropped);
   await a.stop();
   await until(async () => expect(await a.status()).toBe("idle"));
@@ -676,7 +678,7 @@ it("Stop ends an approval wait and a streaming answer, drops what waited, and sa
     "pi [cancelled] I will ask first.",
   ]);
   // Nothing was approved, so nothing ran, and the record says it was cut.
-  expect(listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
+  expect(await listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
   expect(requests).toEqual(["[approve] restart it"]);
   expect(await outcome(a, stopped)).toMatchObject({ status: "cancelled" });
   // Pi keeps no record of a waiting message Stop dropped.
@@ -707,7 +709,7 @@ it("after a restart nothing runs; history and evidence stay; Continue carries on
   const first = randomUUID();
   const waiting = randomUUID();
   await a.send("[approve] restart it", "next", first);
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.send("then check the logs", "next", waiting);
   await loseWorker();
   await startWorker();
@@ -745,7 +747,7 @@ it("after a restart nothing runs; history and evidence stay; Continue carries on
   await until(async () => expect(await a.status()).toBe("idle"));
   // The interrupted call was not made again: Pi told the model its outcome
   // is unknown, and then read what had waited.
-  expect(listExecutions(a.id)).toHaveLength(1);
+  expect(await listExecutions(a.id)).toHaveLength(1);
   expect(requests).toEqual([
     "[approve] restart it",
     "<toolResult>",
@@ -765,7 +767,7 @@ it("after a restart nothing runs; history and evidence stay; Continue carries on
 it("after a restart Stop is there with nothing queued, and ends what Pi held", async () => {
   const a = application("shop");
   await a.send("[approve] restart it");
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   await loseWorker();
   await startWorker();
   expect(await a.status()).toBe("interrupted");
@@ -874,14 +876,14 @@ it("Stop after continuing an idle lane's queue says stopped, from the result of 
   await startWorker();
 
   await a.continue();
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.stop();
   expect(await a.status()).toBe("idle");
   expect((await a.transcript()).slice(-2)).toEqual([
     "you [delivered] [approve] restart it",
     "pi [cancelled] I will ask first.",
   ]);
-  expect(listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
+  expect(await listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
 
   // A later turn, and a worker that went away in between, do not rewrite how
   // that stopped one ended: its operation is the one Pi read the queue in,
@@ -901,12 +903,12 @@ it("Stop after continuing an idle lane's queue says stopped, from the result of 
 it("a second worker steps aside without touching what the first is doing", async () => {
   const a = application("shop");
   await a.send("[approve] restart it");
-  await until(() => expect(approval(a.id)).toBeTruthy());
-  const waiting = approval(a.id)!.id;
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
+  const waiting = (await approval(a.id))!.id;
 
   // Everything a starting worker does, while another one owns the sessions.
   expect(await ownSessions()).toBeNull();
-  expect(approval(a.id)?.id).toBe(waiting);
+  expect((await approval(a.id))?.id).toBe(waiting);
   expect((await a.snapshot()).worker).toEqual({ alive: true });
 
   decideExecution(a.id, waiting, true);
@@ -923,8 +925,8 @@ it.each([false, true])(
     // reading one opens nothing.
     await a.send("[approve] restart it");
     await b.send("[approve] restart it");
-    await until(() => expect(approval(a.id)).toBeTruthy());
-    await until(() => expect(approval(b.id)).toBeTruthy());
+    await until(async () => expect(await approval(a.id)).toBeTruthy());
+    await until(async () => expect(await approval(b.id)).toBeTruthy());
     let finish!: () => void;
     synthetic.cleanup = new Promise((resolve) => (finish = resolve));
     synthetic.cleanupFailsFor = failCleanup ? a.chat : undefined;
@@ -1082,7 +1084,7 @@ it("reads a conversation nobody is running without asking the model provider", a
 it("keeps an older stopped reply stopped, and its calls with it, after a later turn", async () => {
   const a = application("shop");
   await a.send("[approve] restart it");
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.stop();
   const stopped = (await a.snapshot()).messages.at(-1)!;
   expect(stopped.status).toBe("cancelled");
@@ -1133,11 +1135,11 @@ it("an update's hold stops new work, counts an approval wait as work, and lets g
   // Waiting for the owner's approval is work in progress, not idleness: the
   // turn has not ended, and an update that stopped Hallvi now would cut it.
   await a.send("[approve] restart it");
-  await until(() => expect(approval(a.id)).toBeTruthy());
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
   expect(await hold()).toMatchObject({ busy: 1 });
   await release();
 
-  decideExecution(a.id, approval(a.id)!.id, true);
+  decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   expect(await hold()).toMatchObject({ busy: 0 });
   await release();

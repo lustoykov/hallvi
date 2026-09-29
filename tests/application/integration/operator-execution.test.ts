@@ -55,18 +55,18 @@ it("pauses the actual call until approved, then records its output and failure c
     false,
     "host-call",
   );
-  const [receipt] = listExecutions(run.applicationId);
+  const [receipt] = await listExecutions(run.applicationId);
   expect(receipt.status).toBe("awaiting-approval");
   expect(work).not.toHaveBeenCalled();
   // The record keeps the id Pi gave the call; that is what places it.
   expect(receipt.toolCallId).toBe("host-call");
   store.db().$client.close();
   delete globalThis.__hallviDb;
-  expect(listExecutions(run.applicationId)[0].id).toBe(receipt.id);
+  expect((await listExecutions(run.applicationId))[0].id).toBe(receipt.id);
   decideExecution(run.applicationId, receipt.id, true);
   expect(await pending).toEqual({ output: "missing service", exitCode: 3 });
   expect(work).toHaveBeenCalledOnce();
-  expect(listExecutions(run.applicationId)[0]).toMatchObject({
+  expect((await listExecutions(run.applicationId))[0]).toMatchObject({
     status: "failed",
     output: "missing service",
     exitCode: 3,
@@ -86,13 +86,13 @@ it("declining or cancelling an approval never starts the command", async () => {
   );
   decideExecution(
     run.applicationId,
-    listExecutions(run.applicationId)[0].id,
+    (await listExecutions(run.applicationId))[0].id,
     false,
   );
   expect(await declined).toEqual({ declined: true });
   // The SDK completes normally after a decline, so Pi's history says the call
   // came back. This record is what says nothing ran, under Pi's own call id.
-  expect(listExecutions(run.applicationId)[0]).toMatchObject({
+  expect((await listExecutions(run.applicationId))[0]).toMatchObject({
     toolCallId: "declined-call",
     status: "declined",
   });
@@ -110,10 +110,9 @@ it("declining or cancelling an approval never starts the command", async () => {
   controller.abort();
   await expect(cancelled).rejects.toThrow();
   expect(work).not.toHaveBeenCalled();
-  expect(listExecutions(run.applicationId).map((item) => item.status)).toEqual([
-    "declined",
-    "interrupted",
-  ]);
+  expect(
+    (await listExecutions(run.applicationId)).map((item) => item.status),
+  ).toEqual(["declined", "interrupted"]);
 });
 it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even when Pi asks", async () => {
   settings("pi-decides");
@@ -136,7 +135,7 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
     true,
     "approval-call",
   );
-  const receipt = listExecutions(run.applicationId).find(
+  const receipt = (await listExecutions(run.applicationId)).find(
     (item) => item.status === "awaiting-approval",
   )!;
   decideExecution(run.applicationId, receipt.id, true);
@@ -149,7 +148,9 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
     false,
     "approved-call",
   );
-  expect(listExecutions(run.applicationId).at(-1)?.approvalId).toBe(receipt.id);
+  expect((await listExecutions(run.applicationId)).at(-1)?.approvalId).toBe(
+    receipt.id,
+  );
   settings("bypass");
   expect(
     await context.execute(
@@ -162,7 +163,7 @@ it("Pi decides runs ordinary commands and can ask; Bypass never pauses, even whe
     ),
   ).toBe("done");
   expect(
-    listExecutions(run.applicationId).some(
+    (await listExecutions(run.applicationId)).some(
       (item) => item.status === "awaiting-approval",
     ),
   ).toBe(false);
@@ -191,14 +192,17 @@ it("side chats cannot execute and a stretch that ended leaves its pending comman
     "stopped-call",
     stopped.signal,
   );
-  const receipt = listExecutions(run.applicationId)[0];
+  const receipt = (await listExecutions(run.applicationId))[0];
   // What the owner of the session does when a stretch ends or a worker starts.
   settleRunningExecutions(run.applicationId, run.chatId);
+  const interrupted = expect(pending).rejects.toThrow();
   stopped.abort();
-  expect(listExecutions(run.applicationId)[0].status).toBe("interrupted");
+  expect((await listExecutions(run.applicationId))[0].status).toBe(
+    "interrupted",
+  );
   expect(() => decideExecution(run.applicationId, receipt.id, true)).toThrow(
     "no longer",
   );
-  await expect(pending).rejects.toThrow();
+  await interrupted;
   expect(work).not.toHaveBeenCalled();
 });

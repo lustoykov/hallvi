@@ -87,6 +87,7 @@ export const test = base.extend<
           `/api/applications/${missing}/secrets`,
           "/api/host",
           "/api/hallvi/update",
+          `/api/applications/${missing}/executions/${missing}/decision`,
           `/api/applications/${missing}/chats`,
           `/api/applications/${missing}/chats/${missing}/messages`,
           `/api/applications/${missing}/chats/${missing}/events`,

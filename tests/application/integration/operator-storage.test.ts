@@ -62,11 +62,11 @@ it("loads creation and settings after reopening the database", () => {
   expect(operatorSettings(app).permissionMode).toBe("always-ask");
 });
 it("shares one outcome between views while keeping working knowledge unsurfaced", async () => {
-  const hidden = saveInformation(app, {
+  const hidden = await saveInformation(app, {
     title: "Build note",
     body: "Use the repository lockfile.",
   });
-  const record = saveInformation(app, {
+  const record = await saveInformation(app, {
     title: "Application verified",
     body: "HTTP check passed.",
     evidence: [{ type: "url", url: "https://example.com" }],
@@ -94,7 +94,11 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
   expect(listInformation(app, "lockfile").map((r) => r.id)).toEqual([
     hidden.id,
   ]);
-  saveInformation(app, { title: hidden.title, body: "Use npm ci." }, hidden.id);
+  await saveInformation(
+    app,
+    { title: hidden.title, body: "Use npm ci." },
+    hidden.id,
+  );
   expect(listInformation(app, "npm ci")).toHaveLength(1);
   retireInformation(app, record.id);
   expect(listInformation(app).map((r) => r.id)).toEqual([hidden.id]);
@@ -107,17 +111,17 @@ it("tells an author who invented an ID what to do instead, and never touches ano
   // only that they were not found. Record IDs are unique across every
   // application, so an invented one is a mistake worth naming precisely.
   const invented = "deployment";
-  expect(() =>
+  await expect(
     saveInformation(app, { title: "Deployed", body: "It runs." }, invented),
-  ).toThrow(/Omit id to create a record/);
+  ).rejects.toThrow(/Omit id to create a record/);
   expect(listInformation(app)).toHaveLength(0);
 
   // Creating without an ID works and hands back the ID to update with.
-  const created = saveInformation(app, {
+  const created = await saveInformation(app, {
     title: "Deployed",
     body: "It runs.",
   });
-  saveInformation(
+  await saveInformation(
     app,
     { title: "Deployed", body: "It runs, and the data survived." },
     created.id,
@@ -133,18 +137,18 @@ it("tells an author who invented an ID what to do instead, and never touches ano
       repositoryUrl: "https://github.com/example/other",
     })
   ).application.id;
-  expect(() =>
+  await expect(
     saveInformation(
       other,
       { title: "Mine now", body: "Overwritten." },
       created.id,
     ),
-  ).toThrow(/Omit id to create a record/);
+  ).rejects.toThrow(/Omit id to create a record/);
   expect(listInformation(other)).toHaveLength(0);
   expect(listInformation(app)[0].body).toBe("It runs, and the data survived.");
 });
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
-  saveInformation(app, { title: "Note", body: "Saved" });
+  await saveInformation(app, { title: "Note", body: "Saved" });
   // Without the owner nothing is removed: a history must not be orphaned.
   await expect(removeApplication(app, "example/app")).rejects.toThrow(
     /worker is not running/,
@@ -162,8 +166,8 @@ it("removal goes through the worker that owns the histories, and cascades only a
     ).toEqual({ n: 0 });
 });
 
-it("persists typed deployment/access facts and shares edits without duplicating records", () => {
-  const deployment = saveInformation(app, {
+it("persists typed deployment/access facts and shares edits without duplicating records", async () => {
+  const deployment = await saveInformation(app, {
     title: "Application deployed",
     body: "The deployment is recorded.",
     presentation: {
@@ -189,7 +193,7 @@ it("persists typed deployment/access facts and shares edits without duplicating 
       },
     },
   })!;
-  const access = saveInformation(app, {
+  const access = await saveInformation(app, {
     title: "Private access ready",
     body: "Open on the controller PC.",
     presentation: {
@@ -215,7 +219,7 @@ it("persists typed deployment/access facts and shares edits without duplicating 
     listInformation(app).find((r) => r.id === deployment.id)?.presentation
       ?.checks[0].about,
   ).toEqual({ kind: "application", id: "qa-app" });
-  saveInformation(
+  await saveInformation(
     app,
     {
       ...access,
@@ -243,7 +247,7 @@ it("persists typed deployment/access facts and shares edits without duplicating 
   ).toBe("http://127.0.0.1:8081");
 });
 
-it("rejects malformed typed records before saving them", () => {
+it("rejects malformed typed records before saving them", async () => {
   const base = {
     title: "Access",
     body: "",
@@ -260,20 +264,20 @@ it("rejects malformed typed records before saving them", () => {
       },
     },
   };
-  expect(() => saveInformation(app, base)).toThrow("127.0.0.1");
-  expect(() =>
+  await expect(saveInformation(app, base)).rejects.toThrow("127.0.0.1");
+  await expect(
     saveInformation(app, {
       ...base,
       presentation: { ...base.presentation, url: "http://127.0.0.1:8081" },
     }),
-  ).toThrow("localPort");
-  expect(() =>
+  ).rejects.toThrow("localPort");
+  await expect(
     saveInformation(app, {
       ...base,
       presentation: { ...base.presentation, url: undefined },
     }),
-  ).toThrow("browser URL");
-  expect(() =>
+  ).rejects.toThrow("browser URL");
+  await expect(
     saveInformation(app, {
       ...base,
       presentation: {
@@ -281,6 +285,6 @@ it("rejects malformed typed records before saving them", () => {
         content: { kind: "arbitrary-html", html: "<script>" },
       },
     }),
-  ).toThrow();
+  ).rejects.toThrow();
   expect(listInformation(app)).toHaveLength(0);
 });

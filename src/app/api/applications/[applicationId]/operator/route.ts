@@ -14,7 +14,7 @@ export function GET(_request: Request, context: Context) {
     const { applicationId } = await context.params;
     return {
       settings: operatorSettings(applicationId),
-      executions: listExecutions(applicationId),
+      executions: await listExecutions(applicationId),
     };
   });
 }

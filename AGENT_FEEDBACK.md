@@ -7,6 +7,7 @@
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 1 | New |
 
 ## How to contribute
 
@@ -110,3 +111,15 @@ that sets `launchOptions.executablePath`. An environment variable read in
 `tests/browser/playwright.config.ts` would make that one setting.
 
 **+1:** 2026-09-29 — typed-information smoke fix, PR #245
+
+### AF-006 — Reduce full-history response serialization
+
+After execution reads are cached, serializing the complete execution history
+still blocks the event loop: ten readers of a synthetic 2,000-record history
+showed about 82 ms maximum delay from the warm response path. Change
+notifications will remove idle polling; consider bounded or incremental
+evidence responses if long histories still make active chats slow. The
+[measurement](docs/testing/2026-09-29-execution-reader.md) separates file reads
+from this remaining cost.
+
+**+1:** 2026-09-29 — execution history cache task (`codex/execution-history-cache`)
