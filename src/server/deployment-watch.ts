@@ -46,8 +46,10 @@ interface Conversations {
   }): Promise<Transcript>;
 }
 
-const mainChat = (applicationId: string) =>
-  listApplicationChats(applicationId).find((chat) => chat.kind === "main");
+const mainChat = async (applicationId: string) =>
+  (await listApplicationChats(applicationId)).find(
+    (chat) => chat.kind === "main",
+  );
 
 /** What Pi is told. The owner reads it too, marked as started automatically. */
 function wakeup(
@@ -80,9 +82,9 @@ export function deploymentWatch(
 
   /** Say what became of an attempt whose conversation is no longer running. */
   async function settle(applicationId: string, attempt: DeploymentAttempt) {
-    const chat = mainChat(applicationId);
+    const chat = await mainChat(applicationId);
     if (chat && conversations.driving(chat.id)) return;
-    const release = releaseSince(
+    const release = await releaseSince(
       applicationId,
       attempt.commit,
       attempt.startedAt,
@@ -147,7 +149,7 @@ export function deploymentWatch(
     starting.add(applicationId);
     try {
       const state = deploymentState(applicationId);
-      const chat = mainChat(applicationId);
+      const chat = await mainChat(applicationId);
       if (state.attempts.some((one) => one.outcome === "running"))
         throw new WorkerRefusal("A deployment is already running.", "busy");
       if (state.checkError || !state.latest || !chat)
@@ -156,7 +158,7 @@ export function deploymentWatch(
             "Hallvi has not read this branch from GitHub yet.",
           "not-ready",
         );
-      if (!operatorSettings(applicationId).host)
+      if (!(await operatorSettings(applicationId)).host)
         throw new WorkerRefusal(
           "No server is connected for this application yet.",
           "not-ready",
@@ -187,7 +189,7 @@ export function deploymentWatch(
             state,
             state.latest,
             trigger,
-            deployedRevision(applicationId),
+            await deployedRevision(applicationId),
           ),
           delivery: "next",
         },
@@ -217,7 +219,7 @@ export function deploymentWatch(
     }
 
     state = deploymentState(applicationId);
-    const deployed = deployedRevision(applicationId);
+    const deployed = await deployedRevision(applicationId);
     const last = state.attempts[0];
     if (
       state.mode !== "automatic" ||
@@ -254,7 +256,7 @@ export function deploymentWatch(
   return {
     /** Every application once. One that fails never stops the others. */
     async tick() {
-      for (const { id } of listApplications()) {
+      for (const { id } of await listApplications()) {
         if (signal?.aborted) return;
         await care(id).catch((error) =>
           console.warn(
@@ -292,7 +294,7 @@ export function deploymentWatch(
         await lookAtBranch(applicationId, signal);
         await start(applicationId, "owner");
       } else throw new Error("Unknown deployment request.");
-      return deploymentStatus(applicationId);
+      return await deploymentStatus(applicationId);
     },
   };
 }

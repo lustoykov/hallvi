@@ -15,6 +15,9 @@ const CLI = "scripts/cli.mjs";
 function environment() {
   const env = { ...process.env };
   delete env.HALLVI_CONTROLLER_URL;
+  // Playwright forces colors; the terminal can also set NO_COLOR. Keep the
+  // CLI stderr assertion about the command, not Node's conflicting-env warning.
+  delete env.FORCE_COLOR;
   return env;
 }
 function hallvi(...args: string[]) {

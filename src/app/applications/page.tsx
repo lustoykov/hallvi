@@ -7,7 +7,7 @@ import { getPiSetupStatus } from "@/server/pi-setup";
 export const dynamic = "force-dynamic";
 
 export default async function ApplicationsPage() {
-  const applications = listApplicationItems();
+  const applications = await listApplicationItems();
   // With nothing added yet, the welcome is the home: it says what Hallvi is
   // and takes the repository, instead of an empty list with a button to it.
   if (!applications.length) redirect("/applications/new");

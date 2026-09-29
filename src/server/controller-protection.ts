@@ -1,4 +1,3 @@
-import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
 import {
   createCipheriv,
@@ -28,7 +27,7 @@ import { z } from "zod";
 
 import type { ControllerProtectionFacts } from "./application-facts";
 import { backupDestinationAccess } from "./backup-connection";
-import { databasePath } from "./db";
+import { backupDatabase, databasePath } from "./db";
 import { piAccountDir, piConfigDir } from "./pi-configuration";
 import { readTar, writeTar } from "./tar";
 
@@ -237,18 +236,7 @@ export async function captureControllerPayload(): Promise<{
   const staging = mkdtempSync(join(tmpdir(), "hv-controller-copy-"));
   try {
     const target = join(staging, "hallvi.db");
-    const reader = new Database(database, { readonly: true });
-    try {
-      await reader.backup(target);
-    } finally {
-      reader.close();
-    }
-    const copy = new Database(target);
-    try {
-      copy.pragma("journal_mode = DELETE");
-    } finally {
-      copy.close();
-    }
+    await backupDatabase(target);
     entries.push({
       path: "payload/database/hallvi.db",
       content: readFileSync(target),

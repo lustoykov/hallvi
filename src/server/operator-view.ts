@@ -19,15 +19,15 @@ export async function getOperatorView(
   chatId?: string,
 ): Promise<OperatorView> {
   const application = chatId
-    ? loadChat(applicationId, chatId).application
-    : loadApplication(applicationId);
-  const chats = listApplicationChatSummaries(application.id);
+    ? (await loadChat(applicationId, chatId)).application
+    : await loadApplication(applicationId);
+  const chats = await listApplicationChatSummaries(application.id);
   const selected =
     (chatId ? chats.find((chat) => chat.id === chatId) : null) ??
     chats.find((chat) => !chat.archivedAt) ??
     chats[0] ??
     null;
-  const access = repositoryAccess(application);
+  const access = await repositoryAccess(application);
   // The selected conversation comes from Pi, with evidence placed into it.
   const conversation = selected
     ? await chatSnapshot(application.id, selected.id)
@@ -51,17 +51,18 @@ export async function getOperatorView(
       connected: access.connected,
       signIn: Boolean(githubAppRegistration()),
     },
-    executions: conversation?.executions ?? listExecutions(applicationId),
+    executions:
+      conversation?.executions ?? (await listExecutions(applicationId)),
     piActivity: conversation?.piActivity ?? [],
     worker: conversation?.worker,
     chats,
     selectedChatId: selected?.id ?? null,
     messages: conversation?.messages ?? [],
-    information: listInformation(application.id, "", true).filter(
+    information: (await listInformation(application.id, "", true)).filter(
       (r) => r.presentation,
     ),
     secrets: listSecrets(application.id),
-    deployment: deploymentStatus(application.id),
+    deployment: await deploymentStatus(application.id),
     // Hallvi's own protection is the same fact for every application:
     // read from the controller's records, not from this application's.
     facts: { controllerProtection: controllerProtectionFacts() },

@@ -13,14 +13,17 @@ export function GET(_request: Request, context: Context) {
   return handle(async () => {
     const { applicationId } = await context.params;
     return {
-      settings: operatorSettings(applicationId),
-      executions: listExecutions(applicationId),
+      settings: await operatorSettings(applicationId),
+      executions: await listExecutions(applicationId),
     };
   });
 }
 export function POST(request: Request, context: Context) {
   return handle(async () => {
     const settings = await parseJsonRequest(request, operatorSettingsSchema);
-    return saveOperatorSettings((await context.params).applicationId, settings);
+    return await saveOperatorSettings(
+      (await context.params).applicationId,
+      settings,
+    );
   });
 }

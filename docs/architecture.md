@@ -23,13 +23,15 @@ on the application; execution evidence lives in files. See the storage [verifica
 ```mermaid
 flowchart TD
     UI[Conversation and destination pages] --> API[Next.js route handlers]
-    API --> DB[(SQLite: applications, conversations,<br/>saved information)]
+    API -->|await named operation| WebDB[Database thread in web process]
+    WebDB --> DB[(SQLite: applications, conversations,<br/>saved information)]
     API -->|worker.sock: send, continue, stop, read| Worker
-    Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] --> DB
+    Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] -->|await named operation| PiDB[Database thread in Pi process]
+    PiDB --> DB
     Worker --> Tools[Twenty tools]
     Tools --> Host[Application server over SSH]
     Tools --> Providers[Hetzner, Cloudflare, GitHub, object storage]
-    Tools -->|save_information| DB
+    Tools -->|save_information| PiDB
     Tools --> Files[Execution evidence and native Pi history,<br/>files beside the database]
     DB --> Projection[record-projection.ts]
     Projection --> Records[*-records.ts, one per destination]
@@ -52,6 +54,46 @@ operation, from Pi's records of where each began and ended — with its answer
 and bounded, redacted evidence ([requests.ts](../src/server/requests.ts)).
 Nothing is stored for a request. [Working from a terminal](cli.md) owns the
 contract.
+
+## Asynchronous SQLite boundary
+
+[db.ts](../src/server/db.ts) exposes asynchronous storage operations. Each
+process owns one [database thread](../src/server/database-worker.ts), which
+opens the existing SQLite file and executes the Drizzle operations in
+[database-store.ts](../src/server/database-store.ts). Query execution, lock
+waits, schema checks, retained-state ownership checks and SQLite backups run
+there. Web requests and Pi await the result while their event loops remain
+available. A busy connection still queues its own requests; this does not
+remove SQLite's single-writer limit.
+
+WAL, foreign keys and the five-second busy timeout are unchanged. Creating
+an application and its first conversation is one `BEGIN IMMEDIATE` transaction
+inside the database thread. The same operation settles repeated creation keys
+before any insert. Whole operations run in order, including online backup;
+transaction callbacks, Drizzle objects and open transactions never cross the
+message boundary. SQL errors keep their name, message, SQLite code and cause.
+
+An ordinary SQL or schema error rejects its caller. An unexpected database
+thread exit rejects pending and future calls and stops its owning process:
+no write is replayed, since a lost acknowledgement can mean a committed write.
+The installed launcher's existing process-failure behavior stops the paired
+process so the service manager can restart them. Pi still resumes nothing
+without the owner's Continue or Stop. The thread holds retained ownership
+until close or process exit, and checks authority before opening the file.
+
+Graceful Pi shutdown drains accepted database requests and closes the
+connection after its sessions have closed. The existing five-second forced
+exit limit still applies. Idle database threads do not keep
+a process alive; Node ends them with their owning process. Development loads
+the source thread through `scripts/database-worker.mjs`; the build and package
+include `dist/database-worker.mjs`, which needs no TypeScript loader.
+
+The separate `.worker-lock` remains synchronous: it is acquired once, with a
+zero timeout, before Pi serves requests and is held for process ownership.
+Offline migrations, fixture tooling and the launcher's pre-service schema
+preparation also remain synchronous; they do not serve web requests or Pi
+turns. These exceptions never execute application queries on either runtime
+event loop.
 
 ## What is stored
 

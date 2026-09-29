@@ -181,10 +181,10 @@ export class TerminalSession {
   }
 
   /** An existing shell must never outlive a changed application target. */
-  checkTarget() {
+  async checkTarget() {
     let current: Host | null = null;
     try {
-      current = hostFor(this.applicationId);
+      current = await hostFor(this.applicationId);
     } catch {
       // Removed applications and unreadable settings invalidate the session.
     }
@@ -252,6 +252,6 @@ export function readSize(value: unknown): Size | null {
   return size;
 }
 
-export function hostFor(applicationId: string) {
-  return operatorSettings(applicationId).host;
+export async function hostFor(applicationId: string) {
+  return (await operatorSettings(applicationId)).host;
 }

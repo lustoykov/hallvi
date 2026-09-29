@@ -17,6 +17,7 @@ Each of these is linked from the document that owns its decision.
 | Diagram | Owned by |
 | --- | --- |
 | [Architecture routes and connection evidence](../presentation-contract.md#5-architecture-the-state-the-page-needs) | [Presentation contract](../presentation-contract.md) |
+| [Runtime SQLite threads](../architecture.md#the-shape-of-it) | [Architecture](../architecture.md#asynchronous-sqlite-boundary) |
 | [Repository workspace boundary](../architecture.md#repository-workspace-architecture) | [Architecture](../architecture.md) |
 | [Private repository source deployment](../integrations/github.md#deploying-private-source-and-later-revisions) | [GitHub](../integrations/github.md) |
 | [Automatic deployment: the branch watch](../integrations/github.md#deploying-automatically-when-a-branch-changes) | [GitHub](../integrations/github.md) |

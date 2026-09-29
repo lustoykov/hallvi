@@ -101,7 +101,7 @@ export function askWorker<T>(action: string, body: unknown): Promise<T> {
  */
 export async function serveWorker(
   handle: (action: string, body: unknown) => Promise<unknown>,
-  owned?: () => void,
+  owned?: () => void | Promise<void>,
 ): Promise<{ server: Server; release: () => void } | null> {
   const lock = new Database(`${realpathSync(databasePath())}.worker-lock`, {
     timeout: 0,
@@ -111,6 +111,13 @@ export async function serveWorker(
   } catch {
     lock.close();
     return null;
+  }
+  try {
+    // Recovery is part of taking ownership, before any request can arrive.
+    await owned?.();
+  } catch (error) {
+    lock.close();
+    throw error;
   }
   const path = socketPath();
   rmSync(path, { force: true });
@@ -151,7 +158,6 @@ export async function serveWorker(
     const mask = process.umask(0o177);
     server.listen(path, () => {
       process.umask(mask);
-      owned?.();
       resolve();
     });
   });

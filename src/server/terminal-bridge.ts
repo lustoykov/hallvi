@@ -82,8 +82,11 @@ async function start(): Promise<Bridge> {
     if ((request.headers.origin ?? "") !== ticket.origin)
       return refuse(403, "Forbidden");
 
-    sockets.handleUpgrade(request, socket, head, (socketConnection) =>
-      open(bridge, socketConnection, ticket),
+    sockets.handleUpgrade(
+      request,
+      socket,
+      head,
+      async (socketConnection) => await open(bridge, socketConnection, ticket),
     );
   });
 
@@ -113,6 +116,7 @@ function bridge() {
 }
 
 function refuse(socket: WebSocket, detail: string) {
+  if (socket.readyState !== socket.OPEN) return;
   socket.send(
     JSON.stringify({
       type: "state",
@@ -122,19 +126,21 @@ function refuse(socket: WebSocket, detail: string) {
   socket.close(1000);
 }
 
-function open(state: Bridge, socket: WebSocket, ticket: Ticket) {
+async function open(state: Bridge, socket: WebSocket, ticket: Ticket) {
   // Resolving the target can fail — a removed application, unreadable
   // settings. That is an answer to this socket, never a throw inside the
   // upgrade handler, which would take the whole bridge down.
-  let host: ReturnType<typeof hostFor>;
+  let host: Awaited<ReturnType<typeof hostFor>>;
   try {
-    host = hostFor(ticket.applicationId);
+    host = await hostFor(ticket.applicationId);
   } catch {
     return refuse(
       socket,
       "This application could not be read, so no shell was started.",
     );
   }
+  // The browser may have disconnected while the database was waiting.
+  if (socket.readyState !== socket.OPEN) return;
   if (!host) {
     return refuse(socket, "No server is connected to this application.");
   }
@@ -169,8 +175,9 @@ function open(state: Bridge, socket: WebSocket, ticket: Ticket) {
 
   let alive = true;
   socket.on("pong", () => (alive = true));
-  const heartbeat = setInterval(() => {
-    if (!session.checkTarget()) return socket.close(1000);
+  const heartbeat = setInterval(async () => {
+    if (!(await session.checkTarget())) return socket.close(1000);
+    if (socket.readyState !== socket.OPEN) return;
     if (!alive) return socket.terminate();
     alive = false;
     socket.ping();
@@ -179,9 +186,10 @@ function open(state: Bridge, socket: WebSocket, ticket: Ticket) {
   const silence = setTimeout(() => socket.terminate(), SILENCE_MS);
   socket.on("pong", () => silence.refresh());
 
-  socket.on("message", (data, isBinary) => {
+  socket.on("message", async (data, isBinary) => {
     silence.refresh();
-    if (!session.checkTarget()) return socket.close(1000);
+    if (!(await session.checkTarget())) return socket.close(1000);
+    if (socket.readyState !== socket.OPEN) return;
     if (isBinary) return session.write(data as Buffer);
     let message: { type?: string; size?: unknown };
     try {

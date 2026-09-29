@@ -38,7 +38,7 @@ export async function GET(
 }
 
 async function wayIn(applicationId: string) {
-  const record = listInformation(applicationId).find(
+  const record = (await listInformation(applicationId)).find(
     (item) => item.presentation?.content?.kind === "application-access",
   );
   const access = record?.presentation?.content;

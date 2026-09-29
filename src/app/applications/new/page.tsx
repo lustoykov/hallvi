@@ -7,14 +7,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default function NewApplicationPage() {
+export default async function NewApplicationPage() {
   const githubLogin = currentGithubConnectionId()
     ? (readGithubConnection()?.account.login ?? null)
     : null;
   return (
     <NewApplicationScreen
       githubLogin={githubLogin}
-      first={listApplications().length === 0}
+      first={(await listApplications()).length === 0}
     />
   );
 }
