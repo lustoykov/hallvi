@@ -123,6 +123,8 @@ function publishRelease(tag: string) {
       published: false,
       error: `${tag} is not a draft release of ${REPOSITORY}.`,
     };
+  // Published as latest, and so never as a prerelease: every install line
+  // fetches releases/latest/download/install-hallvi.sh.
   const done = gh([
     "release",
     "edit",
@@ -130,6 +132,8 @@ function publishRelease(tag: string) {
     "--repo",
     REPOSITORY,
     "--draft=false",
+    "--prerelease=false",
+    "--latest",
   ]);
   return done.ok
     ? { published: true, tag }
