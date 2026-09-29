@@ -11,7 +11,7 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 | --- | --- | --- | --- |
 | [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | In progress (partial) | Return to the same private route in one action |
 | [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | In progress (partial) | Understand the action, target and unknown outcome |
-| [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | Proposed | Hand over enough evidence to reproduce and repair a defect |
+| [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | In progress | Hand over enough evidence to reproduce and repair a defect |
 
 Votes show interest, not priority or approval. Each count comes from the task
 references in that proposal, including its initial proposal task.
@@ -48,10 +48,11 @@ selector landed in [PR #256](https://github.com/lustoykov/hallvi/pull/256).
 [Verification and matched captures](https://github.com/lustoykov/hallvi/pull/256#issuecomment-5893828846)
 cover that increment only. On 2026-09-29 the owner selected increment 2:
 direct main-operator submission and the saved-route tool form. Assigned to
-`codex/reconnect-saved-route`, in draft
+`codex/reconnect-saved-route`, merged in
 [PR #263](https://github.com/lustoykov/hallvi/pull/263). It preserves the
 existing permission, queue and execution evidence contracts and does not add
-an automatic recovery service. The full feature remains partial.
+an automatic recovery service. Installed real-model and owner-device
+acceptance remains outstanding; the full feature remains partial.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 
@@ -65,8 +66,10 @@ leave the owner unsure what ran, where it ran and what remains unknown.
 **Smallest scope:** Add the recorded action and target to the existing work line
 and an evidence-based interruption explanation beside Continue/Stop. The selected
 increment in [PR #255](https://github.com/lustoykov/hallvi/pull/255) covers the
-current action/target and mobile elapsed-time wrapping. The broader interruption
-explanation is unimplemented and unassigned.
+current action/target and mobile elapsed-time wrapping and is merged. The owner
+selected the next increment: concise interruption evidence in the existing
+Continue/Stop panel and truthful Stop wording. Approval-consequence metadata and
+handover redesign are outside this assignment.
 
 **Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#explain-current-work-and-interruption);
 [scoped verification and matched visual evidence for #255](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md).
@@ -75,26 +78,28 @@ explanation is unimplemented and unassigned.
 can identify the action, target, pending decision and unknown outcome. Verify
 matching evidence and existing continuation behavior on disposable state.
 
-**Open decisions:** Broader interruption scope and wording. User benefit and
+**Open decisions:** Broader approval and handover proposals remain unselected. User benefit and
 earlier findings remain unproven: the real Pi check reported its findings only
 in the final reply; the screenshots' early finding is synthetic.
-**Assignment:** On 2026-09-29 the owner selected the current-action/target increment
-and mobile wrapping for completion in #255. Assigned to the existing clear-progress
-implementation task on `codex/clear-progress`, building on #252. The full feature
-remains partial; no task is assigned to the interruption explanation.
+**Assignment:** The first increment merged in #255. On 2026-09-29 the owner
+selected the interruption/Stop increment, assigned to the existing implementation
+task on `codex/interruption-evidence`. It reads matching native tool history and
+execution results, distinguishes returned results from unknown effects, and counts
+waiting follow-ups. Continue/Stop retain native behavior. The feature remains
+partial until the increment is merged and unfamiliar-owner acceptance is observed.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 
 ### Copy a problem for a coding agent
 
-**Status:** Proposed
+**Status:** In progress (selected smallest increment)
 
 **Problem and intended result:** Application defects need a reproducible handoff
 across Hallvi's operating/code boundary; Copy reply currently copies prose.
 
-**Smallest scope:** Preview and copy one saved investigation packet with revision,
-reproduction, selected redacted evidence, attempts, uncertainty and a check for
-the repaired behavior. The owner chooses where to paste it.
+**Smallest scope:** Copy the smallest useful coding-agent handoff from existing
+matching evidence. The owner chooses where to paste it. No new investigation
+store, generic packet framework or broader handover redesign.
 
 **Evidence:** [Dated source review and existing plan](docs/research/2026-09-29-feature-intake.md#copy-a-reproducible-problem-for-a-coding-agent).
 
@@ -102,9 +107,10 @@ the repaired behavior. The owner chooses where to paste it.
 and repairs one disposable defect. After owner merge and an authorized release,
 the original behavior check passes against the observed running revision.
 
-**Open decisions:** Owner selection and packet contract; test redaction and
-omissions. Saving a procedure does not authorize execution.
-**Assignment:** Unassigned.
+**Open decisions:** Handoff usefulness, redaction and omission checks remain
+for the selected increment. Broader packet storage and procedure work are deferred.
+**Assignment:** Selected by the owner on 2026-09-29; the coding-agent-handoff
+worker owns implementation and verification.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)
 

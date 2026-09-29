@@ -259,3 +259,179 @@ test("current work keeps findings in order and waits for the owner", async ({
     await closeWorker();
   }
 });
+
+test.describe("interruption evidence in the existing recovery panel", () => {
+  test("shows matching results and unknown outcomes after refresh", async ({
+    page,
+    fixture,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const at = "2026-09-29T12:00:00.000Z";
+    await page.clock.setFixedTime(new Date(at));
+    const created = await page.request.post("/api/applications", {
+      data: {
+        requestKey: randomUUID(),
+        repositoryUrl: "https://github.com/qa/interruption-evidence",
+      },
+    });
+    expect(created.ok()).toBe(true);
+    const view = await created.json();
+    const applicationId = view.application.id;
+    const chatId = view.selectedChatId;
+    const { replyId, messages } = exchange(
+      chatId,
+      "Build the application image and inspect the service.",
+      { body: "", status: "running", startedAt: at },
+    );
+    const executions: ExecutionRecord[] = [
+      {
+        id: randomUUID(),
+        applicationId,
+        chatId,
+        runId: replyId,
+        toolCallId: "build",
+        tool: "server_bash",
+        target: "deploy@203.0.113.7:22",
+        input: JSON.stringify({
+          intent: "Build the application image",
+          command: "docker compose build web",
+        }),
+        mode: "always-ask",
+        status: "succeeded",
+        exitCode: 0,
+        output: "Image built",
+        createdAt: at,
+        finishedAt: at,
+      },
+      {
+        id: randomUUID(),
+        applicationId,
+        chatId,
+        runId: replyId,
+        toolCallId: "inspect",
+        tool: "server_bash",
+        target: "deploy@203.0.113.7:22",
+        input: JSON.stringify({
+          intent: "Inspect the service",
+          command: "docker compose ps web",
+        }),
+        mode: "always-ask",
+        status: "interrupted",
+        output: "The turn stopped. Any remote effect must be checked by Pi.",
+        createdAt: at,
+        finishedAt: at,
+      },
+      {
+        id: randomUUID(),
+        applicationId,
+        chatId: randomUUID(),
+        runId: replyId,
+        toolCallId: "other-chat",
+        tool: "server_bash",
+        target: "deploy@203.0.113.99:22",
+        input: JSON.stringify({ intent: "Restart the unrelated database" }),
+        mode: "always-ask",
+        status: "succeeded",
+        exitCode: 0,
+        output: "Unrelated",
+        createdAt: at,
+        finishedAt: at,
+      },
+    ];
+    const dir = join(fixture.state, "operator", applicationId, "executions");
+    mkdirSync(dir, { recursive: true });
+    for (const execution of executions)
+      writeFileSync(
+        join(dir, `${execution.id}.json`),
+        JSON.stringify(execution),
+      );
+    const close = await scriptWorker(fixture, () => ({
+      status: "interrupted",
+      messages: [
+        ...messages.map((m) =>
+          m.role === "assistant"
+            ? {
+                ...m,
+                status: "interrupted" as const,
+                error: "Whether the last command finished is not known.",
+              }
+            : { ...m, createdAt: at },
+        ),
+        ...["Then check the logs.", "Then explain the result."].map(
+          (body, i) => ({
+            ...messages[0],
+            id: `queued-${i}`,
+            requestKey: `queued-${i}`,
+            body,
+            status: "waiting" as const,
+            createdAt: at,
+          }),
+        ),
+      ],
+      calls: Object.fromEntries(
+        executions.slice(0, 2).map((e, i) => [
+          e.toolCallId!,
+          {
+            replyId,
+            sequence: i + 1,
+            tool: e.tool,
+            args: JSON.parse(e.input),
+            at,
+            ...(i === 0
+              ? { result: { text: e.output, failed: false, at } }
+              : {}),
+          },
+        ]),
+      ),
+      said: [],
+    }));
+    try {
+      await page.goto(`/applications/${applicationId}`);
+      const panel = page
+        .locator(".hv-pi-required")
+        .filter({ hasText: "This conversation was interrupted" });
+      await expect(panel).toBeVisible();
+      await page.reload();
+      await expect(
+        panel.getByRole("button", { name: "Continue", exact: true }),
+      ).toBeVisible();
+      await expect(
+        panel.getByRole("button", { name: "Stop", exact: true }),
+      ).toBeVisible();
+      await expect(panel).toContainText(
+        "Last returned result: Build the application image · On the server · 203.0.113.7 — the tool returned exit code 0.",
+      );
+      await expect(panel).toContainText(
+        "Outcome unknown: Inspect the service · On the server · 203.0.113.7.",
+      );
+      await expect(panel).toContainText("2 follow-ups are waiting.");
+      await expect(panel).not.toContainText("Restart the unrelated database");
+      await expect(panel).not.toContainText("Nothing has run since");
+      await expect(
+        panel.getByRole("link", { name: "Read evidence" }),
+      ).toHaveAttribute("href", `#hv-message-${replyId}`);
+      for (const [device, viewport] of [
+        ["desktop", { width: 1440, height: 1000 }],
+        ["mobile", { width: 390, height: 844 }],
+      ] as const) {
+        await page.setViewportSize(viewport);
+        await panel.scrollIntoViewIfNeeded();
+        const rect = await panel.boundingBox();
+        expect(rect).not.toBeNull();
+        expect(rect!.y).toBeGreaterThanOrEqual(0);
+        expect(rect!.y + rect!.height).toBeLessThanOrEqual(viewport.height);
+        await page.screenshot({
+          path: testInfo.outputPath(`interruption-${device}.png`),
+          fullPage: true,
+        });
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true);
+      }
+    } finally {
+      await close();
+    }
+  });
+});

@@ -39,13 +39,23 @@ function render({
   status = "failed",
   body = "",
   messages,
+  executions,
+  worker = true,
 }: {
   error?: string;
   archived?: boolean;
   piActivity?: OperatorView["piActivity"];
-  status?: "waiting" | "running" | "failed" | "cancelled" | "completed";
+  status?:
+    | "waiting"
+    | "running"
+    | "failed"
+    | "cancelled"
+    | "completed"
+    | "interrupted";
   body?: string;
   messages?: OperatorView["messages"];
+  executions?: OperatorView["executions"];
+  worker?: boolean | null;
 } = {}) {
   const view: OperatorView = {
     application: {
@@ -76,6 +86,7 @@ function render({
       },
     ],
     piActivity,
+    executions,
   };
   return renderToStaticMarkup(
     <ChatPane
@@ -85,6 +96,7 @@ function render({
       error={null}
       pendingMessage={null}
       piReady
+      workerAlive={worker ?? undefined}
       composer=""
       onComposerChange={vi.fn()}
       onSend={vi.fn()}
@@ -233,6 +245,8 @@ describe("conversation recovery and assistant branding", () => {
       "Pi holds this and has not read it. Continue has Pi read it; Stop cancels it.",
     );
     expect(html).toContain("This conversation was interrupted");
+    expect(html).toContain("1 follow-up is waiting");
+    expect(html).toContain("Stop cancels waiting messages");
     expect(html).toMatch(/<button[^>]*>Continue<\/button>/);
     expect(html).toMatch(/<button[^>]*>Stop<\/button>/);
     // The interrupted reply offers no "try again" that would send something.
@@ -299,4 +313,146 @@ it("renders streaming text once after earlier tool calls, including before the f
     });
     expect(html.split(body)).toHaveLength(2);
   }
+});
+
+describe("bounded interruption evidence", () => {
+  const execution = (
+    id: string,
+    status: NonNullable<OperatorView["executions"]>[number]["status"],
+  ): NonNullable<OperatorView["executions"]>[number] => ({
+    id,
+    applicationId: "app-one",
+    chatId: chat.id,
+    runId: run.assistantMessageId,
+    toolCallId: `call-${id}`,
+    tool: "server_bash",
+    target: "deploy@203.0.113.7:22",
+    input: JSON.stringify({
+      intent: id === "build" ? "Build the image" : "Inspect the service",
+    }),
+    status,
+    mode: "always-ask",
+    output: "",
+    createdAt: failedAt,
+  });
+  const activity = (
+    e: ReturnType<typeof execution>,
+  ): NonNullable<OperatorView["piActivity"]>[number] => ({
+    id: e.toolCallId!,
+    executionId: e.id,
+    kind: "tool",
+    applicationId: e.applicationId,
+    runId: e.runId,
+    sequence: e.id === "build" ? 1 : 2,
+    tool: e.tool,
+    args: e.input,
+    status: e.status === "awaiting-approval" ? "running" : e.status,
+    preview: "",
+    result: "",
+    startedAt: failedAt,
+    truncated: false,
+  });
+  it("separates a tool's exit code from an unsettled call, with the action, target and matching reply link", () => {
+    const build = { ...execution("build", "succeeded"), exitCode: 0 };
+    const pending = execution("inspect", "interrupted");
+    const html = render({
+      status: "interrupted",
+      executions: [build, pending],
+      piActivity: [activity(pending), activity(build)],
+    });
+    expect(html).toContain(
+      "Last returned result: Build the image · On the server · 203.0.113.7",
+    );
+    expect(html).toContain("the tool returned exit code 0");
+    expect(html).toContain(
+      "Outcome unknown: Inspect the service · On the server · 203.0.113.7",
+    );
+    expect(html).toContain(`href="#hv-message-${run.assistantMessageId}"`);
+    expect(html).toContain("No follow-ups are waiting");
+    expect(html).toContain("Interrupted calls are not automatically repeated");
+    expect(html).not.toMatch(
+      /Nothing has run since|had already run|Nothing had run|deployment succeeded/,
+    );
+  });
+  it.each(["interrupted", "failed", "succeeded"] as const)(
+    "does not turn %s status without a confirmed result into proof of execution",
+    (status) => {
+      const e = execution("inspect", status);
+      const html = render({
+        status: "interrupted",
+        executions: [e],
+        piActivity: [activity(e)],
+      });
+      expect(html).toContain("Outcome unknown: Inspect the service");
+      expect(html).not.toContain("Last returned result:");
+    },
+  );
+  it("excludes other replies, applications, and executions with a different chat or tool identity", () => {
+    const e = execution("build", "succeeded");
+    const unrelated = {
+      ...e,
+      chatId: "other-chat",
+      exitCode: 0,
+      input: JSON.stringify({ intent: "Restart unrelated database" }),
+    };
+    const html = render({
+      status: "interrupted",
+      executions: [unrelated],
+      piActivity: [
+        activity(e),
+        {
+          ...activity(e),
+          id: "old",
+          runId: "earlier-reply",
+          args: '{"intent":"Old work"}',
+        },
+        {
+          ...activity(e),
+          id: "other-app",
+          applicationId: "app-two",
+          args: '{"intent":"Other application"}',
+        },
+      ],
+    });
+    const panel = html.slice(html.indexOf("This conversation was interrupted"));
+    expect(panel).not.toMatch(
+      /Restart unrelated database|Old work|Other application|Last returned result:/,
+    );
+    expect(panel).toContain("Outcome unknown");
+    const wrongCall = render({
+      status: "interrupted",
+      executions: [{ ...e, toolCallId: "different", exitCode: 0 }],
+      piActivity: [activity(e)],
+    });
+    expect(wrongCall).not.toContain("Last returned result:");
+  });
+  it("names a returned native tool error without turning it into an unknown call or successful effect", () => {
+    const native = {
+      ...activity(execution("inspect", "failed")),
+      executionId: undefined,
+      tool: "save_information",
+      args: '{"intent":"Save the check"}',
+      status: "failed" as const,
+      result: "Invalid check",
+      finishedAt: failedAt,
+    };
+    const html = render({ status: "interrupted", piActivity: [native] });
+    expect(html).toContain("Last returned result: Save the check");
+    expect(html).toContain("the tool returned an error");
+    expect(html).not.toContain("Outcome unknown:");
+    expect(html).not.toContain("the tool returned a result");
+  });
+  it("treats missing history or worker as unavailable and an empty history as missing evidence", () => {
+    for (const options of [{}, { worker: null, piActivity: [] }]) {
+      const html = render({ status: "interrupted", ...options });
+      expect(html).toContain("Tool evidence is unavailable");
+      expect(html).not.toContain("Nothing had run");
+    }
+    expect(render({ status: "interrupted", piActivity: [] })).toContain(
+      "No matching tool evidence is available",
+    );
+    const offline = render({ status: "interrupted", worker: false });
+    expect(offline).toContain("No worker is running");
+    expect(offline).not.toContain("This conversation was interrupted");
+  });
 });

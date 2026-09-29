@@ -51,6 +51,7 @@ import {
   type ImageAttachment,
 } from "./message-images";
 import { hasActivity, PiActivity } from "./pi-activity";
+import { hostOf, intentOf, placeOf, whereItRan } from "./execution-text";
 import { WorkingMascot } from "./working-mascot";
 import {
   runActivity,
@@ -154,46 +155,121 @@ export function firstAppearances(
   return seen;
 }
 
-/**
- * What stopping actually did.
- *
- * Stopping ends the reply; it does not undo the work. By the time somebody
- * reaches for Stop, Pi has usually already run something on their server, and
- * "Reply cancelled." invites them to believe otherwise. This counts what had
- * finished and says so, because the difference matters when the next thing
- * they do is decide whether to run it again.
- */
-export function stopOutcome(
-  executions: { runId: string; status: string }[] | undefined,
-  runId: string,
-) {
-  const mine = (executions ?? []).filter((item) => item.runId === runId);
-  // Reached the server and finished there, whatever the result: a command
-  // that failed still ran. Declined and awaiting-approval never started, so
-  // they are not "already run" by any reading.
-  const ran = mine.filter((item) =>
-    ["succeeded", "failed", "interrupted"].includes(item.status),
-  ).length;
-  // Still in flight when the reply ended. Stopping the reply is not a signal
-  // that reaches a command already executing on the far side of an SSH
-  // connection, so this cannot be reported as stopped — only as unconfirmed.
-  const flying = mine.filter((item) => item.status === "running").length;
+/** Stop ends Pi's work and queue, not effects on another machine. */
+export function stopOutcome() {
+  return "Stopped. Any waiting messages were cancelled. Stopping does not undo changes or confirm that remote processes stopped.";
+}
 
-  const already =
-    ran > 0
-      ? `${ran} command${ran === 1 ? "" : "s"} had already run and ${
-          ran === 1 ? "was" : "were"
-        } not undone.`
-      : "";
-  const unconfirmed =
-    flying > 0
-      ? `${flying === 1 ? "One command was" : `${flying} commands were`} still running on the server; stopping the reply does not confirm ${
-          flying === 1 ? "it" : "they"
-        } stopped.`
-      : "";
+/** This reply's native tool evidence; status alone never proves execution. */
+function InterruptionEvidence({
+  view,
+  message,
+  chatId,
+  workerAlive,
+}: {
+  view: OperatorView;
+  message: ChatMessage | undefined;
+  chatId: string | null;
+  workerAlive: boolean | undefined;
+}) {
+  if (!workerAlive || !view.piActivity || !message || message.chatId !== chatId)
+    return (
+      <p>
+        Tool evidence is unavailable; the outcome cannot be established here.
+      </p>
+    );
 
-  if (!already && !unconfirmed) return "Stopped. Nothing had run.";
-  return ["Stopped.", already, unconfirmed].filter(Boolean).join(" ");
+  const calls = view.piActivity
+    .filter(
+      (call) =>
+        call.kind === "tool" &&
+        call.applicationId === view.application?.id &&
+        call.runId === message.id,
+    )
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((call) => {
+      const execution = view.executions?.find(
+        (item) =>
+          item.applicationId === call.applicationId &&
+          item.chatId === chatId &&
+          item.runId === message.id &&
+          item.toolCallId === call.id &&
+          item.id === call.executionId,
+      );
+      const ended =
+        execution && ["succeeded", "failed"].includes(execution.status);
+      // An exit code is the executor's result, including a transport failure.
+      // It proves neither that the intended effect occurred nor remote health.
+      const exit =
+        ended && typeof execution.exitCode === "number"
+          ? execution.exitCode
+          : null;
+      const returned =
+        exit !== null ||
+        (!call.executionId &&
+          Boolean(call.finishedAt && call.result.trim()) &&
+          ["succeeded", "failed"].includes(call.status)) ||
+        (ended &&
+          execution.status === "succeeded" &&
+          Boolean(call.finishedAt && call.result.trim()));
+      const place = execution
+        ? whereItRan(execution)?.said
+        : placeOf(call.tool);
+      const label = [
+        intentOf(execution?.input ?? call.args) ??
+          call.tool.replaceAll("_", " "),
+        place,
+        execution ? (hostOf(execution.target) ?? execution.target) : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return {
+        label,
+        returned,
+        exit,
+        error: !call.executionId && call.status === "failed",
+        declined: execution?.status === "declined",
+        awaiting: execution?.status === "awaiting-approval",
+      };
+    });
+  const result = calls.findLast((call) => call.returned);
+  const unknown = calls.filter((call) => !call.returned && !call.declined);
+  const lastUnknown = unknown.at(-1);
+  return (
+    <>
+      {result && (
+        <p>
+          Last returned result: {result.label} —{" "}
+          {result.exit === null
+            ? result.error
+              ? "the tool returned an error"
+              : "the tool returned a result"
+            : `the tool returned exit code ${result.exit}`}
+          .
+        </p>
+      )}
+      {lastUnknown && (
+        <p>
+          {lastUnknown.awaiting ? "Awaiting approval" : "Outcome unknown"}:{" "}
+          {lastUnknown.label}.{" "}
+          {unknown.length > 1
+            ? `${unknown.length} calls have no confirmed outcome.`
+            : ""}
+        </p>
+      )}
+      {!calls.length && (
+        <p>No matching tool evidence is available for this work.</p>
+      )}
+      {calls.length > 0 && !result && !lastUnknown && (
+        <p>The recorded approval was declined; that call did not start.</p>
+      )}
+      {calls.length > 0 && (
+        <p>
+          <a href={`#hv-message-${message.id}`}>Read evidence</a>
+        </p>
+      )}
+    </>
+  );
 }
 
 /**
@@ -423,20 +499,25 @@ export function ChatPane({
    * The backend refuses a second message while one is queued or running, so
    * this is the same condition it enforces, read from the same records.
    */
-  const inFlight = (view.messages ?? []).find(
+  const messagesHere = view.messages.filter(
+    (message) => message.chatId === chatId,
+  );
+  const inFlight = messagesHere.find(
     (message) => message.role === "assistant" && message.status === "running",
   );
-  const waiting = (view.messages ?? []).filter(
+  const waiting = messagesHere.filter(
     (message) => message.status === "waiting",
   );
   /**
    * Pi holds unfinished work that nobody is running: a worker went away while
    * it was busy. Nothing runs again until the owner says which way it goes.
    */
+  const interruptedReply = messagesHere.findLast(
+    (message) =>
+      message.role === "assistant" && message.status === "interrupted",
+  );
   const interrupted =
-    !inFlight &&
-    (waiting.length > 0 ||
-      view.messages.some((message) => message.status === "interrupted"));
+    !inFlight && (waiting.length > 0 || Boolean(interruptedReply));
   const sendDisabled = sendUnavailable || interrupted;
   const inFlightActivity = runActivity({
     runId: inFlight?.id,
@@ -751,12 +832,12 @@ export function ChatPane({
                             {historyUnavailable
                               ? message.error
                               : message.status === "cancelled"
-                                ? stopOutcome(view.executions, message.id)
+                                ? stopOutcome()
                                 : message.status === "interrupted"
                                   ? // Not the reader's Stop, and never "nothing
                                     // had run": the reply says what is unknown.
                                     (message.error ??
-                                    stopOutcome(view.executions, message.id))
+                                    "Interrupted. The last command’s outcome is unknown.")
                                   : failure.says}
                           </p>
                         )}
@@ -1075,11 +1156,22 @@ export function ChatPane({
             <WarningCircle weight="bold" />
             <div>
               <strong>This conversation was interrupted</strong>
+              <InterruptionEvidence
+                view={view}
+                message={interruptedReply}
+                chatId={chatId}
+                workerAlive={workerAlive}
+              />
               <p>
-                Hallvi stopped while Pi had work in hand. Nothing has run since,
-                and nothing will until you choose. Continue has Pi carry on from
-                where it was, without repeating a command it had started. Stop
-                ends that work and drops anything still waiting.
+                {waiting.length === 0
+                  ? "No follow-ups are waiting."
+                  : `${waiting.length} follow-up${waiting.length === 1 ? " is" : "s are"} waiting.`}{" "}
+                Continue resumes this work, then reads waiting messages.
+                Interrupted calls are not automatically repeated.
+              </p>
+              <p>
+                Stop cancels waiting messages. It does not undo changes or
+                confirm that remote processes stopped.
               </p>
               <p>
                 <button

@@ -141,6 +141,15 @@ Hallvi schedules nothing. Conversations of different applications run at the sam
 - **Continue.** Pi resumes its operation. An interrupted tool call is not made again: Pi gives the model an error result saying the outcome is unknown, and the model investigates. What Pi held queued then runs in its order. With only a queue left, Pi reads it as above.
 - **Stop.** As above, whether or not anything is queued.
 
+The existing recovery panel names the latest returned tool result and latest
+unsettled action/target from that reply, links its evidence, and counts waiting
+follow-ups. It joins by application, conversation, reply and tool-call identity.
+A tool exit code or returned result is described as such, not as proof of the
+intended operational effect. Interrupted status can include an approval wait;
+a failed call can fail before remote execution. Missing history or worker leaves
+evidence unavailable. Stop wording therefore makes no “had run” or “nothing had
+run” claim. Stopping does not undo changes or confirm remote processes stopped.
+
 A new message is refused until one of them is chosen, so an ordinary question cannot quietly resume old operational work ahead of itself. Evidence that still said “running” when the worker started, or when a stretch of work ended, is settled as interrupted.
 
 **Tools, authentication, compaction and retry are Pi's.** Hallvi hands the harness coding-agent's own `ModelRuntime` for credentials, refresh and model access; the same tool definitions as before, with `execute` delegated to Hallvi's workspace and permission wrapper; and nothing at all for compaction and retry, which the harness does by itself. A definition's `prepareArguments` and `constrainedSampling` pass through unchanged. `executionMode` does not exist for the harness: it has one setting for a whole turn's tool calls, so Hallvi's tools declare none and the turn runs them one at a time, and nothing that mutates can run concurrently within a conversation. A tool is stopped through the signal Pi gives that call.

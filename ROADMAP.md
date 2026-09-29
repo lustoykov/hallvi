@@ -10,6 +10,22 @@ Connect real saved records and execution evidence to the accepted reference desi
 
 Keep the scope on the views and interactions needed by that journey. Medium and more complicated applications and broader ongoing care follow this UI/UX checkpoint. Broad security hardening is deferred until after beta; during beta, communicate current risks and practical precautions without turning this into a new architecture project.
 
+## Selected product increments
+
+On 29 September 2026 the owner selected three bounded changes: **03** interruption
+clarity in the existing Continue/Stop presentation, **05** the smallest copyable
+coding-agent handoff, and **11** existing-CLI documentation and a friction exercise.
+The [research plan index](https://github.com/lustoykov/hallvi/pull/246) records their
+scope and deferred proposals. The owner authorized implementing and merging these
+three together after coordinator review; visual evidence remains required, with no
+additional owner-approval gate. FACTORY separately owns release and acceptance.
+
+Performance #252 and Reconnect #256/#263 are merged checkpoints, not assignments
+for these workers. Reconnect remains partial pending installed real-model and
+owner-device acceptance. Return brief, quiet care, recovery rehearsal, learned
+procedures, existing-stack adoption and update rehearsal are deferred. The eleven
+research plans do not constitute eleven implementation commitments.
+
 ## Sprint TODO
 
 This is the single implementation checklist. Completed means merged into `main`; distinguish local work from shipped work. Update the remaining items as implementation and user reviews teach us more.
