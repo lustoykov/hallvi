@@ -63,9 +63,12 @@ function GenericInformationCard({
 
   if (!presentation) return null;
   const { tone, word } = toneOf(record);
+  // Some destinations (Traffic) no record can name, so the list is wider
+  // than the views a record may carry.
   const destinations = applicationSections.filter(
     (section) =>
-      presentation.views.includes(section.id) && section.id !== currentView,
+      (presentation.views as readonly string[]).includes(section.id) &&
+      section.id !== currentView,
   );
   const elsewhere = recordDestination(presentation.views, currentView);
   const established = record.establishedAt ?? record.updatedAt;

@@ -13,6 +13,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
+import { useReconnectAction } from "../reconnect-action";
 
 /**
  * Whether the way in works, or why it is currently unknown.
@@ -143,6 +144,7 @@ export function AccessLink({
   /** Asks Pi to reopen private access. Absent hides the offer. */
   onReopen?: () => void;
 }) {
+  const reconnect = useReconnectAction();
   if (!openUrl) return null;
   // Only a tunnel ends at this computer's own loopback.
   const tunnelled = Boolean(
@@ -182,13 +184,18 @@ export function AccessLink({
               no link: the reader spends the click, the wait and the browser
               error before learning what the page knew. */}
           {onReopen && (
-            <button type="button" className="axj3-reopen" onClick={onReopen}>
+            <button
+              type="button"
+              className="axj3-reopen"
+              onClick={onReopen}
+              disabled={tunnelled && reconnect.disabled}
+            >
               <ChatCircleText weight="bold" />
               {/* The same words the release band uses for the same action.
                   "Reopen it" and "reopen access" name a thing the reader has
                   no picture of; what dropped is a connection this computer
                   holds open. */}
-              {tunnelled ? "Open the connection again" : "Ask Hallvi to look"}
+              {tunnelled ? reconnect.label : "Ask Hallvi to look"}
             </button>
           )}
         </>

@@ -1,4 +1,5 @@
 "use client";
+import { useReconnectAction } from "./reconnect-action";
 
 // What is running, and every release since.
 //
@@ -64,6 +65,11 @@ import {
   type ReleaseStep,
   type ReleaseView,
 } from "./release-records";
+import {
+  ImpactLine,
+  impactQuestion,
+  useReleaseImpacts,
+} from "./traffic/release-impact";
 
 import "./releases-panel.css";
 
@@ -187,6 +193,7 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
 
 export function ReleasesPanel({
   view,
+  applicationId = null,
   records = [],
   executions = [],
   now,
@@ -198,6 +205,11 @@ export function ReleasesPanel({
   onFollow,
 }: {
   view: ReleaseView;
+  /**
+   * Whose traffic to read beside each release. Absent, or an application
+   * that keeps no traffic history, and the rows say nothing about it.
+   */
+  applicationId?: string | null;
   /** The records the releases came from, to reach each one's own evidence. */
   records?: SavedInformation[];
   /** What actually ran. Each release shows only the commands it cites. */
@@ -221,7 +233,10 @@ export function ReleasesPanel({
   /** Opens the conversation that is doing the deploying. */
   onFollow?: () => void;
 }) {
+  const reconnect = useReconnectAction();
   const [filter, setFilter] = useState("all");
+  // What followed each release, where the application keeps history.
+  const impacts = useReleaseImpacts(applicationId, view.all);
   const said = releaseHeadline(view);
   const { running, latest, access } = view;
   // Only a private address depends on the tunnel. A public one is answered by
@@ -322,8 +337,13 @@ export function ReleasesPanel({
     {
       key: "shipped",
       head: "What shipped",
-      cell: (row) =>
-        row.changes[0] ? <Clip text={row.changes[0]} /> : <None />,
+      cell: (row) => (
+        <span className="rp-shipped">
+          {row.changes[0] ? <Clip text={row.changes[0]} /> : <None />}
+          {/* What followed it, only when that is worth a line. */}
+          {!row.flight && <ImpactLine impact={impacts.get(row.at)} now={now} />}
+        </span>
+      ),
     },
     {
       key: "steps",
@@ -441,8 +461,13 @@ export function ReleasesPanel({
           <span className="rp-way">
             <span className="rp-muted">The tunnel is closed</span>
             {onReopen && (
-              <button type="button" className="rp-link" onClick={onReopen}>
-                Open the connection again
+              <button
+                type="button"
+                className="rp-link"
+                disabled={reconnect.disabled}
+                onClick={onReopen}
+              >
+                {reconnect.label}
               </button>
             )}
           </span>
@@ -559,6 +584,15 @@ export function ReleasesPanel({
                           ? "Check what is running"
                           : "What changed here?"}
                     </Ask>
+                    {impactQuestion(impacts.get(row.at), now) && (
+                      <Ask
+                        onAsk={onAsk}
+                        tone="bad"
+                        prompt={impactQuestion(impacts.get(row.at), now)!}
+                      >
+                        What broke after it?
+                      </Ask>
+                    )}
                     {row.serving && before && (
                       <Ask
                         onAsk={onAsk}

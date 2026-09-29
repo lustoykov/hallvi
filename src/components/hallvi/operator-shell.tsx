@@ -1,6 +1,12 @@
 "use client";
 
 import { PulseContext } from "./pulse";
+import { ReconnectActionContext } from "./reconnect-action";
+import {
+  reconnectProgress,
+  reconnectReference,
+  reconnectRequest,
+} from "./reconnect-request";
 import { ArrowLeft, TerminalWindow } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,6 +39,7 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ApplicationNavigation } from "./application-navigation";
+import { useTrafficListed } from "./traffic/source";
 import "./application-shell.css";
 import "./views.css";
 import { OperatorConsole } from "./operator-console";
@@ -268,38 +275,94 @@ export function OperatorShell({
     view.information ?? [],
     view.application?.id,
   );
-  const { reachable, pulse } = useAccessObservation(
-    view.application?.id,
+  const {
+    reachable,
+    pulse,
+    reconnectable,
+    refresh: refreshAccess,
+  } = useAccessObservation(view.application?.id, accessRecord);
+
+  const mainChat = view.chats.find(
+    (chat) => chat.kind === "main" && !chat.archivedAt,
+  );
+  const [mainSnapshot, setMainSnapshot] = useState<{
+    applicationId: string;
+    chatId: string;
+    snapshot: ChatSnapshot;
+  } | null>(null);
+  const mainConversation =
+    view.selectedChatId === mainChat?.id
+      ? view
+      : mainSnapshot &&
+          mainSnapshot.applicationId === applicationId &&
+          mainSnapshot.chatId === mainChat?.id
+        ? mainSnapshot.snapshot
+        : null;
+  const progress = reconnectProgress(
+    mainConversation?.messages ?? [],
+    mainConversation?.executions ?? [],
     accessRecord,
   );
-
-  /** Asks Pi, in the main conversation, about a way in that stopped working. */
-  const askToReopen = useCallback(() => {
-    const record = accessRecord;
-    const url = record?.presentation?.url ?? null;
-    const content = record?.presentation?.content;
-    const name = application?.name ?? "this application";
-    // A published address and a tunnel fail for different reasons, so they
-    // are different questions. Asking Pi to "reopen private access" for a
-    // public name would have it undo the publishing.
-    askInConversation(
-      view.chats[0]?.id ?? null,
-      content?.kind === "application-access" && content.mode === "public"
-        ? `${url ?? name} is not answering. Check it from outside, find out what is broken between the name and the application, and fix it.`
-        : `The tunnel to ${name} is closed${
-            url ? ` — ${url} does not answer` : ""
-          }. Reopen private access and tell me the URL.`,
+  const [pendingReconnect, setPendingReconnect] =
+    useState<ReturnType<typeof readPendingSubmission>>(null);
+  const mainChatId = mainChat?.id;
+  const privateRoute =
+    accessRecord?.presentation?.content?.kind === "application-access" &&
+    accessRecord.presentation.content.mode === "private";
+  const observedMainId = privateRoute ? mainChatId : undefined;
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () =>
+        setPendingReconnect(
+          applicationId && mainChatId
+            ? readPendingSubmission(applicationId, mainChatId)
+            : null,
+        ),
+      0,
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessRecord, view.chats, application?.name]);
+    return () => window.clearTimeout(timer);
+  }, [applicationId, mainChatId]);
+  const unknownReconnect =
+    pendingReconnect?.preserveDraft &&
+    reconnectReference(pendingReconnect.message);
 
+  /** Reconnect is an ordinary, scoped Pi request in the actual main chat. */
+  function askToReopen() {
+    if (!mainChat) {
+      setError("Main operator is unavailable. Reconnect was not sent.");
+      return;
+    }
+    const url = accessRecord?.presentation?.url;
+    const content = accessRecord?.presentation?.content;
+    if (content?.kind === "application-access" && content.mode === "public") {
+      askInConversation(
+        mainChat.id,
+        `${url ?? application?.name} is not answering. Check it from outside, find out what is broken between the name and the application, and fix it.`,
+      );
+    } else if (!reconnectable || !accessRecord) {
+      askInConversation(
+        mainChat.id,
+        "Review the saved private access record and attached server. Explain what needs to be set up before this private connection can be reopened. Do not change the route or server without a separate request.",
+      );
+    } else if (!mainConversation) {
+      setError(
+        "Main operator progress is unavailable. Review it before reconnecting.",
+      );
+    } else if (!progress?.active) {
+      sendMessage(reconnectRequest(accessRecord), "next", mainChat.id);
+    }
+  }
+
+  // Traffic is listed on the owner's standing choice, which is not a record.
+  const trafficKept = useTrafficListed(applicationId);
   const listedHere = useMemo(
     () =>
       standings(
         view.information ?? [],
         (view.secrets ?? []).some((secret) => !secret.establishedAt),
+        trafficKept,
       ),
-    [view.information, view.secrets],
+    [view.information, view.secrets, trafficKept],
   );
   // Facts the view already carries, refreshed by the same poll as the record,
   // under the facts a destination fetches for itself while it is open.
@@ -309,93 +372,113 @@ export function OperatorShell({
   useEffect(() => {
     if (!applicationId || !selectedChatId) return;
     let active = true;
-    let outcomeVersion = "";
-    // This baseline belongs only to this stream. POST/SSR views can arrive
-    // independently; reconnect's full frame replaces it authoritatively.
-    let streamed: ChatSnapshot | null = null;
-    const stream = new EventSource(
-      `/api/applications/${applicationId}/chats/${selectedChatId}/events?changes=1`,
-    );
-    stream.onopen = () => setReconnecting(false);
-    stream.onerror = () => setReconnecting(true);
-    stream.onmessage = (event) => {
-      if (!active) return;
-      const snapshot = applyChatFrame(
-        streamed,
-        JSON.parse(event.data) as ChatFrame,
+    const observedChats = new Set([selectedChatId]);
+    if (observedMainId) observedChats.add(observedMainId);
+    const subscriptions = [...observedChats].map((chatId) => {
+      let outcomeVersion = "";
+      // Each observed chat owns a stream baseline. POST/SSR views arrive
+      // independently; reconnect replaces it with authoritative full state.
+      let streamed: ChatSnapshot | null = null;
+      const stream = new EventSource(
+        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1`,
       );
-      streamed = snapshot;
-      setView((current) =>
-        current.selectedChatId === selectedChatId
-          ? {
-              ...current,
-              messages: snapshot.messages,
-              information: snapshot.information,
-              executions: snapshot.executions,
-              worker: snapshot.worker,
-              piActivity: snapshot.piActivity,
-            }
-          : current,
-      );
-      const pending = readPendingSubmission(applicationId, selectedChatId);
-      if (pending) {
-        if (snapshot.messages.some((sent) => sent.requestKey === pending.key)) {
-          // SSE can confirm acceptance before the POST response arrives.
-          // Retire the optimistic copy as soon as durable intent is visible.
-          setPendingMessage(null);
-          clearPendingSubmission(applicationId, selectedChatId);
-          setDrafts((current) => {
-            const latest = current[selectedChatId] ?? "";
-            if (
-              !acceptedDraftCanClear(
-                latest,
-                pending.message,
-                editedAfterSubmission.current.has(pending.key),
-              )
-            )
-              return current;
-            writeConversationDraft(applicationId, selectedChatId, "");
-            return { ...current, [selectedChatId]: "" };
-          });
-        } else if (submittingChat.current !== selectedChatId) {
-          setDrafts((current) => {
-            if (current[selectedChatId]) return current;
-            writeConversationDraft(
-              applicationId,
-              selectedChatId,
-              pending.message,
-            );
-            return { ...current, [selectedChatId]: pending.message };
-          });
+      stream.onopen = () => setReconnecting(false);
+      stream.onerror = () => setReconnecting(true);
+      stream.onmessage = (event) => {
+        if (!active) return;
+        const snapshot = applyChatFrame(
+          streamed,
+          JSON.parse(event.data) as ChatFrame,
+        );
+        streamed = snapshot;
+        if (chatId === mainChatId)
+          setMainSnapshot({ applicationId, chatId, snapshot });
+        setView((current) =>
+          current.selectedChatId === chatId
+            ? {
+                ...current,
+                messages: snapshot.messages,
+                information: snapshot.information,
+                executions: snapshot.executions,
+                worker: snapshot.worker,
+                piActivity: snapshot.piActivity,
+              }
+            : current,
+        );
+        const pending = readPendingSubmission(applicationId, chatId);
+        if (pending) {
+          if (
+            snapshot.messages.some((sent) => sent.requestKey === pending.key)
+          ) {
+            // SSE can confirm acceptance before the POST response arrives.
+            // Retire the optimistic copy as soon as durable intent is visible.
+            setPendingMessage(null);
+            clearPendingSubmission(applicationId, chatId);
+            setPendingReconnect(null);
+            if (pending.preserveDraft) setError(null);
+            if (!pending.preserveDraft)
+              setDrafts((current) => {
+                const latest = current[chatId] ?? "";
+                if (
+                  !acceptedDraftCanClear(
+                    latest,
+                    pending.message,
+                    editedAfterSubmission.current.has(pending.key),
+                  )
+                )
+                  return current;
+                writeConversationDraft(applicationId, chatId, "");
+                return { ...current, [chatId]: "" };
+              });
+          } else if (
+            !pending.preserveDraft &&
+            submittingChat.current !== chatId
+          ) {
+            setDrafts((current) => {
+              if (current[chatId]) return current;
+              writeConversationDraft(applicationId, chatId, pending.message);
+              return { ...current, [chatId]: pending.message };
+            });
+          }
         }
-      }
-      const nextVersion = snapshot.messages
-        .filter((settled) => settled.finishedAt)
-        .map((settled) => `${settled.id}:${settled.revision}`)
-        .join(";");
-      if (nextVersion !== outcomeVersion) {
-        outcomeVersion = nextVersion;
-        void api
-          .metadata(applicationId, selectedChatId)
-          .then((next) => {
-            if (active)
-              setView((current) =>
-                current.selectedChatId === selectedChatId
-                  ? { ...current, ...next }
-                  : current,
-              );
-          })
-          .catch(() => {
-            if (active) setReconnecting(true);
-          });
-      }
-    };
+        const nextVersion = snapshot.messages
+          .filter((settled) => settled.finishedAt)
+          .map((settled) => `${settled.id}:${settled.revision}`)
+          .join(";");
+        if (nextVersion !== outcomeVersion) {
+          outcomeVersion = nextVersion;
+          refreshAccess();
+          void api
+            .metadata(applicationId, chatId)
+            .then((next) => {
+              if (active)
+                setView((current) =>
+                  current.selectedChatId === chatId
+                    ? { ...current, ...next }
+                    : current,
+                );
+            })
+            .catch(() => {
+              if (active) setReconnecting(true);
+            });
+        }
+      };
+      return () => {
+        streamed = null;
+        stream.close();
+      };
+    });
     return () => {
       active = false;
-      streamed = null;
-      stream.close();
+      subscriptions.forEach((close) => close());
     };
-  }, [applicationId, selectedChatId]);
+  }, [
+    applicationId,
+    selectedChatId,
+    mainChatId,
+    observedMainId,
+    refreshAccess,
+  ]);
 
   function setComposer(value: string) {
     if (!activeChat || !applicationId) return;
@@ -612,25 +695,51 @@ export function OperatorShell({
   }
 
   /** `told` is a message a card sends for the owner; the draft is kept. */
-  function sendMessage(told?: string, delivery: "next" | "steer" = "next") {
+  function sendMessage(
+    told?: string,
+    delivery: "next" | "steer" = "next",
+    targetChatId?: string,
+  ) {
+    const targetChat = targetChatId
+      ? view.chats.find((chat) => chat.id === targetChatId)
+      : activeChat;
     const message = (told ?? composer).trim();
+    const isReconnect = Boolean(told && reconnectReference(told));
     const images = told ? [] : attached;
     if (!message && !images.length) return;
-    if (busy || !piReady || !application || !activeChat) {
-      // Not sendable right now: leave it where the owner can send it.
-      if (told) setComposer(told);
+    if (busy || submittingChat.current) return;
+    if (
+      !piReady ||
+      !application ||
+      !targetChat ||
+      view.worker?.alive === false
+    ) {
+      if (told)
+        setError(
+          "Pi is unavailable. The request was not sent; your draft is kept.",
+        );
+      return;
+    }
+    const previous = readPendingSubmission(application.id, targetChat.id);
+    if (
+      previous &&
+      (told || previous.preserveDraft) &&
+      previous.message !== message
+    ) {
+      setError(
+        "The earlier request has an unknown outcome. Review Main operator or retry that same request before sending another.",
+      );
       return;
     }
     setPendingMessage({ body: message, images });
-    submittingChat.current = activeChat.id;
+    submittingChat.current = targetChat.id;
     // Clear the field optimistically, but keep its durable copy until the
     // server accepts it. Text typed after this point is a newer draft and
     // wins in both React state and storage.
     if (!told) {
-      setDrafts((current) => ({ ...current, [activeChat.id]: "" }));
-      setAttachments((current) => ({ ...current, [activeChat.id]: [] }));
+      setDrafts((current) => ({ ...current, [targetChat.id]: "" }));
+      setAttachments((current) => ({ ...current, [targetChat.id]: [] }));
     }
-    const previous = readPendingSubmission(application.id, activeChat.id);
     // Images are not kept across a reload, so a key is reused only for words.
     const key =
       previous?.message === message && !images.length
@@ -639,15 +748,15 @@ export function OperatorShell({
     submittingKey.current = key;
     editedAfterSubmission.current.delete(key);
     if (told) editedAfterSubmission.current.add(key);
-    const context = contexts[activeChat.id];
+    const context = contexts[targetChat.id];
     const draftContext = told || context?.requestKey ? null : context;
     if (draftContext) {
       const sentContext = { ...draftContext, requestKey: key };
       setContexts((current) => ({
         ...current,
-        [activeChat.id]: sentContext,
+        [targetChat.id]: sentContext,
       }));
-      writeConversationContext(application.id, activeChat.id, sentContext);
+      writeConversationContext(application.id, targetChat.id, sentContext);
     }
     let accepted = false;
     void run(
@@ -655,13 +764,15 @@ export function OperatorShell({
       async () => {
         // Keep the key across a lost HTTP response and reload. Resubmitting the
         // same draft cannot create two accepted requests.
-        writePendingSubmission(application.id, activeChat.id, {
+        writePendingSubmission(application.id, targetChat.id, {
           message,
           key,
+          ...(told ? { preserveDraft: true } : {}),
         });
+        if (told) setPendingReconnect({ message, key, preserveDraft: true });
         await api.sendMessage(
           application.id,
-          activeChat.id,
+          targetChat.id,
           message,
           key,
           delivery,
@@ -669,68 +780,83 @@ export function OperatorShell({
         );
         accepted = true;
         setPendingMessage(null);
-        clearPendingSubmission(application.id, activeChat.id);
-        setDrafts((current) => {
-          if (
-            !acceptedDraftCanClear(
-              current[activeChat.id] ?? "",
-              message,
-              editedAfterSubmission.current.has(key),
-            )
-          )
-            return current;
-          writeConversationDraft(application.id, activeChat.id, "");
-          return current;
-        });
-        return api.view(application.id, activeChat.id);
-      },
-      async () => {
-        const snapshot = await api
-          .runSnapshot(application.id, activeChat.id)
-          .catch(() => null);
-        accepted ||= Boolean(
-          snapshot?.messages.some((sent) => sent.requestKey === key),
-        );
-        if (accepted) {
-          clearPendingSubmission(application.id, activeChat.id);
+        clearPendingSubmission(application.id, targetChat.id);
+        setPendingReconnect(null);
+        if (!told)
           setDrafts((current) => {
             if (
               !acceptedDraftCanClear(
-                current[activeChat.id] ?? "",
+                current[targetChat.id] ?? "",
                 message,
                 editedAfterSubmission.current.has(key),
               )
             )
               return current;
-            writeConversationDraft(application.id, activeChat.id, "");
+            writeConversationDraft(application.id, targetChat.id, "");
             return current;
           });
-          setError("Your message was saved. Reconnecting to its progress…");
+        return api.view(application.id, targetChat.id);
+      },
+      async () => {
+        const snapshot = await api
+          .runSnapshot(application.id, targetChat.id)
+          .catch(() => null);
+        accepted ||= Boolean(
+          snapshot?.messages.some((sent) => sent.requestKey === key),
+        );
+        if (accepted) {
+          clearPendingSubmission(application.id, targetChat.id);
+          setPendingReconnect(null);
+          if (!told)
+            setDrafts((current) => {
+              if (
+                !acceptedDraftCanClear(
+                  current[targetChat.id] ?? "",
+                  message,
+                  editedAfterSubmission.current.has(key),
+                )
+              )
+                return current;
+              writeConversationDraft(application.id, targetChat.id, "");
+              return current;
+            });
+          setError(
+            isReconnect
+              ? "Reconnect was saved. Follow its progress in Main operator."
+              : "Your message was saved. Reconnecting to its progress…",
+          );
         } else {
+          if (told)
+            setError(
+              isReconnect
+                ? "Reconnect acceptance is unknown. Retry Reconnect with the same request, or review Main operator. Your draft is kept."
+                : "Request acceptance is unknown. Review the conversation or retry the same request. Your draft is kept.",
+            );
           if (draftContext) {
             setContexts((current) => ({
               ...current,
-              [activeChat.id]: draftContext,
+              [targetChat.id]: draftContext,
             }));
             writeConversationContext(
               application.id,
-              activeChat.id,
+              targetChat.id,
               draftContext,
             );
           }
-          setDrafts((current) => {
-            const next = current[activeChat.id] || message;
-            writeConversationDraft(application.id, activeChat.id, next);
-            return { ...current, [activeChat.id]: next };
-          });
+          if (!told)
+            setDrafts((current) => {
+              const next = current[targetChat.id] || message;
+              writeConversationDraft(application.id, targetChat.id, next);
+              return { ...current, [targetChat.id]: next };
+            });
           if (images.length)
             setAttachments((current) => ({
               ...current,
-              [activeChat.id]: [...images, ...(current[activeChat.id] ?? [])],
+              [targetChat.id]: [...images, ...(current[targetChat.id] ?? [])],
             }));
         }
         const refreshed = await api
-          .view(application.id, activeChat.id)
+          .view(application.id, targetChat.id)
           .catch(() => null);
         if (refreshed) applyView(refreshed);
       },
@@ -864,41 +990,75 @@ export function OperatorShell({
           <section
             className={`hv-workspace${recordVisible ? " hv-dashboard-open" : ""}`}
           >
-            {activeSection && (
-              <ApplicationSectionView
-                key={`${applicationId}:${activeSection}`}
-                section={activeSection}
-                view={view}
-                reachable={reachable}
-                onReopen={askToReopen}
-                now={now}
-                facts={facts}
-                onRefresh={refreshDeployment}
-                onOpenDestination={selectSection}
-                onOpenConversation={openConversation}
-                onAsk={askInConversation}
-                bar={
-                  <div className="hv-view-bar">
-                    <button
-                      type="button"
-                      className="hv-view-back"
-                      onClick={closeSection}
-                    >
-                      <ArrowLeft aria-hidden="true" />
-                      Back to {activeChat?.title ?? "the conversation"}
-                    </button>
-                  </div>
-                }
-              >
-                {activeSection === "logs" && applicationId && (
-                  <OperatorConsole
-                    applicationId={applicationId}
-                    chatId={view.chats[0]?.id ?? ""}
-                    main={false}
-                    records={view.executions}
-                  />
+            {activeSection && (progress || unknownReconnect || error) && (
+              <div className="hv-reconnect-notice" role="status">
+                <span>
+                  {error ??
+                    progress?.text ??
+                    "Reconnect acceptance is unknown. Review Main operator or retry the same request."}
+                </span>
+                {mainChat && (
+                  <button
+                    type="button"
+                    className="hv-reconnect-follow"
+                    onClick={() =>
+                      openConversation(mainChat.id, progress?.replyId ?? null)
+                    }
+                  >
+                    Main operator
+                  </button>
                 )}
-              </ApplicationSectionView>
+              </div>
+            )}
+            {activeSection && (
+              <ReconnectActionContext.Provider
+                value={{
+                  label: unknownReconnect
+                    ? "Retry Reconnect"
+                    : reconnectable
+                      ? "Reconnect"
+                      : "Review private access",
+                  disabled:
+                    busy !== null ||
+                    Boolean(progress?.active) ||
+                    (reconnectable && !mainConversation),
+                }}
+              >
+                <ApplicationSectionView
+                  key={`${applicationId}:${activeSection}`}
+                  section={activeSection}
+                  view={view}
+                  reachable={reachable}
+                  onReopen={askToReopen}
+                  now={now}
+                  facts={facts}
+                  onRefresh={refreshDeployment}
+                  onOpenDestination={selectSection}
+                  onOpenConversation={openConversation}
+                  onAsk={askInConversation}
+                  bar={
+                    <div className="hv-view-bar">
+                      <button
+                        type="button"
+                        className="hv-view-back"
+                        onClick={closeSection}
+                      >
+                        <ArrowLeft aria-hidden="true" />
+                        Back to {activeChat?.title ?? "the conversation"}
+                      </button>
+                    </div>
+                  }
+                >
+                  {activeSection === "logs" && applicationId && (
+                    <OperatorConsole
+                      applicationId={applicationId}
+                      chatId={view.chats[0]?.id ?? ""}
+                      main={false}
+                      records={view.executions}
+                    />
+                  )}
+                </ApplicationSectionView>
+              </ReconnectActionContext.Provider>
             )}
             <div
               className={`hv-chat-column${recordVisible ? " hv-chat-parked" : ""}`}
@@ -1000,7 +1160,11 @@ export function OperatorShell({
                 ["waiting", "running"].includes(item.status),
               )}
               onClose={() =>
-                setTerminal({ open: false, expanded: false, minimized: false })
+                setTerminal({
+                  open: false,
+                  expanded: false,
+                  minimized: false,
+                })
               }
               onToggleExpanded={() =>
                 setTerminal((current) => ({

@@ -14,6 +14,8 @@ import type {
 
 import type { ConversationStatus } from "./operator-data";
 import type { ChatMessage } from "./types";
+import { failureText, nativeFailure } from "./pi-failure";
+import { redactSecrets } from "./secrets";
 
 /** Every message handed to Pi carries the id its sender gave it. */
 export const MESSAGE_TAG = "hallviMessageId";
@@ -127,25 +129,6 @@ function imagesOf(content: unknown) {
 }
 const imageCount = (content: unknown) => imagesOf(content).length || undefined;
 
-/**
- * What to do about a model failure. Pi keeps the provider's own words; the
- * page gets advice, never those words.
- */
-function advice(errorMessage: string | undefined) {
-  const said = errorMessage ?? "";
-  return `${
-    /\b(401|403)\b|unauthori|invalid_grant|forbidden/i.test(said)
-      ? "The model connection was rejected. Open Settings and reconnect."
-      : /\b429\b|rate.?limit|usage.?limit|quota/i.test(said)
-        ? "The model reports a usage or rate limit. Check the account allowance, then retry."
-        : /\b5\d\d\b|overloaded|network|fetch failed|ECONN|ETIMEDOUT|ENOTFOUND/i.test(
-              said,
-            )
-          ? "The model service could not be reached. Check your connection and retry."
-          : "Hallvi could not finish this attempt. Check Settings or retry."
-  } Check execution history for any effects.`;
-}
-
 const at = (timestamp: number | undefined) =>
   new Date(timestamp ?? 0).toISOString();
 
@@ -257,6 +240,7 @@ export function projectTranscript(
   results: OperationResultRecord[],
   lane: LaneView,
   driving: boolean,
+  clean: (text: string) => string = (text) => redactSecrets(text).text,
 ): Transcript {
   const messages: ChatMessage[] = [];
   const calls: Transcript["calls"] = {};
@@ -351,8 +335,11 @@ export function projectTranscript(
         : message.stopReason === "aborted"
           ? "cancelled"
           : "completed";
-    to.error =
-      message.stopReason === "error" ? advice(message.errorMessage) : null;
+    to.failure =
+      message.stopReason === "error"
+        ? nativeFailure("model", message.errorMessage, clean)
+        : undefined;
+    to.error = to.failure ? failureText(to.failure) : null;
   };
 
   for (const entry of history) {
@@ -404,6 +391,49 @@ export function projectTranscript(
       } catch {
         // A refused save returns prose, and shows nothing.
       }
+    }
+  }
+
+  for (const result of results) {
+    if (result.status !== "failed") continue;
+    const asked = messages.findLast(
+      (message) =>
+        message.role === "user" && message.operationId === result.operationId,
+    );
+    let ended = messages.findLast(
+      (message) =>
+        message.role === "assistant" &&
+        message.operationId === result.operationId,
+    );
+    if (!ended && asked) {
+      ended = {
+        id: `reply:${asked.id}`,
+        chatId,
+        role: "assistant",
+        body: "",
+        source: "pi",
+        status: "failed",
+        createdAt: at(result.startedAt),
+        startedAt: at(result.startedAt),
+        responseTo: asked.id,
+        operationId: result.operationId,
+        revision: 0,
+      };
+      const after = messages.findLastIndex(
+        (message) => message.operationId === result.operationId,
+      );
+      messages.splice(after + 1, 0, ended);
+    }
+    if (!ended) continue;
+    ended.status = "failed";
+    ended.finishedAt = at(result.endedAt);
+    if (!ended.failure?.reason) {
+      ended.failure = nativeFailure(
+        result.error ? "runtime" : (ended.failure?.source ?? "runtime"),
+        result.error?.message || result.error?.code,
+        clean,
+      );
+      ended.error = failureText(ended.failure);
     }
   }
 

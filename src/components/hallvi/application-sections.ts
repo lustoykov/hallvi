@@ -14,6 +14,7 @@ import {
   Globe,
   StackSimple,
   SlidersHorizontal,
+  Footprints,
 } from "@phosphor-icons/react";
 import type { SavedInformation } from "@/server/operator-data";
 import {
@@ -52,6 +53,14 @@ export const applicationSections = [
     id: "deployment",
     label: "Deployment",
     icon: RocketLaunch,
+    group: "application",
+  },
+  // Who uses the application and how it is doing, from stored totals. It is
+  // listed once history is kept or totals remain; see `standingOf`.
+  {
+    id: "traffic",
+    label: "Traffic",
+    icon: Footprints,
     group: "application",
   },
   {
@@ -163,7 +172,12 @@ const speaks: Partial<Record<ApplicationSection, string[]>> = {
 };
 
 /** The pages whose emptiness is a decision, not a gap in looking. */
-const arranged = new Set<ApplicationSection>(["backups", "monitoring", "cdn"]);
+const arranged = new Set<ApplicationSection>([
+  "backups",
+  "monitoring",
+  "cdn",
+  "traffic",
+]);
 
 /**
  * Pages that exist for every application, whatever it runs: the three that
@@ -220,8 +234,12 @@ export function standingOf(
   section: ApplicationSectionDefinition,
   records: SavedInformation[],
   waiting = false,
+  kept = false,
 ): Standing {
   if (always.has(section.id)) return "recorded";
+  // Traffic history is the owner's standing choice, not a record: listed
+  // while it is kept or its totals remain, a decision nobody made before.
+  if (section.id === "traffic") return kept ? "recorded" : "not-set-up";
   if (section.id === "backups" && holdsData(records)) return "recorded";
   // A value Pi has asked the owner for and not been given is content for
   // Environment Variables: the page is where the answer goes.
@@ -254,10 +272,12 @@ export function standings(
   records: SavedInformation[],
   /** Whether Pi has asked the owner for a value it has not been given. */
   waiting = false,
+  /** Whether traffic history is kept, or stored totals remain. */
+  kept = false,
 ): SectionStanding[] {
   return applicationSections.map((section) => ({
     section,
-    standing: standingOf(section, records, waiting),
+    standing: standingOf(section, records, waiting, kept),
   }));
 }
 

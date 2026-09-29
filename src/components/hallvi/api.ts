@@ -1,4 +1,10 @@
 import type {
+  Collection,
+  ReleaseImpact,
+  TrafficHistory,
+  TrafficRange,
+} from "@/server/traffic/contract";
+import type {
   ChatMessage,
   ChatSnapshot,
   OperatorMetadata,
@@ -123,6 +129,35 @@ export const api = {
     return jsonRequest(
       `/api/applications/${applicationId}/chats/${chatId}/stop`,
       { method: "POST" },
+    );
+  },
+  /** Stored traffic totals for one range, read without asking Pi. */
+  trafficHistory(applicationId: string, range: TrafficRange) {
+    return jsonRequest<TrafficHistory>(
+      `/api/applications/${applicationId}/traffic/history?range=${range}`,
+    );
+  },
+  /** Whether traffic history is kept, and what the collector last saw. */
+  trafficCollection(applicationId: string) {
+    return jsonRequest<Collection>(
+      `/api/applications/${applicationId}/traffic/collection`,
+    );
+  },
+  /** The owner's standing choice: keep history, stop, or forget totals. */
+  setTrafficCollection(
+    applicationId: string,
+    action: "keep" | "stop" | "forget",
+  ) {
+    return jsonRequest<Collection>(
+      `/api/applications/${applicationId}/traffic/collection`,
+      { method: "POST", body: JSON.stringify({ action }) },
+    );
+  },
+  /** What changed around each release, one answer per time, in order. */
+  releaseImpact(applicationId: string, at: string[]) {
+    const query = at.map((one) => `at=${encodeURIComponent(one)}`).join("&");
+    return jsonRequest<ReleaseImpact[]>(
+      `/api/applications/${applicationId}/traffic/impact?${query}`,
     );
   },
 };

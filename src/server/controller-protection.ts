@@ -1,3 +1,4 @@
+import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
 import {
   createCipheriv,
@@ -30,6 +31,7 @@ import { backupDestinationAccess } from "./backup-connection";
 import { backupDatabase, databasePath } from "./db";
 import { piAccountDir, piConfigDir } from "./pi-configuration";
 import { readTar, writeTar } from "./tar";
+import { trafficDatabasePath } from "./traffic/store";
 
 /**
  * Hallvi's own records and keys, copied to the destination the owner
@@ -235,13 +237,36 @@ export async function captureControllerPayload(): Promise<{
   const database = databasePath();
   const staging = mkdtempSync(join(tmpdir(), "hv-controller-copy-"));
   try {
-    const target = join(staging, "hallvi.db");
-    await backupDatabase(target);
-    entries.push({
-      path: "payload/database/hallvi.db",
-      content: readFileSync(target),
-      mode: 0o600,
-    });
+    // Traffic history's totals travel with the records: without them a
+    // recovered controller can recount only what the server's log still
+    // holds.
+    for (const [name, source] of [
+      ["hallvi.db", database],
+      ["traffic.db", trafficDatabasePath()],
+    ]) {
+      if (name === "traffic.db" && !existsSync(source)) continue;
+      const target = join(/* turbopackIgnore: true */ staging, name);
+      if (name === "hallvi.db") await backupDatabase(target);
+      else {
+        const reader = new Database(source, { readonly: true });
+        try {
+          await reader.backup(target);
+        } finally {
+          reader.close();
+        }
+        const copy = new Database(target);
+        try {
+          copy.pragma("journal_mode = DELETE");
+        } finally {
+          copy.close();
+        }
+      }
+      entries.push({
+        path: `payload/database/${name}`,
+        content: readFileSync(/* turbopackIgnore: true */ target),
+        mode: 0o600,
+      });
+    }
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }

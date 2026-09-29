@@ -7,8 +7,12 @@ import {
   type Context,
   type Model,
   type SimpleStreamOptions,
+  type ToolCall,
 } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { makeStrictJsonSchema } from "@earendil-works/pi-ai/api/constrained-sampling";
+import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
+import { privateAccessArguments } from "@/server/saved-private-access";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -189,6 +193,38 @@ beforeAll(async () => {
           ? `${text}${" [image]".repeat(images)}`
           : `<${last.role}>`,
       );
+      const requested = context.messages.findLast(
+        (message) => message.role === "user",
+      );
+      if (requested && said(requested.content).includes("[diagnostic]")) {
+        const message =
+          last.role === "toolResult"
+            ? assistant(
+                model,
+                [],
+                "error",
+                'HTTP 400 context window exceeded; password=opaque-private-value; response body {"prompt":"private-payload"}',
+              )
+            : assistant(
+                model,
+                [
+                  {
+                    type: "toolCall",
+                    id: `call-${++calls}`,
+                    name: "get_application_status",
+                    arguments: {},
+                  },
+                ],
+                "toolUse",
+              );
+        stream.push({ type: "start", partial: message });
+        stream.push(
+          message.stopReason === "error"
+            ? { type: "error", reason: "error", error: message }
+            : { type: "done", reason: "toolUse", message },
+        );
+        return stream;
+      }
       // A provider mid-answer when Stop arrives, as a real one is.
       if (text.includes("[slow]")) {
         const partial = assistant(model, [{ type: "text", text: "" }], "stop");
@@ -336,6 +372,63 @@ afterAll(async () => {
   await store.closeDatabase();
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
+});
+
+it("the registered private-access tool accepts provider nullable forms through Pi validation and the executor", async () => {
+  const a = await application("private-schema");
+  await loseWorker();
+  const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
+  try {
+    const tool = (await direct.harness.getTools(ctx)).find(
+      (item) => item.name === "open_server_port",
+    )!;
+    expect(tool).toBeDefined();
+    const providerSchema = makeStrictJsonSchema(tool.parameters);
+    expect(providerSchema).toMatchObject({
+      type: "object",
+      required: expect.arrayContaining([
+        "remotePort",
+        "localPort",
+        "accessRecordId",
+        "expectedUpdatedAt",
+      ]),
+    });
+    const saved = {
+      accessRecordId: randomUUID(),
+      expectedUpdatedAt: new Date().toISOString(),
+    };
+    const normalize = (args: ToolCall["arguments"]) =>
+      validateToolArguments(tool, {
+        type: "toolCall",
+        id: "private-schema",
+        name: tool.name,
+        arguments: args,
+      });
+    const savedArgs = normalize({
+      ...saved,
+      remotePort: null,
+      localPort: null,
+    });
+    expect(savedArgs).toEqual(saved);
+    expect(privateAccessArguments.parse(savedArgs)).toEqual(saved);
+    const explicitArgs = normalize({
+      remotePort: 8080,
+      localPort: null,
+      accessRecordId: null,
+      expectedUpdatedAt: null,
+    });
+    expect(explicitArgs).toEqual({ remotePort: 8080 });
+    expect(privateAccessArguments.parse(explicitArgs)).toEqual({
+      remotePort: 8080,
+    });
+    expect(
+      privateAccessArguments.safeParse(
+        normalize({ ...saved, remotePort: 8080, localPort: null }),
+      ).success,
+    ).toBe(false);
+  } finally {
+    await direct.close();
+  }
 });
 
 async function application(name: string, address?: string) {
@@ -853,7 +946,41 @@ it("leaves retrying, compaction and failure to Pi, and gives the page advice ins
   const failed = (await a.snapshot()).messages.at(-1)!;
   expect(failed.status).toBe("failed");
   expect(failed.error).toMatch(/Open Settings and reconnect/);
-  expect(JSON.stringify(await a.snapshot())).not.toContain("invalid_grant");
+  expect(failed.failure).toMatchObject({
+    source: "model",
+    category: "authentication",
+    reason: "invalid_grant: 401 unauthorized",
+  });
+  expect(failed.error).toContain("invalid_grant: 401 unauthorized");
+});
+
+it("a model failure after a successful status read keeps the same safe reason in chat and request outcomes after reopening", async () => {
+  const a = await application("diagnostic");
+  const key = randomUUID();
+  await a.send("[diagnostic] Check status", "next", key);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  const check = async () => {
+    const reply = (await a.snapshot()).messages.at(-1)!;
+    expect(reply).toMatchObject({
+      status: "failed",
+      failure: { source: "model", category: "unknown" },
+    });
+    expect(reply.failure?.reason).toContain("HTTP 400 context window exceeded");
+    const result = await outcome(a, key);
+    expect(result.status).toBe("failed");
+    expect(result.failure).toBe(reply.error);
+    expect(result.failure).toContain("context window exceeded");
+    expect(result.failure).not.toMatch(/Settings|could not be reached/);
+    expect(result.evidence).toMatchObject([
+      { tool: "get_application_status", status: "succeeded", exitCode: null },
+    ]);
+    const exposed = JSON.stringify({ reply, result });
+    expect(exposed).not.toMatch(/opaque-private-value|private-payload/);
+  };
+  await check();
+  await loseWorker();
+  await startWorker();
+  await check();
 });
 
 it("Stop after continuing an idle lane's queue says stopped, from the result of the operation Pi read the queue in", async () => {
