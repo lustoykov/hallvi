@@ -12,7 +12,7 @@ import { isIP } from "node:net";
 import { join } from "node:path";
 import { Reader, type Response } from "mmdb-lib";
 
-import { DEVICES, DIRECT, UNKNOWN } from "./contract";
+import { DEVICES, DIRECT, UNKNOWN, type ScriptEvent } from "./contract";
 
 export type Device = (typeof DEVICES)[number];
 
@@ -349,6 +349,14 @@ export function pageName(path: string) {
   }
   if (name.length > 1) name = name.replace(/\/+$/, "") || "/";
   return name.slice(0, 300);
+}
+
+/** The record, not a browser event, chooses which query key may be kept. */
+export function eventPage(event: ScriptEvent, pageKey?: string) {
+  const page = pageName(event.p);
+  return pageKey && event.q?.k === pageKey
+    ? `${page}?${pageKey}=${event.q.v}`
+    : page;
 }
 
 /**

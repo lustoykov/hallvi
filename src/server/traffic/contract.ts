@@ -92,7 +92,7 @@ export type VitalName = "LCP" | "INP" | "CLS";
  * What the script sends. `s` is a random id for one page view — it joins a
  * `leave` to its `view` and identifies nobody. `p` is the page's path.
  */
-export type ScriptEvent =
+export type ScriptEvent = (
   | {
       t: "view";
       s: string;
@@ -125,7 +125,11 @@ export type ScriptEvent =
       /** LCP and INP in milliseconds; CLS as the score times 1000. */
       v: number;
     }
-  | { t: "error"; s: string; p: string };
+  | { t: "error"; s: string; p: string }
+) & {
+  /** Only the application's configured page query key, never the full query. */
+  q?: { k: string; v: string };
+};
 
 const LIMITS = {
   path: 300,
@@ -178,7 +182,22 @@ export function eventOf(path: string): ScriptEvent | null {
     /[?#]/.test(p as string)
   )
     return null;
-  const base = { s, p: p as string };
+  const base: { s: string; p: string; q?: { k: string; v: string } } = {
+    s,
+    p: p as string,
+  };
+  if (value.q !== undefined) {
+    if (!value.q || typeof value.q !== "object" || Array.isArray(value.q))
+      return null;
+    const { k, v } = value.q as Record<string, unknown>;
+    if (
+      typeof k !== "string" ||
+      !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(k) ||
+      !text(v, LIMITS.tag)
+    )
+      return null;
+    base.q = { k, v: v as string };
+  }
   switch (t) {
     case "view": {
       const event: Extract<ScriptEvent, { t: "view" }> = { t, ...base };

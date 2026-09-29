@@ -16,8 +16,12 @@ node(["node_modules/next/dist/bin/next", "build"]);
 // Dependencies stay in node_modules: two of them are native, and the rest are
 // installed for the machine anyway.
 await build({
-  entryPoints: ["src/worker.ts"],
-  outfile: "dist/worker.mjs",
+  entryPoints: {
+    worker: "src/worker.ts",
+    "database-worker": "src/server/database-worker.ts",
+  },
+  outdir: "dist",
+  outExtension: { ".js": ".mjs" },
   bundle: true,
   packages: "external",
   platform: "node",

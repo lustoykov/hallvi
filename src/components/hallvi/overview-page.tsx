@@ -1,5 +1,7 @@
 "use client";
 
+import { currentAccessRecord } from "@/server/access-record";
+
 // Overview, on real records.
 //
 // The accepted design draws it when Pi has recorded a map. Without one there
@@ -208,13 +210,7 @@ export function OverviewPage({
 
   // Where the application answers, from the record that says so.
   const openUrl =
-    records
-      .filter((record) => !record.retiredAt)
-      .find(
-        (record) =>
-          record.presentation?.content?.kind === "application-access" &&
-          record.presentation.url,
-      )?.presentation?.url ?? null;
+    currentAccessRecord(records, application.id)?.presentation?.url ?? null;
 
   // Deployed: the page is what is happening now, around what is recorded.
   // Everything before that is still a journey, and keeps its own pages.

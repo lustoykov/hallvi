@@ -16,6 +16,8 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Beta precautions](beta-safety.md) | Practical risks and safeguards for the current alpha when granting server and repository access. |
 | [Development setup](development.md) | Run a checkout locally, open its paired dashboard and database viewer, inspect diagnostics and choose proportionate checks. |
 | [Verification workflow](verification.md) | The shared repository skill's executable path from environment selection through CLI evidence, useful behavior and task-owned cleanup. |
+| [Agent feedback](../AGENT_FEEDBACK.md) | Bugs, friction and wishes captured during ordinary development, with no research prerequisite. |
+| [Agent features](../AGENT_FEATURES.md) | Researched product proposals, the discovery workflow and owner-selected assignments. |
 | [Publishing a release](releases.md) | The maintainer's side: the signed release manifest and what trusts it, the one secret the owner supplies, and the version → build → verify → publish → discover sequence. |
 | [Changelog](../CHANGELOG.md) | What changed in each release, newest first. Installations show it under What's new, and each release's GitHub notes come from it. |
 | [Beta walkthrough](beta-walkthrough.md) | Fresh-user acceptance: install the exact candidate, inspect a repository, connect a test server, use the app and return after restart. |
@@ -24,8 +26,8 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Development environment](development-environment.md) | Discover, snapshot, exclusively attach and detach retained applications; check compatibility, upgrade their records and recover them. |
 | [Development resources](development-resources.md) | Resource ownership, cloud fixtures and cleanup when a task finishes. |
 | [GitHub setup](integrations/github.md) | Connection and credential setup that still applies. |
-| [Testing and evidence](testing/README.md) | What has actually been proved, coverage gaps and links to dated source accounts. |
-| [Dashboard acceptance guide](testing/phase-one-acceptance.md) | Small reference retained at the path the test dashboard loads. |
+| [Test runners](../tests/README.md) | Commands, fixtures, coverage and verification limits. |
+| [Dashboard acceptance guide](../tests/acceptance.md) | Acceptance criteria loaded by the test dashboard. |
 
 The owning references outside this directory are [Product](../PRODUCT.md), [Roadmap](../ROADMAP.md), [terminology](../CONTEXT.md), [component design](../src/components/hallvi/DESIGN.md) and [test runner instructions](../tests/README.md). Avoid duplicating them here.
 
@@ -35,4 +37,4 @@ Update the current document when behavior changes. Delete completed handoffs, ol
 
 The redesign changes general execution, permissions, conversation ownership and record presentation. Follow the operator design for those decisions, the roadmap for stage order and the requirements for current outcomes. Existing architecture, runner contracts and prototype descriptions remain useful accounts of their implementation; they are not competing redesign plans.
 
-Dated audits and proof reports retain their historical claims and limitations. Their old next actions do not override the current roadmap. Setup, fixture instructions and visual tokens continue to apply where their implementation remains in use. The user has explicitly authorized discarding old development data. Remove obsolete code, tests, migrations and recovery machinery rather than adding compatibility layers. Historical documents describe old behavior, not a preservation requirement.
+Dated audits and proof reports remain in Git history with their historical claims and limitations; new run-specific evidence stays out of Git. Their old next actions do not override the current roadmap. Setup, fixture instructions and visual tokens continue to apply where their implementation remains in use. The user has explicitly authorized discarding old development data. Remove obsolete code, tests, migrations and recovery machinery rather than adding compatibility layers. Historical documents describe old behavior, not a preservation requirement.

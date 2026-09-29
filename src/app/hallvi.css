@@ -618,7 +618,8 @@
 .hv-still-what {
   min-width: 0;
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   align-items: baseline;
 }
 .hv-error {
@@ -682,6 +683,7 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
+  white-space: nowrap;
 }
 /* A turn stopped on the reader is not a turn that is working. */
 .hv-run-status [data-waiting] {

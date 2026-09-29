@@ -75,7 +75,23 @@ describe("offering a way in", () => {
       reachable: "checking",
       onAsk: () => undefined,
     });
-    expect(html).toContain("Checking that the tunnel still answers");
+    expect(html).toContain("Checking the way in");
+    expect(html).not.toContain('href="http://127.0.0.1:18000"');
+  });
+
+  it.each([
+    ["unknown", "Access has not been checked"],
+    ["unavailable", "Cannot reach Hallvi"],
+  ] as const)("withholds private links when %s", (reachable, label) => {
+    const html = draw({
+      view: view("private"),
+      now: NOW,
+      reachable,
+      onAsk: () => undefined,
+    });
+    expect(html).toContain(label);
+    expect(html).not.toContain('href="http://127.0.0.1:18000"');
+    expect(html).not.toContain("Open the connection again");
   });
 
   it("does not withhold a public address because this PC's tunnel is down", () => {

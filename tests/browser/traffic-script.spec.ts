@@ -13,10 +13,11 @@ import {
   SCRIPT_PATH,
   type ScriptEvent,
 } from "../../src/server/traffic/contract";
-import { SCRIPT_TAG, trafficScript } from "../../src/server/traffic/script";
+import { trafficScript } from "../../src/server/traffic/script";
+import { trafficScriptFor } from "../../src/server/traffic/pi-tools";
 
-const html = (body: string) =>
-  `<!doctype html><html><head><meta charset="utf-8">${SCRIPT_TAG}</head><body>${body}</body></html>`;
+const html = (body: string, pageKey?: string) =>
+  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", pageKey).tag}</head><body>${body}</body></html>`;
 
 const pages: Record<string, string> = {
   // Big enough text to be the largest paint, a banner that pushes it down
@@ -34,6 +35,13 @@ const pages: Record<string, string> = {
       "afterbegin", '<div style="height: 200px">Banner</div>'), 300);
   </script>`),
   "/next": html(`<p>Next</p><a href="/landing">Back to landing</a>`),
+  "/query": html(
+    `<nav>
+    <button onclick="history.pushState({}, '', '/query?p=456&token=secret')">Next page</button>
+    <button onclick="history.replaceState({}, '', '/query?p=456&tab=2')">Same page</button>
+  </nav>`,
+    "p",
+  ),
   "/app": html(`<nav>
     <button onclick="history.pushState({}, '', '/app/settings')">Settings</button>
     <button onclick="history.replaceState({}, '', '/app/settings?tab=2')">Tab</button>
@@ -232,6 +240,26 @@ test("a single-page application: a new path is a new view, the same path is not"
   expect(leaves.map((leave) => [leave.s, leave.p])).toEqual(
     views.slice(0, 3).map((view) => [view.s, view.p]),
   );
+});
+
+test("query-routed pages use only the configured page key", async ({
+  page,
+}) => {
+  await page.goto(`${site}/query?p=123&token=secret`);
+  await until("view", 1);
+  await page.getByRole("button", { name: "Next page" }).click();
+  const views = await until("view", 2);
+  expect(views.map(({ p, q }) => ({ p, q }))).toEqual([
+    { p: "/query", q: { k: "p", v: "123" } },
+    { p: "/query", q: { k: "p", v: "456" } },
+  ]);
+  const [leave] = await until("leave", 1);
+  expect(leave.q).toEqual({ k: "p", v: "123" });
+  await page.getByRole("button", { name: "Same page" }).click();
+  await page.goBack();
+  const returned = await until("view", 3);
+  expect(returned.map(({ q }) => q?.v)).toEqual(["123", "456", "123"]);
+  expect(JSON.stringify(events())).not.toMatch(/token|secret|tab/);
 });
 
 test("pings while the tab is visible, and visible time keeps adding up after a return", async ({

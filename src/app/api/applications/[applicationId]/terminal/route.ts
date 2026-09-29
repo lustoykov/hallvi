@@ -13,7 +13,7 @@ type Context = { params: Promise<{ applicationId: string }> };
 /** What the panel needs before asking for a shell: is there a server yet. */
 export function GET(_request: Request, context: Context) {
   return handle(async () => {
-    const host = hostFor((await context.params).applicationId);
+    const host = await hostFor((await context.params).applicationId);
     return {
       target: host
         ? { user: host.user, address: host.address, port: host.port }
@@ -55,7 +55,7 @@ export function POST(request: Request, context: Context) {
         { status: 400 },
       );
 
-    const saved = hostFor(applicationId);
+    const saved = await hostFor(applicationId);
     if (!saved)
       return NextResponse.json(
         { error: "No server is connected to this application." },

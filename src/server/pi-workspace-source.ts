@@ -12,7 +12,7 @@ export async function applicationWorkspaceSource(
   const { recordedRepositoryId } = await import("./applications");
   const { repositoryCredential } = await import("./github-connection");
   const { githubJson } = await import("./github-api");
-  const application = getApplication(applicationId);
+  const application = await getApplication(applicationId);
   if (!application) throw new Error("Application not found.");
   const repository = `${application.repositoryOwner}/${application.repositoryName}`;
   const { token } = await repositoryCredential();
@@ -20,7 +20,7 @@ export async function applicationWorkspaceSource(
     .data as { id?: number; default_branch?: string };
   // A later failed or unavailable check records no identity; it does not
   // release the one a successful check pinned.
-  const pinned = recordedRepositoryId(applicationId);
+  const pinned = await recordedRepositoryId(applicationId);
   if (pinned !== undefined && found.id !== pinned)
     throw new Error(
       "The repository's identity changed since its access check. Check GitHub access before reading it.",

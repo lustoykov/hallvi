@@ -1,5 +1,7 @@
 "use client";
 
+import { currentAccessRecord } from "@/server/access-record";
+
 // Processes, on real records.
 //
 // The selected design (the register), fed by the `process` subjects Pi
@@ -110,11 +112,7 @@ export function ProcessesPage({
   const read = (_row: ProcessCard, probe: Probe) => probeReading(probe);
   /** Ran and failed. A note (`info`) did neither. */
   const broke = (probe: Probe) => probe.passed === false && !probe.noted;
-  const access = records
-    .filter((record) => !record.retiredAt)
-    .find(
-      (record) => record.presentation?.content?.kind === "application-access",
-    );
+  const access = currentAccessRecord(records);
 
   const head = (
     <PageHead

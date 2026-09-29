@@ -16,20 +16,22 @@ from Pi's session on every view, and the database holds only the
 conversation's title, its application and the id of that session. Evidence
 records still call the place they are shown a "run"; it is the reply Pi's
 transcript puts the tool call under. Permissions and the host reference live
-on the application; execution evidence lives in files. See the storage [verification](testing/2026-09-12-operator-execution.md).
+on the application; execution evidence lives in files. See the storage [verification](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-12-operator-execution.md).
 
 ## The shape of it
 
 ```mermaid
 flowchart TD
     UI[Conversation and destination pages] --> API[Next.js route handlers]
-    API --> DB[(SQLite: applications, conversations,<br/>saved information)]
+    API -->|await named operation| WebDB[Database thread in web process]
+    WebDB --> DB[(SQLite: applications, conversations,<br/>saved information)]
     API -->|worker.sock: send, continue, stop, read| Worker
-    Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] --> DB
-    Worker --> Tools[Twenty tools]
+    Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] -->|await named operation| PiDB[Database thread in Pi process]
+    PiDB --> DB
+    Worker --> Tools[Operator tools]
     Tools --> Host[Application server over SSH]
     Tools --> Providers[Hetzner, Cloudflare, GitHub, object storage]
-    Tools -->|save_information| DB
+    Tools -->|save_information| PiDB
     Tools --> Files[Execution evidence and native Pi history,<br/>files beside the database]
     DB --> Projection[record-projection.ts]
     Projection --> Records[*-records.ts, one per destination]
@@ -53,6 +55,95 @@ and bounded, redacted evidence ([requests.ts](../src/server/requests.ts)).
 Nothing is stored for a request. [Working from a terminal](cli.md) owns the
 contract.
 
+### Conversation change delivery
+
+The worker's existing Unix socket also carries ephemeral invalidations. Pi
+lane and tool-preview changes target one conversation; execution writes,
+saved-information commits and application changes target all conversations
+of that application. Readers always reconstruct the current snapshot from
+Pi and durable records; notifications contain no transcript or retained log.
+
+```mermaid
+flowchart LR
+    Pi[Pi lane and tool changes] --> Hub[Worker change hub]
+    Writes[Committed database or execution writes] --> Hub
+    WebWrite[Web mutation commits] --> Local[Web process hub]
+    Local -->|POST /changed on worker.sock| Hub
+    Hub -->|one GET /changes per web process| Local
+    Local -->|matching application or chat| Stream[Browser SSE handlers]
+    Stream -->|initial, changed or reconnected| Snapshot[Current chat snapshot]
+    Snapshot --> Browser[Open conversations]
+```
+
+The web hub is shared across Next route bundles and keyed by canonical
+database and controller-configuration paths. Both ends check that identity;
+sharing a Pi account does not share this channel. Web-originated commits
+notify local readers immediately and relay their invalidation to the worker.
+A failed relay retries coalesced scopes, never a database write or Pi send.
+Notifications run after a database acknowledgement or atomic execution-file
+replacement. A broken observer cannot turn a committed write into a failure.
+
+Each SSE handler subscribes before its initial read. The worker acknowledges
+only after registering its listener. Every initial or reconnected read, and
+every execution change, invalidates an older in-flight execution scan. An
+event arriving during an asynchronous read schedules another read. Bursts
+are coalesced, with at most one read in flight and one start every 500 ms;
+the first change after idle can start after 100 ms. Identical snapshots are
+not sent again. The 15-second heartbeat transports no state and reads none.
+
+Worker loss produces one unavailable snapshot. Connection retries do not
+rebuild histories; a successful reconnect reads current state, including
+changes missed during the gap. Slow readers are disconnected instead of
+accumulating snapshots. The last browser subscriber releases its upstream
+connection, retry and heartbeat resources.
+
+The page's 2.5/15-second refresh reads application metadata only: repository,
+chat summaries, deployment, secrets metadata and controller-protection facts.
+The permission control reads settings only; the logs view takes execution
+records from SSE. Existing access observations and traffic subscriptions
+keep their own cadence. No periodic background path reconstructs idle chat
+history. See the [notification measurements](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-chat-notifications.md).
+
+## Asynchronous SQLite boundary
+
+[db.ts](../src/server/db.ts) exposes asynchronous storage operations. Each
+process owns one [database thread](../src/server/database-worker.ts), which
+opens the existing SQLite file and executes the Drizzle operations in
+[database-store.ts](../src/server/database-store.ts). Query execution, lock
+waits, schema checks, retained-state ownership checks and SQLite backups run
+there. Web requests and Pi await the result while their event loops remain
+available. A busy connection still queues its own requests; this does not
+remove SQLite's single-writer limit.
+
+WAL, foreign keys and the five-second busy timeout are unchanged. Creating
+an application and its first conversation is one `BEGIN IMMEDIATE` transaction
+inside the database thread. The same operation settles repeated creation keys
+before any insert. Whole operations run in order, including online backup;
+transaction callbacks, Drizzle objects and open transactions never cross the
+message boundary. SQL errors keep their name, message, SQLite code and cause.
+
+An ordinary SQL or schema error rejects its caller. An unexpected database
+thread exit rejects pending and future calls and stops its owning process:
+no write is replayed, since a lost acknowledgement can mean a committed write.
+The installed launcher's existing process-failure behavior stops the paired
+process so the service manager can restart them. Pi still resumes nothing
+without the owner's Continue or Stop. The thread holds retained ownership
+until close or process exit, and checks authority before opening the file.
+
+Graceful Pi shutdown drains accepted database requests and closes the
+connection after its sessions have closed. The existing five-second forced
+exit limit still applies. Idle database threads do not keep
+a process alive; Node ends them with their owning process. Development loads
+the source thread through `scripts/database-worker.mjs`; the build and package
+include `dist/database-worker.mjs`, which needs no TypeScript loader.
+
+The separate `.worker-lock` remains synchronous: it is acquired once, with a
+zero timeout, before Pi serves requests and is held for process ownership.
+Offline migrations, fixture tooling and the launcher's pre-service schema
+preparation also remain synchronous; they do not serve web requests or Pi
+turns. These exceptions never execute application queries on either runtime
+event loop.
+
 ## What is stored
 
 Three tables, in [db-schema.ts](../src/server/db-schema.ts), at schema 18:
@@ -71,12 +162,69 @@ all records with a subject and a claim.
 Three things live in files beside the database rather than in it. Native Pi
 conversation history, under `pi-sessions/<application>/<chat>/`, because Pi's
 session repository owns it and its format. Execution evidence — every command, its output and its
-outcome — under `operator/<application>/executions/`, because a command's
-output is large and append-only. And local diagnostics, under `diagnostics/`.
+outcome — under `operator/<application>/executions/`, with each update
+atomically replacing that execution's JSON file. And local diagnostics, under
+`diagnostics/`.
+
+### Reading execution evidence
+
+Chat snapshots, application views, CLI inspection and Pi's status tool await
+the same [execution reader](../src/server/execution-reader.ts). It scans file
+names and metadata asynchronously, then reads and parses only changed or
+uncached records. Overlapping lists of one directory share their scan, and
+overlapping reads of the same file version share their content read. A call
+joining an in-progress list observes that scan; the next list checks again.
+This is neither a directory-wide transactional snapshot nor a freshness TTL.
+`invalidateExecutionReads(applicationId)` makes a notified refresh start a new
+scan instead of joining one begun before the change. SSE uses it before every
+initial read, on worker connection changes and on execution notices for that
+application. Omitting the ID invalidates all in-flight lists. Metadata checks
+keep cached content and single-file reads correct without purging unchanged
+records.
+
+The process-local cache keys absolute storage paths, not application IDs
+alone. Device, inode, size, nanosecond modification and change times identify
+a file version, so atomic replacement, running output, new files and removal
+are visible on subsequent reads. A version that changes during a read is not
+cached. Missing files are omitted; other read/parse failures remain errors.
+No watcher or cross-process invalidation service is needed: the writer's
+files remain authoritative, and a restarted process starts with an empty cache.
+
+Each reader process retains at most 4,096 records and a 32 MiB estimated
+content budget (UTF-16 JSON length plus entry overhead), evicting least recently
+used records. This is a cache budget, not a total heap limit: active responses
+still contain the complete requested history. Large histories exceeding the
+budget are reread as needed. At most eight file jobs run together across
+applications, with only eight queued workers per directory. Returned arrays
+and flat execution objects are copies; their immutable strings may be shared.
+
+```mermaid
+flowchart LR
+    C[Chat, views, CLI and Pi status] --> R[Async execution reader]
+    R --> M[Directory and file metadata]
+    M --> V{Cached version matches?}
+    V -->|yes| B[Bounded process cache]
+    V -->|no| F[Async content read and JSON parse]
+    F -->|version unchanged| B
+    B --> O[Independent record objects]
+    F --> O
+    O --> C
+    W[Synchronous execution writer] -->|atomic rename| D[Authoritative JSON files]
+    D --> M
+    D --> F
+```
+
+Execution writes remain synchronous. The worker awaits the async reader for
+recovery before accepting socket requests and for settlement before a live
+stretch stops driving. Settlement starts a fresh scan after the scope stops
+executing, so it cannot join an older read and overwrite a completed command.
+Transcript projection and response serialization still run on the main thread.
+The [synthetic measurement](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-execution-reader.md) separates
+file-read counts from response cost and these remaining limits.
 
 ## What Pi can do
 
-Twenty-three tools, registered in [pi.ts](../src/server/pi.ts). There is no workflow
+Tools are registered in [pi.ts](../src/server/pi.ts). There is no workflow
 engine behind them: Pi reads the repository, decides what to do and does it,
 and the tools are the only things that can reach outside.
 
@@ -200,7 +348,7 @@ hold, and a stretch they no longer hold is named as a gap. The collector
 records its state (`catching-up`, `live`, `lost`, `no-log`, `unsupported`),
 the last line, the oldest line the server keeps and the script's switch point
 and silence, which the Traffic page shows. The
-[collection experiment](testing/2026-09-29-traffic-collection.md) is the
+[collection experiment](https://github.com/lustoykov/hallvi/blob/072f69a1d5da22650ddedb7897142db8d43aa019/docs/testing/2026-09-29-traffic-collection.md) is the
 proof.
 
 ## From a record to a page
@@ -304,7 +452,7 @@ the internet. It adds two tools and no workflow, table or approval type. The
 public request path is browser → DNS → a reverse proxy on the deployment server
 → the application → its private dependencies; the controller is on none of it.
 See the [decision diagram](architecture/publishing-evidence.html) and the
-[evidence](testing/2026-09-15-publish-custom-domain.md).
+[evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-15-publish-custom-domain.md).
 
 `set_domain_record` writes one exact name of one exact type per call at the DNS
 provider, so no request it can make touches a record it was not given. It
@@ -349,7 +497,7 @@ claims to have observed a renewal.
 
 ## Provisioning
 
-Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation; since 18 September the [host request card](design/onboarding.md) gathers both with one command the owner pastes on the machine, and `connection-checks.ts` also requires passwordless administrator rights and a 64-bit Linux before the host is saved. The same card proves a Hetzner token can write by registering the application's public SSH key. No schema table, workflow engine or approval mode is added. See the [evidence and limits](testing/2026-09-12-hetzner-provisioning.md).
+Merged in [PR #56](https://github.com/lustoykov/hallvi/pull/56) on 12 September 2026, this adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation; since 18 September the [host request card](design/onboarding.md) gathers both with one command the owner pastes on the machine, and `connection-checks.ts` also requires passwordless administrator rights and a 64-bit Linux before the host is saved. The same card proves a Hetzner token can write by registering the application's public SSH key. No schema table, workflow engine or approval mode is added. See the [evidence and limits](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-12-hetzner-provisioning.md).
 
 ## Protecting the controller
 
@@ -379,7 +527,7 @@ controller stays manual; see
   formats — Caddy's JSON, Hallvi's line from nginx, Traefik's JSON — set up
   the way `traffic_setup` tells Pi, and a record saying where. Other proxies
   and formats are not read. Caddy's container and file sources were
-  [run on a rented server](testing/2026-09-19-overview-live.md) with a record
+  [run on a rented server](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-19-overview-live.md) with a record
   Pi wrote. A private application has no proxy until the owner asks for this,
   and a dead connection takes about fifteen seconds to notice.
 - One conversation per application runs at a time, and applications run
@@ -400,6 +548,6 @@ Core source: [Pi runtime](../src/server/pi.ts),
 [secrets](../src/server/application-secrets.ts) and
 [controller protection](../src/server/controller-protection.ts).
 
-[Evidence](testing/README.md) distinguishes actual model runs, scripted tests,
-local Docker and live-host observations. Documentation does not establish
+The [verification guide](verification.md) distinguishes actual model runs,
+scripted tests, local Docker and live-host observations. Documentation does not establish
 shipped support.

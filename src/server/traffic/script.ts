@@ -47,9 +47,9 @@ export const SCRIPT_TAG = `<script defer src="${SCRIPT_PATH}"></script>`;
 
 /**
  * Where the script lives on the application's server. One file serves every
- * application there: the script has no settings, because its events go back
- * to whichever site loaded it. A proxy in a container mounts this directory
- * read-only at the same path.
+ * application there: its events go back to whichever site loaded it, and an
+ * optional page query key is configured on that site's include tag. A proxy
+ * in a container mounts this directory read-only at the same path.
  */
 export const SCRIPT_DIRECTORY = "/srv/hallvi";
 export const SCRIPT_FILE = `${SCRIPT_DIRECTORY}${SCRIPT_PATH}`;

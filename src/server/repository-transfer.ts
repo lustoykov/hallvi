@@ -21,8 +21,8 @@ export async function copyRepositoryToServer(
   signal?: AbortSignal,
 ) {
   z.uuid().parse(applicationId);
-  const application = loadApplication(applicationId);
-  const host = operatorSettings(applicationId).host;
+  const application = await loadApplication(applicationId);
+  const host = (await operatorSettings(applicationId)).host;
   if (!host)
     throw new Error("Connect the application's server before copying source.");
   const repository = `${application.repositoryOwner}/${application.repositoryName}`;
@@ -33,7 +33,7 @@ export async function copyRepositoryToServer(
     full_name: string;
     default_branch: string;
   };
-  const knownId = recordedRepositoryId(applicationId);
+  const knownId = await recordedRepositoryId(applicationId);
   if (
     metadata.full_name?.toLowerCase() !== repository.toLowerCase() ||
     (knownId !== undefined && metadata.id !== knownId)
@@ -80,7 +80,7 @@ export async function copyRepositoryToServer(
       "The GitHub connection changed. Retry with the current connection.",
     );
   if (
-    JSON.stringify(operatorSettings(applicationId).host) !==
+    JSON.stringify((await operatorSettings(applicationId)).host) !==
     JSON.stringify(host)
   )
     throw new Error(

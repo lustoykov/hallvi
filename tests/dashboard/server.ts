@@ -21,10 +21,12 @@ import { browserJourneys } from "../browser/journeys.ts";
 import { suiteGuides } from "./suite-guides.ts";
 import { guidePage, renderMarkdown } from "./markdown.ts";
 import { checkout, developmentState, releasesState } from "./development.ts";
+import { createLearning, LearningError } from "./learning.ts";
+import { learningPage, learningSourcePage } from "./learning-page.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
-export const API_VERSION = 7;
+export const API_VERSION = 10;
 
 const REPOSITORY = "lustoykov/hallvi";
 
@@ -229,6 +231,7 @@ export type Launch = (
   options: SpawnOptions,
 ) => ChildProcess;
 export function createDashboard(root: string, launch: Launch = spawn) {
+  const learning = createLearning(root);
   const pairedAppPort = Number(process.env.HALLVI_DEV_APP_PORT) || undefined;
   const appUrl = `http://127.0.0.1:${pairedAppPort ?? 3000}`;
   const storage = directory(join(root, "tests/results"));
@@ -381,6 +384,25 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     }
     const url = new URL(request.url!, origin);
     try {
+      if (request.method === "GET" && url.pathname === "/learn") {
+        response.setHeader("Content-Type", "text/html; charset=utf-8");
+        response.end(learningPage(appUrl, token));
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/learn/source") {
+        const path = url.searchParams.get("file");
+        const revision = url.searchParams.get("revision");
+        let source: string;
+        try {
+          source = learning.source(path ?? "", revision);
+        } catch {
+          json({ error: "Unknown learning source" }, 404);
+          return;
+        }
+        response.setHeader("Content-Type", "text/html; charset=utf-8");
+        response.end(learningSourcePage(path!, source, appUrl, revision));
+        return;
+      }
       if (
         request.method === "GET" &&
         [
@@ -391,6 +413,8 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           "/releases",
           "/dashboard.js",
           "/dashboard.css",
+          "/learning.js",
+          "/learning.css",
         ].includes(url.pathname)
       ) {
         const name = [
@@ -419,27 +443,44 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       }
       if (
         request.method === "GET" &&
-        ["/guide", "/feedback"].includes(url.pathname)
+        ["/guide", "/feedback", "/features"].includes(url.pathname)
       ) {
         const feedback = url.pathname === "/feedback";
+        const features = url.pathname === "/features";
+        const repositoryDocument = feedback || features;
         const path = feedback
           ? "AGENT_FEEDBACK.md"
-          : "docs/testing/phase-one-acceptance.md";
-        const title = feedback ? "Agent feedback" : "Acceptance guide";
+          : features
+            ? "AGENT_FEATURES.md"
+            : "tests/acceptance.md";
+        const title = feedback
+          ? "Agent feedback"
+          : features
+            ? "Agent features"
+            : "Acceptance guide";
         response.setHeader("Content-Type", "text/html; charset=utf-8");
         let body: string;
         try {
           body = renderMarkdown(
             readFileSync(join(root, path), "utf8"),
-            feedback
+            repositoryDocument
               ? `https://github.com/${REPOSITORY}/blob/main/`
               : undefined,
           );
-          if (feedback)
+          if (repositoryDocument) {
+            // Agent documents keep closed entries in a final Archive section.
+            body = body.replace(
+              /<h2 id="archive">Archive<\/h2>([\s\S]*)$/,
+              (_section, archive: string) => {
+                const count = (archive.match(/<h3\b/g) ?? []).length;
+                return `<details class="document-archive" id="archive"><summary>Archive (${count})</summary>${archive}</details>`;
+              },
+            );
             body = body.replace(
               "</h1>",
-              '</h1><p class="footnote">Read-only view of <code>AGENT_FEEDBACK.md</code> in this checkout. Reload to see local edits. Feedback is shared between worktrees through merges; repository links open GitHub main.</p>',
+              `</h1><p class="footnote">Read-only view of <code>${path}</code> in this checkout. Reload to see local edits. Changes are shared between worktrees through merges; repository links open GitHub main.</p>`,
             );
+          }
         } catch (error) {
           const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
           response.statusCode = missing ? 404 : 500;
@@ -468,6 +509,10 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         });
         return;
       }
+      if (request.method === "GET" && url.pathname === "/api/learning") {
+        json(learning.state());
+        return;
+      }
       if (request.method === "GET" && url.pathname === "/api/development") {
         json({
           apiVersion: API_VERSION,
@@ -494,6 +539,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           "/api/stop",
           "/api/releases/build",
           "/api/releases/publish",
+          "/api/learning",
         ].includes(url.pathname)
       ) {
         json({ error: "Not found" }, 404);
@@ -513,6 +559,10 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           throw new Error("Request too large");
       }
       const body = JSON.parse(text);
+      if (url.pathname === "/api/learning") {
+        json(learning.act(body));
+        return;
+      }
       if (url.pathname === "/api/stop") {
         z.strictObject({}).parse(body);
         cancelActive?.();
@@ -591,7 +641,19 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           ...review.review,
         }),
       );
-    } catch {
+    } catch (error) {
+      if (url.pathname.startsWith("/api/learning")) {
+        json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Could not read learning sources or save progress. Refresh to retry.",
+          },
+          error instanceof LearningError ? error.status : 500,
+        );
+        return;
+      }
       json(
         {
           error:

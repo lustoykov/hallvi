@@ -3,7 +3,7 @@
 // recount takes the place of what was stored only for the stretches it
 // answers for. The rest of the collector — restart is a recount, nothing
 // counted twice, rotation, deletion and a lost connection — is proved against
-// real Caddy and sshd in docs/testing/2026-09-29-traffic-collection.md, and
+// real Caddy and sshd (the report linked in docs/architecture.md), and
 // the day's close in integration/traffic-day-close.test.ts.
 
 import { describe, expect, it } from "vitest";

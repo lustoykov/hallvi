@@ -85,30 +85,36 @@ export function readDays(
  * must not bring any back. Answers whether it stored the day.
  */
 export function writeDay(applicationId: string, day: TrafficDay) {
-  if (!recorded(applicationId).enabledAt) return false;
+  if (!existsSync(trafficDatabasePath())) return false;
   const covered = coveredOf(day);
   const client = store();
-  return client.transaction(() => {
-    const kept = client
-      .prepare(
-        "SELECT final, covered_ms FROM days WHERE application_id = ? AND day = ?",
-      )
-      .get(applicationId, day.day) as
-      { final: number; covered_ms: number } | undefined;
-    if (kept?.final && !(day.final && covered >= kept.covered_ms)) return false;
-    client
-      .prepare(
-        "INSERT OR REPLACE INTO days (application_id, day, final, covered_ms, data) VALUES (?, ?, ?, ?, ?)",
-      )
-      .run(
-        applicationId,
-        day.day,
-        day.final ? 1 : 0,
-        Math.round(covered),
-        JSON.stringify(day),
-      );
-    return true;
-  })();
+  return client
+    .transaction(() => {
+      // The web process can stop or forget while the worker is counting.
+      // Acquire the write lock before reading its choice, not after it.
+      if (!recorded(applicationId).enabledAt) return false;
+      const kept = client
+        .prepare(
+          "SELECT final, covered_ms FROM days WHERE application_id = ? AND day = ?",
+        )
+        .get(applicationId, day.day) as
+        { final: number; covered_ms: number } | undefined;
+      if (kept?.final && !(day.final && covered >= kept.covered_ms))
+        return false;
+      client
+        .prepare(
+          "INSERT OR REPLACE INTO days (application_id, day, final, covered_ms, data) VALUES (?, ?, ?, ?, ?)",
+        )
+        .run(
+          applicationId,
+          day.day,
+          day.final ? 1 : 0,
+          Math.round(covered),
+          JSON.stringify(day),
+        );
+      return true;
+    })
+    .immediate();
 }
 
 type Recorded = Omit<Collection, "storedFrom" | "logMisses">;
@@ -164,20 +170,24 @@ export function collectionOf(applicationId: string): Collection {
  * the collector reads the choice and follows it.
  */
 export function setCollection(applicationId: string, choice: "keep" | "stop") {
-  const current = recorded(applicationId);
-  const at = new Date().toISOString();
-  save(
-    applicationId,
-    choice === "keep"
-      ? {
-          ...current,
-          enabledAt: current.enabledAt ?? at,
-          disabledAt: null,
-          // Until the collector says otherwise, it is starting to read.
-          state: current.state === "off" ? "catching-up" : current.state,
-        }
-      : { ...current, enabledAt: null, disabledAt: at, state: "off" },
-  );
+  store()
+    .transaction(() => {
+      const current = recorded(applicationId);
+      const at = new Date().toISOString();
+      save(
+        applicationId,
+        choice === "keep"
+          ? {
+              ...current,
+              enabledAt: current.enabledAt ?? at,
+              disabledAt: null,
+              // Until the collector says otherwise, it is starting to read.
+              state: current.state === "off" ? "catching-up" : current.state,
+            }
+          : { ...current, enabledAt: null, disabledAt: at, state: "off" },
+      );
+    })
+    .immediate();
   return collectionOf(applicationId);
 }
 
@@ -201,8 +211,13 @@ export function recordCollector(
     >
   >,
 ) {
-  const current = recorded(applicationId);
-  if (current.enabledAt) save(applicationId, { ...current, ...seen });
+  if (!existsSync(trafficDatabasePath())) return collectionOf(applicationId);
+  store()
+    .transaction(() => {
+      const current = recorded(applicationId);
+      if (current.enabledAt) save(applicationId, { ...current, ...seen });
+    })
+    .immediate();
   return collectionOf(applicationId);
 }
 

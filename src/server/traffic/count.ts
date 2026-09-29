@@ -50,6 +50,7 @@ import {
   arrivalOf,
   countryOf,
   deviceOf,
+  eventPage,
   pageName,
   referringPage,
   tagOf,
@@ -600,7 +601,7 @@ export class DayCounter {
   /** A page load: the browser's latest view, pending its script view. */
   private loaded(line: TrafficLine, key: string, counted: boolean) {
     if (counted)
-      this.pending.set(key, { page: pageName(line.path), at: line.at });
+      this.pending.set(key, { page: this.pageOf(line), at: line.at });
     else this.pending.delete(key);
   }
 
@@ -685,7 +686,7 @@ export class DayCounter {
     if (this.lastEvent === null || line.at > this.lastEvent)
       this.lastEvent = line.at;
     this.quiet = null;
-    const page = pageName(event.p);
+    const page = eventPage(event, this.options.pageKey);
     switch (event.t) {
       case "view": {
         if (this.paired(key, page, line.at)) return;

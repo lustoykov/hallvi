@@ -17,7 +17,7 @@ import { useSyncExternalStore } from "react";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
 
-import { placeOf } from "./execution-text";
+import { hostOf, intentOf, placeOf, whereItRan } from "./execution-text";
 
 const noTicks = () => () => undefined;
 const yes = () => true;
@@ -140,13 +140,17 @@ export function runActivity(input: {
 
   const command = executions.find((item) => item.status === "running");
   if (command) {
-    const place = placeOf(command.tool);
+    const intent = intentOf(command.input);
+    const place = whereItRan(command)?.said;
+    const action = intent
+      ? `Running: ${intent}${place ? ` · ${place}` : ""}`
+      : place
+        ? `Running a command ${place.charAt(0).toLowerCase()}${place.slice(1)}`
+        : "Running a command";
     const seconds = secondsSince(command.createdAt, now);
     const silence = quiet(command, now);
     return {
-      says: place
-        ? `Running a command ${place.charAt(0).toLowerCase()}${place.slice(1)}`
-        : "Running a command",
+      says: [action, hostOf(command.target)].filter(Boolean).join(" · "),
       since: [
         seconds === null ? null : spell(seconds),
         silence === null ? null : `quiet for ${spell(silence)}`,

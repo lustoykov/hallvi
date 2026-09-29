@@ -4,7 +4,12 @@ import type {
   TrafficHistory,
   TrafficRange,
 } from "@/server/traffic/contract";
-import type { ChatMessage, ChatSnapshot, OperatorView } from "@/server/types";
+import type {
+  ChatMessage,
+  ChatSnapshot,
+  OperatorMetadata,
+  OperatorView,
+} from "@/server/types";
 
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -72,6 +77,11 @@ export const api = {
   view(applicationId: string, chatId: string) {
     return jsonRequest<OperatorView>(
       `/api/applications/${applicationId}?chat=${encodeURIComponent(chatId)}`,
+    );
+  },
+  metadata(applicationId: string, chatId: string) {
+    return jsonRequest<OperatorMetadata>(
+      `/api/applications/${applicationId}?chat=${encodeURIComponent(chatId)}&view=metadata`,
     );
   },
   createChat(applicationId: string) {

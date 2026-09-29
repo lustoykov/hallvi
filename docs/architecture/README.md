@@ -17,6 +17,8 @@ Each of these is linked from the document that owns its decision.
 | Diagram | Owned by |
 | --- | --- |
 | [Architecture routes and connection evidence](../presentation-contract.md#5-architecture-the-state-the-page-needs) | [Presentation contract](../presentation-contract.md) |
+| [Runtime SQLite threads](../architecture.md#the-shape-of-it) | [Architecture](../architecture.md#asynchronous-sqlite-boundary) |
+| [Conversation change delivery](../architecture.md#conversation-change-delivery) | [Architecture](../architecture.md) |
 | [Repository workspace boundary](../architecture.md#repository-workspace-architecture) | [Architecture](../architecture.md) |
 | [Private repository source deployment](../integrations/github.md#deploying-private-source-and-later-revisions) | [GitHub](../integrations/github.md) |
 | [Automatic deployment: the branch watch](../integrations/github.md#deploying-automatically-when-a-branch-changes) | [GitHub](../integrations/github.md) |
@@ -26,15 +28,18 @@ Each of these is linked from the document that owns its decision.
 | [Cleanup scope](cleanup-scope.md) | [Development resources](../development-resources.md#discarding-development-data) |
 | [Where a check belongs, and where it does not](where-coverage-lives.md) | [Testing](../../tests/README.md#the-8020-bar) |
 | [Select tests by the behavior they protect](test-selection.md) | [Testing](../../tests/README.md#the-8020-bar) |
+| [Architecture learning and saved progress](../development.md#learn-the-current-architecture) | [Development](../development.md) |
 | [What counts as published](publishing-evidence.html) | [Architecture](../architecture.md#publishing-at-a-domain) |
 | [What a record is allowed to claim](recovery-claims.html) | [Presentation contract](../presentation-contract.md) |
 | [Wording that outruns its record](wording-and-records.html) | [Presentation contract](../presentation-contract.md) |
 | [What a page may print, and where](page-evidence-and-labels.md) | [Presentation contract](../presentation-contract.md) |
-| [Proportionate care](proportionate-care.html) | [Care evidence](../testing/2026-09-16-proportionate-care.md) |
+| [Proportionate care](proportionate-care.html) | [Care evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-16-proportionate-care.md) |
 | [Who owns a conversation's lifecycle](conversation-lifecycle.md) | [Operator design](../operator-design.md#interaction-while-pi-is-busy) |
 | [A request from a terminal](../cli.md#where-it-is-shown) | [Working from a terminal](../cli.md) |
+| [Reading execution evidence](../architecture.md#reading-execution-evidence) | [Architecture](../architecture.md) |
 | [Who holds a credential, and who may read it](credential-lifecycle.html) | [Roadmap](../../ROADMAP.md) |
 | [Where the way in is answered](private-access-reachability.html) | [Roadmap](../../ROADMAP.md) |
+| [Reconnect an established private route](reconnect-private-route.md) | [Operator design](../operator-design.md) |
 | [What trusts what in a release](../releases.md#what-trusts-what) | [Publishing a release](../releases.md) |
 
 ## Historical

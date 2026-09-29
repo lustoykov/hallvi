@@ -28,7 +28,7 @@ import { z } from "zod";
 
 import type { ControllerProtectionFacts } from "./application-facts";
 import { backupDestinationAccess } from "./backup-connection";
-import { databasePath } from "./db";
+import { backupDatabase, databasePath } from "./db";
 import { piAccountDir, piConfigDir } from "./pi-configuration";
 import { readTar, writeTar } from "./tar";
 import { trafficDatabasePath } from "./traffic/store";
@@ -246,17 +246,20 @@ export async function captureControllerPayload(): Promise<{
     ]) {
       if (name === "traffic.db" && !existsSync(source)) continue;
       const target = join(/* turbopackIgnore: true */ staging, name);
-      const reader = new Database(source, { readonly: true });
-      try {
-        await reader.backup(target);
-      } finally {
-        reader.close();
-      }
-      const copy = new Database(target);
-      try {
-        copy.pragma("journal_mode = DELETE");
-      } finally {
-        copy.close();
+      if (name === "hallvi.db") await backupDatabase(target);
+      else {
+        const reader = new Database(source, { readonly: true });
+        try {
+          await reader.backup(target);
+        } finally {
+          reader.close();
+        }
+        const copy = new Database(target);
+        try {
+          copy.pragma("journal_mode = DELETE");
+        } finally {
+          copy.close();
+        }
       }
       entries.push({
         path: `payload/database/${name}`,

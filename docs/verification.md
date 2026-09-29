@@ -17,6 +17,9 @@ existing tools; there is no development-verification command in the public CLI.
 
 Use an isolated worktree and Node 22 (`node --version`), then `npm ci`.
 Record `git rev-parse HEAD` and any uncommitted changes being tested.
+Keep temporary source archives for before/after comparisons under `work/`.
+TypeScript, ESLint and Prettier exclude that ignored scratch directory; source
+and tests remain in the normal checks. Remove task-owned archives after retaining the evidence.
 
 | What the change needs to prove | Start here |
 | --- | --- |
@@ -24,6 +27,12 @@ Record `git rev-parse HEAD` and any uncommitted changes being tested.
 | Deletion, fault injection, incompatible schemas or recovery from loss | A task-owned disposable fixture using the existing test tooling; see [when to use a disposable fixture](development-environment.md#when-a-disposable-fixture-is-still-the-right-thing). Never break retained state or a shared host to prove a failure. |
 | Old conversations or several real applications rendered together | `node scripts/retained-application.mjs snapshot work/verify-snapshot <name>` (add names as needed). Run the exact environment assignments it prints, choosing a free port. The empty account directory is deliberate: histories are readable, new Pi turns are unavailable. |
 | Real Pi work against an existing application, history or data | Check `node scripts/retained-application.mjs status` and the register described in [the development environment](development-environment.md). Choose a free application that exercises your criterion; attach it as below. Registration is not evidence of live host health. |
+
+For a credential-free fixture that renders Pi setup, set `PI_CODING_AGENT_DIR`
+to its empty account directory as well as `HALLVI_PI_CONFIG_DIR`.
+Hallvi's account override does not redirect standalone Pi's directory: setup
+detects a reusable Pi login through the SDK's `getAgentDir()`. Isolate both
+paths before opening the browser so detection cannot read the owner's Pi login.
 
 For an ordinary fresh development controller, `npm run db:push` then
 `npm run dev` starts the app, worker and paired development tools. Add an
@@ -129,11 +138,13 @@ Full execution data is under `execution` (including `id`, `toolCallId`,
 limited to the last 100,000 recorded output characters. The outcome holds
 the last 40 calls; `inspect` holds the newest 20 executions and 25 presented
 records. Check `evidenceOmitted`, `executionsOmitted`, `recordsOmitted` and
-`answerTruncated`. For missing calls or answer text, use the matching
-conversation/tool disclosures or the existing
-[conversation inspector](development.md#diagnostics); do not treat omitted
-evidence as a clean run. A call with no execution ID has no full execution to
-fetch; state the gap if its recorded result is insufficient.
+`answerTruncated`. For calls or answer text omitted from those lists, open the
+matching [conversation and tool disclosures](development.md#diagnostics).
+The page's arguments and results are also bounded, redacted previews; it cannot
+recover output beyond the execution recorder's limit. Raw reasoning export is
+currently unavailable. A call with no execution ID has no full execution to
+fetch. State the gap if the available evidence is insufficient; do not treat
+omitted evidence as a clean run.
 
 ## 3. Respond to the actual outcome
 
@@ -165,6 +176,13 @@ run `npm run format`, and review the final diff.
 In the PR, state the tested revision and environment (real model/provider,
 local container or scripted fixture), request/operation/execution identities,
 observations, independent behavior check and relevant screenshot links.
+Keep screenshots, logs and per-run reports in ignored `tests/results/` or
+`work/`; attach useful captures to the PR rather than committing them. Do not
+add new evidence files under `docs/testing/`. Durable testing instructions
+belong in the existing guides; run-specific results belong in the PR.
+Never force-add ignored artifacts. After review, remove this task's temporary
+captures and reports when they are no longer needed; never clean another
+task's files.
 Separate historical evidence from this run and say what was blocked, simulated
 or unverified. Use [the PR template](../.github/pull_request_template.md);
 documentation-only changes do not require a broad suite or a new deployment.

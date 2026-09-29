@@ -140,7 +140,7 @@ describe("a day's close", () => {
 
     const stop = new AbortController();
     const collector = trafficCollector(stop.signal);
-    collector.tick();
+    await collector.tick();
     await vi.advanceTimersByTimeAsync(2_000);
     expect(stored()).toMatchObject({ final: false });
     expect(requests()).toBe(1);

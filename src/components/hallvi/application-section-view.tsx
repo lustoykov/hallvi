@@ -1,5 +1,7 @@
 "use client";
 
+import { currentAccessRecord } from "@/server/access-record";
+
 import type { ReactNode } from "react";
 
 import type { ApplicationFacts } from "@/server/application-facts";
@@ -359,6 +361,7 @@ export function ApplicationSectionView({
         onAsk={(draft) => onAsk(null, draft)}
       />
     );
+  const currentAccessId = currentAccessRecord(information, app.id)?.id;
   const records = information
     .filter((r) => !r.retiredAt && r.presentation?.views.includes(section))
     // What needs you comes first, what is simply true next, what Pi
@@ -404,6 +407,13 @@ export function ApplicationSectionView({
             record={record}
             onOpen={onOpenDestination}
             currentView={section}
+            reachable={
+              record.presentation?.content?.kind === "application-access" &&
+              record.presentation.content.mode === "private" &&
+              record.id !== currentAccessId
+                ? "unknown"
+                : reachable
+            }
           />
         ))}
         {/* Logs has its own page and its own empty state now. */}

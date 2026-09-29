@@ -1,4 +1,5 @@
 "use client";
+import { useReconnectAction } from "./reconnect-action";
 
 // What is running, and every release since.
 //
@@ -30,7 +31,10 @@ import type { DeploymentAttempt } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
-import type { Reachability } from "./deployment-prototype/page-head";
+import {
+  accessStateText,
+  type Reachability,
+} from "./deployment-prototype/page-head";
 import { LocalTime } from "./local-time";
 import {
   Ask,
@@ -229,6 +233,7 @@ export function ReleasesPanel({
   /** Opens the conversation that is doing the deploying. */
   onFollow?: () => void;
 }) {
+  const reconnect = useReconnectAction();
   const [filter, setFilter] = useState("all");
   // What followed each release, where the application keeps history.
   const impacts = useReleaseImpacts(applicationId, view.all);
@@ -456,10 +461,19 @@ export function ReleasesPanel({
           <span className="rp-way">
             <span className="rp-muted">The tunnel is closed</span>
             {onReopen && (
-              <button type="button" className="rp-link" onClick={onReopen}>
-                Open the connection again
+              <button
+                type="button"
+                className="rp-link"
+                disabled={reconnect.disabled}
+                onClick={onReopen}
+              >
+                {reconnect.label}
               </button>
             )}
+          </span>
+        ) : access?.localOnly && reachable !== "open" ? (
+          <span className="rp-way rp-muted">
+            {accessStateText(reachable ?? "checking")}
           </span>
         ) : access ? (
           <span className="rp-way">

@@ -177,6 +177,12 @@ internet, no cookies and nothing stored in the browser.
   rewriting HTML at the proxy: that changes what the application serves
   without the owner merging anything, which the
   [operating boundary](../../PRODUCT.md#operating-boundary) rules out.
+- **Query-routed pages:** when the application's access-log record has a
+  `pageKey`, `traffic_script` adds `data-hv-page-key="p"` (using that key) to
+  each include example. The shared script sends only this key and its value,
+  separately from the path, and treats a changed value as a new page. The
+  counter and live stream keep it only when it matches the record's key;
+  other query values remain excluded.
 - **Offered, not pushed.** Nothing is said about the script during deployment
   unless the owner asks for analytics then. The Traffic page offers it, once,
   when the evidence says the log misses something: the application changes
@@ -206,6 +212,10 @@ automatic deploys, and stays on until they turn it off.
 - **Turning it off** stops the follow at once. Stored totals remain until the
   owner deletes them; the server's logs keep their own retention; Hallvi
   changes nothing on the server by itself.
+- The web process's choice and the worker's writes take the same SQLite write
+  lock before reading whether collection is enabled. A concurrent stop or
+  deletion therefore cannot be overwritten by an older collector observation
+  or recreate deleted totals.
 - **Removing the application** removes its totals.
 
 ### Privacy, in the words the product uses

@@ -12,6 +12,7 @@ next-env.d.ts
 .claude
 data
 tests/results
+work/
 
 # Lockfile and fixture sources copied verbatim into disposable apps
 package-lock.json

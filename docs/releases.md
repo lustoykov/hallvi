@@ -156,10 +156,18 @@ Actions → General before building a draft.
 **Verify.** The workflow signs the manifest and then verifies its own
 signature with the public key Hallvi ships, so a key that no longer matches is
 a failed release rather than an update nobody can install. Run **Verify Hallvi
-draft** with the draft version and its exact source revision. It downloads the
-draft assets, checks the signature and archive hash, then installs and starts
-the service on clean macOS arm64 and Ubuntu 24.04 x64 runners. Both jobs must
-pass before publishing. The
+draft** with the draft version, its exact source revision and an explicit older
+published baseline (currently `0.1.1-alpha.7`). It verifies signed manifests,
+source revision, archive sizes and hashes. Four independent native jobs cover
+clean installation and baseline-to-candidate upgrade on macOS arm64 and
+Ubuntu 24.04 x64. Upgrade jobs create application, main/side-chat and permission
+settings records through the baseline API, then require the candidate installer
+to replace the running service while preserving those records and its address.
+They then restart the candidate with an active conversation stream, requiring
+the old stream to close and the same records and address to survive.
+This exercises installer-mediated upgrades, not public automatic-update discovery
+or downloading. The jobs refuse an existing same-user installation or service.
+All four jobs must pass before publishing. The
 [beta walkthrough](beta-walkthrough.md) is the fuller acceptance.
 
 **Publish.** The workflow leaves a **draft**. GitHub does not serve a draft to
@@ -251,5 +259,5 @@ at a release source of your own:
 
 An installation trusting a key from its own settings says so wherever it offers
 an update, in Settings and in `hallvi update`, because that is not the same
-promise. [The 20 September proof](testing/2026-09-20-downloads-and-updates.md)
+promise. [The 20 September proof](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-20-downloads-and-updates.md)
 used both against a disposable release source.

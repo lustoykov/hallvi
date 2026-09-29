@@ -227,7 +227,19 @@ Pi decides what a view says. This decides how it is said, so a destination nobod
 
 **Before a verified deployment, Overview keeps the Timeline composition.** That route uses the reference layout: an application action in the header, a hero of four rails (Checks, Backups, Server, Access; `lane-rails.tsx`, shared with Database), a dark recorded-work log, then an architecture miniature and recent work. It reads shared records directly; the prototype scenario engine and retired operation model do not run here. Check `subject` places an observation on its lane, and `establishedAt` places it in time. A mark proves an observation at that time, never continuous uptime or a backup schedule. Missing evidence reads “Not established”. Clicking a mark opens its original record. Since 17 September the lanes are rails, not dots on a time axis: stops are evenly spaced and worded as things that happened, the quiet between them is written on the line, each lane opens with the question it answers and one plain sentence, only the stretch from the last stop to now wears the lane's state, and "Earlier" pages back through history. Kept deliberately quiet: hairline rails, small rings, colour only on that last stretch.
 
-**Typed content keeps meaning separate from layout.** Deployment results expose source, running image, material changes and checks; application access exposes the entry point and, for private access, the SSH route. Chat folds deployment details. Overview gives the application link prominence; destination views expand the relevant details. Both render the same saved record and reuse the certainty tag, body disclosure, timestamps and tone tokens. `presentation.content.kind` selects these product-owned components; Pi never supplies layout or styling.
+**Typed content keeps meaning separate from layout.** Deployment results expose source, running image, material changes and checks; application access exposes the entry point and, for private access, the SSH route. Chat folds deployment details. Overview gives the application link prominence; destination views expand the relevant details. Both render the same saved record and reuse the certainty tag, body disclosure, timestamps and tone tokens. A closed established private route offers Reconnect: a direct scoped request in Main operator that preserves drafts. The destination retains its layout and shows one status strip with a visible Main operator link on desktop and narrow screens. Queue, approval and outcome come from the native conversation and execution evidence; successful tunnel observation offers ordinary Open. Legacy route labels offer Review private access. No automatic popup or repair. `presentation.content.kind` selects these product-owned components; Pi never supplies layout or styling.
+
+**Current access is an observation about one saved route.** The controller
+check, destination Open links, release strip, Access address and existing reopen
+draft select the most recently updated non-retired application-access record.
+An incomplete newer private route does not revive an older one. Answers carry
+that route's identity, including its revision; a replaced or edited route starts
+checking and cannot borrow the earlier answer. Private SSH liveness establishes
+only that the connection is open, never application HTTP health. Missing or
+failed observations are neutral and withhold private Open links; controller
+transport loss says “Cannot reach Hallvi,” while a negative tunnel check says
+“The tunnel is closed.” Historical saved checks retain their recorded meaning.
+Reopening still prepares a draft for the main operator.
 
 **Adding a destination** means rendering `InformationCard` from the sorted records with `currentView` set, and nothing else until that destination earns more. The content contract Pi writes against lives with the `save_information` tool in `src/server/pi.ts`; when a component needs a field the records do not carry, the fix is that contract, not a component that invents one.
 
@@ -321,6 +333,13 @@ typed; the first character brings "Send next" back. Its accessible name says
 what it cancels ("Stop + cancel 1 waiting"). Chosen from a switchable prototype
 on the real shell; the options and the verdict are on the
 `prototype/ux-sidebar-and-working` branch.
+
+The line uses the active reply's execution intent and recorded host when
+available: “Running: Build the application image · On the server · 203.0.113.7”.
+This describes work in flight, not a completed effect. Missing intent keeps
+the generic command/location wording; shell text is not a substitute for an
+intent. Approval waits remain authoritative. Useful findings stay in ordinary
+intermediate Pi replies, in their original order and through refresh.
 
 ## Conversation-first design language from Fable
 

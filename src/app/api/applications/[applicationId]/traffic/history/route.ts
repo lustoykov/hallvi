@@ -23,7 +23,7 @@ export async function GET(
 ) {
   return handle(async () => {
     const { applicationId } = await context.params;
-    loadApplication(applicationId);
+    await loadApplication(applicationId);
     const range = request.nextUrl.searchParams.get("range") ?? "24h";
     if (!(TRAFFIC_RANGES as readonly string[]).includes(range))
       throw new RequestValidationError("Choose a range of 24h, 7d or 30d.");
@@ -34,7 +34,7 @@ export async function GET(
       readDays(applicationId, from, to),
       range as TrafficRange,
       now,
-      currentCollection(applicationId, now),
+      await currentCollection(applicationId, now),
       timeZone,
     );
   });

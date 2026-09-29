@@ -302,7 +302,7 @@ export function trafficReading(
 }
 
 /** The controller's stored totals for a range, read as `trafficReading`. */
-export function readTraffic(
+export async function readTraffic(
   applicationId: string,
   range: TrafficRange,
   releaseAts: string[] = [],
@@ -314,7 +314,7 @@ export function readTraffic(
     readDays(applicationId, from, to),
     range,
     now,
-    currentCollection(applicationId, now),
+    await currentCollection(applicationId, now),
     timeZone,
   );
   const releases = releaseAts.map((at) => {
@@ -694,7 +694,13 @@ export function trafficSetup(proxy: Proxy, version: string) {
 // ---------------------------------------------------------------------------
 // traffic_script
 
-export function trafficScriptFor(proxy: Proxy) {
+export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
+  if (pageKey !== undefined && !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(pageKey))
+    throw new Error("Invalid traffic page key.");
+  const configuredTag = (text: string) =>
+    pageKey
+      ? text.replaceAll("<script", `<script data-hv-page-key="${pageKey}"`)
+      : text;
   const script = trafficScript();
   const check = eventPath({ t: "ping", s: "hallvicheck1", p: "/" });
   return {
@@ -704,8 +710,12 @@ export function trafficScriptFor(proxy: Proxy) {
     content: script.content,
     install: `mkdir -p ${SCRIPT_DIRECTORY}/_hv, write content to ${SCRIPT_FILE} exactly (mode 0644), and check that \`sha256sum ${SCRIPT_FILE}\` prints sha256. One file serves every application on the server. A proxy in a container mounts ${SCRIPT_DIRECTORY} read-only at the same path.`,
     serving: SCRIPT_SERVING[proxy],
-    tag: SCRIPT_TAG,
-    includes: SCRIPT_INCLUDES,
+    tag: configuredTag(SCRIPT_TAG),
+    includes: SCRIPT_INCLUDES.map((include) => ({
+      ...include,
+      line: configuredTag(include.line),
+      ...(include.note ? { note: configuredTag(include.note) } : {}),
+    })),
     goals:
       "Goals are the owner's to mark in their own code: window.hv?.('signup') after the action, or data-hv-goal=\"signup\" on a link or button (letters, digits, _ and -, up to 40). That is application code, outside the operability pull request: tell the owner how rather than writing it, and keep anything personal out of a goal's name.",
     check: [

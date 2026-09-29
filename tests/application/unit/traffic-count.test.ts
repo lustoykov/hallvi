@@ -106,6 +106,45 @@ const options: CountOptions = {
 const hour = (day: ReturnType<typeof countDay>, index: number) =>
   day.hours[index];
 
+it("keeps only the configured page key across the log-to-script switch", () => {
+  const day = countDay(
+    [
+      page({ kept: { p: "123" } }),
+      sent(
+        { t: "view", s: "abcdefgh12", p: "/", q: { k: "p", v: "123" } },
+        { at: at(10, 0, 1) },
+      ),
+      sent(
+        { t: "view", s: "abcdefgh13", p: "/", q: { k: "p", v: "456" } },
+        { at: at(10, 0, 2) },
+      ),
+      sent(
+        {
+          t: "leave",
+          s: "abcdefgh13",
+          p: "/",
+          q: { k: "p", v: "456" },
+          e: 1000,
+        },
+        { at: at(10, 0, 3) },
+      ),
+      sent(
+        { t: "view", s: "abcdefgh14", p: "/", q: { k: "token", v: "secret" } },
+        { at: at(10, 0, 4) },
+      ),
+    ],
+    { ...options, pageKey: "p" },
+  );
+  expect(day.hours[10].views).toBe(3);
+  expect(day.pages.map(({ key }) => key).sort()).toEqual([
+    "/",
+    "/?p=123",
+    "/?p=456",
+  ]);
+  expect(day.engagement).toEqual([{ path: "/?p=456", ms: 1000, samples: 1 }]);
+  expect(JSON.stringify(day)).not.toMatch(/token|secret/);
+});
+
 describe("what a logged request is", () => {
   it("tells a page view from a prefetch, a request, a bot, a probe and Hallvi's own", () => {
     expect(classify(page())).toMatchObject({

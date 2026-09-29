@@ -16,10 +16,10 @@ const RECENT_DAYS = 7;
  * current `cdn` record saying it caches pages. Nothing once the script has
  * passed its switch point: from there it sees what the log could not.
  */
-export function currentCollection(
+export async function currentCollection(
   applicationId: string,
   now = Date.now(),
-): Collection {
+): Promise<Collection> {
   const collection = collectionOf(applicationId);
   if (collection.scriptSince) return collection;
   const logMisses: Collection["logMisses"] = [];
@@ -30,7 +30,7 @@ export function currentCollection(
     )
   )
     logMisses.push("browser-pages");
-  const records = listInformation(applicationId);
+  const records = await listInformation(applicationId);
   if (
     subjectsOfKind(records, "cdn").some((ref) => {
       const presence = presenceOf(records, ref);

@@ -5,7 +5,7 @@ import { createServer } from "node:net";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
-import { operatorSettings } from "./operator-execution";
+import { operatorSettings, type OperatorSettings } from "./operator-execution";
 import { managedSshOptions } from "./managed-ssh";
 
 const exec = promisify(execFile);
@@ -28,6 +28,11 @@ function privateRange() {
     process.env.HALLVI_PRIVATE_PORTS?.trim() ?? "",
   );
   return match ? { first: Number(match[1]), last: Number(match[2]) } : null;
+}
+
+export function privateAccessPortAllowed(port: number) {
+  const range = privateRange();
+  return !range || (port >= range.first && port <= range.last);
 }
 
 function free(port: number) {
@@ -85,11 +90,16 @@ export async function openServerPort(
   applicationId: string,
   options: z.input<typeof optionsSchema>,
   signal?: AbortSignal,
+  expected?: { host: NonNullable<OperatorSettings["host"]>; url: string },
 ) {
   const parsed = optionsSchema.parse(options);
   const { remotePort } = parsed;
-  const host = operatorSettings(applicationId).host;
+  const host = (await operatorSettings(applicationId)).host;
   if (!host) throw new Error("Connect a server before opening private access.");
+  if (expected && JSON.stringify(host) !== JSON.stringify(expected.host))
+    throw new Error(
+      "The attached server changed. Review private access again.",
+    );
   signal?.throwIfAborted();
   mkdirSync(`/tmp/hallvi-ssh-${process.getuid!()}`, {
     recursive: true,
@@ -149,28 +159,44 @@ export async function openServerPort(
     reused = true;
   } catch {
     signal?.throwIfAborted();
-    await exec(
-      "ssh",
-      [
-        ...connection,
-        "-M",
-        "-f",
-        "-N",
-        "-T",
-        "-o",
-        "ExitOnForwardFailure=yes",
-        "-o",
-        "ServerAliveInterval=15",
-        "-o",
-        "ServerAliveCountMax=2",
-        "-L",
-        `127.0.0.1:${localPort}:127.0.0.1:${remotePort}`,
-        target,
-      ],
-      { signal, timeout: 20000 },
-    );
+    try {
+      await exec(
+        "ssh",
+        [
+          ...connection,
+          "-M",
+          "-f",
+          "-N",
+          "-T",
+          "-o",
+          "ExitOnForwardFailure=yes",
+          "-o",
+          "ServerAliveInterval=15",
+          "-o",
+          "ServerAliveCountMax=2",
+          "-L",
+          `127.0.0.1:${localPort}:127.0.0.1:${remotePort}`,
+          target,
+        ],
+        { signal, timeout: 20000 },
+      );
+    } catch (error) {
+      signal?.throwIfAborted();
+      // execFile's default error includes the full SSH command and key paths.
+      // Keep the useful failure without handing connection internals to Pi.
+      const failure = error as Error & { stderr?: string };
+      const message = failure.stderr?.trim() || failure.message;
+      throw new Error(
+        (message.startsWith("Command failed:")
+          ? "SSH could not open this private connection."
+          : message
+        )
+          .replaceAll(host.privateKeyPath, "[private key]")
+          .replaceAll(host.knownHostsPath, "[pinned host]"),
+      );
+    }
   }
-  const url = `http://127.0.0.1:${localPort}`;
+  const url = expected?.url ?? `http://127.0.0.1:${localPort}`;
   let httpStatus: number | null = null;
   try {
     const response = await fetch(url, {
@@ -221,7 +247,7 @@ export async function privateAccessOpen(
   remotePort: number,
   localPort: number,
 ) {
-  const host = operatorSettings(applicationId).host;
+  const host = (await operatorSettings(applicationId)).host;
   if (!host) return false;
   return masterAlive(
     controlSocket(applicationId, host, remotePort, localPort),

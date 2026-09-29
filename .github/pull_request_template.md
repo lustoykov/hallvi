@@ -20,6 +20,8 @@
 
 ### Visual evidence
 
+<!-- Attach captures to the PR; keep local files in ignored tests/results/ or work/. Do not commit screenshots or per-run verification reports. -->
+
 <!-- Delete when there is no relevant visual surface. Embed or link captioned screenshots or a short video from the implemented revision, using representative data. Show before/after when comparison helps; for interactions, preserve the action and its result. For critical/complex journeys, include relevant waiting, failure and recovery states, not just the successful final screen. Label simulated states and skipped/accelerated waits. Exclude credentials and sensitive data. See REVIEW.md, "Visual verification evidence". -->
 
 ### Limits

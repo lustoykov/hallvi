@@ -20,7 +20,7 @@ export default async function GithubSetupPage({
     <GithubSetupScreen
       initialStatus={initialStatus}
       returnToAdd={params.from === "add"}
-      returnTo={setupReturnDestination(params) ?? undefined}
+      returnTo={(await setupReturnDestination(params)) ?? undefined}
     />
   );
 }

@@ -2,7 +2,13 @@ import { handle } from "@/server/http";
 import { privateAccessOpen } from "@/server/private-access";
 import { publicUrlReachable } from "@/server/public-access";
 import { serverBeat } from "@/server/pulse";
+import { operatorSettings } from "@/server/operator-execution";
+import { reconnectEligible } from "@/server/saved-private-access";
 import { listInformation } from "@/server/saved-information";
+import {
+  accessRouteIdentity,
+  currentAccessRecord,
+} from "@/server/access-record";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +26,8 @@ export const dynamic = "force-dynamic";
  * unchecked claim the private side was built to stop making.
  *
  * `server` is the same idea one layer down: whether the machine accepts the
- * controller's SSH right now. Together they are the pulse a page uses to
+ * controller's SSH right now. Private access proves tunnel liveness only.
+ * Together they are the pulse a page uses to
  * decide whether an old reading is worth mentioning; see `pulse.ts`.
  */
 export async function GET(
@@ -38,21 +45,31 @@ export async function GET(
 }
 
 async function wayIn(applicationId: string) {
-  const record = listInformation(applicationId).find(
-    (item) => item.presentation?.content?.kind === "application-access",
+  const record = currentAccessRecord(
+    await listInformation(applicationId),
+    applicationId,
   );
+  const routeIdentity = accessRouteIdentity(record);
   const access = record?.presentation?.content;
-  if (access?.kind !== "application-access") return { mode: null };
+  if (access?.kind !== "application-access")
+    return { mode: null, routeIdentity };
   if (access.mode === "public") {
     const url = record?.presentation?.url;
     return {
       mode: "public",
+      routeIdentity,
       open: url ? await publicUrlReachable(url) : undefined,
     };
   }
-  if (!access.localPort || !access.remotePort) return { mode: "private" };
+  if (!access.localPort || !access.remotePort)
+    return { mode: "private", routeIdentity };
   return {
     mode: "private",
+    routeIdentity,
+    reconnectable: reconnectEligible(
+      record,
+      (await operatorSettings(applicationId)).host,
+    ),
     open: await privateAccessOpen(
       applicationId,
       access.remotePort,

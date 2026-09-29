@@ -25,7 +25,7 @@ export async function GET(
 ) {
   return handle(async () => {
     const { applicationId } = await context.params;
-    loadApplication(applicationId);
+    await loadApplication(applicationId);
     const asked = request.nextUrl.searchParams.getAll("at");
     if (asked.length > MOST)
       throw new RequestValidationError(

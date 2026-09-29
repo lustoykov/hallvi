@@ -1,6 +1,6 @@
 import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
-import { openServerPort } from "./private-access";
+import { executePrivateAccess } from "./saved-private-access";
 import { requestDomain, requestHost } from "./connection-requests";
 import {
   askDeploymentChoice,
@@ -54,6 +54,7 @@ import {
   listExecutions,
 } from "./operator-execution";
 import { loadApplication, repositoryAccess } from "./applications";
+import { accessLogRecord } from "./access-log";
 import { TRAFFIC_RANGES } from "./traffic/contract";
 import {
   PROXIES,
@@ -104,6 +105,8 @@ export class PiUnavailableError extends Error {
 // Stable across Runs: changing facts belong in native messages or tool results,
 // never in a rewritten instruction prefix.
 export const SYSTEM_PROMPT = `You are Hallvi, the operator for one application. Help the user deploy it and keep it running, and protect its data in proportion to what there is to lose. Use your tools to do the work and verify the result. Explain progress and consequential outcomes clearly and concisely.
+
+During multi-step work, share a brief finding before continuing into lengthy work when it is new, supported by evidence you just read, and useful to the owner's next decision. Say what establishes it and what remains uncertain: a requirement in the repository is not proof of what runs on the server. Use ordinary intermediate replies; do not wait for the final answer to reveal a useful dependency or missing input. Do not narrate every command, repeat unchanged status, or save a record just to report progress. Use the existing input-request tools when the owner must supply something; save only lasting discoveries through save_information.
 
 Care in proportion. Most first applications here are small: a personal tool, a test, a site with a handful of visitors and little data. The owner wants to get it running and get back to building it, not to harden every case on day one. So: do not raise warnings, failed checks or next steps about missing backups, restore tests, monitoring, firewall hardening or certificates for something the owner never asked for and that a small application does not yet need. Record what you found as status info with no nextStep ("Nothing copies this data yet" is a fact, not a failure), and mention the option at most once, in one plain sentence, when the owner is not in the middle of something else. Raise it to a warning only when it has earned one: the data is large or clearly growing, the application has real users or traffic, the owner said the data matters, or something that existed has broken. Something that exists and stops working (a copy that failed, a certificate that expired, a check that did not pass, a process that died) is always worth attention; the absence of something nobody asked for is not. When in doubt, say less and say it calmly.
 
@@ -314,7 +317,7 @@ export async function openPiSession(
     const { configuration, modelRuntime, model } =
       await configuredPiRuntime(sdk);
     options.signal?.throwIfAborted();
-    const main = isMainChat(scope.applicationId, scope.chatId);
+    const main = await isMainChat(scope.applicationId, scope.chatId);
     const execution = executionContext(scope, options.signal);
     const json = (value: unknown) => ({
       content: [{ type: "text" as const, text: JSON.stringify(value) }],
@@ -332,7 +335,7 @@ export async function openPiSession(
         }),
         async execute(_id, params) {
           return json(
-            listInformation(
+            await listInformation(
               scope.applicationId,
               params.query,
               params.includeRetired,
@@ -360,10 +363,10 @@ export async function openPiSession(
                 if (params.action === "retire") {
                   if (!params.id) throw new Error("A record ID is required.");
                   return json(
-                    retireInformation(scope.applicationId, params.id),
+                    await retireInformation(scope.applicationId, params.id),
                   );
                 }
-                const record = saveInformation(
+                const record = await saveInformation(
                   scope.applicationId,
                   params.record,
                   params.id,
@@ -389,7 +392,9 @@ export async function openPiSession(
               throw new Error(
                 `Not a time: ${at}. Give each release as an ISO time, such as 2026-09-29T14:05:00Z.`,
               );
-          return json(readTraffic(scope.applicationId, params.range, releases));
+          return json(
+            await readTraffic(scope.applicationId, params.range, releases),
+          );
         },
       }),
       defineTool({
@@ -399,9 +404,9 @@ export async function openPiSession(
           "Read application identity, host address, permission mode and recent execution evidence. Does not check live health.",
         parameters: Type.Object({}, { additionalProperties: false }),
         async execute() {
-          const settings = operatorSettings(scope.applicationId);
-          const application = loadApplication(scope.applicationId);
-          const access = repositoryAccess(application);
+          const settings = await operatorSettings(scope.applicationId);
+          const application = await loadApplication(scope.applicationId);
+          const access = await repositoryAccess(application);
           return json({
             application: {
               id: application.id,
@@ -429,7 +434,7 @@ export async function openPiSession(
                   serverId: settings.host.serverId,
                 }
               : null,
-            executions: listExecutions(scope.applicationId).slice(-20),
+            executions: (await listExecutions(scope.applicationId)).slice(-20),
           });
         },
       }),
@@ -440,28 +445,32 @@ export async function openPiSession(
             name: "open_server_port",
             label: "Open private application access",
             description:
-              "Open or reuse an SSH tunnel from this controller PC's 127.0.0.1 to a loopback port on the connected server. Returns a local HTTP URL; verify the app separately. Omit localPort unless you need a particular one: an installation keeps private links on ports its owner forwards to their browser, picks a free one for you, and refuses ports outside them. Does not change the server's listeners/firewall. If the local port on this PC is occupied, choose another and carry on: picking a free port is bookkeeping, not a decision, and it needs no approval and no mention beyond the address you end up giving. A port in use on this PC says only that this PC is using it — it is not evidence about the server, and it never means another application has taken the deployment host. A port already in use on the *server* is a different matter: find out what is listening before you take it or move around it, and if the answer is that something else is deployed there, that is a question about which machine this application should be on and it goes to the owner. The URL works on this PC while the tunnel is alive, and in the owner's browser on another machine only when the result's access says this installation's ports are forwarded to it; give the URL as returned either way. No credentials or arbitrary bind addresses are accepted.",
-            parameters: Type.Object({
-              remotePort: Type.Number({ minimum: 1, maximum: 65535 }),
-              localPort: Type.Optional(
-                Type.Number({ minimum: 1024, maximum: 65535 }),
-              ),
-            }),
+              "Open or reuse an SSH tunnel from this controller PC's 127.0.0.1 to a loopback port on the connected server. Returns a local HTTP URL; verify the app separately. Omit localPort unless you need a particular one: an installation keeps private links on ports its owner forwards to their browser, picks a free one for you, and refuses ports outside them. Does not change the server's listeners/firewall. If the local port on this PC is occupied, choose another and carry on: picking a free port is bookkeeping, not a decision, and it needs no approval and no mention beyond the address you end up giving. A port in use on this PC says only that this PC is using it — it is not evidence about the server, and it never means another application has taken the deployment host. A port already in use on the *server* is a different matter: find out what is listening before you take it or move around it, and if the answer is that something else is deployed there, that is a question about which machine this application should be on and it goes to the owner. The URL works on this PC while the tunnel is alive, and in the owner's browser on another machine only when the result's access says this installation's ports are forwarded to it; give the URL as returned either way. No credentials or arbitrary bind addresses are accepted. To reconnect an established saved private route, instead supply only accessRecordId and expectedUpdatedAt from that record. The server validates its current revision, canonical attached host and exact saved ports before approval and again before opening. In saved-route form, never switch ports or fall back to explicit-port setup after failure; report the access result and stop. Reconnect does not authorize service repair, restart, public exposure or changes to the saved route.",
+            // Providers require an object at the tool-schema root. The
+            // executor validates the two mutually exclusive argument forms.
+            parameters: Type.Object(
+              {
+                remotePort: Type.Optional(
+                  Type.Integer({ minimum: 1, maximum: 65535 }),
+                ),
+                localPort: Type.Optional(
+                  Type.Integer({ minimum: 1024, maximum: 65535 }),
+                ),
+                accessRecordId: Type.Optional(Type.String({ format: "uuid" })),
+                expectedUpdatedAt: Type.Optional(
+                  Type.String({ format: "date-time" }),
+                ),
+              },
+              { additionalProperties: false },
+            ),
             async execute(id, params, signal) {
               return json(
-                await execution.execute(
-                  "open_server_port",
-                  "Private access on the controller PC",
+                await executePrivateAccess(
+                  scope.applicationId,
+                  execution,
                   params,
-                  () =>
-                    openServerPort(
-                      scope.applicationId,
-                      params,
-                      signal ?? options.signal,
-                    ),
-                  false,
                   id,
-                  signal,
+                  signal ?? options.signal,
                 ),
               );
             },
@@ -604,7 +613,7 @@ export async function openPiSession(
               // not data. Refuse it here, before the record is written, with
               // a message saying what to do instead.
               refuseSecretHandles(params.command);
-              const host = operatorSettings(scope.applicationId).host;
+              const host = (await operatorSettings(scope.applicationId)).host;
               if (!host)
                 throw new Error(
                   "No server is connected. Inspect the repository, prepare a suitable Hetzner server or obtain existing-machine access, then use connect_server and continue with the deployment.",
@@ -650,7 +659,7 @@ export async function openPiSession(
               ]),
             }),
             async execute(_id, params) {
-              const host = operatorSettings(scope.applicationId).host;
+              const host = (await operatorSettings(scope.applicationId)).host;
               if (host)
                 return json({
                   attached: true,
@@ -672,7 +681,7 @@ export async function openPiSession(
               "Ask the owner how this application should deploy from now on, during its first deployment. It puts one card in the conversation: automatically when the branch changes, or only when they ask, with the branch editable and what automatic authorizes spelled out. `branch` is the repository's default branch unless the owner already named another. Then end your turn: a message arrives with their choice. If they have already chosen, nothing is asked and the current configuration comes back.",
             parameters: Type.Object({ branch: Type.String() }),
             async execute(_id, params) {
-              const before = deploymentStatus(scope.applicationId);
+              const before = await deploymentStatus(scope.applicationId);
               if (before.mode)
                 return json({
                   asked: false,
@@ -702,7 +711,7 @@ export async function openPiSession(
             async execute(_id, params, signal) {
               if (Object.values(params).some((value) => value !== undefined))
                 await chooseDeployment(scope.applicationId, params, signal);
-              return json(deploymentStatus(scope.applicationId));
+              return json(await deploymentStatus(scope.applicationId));
             },
           }),
           defineTool({
@@ -1059,7 +1068,8 @@ export async function openPiSession(
               proxy: Type.Union(PROXIES.map((proxy) => Type.Literal(proxy))),
             }),
             async execute(_id, params) {
-              return json(trafficScriptFor(params.proxy));
+              const log = await accessLogRecord(scope.applicationId);
+              return json(trafficScriptFor(params.proxy, log?.pageKey));
             },
           }),
           defineTool({

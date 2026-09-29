@@ -71,7 +71,8 @@ const isPreview = (command) =>
   /\bnpm run dev(?:\s|$)/.test(command) ||
   /\bnode_modules\/next\/dist\/bin\/next (?:dev|start)(?:\s|$)/.test(command) ||
   /\bscripts\/dev\.mjs(?:\s|$)/.test(command) ||
-  /\bhx-serve\.mjs(?:\s|$)/.test(command);
+  /\bhx-serve\.mjs(?:\s|$)/.test(command) ||
+  /\btests\/dashboard\/server\.ts(?:\s|$)/.test(command);
 
 const previews = [];
 for (const { pid, command } of rows) {

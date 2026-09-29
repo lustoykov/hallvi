@@ -62,6 +62,31 @@ const record = (source: unknown) => ({
 });
 
 describe("the access log", () => {
+  it("pairs the first script view with the log load without hiding later navigation", () => {
+    const now = Date.now();
+    const window = new LiveWindow({ hosts: ["shop.example"], script: false });
+    expect(window.arrival(request("/docs", now))).toMatchObject({
+      kind: "view",
+    });
+    const event = (p: string, s: string, offset: number) =>
+      window.arrival(
+        request(eventPath({ t: "view", s, p }), now + offset, { beacon: true }),
+      );
+    expect(event("/docs", "abcdefgh12", 100)).toBeNull();
+    expect(window.now(now + 100)).toMatchObject({
+      openNow: 1,
+      recentVisitors: 1,
+    });
+    expect(event("/settings", "abcdefgh13", 200)).toMatchObject({
+      kind: "view",
+      path: "/settings",
+    });
+    expect(event("/docs", "abcdefgh14", 300)).toMatchObject({
+      kind: "view",
+      path: "/docs",
+    });
+  });
+
   it("tells arrivals apart and leaves the person out of them", () => {
     const now = Date.now();
     const window = new LiveWindow({ hosts: ["shop.example"], script: false });

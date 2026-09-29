@@ -28,6 +28,18 @@
     "ref",
   ];
   const GOAL = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
+  // The same routing key as the application's access-log record. The tag
+  // opts in to one key; tokens and the rest of the query never travel.
+  const configuredKey =
+    document.currentScript?.getAttribute("data-hv-page-key");
+  const PAGE_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(configuredKey || "")
+    ? configuredKey
+    : null;
+  const pageQuery = () => {
+    const value =
+      PAGE_KEY && new URLSearchParams(location.search).get(PAGE_KEY);
+    return value ? { k: PAGE_KEY, v: value.slice(0, 100) } : undefined;
+  };
   // An error thrown in a loop would otherwise be a request per frame.
   const ERRORS_PER_VIEW = 10;
 
@@ -79,7 +91,8 @@
     if (!navigator.sendBeacon?.(url))
       fetch(url, { method: "POST", keepalive: true }).catch(() => {});
   };
-  const emit = (t, more) => view && send({ t, s: view.s, p: view.p, ...more });
+  const emit = (t, more) =>
+    view && send({ t, s: view.s, p: view.p, q: view.q, ...more });
 
   // Where the page the browser loaded was reached from: the referrer's
   // origin, never the page it was — this site's own when the visitor came
@@ -111,6 +124,7 @@
         byte.toString(16).padStart(2, "0"),
       ).join(""),
       p: location.pathname.slice(0, 300),
+      q: pageQuery(),
       shown: 0,
       since: visible() ? now() : null,
       left: false,
@@ -154,7 +168,11 @@
   };
 
   const moved = () => {
-    if (location.pathname.slice(0, 300) === view.p) return;
+    if (
+      location.pathname.slice(0, 300) === view.p &&
+      pageQuery()?.v === view.q?.v
+    )
+      return;
     end();
     start(false);
   };
@@ -222,7 +240,8 @@
     observe("first-input", interactions);
 
     // Route changes inside the application. The same path again (a query or
-    // a hash changing, a router tidying its state) is the same page view.
+    // a hash changing, a router tidying its state) is the same page view,
+    // except for the one query key configured to identify pages.
     for (const name of ["pushState", "replaceState"]) {
       const original = history[name];
       history[name] = function (...args) {

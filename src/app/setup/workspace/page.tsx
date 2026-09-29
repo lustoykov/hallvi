@@ -19,7 +19,7 @@ export default async function WorkspaceSetupPage({
   return (
     <WorkspaceSetupScreen
       initialStatus={initialStatus}
-      returnTo={setupReturnDestination(params) ?? undefined}
+      returnTo={(await setupReturnDestination(params)) ?? undefined}
     />
   );
 }

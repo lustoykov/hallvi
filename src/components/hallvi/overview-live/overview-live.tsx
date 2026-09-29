@@ -17,6 +17,7 @@ import type { ApplicationSection } from "../application-sections";
 import { ago } from "../architecture-prototype/model";
 import {
   PageHead,
+  accessStateText,
   type PageChrome,
   type Reachability,
 } from "../deployment-prototype/page-head";
@@ -274,7 +275,10 @@ export function OverviewLive({
         { word: "The way in is open", state: "well" }
       : reachable === "closed"
         ? { word: "The way in is closed", state: "bad" }
-        : { word: "Asking…", state: "asking" };
+        : {
+            word: accessStateText(reachable),
+            state: reachable === "checking" ? "asking" : "unknown",
+          };
 
   return (
     <div className="hv-section-page hv-section-overview ovl">

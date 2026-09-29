@@ -37,7 +37,7 @@ beforeEach(() => {
   });
 });
 
-it("pins the saved SSH identity and closes the old shell when the target changes", () => {
+it("pins the saved SSH identity and closes the old shell when the target changes", async () => {
   const session = new TerminalSession("session", "application", fake.host, {
     cols: 80,
     rows: 24,
@@ -58,13 +58,13 @@ it("pins the saved SSH identity and closes the old shell when the target changes
     ]),
   );
   expect(options.env.SSH_AUTH_SOCK).toBeUndefined();
-  expect(session.checkTarget()).toBe(true);
+  expect(await session.checkTarget()).toBe(true);
   session.write(Buffer.from("pwd\r"));
   expect(fake.write).toHaveBeenCalledWith("pwd\r");
   session.resize({ cols: 120, rows: 40 });
   expect(fake.resize).toHaveBeenCalledWith(120, 40);
   fake.host = { ...fake.host, address: "replacement.test" };
-  expect(session.checkTarget()).toBe(false);
+  expect(await session.checkTarget()).toBe(false);
   expect(state).toHaveBeenLastCalledWith(
     expect.objectContaining({ name: "failed" }),
   );

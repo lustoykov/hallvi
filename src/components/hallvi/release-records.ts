@@ -1,5 +1,7 @@
 "use client";
 
+import { currentAccessRecord } from "@/server/access-record";
+
 // Releases, and which one is actually running.
 //
 // Deployment read `releases[0]` — the newest deployment record, whatever
@@ -132,18 +134,9 @@ export function releasesFromRecords(
   // newest one, and that gap is the whole point of this projection.
   const running = all.find((release) => release.outcome === "deployed") ?? null;
 
-  const accessRecord = live
-    .filter(
-      (record) => record.presentation?.content?.kind === "application-access",
-    )
-    .sort(
-      (a, b) =>
-        Date.parse(b.establishedAt ?? b.createdAt) -
-        Date.parse(a.establishedAt ?? a.createdAt),
-    )[0];
+  const accessRecord = currentAccessRecord(live, applicationId || undefined);
   const accessContent = accessRecord?.presentation?.content as
     Access | undefined;
-  void applicationId;
 
   return {
     all,

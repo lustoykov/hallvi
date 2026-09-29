@@ -21,11 +21,11 @@ export async function GET(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId } = await context.params;
-    const configuration = () => {
-      const host = operatorSettings(applicationId).host;
-      return { host, log: host ? accessLogRecord(applicationId) : null };
+    const configuration = async () => {
+      const host = (await operatorSettings(applicationId)).host;
+      return { host, log: host ? await accessLogRecord(applicationId) : null };
     };
-    const initial = configuration();
+    const initial = await configuration();
     const { host, log } = initial;
 
     const encoder = new TextEncoder();
@@ -58,15 +58,23 @@ export async function GET(
           close();
           return;
         }
-        // A held-open page must discover a newly recorded log and stop
-        // following one that was retired, moved or changed, without a reload.
-        watch = setInterval(() => {
+        // A held-open page must discover a newly recorded source and stop
+        // following one that was retired or moved, without a page reload.
+        let checking = false;
+        watch = setInterval(async () => {
+          if (checking || session.signal.aborted) return;
+          checking = true;
           try {
-            if (JSON.stringify(configuration()) === JSON.stringify(initial))
+            if (
+              JSON.stringify(await configuration()) === JSON.stringify(initial)
+            )
               return;
           } catch {
             // Deleting the application also ends its observation.
+          } finally {
+            checking = false;
           }
+          if (session.signal.aborted) return;
           controller.enqueue(encoder.encode("retry: 1000\n\n"));
           close();
         }, 1000);

@@ -35,9 +35,10 @@ vi.mock("@/server/controller-protection", () => ({
 vi.mock("@/server/traffic/collector", () => ({
   TICK_MS: 20,
   trafficCollector: () => ({
-    tick: () => {
+    tick: async () => {
       worker.ticks += 1;
     },
+    stop: async () => {},
   }),
 }));
 

@@ -11,6 +11,11 @@ on:
         description: Full source commit the signed manifest must name
         required: true
         type: string
+      baseline_version:
+        description: Published version to upgrade from (must be older)
+        required: true
+        default: "0.1.1-alpha.7"
+        type: string
 
 permissions:
   # GitHub exposes draft releases only to tokens with push access. This
@@ -19,15 +24,17 @@ permissions:
 
 jobs:
   install:
-    name: Install draft on ${{ matrix.platform }}
+    name: Verify ${{ matrix.journey }} on ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
+        platform: [darwin-arm64, linux-x64]
+        journey: [clean-install, upgrade]
         include:
-          - runner: macos-15
-            platform: darwin-arm64
-          - runner: ubuntu-24.04
-            platform: linux-x64
+          - platform: darwin-arm64
+            runner: macos-15
+          - platform: linux-x64
+            runner: ubuntu-24.04
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
@@ -35,6 +42,40 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      # The service label/unit is per OS user, even with another data path.
+      # Each matrix journey needs its own fresh runner, not a renamed HOME.
+      - name: Refuse an existing installation or same-user service
+        id: isolation
+        run: |
+          set -eu
+          for path in \
+            "$HOME/.local/lib/hallvi" "$HOME/.local/bin/hallvi" \
+            "$HOME/.local/share/hallvi" "$HOME/.config/hallvi" \
+            "$HOME/Library/LaunchAgents/com.hallvi.plist" \
+            "$HOME/.config/systemd/user/hallvi.service"; do
+            if [ -e "$path" ] || [ -L "$path" ]; then
+              echo "Refusing existing Hallvi state or installation: $path" >&2
+              exit 1
+            fi
+          done
+          case "$(uname -s)" in
+            Darwin)
+              launchctl print "gui/$(id -u)" >/dev/null
+              if launchctl print "gui/$(id -u)/com.hallvi" >/dev/null 2>&1; then
+                echo 'Refusing an existing Hallvi launchd service.' >&2
+                exit 1
+              fi
+              ;;
+            Linux)
+              systemctl --user show-environment >/dev/null
+              state=$(systemctl --user show hallvi.service --property=LoadState --value || true)
+              if [ "$state" != not-found ]; then
+                echo 'Refusing an existing or unknown Hallvi systemd service.' >&2
+                exit 1
+              fi
+              ;;
+          esac
 
       - name: Download the exact draft assets
         env:
@@ -50,41 +91,96 @@ jobs:
             --pattern 'hallvi-release.json*' \
             --pattern 'install-hallvi.sh'
 
+      - name: Download the published upgrade baseline
+        if: matrix.journey == 'upgrade'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -eu
+          test "$(gh release view "v${BASELINE_VERSION}" \
+            --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = false
+          mkdir baseline
+          gh release download "v${BASELINE_VERSION}" \
+            --repo "$GITHUB_REPOSITORY" --dir baseline \
+            --pattern "hallvi-${BASELINE_VERSION}-${RELEASE_PLATFORM}.tgz*" \
+            --pattern 'hallvi-release.json*' \
+            --pattern 'install-hallvi.sh'
+
       - name: Verify signature, revision, size and archive hash
         env:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_PLATFORM: ${{ matrix.platform }}
           EXPECTED_REVISION: ${{ inputs.expected_revision }}
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          JOURNEY: ${{ matrix.journey }}
         run: |
           node --input-type=module <<'NODE'
           import { createHash } from 'node:crypto';
           import { readFileSync, statSync } from 'node:fs';
+          import { compareVersions } from './scripts/release-source.mjs';
           import { trustedKeys, verifyManifest } from './scripts/release-trust.mjs';
 
-          const bytes = readFileSync('candidate/hallvi-release.json');
-          const signature = readFileSync('candidate/hallvi-release.json.sig', 'utf8');
-          const manifest = verifyManifest({ bytes, signature, channel: 'alpha', keys: trustedKeys({}).keys });
-          if (manifest.version !== process.env.RELEASE_VERSION || manifest.revision !== process.env.EXPECTED_REVISION)
-            throw new Error('The draft does not name the reviewed version and revision.');
-          const archive = manifest.packages[process.env.RELEASE_PLATFORM];
-          const path = `candidate/${archive.file}`;
-          if (statSync(path).size !== archive.size || createHash('sha256').update(readFileSync(path)).digest('hex') !== archive.sha256)
-            throw new Error('The draft archive does not match the signed manifest.');
-          console.log(`Verified ${manifest.version} ${process.env.RELEASE_PLATFORM} from ${manifest.revision}`);
+          const releases = [['candidate', process.env.RELEASE_VERSION]];
+          if (process.env.JOURNEY === 'upgrade') {
+            if (compareVersions(process.env.RELEASE_VERSION, process.env.BASELINE_VERSION) <= 0)
+              throw new Error('The candidate must be newer than the explicit published baseline.');
+            releases.push(['baseline', process.env.BASELINE_VERSION]);
+          }
+          for (const [directory, version] of releases) {
+            const bytes = readFileSync(`${directory}/hallvi-release.json`);
+            const signature = readFileSync(`${directory}/hallvi-release.json.sig`, 'utf8');
+            const manifest = verifyManifest({ bytes, signature, channel: 'alpha', keys: trustedKeys({}).keys });
+            if (manifest.version !== version || (directory === 'candidate' && manifest.revision !== process.env.EXPECTED_REVISION))
+              throw new Error('The release does not name the requested version and revision.');
+            const archive = manifest.packages[process.env.RELEASE_PLATFORM];
+            if (archive?.file !== `hallvi-${version}-${process.env.RELEASE_PLATFORM}.tgz`)
+              throw new Error('The signed manifest does not name the requested platform archive.');
+            const path = `${directory}/${archive.file}`;
+            if (statSync(path).size !== archive.size || createHash('sha256').update(readFileSync(path)).digest('hex') !== archive.sha256)
+              throw new Error('The release archive does not match the signed manifest.');
+            console.log(`Verified ${directory}: ${manifest.version} ${process.env.RELEASE_PLATFORM} from ${manifest.revision}`);
+          }
           NODE
 
+      - name: Install baseline and save synthetic records through its API
+        if: matrix.journey == 'upgrade'
+        env:
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+          HALLVI_USE: remote
+        run: |
+          set -eu
+          sh baseline/install-hallvi.sh "baseline/hallvi-${BASELINE_VERSION}-${RELEASE_PLATFORM}.tgz"
+          "$HOME/.local/bin/hallvi" status
+          node scripts/verify-installed-upgrade.mjs seed baseline/hallvi-release.json upgrade-state.json
+
+      # This is the archive installer path, not automatic updater coverage.
+      # For upgrade, leave the baseline running: the installer must restart it.
       - name: Install and start the service
         env:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_PLATFORM: ${{ matrix.platform }}
           HALLVI_USE: remote
         run: |
+          set -eu
           sh candidate/install-hallvi.sh "candidate/hallvi-${RELEASE_VERSION}-${RELEASE_PLATFORM}.tgz"
           "$HOME/.local/bin/hallvi" status
 
+      - name: Verify service replacement and API data after upgrade
+        if: matrix.journey == 'upgrade'
+        run: |
+          node scripts/verify-installed-upgrade.mjs verify candidate/hallvi-release.json upgrade-state.json
+
+      - name: Restart candidate while a chat event stream is open
+        if: matrix.journey == 'upgrade'
+        run: |
+          node scripts/verify-installed-upgrade.mjs restart candidate/hallvi-release.json upgrade-state.json
+
       - name: Stop the test service
-        if: always()
+        if: always() && steps.isolation.outcome == 'success'
         run: |
           if [ -x "$HOME/.local/bin/hallvi" ]; then
-            "$HOME/.local/bin/hallvi" stop || true
+            "$HOME/.local/bin/hallvi" stop
           fi

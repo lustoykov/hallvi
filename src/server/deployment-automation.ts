@@ -146,8 +146,8 @@ export function sameCommit(a: string, b: string) {
 }
 
 /** Release records for this application, newest first. */
-function releases(applicationId: string) {
-  return listInformation(applicationId)
+async function releases(applicationId: string) {
+  return (await listInformation(applicationId))
     .flatMap((record) => {
       const content = record.presentation?.content;
       return content?.kind === "deployment"
@@ -165,21 +165,22 @@ function releases(applicationId: string) {
 }
 
 /** The commit a check proved is running, exactly as the page reads it. */
-export function deployedRevision(applicationId: string) {
+export async function deployedRevision(applicationId: string) {
   return (
-    releases(applicationId).find((release) => release.outcome === "deployed")
-      ?.revision ?? null
+    (await releases(applicationId)).find(
+      (release) => release.outcome === "deployed",
+    )?.revision ?? null
   );
 }
 
 /** What Pi recorded about this commit since an attempt began. */
-export function releaseSince(
+export async function releaseSince(
   applicationId: string,
   wanted: string,
   since: string,
 ) {
   return (
-    releases(applicationId).find(
+    (await releases(applicationId)).find(
       (release) =>
         sameCommit(release.revision, wanted) &&
         Date.parse(release.record.updatedAt) >= Date.parse(since),
@@ -237,7 +238,7 @@ async function branchTip(
   branch: string,
   signal?: AbortSignal,
 ) {
-  const application = loadApplication(applicationId);
+  const application = await loadApplication(applicationId);
   const { token } = await repositoryCredential();
   if (!token)
     throw new GithubAccessError(
@@ -331,9 +332,12 @@ export function askDeploymentChoice(applicationId: string, branch?: string) {
  * watching: a choice of automatic says what the owner wants, and only a recent
  * answer from GitHub says it is happening.
  */
-export function deploymentStatus(applicationId: string, now = Date.now()) {
+export async function deploymentStatus(
+  applicationId: string,
+  now = Date.now(),
+) {
   const state = deploymentState(applicationId);
-  const deployed = deployedRevision(applicationId);
+  const deployed = await deployedRevision(applicationId);
   const fresh =
     state.checkedAt !== null &&
     now - Date.parse(state.checkedAt) < LOOK_INTERVAL_SECONDS * 5 * 1000;
@@ -348,4 +352,4 @@ export function deploymentStatus(applicationId: string, now = Date.now()) {
     lookIntervalSeconds: LOOK_INTERVAL_SECONDS,
   };
 }
-export type DeploymentStatus = ReturnType<typeof deploymentStatus>;
+export type DeploymentStatus = Awaited<ReturnType<typeof deploymentStatus>>;

@@ -3,8 +3,11 @@
 // written while traffic history is off.
 
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { once } from "node:events";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Worker } from "node:worker_threads";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { TrafficDay, TrafficLine } from "@/server/traffic/contract";
@@ -75,6 +78,63 @@ function view(at: number, address: string): TrafficLine {
 }
 
 describe("traffic.db", () => {
+  it.each(["stop", "forget"] as const)(
+    "a concurrent %s wins over collector writes",
+    async (action) => {
+      for (const update of ["observation", "day"] as const) {
+        const id = `race-${action}-${update}`;
+        setCollection(id, "keep");
+        // The web process holds an uncommitted stop/delete while the collector
+        // starts. WAL readers can still see the old enabled record; a writer
+        // must acquire its lock before deciding whether collection is allowed.
+        const writer = new Worker(
+          `
+        const { parentPort, workerData } = require('node:worker_threads');
+        const Database = require(workerData.sqlite);
+        const db = new Database(workerData.path);
+        db.exec('BEGIN IMMEDIATE');
+        if (workerData.action === 'forget') {
+          db.prepare('DELETE FROM days WHERE application_id = ?').run(workerData.id);
+          db.prepare('DELETE FROM collections WHERE application_id = ?').run(workerData.id);
+        } else {
+          const row = db.prepare('SELECT data FROM collections WHERE application_id = ?').get(workerData.id);
+          const state = {...JSON.parse(row.data), enabledAt:null, state:'off'};
+          db.prepare('UPDATE collections SET data = ? WHERE application_id = ?').run(JSON.stringify(state),workerData.id);
+        }
+        parentPort.once('message', () => setTimeout(() => {
+          db.exec('COMMIT'); db.close(); parentPort.close();
+        }, 100));
+        parentPort.postMessage('locked');
+      `,
+          {
+            eval: true,
+            workerData: {
+              sqlite: createRequire(import.meta.url).resolve("better-sqlite3"),
+              path: trafficDatabasePath(),
+              action,
+              id,
+            },
+          },
+        );
+        try {
+          await once(writer, "message");
+          const exited = once(writer, "exit");
+          writer.postMessage("commit");
+          if (update === "observation") recordCollector(id, { state: "live" });
+          else expect(writeDay(id, counted(12, false))).toBe(false);
+          await exited;
+          expect(collectionOf(id)).toMatchObject({
+            enabledAt: null,
+            state: "off",
+          });
+          expect(readDays(id, DAY, DAY)).toEqual([]);
+        } finally {
+          await writer.terminate();
+        }
+      }
+    },
+  );
+
   it("keeps a recount only when it covers at least as much, and never a provisional one over a final one", () => {
     setCollection("replacing", "keep");
     const kept = () => readDays("replacing", DAY, DAY)[0];

@@ -169,6 +169,7 @@ migrateAccountConnections(resolved.config, resolved.piAccount);
 
 const children = new Set();
 let stopping = false;
+let shutdownDeadline;
 
 function start(args) {
   const child = spawn(process.execPath, args, {
@@ -183,7 +184,10 @@ function start(args) {
     },
   });
   children.add(child);
-  child.on("exit", () => children.delete(child));
+  child.on("exit", () => {
+    children.delete(child);
+    if (children.size === 0) clearTimeout(shutdownDeadline);
+  });
   return child;
 }
 
@@ -192,6 +196,12 @@ function stop(signal, code) {
   if (stopping) return;
   stopping = true;
   for (const child of children) child.kill(signal);
+  // Next waits for open requests, including conversation streams. Give both
+  // children time to finish, then release their ports for the next service.
+  if (children.size > 0)
+    shutdownDeadline = setTimeout(() => {
+      for (const child of children) child.kill("SIGKILL");
+    }, 10_000).unref();
 }
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => stop(signal, 0));

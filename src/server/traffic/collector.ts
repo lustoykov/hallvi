@@ -48,7 +48,7 @@ import {
 } from "./sources";
 import { collectionOf, readDays, recordCollector, writeDay } from "./store";
 
-type Host = NonNullable<ReturnType<typeof operatorSettings>["host"]>;
+type Host = NonNullable<Awaited<ReturnType<typeof operatorSettings>>["host"]>;
 
 /** How often the owner's choice and the records are read again. */
 export const TICK_MS = 2_000;
@@ -791,11 +791,13 @@ export function trafficCollector(signal: AbortSignal) {
     running.delete(applicationId);
   };
 
-  function care(applicationId: string) {
+  async function care(applicationId: string) {
     const collection = collectionOf(applicationId);
     if (!collection.enabledAt) return stop(applicationId);
-    const host = operatorSettings(applicationId).host ?? null;
-    const log = host ? accessLogRecord(applicationId) : null;
+    const host = (await operatorSettings(applicationId)).host ?? null;
+    const log = host ? await accessLogRecord(applicationId) : null;
+    if (signal.aborted || !collectionOf(applicationId).enabledAt)
+      return stop(applicationId);
     const reason = blocked(host, log);
     if (reason || !host || !log) {
       stop(applicationId);
@@ -835,19 +837,19 @@ export function trafficCollector(signal: AbortSignal) {
   return {
     /**
      * Reads every application's choice and records, starting and stopping
-     * follows to match. Quick and synchronous: the follows run on their own.
+     * follows to match. The follows run on their own after records are read.
      */
-    tick() {
+    async tick() {
       if (signal.aborted) return;
       let applications: string[];
       try {
-        applications = listApplications().map(({ id }) => id);
+        applications = (await listApplications()).map(({ id }) => id);
       } catch {
         return;
       }
       for (const applicationId of applications)
         try {
-          care(applicationId);
+          await care(applicationId);
         } catch (error) {
           stop(applicationId);
           console.warn(

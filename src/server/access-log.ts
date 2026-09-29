@@ -19,12 +19,14 @@ import { createHmac, randomBytes } from "node:crypto";
 import type { OperatorSettings } from "./operator-data";
 import { listInformation } from "./saved-information";
 import { classify, hasFetchMetadata, IMITATION } from "./traffic/classify";
+import { LOOKBACK_MS } from "./traffic/count";
 import type { Arrival, TrafficLine } from "./traffic/contract";
 import {
   agentOf,
   arrivalOf,
   countryOf,
   deviceOf,
+  eventPage,
   pageName,
 } from "./traffic/enrich";
 import { parseLine } from "./traffic/parse";
@@ -39,8 +41,10 @@ export { HALLVI_USER_AGENT } from "./traffic/parse";
 export type AccessLogSource = AccessLogRecord["source"];
 
 /** The newest current `access-log` record, if any record says where it is. */
-export function accessLogRecord(applicationId: string): AccessLogRecord | null {
-  for (const record of listInformation(applicationId)) {
+export async function accessLogRecord(
+  applicationId: string,
+): Promise<AccessLogRecord | null> {
+  for (const record of await listInformation(applicationId)) {
     const content = record.presentation?.content;
     if (content?.kind === "access-log") return content;
   }
@@ -75,6 +79,8 @@ export class LiveWindow {
   private readonly browsers = new Map<string, number>();
   /** Page views, by the script's id, and when each last pinged. */
   private readonly open = new Map<string, number>();
+  /** A log view may be followed by the script reporting the same load. */
+  private readonly loaded = new Map<string, { page: string; at: number }>();
   private script: boolean;
 
   constructor(options: {
@@ -111,12 +117,22 @@ export class LiveWindow {
       if (event.t === "view" || event.t === "ping")
         this.seen(this.open, event.s, line.at);
       if (event.t !== "view") return null;
+      const page = eventPage(event, this.pageKey);
+      const load = this.loaded.get(visitor);
+      this.loaded.delete(visitor);
+      if (
+        load &&
+        load.page === page &&
+        load.at <= line.at &&
+        line.at - load.at <= LOOKBACK_MS
+      )
+        return null;
       return {
         at: line.at,
         kind: "view",
         // The script's word for a view, never a request the page counts.
         script: true,
-        path: pageName(event.p),
+        path: page,
         status: line.status,
         ms: line.ms,
         country: country(),
@@ -138,6 +154,11 @@ export class LiveWindow {
     const person = !bot && kind.browser;
     if (person) this.seen(this.browsers, visitor, line.at);
     const view = person && kind.view && !this.script;
+    if (person && kind.view) {
+      if (view && !kind.imitation)
+        this.loaded.set(visitor, { page: this.pageOf(line), at: line.at });
+      else this.loaded.delete(visitor);
+    }
     return {
       at: line.at,
       kind: bot ? "bot" : view ? "view" : "request",
@@ -161,6 +182,8 @@ export class LiveWindow {
 
   /** Browsers in the window, and pages open now (null without the script). */
   now(at = Date.now()) {
+    for (const [key, load] of this.loaded)
+      if (load.at < at - LOOKBACK_MS) this.loaded.delete(key);
     for (const [key, seen] of this.browsers)
       if (seen < at - WINDOW_MS) this.browsers.delete(key);
     for (const [id, seen] of this.open)

@@ -91,7 +91,7 @@ firewalls and SSH keys — across all pages, and report anything you cannot read
 as a gap, never as an empty account. List everything before deleting anything:
 a list that omits a kind cannot establish afterwards what was in it, and
 Hetzner keeps no audit log for SSH keys (see the
-[resource scope audit](testing/2026-09-14-resource-scope-audit.md)).
+[resource scope audit](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-14-resource-scope-audit.md)).
 
 Delete only what the person who asked approves, and only resources with the
 labels above, `sg-cleanup=allowed`, an expired `sg-expires-at`, no deletion
