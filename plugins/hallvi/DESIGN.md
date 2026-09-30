@@ -66,6 +66,17 @@ At every width the composer stays attached at the bottom and nothing scrolls
 sideways; checked at 320, 380, 480 and 760px, light and dark, sidebar and
 in-thread.
 
+## Panel updates
+
+The menu keeps the rendered version and a stable **Check for a panel update**
+action. A neutral notice below the header holds the outcome outside the menu:
+which version is shown, which the adapter serves, and how to get the newer one.
+It never changes the operator's activity state. A mismatch explains the new-chat
+path in Codex and the reconnect fallback, with a reminder to copy unsent text.
+A check cannot send work, switch applications or erase a draft. While waiting,
+repeat checks are disabled; a host timeout restores retry and preserves the
+last known version. Matching panel bytes do not imply an adapter restart.
+
 ## A turn
 
 - **The ask** is a right-aligned tint, folded after about four lines. A message
