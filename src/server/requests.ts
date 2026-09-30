@@ -65,6 +65,8 @@ export interface Evidence {
 export interface Attention {
   kind: "approval" | "input" | "interrupted";
   reason: string;
+  /** When the unanswered input was first requested, not the latest read. */
+  requestedAt?: string;
   /** The Hallvi page, as a path on the controller. */
   page: string;
   executionId?: string;
@@ -166,7 +168,7 @@ async function openInputs(applicationId: string, asked?: Asking[]) {
           Date.parse(openedAt) <= call.returnedAt,
       ));
   const clean = cleaner(applicationId);
-  const open: string[] = [];
+  const open: { reason: string; requestedAt: string }[] = [];
   const connections = listConnectionRequests(applicationId).filter(
     (request) => !request.settledAt,
   );
@@ -175,14 +177,18 @@ async function openInputs(applicationId: string, asked?: Asking[]) {
       request.kind === "host" &&
       askedFor("request_connection", request.requestedAt)
     )
-      open.push(`Where it should run: ${clean(request.needs)}`);
+      open.push({
+        reason: `Where it should run: ${clean(request.needs)}`,
+        requestedAt: request.requestedAt,
+      });
     if (
       request.kind === "domain" &&
       askedFor("request_domain_access", request.requestedAt)
     )
-      open.push(
-        `How to reach the DNS of ${request.progress.name || "the domain"}.`,
-      );
+      open.push({
+        reason: `How to reach the DNS of ${request.progress.name || "the domain"}.`,
+        requestedAt: request.requestedAt,
+      });
   }
   const deployment = await deploymentStatus(applicationId);
   if (
@@ -190,13 +196,19 @@ async function openInputs(applicationId: string, asked?: Asking[]) {
     !deployment.mode &&
     askedFor("request_deployment_choice", deployment.askedAt)
   )
-    open.push("How it should deploy.");
+    open.push({
+      reason: "How it should deploy.",
+      requestedAt: deployment.askedAt,
+    });
   for (const secret of listSecrets(applicationId))
     if (
       !secret.establishedAt &&
       askedFor("request_secret", secret.requestedAt, secret.name)
     )
-      open.push(`A value for ${secret.name}: ${clean(secret.why)}`);
+      open.push({
+        reason: `A value for ${secret.name}: ${clean(secret.why)}`,
+        requestedAt: secret.requestedAt,
+      });
   return open;
 }
 
@@ -329,7 +341,11 @@ export async function requestOutcome(
     );
     status = open.length ? "waiting-for-input" : "completed";
     if (open.length)
-      attention = { kind: "input", reason: open.join(" "), page };
+      attention = {
+        kind: "input",
+        reason: open.map((item) => item.reason).join(" "),
+        page,
+      };
   } else status = operation.status === "aborted" ? "cancelled" : "failed";
 
   const ended = operation.status !== "open";
@@ -400,9 +416,9 @@ export async function inspectApplication(applicationId: string) {
       page,
       executionId: record.id,
     })),
-    ...(await openInputs(applicationId)).map((reason) => ({
+    ...(await openInputs(applicationId)).map((input) => ({
       kind: "input" as const,
-      reason,
+      ...input,
       page,
     })),
     ...(conversation?.transcript.status === "interrupted"

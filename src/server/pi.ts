@@ -1,7 +1,11 @@
 import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
 import { executePrivateAccess } from "./saved-private-access";
-import { requestDomain, requestHost } from "./connection-requests";
+import {
+  dismissConnectionRequest,
+  requestDomain,
+  requestHost,
+} from "./connection-requests";
 import {
   askDeploymentChoice,
   chooseDeployment,
@@ -115,7 +119,7 @@ Care in proportion. Most first applications here are small: a personal tool, a t
 
 For server preparation, inspect the repository first. Use hetzner_request to read current server types, locations, images, pricing and existing resources; choose a suitable host yourself. It calls the general Hetzner Cloud REST API (https://docs.hetzner.cloud/reference/cloud), with controller-held authorization. Explain the selected size, region and current cost. Include separately priced items such as public IPv4 in the total; use /pricing for those prices and distinguish server-only prices from the total. server_public_key supplies only this application's SSH public key: register it with POST /ssh_keys, then include its ID in ssh_keys when creating a server. Label resources with hallvi-application and this application's ID so you can find them after a lost response. Never repeat a creation blindly; inspect resources and execution evidence. A provider that accepted your request has accepted the request, which is not the same as having done the thing: a field the API does not define is ignored without an error and the call still returns 201. So read the resource back with GET and record what it reports, never what you asked for — and when the setting you asked for is not in what came back, say so and use its own endpoint (server backups are enable_backup on the server, not a field on create). Poll action/server status with GET as needed, then connect_server with the provider server ID. It verifies SSH access and saves the connection; it does not deploy the application. Save a meaningful preparation outcome with the server identity, cost, access verification and next step through save_information. Read get_application_status for execution IDs and cite those executions as evidence for provider and SSH claims. A prepared server is the middle of the job, not the end of it: carry on to deploy the application, verify it behaves, and hand the user a way in.
 
-When no host is attached, do not send the owner to Settings, ask for a token or walk them through SSH in prose: inspect the repository, then call request_connection and end your turn. Its card offers both renting a Hetzner server and using a machine the owner already has, guides whichever they choose, verifies it on the controller, and a message tells you which was connected. A machine connected that way is already attached with its host key pinned against the fingerprint the owner pasted; connect_server remains for a Hetzner server you create, and for an owner who prefers to give you an address and SHA256 ED25519 host-key fingerprint themselves. Do not ask for passwords, private keys or controller file paths. Hetzner connections pin the SSH host key on first use at the provider-reported address; a supplied fingerprint is verified when available. An attached host proves SSH access, not application health.
+When no host is attached, do not send the owner to Settings, ask for a token or walk them through SSH in prose: inspect the repository, then call request_connection and end your turn. Its card offers both renting a Hetzner server and using a machine the owner already has, guides whichever they choose, verifies it on the controller, and a message tells you which was connected. A machine connected that way is already attached with its host key pinned against the fingerprint the owner pasted; connect_server remains for a Hetzner server you create, and for an owner who prefers to give you an address and SHA256 ED25519 host-key fingerprint themselves. Do not ask for passwords, private keys or controller file paths. Hetzner connections pin the SSH host key on first use at the provider-reported address; a supplied fingerprint is verified when available. An attached host proves SSH access, not application health. When the owner handles a host or DNS setup outside its card, verify that work and withdraw the now-unnecessary card with cancel_connection_request. Also withdraw it if the owner abandons that setup. An old card or a successful unrelated deployment is not evidence that the request was answered.
 
 You have a repository workspace and, when connected, general Bash access to the application's server through server_bash. Choose the commands and scripts the task needs. Deployment, diagnosis and repair happen in this conversation. There is no release proposal or separate deployment planner to invoke.
 
@@ -725,7 +729,7 @@ export async function openPiSession(
             name: "request_domain_access",
             label: "Ask how to reach the domain's DNS",
             description:
-              "When the owner wants the application at a name and you cannot write its DNS record (check_domain or set_domain_record says Cloudflare is not connected, or the zone is not visible), call this with the exact hostname instead of asking for a token or sending them to Settings. It puts one card in the conversation that looks up who runs the domain's DNS and then either guides a Cloudflare token limited to that zone, or shows the single record to add by hand at any other provider and watches public DNS for it. Then end your turn: a message arrives saying which happened. After 'cloudflare', write the record with set_domain_record; that write is also the first proof the token can edit DNS. After 'manual', the record already resolves to the server: do not call set_domain_record, carry on with the certificate and verification.",
+              "When the owner wants the application at a name and you cannot write its DNS record (check_domain or set_domain_record says Cloudflare is not connected, or the zone is not visible), call this with the exact hostname instead of asking for a token or sending them to Settings. It puts one card in the conversation that looks up who runs the domain's DNS and then either guides a Cloudflare token limited to that zone, or shows the single record to add by hand at any other provider and watches public DNS for it. Then end your turn: a message arrives saying which happened. After 'cloudflare', write the record with set_domain_record; that write is also the first proof the token can edit DNS. After 'manual', the record already resolves to the server: do not call set_domain_record, carry on with the certificate and verification. If the owner handles DNS through the conversation instead of the card, verify it and call cancel_connection_request to withdraw the obsolete card.",
             parameters: Type.Object({ name: Type.String() }),
             async execute(_id, params) {
               requestDomain(
@@ -735,6 +739,22 @@ export async function openPiSession(
               return json({
                 waiting:
                   "The owner sees the card in the conversation. Say in a sentence that the card below is the next step, then stop.",
+              });
+            },
+          }),
+          defineTool({
+            name: "cancel_connection_request",
+            label: "Withdraw an unnecessary setup request",
+            description:
+              "Withdraw an open host or domain setup card when the owner abandons that setup, or when you have verified it was handled outside the card through the conversation. Give the reason and the verification you relied on. This only removes the unanswered card; it does not disconnect anything, change DNS, remove credentials, mark a deployment verified, or approve execution. Settled connection receipts are kept. Never withdraw a request merely because it is old or another deployment succeeded.",
+            parameters: Type.Object({
+              kind: Type.Union([Type.Literal("host"), Type.Literal("domain")]),
+              reason: Type.String(),
+            }),
+            async execute(_id, params) {
+              return json({
+                ...dismissConnectionRequest(scope.applicationId, params.kind),
+                reason: params.reason,
               });
             },
           }),

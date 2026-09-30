@@ -732,13 +732,11 @@ function renderIdentity() {
 
   // The operator's state, only when there is something to say.
   const c = state.conversation;
-  const attention = state.context?.attention ?? [];
   let chip = null;
   if (state.conversationError && state.failures > 1) chip = ["unknown", "Can't reach Hallvi"];
   else if (c && !c.worker?.alive) chip = ["unknown", "Worker stopped"];
   else if (c?.status === "awaiting-approval" || waitingOnApproval(c)) chip = ["waiting", "Needs your approval"];
   else if (c?.status === "interrupted") chip = ["waiting", "Interrupted"];
-  else if (attention.some((item) => item.kind === "input")) chip = ["waiting", "Needs you"];
   else if (c?.status === "working" || state.send?.state === "sending") chip = ["working", "Working"];
   $("state").replaceChildren(chip ? el("span", { class: `chip ${chip[0]}` }, chip[0] === "working" ? el("span", { class: "pulse", "aria-hidden": "true" }) : null, chip[1]) : "");
 
@@ -1044,11 +1042,18 @@ function renderComposer() {
   else if (s?.state === "refused") { note.hidden = false; note.classList.add("failed"); note.textContent = s.message; }
   else note.hidden = true;
 
-  // Input Hallvi asked for through its own cards is given in Hallvi.
+  // An open card may belong to earlier work. Keep its date and do not
+  // present it as the current operator's blocking state.
   const inputs = (state.context?.attention ?? []).filter((item) => item.kind === "input");
   const needs = $("needs");
   needs.hidden = !inputs.length;
-  if (inputs.length) needs.replaceChildren(el("div", { class: "card waiting" }, el("h4", {}, "Hallvi needs something from you"), inputs.slice(0, 3).map((item) => el("p", {}, item.reason)), el("button", { type: "button", class: "secondary", onclick: () => void openAddress(inputs[0].page ?? pageOf()) }, "Answer in Hallvi")));
+  if (inputs.length) needs.replaceChildren(el("div", { class: "card" },
+    el("h4", {}, plural(inputs.length, "open request", "open requests")),
+    inputs.slice(0, 3).map((item) => el("div", {},
+      el("p", {}, item.reason),
+      el("p", { class: "muted" }, item.requestedAt && clock(item.requestedAt) ? `Asked ${clock(item.requestedAt)}` : "Request date unavailable"))),
+    inputs.length > 3 ? el("p", { class: "muted" }, `${inputs.length - 3} more in Hallvi`) : null,
+    el("button", { type: "button", class: "secondary", onclick: () => void openAddress(inputs[0].page ?? pageOf()) }, "Review in Hallvi")));
 }
 function autosize() {
   const draft = $("draft");
