@@ -115,13 +115,18 @@ location ^~ /_hv/e/ {
    * application's own host, entry points and TLS, and its priority keeps it
    * ahead of the application's router whatever that router's rule is.
    */
-  traefik: {
-    /** Written to SCRIPT_DIRECTORY/Caddyfile, beside the script. */
-    caddyfile: `:80 {
+  traefik(applicationId: string) {
+    // Each provider merges router and service definitions across Compose
+    // projects or dynamic files. The application's identity keeps a repeated
+    // installation stable without colliding with another site's Host rule.
+    const name = `hallvi-script-${createHash("sha256").update(applicationId).digest("hex").slice(0, 16)}`;
+    return {
+      /** Written to SCRIPT_DIRECTORY/Caddyfile, beside the script. */
+      caddyfile: `:80 {
 ${caddyHandles.replace(/^/gm, "\t")}
 }`,
-    /** The container, on Traefik's network, routed by labels. */
-    compose: `hallvi-script:
+      /** The container, on Traefik's network, routed by labels. */
+      compose: `${name}:
   image: caddy:2
   restart: unless-stopped
   command: caddy run --config ${SCRIPT_DIRECTORY}/Caddyfile --adapter caddyfile
@@ -129,25 +134,27 @@ ${caddyHandles.replace(/^/gm, "\t")}
     - ${SCRIPT_DIRECTORY}:${SCRIPT_DIRECTORY}:ro
   labels:
     - traefik.enable=true
-    - traefik.http.routers.hallvi-script.rule=Host(\`app.example.com\`) && PathPrefix(\`/_hv/\`)
-    - traefik.http.routers.hallvi-script.entrypoints=websecure
-    - traefik.http.routers.hallvi-script.tls=true
-    - traefik.http.routers.hallvi-script.priority=10000
-    - traefik.http.services.hallvi-script.loadbalancer.server.port=80`,
-    /** The same router for a Traefik configured through files instead. */
-    dynamic: `http:
+    - traefik.http.routers.${name}.rule=Host(\`app.example.com\`) && PathPrefix(\`/_hv/\`)
+    - traefik.http.routers.${name}.entrypoints=websecure
+    - traefik.http.routers.${name}.tls=true
+    - traefik.http.routers.${name}.priority=10000
+    - traefik.http.routers.${name}.service=${name}
+    - traefik.http.services.${name}.loadbalancer.server.port=80`,
+      /** The same router for a Traefik configured through files instead. */
+      dynamic: `http:
   routers:
-    hallvi-script:
+    ${name}:
       rule: Host(\`app.example.com\`) && PathPrefix(\`/_hv/\`)
       entryPoints: [websecure]
       tls: {}
       priority: 10000
-      service: hallvi-script
+      service: ${name}
   services:
-    hallvi-script:
+    ${name}:
       loadBalancer:
         servers:
-          - url: http://hallvi-script:80`,
+          - url: http://${name}:80`,
+    };
   },
 } as const;
 
