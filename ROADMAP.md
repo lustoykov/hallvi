@@ -16,6 +16,8 @@ Keep the scope on the views and interactions needed by that journey. Medium and 
 The owner requested using an existing Hallvi controller through Codex locally
 or over SSH, with a ChatGPT application panel. The [plugin proof of
 concept](docs/hallvi-plugin.md) reuses the existing operator and CLI contract.
+Its panel is a compact Hallvi built around the main operator: ask, follow,
+read the result and continue, with condition, traffic and errors as context.
 Approvals remain in Hallvi. Public hosting, account infrastructure and
 directory submission are outside this experiment.
 
