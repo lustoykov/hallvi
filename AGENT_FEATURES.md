@@ -16,7 +16,7 @@ unnecessary complexity and closing demonstrated bugs and generalization gaps.
 UI pass and broader acceptance](docs/research/2026-09-30-post-merge-scope.md).
 Larger simulator/log-reader reductions depend on evidence.
 **Evidence and acceptance:** The linked scope records the audited and refreshed
-revisions, AF-029–AF-032/AF-038, and a concrete completion check for each package.
+revisions, AF-029–AF-032/AF-039, and a concrete completion check for each package.
 **Open decisions:** Select implementation scopes; a more compact default script
 offer and feature deletions remain product choices.
 **Assignment:** Scoping only, task `01a0f19e-1f49-7d70-947b-28c911465e09`,

@@ -9,7 +9,7 @@ unnecessary complexity, find bugs, simplify the experience, and establish which
 application shapes actually work. The original 54-PR audit ends at
 [`9c99cf3b`](https://github.com/lustoykov/hallvi/commit/9c99cf3b61375d97688e400b2cd665124c446315).
 This scope was refreshed against remote main
-[`3cb165e9`](https://github.com/lustoykov/hallvi/commit/3cb165e931a6669463f02f84d1c4173f1f105407).
+[`5f42edd7`](https://github.com/lustoykov/hallvi/commit/5f42edd7746707a89632671e2330d54871656577).
 The four reproduced Traffic implementations and the three test-cleanup targets
 are unchanged between those revisions. That is a source check, not a new test run.
 
@@ -26,7 +26,7 @@ independently. All five remain proposals pending selection.
 | **T2 — Traffic database work off the caller's thread** ([AF-029](../../AGENT_FEEDBACK.md#af-029--keep-traffic-database-waits-off-the-event-loop)) | Move synchronous Traffic storage behind the existing named-operation worker pattern. Keep traffic.db separate, its format compatible, and each read/check/write transaction atomic. Avoid a new storage framework. Check queue ownership so an analytics lock does not make unrelated main-record work wait behind it. | Hold a disposable Traffic write lock while an unrelated HTTP/chat operation and timer make progress. Stop/Forget must still defeat late writes. Reopen existing totals after restart. Verify the shipping build includes and starts the worker. Adding async wrappers alone does not satisfy this. |
 | **T3 — Explicit hash-route support** ([AF-031](../../AGENT_FEEDBACK.md#af-031--account-for-hash-routed-pages-before-promising-spa-coverage)) | Add an explicit routing choice to the existing configuration/tag path for supported hash routes such as /#/inbox. Preserve current history/query defaults and data minimization. Do not interpret every fragment as a route or add a settings wizard. State unsupported forms honestly. | The shipped script in a browser counts initial load, navigation and back/forward once per page in history, configured query and configured hash modes. Ordinary anchors and token-bearing fragments remain excluded. Use a few contrasting cases, not every framework/version combination. |
 | **T4 — Remove or bound the live country cache** ([AF-032](../../AGENT_FEEDBACK.md#af-032--bound-the-live-traffic-country-cache)) | First measure lookup cost on representative input. Prefer removing the cache; if it earns its cost, keep a small bounded/expiring cache with bot entries covered too. Preserve country labels and existing live-window privacy. | Repeated arrival/expiry cycles reach a stable retained-entry bound, including bot identities. Labels remain correct. Compare lookup and event-loop cost before/after; an entry-count check does not establish production memory usage. |
-| **T5 — Focused test pruning** ([AF-038](../../AGENT_FEEDBACK.md#af-038--keep-new-tests-tied-to-useful-behavior)) | Delete the redundant script-compilation/comment-format test. Replace the exact chart class/attribute assertion with proof of the visible gap state. Limit installer-link checks to current install entry points, allowing labelled historical examples. Keep privacy, missing-data, stale-installer and real failure regressions. | The retained behavior tests pass; a syntax failure still fails script execution, a real gap still appears, and current installation instructions still resolve to the intended installer. Run the retained default suite once after pruning. No arbitrary test-count or line-reduction target. |
+| **T5 — Focused test pruning** ([AF-039](../../AGENT_FEEDBACK.md#af-039--keep-new-tests-tied-to-useful-behavior)) | Delete the redundant script-compilation/comment-format test. Replace the exact chart class/attribute assertion with proof of the visible gap state. Limit installer-link checks to current install entry points, allowing labelled historical examples. Keep privacy, missing-data, stale-installer and real failure regressions. | The retained behavior tests pass; a syntax failure still fails script execution, a real gap still appears, and current installation instructions still resolve to the intended installer. Run the retained default suite once after pruning. No arbitrary test-count or line-reduction target. |
 
 The main source areas are
 [script templates](../../src/server/traffic/script.ts),
@@ -95,7 +95,7 @@ the difference between merged, tested, installed and deployed visible.
 [#283](https://github.com/lustoykov/hallvi/pull/283),
 [#293](https://github.com/lustoykov/hallvi/pull/293) and
 [#295](https://github.com/lustoykov/hallvi/pull/295) merged after the original
-cutoff. Give these a bounded supplemental review for duplicated operator state,
+cutoff. Release [#296](https://github.com/lustoykov/hallvi/pull/296) followed during scoping; its installed-dependency follow-up (AF-038) remains separate existing feedback. Give these a bounded supplemental review for duplicated operator state,
 setup requests and native-host behavior before proposing new cuts. The stale
 setup-request repair is already merged. Open
 [#294](https://github.com/lustoykov/hallvi/pull/294) owns plugin-update work;

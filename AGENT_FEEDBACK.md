@@ -19,7 +19,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | New |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | New |
 | [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | New |
-| [AF-038 — Keep new tests tied to useful behavior](#af-038--keep-new-tests-tied-to-useful-behavior) | 1 | New |
+| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | New |
 
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 
@@ -29,6 +29,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
 
+| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
@@ -89,7 +90,7 @@ changing their decision.
 
 ## Requests
 
-### AF-038 — Keep new tests tied to useful behavior
+### AF-039 — Keep new tests tied to useful behavior
 
 The audit follow-up found a redundant script-compilation assertion in
 `traffic-script.test.ts:69`: the neighboring contract tests already execute the
@@ -159,6 +160,19 @@ cost allows, or bound/expire it with the live window; avoid another permanent
 visitor registry. This proves retention, not a production memory-exhaustion rate.
 
 **+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-038 — Check installed versions behind upstream shrinkwraps
+
+Alpha.12 preparation found that Pi 0.87.1 ships an `npm-shrinkwrap.json`
+pinning its runtime `brace-expansion` to 5.0.9, covered by current denial-of-service
+advisories. `npm update brace-expansion` patched development copies but left
+that runtime copy alone. A trial root-lock edit made `npm audit --omit=dev`
+report zero while a fresh `npm ci` still installed 5.0.9; the misleading edit
+was removed. Check actual installed versions as well as audit metadata before
+claiming a dependency is patched. A compatible upstream Pi update remains a
+follow-up; this release patches Hallvi's direct `ws` runtime to 8.22.0.
+
+**+1:** 2026-09-30 — alpha.12 release preparation, `codex/release-alpha12`
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
