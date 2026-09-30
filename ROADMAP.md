@@ -40,9 +40,13 @@ through an installed restart. Return brief, quiet care, recovery rehearsal, lear
 procedures, existing-stack adoption and update rehearsal are deferred. The eleven
 research plans do not constitute eleven implementation commitments.
 
-AF-013’s roughly 300 ms loading pause remains open. The loading and shared-read
-improvements have narrower measured results; the earlier missed development wave
-remains unattributed. Neither is claimed fixed by this release.
+AF-013’s roughly 300 ms loading pause remains open. Current-source profiles
+attribute substantial cold-opening cost to SDK module loading; the supported web
+bundling experiment was reverted after exposing an OAuth import failure or slower
+usable opening. [AF-013](AGENT_FEEDBACK.md#af-013--investigate-the-first-navigation-event-loop-pause)
+keeps those local results separate from signed-release measurements. The loading
+and shared-read improvements have narrower measured results; the earlier missed
+development wave remains unattributed. Neither is claimed fixed by this release.
 
 ## Sprint TODO
 
