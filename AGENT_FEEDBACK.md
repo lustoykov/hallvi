@@ -15,24 +15,18 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
 | [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
-| [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | New |
-| [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | New |
-| [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | New |
-| [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | New |
-| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | New |
-
+| [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Accepted; fix in #310 |
+| [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Accepted; fixes in #303 and #308 |
+| [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | Accepted; fix in #301 |
+| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | Accepted; fix in #301 |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
-
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
-
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
-
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
-
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
-
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
+| [AF-045 — Keep simulated SPA route identities honest](#af-045--keep-simulated-spa-route-identities-honest) | 1 | Accepted; fix in #308 |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
@@ -93,6 +87,19 @@ changing their decision.
 
 ## Requests
 
+### AF-045 — Keep simulated SPA route identities honest
+
+The live traffic generator fetched the landing document and script again after
+an in-page navigation, then reused that route's view ID for the landing page.
+An actual HTTP run produced five views with only three identities. The fix in
+[PR #308](https://github.com/lustoykov/hallvi/pull/308) keeps one document load and
+a distinct identity per route. Its focused regression checks delivered events;
+the simulator still synthesizes instrumentation, so real browser-script tests
+remain a separate proof. UI scenario fixtures serve a different visual purpose.
+
+**+1:** 2026-09-30 — post-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+
 ### AF-042 — Include consent and notices in traffic setup
 
 **+1:** 2026-09-30 — owner's traffic privacy task,
@@ -117,6 +124,8 @@ Manual event support remains.
 
 ### AF-039 — Keep new tests tied to useful behavior
 
+**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the redundant parse/comment assertion, narrows installation-link checks, and asserts the accessible missing-data description instead of CSS structure. Concrete privacy, ownership and retained-state regressions remain.
+
 The audit follow-up found a redundant script-compilation assertion in
 `traffic-script.test.ts:69`: the neighboring contract tests already execute the
 same served script. Checking that whole-line comments disappeared pins the
@@ -137,6 +146,8 @@ Stop/Forget, retained-state ownership and cross-stack behavior coverage.
 
 ### AF-029 — Keep Traffic database waits off the event loop
 
+**Implementation:** [PR #310](https://github.com/lustoykov/hallvi/pull/310) moves Traffic to its own database worker and queue, sharing the existing dispatch handling. A real two-second Traffic write lock left production application reads and Pi-alive chat creation responsive. The same work fixes a standalone worker-close exit before the awaited close settled. Combined acceptance is recorded in the audit PR.
+
 Traffic adds synchronous `better-sqlite3` calls in the web and Pi processes,
 after #252 moved the main database work into threads. On merged `9c99cf3`,
 holding a disposable traffic database's write lock for 350 ms made
@@ -147,19 +158,9 @@ Stop/Forget checks that prevent stale writes from restoring totals.
 
 **+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
-### AF-030 — Make the Traffic script template safe for a shared Traefik
-
-`traffic_script` returns the same `hallvi-script` router and service names for
-every app. Reusing its labels with two different host rules under one Traefik
-3.7 produced "HTTP router defined multiple times with different configurations"
-and 404 for both script routes. Removing the second test app restored HTTP 200
-for the first. This tested the supplied routing labels with local stand-in
-backends, not Pi's full installation journey. Give the configuration per-app
-names, or explicitly reuse one shared helper/router with all intended hosts.
-
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
-
 ### AF-031 — Account for hash-routed pages before promising SPA coverage
+
+**Implementation:** [PR #303](https://github.com/lustoykov/hallvi/pull/303) adds explicit hash routing while ignoring anchors and credential fragments. Review also reproduced a missed Back navigation to the empty fragment; [PR #308](https://github.com/lustoykov/hallvi/pull/308) distinguishes that physical root from an ignored fragment. The existing browser cases cover both hash forms and distinct Back/Forward views.
 
 The Traffic script compares `location.pathname` and a configured query key;
 `/#/home`, `/#/inbox` and `/#/settings` all become one `/` page. Running the
@@ -175,6 +176,8 @@ event receiver confirmed three history views versus one hash-route view.
 **+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 ### AF-032 — Bound the live Traffic country cache
+
+**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the country map. Warm direct lookup cost was about 52 ms per 100,000 lookups locally, and three arrival/expiry cycles retained no country entries. This is a controlled lookup/retention check, not a production capacity claim.
 
 `LiveWindow` expires browsers, open pages and loaded-page keys, but never its
 country lookup map. Feeding it 10,000 distinct browser identities, then calling
@@ -450,14 +453,12 @@ retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
 
-Use this small template; add detail only when useful. Link the overview row to
-the request heading.
-
-```markdown
 ## Archive
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | Resolved in #302 |
+| [AF-044 — Preserve uncertain sends when browser storage writes fail](#af-044--preserve-uncertain-sends-when-browser-storage-writes-fail) | 1 | Resolved in #307 |
 | [AF-023 — Discover newer releases despite GitHub listing order](#af-023--discover-newer-releases-despite-github-listing-order) | 1 | Fixed in #285 |
 | [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fixed in #282 |
 | [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
@@ -473,6 +474,32 @@ the request heading.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-030 — Make the Traffic script template safe for a shared Traefik
+
+**Resolution:** [PR #302](https://github.com/lustoykov/hallvi/pull/302) uses stable application-scoped Traefik names. The generated configuration was checked with two apps under Traefik and with actual Caddy and nginx routes. Proxy configuration differs by server; the script/event contract is shared.
+
+`traffic_script` returns the same `hallvi-script` router and service names for
+every app. Reusing its labels with two different host rules under one Traefik
+3.7 produced "HTTP router defined multiple times with different configurations"
+and 404 for both script routes. Removing the second test app restored HTTP 200
+for the first. This tested the supplied routing labels with local stand-in
+backends, not Pi's full installation journey. Give the configuration per-app
+names, or explicitly reuse one shared helper/router with all intended hosts.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-044 — Preserve uncertain sends when browser storage writes fail
+
+A readable localStorage can still reject writes because it is full. The panel
+then read an older persisted draft instead of the in-memory draft and request
+key; switching apps could lose the identity needed for a safe retry. Resolved
+in [PR #307](https://github.com/lustoykov/hallvi/pull/307): unsaved drafts stay
+authoritative in memory until storage succeeds. One browser regression covers
+app switching, retry of the same key, acknowledgement and failed removal.
+The unused sent-message set was also removed; it had no readers.
+
+**+1:** 2026-09-30 — post-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 ### AF-023 — Discover newer releases despite GitHub listing order
 
