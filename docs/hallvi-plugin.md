@@ -69,10 +69,9 @@ copy the generated marketplace to a stable location outside the worktree
 before registering it. For a remote controller, replace the generated
 `hallvi-plugin/.mcp.json` connection with the SSH command below before
 installing. The controller must already be running; installation does not
-start Hallvi. If the desktop app has not refreshed its plugin list, restart
-it after finishing active work. Check that Hallvi actually opens from the
-sidebar: successful installation and tool discovery alone do not verify that
-UI. Choose either this route or the direct MCP configuration
+start Hallvi. The desktop may retain an existing MCP session after installation. Check
+that Hallvi actually opens from the sidebar and follow the update procedure
+below; successful installation and tool discovery alone do not verify that UI. Choose either this route or the direct MCP configuration
 to avoid duplicate tools. The generated local manifest uses the build
 machine's Node path; it is not a public distribution package. Preserve the
 bundle directory while that connection is configured.
@@ -112,13 +111,56 @@ open-link requests, so the panel shows **Copy address** for HTTP URLs. Paste
 the address into your browser; keep the SSH forward running. If clipboard
 access is denied, the panel selects the address for manual copying. HTTPS
 URLs retain **Open in Hallvi**, with a copy fallback if the host reports a
-failure. Reopen an already loaded panel after updating its HTML.
+failure. For changed panel HTML, follow the UI update procedure below.
 
 `--ui-url` controls browser links only; the
 adapter still talks exclusively to the server's local controller. Request
 handles contain that remote loopback address: pass them back to `hallvi_wait`,
 not to a browser or an HTTP client on your laptop. Use a different MCP server
 name for a second controller so each connection remains explicit.
+
+## Updating the plugin UI
+
+Each HTML revision gets a content-addressed URI:
+`ui://hallvi/applications-<sha256-prefix>.html`. Tool metadata, resource reads
+and the UI version shown at the bottom of the panel agree. The build prints
+the expected resource URI. A URI retains its
+original bytes within a running stdio connection; it keeps up to eight revisions.
+The stateless HTTP transport serves only the current revision per request.
+Expired resources fail instead of returning different HTML under an old URI.
+
+For HTML, CSS and panel JavaScript changes:
+
+1. Replace `panel.html` beside the **running adapter** (on the remote host for
+   an SSH connection). Use a temporary file and rename for an atomic update.
+   Keep the marketplace's source copy up to date for future installs too.
+2. Click **Reload UI** in the panel, or ask Codex to call `hallvi_reload_ui`.
+   This reads the new file and emits standard MCP tool/resource list-change
+   notifications on the existing connection. It does not restart any process.
+3. Close and reopen Hallvi, then compare the panel's **UI** version with the
+   version returned by the reload tool. An already rendered iframe does not
+   replace itself. A successful reload-tool response alone is not proof that
+   the host has refreshed its cached tool metadata or rendered the new panel.
+
+**Refresh** rereads application records; **Reload UI** checks the installed
+panel file. Failed UI reads preserve the last working resource and tools.
+The reload tool cannot download updates, run shell commands, change the
+controller, or load new adapter code.
+
+Adapter-code, tool-schema and plugin-manifest updates still need an MCP
+connection refresh. Version 0.1.1 first introduces this UI reload mechanism,
+so an older running adapter must reconnect once before it can offer it.
+Do not describe a fresh standalone Codex app-server check as proof that the
+already-running desktop connection refreshed. Host-specific verification is
+recorded in the PR; native ChatGPT behavior is still unverified.
+
+The Codex app-server protocol also exposes `config/mcpServer/reload` (no
+parameters). A persistent app-server test verified that this discovers a changed
+UI URI without restarting that app-server process. This is a client integration
+API, not a shell command to run against a second app-server: that second process
+cannot refresh the desktop's existing connection. The running desktop in this
+setup has no app-server control socket exposed to the CLI proxy. Its plugin
+reconnection and refreshed native rendering must be tested through the host UI.
 
 ## ChatGPT sidebar and conversation panel
 
@@ -162,7 +204,8 @@ this private proof of concept.
 | `hallvi_inspect` | Read identity, permission mode, attention and bounded evidence; optionally one execution in full. |
 | `hallvi_exec` | Send one bounded request with a caller-supplied UUID key; return its handle after acceptance. |
 | `hallvi_wait` | Read that handle, optionally waiting up to 20 seconds. Never restart or resend work. |
-| `hallvi_open` | Read the application list and attach the panel resource. |
+| `hallvi_open` | Read the application list and attach the versioned panel resource. |
+| `hallvi_reload_ui` | Reread installed panel HTML, publish a content-versioned resource and notify the existing MCP connection. No Pi work or controller restart. |
 
 An MCP send has a 40-second observer deadline. Acceptance can be unknown if a
 reply is lost; keep the handle and retry the exact message with the same key

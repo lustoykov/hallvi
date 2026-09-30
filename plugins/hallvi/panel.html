@@ -71,6 +71,7 @@
     <section><h3>Recent executions</h3><ul id="executions"></ul><small id="executions-note"></small></section>
     <section><p class="muted">Use the conversation to ask Hallvi to check or operate this application. These records describe past observations; Refresh reads them again without probing your server.</p></section>
   </div>
+<footer><small>UI <span id="ui-version">__HALLVI_UI_VERSION__</span></small> <button id="reload-ui" type="button" disabled>Reload UI</button><p id="ui-status" role="status" class="muted"></p></footer>
 </main>
 <script type="module">
 const $ = (id) => document.getElementById(id);
@@ -224,12 +225,24 @@ async function refresh() {
   catch(error) { $("notice").textContent="Hallvi is unavailable. Check the connection and try Refresh."; showError(error); }
   finally { $("refresh").disabled=false; }
 }
+$("reload-ui").onclick=async () => {
+  $("reload-ui").disabled=true;
+  $("ui-status").textContent="Checking the installed UI…";
+  try {
+    const result=await call("hallvi_reload_ui");
+    $("ui-status").textContent=result.version === $("ui-version").textContent
+      ? "This panel is up to date."
+      : `UI ${result.version} is available. Close and reopen Hallvi to load it.`;
+  } catch {
+    $("ui-status").textContent="Could not reload the UI. The current panel is still available; try again after reconnecting the Hallvi plugin.";
+  } finally { $("reload-ui").disabled=false; }
+};
 $("refresh").onclick=refresh;
 $("application").onchange=() => { selected=$("application").value; void inspect(); };
 try {
   if (window.parent === window) throw new Error("Open this panel through the Hallvi plugin in ChatGPT. It needs an MCP Apps host.");
-  await request("ui/initialize", { appInfo:{name:"hallvi",version:"0.1.0"}, appCapabilities:{}, protocolVersion:"2026-01-26" });
-  notify("ui/notifications/initialized",{}); ready=true;
+  await request("ui/initialize", { appInfo:{name:"hallvi",version:"0.1.1"}, appCapabilities:{}, protocolVersion:"2026-01-26" });
+  notify("ui/notifications/initialized",{}); ready=true; $("reload-ui").disabled=false;
   await refresh();
 } catch(error) { $("notice").textContent="Panel connection unavailable."; showError(error); }
 </script>

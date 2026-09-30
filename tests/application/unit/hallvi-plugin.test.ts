@@ -1,10 +1,18 @@
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { startHttp, PANEL_URI } from "../../../plugins/hallvi/server.mjs";
+import {
+  startHttp,
+  createHallviServer,
+} from "../../../plugins/hallvi/server.mjs";
 
 const app = "3ee7c9a7-5da8-434a-8222-cccac5089141";
 const chat = "798e4859-86dc-43d1-a0fd-b2d2bee3be28";
@@ -129,6 +137,7 @@ it("advertises native entrypoints and reads the real panel over MCP", async () =
     "hallvi_exec",
     "hallvi_wait",
     "hallvi_open",
+    "hallvi_reload_ui",
   ]);
   expect(
     tools.find((tool) => tool.name === "hallvi_exec")?.annotations,
@@ -138,7 +147,13 @@ it("advertises native entrypoints and reads the real panel over MCP", async () =
   ).toMatchObject({
     "openai/ui": { entrypoints: [{ type: "global" }, { type: "thread" }] },
   });
-  const panel = await client.readResource({ uri: PANEL_URI });
+  const uri = (
+    tools.find((tool) => tool.name === "hallvi_open")?._meta?.ui as {
+      resourceUri: string;
+    }
+  ).resourceUri;
+  expect(uri).toMatch(/^ui:\/\/hallvi\/applications-[a-f0-9]{16}\.html$/);
+  const panel = await client.readResource({ uri });
   expect("text" in panel.contents[0] ? panel.contents[0].text : "").toContain(
     "ui/update-model-context",
   );
@@ -273,4 +288,79 @@ it("runs the adapter over stdio, the transport used locally and through SSH", as
     (await client.callTool({ name: "hallvi_apps", arguments: {} }))
       .structuredContent,
   ).toMatchObject({ controller: f.controller, applications: [{ id: app }] });
+});
+
+it("reloads UI on the same MCP connection, preserves revision bytes and recovers from a missing update", async () => {
+  const f = await fixture();
+  const dir = await mkdtemp(join(tmpdir(), "hallvi-panel-"));
+  cleanup.push(() => rm(dir, { recursive: true, force: true }));
+  const panelPath = join(dir, "panel.html");
+  await writeFile(
+    panelPath,
+    "<h1>First UI</h1><small>__HALLVI_UI_VERSION__</small>",
+  );
+  const server = createHallviServer({ controller: f.controller, panelPath });
+  cleanup.push(() => server.close());
+  const client = new Client({ name: "ui-reload-test", version: "1" });
+  const [clientTransport, serverTransport] =
+    InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  cleanup.push(() => client.close());
+  const uri = async () => {
+    const { tools } = await client.listTools();
+    return (
+      tools.find((tool) => tool.name === "hallvi_open")?._meta?.ui as {
+        resourceUri: string;
+      }
+    ).resourceUri;
+  };
+  const first = await uri();
+  const firstResource = await client.readResource({ uri: first });
+  let changed = 0;
+  client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
+    changed++;
+  });
+  await writeFile(
+    panelPath,
+    "<h1>Second UI</h1><small>__HALLVI_UI_VERSION__</small>",
+  );
+  const updated = await client.callTool({
+    name: "hallvi_reload_ui",
+    arguments: {},
+  });
+  const second = await uri();
+  expect(second).not.toBe(first);
+  expect(updated.structuredContent).toMatchObject({
+    changed: true,
+    resourceUri: second,
+  });
+  expect(changed).toBe(1);
+  expect(await client.readResource({ uri: first })).toEqual(firstResource);
+  const newResource = await client.readResource({ uri: second });
+  const content = newResource.contents[0];
+  const html = "text" in content ? content.text : "";
+  expect(html).toContain("Second UI");
+  expect(html).not.toContain("__HALLVI_UI_VERSION__");
+  expect(
+    (await client.callTool({ name: "hallvi_reload_ui", arguments: {} }))
+      .structuredContent,
+  ).toMatchObject({ changed: false, resourceUri: second });
+  expect(changed).toBe(1);
+  await rm(panelPath);
+  expect(
+    (await client.callTool({ name: "hallvi_reload_ui", arguments: {} }))
+      .isError,
+  ).toBe(true);
+  expect(await uri()).toBe(second);
+  expect(await client.readResource({ uri: second })).toEqual(newResource);
+  expect(
+    (await client.callTool({ name: "hallvi_apps", arguments: {} })).isError,
+  ).toBe(false);
+  await writeFile(panelPath, "<h1>Third UI</h1>");
+  expect(
+    (await client.callTool({ name: "hallvi_reload_ui", arguments: {} }))
+      .isError,
+  ).toBe(false);
+  expect(await uri()).not.toBe(second);
 });

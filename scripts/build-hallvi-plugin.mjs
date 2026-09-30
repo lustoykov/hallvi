@@ -4,7 +4,11 @@ import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { selectController } from "./controller-client.mjs";
-import { uiOrigin } from "../plugins/hallvi/server.mjs";
+import {
+  uiOrigin,
+  PLUGIN_VERSION,
+  panelResource,
+} from "../plugins/hallvi/server.mjs";
 
 const { values } = parseArgs({
   options: {
@@ -41,7 +45,7 @@ const json = (path, value) =>
   writeFile(path, JSON.stringify(value, null, 2) + "\n");
 await json(`${root}/.codex-plugin/plugin.json`, {
   name: "hallvi",
-  version: "0.1.0",
+  version: PLUGIN_VERSION,
   description: "Operate your self-hosted applications through Hallvi.",
   author: { name: "Hallvi" },
   skills: "./skills/",
@@ -80,6 +84,7 @@ await json("dist/.agents/plugins/marketplace.json", {
     },
   ],
 });
+const panel = panelResource(await readFile(`${root}/panel.html`, "utf8"));
 console.log(
-  `Built ${root}\nCodex: codex mcp add hallvi -- ${process.execPath} ${root}/server.mjs --controller ${controller} --ui-url ${uiUrl}\nRemote: copy server.mjs and panel.html beside your remote Hallvi, then run with Node 22 over SSH.\nLocal plugin marketplace: ${resolve("dist")}`,
+  `Built Hallvi plugin ${PLUGIN_VERSION}: ${root}\nUI resource: ${panel.uri}\nCodex: codex mcp add hallvi -- ${process.execPath} ${root}/server.mjs --controller ${controller} --ui-url ${uiUrl}\nRemote: copy server.mjs and panel.html beside your remote Hallvi, then run with Node 22 over SSH.\nLocal plugin marketplace: ${resolve("dist")}`,
 );

@@ -83,6 +83,7 @@ Controls and execution excerpts use a 7px radius. Lists remain open rows with bo
 ## Components
 
 - **Application selector:** A labeled, full-width native select with a 38px minimum height. Changing selection clears the previous detail before reading the new application.
+- **UI reload:** A secondary footer shows the content version and Reload UI. It publishes a new resource over the existing MCP connection and asks the owner to reopen the panel when needed; it never claims the visible iframe has already updated.
 - **Refresh:** A secondary control that rereads recorded data. Its disabled state during a request and the visible connection, loading and error messages explain what is happening.
 - **Attention and records:** Show the reason or title as plain text. When no attention is listed, say only what was known when records were read; if the operator is unavailable, say pending attention is unknown. No records means unassessed, never healthy.
 - **Execution evidence:** A summary names the tool and status, with time, target and a short input preview. The full recorded input and output start collapsed in a native `details` disclosure. Mark failed runs in red and identify truncated output as an excerpt.

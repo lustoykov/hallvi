@@ -1,4 +1,5 @@
 // An adapter to one named Hallvi controller. No sessions or jobs live here.
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { parseArgs } from "node:util";
@@ -16,7 +17,16 @@ import {
   selectController,
 } from "../../scripts/controller-client.mjs";
 
-export const PANEL_URI = "ui://hallvi/applications.html";
+export const PLUGIN_VERSION = "0.1.1";
+
+export function panelResource(html) {
+  const version = createHash("sha256").update(html).digest("hex").slice(0, 16);
+  return {
+    version,
+    uri: `ui://hallvi/applications-${version}.html`,
+    html: html.replaceAll("__HALLVI_UI_VERSION__", version),
+  };
+}
 const id = z.string().regex(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
 const readOnly = {
   readOnlyHint: true,
@@ -43,12 +53,17 @@ export function uiOrigin(value, controller) {
   return url.origin;
 }
 
-export function createHallviServer({ controller, uiUrl, panelHtml } = {}) {
+export function createHallviServer({
+  controller,
+  uiUrl,
+  panelHtml,
+  panelPath,
+} = {}) {
   controller = selectController({ flag: controller });
   const pageOrigin = uiOrigin(uiUrl, controller);
   const client = controllerClient(controller);
   const server = new McpServer(
-    { name: "hallvi", version: "0.1.0" },
+    { name: "hallvi", version: PLUGIN_VERSION },
     {
       instructions:
         "Use hallvi_apps then hallvi_inspect to confirm the application and permission mode before submitting work. Hallvi's existing Pi operator performs the work. Reuse the same request_key and message after uncertain acceptance; never invent a new key to retry. Follow the handle with hallvi_wait. Completed means Pi finished answering, not verified success. Read answer and evidence. Approval, input, Continue and Stop stay in Hallvi; never bypass a wait.",
@@ -236,26 +251,64 @@ export function createHallviServer({ controller, uiUrl, panelHtml } = {}) {
       }
     },
   );
-  server.registerResource(
-    "hallvi-panel",
-    PANEL_URI,
-    {
-      mimeType: "text/html;profile=mcp-app",
-    },
-    async () => ({
-      contents: [
-        {
-          uri: PANEL_URI,
-          mimeType: "text/html;profile=mcp-app",
-          text:
-            panelHtml ??
-            readFileSync(new URL("./panel.html", import.meta.url), "utf8"),
-          _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } } },
-        },
-      ],
-    }),
-  );
-  tool(
+  // Capture each revision's bytes: one URI must never return different HTML.
+  const revisions = new Map();
+  let currentPanel;
+  let openTool;
+  const openMeta = (uri) => ({
+    ui: { resourceUri: uri },
+    "openai/ui": { entrypoints: [{ type: "global" }, { type: "thread" }] },
+  });
+  function reloadPanel() {
+    const next = panelResource(
+      panelHtml ??
+        readFileSync(
+          panelPath ?? new URL("./panel.html", import.meta.url),
+          "utf8",
+        ),
+    );
+    const changed = currentPanel?.uri !== next.uri;
+    if (changed) {
+      if (!revisions.has(next.uri)) {
+        const resource = server.registerResource(
+          `hallvi-panel-${next.version}`,
+          next.uri,
+          { mimeType: "text/html;profile=mcp-app" },
+          async () => ({
+            contents: [
+              {
+                uri: next.uri,
+                mimeType: "text/html;profile=mcp-app",
+                text: next.html,
+                _meta: {
+                  ui: { csp: { connectDomains: [], resourceDomains: [] } },
+                },
+              },
+            ],
+          }),
+        );
+        revisions.set(next.uri, resource);
+      }
+      currentPanel = next;
+      openTool?.update({ _meta: openMeta(next.uri) });
+      // Keep a few already-open revisions usable without growing forever.
+      while (revisions.size > 8) {
+        const oldest = revisions.keys().next().value;
+        revisions.get(oldest).remove();
+        revisions.delete(oldest);
+      }
+    }
+    return {
+      changed,
+      version: next.version,
+      resourceUri: next.uri,
+      message: changed
+        ? "UI resource updated. Close and reopen the Hallvi panel. This does not reload adapter code or restart Hallvi."
+        : "The adapter already serves this UI version. Compare it with the version shown in your panel.",
+    };
+  }
+  reloadPanel();
+  openTool = tool(
     "hallvi_open",
     {
       title: "Open Hallvi",
@@ -263,12 +316,26 @@ export function createHallviServer({ controller, uiUrl, panelHtml } = {}) {
         "Open the Hallvi application browser beside this conversation or from the sidebar. Select an application to inspect its evidence and give the conversation context.",
       inputSchema: {},
       annotations: readOnly,
-      _meta: {
-        ui: { resourceUri: PANEL_URI },
-        "openai/ui": { entrypoints: [{ type: "global" }, { type: "thread" }] },
-      },
+      _meta: openMeta(currentPanel.uri),
     },
-    apps,
+    async (args, extra) => ({
+      ...(await apps(args, extra)),
+      ui: {
+        version: currentPanel.version,
+        resourceUri: currentPanel.uri,
+      },
+    }),
+  );
+  tool(
+    "hallvi_reload_ui",
+    {
+      title: "Reload Hallvi UI resource",
+      description:
+        "Read an installed panel.html update, publish a content-versioned UI resource and notify this MCP connection of the changed tool/resource metadata. Does not execute application work, reconnect MCP, reload adapter code, or restart Hallvi. Reopen the panel after a change; host cache refresh is host-dependent.",
+      inputSchema: {},
+      annotations: { ...readOnly, readOnlyHint: false, idempotentHint: true },
+    },
+    async () => reloadPanel(),
   );
   return server;
 }

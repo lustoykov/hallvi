@@ -69,6 +69,10 @@ installed Codex host’s silent rejection of HTTP URLs. A successful bridge
 reply did not establish that a browser opened. The panel now offers a copyable
 HTTP address and handles clipboard denial and explicit host link failures.
 Keep native host behavior separate from fixture results when reporting proof.
+Replacing panel bytes at one resource URI also left the native host showing
+an older interface. The follow-up adds content-versioned resources and an
+explicit UI reload; protocol acknowledgment must still be distinguished from
+the host actually rendering the new version.
 
 **+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
 
