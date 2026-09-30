@@ -26,7 +26,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
-| [AF-039 — Show OpenRouter credit beside the saved key](#af-039--show-openrouter-credit-beside-the-saved-key) | 1 | New |
+| [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -343,7 +343,7 @@ retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
 
-### AF-039 — Show OpenRouter credit beside the saved key
+### AF-041 — Show OpenRouter credit beside the saved key
 
 OpenRouter is paid per use, and an empty balance only shows up as a refused
 message (402). OpenRouter's `GET /api/v1/key` answers usage and limit without a
