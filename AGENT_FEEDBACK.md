@@ -24,6 +24,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
 
+| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
+
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
 ## How to contribute
@@ -71,6 +73,19 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-038 — Check installed versions behind upstream shrinkwraps
+
+Alpha.12 preparation found that Pi 0.87.1 ships an `npm-shrinkwrap.json`
+pinning its runtime `brace-expansion` to 5.0.9, covered by current denial-of-service
+advisories. `npm update brace-expansion` patched development copies but left
+that runtime copy alone. A trial root-lock edit made `npm audit --omit=dev`
+report zero while a fresh `npm ci` still installed 5.0.9; the misleading edit
+was removed. Check actual installed versions as well as audit metadata before
+claiming a dependency is patched. A compatible upstream Pi update remains a
+follow-up; this release patches Hallvi's direct `ws` runtime to 8.22.0.
+
+**+1:** 2026-09-30 — alpha.12 release preparation, `codex/release-alpha12`
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.

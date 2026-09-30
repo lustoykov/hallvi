@@ -157,7 +157,7 @@ Actions → General before building a draft.
 signature with the public key Hallvi ships, so a key that no longer matches is
 a failed release rather than an update nobody can install. Run **Verify Hallvi
 draft** with the draft version, its exact source revision and an explicit older
-published baseline (currently `0.1.1-alpha.10`). It verifies signed manifests,
+published baseline (currently `0.1.1-alpha.11`). It verifies signed manifests,
 source revision, archive sizes and hashes. Four independent native jobs cover
 clean installation and baseline-to-candidate upgrade on macOS arm64 and
 Ubuntu 24.04 x64. Upgrade jobs create application, main/side-chat and permission

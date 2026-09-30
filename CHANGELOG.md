@@ -4,6 +4,19 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.12 — 30 September 2026
+
+Ask the existing Hallvi operator from Codex, understand Traffic setup, and find Hallvi settings and updates in one menu.
+
+- **Codex and ChatGPT plugin proof of concept.** A separately built adapter can list existing applications, read the main conversation and recorded evidence, send work to Pi, and follow the result. Its compact operator panel keeps approvals, missing input, Continue and Stop in Hallvi. Native Codex use has been observed; native ChatGPT rendering and the updated panel over SSH remain unverified. See the [plugin setup and limits](https://github.com/lustoykov/hallvi/blob/v0.1.1-alpha.12/docs/hallvi-plugin.md).
+- **Traffic history starts with the access log.** History collection is on by default once Hallvi has a recorded access log. Stop keeps saved totals; Forget removes them. The Traffic page explains what the optional browser script adds and keeps its installation checklist easy to find.
+- **More accurate page counts.** Static assets no longer count as page visits, and query-routed applications retain their configured page routes.
+- **One Hallvi menu.** Open the Hallvi row at the bottom of the sidebar for Settings, What's new and Check for updates, with update status shown there too.
+- **Deployment file timestamps.** Transferred repository files keep the selected commit's modification time instead of the deployment time.
+- **Patched dependencies.** Update the WebSocket runtime and development brace-expansion dependencies within their supported major versions to address published security advisories. Pi's shrinkwrapped runtime copy of brace-expansion remains an upstream dependency limitation.
+
+**Known Traffic limits:** hash-based application routes are counted as one page, the supplied Traefik script labels need unique names when used for several applications, and Traffic database contention and live country-cache retention remain recorded follow-ups. See the [merge audit](https://github.com/lustoykov/hallvi/pull/292) for the reproductions and scope.
+
 ## 0.1.1-alpha.11 — 30 September 2026
 
 Find the newest signed release even when GitHub lists older releases first, and keep traffic observations clearer.
