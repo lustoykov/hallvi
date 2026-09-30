@@ -15,6 +15,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-026 — Native host checks must exercise link and clipboard failures](#af-026--native-host-checks-must-exercise-link-and-clipboard-failures) | 2 | New |
 | [AF-029 — Say "awaiting approval" while request_approval waits](#af-029--say-awaiting-approval-while-request_approval-waits) | 1 | New |
 | [AF-030 — Let the plugin label the messages it sends](#af-030--let-the-plugin-label-the-messages-it-sends) | 1 | New |
+| [AF-031 — Update all installed plugin copies in one command](#af-031--update-all-installed-plugin-copies-in-one-command) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -96,6 +97,17 @@ this. Reporting the owner as the one being waited on in the snapshot would let
 one field answer it.
 
 **+1:** 2026-09-30 — Codex operator panel
+
+### AF-031 — Update all installed plugin copies in one command
+
+The sidebar kept showing an older plugin while `hallvi-dev` showed the new
+panel. Updating required rebuilding, copying the marketplace, updating the
+adapter on the Mac mini, reinstalling and reconnecting. The owner asked to
+automate that sequence. `npm run plugin:update` now preserves the existing
+connection, updates the installed copies and reports the expected UI version
+and whether adapter code changed. The desktop still owns reconnection.
+
+**+1:** 2026-09-30 — `codex/hallvi-plugin-update`.
 
 ### AF-030 — Let the plugin label the messages it sends
 
