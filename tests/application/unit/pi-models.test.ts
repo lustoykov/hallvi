@@ -29,7 +29,7 @@ describe("the bundled Pi model catalog", () => {
       options.find((model) => model.providerId !== "openai-codex"),
     ).toMatchObject({ name: "Claude Sonnet 5", price: { input: 2 } });
     expect(
-      options.find((model) => model.id === "gpt-6-sol")?.reasoningEfforts,
+      options.find((model) => model.id === "gpt-6.1-sol")?.reasoningEfforts,
     ).toContain("high");
     for (const option of options) {
       const model = catalog.getModel(option.providerId, option.id)!;
