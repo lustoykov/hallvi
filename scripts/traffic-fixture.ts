@@ -2899,11 +2899,14 @@ async function live(flags: Record<string, string>) {
   const bad = new Set<string>();
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      stop.signal.addEventListener("abort", () => {
+      const finish = () => {
         clearTimeout(timer);
+        stop.signal.removeEventListener("abort", finish);
         resolve();
-      });
+      };
+      const timer = setTimeout(finish, ms);
+      stop.signal.addEventListener("abort", finish);
+      if (stop.signal.aborted) finish();
     });
 
   const send = async (
