@@ -744,7 +744,11 @@ export function trafficSetup(proxy: Proxy, version: string) {
 // ---------------------------------------------------------------------------
 // traffic_script
 
-export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
+export function trafficScriptFor(
+  proxy: Proxy,
+  applicationId: string,
+  pageKey?: string,
+) {
   if (pageKey !== undefined && !PAGE_KEY_NAME.test(pageKey))
     throw new Error("Invalid traffic page key.");
   // An application that routes pages by a query key names it on its tag, so
@@ -761,7 +765,14 @@ export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
     version: script.version,
     content: script.content,
     install: `mkdir -p ${SCRIPT_DIRECTORY}/_hv, write content to ${SCRIPT_FILE} exactly (mode 0644), and check that \`sha256sum ${SCRIPT_FILE}\` prints sha256. One file serves every application on the server. A proxy in a container mounts ${SCRIPT_DIRECTORY} read-only at the same path.`,
-    serving: SCRIPT_SERVING[proxy],
+    serving:
+      proxy === "traefik"
+        ? SCRIPT_SERVING.traefik(applicationId)
+        : SCRIPT_SERVING[proxy],
+    ...(proxy === "traefik" && {
+      names:
+        "The router, service and Compose service names belong to this application and stay the same on repeat installation. Keep them as given; replace app.example.com with this application's own hosts, and match its entry points, TLS and network. Removing this application's router and service leaves the other applications' names alone. The script file and Caddyfile are shared: keep them while any application uses them.",
+    }),
     tag: configuredTag(SCRIPT_TAG),
     includes: SCRIPT_INCLUDES.map((include) => ({
       ...include,

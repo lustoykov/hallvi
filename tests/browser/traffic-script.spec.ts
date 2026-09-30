@@ -17,7 +17,7 @@ import { trafficScript } from "../../src/server/traffic/script";
 import { trafficScriptFor } from "../../src/server/traffic/pi-tools";
 
 const html = (body: string, pageKey?: string) =>
-  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", pageKey).tag}</head><body>${body}</body></html>`;
+  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", "traffic-script-fixture", pageKey).tag}</head><body>${body}</body></html>`;
 
 const pages: Record<string, string> = {
   // Big enough text to be the largest paint, a banner that pushes it down
