@@ -1139,7 +1139,13 @@ export async function openPiSession(
             }),
             async execute(_id, params) {
               const log = await accessLogRecord(scope.applicationId);
-              return json(trafficScriptFor(params.proxy, log?.pageKey));
+              return json(
+                trafficScriptFor(
+                  params.proxy,
+                  scope.applicationId,
+                  log?.pageKey,
+                ),
+              );
             },
           }),
           defineTool({
