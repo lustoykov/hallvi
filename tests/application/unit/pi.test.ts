@@ -1,4 +1,7 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   open: vi.fn(),
@@ -45,7 +48,8 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
   AgentHarness: { create: mocks.create },
   BACKGROUND_CONTEXT: {},
 }));
-vi.mock("../../../src/server/pi-configuration", () => ({
+vi.mock("../../../src/server/pi-configuration", async (original) => ({
+  ...(await original<typeof import("../../../src/server/pi-configuration")>()),
   configuredPiRuntime: mocks.configure,
 }));
 vi.mock("../../../src/server/pi-sessions", () => ({
@@ -73,8 +77,14 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
   },
 }));
 import { openPiSession, describePiFailure } from "../../../src/server/pi";
+import {
+  listConnectionRequests,
+  requestDomain,
+  requestHost,
+  settleHost,
+} from "../../../src/server/connection-requests";
 const scope = {
-  applicationId: "app-a",
+  applicationId: "6f1c2a3e-7b5d-4c8e-9a10-2b3c4d5e6f70",
   chatId: "chat-a",
   reply: () => "reply-a",
 };
@@ -90,7 +100,10 @@ type RegisteredTool = {
   ) => Promise<unknown>;
 };
 let harness: { close: ReturnType<typeof vi.fn> };
+let config: string;
 beforeEach(() => {
+  config = mkdtempSync(join(tmpdir(), "hallvi-pi-tools-"));
+  vi.stubEnv("HALLVI_CONFIG_DIR", config);
   vi.clearAllMocks();
   mocks.main.mockReturnValue(true);
   mocks.configure.mockResolvedValue({
@@ -135,6 +148,10 @@ beforeEach(() => {
     ]),
   });
   mocks.propose.mockResolvedValue({ status: "opened" });
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  rmSync(config, { recursive: true, force: true });
 });
 /** A tool as the harness calls it. */
 const call = (name: string, id: string, args: unknown) =>
@@ -295,6 +312,48 @@ it("provider and connection tools use the same permission boundary, including de
   expect(mocks.connect).toHaveBeenCalledOnce();
 });
 
+it("closes only the obsolete host request after Pi connects, and keeps it after failure", async () => {
+  const otherApplication = "7f1c2a3e-7b5d-4c8e-9a10-2b3c4d5e6f70";
+  const request = {
+    needs: "A Linux machine with Docker.",
+    estimate: "Use an existing machine.",
+    recommended: "machine" as const,
+  };
+  requestHost(scope.applicationId, request);
+  requestDomain(scope.applicationId, "app.example.com");
+  const before = listConnectionRequests(scope.applicationId);
+  const other = requestHost(otherApplication, request);
+  const { close } = await openPiSession(scope);
+  try {
+    mocks.connect.mockRejectedValueOnce(new Error("SSH was not verified."));
+    await expect(
+      call("connect_server", "failed-connect", { serverId: 123 }),
+    ).rejects.toThrow("SSH was not verified.");
+    expect(listConnectionRequests(scope.applicationId)).toEqual(before);
+
+    mocks.connect.mockResolvedValueOnce({ sshVerified: true });
+    await call("connect_server", "verified-connect", { serverId: 123 });
+    expect(listConnectionRequests(scope.applicationId)).toEqual(
+      before.filter((request) => request.kind === "domain"),
+    );
+    expect(listConnectionRequests(otherApplication)).toEqual([other]);
+
+    requestHost(scope.applicationId, request);
+    settleHost(scope.applicationId, {
+      kind: "machine",
+      user: "root",
+      address: "test-host",
+      os: "Linux",
+    });
+    const receipt = listConnectionRequests(scope.applicationId);
+    mocks.connect.mockResolvedValueOnce({ sshVerified: true });
+    await call("connect_server", "reconnect", { serverId: 123 });
+    expect(listConnectionRequests(scope.applicationId)).toEqual(receipt);
+  } finally {
+    await close();
+  }
+});
+
 it("opens private access through the permission boundary and honors decline", async () => {
   mocks.tunnel.mockResolvedValue({
     url: "http://127.0.0.1:8080",
@@ -304,7 +363,7 @@ it("opens private access through the permission boundary and honors decline", as
   await call("open_server_port", "tunnel", { remotePort: 80 });
   expect(mocks.execute.mock.calls[0][0]).toBe("open_server_port");
   expect(mocks.tunnel).toHaveBeenCalledWith(
-    "app-a",
+    scope.applicationId,
     { remotePort: 80 },
     undefined,
   );
