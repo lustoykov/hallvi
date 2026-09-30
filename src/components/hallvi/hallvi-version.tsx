@@ -1,24 +1,38 @@
 "use client";
 
-// Which Hallvi this is, in the chrome rather than in Settings.
+// Hallvi itself, at the foot of the column.
 //
-// Hallvi's own version is not an account it acts through, so it does not
-// belong in the list of those. It belongs where a program's version belongs:
-// at the bottom, with an explicit update check below it. The check opens the
-// result panel; installing stays a separate action. Active update progress
-// gets a prominent notice because the sidebar disappears on narrow screens.
+// The top of the column is the application; the foot is Hallvi: its face, its
+// name and its version on one row that opens a small menu upward, as Claude's
+// account menu does. Settings, What's new and the update check live in that
+// menu. Hallvi's own version is not an account it acts through, so it stays
+// out of the list of those in Settings.
+//
+// The worker already looks for a release every hour, so checking is only for
+// the impatient and stays inside the menu. A waiting release is news: a mark
+// on the row, "Update ready" beneath the name, and the first thing in the
+// menu. Installing stays a separate press.
 //
 // An update is the rare thing here that takes Hallvi away and brings it back,
-// so its phase stays visible whether the panel is open or not. Completion
-// means the new server answers with the revision that was installed. The
-// browser still needs a full page reload to replace its loaded interface.
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowClockwise } from "@phosphor-icons/react";
+// so its phase stays visible whether the menu is open or not, in a notice
+// that also survives the narrow screens where this column is hidden.
+// Completion means the new server answers with the revision that was
+// installed. The browser still needs a full page reload to replace its loaded
+// interface.
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  ArrowClockwise,
+  CaretUpDown,
+  Check,
+  GearSix,
+  Sparkle,
+} from "@phosphor-icons/react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 
 import { ExternalLink } from "./external-link";
-import { LocalTime } from "./local-time";
+import { HallviMark } from "./hallvi-mark";
+import { ago } from "./register";
 
 type Phase =
   | "checking"
@@ -109,29 +123,44 @@ function readState() {
 }
 
 export function ThisHallvi({
-  className,
+  settingsHref,
   whatsNewHref = "/whats-new",
 }: {
-  className?: string;
+  /** Settings, carrying the way back to where the reader was. */
+  settingsHref: string;
   /** What's new, carrying the way back to where the reader was. */
   whatsNewHref?: string;
 }) {
   const [state, setState] = useState<HallviVersionState | null>(null);
   const [open, setOpen] = useState(false);
+  // Whether the reader pressed the check since opening the menu, so the item
+  // can answer "Up to date" where they pressed it.
+  const [looked, setLooked] = useState(false);
+  // "looked 20 min ago" is measured from when the menu opened.
+  const [now, setNow] = useState(0);
   const [busy, setBusy] = useState<"check" | "install" | null>(null);
   const [error, setError] = useState("");
   const [disconnected, setDisconnected] = useState(false);
   const [needsReload, setNeedsReload] = useState(false);
   const here = useRef<HTMLDivElement>(null);
+  const row = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setLooked(false);
+  }, []);
 
   /** A layer over the page closes the way one is expected to. */
   useEffect(() => {
     if (!open) return;
     const away = (event: PointerEvent) => {
-      if (!here.current?.contains(event.target as Node)) setOpen(false);
+      if (!here.current?.contains(event.target as Node)) close();
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      close();
+      row.current?.focus();
     };
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", escape);
@@ -139,7 +168,7 @@ export function ThisHallvi({
       document.removeEventListener("pointerdown", away);
       document.removeEventListener("keydown", escape);
     };
-  }, [open]);
+  }, [open, close]);
 
   useEffect(() => {
     let alive = true;
@@ -222,159 +251,276 @@ export function ThisHallvi({
       window.location.reload();
   }
 
-  if (!state) return null;
-  const { installed, available } = state;
-  const offering = Boolean(available && !available.blocked && !running);
+  const installed = state?.installed ?? null;
+  const available = state?.available ?? null;
+  const release = installed?.kind === "installed" ? installed : null;
   const preparing = busy === "install";
+  const offering = Boolean(available && !available.blocked && !running);
+  const settled = attempt && !running ? attempt.phase : null;
   const noticePhase = preparing ? "checking" : (attempt?.phase ?? "checking");
   const currentStep = UPDATE_STEPS.findIndex(
     (step) => step.phase === noticePhase,
   );
   const showNotice = preparing || Boolean(attempt);
 
-  return (
-    <div
-      className={`hv-this-hallvi${className ? ` ${className}` : ""}`}
-      ref={here}
-    >
-      <button
-        type="button"
-        className="hv-this-hallvi-line"
-        aria-expanded={open}
-        onClick={() => setOpen((was) => !was)}
-        title={
-          installed.kind === "installed"
-            ? `Hallvi ${installed.version} (${installed.revision.slice(0, 7)}) on ${state.machine}`
-            : installed.reason
+  /** The row's second line and mark: the version, or the news. */
+  const news: {
+    words: string;
+    tone: "ready" | "working" | "failed" | "blocked" | "done";
+  } | null = !release
+    ? null
+    : running || preparing
+      ? {
+          words:
+            attempt?.phase === "downloading" &&
+            typeof attempt.progress === "number"
+              ? `Updating · ${attempt.progress}%`
+              : "Updating",
+          tone: "working",
         }
-      >
-        <span>
-          {installed.kind === "installed"
-            ? `Hallvi ${installed.version}`
-            : "Hallvi · development checkout"}
-        </span>
-        {running ? (
-          <em className="hv-this-hallvi-ready">Update in progress</em>
-        ) : (
-          offering && <em className="hv-this-hallvi-ready">Update available</em>
-        )}
-      </button>
+      : settled === "failed"
+        ? { words: "Update failed", tone: "failed" }
+        : settled === "blocked"
+          ? { words: "Update not started", tone: "blocked" }
+          : settled === "completed"
+            ? { words: "Updated", tone: "done" }
+            : offering
+              ? { words: "Update ready", tone: "ready" }
+              : null;
+  const subline = installed
+    ? installed.kind === "installed"
+      ? (news?.words ?? installed.version)
+      : "Development checkout"
+    : "";
+  const label = release
+    ? `Hallvi ${release.version}${news ? `, ${news.words.toLowerCase()}` : ""}`
+    : installed
+      ? "Hallvi, development checkout"
+      : "Hallvi";
 
-      {installed.kind === "installed" && (
+  /**
+   * The one piece of news the menu leads with, most urgent first: an update
+   * running, how the last one ended, then a release waiting.
+   */
+  const latest =
+    running && attempt ? (
+      <div className="hv-this-hallvi-news">
+        <strong className="hv-sheen">
+          {disconnected
+            ? "Reconnecting to Hallvi"
+            : UPDATE_HEADINGS[attempt.phase]}
+        </strong>
+        <small>
+          {attempt.to?.version ?? available?.version} · Hallvi comes back on its
+          own
+        </small>
+      </div>
+    ) : attempt && settled === "completed" ? (
+      <div className="hv-this-hallvi-news hv-this-hallvi-news-done">
+        <strong>Updated to {attempt.to?.version}</strong>
+        {needsReload && (
+          <small>Reload the page to use the new interface.</small>
+        )}
+        <span className="hv-this-hallvi-news-actions">
+          {needsReload && (
+            <button
+              type="button"
+              className="hv-this-hallvi-go"
+              onClick={reloadInterface}
+            >
+              Reload page
+            </button>
+          )}
+          <button
+            type="button"
+            className="hv-this-hallvi-quiet-button"
+            onClick={() => act("dismiss")}
+          >
+            Dismiss
+          </button>
+        </span>
+      </div>
+    ) : attempt && settled ? (
+      <div className="hv-this-hallvi-news hv-this-hallvi-news-failed">
+        <strong>
+          {settled === "blocked"
+            ? "The update did not start"
+            : "The update failed"}
+        </strong>
+        <small>
+          {attempt.message}
+          {attempt.from
+            ? ` Hallvi ${attempt.from.version} is still installed.`
+            : ""}
+        </small>
+        <span className="hv-this-hallvi-news-actions">
+          {offering && (
+            <button
+              type="button"
+              className="hv-this-hallvi-go"
+              disabled={busy !== null}
+              onClick={() => act("install")}
+            >
+              {preparing ? "Starting…" : "Try again"}
+            </button>
+          )}
+          <button
+            type="button"
+            className="hv-this-hallvi-quiet-button"
+            onClick={() => act("dismiss")}
+          >
+            Dismiss
+          </button>
+        </span>
+      </div>
+    ) : offering && available ? (
+      <div className="hv-this-hallvi-news hv-this-hallvi-news-ready">
+        <strong>{available.version} is ready</strong>
+        <small>
+          {megabytes(available.size) && `${megabytes(available.size)} · `}
+          <ExternalLink href={available.notes}>Notes</ExternalLink>
+        </small>
         <button
           type="button"
-          className="hv-this-hallvi-check"
-          disabled={busy !== null || running}
-          onClick={() => {
-            setOpen(true);
-            void act("check");
-          }}
+          className="hv-this-hallvi-go"
+          disabled={busy !== null}
+          title="Hallvi checks it against the signed release, then stops and starts itself. Applications, conversations, credentials and ports stay as they are, and this page comes back on the same address."
+          onClick={() => act("install")}
         >
-          <ArrowClockwise size={14} aria-hidden="true" />
-          {busy === "check" ? "Checking for updates…" : "Check for updates"}
+          {preparing ? "Starting…" : "Update and restart"}
         </button>
-      )}
+      </div>
+    ) : available?.blocked ? (
+      <div className="hv-this-hallvi-news">
+        <strong>{available.version} is out</strong>
+        <small>{available.blocked}</small>
+      </div>
+    ) : null;
+
+  return (
+    <div className="hv-this-hallvi" ref={here}>
+      <button
+        type="button"
+        ref={row}
+        className={`hv-this-hallvi-row${open ? " open" : ""}`}
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={label}
+        title={
+          release
+            ? `Hallvi ${release.version} (${release.revision.slice(0, 7)}) on ${state?.machine}`
+            : installed?.kind === "development"
+              ? installed.reason
+              : undefined
+        }
+        onClick={() => {
+          if (open) return close();
+          setNow(Date.now());
+          setOpen(true);
+        }}
+      >
+        <HallviMark size={24} />
+        <span className="hv-this-hallvi-name">
+          <strong>Hallvi</strong>
+          <span
+            className={`hv-this-hallvi-sub${news ? ` hv-this-hallvi-tone-${news.tone}` : ""}${news?.tone === "working" ? " hv-sheen" : ""}`}
+          >
+            {subline}
+          </span>
+        </span>
+        {news && (
+          <i
+            className={`hv-this-hallvi-mark hv-this-hallvi-mark-${news.tone}`}
+            aria-hidden="true"
+          />
+        )}
+        <CaretUpDown className="hv-this-hallvi-caret" aria-hidden="true" />
+      </button>
+
       {open && (
-        <div
-          className="hv-this-hallvi-panel"
-          role="region"
-          aria-label="Hallvi updates"
-        >
-          {installed.kind === "installed" ? (
-            <p>
-              {installed.version} ({installed.revision.slice(0, 7)}) on{" "}
-              {state.machine} · <Link href={whatsNewHref}>What&apos;s new</Link>
-            </p>
-          ) : (
-            <p>
-              {installed.reason} Use git; a release does not replace it.{" "}
-              <Link href={whatsNewHref}>What&apos;s new</Link>
+        <div className="hv-this-hallvi-menu" id={menuId}>
+          {release && latest}
+
+          <Link className="hv-this-hallvi-item" href={settingsHref}>
+            <GearSix aria-hidden="true" />
+            <span>Settings</span>
+          </Link>
+          <Link className="hv-this-hallvi-item" href={whatsNewHref}>
+            <Sparkle aria-hidden="true" />
+            <span>What&apos;s new</span>
+          </Link>
+          {release && (
+            <button
+              type="button"
+              className="hv-this-hallvi-item"
+              disabled={busy !== null || running}
+              onClick={() => {
+                setLooked(true);
+                void act("check");
+              }}
+            >
+              {busy === "check" ? (
+                <>
+                  <ArrowClockwise aria-hidden="true" />
+                  <span className="hv-sheen">Checking for updates</span>
+                </>
+              ) : looked && state?.checkError ? (
+                <>
+                  <ArrowClockwise aria-hidden="true" />
+                  <span title={state.checkError}>Could not look · retry</span>
+                </>
+              ) : looked && !offering ? (
+                <>
+                  <Check className="hv-this-hallvi-ok" aria-hidden="true" />
+                  <span>Up to date</span>
+                  <em>{ago(state?.checkedAt, now)}</em>
+                </>
+              ) : (
+                <>
+                  <ArrowClockwise aria-hidden="true" />
+                  <span>Check for updates</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {error && (
+            <p className="hv-this-hallvi-error" role="alert">
+              {error}
             </p>
           )}
 
-          {installed.kind === "installed" && (
-            <>
-              <p className="hv-this-hallvi-quiet">
-                {state.channel} channel ·{" "}
-                {state.checkedAt ? (
-                  <>
-                    looked{" "}
-                    <LocalTime value={state.checkedAt} variant="compact" />
-                  </>
-                ) : (
-                  "not looked yet"
-                )}
-                {!state.ownKey && " · trusting a key from this installation"}
-              </p>
-
-              {busy === "check" ? (
-                <p className="hv-this-hallvi-quiet" role="status">
-                  Checking for new releases…
-                </p>
-              ) : available ? (
-                <div className="hv-this-hallvi-offer">
-                  <p>
-                    <strong>{available.version}</strong> is available
-                    {megabytes(available.size)
-                      ? ` (${megabytes(available.size)})`
-                      : ""}
-                    {" · "}
-                    <ExternalLink href={available.notes}>notes</ExternalLink>
-                  </p>
-                  <p className="hv-this-hallvi-quiet">
-                    {available.blocked ??
-                      "Hallvi checks it against the signed release, then stops and starts itself. Applications, conversations, credentials and ports stay as they are, and this page comes back on the same address."}
-                  </p>
-                </div>
-              ) : state.checkError ? (
-                <p className="hv-this-hallvi-quiet">
-                  {state.checkError} Hallvi cannot say whether a newer release
-                  exists.
-                </p>
+          {installed && (
+            <p className="hv-this-hallvi-meta">
+              {release ? (
+                <>
+                  <span>
+                    {release.version} · {release.revision.slice(0, 7)}
+                  </span>
+                  <span>
+                    {state?.machine} ·{" "}
+                    {state?.checkedAt
+                      ? `looked ${ago(state.checkedAt, now)}`
+                      : "not looked yet"}
+                  </span>
+                  {state?.checkError && !looked && (
+                    <span>Last look failed: {state.checkError}</span>
+                  )}
+                  {!state?.ownKey && (
+                    <span>Trusting a release key from this installation</span>
+                  )}
+                </>
               ) : (
-                state.checkedAt && (
-                  <p className="hv-this-hallvi-quiet">
-                    This is the newest {state.channel} release.
-                  </p>
-                )
+                <span>
+                  {installed.kind === "development" && installed.reason} Use
+                  git; a release does not replace it.
+                </span>
               )}
-
-              {attempt && !RUNNING.includes(attempt.phase) && (
-                <p className="hv-this-hallvi-quiet">
-                  {attempt.message}
-                  {attempt.phase === "failed" && attempt.from
-                    ? ` Hallvi ${attempt.from.version} is still installed.`
-                    : ""}
-                </p>
-              )}
-
-              {error && (
-                <p className="hv-this-hallvi-quiet" role="alert">
-                  {error}
-                </p>
-              )}
-
-              <div className="hv-this-hallvi-actions">
-                {offering && (
-                  <button
-                    type="button"
-                    className="hv-this-hallvi-go"
-                    disabled={busy !== null}
-                    onClick={() => act("install")}
-                  >
-                    {busy === "install" ? "Starting…" : "Update"}
-                  </button>
-                )}
-                {attempt && !RUNNING.includes(attempt.phase) && (
-                  <button type="button" onClick={() => act("dismiss")}>
-                    Dismiss
-                  </button>
-                )}
-              </div>
-            </>
+            </p>
           )}
         </div>
       )}
+
       {showNotice &&
         typeof document !== "undefined" &&
         createPortal(

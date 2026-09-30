@@ -20,7 +20,6 @@ import {
 import { DIRECT, countryName, plural } from "./model";
 import { Visit } from "./moment";
 import type { Moment } from "./model";
-import type { Variant } from "./variants";
 import { WorldMap } from "./world-map";
 
 const since = (at: number, clock: number) => {
@@ -135,28 +134,22 @@ function Arrivals({
 export function LiveArea({
   traffic,
   countries,
-  variant,
   moment,
   onAsk,
 }: {
   traffic: Traffic;
   /** The last day's countries, which the map rests on. */
   countries: Ranked[];
-  variant: Variant;
   moment: Moment | null;
   onAsk: (draft: string) => void;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const live = traffic.state === "live";
-  const map = (small: boolean) => (
-    <div
-      className="tf-live-map"
-      data-small={small || undefined}
-      data-live={live || undefined}
-    >
+  const map = (
+    <div className="tf-live-map" data-live={live || undefined}>
       <WorldMap
         countries={countries}
-        look={variant === "tint" ? "tint" : "dots"}
+        look="tint"
         onArrival={traffic.onArrival}
         focus={focus}
         label={
@@ -168,7 +161,6 @@ export function LiveArea({
             : "A world map. No visits are placed on it yet."
         }
       />
-      {moment && variant === "map" && <Visit moment={moment} place="corner" />}
     </div>
   );
   const ask =
@@ -186,32 +178,9 @@ export function LiveArea({
       </button>
     ) : null;
 
-  if (variant === "calm")
-    return (
-      <section className="tf-live" data-variant="calm" aria-label="Right now">
-        <p className="tf-now">
-          <Pulse traffic={traffic} />
-          <NowWords traffic={traffic} />
-          {traffic.arrivals[0] && (
-            <span className="tf-now-last">
-              Last:{" "}
-              {traffic.arrivals[0].country &&
-                `${countryName(traffic.arrivals[0].country)} · `}
-              <code>{traffic.arrivals[0].path}</code>
-              {traffic.arrivals[0].source &&
-                ` · ${sourceWords(traffic.arrivals[0].source)}`}
-            </span>
-          )}
-          {ask}
-          {moment && <Visit moment={moment} place="line" />}
-        </p>
-      </section>
-    );
-
   return (
     <section
       className="tf-live"
-      data-variant={variant}
       aria-label="Right now"
       onPointerLeave={() => setFocus(null)}
     >
@@ -219,26 +188,13 @@ export function LiveArea({
         <Pulse traffic={traffic} />
         <NowWords traffic={traffic} />
         {ask}
-        {moment && variant === "tint" && (
-          <Visit moment={moment} place="beside" />
-        )}
+        {moment && <Visit moment={moment} place="beside" />}
       </p>
-      {variant === "list" ? (
-        <div className="tf-live-body">
-          <Arrivals
-            traffic={traffic}
-            shown={8}
-            visit={moment ? <Visit moment={moment} place="row" /> : undefined}
-          />
-          {map(true)}
-        </div>
-      ) : (
-        <div className="tf-live-body">
-          {map(false)}
-          <Arrivals traffic={traffic} shown={variant === "tint" ? 4 : 6} />
-        </div>
-      )}
-      {countries.length > 0 && variant !== "list" && (
+      <div className="tf-live-body">
+        {map}
+        <Arrivals traffic={traffic} shown={4} />
+      </div>
+      {countries.length > 0 && (
         <ul className="tf-live-countries" aria-label="Countries today">
           {countries.slice(0, 6).map((country) => (
             <li key={country.key} onPointerEnter={() => setFocus(country.key)}>

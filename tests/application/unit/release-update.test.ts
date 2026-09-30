@@ -212,7 +212,7 @@ it("refuses a signed manifest for another channel, or one naming nothing usable"
     ).toThrow(complaint);
 });
 
-it("finds the newest published release, skipping drafts and anything signed by another key", async () => {
+it("finds the newest published release, skipping drafts and refusing an untrusted signature", async () => {
   const key = keypair();
   const stranger = keypair();
   const good = signedBy(key, manifestFor());
@@ -627,54 +627,77 @@ it("waits out the hour after a look that failed, then looks again", async () => 
   expect(looked?.error).toEqual(expect.any(String));
 });
 
-it("does not fetch a release it has already verified", async () => {
+it("ranks shuffled releases before the known-tag shortcut and still verifies new candidates", async () => {
   const key = keypair();
-  const manifest = manifestFor();
-  const { bytes, signature } = signedBy(key, manifest);
+  const source = "https://releases.test/index";
   const asked: string[] = [];
-  const listing = JSON.stringify([
-    {
-      tag_name: "v0.1.0-alpha.2",
+  const served = new Map<string, string>();
+  // Actual public GitHub ordering after alpha.10 was published: 9, 8, 10.
+  const listing = [9, 8, 10].map((number) => {
+    const tag = `v0.1.1-alpha.${number}`;
+    const base = `https://releases.test/${tag}`;
+    const signed = signedBy(key, manifestFor({ version: tag.slice(1) }));
+    served.set(`${base}/hallvi-release.json`, signed.bytes.toString("utf8"));
+    served.set(`${base}/hallvi-release.json.sig`, signed.signature);
+    return {
+      tag_name: tag,
       draft: false,
       assets: [
         {
           name: "hallvi-release.json",
-          browser_download_url: "https://example.com/hallvi-release.json",
+          browser_download_url: `${base}/hallvi-release.json`,
         },
         {
           name: "hallvi-release.json.sig",
-          browser_download_url: "https://example.com/hallvi-release.json.sig",
+          browser_download_url: `${base}/hallvi-release.json.sig`,
         },
       ],
-    },
-  ]);
+    };
+  });
   const get = async (url: string) => {
     asked.push(String(url));
-    const body = String(url).endsWith(".sig")
-      ? signature
-      : String(url).endsWith("hallvi-release.json")
-        ? bytes.toString("utf8")
-        : listing;
-    return new Response(body, { status: 200 });
+    return new Response(
+      url === source ? JSON.stringify(listing) : served.get(url),
+      { status: served.has(url) || url === source ? 200 : 404 },
+    );
+  };
+  const options = {
+    source,
+    env: { ...process.env, HALLVI_RELEASE_KEY: keyOf(key) },
+    fetch: get as unknown as typeof fetch,
   };
 
-  // Told nothing, it fetches the listing and both assets and verifies them.
-  const found = await discover({
-    source: "https://example.com/releases",
-    env: { ...process.env, HALLVI_RELEASE_KEY: keyOf(key) },
-    fetch: get as unknown as typeof fetch,
-  });
-  expect(found).not.toBe(UNCHANGED);
-  expect(asked).toHaveLength(3);
+  // Neither a fresh check nor a cached alpha.9 may stop on the first entry.
+  for (const known of [null, "v0.1.1-alpha.9"]) {
+    asked.length = 0;
+    const found = known
+      ? await discover({ ...options, known })
+      : await discover(options);
+    expect(found).toMatchObject({
+      tag: "v0.1.1-alpha.10",
+      manifest: { version: "0.1.1-alpha.10" },
+    });
+    expect(asked).toEqual([
+      source,
+      "https://releases.test/v0.1.1-alpha.10/hallvi-release.json",
+      "https://releases.test/v0.1.1-alpha.10/hallvi-release.json.sig",
+    ]);
+  }
 
-  // Told the tag it already has, it reads the listing and stops there.
+  // When the highest candidate was already verified, only the listing is read.
   asked.length = 0;
-  const again = await discover({
-    source: "https://example.com/releases",
-    env: { ...process.env, HALLVI_RELEASE_KEY: keyOf(key) },
-    known: "v0.1.0-alpha.2",
-    fetch: get as unknown as typeof fetch,
-  });
-  expect(again).toBe(UNCHANGED);
-  expect(asked).toEqual(["https://example.com/releases"]);
+  expect(await discover({ ...options, known: "v0.1.1-alpha.10" })).toBe(
+    UNCHANGED,
+  );
+  expect(asked).toEqual([source]);
+
+  // Listing metadata is fetch priority, never trust: a newer bad signature
+  // is refused rather than hidden by the cached, correctly signed alpha.9.
+  served.set(
+    "https://releases.test/v0.1.1-alpha.10/hallvi-release.json.sig",
+    signedBy(keypair(), manifestFor()).signature,
+  );
+  await expect(
+    discover({ ...options, known: "v0.1.1-alpha.9" }),
+  ).rejects.toThrow(/not signed by the key this Hallvi trusts/);
 });

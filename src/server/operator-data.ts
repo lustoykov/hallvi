@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { LOG_FORMATS } from "./traffic/contract";
+import { LOG_FORMATS, LOG_QUERIES } from "./traffic/contract";
 
 export const operatorSettingsSchema = z.object({
   permissionMode: z.enum(["always-ask", "pi-decides", "bypass"]),
@@ -246,6 +246,13 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
       .min(1)
       .max(20)
       .optional(),
+    /**
+     * What the proxy removes before writing a line, as the applied setup
+     * does (`traffic_setup`'s record says): the query of the address and
+     * the referrer, of the address only, or nothing. Absent: unknown, and
+     * the Traffic page claims nothing.
+     */
+    queries: z.enum(LOG_QUERIES).optional(),
     /** A query key the application routes by, such as WordPress's `p`. */
     pageKey: z
       .string()

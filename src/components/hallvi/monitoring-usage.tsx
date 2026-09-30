@@ -45,6 +45,11 @@ interface Counted {
   paths: { path: string; requests: number; serverErrors: number }[];
   /** What the list of paths counts. */
   pathsAre: "Most requested" | "Most viewed";
+  /**
+   * The stored lists were kept or counted only in part: the paths' counts
+   * and their failures are floors.
+   */
+  pathsAtLeast?: { requests: boolean; serverErrors: boolean };
 }
 
 function fromUsage(usage: Usage): Counted | null {
@@ -88,6 +93,10 @@ function fromHistory(history: TrafficHistory): Counted {
           history.errors.find((error) => error.key === page.key)?.count ?? 0,
       })),
     pathsAre: "Most viewed",
+    pathsAtLeast: {
+      requests: history.partialLists.includes("pages"),
+      serverErrors: history.partialLists.includes("errors"),
+    },
   };
 }
 
@@ -395,10 +404,13 @@ function Traffic({
                 <span className="axmu-share" aria-hidden="true">
                   <i style={{ width: `${(path.requests / pathTop) * 100}%` }} />
                 </span>
-                <span>{count(path.requests)}</span>
+                <span>
+                  {traffic.pathsAtLeast?.requests ? "≥ " : ""}
+                  {count(path.requests)}
+                </span>
                 <em>
                   {path.serverErrors > 0
-                    ? `${count(path.serverErrors)} failed`
+                    ? `${traffic.pathsAtLeast?.serverErrors ? "≥ " : ""}${count(path.serverErrors)} failed`
                     : ""}
                 </em>
               </li>

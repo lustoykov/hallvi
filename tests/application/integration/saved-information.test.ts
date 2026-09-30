@@ -78,3 +78,66 @@ it("returns and persists redacted problem prose on creation and update, using th
   );
   expect((await listInformation(app.id))[0].body).toBe(updated.body);
 });
+
+// A proof found Pi updating a cdn record with facts: [] and erasing
+// caches-pages. An update still replaces the record, but the result names
+// what it dropped so Pi can put back a fact it meant to keep.
+it("names the facts an update dropped, with what they held", async () => {
+  const app = await insertApplication({
+    name: "Cached",
+    repositoryUrl: "https://github.com/qa/cached",
+    repositoryOwner: "qa",
+    repositoryName: "cached",
+  });
+  const cdn = (facts: { key: string; label: string; value: string }[]) => ({
+    title: "Cloudflare caches pages",
+    body: "A second request came back HIT.",
+    establishedAt: "2026-09-29T12:00:00.000Z",
+    presentation: {
+      states: { ref: { kind: "cdn", id: "cloudflare" }, presence: "present" },
+      views: ["cdn"],
+      role: "status",
+      status: "verified",
+      checks: [
+        {
+          key: "caching",
+          label: "Caching",
+          status: "passed",
+          claim: "configuration",
+          basis: "observed",
+        },
+      ],
+      facts: facts.map((fact) => ({
+        ...fact,
+        claim: "configuration",
+        basis: "observed",
+      })),
+    },
+  });
+  const providerFact = {
+    key: "provider",
+    label: "Provider",
+    value: "Cloudflare",
+  };
+  const cachesFact = {
+    key: "caches-pages",
+    label: "Caches pages",
+    value: "yes",
+  };
+  const saved = await saveInformation(app.id, cdn([providerFact, cachesFact]));
+  expect(saved).not.toHaveProperty("warning");
+
+  const kept = await saveInformation(
+    app.id,
+    cdn([providerFact, { ...cachesFact, value: "no" }]),
+    saved.id,
+  );
+  expect(kept).not.toHaveProperty("warning");
+
+  const erased = await saveInformation(app.id, cdn([]), saved.id);
+  expect(erased).toMatchObject({
+    warning: expect.stringMatching(
+      /removed provider \("Cloudflare"\), caches-pages \("no"\)/,
+    ),
+  });
+});

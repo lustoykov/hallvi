@@ -296,8 +296,8 @@ The second command stays open and says nothing while it is connected. Every
 forward explicitly binds the laptop's `127.0.0.1`, even when its SSH defaults
 allow forwarded ports on other interfaces. Open the address the installer
 printed, for example <http://127.0.0.1:5747>. The tab title says which machine
-you have reached, and so does the version at the foot of the sidebar when you
-click it. A private application
+you have reached, and so does the Hallvi menu at the foot of the sidebar when
+you open it. A private application
 link Pi opens, for example `http://127.0.0.1:5757`, works in the laptop's
 browser as it is written. Connecting ChatGPT and GitHub uses device codes, so
 both work through the same connection with nothing further to forward. If the
@@ -325,12 +325,13 @@ note explains why.
 
 <a id="upgrade"></a>
 
-Hallvi updates itself. Its version sits at the bottom of the sidebar, under
-**Settings**, with a visible **Check for updates** button below it. Press it to
-check immediately and open the result. When a release is available, press
-**Update** in that panel to install it. Checking does not start installation.
-**What's new**, beside the version in that panel, lists what changed in each
-release up to the installed one; an available release links to its own notes.
+Hallvi updates itself. Its own row sits at the foot of the sidebar: the name,
+with the installed version beneath. Opening it shows a small menu with
+**Settings**, **What's new** and **Check for updates**. When a release is
+waiting, the row says **Update ready** and the menu leads with it, its size and
+its notes; press **Update and restart** to install it. **Check for updates**
+looks immediately, and checking does not start installation. **What's new**
+lists what changed in each release up to the installed one.
 
 The service coming back does not replace the interface already loaded in your
 browser. When an open page sees the update finish, **Reload page** loads that
@@ -388,7 +389,7 @@ you are on. The helper's own account is in `~/.local/share/hallvi/logs/update.lo
 
 Only one update runs at a time; a second is told what the first is doing.
 Installing is always something you press: Hallvi never replaces itself on its
-own. It looks for a release at most once a day, and keeps the answer in
+own. It looks for a release at most once an hour, and keeps the answer in
 between, so opening a page never waits on the network.
 
 **A development checkout** says what it is and offers nothing. `git` is how it
@@ -495,9 +496,15 @@ the same "Dev" chip. The installed Hallvi has none of these.
 
 ## Limits today
 
-- The [first signed alpha release](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.1)
-  is published. External-user installation and deployment acceptance on that
-  exact release remains open; see [the roadmap](../ROADMAP.md#public-self-service-beta-preparation).
+- [Alpha.11](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.11)
+  passed native clean-install and upgrade checks on both supported platforms, and
+  the existing Mac mini installation upgraded with its retained records intact.
+  A fresh isolated account completed ChatGPT sign-in, public-repository inspection
+  and manual deployment on a real host, with API behavior checked. Chrome returned
+  `ERR_BLOCKED_BY_CLIENT` when opening that private route, so complete fresh-user
+  browser acceptance and independent external onboarding remain unverified. See
+  [release acceptance](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065) and
+  [the roadmap](../ROADMAP.md#public-self-service-beta-preparation).
 - A first installation trusts github.com over HTTPS for the installer script.
   The script carries the public release key and checks the signed manifest.
   On stock macOS the signature check runs after unpacking with Node.js from

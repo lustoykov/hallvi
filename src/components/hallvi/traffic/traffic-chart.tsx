@@ -310,7 +310,10 @@ export function TrafficChart({
                 <>
                   <span>
                     <i data-series="visitors" />
-                    {plural(hovered.visitors, "estimated visitor")}
+                    {atLeast(
+                      plural(hovered.visitors, "estimated visitor"),
+                      hovered.visitorsAtLeast,
+                    )}
                   </span>
                   <span>
                     <i data-series="views" />

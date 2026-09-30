@@ -199,4 +199,10 @@ this task, preserving any prior edits. Stop your own previews by recorded PID, r
 Remove only your exact disposable fixtures/snapshots after preserving needed
 redacted evidence. Follow [resource cleanup](development-resources.md) for
 containers, provider resources and anything intentionally left for review.
+For a disposable installed application, **Forget** removes its registration and
+history but currently can leave its managed SSH tunnel and application-specific
+operator configuration behind. After saving evidence and forgetting the idle
+fixture, match the remaining process and directory to that exact application ID
+before removing them. Preserve the owner’s laptop forwards and shared account
+configuration; Forget is not remote deployment cleanup.
 Never prune shared resources or remove a worktree by hand.

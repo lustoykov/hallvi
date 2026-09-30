@@ -119,12 +119,13 @@ export function fitToBudget(
   return { files: files.filter((file) => !dropped.has(file)), omitted };
 }
 
-export function treeArchive(files: TreeFile[]) {
+export function treeArchive(files: TreeFile[], mtime?: number) {
   return writeTar(
     files.map((file) => ({
       path: file.path,
       content: file.content,
       mode: file.mode & 0o111 ? 0o755 : 0o644,
     })),
+    { mtime },
   );
 }
