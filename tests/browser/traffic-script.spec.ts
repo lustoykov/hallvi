@@ -12,12 +12,22 @@ import {
   PING_SECONDS,
   SCRIPT_PATH,
   type ScriptEvent,
+  type TrafficLine,
 } from "../../src/server/traffic/contract";
+import { LiveWindow } from "../../src/server/access-log";
+import { countDay } from "../../src/server/traffic/count";
 import { trafficScript } from "../../src/server/traffic/script";
 import { trafficScriptFor } from "../../src/server/traffic/pi-tools";
 
-const html = (body: string, pageKey?: string) =>
-  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", "traffic-script-fixture", pageKey).tag}</head><body>${body}</body></html>`;
+// Route counting represents a visitor browser; the classifier correctly
+// excludes Playwright's default self-declared HeadlessChrome agent.
+test.use({
+  userAgent:
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+});
+
+const html = (body: string, pageKey?: string, hashRouting?: boolean) =>
+  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", "traffic-script-fixture", pageKey, hashRouting).tag}</head><body>${body}</body></html>`;
 
 const pages: Record<string, string> = {
   // Big enough text to be the largest paint, a banner that pushes it down
@@ -48,18 +58,39 @@ const pages: Record<string, string> = {
     <button onclick="history.pushState({}, '', '/app/settings#billing')">Billing</button>
     <button onclick="history.pushState({}, '', '/app/promo?utm_source=mail&password=hunter2')">Promo</button>
   </nav>`),
+  "/hash": html("<p>Hash-routed application</p>", undefined, true),
 };
 
 let servers: Server[] = [];
 let site = "";
 let other = "";
 let paths: string[] = [];
+let lines: TrafficLine[] = [];
 
 test.beforeAll(async () => {
   const script = trafficScript().content;
   const handle: Parameters<typeof createServer>[1] = (request, response) => {
     const path = new URL(request.url ?? "/", "http://proxy").pathname;
+    const record = (status: number, contentType: string | null) =>
+      lines.push({
+        at: Date.now(),
+        host: "127.0.0.1",
+        method: request.method ?? "GET",
+        path,
+        kept: {},
+        status,
+        ms: 0,
+        address: "203.0.113.9",
+        userAgent: String(request.headers["user-agent"] ?? ""),
+        referrer: request.headers.referer ?? null,
+        fetchDest: String(request.headers["sec-fetch-dest"] ?? ""),
+        fetchMode: String(request.headers["sec-fetch-mode"] ?? ""),
+        purpose: null,
+        contentType,
+        cdnCountry: null,
+      });
     if (request.method === "POST" && path.startsWith(EVENT_PREFIX)) {
+      record(204, null);
       paths.push(request.url ?? "");
       return response.writeHead(204).end();
     }
@@ -75,6 +106,7 @@ test.beforeAll(async () => {
           `<a href="${site}/landing?utm_source=news&utm_campaign=launch&token=secret">Visit</a>`,
         );
     if (!pages[path]) return response.writeHead(404).end();
+    record(200, "text/html");
     response.writeHead(200, { "content-type": "text/html" }).end(pages[path]);
   };
   // Two origins: a page on the second one sends visitors to the first.
@@ -103,6 +135,7 @@ test.afterAll(async () => {
 
 test.beforeEach(() => {
   paths = [];
+  lines = [];
 });
 
 /** Every event so far. A path Hallvi would not accept fails the test. */
@@ -216,29 +249,39 @@ test("a single-page application: a new path is a new view, the same path is not"
   await nav("Billing");
   await nav("Promo");
   await page.goBack();
+  await until("view", 4);
+  await page.goForward();
 
-  const views = await until("view", 4);
+  const views = await until("view", 5);
   expect(views.map((view) => view.p)).toEqual([
     "/app",
     "/app/settings",
     "/app/promo",
     "/app/settings",
+    "/app/promo",
   ]);
-  expect(new Set(views.map((view) => view.s)).size).toBe(4);
+  expect(new Set(views.map((view) => view.s)).size).toBe(5);
   // Opened directly, so the first view has no referrer; every route change
   // was reached from the application itself. Campaign tags come from each
   // view's own address.
-  expect(views.map((view) => view.r)).toEqual([undefined, site, site, site]);
+  expect(views.map((view) => view.r)).toEqual([
+    undefined,
+    site,
+    site,
+    site,
+    site,
+  ]);
   expect(views.map((view) => view.u)).toEqual([
     undefined,
     undefined,
     { utm_source: "mail" },
     undefined,
+    { utm_source: "mail" },
   ]);
   // Every view but the current one has left, once.
-  const leaves = await until("leave", 3);
+  const leaves = await until("leave", 4);
   expect(leaves.map((leave) => [leave.s, leave.p])).toEqual(
-    views.slice(0, 3).map((view) => [view.s, view.p]),
+    views.slice(0, 4).map((view) => [view.s, view.p]),
   );
 });
 
@@ -259,7 +302,143 @@ test("query-routed pages use only the configured page key", async ({
   await page.goBack();
   const returned = await until("view", 3);
   expect(returned.map(({ q }) => q?.v)).toEqual(["123", "456", "123"]);
+  await page.goForward();
+  expect((await until("view", 4)).map(({ q }) => q?.v)).toEqual([
+    "123",
+    "456",
+    "123",
+    "456",
+  ]);
   expect(JSON.stringify(events())).not.toMatch(/token|secret|tab/);
+});
+
+for (const prefix of ["#/", "#!/"]) {
+  test(`configured ${prefix} routes count initial load, navigation and back/forward once`, async ({
+    page,
+  }, testInfo) => {
+    await page.goto(`${site}/hash${prefix}home`);
+    await until("view", 1);
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, `${prefix}inbox`);
+    await until("view", 2);
+    await page.evaluate((hash) => {
+      history.replaceState({}, "", hash + "?token=secret#billing");
+    }, `${prefix}inbox`);
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, `${prefix}settings/new`);
+    await until("view", 3);
+    await page.goBack();
+    await until("view", 4);
+    await page.goForward();
+    const views = await until("view", 5);
+    expect(views.map(({ p, h }) => [p, h])).toEqual(
+      ["home", "inbox", "settings/new", "inbox", "settings/new"].map(
+        (route) => ["/hash", prefix + route],
+      ),
+    );
+    expect(new Set(views.map(({ s }) => s)).size).toBe(5);
+    expect((await until("leave", 4)).map(({ s }) => s)).toEqual(
+      views.slice(0, 4).map(({ s }) => s),
+    );
+
+    // Feed the actual browser requests through both shipping consumers:
+    // the document and its first script event are one view at takeover.
+    const day = countDay(lines, {
+      day: new Date(lines[0].at).toISOString().slice(0, 10),
+      timeZone: "UTC",
+      scriptSince: null,
+      hashRouting: true,
+      coverage: { from: null, to: null, gaps: [] },
+    });
+    expect(day.hours.reduce((sum, hour) => sum + hour.views, 0)).toBe(5);
+    expect(day.pages.map(({ key }) => key).sort()).toEqual(
+      ["/hash", `/hash${prefix}inbox`, `/hash${prefix}settings/new`].sort(),
+    );
+    const live = new LiveWindow({ script: false, hashRouting: true });
+    const arrivals = lines
+      .map((line) => live.arrival(line))
+      .filter((arrival) => arrival?.kind === "view");
+    expect(arrivals.map((arrival) => arrival?.path)).toEqual([
+      "/hash",
+      `/hash${prefix}inbox`,
+      `/hash${prefix}settings/new`,
+      `/hash${prefix}inbox`,
+      `/hash${prefix}settings/new`,
+    ]);
+    expect(JSON.stringify(events())).not.toMatch(/secret|token|billing/);
+    await testInfo.attach("accepted-events.json", {
+      body: JSON.stringify(
+        { events: events(), pages: day.pages, arrivals },
+        null,
+        2,
+      ),
+      contentType: "application/json",
+    });
+  });
+}
+
+test("hash privacy: default ignores routes; opt-in excludes anchors and credential fragments", async ({
+  page,
+}, testInfo) => {
+  await page.goto(`${site}/app#/home`);
+  await until("view", 1);
+  await page.evaluate(() => {
+    location.hash = "#/inbox";
+  });
+  await page.evaluate(() =>
+    (window as unknown as { hv(name: string): void }).hv("check"),
+  );
+  await until("goal", 1);
+  expect(ofType("view")).toHaveLength(1);
+  expect(events().every((event) => event.h === undefined)).toBe(true);
+
+  paths = [];
+  await page.goto(`${site}/hash#access_token=secret`);
+  await until("view", 1);
+  for (const hash of [
+    "#billing",
+    "#reset_token=secret",
+    "#id_token=secret&state=secret",
+    "#/access_token=secret",
+    "#!/code=secret",
+    "#/reset&token=secret",
+    "#/access_token%3Dsecret",
+    "#/reset%26token%3Dsecret",
+    "#/oauth%253Dsecret",
+    "#/bad%ZZsecret",
+  ]) {
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, hash);
+    await page.evaluate(() =>
+      (window as unknown as { hv(name: string): void }).hv("check"),
+    );
+  }
+  await until("goal", 10);
+  expect(ofType("view")).toHaveLength(1);
+  expect(events().every((event) => event.h === undefined)).toBe(true);
+  await page.evaluate(() => {
+    location.hash = "#/reset?token=secret#secret-anchor";
+  });
+  await until("view", 2);
+  await page.evaluate(() => {
+    location.hash = "#!/settings?access_token=secret#billing";
+  });
+  const views = await until("view", 3);
+  expect(views.map(({ h }) => h)).toEqual([
+    undefined,
+    "#/reset",
+    "#!/settings",
+  ]);
+  expect(JSON.stringify(events())).not.toMatch(
+    /secret|token|billing|oauth|code=/,
+  );
+  await testInfo.attach("accepted-events.json", {
+    body: JSON.stringify(events(), null, 2),
+    contentType: "application/json",
+  });
 });
 
 test("pings while the tab is visible, and visible time keeps adding up after a return", async ({

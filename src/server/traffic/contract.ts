@@ -113,12 +113,18 @@ export const PAGE_KEY_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,39}$/;
  */
 export const PAGE_KEY_VALUE = /^[^\u0000-\u001f\u007f?#&=]{1,100}$/u;
 
+/** Explicit opt-in for #/… and #!/… routes; absent means ignore fragments. */
+export const HASH_ROUTING_ATTRIBUTE = "data-hv-hash-routing";
+/** A decoded hash route's path, without query, anchor or key-value data. */
+export const HASH_ROUTE_PATH = /^\/[^\u0000-\u0020\u007f%?#&=]{0,199}$/u;
+
 /**
  * What the script sends. `s` is a random id for one page view — it joins a
  * `leave` to its `view` and identifies nobody. `p` is the page's path, and
  * `q` the page key its tag names with that key's value, when the tag names
  * one and the address carries it: the only part of a query an event holds.
  * A count keeps it only when `q.k` is the key the application's record names.
+ * `h` is a decoded #/… or #!/… route path, kept only with hash-routing opt-in.
  */
 export type ScriptEvent = (
   | {
@@ -157,6 +163,8 @@ export type ScriptEvent = (
 ) & {
   /** The tag's page key and its value, never the rest of the query. */
   q?: { k: string; v: string };
+  /** A supported hash route, kept only when the record opts in. */
+  h?: string;
 };
 
 const LIMITS = {
@@ -210,7 +218,12 @@ export function eventOf(path: string): ScriptEvent | null {
     /[?#]/.test(p as string)
   )
     return null;
-  const base: { s: string; p: string; q?: { k: string; v: string } } = {
+  const base: {
+    s: string;
+    p: string;
+    q?: { k: string; v: string };
+    h?: string;
+  } = {
     s,
     p: p as string,
   };
@@ -226,6 +239,12 @@ export function eventOf(path: string): ScriptEvent | null {
     )
       return null;
     base.q = { k, v };
+  }
+  if (value.h !== undefined) {
+    if (typeof value.h !== "string") return null;
+    const route = /^#!?(\/.*)$/u.exec(value.h)?.[1];
+    if (!route || !HASH_ROUTE_PATH.test(route)) return null;
+    base.h = value.h;
   }
   switch (t) {
     case "view": {

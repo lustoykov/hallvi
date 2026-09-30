@@ -38,6 +38,11 @@
     ? named
     : null;
   const PAGE_VALUE = /^[^\u0000-\u001f\u007f?#&=]{1,100}$/u;
+  // Hash routes are explicit opt-in. Ordinary anchors and credential
+  // fragments are not routes; only #/… and #!/… path forms are supported.
+  const HASH_ROUTING =
+    document.currentScript?.getAttribute("data-hv-hash-routing") === "true";
+  const HASH_PATH = /^\/[^\u0000-\u0020\u007f%?#&=]{0,199}$/u;
   // An error thrown in a loop would otherwise be a request per frame.
   const ERRORS_PER_VIEW = 10;
 
@@ -90,7 +95,7 @@
       fetch(url, { method: "POST", keepalive: true }).catch(() => {});
   };
   const emit = (t, more) =>
-    view && send({ t, s: view.s, p: view.p, q: view.q, ...more });
+    view && send({ t, s: view.s, p: view.p, q: view.q, h: view.h, ...more });
 
   // The page: its path, and the page key with its value when the tag names
   // one and the address carries it.
@@ -101,6 +106,23 @@
       .get(PAGE_KEY)
       ?.slice(0, 100);
     if (value && PAGE_VALUE.test(value)) return { k: PAGE_KEY, v: value };
+  };
+  const hashRoute = () => {
+    if (!HASH_ROUTING) return;
+    const prefix = location.hash.startsWith("#/")
+      ? "#"
+      : location.hash.startsWith("#!/")
+        ? "#!"
+        : null;
+    if (!prefix) return;
+    try {
+      // Strip query values and secondary anchors before decoding. Reject
+      // malformed/encoded key-value credentials and nested encodings too.
+      const route = decodeURIComponent(
+        location.hash.slice(prefix.length).split(/[?#]/, 1)[0],
+      );
+      if (HASH_PATH.test(route)) return prefix + route;
+    } catch {}
   };
 
   // Where the page the browser loaded was reached from: the referrer's
@@ -134,6 +156,7 @@
       ).join(""),
       p: path(),
       q: keyed(),
+      h: hashRoute(),
       shown: 0,
       since: visible() ? now() : null,
       left: false,
@@ -177,7 +200,13 @@
   };
 
   const moved = () => {
-    if (path() === view.p && keyed()?.v === view.q?.v) return;
+    const hash = hashRoute();
+    if (
+      path() === view.p &&
+      keyed()?.v === view.q?.v &&
+      (hash === undefined || hash === view.h)
+    )
+      return;
     end();
     start(false);
   };
@@ -245,8 +274,8 @@
     observe("first-input", interactions);
 
     // Route changes inside the application. The same page again (another
-    // part of the query or the hash changing, a router tidying its state) is
-    // the same page view; a new path or page key's value is a new one.
+    // part of the query changing, a router tidying its state) is the same
+    // view. Hash changes count only with opt-in and a supported route.
     for (const name of ["pushState", "replaceState"]) {
       const original = history[name];
       history[name] = function (...args) {
@@ -256,6 +285,7 @@
       };
     }
     addEventListener("popstate", safely(moved));
+    if (HASH_ROUTING) addEventListener("hashchange", safely(moved));
 
     document.addEventListener(
       "visibilitychange",
