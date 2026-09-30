@@ -190,7 +190,7 @@ function ScriptOffer({
 }) {
   return (
     <div className="tf-offer-line">
-      <p>{says}</p>
+      <p>{says} Measurement starts after analytics consent.</p>
       <button
         type="button"
         className="tf-button"
@@ -374,12 +374,18 @@ function Foot({
         )}
         {!script && kept && !asked && (
           <button type="button" className="tf-link" onClick={onAsked}>
-            Goals and page speed
+            Page speed
           </button>
         )}
         {error && <span className="tf-error">{error}</span>}
       </div>
       {asked}
+      {script && (
+        <p className="tf-foot-quiet">
+          Consent-gated script measurements cover visitors who allow analytics,
+          so they can understate total use.
+        </p>
+      )}
       <p className="tf-foot-quiet">
         Hallvi keeps totals on this computer, never an address.{" "}
         {serverLogWords(collection.source)}{" "}
@@ -733,7 +739,7 @@ export function TrafficPage({
         asked={asked ? lockedOffer(asked) : null}
         onToggle={() => perform(collection.enabledAt ? "stop" : "keep")}
         onForget={() => setForgetting(true)}
-        onAsked={() => setAsked("goals")}
+        onAsked={() => setAsked("speed")}
       />
       {forgetting && (
         <ConfirmActionDialog

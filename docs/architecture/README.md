@@ -42,6 +42,7 @@ Each of these is linked from the document that owns its decision.
 | [Where the way in is answered](private-access-reachability.html) | [Roadmap](../../ROADMAP.md) |
 | [Reconnect an established private route](reconnect-private-route.md) | [Operator design](../operator-design.md) |
 | [What trusts what in a release](../releases.md#what-trusts-what) | [Publishing a release](../releases.md) |
+| [Analytics consent lifecycle](../design/traffic.md#analytics-consent-and-privacy-notice) | [Traffic](../design/traffic.md) |
 
 ## Historical
 

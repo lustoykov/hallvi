@@ -10,7 +10,7 @@ import { AppWindow, Check, FileText, Minus } from "@phosphor-icons/react";
 
 /** Why the page offers it: the evidence, or only what the script adds. */
 export type OfferReason =
-  "browser-pages" | "cached-pages" | "time" | "goals" | "speed" | "more";
+  "browser-pages" | "cached-pages" | "time" | "speed" | "more";
 
 interface Props {
   reason: OfferReason;
@@ -44,7 +44,13 @@ export function ScriptOffers(props: Props) {
     );
   return (
     <section className="tf-script" aria-label="Hallvi's traffic script">
-      <Checklist {...props} />
+      <div>
+        <Checklist {...props} />
+        <p className="tf-script-privacy">
+          Measures visitors who allow analytics. Hallvi can add consent controls
+          and a privacy notice that fit your site.
+        </p>
+      </div>
       <div className="tf-script-actions">
         <button type="button" className="tf-primary" onClick={onAdd}>
           Add Hallvi&apos;s script
@@ -74,7 +80,6 @@ function Checklist({ reason }: Props) {
     { id: "cdn", label: "Pages a CDN served", log: false },
     { id: "time", label: "Time on page", log: false },
     { id: "speed", label: "Page speed", log: false },
-    { id: "goals", label: "Goals, like sign-ups", log: false },
   ];
   const here = HERE[reason];
   return (
