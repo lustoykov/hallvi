@@ -29,8 +29,8 @@ import {
 
 const model = {
   provider: "openai-codex",
-  id: "gpt-6-sol",
-  name: "GPT-6 Sol",
+  id: "gpt-6.1-sol",
+  name: "GPT-6.1 Sol",
   reasoning: true,
 };
 const oauth = {
@@ -123,11 +123,11 @@ describe("explicit Pi adoption", () => {
       else {
         await choosePiSetup({ mode: "separate" }, sdkLoader);
         writeFileSync(
-          readPiConfiguration()!.authPath,
+          readPiConfiguration()!.authPath!,
           JSON.stringify({ [model.provider]: oauth }),
         );
       }
-      const authPath = readPiConfiguration()!.authPath;
+      const authPath = readPiConfiguration()!.authPath!;
       const before = readFileSync(authPath, "utf8");
       const piPreferences = readFileSync(
         join(agentDirectory, "settings.json"),
@@ -146,7 +146,7 @@ describe("explicit Pi adoption", () => {
         detected: { canReuse: true },
       });
       await expect(configuredPiRuntime(await sdkLoader())).rejects.toThrow(
-        "choose whether",
+        "connect a model",
       );
       expect(runtime.getAuth).not.toHaveBeenCalled();
     },
@@ -278,7 +278,7 @@ describe("explicit Pi adoption", () => {
       defaultThinkingLevel: "high",
     });
     credentials({ anthropic: oauth });
-    await expect(adopt()).rejects.toThrow("subscription access only");
+    await expect(adopt()).rejects.toThrow("Hallvi offers ChatGPT models");
     expect(readPiConfiguration()).toBeNull();
   });
 
@@ -326,7 +326,7 @@ describe("explicit Pi adoption", () => {
 
   it("refuses a model turn without a saved choice", async () => {
     await expect(configuredPiRuntime(await sdkLoader())).rejects.toThrow(
-      "choose whether",
+      "connect a model",
     );
     expect(createRuntime).not.toHaveBeenCalled();
   });
@@ -351,7 +351,6 @@ describe("explicit Pi adoption", () => {
       modelId: model.id,
       reasoningEffort: "medium",
       authPath: join(agentDirectory, "auth.json"),
-      credentialType: "oauth",
     });
     expect(readFileSync(join(agentDirectory, "settings.json"), "utf8")).toBe(
       settingsBefore,
@@ -782,11 +781,11 @@ describe("Pi login across development previews", () => {
     vi.stubEnv("HALLVI_PI_CONFIG_DIR", join(directory, "account"));
     const firstState = piConfigDir();
     await choosePiSetup({ mode: "separate" }, sdkLoader);
-    const authPath = readPiConfiguration()!.authPath;
+    const authPath = readPiConfiguration()!.authPath!;
     writeFileSync(authPath, JSON.stringify({ [model.provider]: oauth }));
     vi.stubEnv("HALLVI_CONFIG_DIR", join(directory, "preview-two"));
     expect(piConfigDir()).not.toBe(firstState);
-    expect(readPiConfiguration()!.authPath).toBe(authPath);
+    expect(readPiConfiguration()!.authPath!).toBe(authPath);
     expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ ready: true });
     await configuredPiRuntime(await sdkLoader());
     expect(createRuntime).toHaveBeenLastCalledWith({
@@ -799,7 +798,7 @@ describe("Pi login across development previews", () => {
     writeFileSync(authPath, JSON.stringify({ [model.provider]: refreshed }));
     vi.stubEnv("HALLVI_CONFIG_DIR", firstState);
     expect(
-      readPiCredential(readPiConfiguration()!.authPath, model.provider),
+      readPiCredential(readPiConfiguration()!.authPath!, model.provider),
     ).toEqual(refreshed);
     expect(existsSync(join(firstState, "pi-settings.json"))).toBe(false);
     const coordinator = new PiLoginCoordinator(sdkLoader);

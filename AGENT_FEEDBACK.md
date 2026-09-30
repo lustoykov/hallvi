@@ -6,8 +6,9 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
+| [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
+| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
-| [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
@@ -23,8 +24,9 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
-| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
+| [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
+| [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
 | [AF-045 — Keep simulated SPA route identities honest](#af-045--keep-simulated-spa-route-identities-honest) | 1 | Accepted; fix in #308 |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
@@ -99,6 +101,18 @@ remain a separate proof. UI scenario fixtures serve a different visual purpose.
 
 **+1:** 2026-09-30 — post-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
+### AF-040 — Say whether a Pi upgrade keeps the shared login readable
+
+Attach guards Pi's history format, but every checkout reads the ChatGPT login
+in `~/.config/hallvi/pi` whatever Pi it bundles, and a refresh written by one
+Pi version has to stay readable by the others. Nothing names that boundary.
+Establishing it for 0.99.1 meant diffing `dist/` against another checkout's
+0.87.1, because `pi-ai` and `pi-agent-core` ship no changelog. A line in
+[the development environment](docs/development-environment.md) naming the
+credential file as a boundary, or a check beside the history-format one,
+would make an upgrade's live run a decision instead of an investigation.
+
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`
 
 ### AF-042 — Include consent and notices in traffic setup
 
@@ -201,6 +215,9 @@ claiming a dependency is patched. A compatible upstream Pi update remains a
 follow-up; this release patches Hallvi's direct `ws` runtime to 8.22.0.
 
 **+1:** 2026-09-30 — alpha.12 release preparation, `codex/release-alpha12`
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`: 0.99.1's shrinkwrap
+still installs `brace-expansion` 5.0.9 under `pi-coding-agent`, so the upgrade
+does not close this.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
@@ -229,6 +246,9 @@ only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`: Pi's `bash` now
+returns `structuredContent.exit_code`; the workspace bridge drops it today and
+could pass the code on instead.
 
 ### AF-005 — Let the browser suite use a preinstalled Chromium
 
@@ -452,6 +472,19 @@ controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
 retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
+
+### AF-041 — Show OpenRouter credit beside the saved key
+
+OpenRouter is paid per use, and an empty balance only shows up as a refused
+message (402). OpenRouter's `GET /api/v1/key` answers usage and limit without a
+model request; Settings could say "$4.20 left" beside **Key saved**, and the
+Model row could warn before the credit runs out rather than after.
+
+**+1:** 2026-09-30 — OpenRouter models (`claude/openrouter-models`)
+
+Review of [#297](https://github.com/lustoykov/hallvi/pull/297) also found that a
+402 can report a key spending limit. A credit display should distinguish that
+limit from the account balance; the request error now names both possibilities.
 
 ## Archive
 

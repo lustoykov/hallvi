@@ -13,6 +13,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  activeCredential,
   readPiConfiguration,
   readPiCredential,
   type PiSdk,
@@ -180,11 +181,13 @@ export async function configuredPiRuntime(sdk: PiSdk) {
   if (!root)
     throw new Error("Synthetic provider requires an isolated QA root.");
   const configuration = readPiConfiguration();
+  const expected = configuration && activeCredential(configuration);
   if (
     !configuration ||
-    !readPiCredential(configuration.authPath, configuration.providerId)
+    !expected ||
+    !readPiCredential(expected.authPath, configuration.providerId)
   )
-    throw new Error("Connect ChatGPT in Settings before using the QA model.");
+    throw new Error("Connect a model in Settings before using the QA model.");
   const modelRuntime = await sdk.ModelRuntime.create({
     credentials: new InMemoryCredentialStore(),
     modelsPath: null,

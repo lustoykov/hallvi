@@ -205,16 +205,22 @@ export function describePiFailure(error: unknown): string {
   const normalized = (
     error instanceof Error ? error.message : ""
   ).toLowerCase();
-  if (/usage limit|rate limit|quota|status:? 429/.test(normalized))
+  if (/usage limit|rate limit|quota|^429\b|\bstatus:?\s*429\b/.test(normalized))
     return "The selected model reports a usage or rate limit. Check the account’s allowance, then retry.";
   if (
-    /invalid_grant|unauthorized|status:? 401|provider is not configured/.test(
+    /^402\b|\bstatus:?\s*402\b|insufficient credits|more credits/.test(
       normalized,
     )
   )
-    return "ChatGPT authentication is missing or expired. Open Settings and reconnect.";
-  if (/choose|setup|credential|connect chatgpt/.test(normalized))
-    return "Check the ChatGPT connection in Settings before retrying.";
+    return "OpenRouter has insufficient credit for this request. Add credit or check the key’s spending limit on openrouter.ai, then retry.";
+  if (
+    /invalid_grant|unauthorized|^401\b|\bstatus:?\s*401\b|provider is not configured/.test(
+      normalized,
+    )
+  )
+    return "The model account refused Hallvi’s login: it is missing, expired or revoked. Open Settings and connect it again.";
+  if (/choose|setup|credential|connect/.test(normalized))
+    return "Check the model connection in Settings before retrying.";
   // Provider exceptions can embed credentials or request payloads.
   return "Hallvi could not reach the selected model. Check Settings or retry.";
 }

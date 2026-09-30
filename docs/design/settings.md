@@ -23,10 +23,10 @@ rounded: {card: "14px", button: "7px", help: "12px"}
 # Settings design reference
 
 **Settings is one page (20 September 2026).** `/setup/connections` lists every
-account Hallvi acts through — ChatGPT, GitHub, Hallvi’s workspace, then the owner's
-providers — each with its state in words and one action. A ChatGPT or GitHub
+account Hallvi acts through — the model, GitHub, Hallvi’s workspace, then the owner's
+providers — each with its state in words and one action. A Model or GitHub
 row that is not connected expands the same card the conversation draws
-(`onboarding/chatgpt-connect.tsx`, `onboarding/github-connect.tsx`) with
+(`onboarding/model-connect.tsx`, `onboarding/github-connect.tsx`) with
 `plain` set, so there is one sign-in in the product rather than a settings copy
 of it. A row that already holds a login links to its own page instead: changing
 an account, signing out and choosing a model are not things a sign-in card can
@@ -65,10 +65,12 @@ Retain the shared card, primary-button, and help-panel radii above. Controls use
 
 ## Components
 
-- **Navigation:** reuse [SettingsNav](../../src/components/hallvi/settings-nav.tsx): “Connections”, “ChatGPT & model”, “GitHub” and “Workspace”, with an underline and `aria-current="page"` for the active route. Settings opens on Connections, which shows every account at once; the other tabs are the detail each one links to.
+- **Navigation:** reuse [SettingsNav](../../src/components/hallvi/settings-nav.tsx): “Connections”, “Model”, “GitHub” and “Workspace”, with an underline and `aria-current="page"` for the active route. Settings opens on Connections, which shows every account at once; the other tabs are the detail each one links to.
 - **Actions:** primary controls have a 44px minimum height, 12px by 20px padding, and a darker blue hover. Secondary actions remain text buttons. Preserve the visible focus outline (2px in the primary blue, offset 3px, shared by every screen) and disabled treatment.
 - **Account choice:** distinguish a detected login from an accepted connection. Show the account and credential source, explicit reuse, an alternative login when available, and a way to retain the current connection.
 - **Device sign-in:** show the code, copy feedback, provider link, stable waiting announcement, expiry, and cancel action. While replacing an account, name the account still in use. Keep the changing countdown outside the live announcement. A saved login is never drawn as a working one: it says ChatGPT checks it on the first message.
+- **Two model accounts:** the Model page holds ChatGPT (subscription) and OpenRouter (paid per use from its credit). OpenRouter offers a curated list from `OPENROUTER_MODEL_IDS`: the frontier models its rankings lead with, as far as the bundled Pi catalog knows them, plus two strong cheaper ones, each with its price per million tokens. Either account is enough; the other is marked optional and its connect action stays quiet. The model picker always lists both accounts' models; one from an account that is not connected says so and cannot be saved. Both may be saved and one is active. Connecting OpenRouter makes it active; disconnecting either hands new messages to the other when it is connected. Hallvi never switches between them by itself.
+- **Connection lifetime:** cancelling or replacing a pending sign-in prevents its later callback from changing the account or model. Once a turn starts, it keeps its OpenRouter key in memory until that turn ends; replacing or disconnecting the saved key applies to future turns. A saved ChatGPT connection remains usable when an unused OpenRouter credential file is damaged. Connecting OpenRouter recovers invalid model settings while retaining any valid saved ChatGPT connection metadata.
 - **Repository access:** show GitHub App installation guidance only for an App connection. Existing CLI/environment connections use their existing permissions. Account connection does not claim repository verification; adding an application checks access and the exact commit.
 - **Workspace choice:** two radio cards, “On this computer” (default) and “In Docker”, each with one short paragraph that states what it does and does not protect. The Docker card shows whether Docker answers now; a Docker choice that cannot be met says so without offering to switch. Saving applies from the next message.
 - **Help and errors:** keep inline copy concise; disclose storage details in the titled popover. Show actionable errors near the account controls. Disconnect uses the existing confirmation dialog.

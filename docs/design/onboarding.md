@@ -39,8 +39,8 @@ No wizard, no modal, no trip to Settings. The task stays visible above it.
 
 ```mermaid
 flowchart TD
-  A[Add a repository] --> A1{ChatGPT connected?}
-  A1 -- No --> A2[Connect ChatGPT with the app and caretaker in view]
+  A[Add a repository] --> A1{Model connected?}
+  A1 -- No --> A2[Connect ChatGPT, or OpenRouter, with the app and caretaker in view]
   A2 --> A3[Read repository: explicit action]
   A1 -- Yes --> A3
   A3 --> B[Hallvi explains what it needs: no renting or deployment yet]
@@ -69,7 +69,7 @@ flowchart TD
    A repository Hallvi cannot read is a request in the conversation
    (`github-connect.tsx`), not a strip above it. In an untouched conversation
    the welcome says it first, in one sentence with the one action that state
-   allows, and never offers **Read repository** beside it; when ChatGPT is
+   allows, and never offers **Read repository** beside it; when a model is
    missing too, the two are two lines and only the first is blue. The card
    keeps three things apart because they fail apart: whether this release can
    sign in to GitHub, whether an account is signed in, and whether that
@@ -83,15 +83,18 @@ flowchart TD
    in plain language; its detailed control stays in the conversation.
 
    Before the first message, an app-specific introduction says what Hallvi
-   will inspect and offers **Read repository**, or **Connect ChatGPT** if
+   will inspect and offers **Read repository**, or **Connect a model** if
    needed. Connecting happens in the conversation
-   (`onboarding/chatgpt-connect.tsx`): the code, the waiting and the three
+   (`onboarding/model-connect.tsx`): the code, the waiting and the three
    ways it can end are drawn beside the composer, so an unsent message never
    travels and there is no trip to return from. The card reuses the existing
    login endpoints, including the offer to share a login already on the
-   machine; model preferences stay in Settings, one link away. A saved login
+   machine; model preferences stay in Settings, one link away. ChatGPT is the
+   card's first offer; **Use OpenRouter instead** swaps in OpenRouter's own
+   app sign-in (`onboarding/openrouter-connect.tsx`), which opens in a new tab
+   and comes back to this controller, or a pasted key. A saved login or key
    says it is checked with the first message, because nothing has been asked
-   of ChatGPT until then. The explicit **Read repository** action sends
+   of the model until then. The explicit **Read repository** action sends
    the inspection request.
    It asks Pi to explain the app, its requirements and a sensible hosting
    option, without renting, deploying or changing anything. Authentication

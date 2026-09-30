@@ -585,3 +585,8 @@
   outline: 2px solid var(--blue);
   outline-offset: 4px;
 }
+.optional {
+  color: #536078;
+  font-size: 13px;
+  font-weight: 400;
+}

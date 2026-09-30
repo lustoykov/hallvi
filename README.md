@@ -40,8 +40,8 @@ or reuse. You do **not** need to clone this repository or install Node.js.
 are available for both platforms; Intel Macs and other Linux systems do not
 have a prebuilt release yet.
 
-Open <http://127.0.0.1:4747> on the machine running Hallvi. Connect ChatGPT,
-add a repository, and connect Hetzner or a Linux server when Hallvi asks. For a
+Open <http://127.0.0.1:4747> on the machine running Hallvi. Connect ChatGPT (or
+OpenRouter, paid per use, for Claude, Gemini and a few others), add a repository, and connect Hetzner or a Linux server when Hallvi asks. For a
 Mac mini or headless Ubuntu machine you use from a laptop, choose **From another
 computer** during installation and follow the printed SSH instructions.
 Managed applications run on a Linux deployment server; installing Hallvi on a

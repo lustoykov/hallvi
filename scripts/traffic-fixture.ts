@@ -2973,31 +2973,15 @@ async function live(flags: Record<string, string>) {
           "browser",
         ),
       ).then((reply) => reply.status && count(`event ${value.t}`));
+    let route = target.split("?")[0];
+    let routeUrl = new URL(target, base).href;
     try {
       for (let views = 0; views < 12 && !stop.signal.aborted; views++) {
-        let reply = await send(
-          agent,
-          "browser",
-          "GET",
-          target,
-          browserHeaders(
-            person,
-            { dest: "document", mode: "navigate", site, referrer, user: true },
-            "browser",
-          ),
-        );
-        for (
-          let hop = 0;
-          hop < 3 &&
-          reply.status >= 300 &&
-          reply.status < 400 &&
-          reply.location;
-          hop++
-        ) {
-          const next = new URL(reply.location, new URL(target, base));
-          if (next.origin !== base.origin) break;
-          target = next.pathname + next.search;
-          reply = await send(
+        let page = routeUrl;
+        let found: ReturnType<typeof linksIn> = { files: [], pages: [] };
+        // An in-page SPA navigation keeps the document and loaded script.
+        if (shape !== "spa" || views === 0) {
+          let reply = await send(
             agent,
             "browser",
             "GET",
@@ -3014,81 +2998,110 @@ async function live(flags: Record<string, string>) {
               "browser",
             ),
           );
-        }
-        const path = target.split("?")[0];
-        if (reply.status >= 200 && reply.status < 300) good.add(path);
-        else if (reply.status >= 400) {
-          bad.add(path);
-          good.delete(path);
-        }
-        // A browser without fetch metadata is only known by its HTML.
-        const answered =
-          (reply.status >= 200 && reply.status < 300) || reply.status === 304;
-        if (
-          answered &&
-          (!person.browser.noFetchMetadata || reply.type === "text/html")
-        )
-          count("views");
-        const page = new URL(target, base).href;
-        const found = reply.html
-          ? linksIn(reply.html, new URL(page))
-          : { files: [], pages: [] };
-        await Promise.all(
-          found.files.map((file) =>
-            send(
+          for (
+            let hop = 0;
+            hop < 3 &&
+            reply.status >= 300 &&
+            reply.status < 400 &&
+            reply.location;
+            hop++
+          ) {
+            const next = new URL(reply.location, new URL(target, base));
+            if (next.origin !== base.origin) break;
+            target = next.pathname + next.search;
+            reply = await send(
               agent,
               "browser",
               "GET",
-              file.target,
+              target,
               browserHeaders(
                 person,
                 {
-                  dest: file.dest,
-                  mode: file.dest === "font" ? "cors" : "no-cors",
+                  dest: "document",
+                  mode: "navigate",
+                  site,
+                  referrer,
+                  user: true,
+                },
+                "browser",
+              ),
+            );
+          }
+          const path = target.split("?")[0];
+          if (reply.status >= 200 && reply.status < 300) good.add(path);
+          else if (reply.status >= 400) {
+            bad.add(path);
+            good.delete(path);
+          }
+          // A browser without fetch metadata is only known by its HTML.
+          const answered =
+            (reply.status >= 200 && reply.status < 300) || reply.status === 304;
+          if (
+            answered &&
+            (!person.browser.noFetchMetadata || reply.type === "text/html")
+          )
+            count("views");
+          page = new URL(target, base).href;
+          found = reply.html
+            ? linksIn(reply.html, new URL(page))
+            : { files: [], pages: [] };
+          await Promise.all(
+            found.files.map((file) =>
+              send(
+                agent,
+                "browser",
+                "GET",
+                file.target,
+                browserHeaders(
+                  person,
+                  {
+                    dest: file.dest,
+                    mode: file.dest === "font" ? "cors" : "no-cors",
+                    site: "same-origin",
+                    referrer: page,
+                  },
+                  "browser",
+                ),
+              ),
+            ),
+          );
+          for (const link of found.pages.slice(0, 20))
+            if (!bad.has(link.split("?")[0])) good.add(link.split("?")[0]);
+          route = path;
+          routeUrl = page;
+          if (shape === "spa") {
+            await send(
+              agent,
+              "browser",
+              "GET",
+              SCRIPT_PATH,
+              browserHeaders(
+                person,
+                {
+                  dest: "script",
+                  mode: "no-cors",
                   site: "same-origin",
                   referrer: page,
                 },
                 "browser",
               ),
-            ),
-          ),
-        );
-        for (const link of found.pages.slice(0, 20))
-          if (!bad.has(link.split("?")[0])) good.add(link.split("?")[0]);
-        let route = path;
-        let routeUrl = page;
-        if (shape === "spa") {
-          await send(
-            agent,
-            "browser",
-            "GET",
-            SCRIPT_PATH,
-            browserHeaders(
-              person,
-              {
-                dest: "script",
-                mode: "no-cors",
-                site: "same-origin",
-                referrer: page,
-              },
-              "browser",
-            ),
-          );
-          const first: ScriptEvent = {
-            t: "view",
-            s: view,
-            p: route,
-            w: person.width,
-          };
-          if (referrer) first.r = originOf(referrer);
-          const tags = keptOf(landing.query);
-          if (views === 0 && Object.keys(tags).length) first.u = tags;
-          await event(page, first);
+            );
+            const first: ScriptEvent = {
+              t: "view",
+              s: view,
+              p: route,
+              w: person.width,
+            };
+            if (referrer) first.r = originOf(referrer);
+            const tags = keptOf(landing.query);
+            if (views === 0 && Object.keys(tags).length) first.u = tags;
+            await event(page, first);
+          }
         }
         // Stay a while; the script pings while the tab is open.
         const stayed = Math.min(
           own.around(
-            (SECTIONS[sectionOf(plan, path) ?? "home"]?.dwell ?? 30) * SECOND,
+            (SECTIONS[sectionOf(plan, route) ?? "home"]?.dwell ?? 30) * SECOND,
             0.8,
           ),
           3 * MINUTE,
@@ -3109,7 +3122,7 @@ async function live(flags: Record<string, string>) {
             p: route,
             e: Math.round(stayed),
           });
-          if (!own.chance(0.7)) break;
+          if (stop.signal.aborted || views === 11 || !own.chance(0.7)) break;
           // A route change inside the application: no document at all.
           route = pickPage(plan, own, "app");
           routeUrl = new URL(route, base).href;

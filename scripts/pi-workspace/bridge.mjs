@@ -52,7 +52,15 @@ try {
     // send the result so far; passing nothing is why nothing used to stream.
     (partial) => line({ partial }),
   );
-  line({ result });
+  // Pi's shell tools return a failed command as a result marked isError, for
+  // Pi's own loop. Hallvi's harness and execution records read a failure as a
+  // throw, so it stays one. structuredContent repeats the output for codemode
+  // callers (up to 1 MiB); nothing here reads it.
+  const { isError, ...kept } = result;
+  delete kept.structuredContent;
+  if (isError)
+    throw new Error(kept.content.map((part) => part.text ?? "").join("\n"));
+  line({ result: kept });
 } catch (error) {
   line({ error: String(error.message ?? error) });
   process.exitCode = 1;

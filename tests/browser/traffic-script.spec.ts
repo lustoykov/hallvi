@@ -490,6 +490,36 @@ for (const prefix of ["#/", "#!/"]) {
       ),
       contentType: "application/json",
     });
+
+    paths = [];
+    await page.goto(`${site}/hash`);
+    await until("view", 1);
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, `${prefix}inbox`);
+    await until("view", 2);
+    await page.goBack();
+    await until("view", 3);
+    await page.goForward();
+    await until("view", 4);
+    // popstate and hashchange both fire for Back/Forward. The empty root
+    // route must count once, while rejected fragments remain ignored.
+    await page.evaluate(() =>
+      (window as unknown as { hv(name: string): void }).hv("check"),
+    );
+    await until("goal", 1);
+    const roots = ofType("view");
+    expect(roots.map(({ p, h }) => [p, h])).toEqual([
+      ["/hash", undefined],
+      ["/hash", `${prefix}inbox`],
+      ["/hash", undefined],
+      ["/hash", `${prefix}inbox`],
+    ]);
+    expect(new Set(roots.map(({ s }) => s)).size).toBe(4);
+    await testInfo.attach("empty-root-events.json", {
+      body: JSON.stringify(events(), null, 2),
+      contentType: "application/json",
+    });
   });
 }
 
