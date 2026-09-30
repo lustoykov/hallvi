@@ -23,7 +23,10 @@ work, permissions, history and execution evidence.
    reply, not that the deployment or repair worked. Inspect a specific
    execution when an excerpt is insufficient; report omitted or unknown facts.
 
-`hallvi_open` shows a read-only application panel where supported. Tools also
+`hallvi_conversation` shows what the main operator is doing and recently said,
+from any surface; read it before asking about work already under way.
+`hallvi_open` shows Hallvi's panel where supported; the owner may send
+messages there too, and its selection is shared with you as context. Tools also
 work without UI. A remote controller's loopback handle belongs to that server;
 pass it to `hallvi_wait`, never fetch it from the user's laptop. The configured
 page URL is for the user's browser, often through an SSH local forward.

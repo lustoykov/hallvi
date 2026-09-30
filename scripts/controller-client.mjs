@@ -243,6 +243,20 @@ export function controllerClient(controller) {
         options,
       ),
 
+    /** The conversation as the page reads it, whole; callers bound it. */
+    conversation: (applicationId, chatId, options) =>
+      read(`/api/applications/${applicationId}/chats/${chatId}/messages`, {
+        timeoutMs: 20_000,
+        ...options,
+      }),
+
+    /** The last day of stored traffic totals. Nothing here looks at a host. */
+    traffic: (applicationId, options) =>
+      read(`/api/applications/${applicationId}/traffic/history?range=24h`, {
+        timeoutMs: 10_000,
+        ...options,
+      }),
+
     /**
      * Hand a request to Pi as an ordinary follow-up, and resolve once Pi has
      * durably taken it. An answer lost on the way back is asked again under
