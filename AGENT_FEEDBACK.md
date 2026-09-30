@@ -14,7 +14,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 2 | New |
 
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 
@@ -283,6 +283,10 @@ test changed. A cheap way to see which journeys currently fail on main would
 separate old breakage from a new change's.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
+**+1:** 2026-09-30 — settings redesign (`claude/settings-redesign`): on main,
+`applications.spec.ts` P1-10 stalls on the synthetic reply ("Writing the
+reply") before it reaches Settings, and `controller-protection.spec.ts` looks
+for Backups, which now sits behind "Show more" in the application sidebar.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 

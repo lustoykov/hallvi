@@ -1,16 +1,13 @@
 "use client";
 
-import { HallviMark } from "./hallvi-mark";
 import {
-  ArrowLeft,
-  ArrowRight,
   ArrowSquareOut,
   Check,
   Copy,
   SpinnerGap,
+  Warning,
   X,
 } from "@phosphor-icons/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { DetectedPiSetup } from "@/server/pi-configuration";
@@ -26,8 +23,9 @@ import {
 import type { PiModelOption } from "@/server/pi-models";
 import { OpenRouterConnect } from "./onboarding/openrouter-connect";
 import { RequestCard } from "./onboarding/pieces";
-import { SettingsNav } from "./settings-nav";
-import s from "./pi-setup-screen.module.css";
+import { SettingsShell, useToast } from "./settings-shell";
+import s from "./settings.module.css";
+import h from "./pi-setup-screen.module.css";
 
 class SetupRequestError extends Error {
   constructor(
@@ -54,13 +52,64 @@ function effortLabel(effort: string) {
     ? "Extra high"
     : effort.charAt(0).toUpperCase() + effort.slice(1);
 }
-const optionKey = (model: { providerId: string; id: string }) =>
-  `${model.providerId} ${model.id}`;
 const isDefault = (model: PiModelOption) =>
   model.id ===
   (model.providerId === PI_PROVIDER_ID ? PI_MODEL_ID : OPENROUTER_MODEL_ID);
 const dollars = (value: number) =>
   `$${Number.isInteger(value) ? value : value.toFixed(2)}`;
+const price = (model: PiModelOption) =>
+  model.price
+    ? `${dollars(model.price.input)} / ${dollars(model.price.output)}`
+    : "In plan";
+/** The generation a ChatGPT model belongs to: "gpt-6-sol" → "6". */
+const generation = (id: string) => /^gpt-(\d+)/.exec(id)?.[1] ?? "";
+
+/** One line on what a model is for; the catalog has only names. */
+const NOTES: Record<string, string> = {
+  "gpt-6-sol": "The everyday choice. Strong at code and servers.",
+  "gpt-6-astra": "Most capable. Slower; uses more of your plan.",
+  "gpt-6-luna": "Fastest and lightest on your plan.",
+  "anthropic/claude-sonnet-5": "Careful and thorough. A great default.",
+  "anthropic/claude-opus-5.5": "Anthropic’s strongest, for hard problems.",
+  "openai/gpt-6-sol": "ChatGPT’s model, without a plan.",
+  "google/gemini-3.1-pro-preview":
+    "Huge context. Good at reading big repositories.",
+  "qwen/qwen3.8-max-0902": "Frontier quality at a third of the price.",
+  "z-ai/glm-5.3": "Capable and very cheap.",
+  "deepseek/deepseek-v4-pro-0813": "The cheapest strong option.",
+};
+
+const ACCOUNTS = {
+  chatgpt: {
+    name: "ChatGPT",
+    mark: "C",
+    billing: "Included in your ChatGPT plan",
+  },
+  openrouter: {
+    name: "OpenRouter",
+    mark: "O",
+    billing: "Pay per use from OpenRouter credit",
+  },
+} as const;
+
+function Mark({
+  account,
+  size = 28,
+}: {
+  account: keyof typeof ACCOUNTS;
+  size?: number;
+}) {
+  return (
+    <span
+      className={h.mark}
+      data-account={account}
+      style={{ width: size, height: size, fontSize: size * 0.46 }}
+      aria-hidden="true"
+    >
+      {ACCOUNTS[account].mark}
+    </span>
+  );
+}
 
 export function PiSetupScreen({
   initialStatus,
@@ -69,8 +118,7 @@ export function PiSetupScreen({
   initialStatus: PiSetupStatus;
   /**
    * The conversation the reader came from, already checked against the
-   * records by the page. Setup is a detour, and both ways out of it — a
-   * saved login and a cancelled one — lead back here.
+   * records by the page; the top bar's way out leads back to it.
    */
   returnTo?: SetupReturn;
 }) {
@@ -79,8 +127,12 @@ export function PiSetupScreen({
   const [detected, setDetected] = useState<DetectedPiSetup | null>(
     initialStatus.detected,
   );
+  // ChatGPT's own choice between reusing a login and signing in, open while it
+  // is not connected or while the owner is changing it.
   const [choosing, setChoosing] = useState(!initialStatus.connections.chatgpt);
   const [attempt, setAttempt] = useState<PiLoginAttempt | null>(null);
+  const [openRouterOpen, setOpenRouterOpen] = useState(false);
+  const [older, setOlder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -93,60 +145,30 @@ export function PiSetupScreen({
     "chatgpt" | "openrouter" | null
   >(null);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
-  const [providerId, setProviderId] = useState(
-    initialStatus.selection.providerId,
-  );
-  const [modelId, setModelId] = useState(initialStatus.selection.modelId);
-  const [effort, setEffort] = useState(initialStatus.selection.reasoningEffort);
+  const { show, toast } = useToast();
   const working = active(attempt);
-  // Every offered model, so the choice is visible before an account is
-  // connected; one from an account that is not connected yet cannot be saved.
   const { chatgpt, openRouter } = status.connections;
-  const groups = [
-    {
-      label: "ChatGPT plan",
-      models: status.models.filter(
-        (model) => model.providerId === PI_PROVIDER_ID,
-      ),
-    },
-    {
-      label: "OpenRouter · $ per million tokens in / out",
-      models: status.models.filter(
-        (model) => model.providerId === OPENROUTER_PROVIDER_ID,
-      ),
-    },
-  ]
-    .map((group) => ({
-      ...group,
-      models: [...group.models].sort(
-        (a, b) => Number(isDefault(b)) - Number(isDefault(a)),
-      ),
-    }))
-    .filter((group) => group.models.length);
-  const models = groups.flatMap((group) => group.models);
-  const selectedModel = models.find(
-    (model) => model.providerId === providerId && model.id === modelId,
+  const selection = status.selection;
+  const selected = status.models.find(
+    (model) =>
+      model.providerId === selection.providerId &&
+      model.id === selection.modelId,
   );
-  const validSelection =
-    selectedModel?.reasoningEfforts.includes(effort) ?? false;
-  const selectedConnected =
-    providerId === OPENROUTER_PROVIDER_ID ? openRouter : chatgpt;
-  const hasChanges =
-    providerId !== status.selection.providerId ||
-    modelId !== status.selection.modelId ||
-    effort !== status.selection.reasoningEffort;
-  const connectionReady = chatgpt && !choosing;
+  const chatgptModels = status.models
+    .filter((model) => model.providerId === PI_PROVIDER_ID)
+    .sort((a, b) => Number(isDefault(b)) - Number(isDefault(a)));
+  const featured = chatgptModels.filter(
+    (model) => generation(model.id) === generation(PI_MODEL_ID),
+  );
+  const openRouterModels = status.models.filter(
+    (model) => model.providerId === OPENROUTER_PROVIDER_ID,
+  );
   const visibleError =
-    error ??
-    (attempt?.state === "failed" ? attempt.message : null) ??
-    status.issue;
+    error ?? (attempt?.state === "failed" ? attempt.message : null);
 
   function applyStatus(next: PiSetupStatus) {
     setStatus(next);
     setDetected(next.detected);
-    setProviderId(next.selection.providerId);
-    setModelId(next.selection.modelId);
-    setEffort(next.selection.reasoningEffort);
     setChoosing(!next.connections.chatgpt);
   }
   async function reload() {
@@ -155,6 +177,7 @@ export function PiSetupScreen({
         await fetch("/api/pi/setup", { cache: "no-store" }),
       ),
     );
+    setOpenRouterOpen(false);
     router.refresh();
   }
 
@@ -175,6 +198,9 @@ export function PiSetupScreen({
             },
           ),
         ),
+      );
+      show(
+        `${confirmDisconnect === "openrouter" ? "OpenRouter" : "ChatGPT"} disconnected`,
       );
       setAttempt(null);
       setError(null);
@@ -217,7 +243,11 @@ export function PiSetupScreen({
                 )
               : null;
           if (controller.signal.aborted) return;
-          if (saved) applyStatus(saved);
+          if (saved) {
+            applyStatus(saved);
+            show("ChatGPT connected");
+            router.refresh();
+          }
           setPollError(null);
           setAttempt(next);
         } catch (caught) {
@@ -245,6 +275,9 @@ export function PiSetupScreen({
       window.clearTimeout(timeout);
       controller.abort();
     };
+    // `show` and `router` are stable enough for a poll that restarts on each
+    // attempt change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt]);
 
   async function changeConnection() {
@@ -257,7 +290,6 @@ export function PiSetupScreen({
         await fetch("/api/pi/setup?preview=1", { cache: "no-store" }),
       );
       setDetected(preview.detected);
-      setStatus((current) => ({ ...current, models: preview.models }));
       setChoosing(true);
     } catch (caught) {
       setError(
@@ -283,6 +315,8 @@ export function PiSetupScreen({
           }),
         ),
       );
+      show("Using the ChatGPT login from Pi");
+      router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -293,27 +327,34 @@ export function PiSetupScreen({
       setSaving(false);
     }
   }
-  async function startLogin() {
+  /** Sign in to ChatGPT, starting on `model` when one was picked. */
+  async function startLogin(model?: PiModelOption) {
     setSaving(true);
     setError(null);
     setPollError(null);
     setCopied(false);
+    const chosen =
+      model ??
+      (selection.providerId === PI_PROVIDER_ID ? selected : undefined) ??
+      chatgptModels[0];
     try {
-      const next = await readJson<PiLoginAttempt>(
-        await fetch("/api/pi/setup/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            providerId,
-            modelId,
-            reasoningEffort: effort,
+      setAttempt(
+        await readJson<PiLoginAttempt>(
+          await fetch("/api/pi/setup/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              providerId: PI_PROVIDER_ID,
+              modelId: chosen?.id ?? PI_MODEL_ID,
+              reasoningEffort: chosen?.reasoningEfforts.includes(
+                selection.reasoningEffort,
+              )
+                ? selection.reasoningEffort
+                : "high",
+            }),
           }),
-        }),
+        ),
       );
-      setAttempt(next);
-      setProviderId(next.selection.providerId);
-      setModelId(next.selection.modelId);
-      setEffort(next.selection.reasoningEffort);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Could not start sign-in.",
@@ -350,31 +391,42 @@ export function PiSetupScreen({
       setSaving(false);
     }
   }
-  async function viewApplications() {
+  /** A model or an effort applies when it is picked, like Claude's menu. */
+  async function save(model: PiModelOption, effort?: string) {
+    const reasoningEffort =
+      effort ??
+      (model.reasoningEfforts.includes(selection.reasoningEffort)
+        ? selection.reasoningEffort
+        : model.reasoningEfforts.includes("high")
+          ? "high"
+          : model.reasoningEfforts[0]);
     setSaving(true);
     setError(null);
     try {
-      if (hasChanges)
-        applyStatus(
-          await readJson<PiSetupStatus>(
-            await fetch("/api/pi/setup", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                providerId,
-                modelId,
-                reasoningEffort: effort,
-              }),
+      applyStatus(
+        await readJson<PiSetupStatus>(
+          await fetch("/api/pi/setup", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              providerId: model.providerId,
+              modelId: model.id,
+              reasoningEffort,
             }),
-          ),
-        );
-      router.push(returnTo?.href ?? "/applications");
+          }),
+        ),
+      );
+      show(
+        effort
+          ? `Saved · ${effortLabel(effort)} effort`
+          : `Saved · the next message uses ${model.name}`,
+      );
       router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not save model preferences.",
+          : "Could not save the model. Try again.",
       );
     } finally {
       setSaving(false);
@@ -389,390 +441,386 @@ export function PiSetupScreen({
     }
   }
 
-  return (
-    <main className={"hv-setup-shell " + s.root}>
-      <header className="hv-setup-topbar">
-        <Link className="hv-setup-brand" href="/" aria-label="Hallvi">
-          <HallviMark size={22} />
-          <span>Hallvi</span>
-        </Link>
-        <Link
-          className="hv-setup-back"
-          href={returnTo?.href ?? "/applications"}
+  const row = (
+    model: PiModelOption,
+    connected: boolean,
+    onPick: () => void,
+  ) => {
+    // Only a usable choice wears the check: a saved preference for an
+    // account that is not connected says nothing about what runs.
+    const on =
+      connected &&
+      model.providerId === selection.providerId &&
+      model.id === selection.modelId;
+    return (
+      <li key={`${model.providerId} ${model.id}`}>
+        <button
+          type="button"
+          className={`${s.row} ${s.pick}`}
+          aria-pressed={on}
+          disabled={saving || working}
+          onClick={onPick}
         >
-          <ArrowLeft /> {returnTo?.label ?? "All applications"}
-        </Link>
-      </header>
-      <div className={s.page}>
-        <SettingsNav current="pi" returnTo={returnTo} />
-        <header className={s.heading}>
+          <span className={s.check}>{on && <Check weight="bold" />}</span>
+          <span className={s.rowText}>
+            <strong>
+              {model.name}
+              {isDefault(model) && (
+                <span className={h.defaultTag}> Default</span>
+              )}
+            </strong>
+            {NOTES[model.id] && <small>{NOTES[model.id]}</small>}
+          </span>
+          <span className={s.price}>
+            {connected ? price(model) : "Connect"}
+          </span>
+        </button>
+      </li>
+    );
+  };
+
+  return (
+    <SettingsShell
+      current="pi"
+      title="Model"
+      lead="What Hallvi thinks with, and who pays for it."
+      returnTo={returnTo}
+    >
+      <section className={s.hero} aria-label="Current model">
+        {status.ready && selected ? (
+          <>
+            <div>
+              <span className={s.eyebrow}>Thinking with</span>
+              <h3>{selected.name}</h3>
+              <p className={s.heroMeta}>
+                <Mark
+                  account={
+                    selected.providerId === OPENROUTER_PROVIDER_ID
+                      ? "openrouter"
+                      : "chatgpt"
+                  }
+                  size={18}
+                />
+                {selected.price
+                  ? `OpenRouter · ${price(selected)} per million tokens`
+                  : "ChatGPT · included in your plan"}
+              </p>
+              <p className={h.checkedNote}>
+                Access is checked when you send a message.
+              </p>
+            </div>
+            <div
+              className={s.seg}
+              role="radiogroup"
+              aria-label="Reasoning effort"
+            >
+              {selected.reasoningEfforts.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  role="radio"
+                  aria-checked={selection.reasoningEffort === level}
+                  disabled={saving}
+                  onClick={() =>
+                    level !== selection.reasoningEffort &&
+                    void save(selected, level)
+                  }
+                >
+                  {level === "xhigh" ? "X-high" : effortLabel(level)}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
           <div>
-            <h1>Settings</h1>
-            <p>The accounts Hallvi thinks through, and the model it uses.</p>
+            <span className={s.eyebrow}>No model yet</span>
+            <h3>Pick what Hallvi thinks with</h3>
+            <p>Use your ChatGPT plan, or pay per use through OpenRouter.</p>
+            {status.issue && (
+              <p className={s.problem} role="alert">
+                <Warning aria-hidden="true" />
+                {status.issue}
+              </p>
+            )}
           </div>
-        </header>
-        <section className={s.card} aria-label="Model settings">
-          <section className={s.section} aria-labelledby="account-heading">
-            <h2 id="account-heading">
-              <span className={s.step}>
-                {connectionReady && !working ? <Check /> : "1"}
+        )}
+      </section>
+
+      {/* ChatGPT: the subscription. */}
+      <section aria-labelledby="chatgpt-heading">
+        <header className={s.groupHead}>
+          <Mark account="chatgpt" />
+          <div>
+            <strong id="chatgpt-heading">ChatGPT</strong>
+            <span>{ACCOUNTS.chatgpt.billing}</span>
+          </div>
+          {chatgpt && !choosing && !working ? (
+            <span className={s.rowSide}>
+              <span className={s.ok}>
+                <span className={s.dot} /> Login saved
               </span>
-              ChatGPT account
-              {openRouter && <span className={s.optional}>optional</span>}
-            </h2>
-            <div aria-live="polite">
-              {working ? (
-                <div className={s.device}>
-                  {attempt?.state === "awaiting-user" ? (
-                    <>
-                      <p>Enter this code on OpenAI’s website.</p>
-                      <div className={s.codeRow}>
-                        <code>{attempt.userCode}</code>
-                        <button
-                          className={s.textButton}
-                          type="button"
-                          onClick={copyCode}
-                        >
-                          {copied ? <Check /> : <Copy />}
-                          {copied ? "Copied" : "Copy code"}
-                        </button>
-                      </div>
-                      <a
-                        className={s.primary}
-                        href={attempt.verificationUri ?? undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open OpenAI &amp; enter code <ArrowSquareOut />
-                      </a>
-                      <p className={s.hint}>
-                        On another browser, open{" "}
-                        <code className={s.verificationUrl}>
-                          {attempt.verificationUri}
-                        </code>
-                        .
-                      </p>
-                      {attempt.expiresAt && (
-                        <p className={s.hint}>
-                          Code expires at{" "}
-                          {new Date(attempt.expiresAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          .
-                        </p>
-                      )}
-                      <p className={s.hint}>
-                        <SpinnerGap className="spin" /> Waiting for approval…
-                      </p>
-                    </>
-                  ) : (
-                    <p>
-                      <SpinnerGap className="spin" /> Starting sign-in…
-                    </p>
-                  )}
+              <button
+                type="button"
+                className={s.link}
+                disabled={saving}
+                onClick={changeConnection}
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                className={`${s.link} ${s.quiet}`}
+                disabled={saving}
+                onClick={() => {
+                  setDisconnectError(null);
+                  setConfirmDisconnect("chatgpt");
+                }}
+              >
+                Disconnect
+              </button>
+            </span>
+          ) : !working ? (
+            <span className={s.rowSide}>
+              {detected?.canReuse && (
+                <button
+                  type="button"
+                  className={`${s.btn} ${status.ready ? "" : s.primary}`}
+                  disabled={saving}
+                  onClick={reuse}
+                >
+                  Use existing login
+                </button>
+              )}
+              <button
+                type="button"
+                className={`${s.btn} ${status.ready || detected?.canReuse ? "" : s.primary}`}
+                disabled={saving}
+                onClick={() => void startLogin()}
+              >
+                {detected?.canReuse
+                  ? "Connect another account"
+                  : "Connect ChatGPT"}
+              </button>
+              {chatgpt && (
+                <button
+                  type="button"
+                  className={s.link}
+                  onClick={() => {
+                    setChoosing(false);
+                    setAttempt(null);
+                    setError(null);
+                  }}
+                >
+                  Keep current login
+                </button>
+              )}
+            </span>
+          ) : null}
+        </header>
+        {!chatgpt && !working && (
+          <p className={s.fine}>
+            {detected?.canReuse
+              ? `A ChatGPT login was found in Pi on this machine · ${
+                  chatgptModels.find((m) => m.id === detected.selection.modelId)
+                    ?.name ?? detected.selection.modelId
+                } / ${effortLabel(detected.selection.reasoningEffort)}. Using it shares Pi’s login file.`
+              : "No reusable ChatGPT login found. Sign in with a short code on ChatGPT’s page."}
+          </p>
+        )}
+        {chatgpt && !choosing && (
+          <p className={s.fine}>
+            {status.mode === "shared"
+              ? "Sharing the existing Pi login file. ChatGPT checks it when you send a message."
+              : "Separate login for Hallvi. ChatGPT checks it when you send a message."}
+          </p>
+        )}
+        {working && (
+          <div className={s.flow} aria-live="polite">
+            {attempt?.state === "awaiting-user" ? (
+              <>
+                <p>Enter this code on OpenAI’s website, then approve.</p>
+                <p className={s.code}>{attempt.userCode}</p>
+                <div className={s.flowRow}>
+                  <span>
+                    <SpinnerGap className="spin" aria-hidden="true" /> Waiting
+                    for approval…
+                    {attempt.expiresAt &&
+                      ` Code expires at ${new Date(
+                        attempt.expiresAt,
+                      ).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}.`}
+                  </span>
+                  <button type="button" className={s.link} onClick={copyCode}>
+                    {copied ? <Check /> : <Copy />}{" "}
+                    {copied ? "Copied" : "Copy code"}
+                  </button>
+                  <a
+                    className={`${s.btn} ${s.primary}`}
+                    href={attempt.verificationUri ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open OpenAI &amp; enter code <ArrowSquareOut />
+                  </a>
                   <button
-                    className={s.textButton}
                     type="button"
+                    className={`${s.link} ${s.quiet}`}
                     disabled={saving}
                     onClick={cancelLogin}
                   >
                     Cancel sign-in
                   </button>
                 </div>
-              ) : connectionReady ? (
-                <div className={s.accountRow}>
-                  <div>
-                    {/* Saved is not proven: nothing has been asked of ChatGPT
-                        with it yet, so it does not wear the verified green. */}
-                    <strong className={s.saved}>
-                      <Check /> Login saved
-                    </strong>
-                    <p>
-                      ChatGPT checks it when you send your first message.{" "}
-                      {status.mode === "shared"
-                        ? "Sharing the existing Pi login file."
-                        : "Separate login for Hallvi."}
-                    </p>
-                  </div>
-                  <button
-                    className={s.textButton}
-                    type="button"
-                    disabled={saving}
-                    onClick={changeConnection}
-                  >
-                    Change
-                  </button>
-                </div>
-              ) : (
-                <div className={s.actions}>
-                  {detected?.canReuse && (
-                    <>
-                      <div className={s.savedLogin}>
-                        <Check />
-                        <div>
-                          <strong>Existing ChatGPT login found</strong>
-                          <p>
-                            In Pi on this machine ·{" "}
-                            {models.find(
-                              (model) =>
-                                model.id === detected.selection.modelId,
-                            )?.name ?? detected.selection.modelId}{" "}
-                            / {effortLabel(detected.selection.reasoningEffort)}
-                          </p>
-                        </div>
-                      </div>
-                      <p className={s.hint}>
-                        Share Pi’s login file and copy its model settings.
-                      </p>
-                      <button
-                        className={s.primary}
-                        type="button"
-                        disabled={saving}
-                        onClick={reuse}
-                      >
-                        Use existing login
-                      </button>
-                    </>
-                  )}
-                  {detected && !detected.canReuse && (
-                    <p className={s.hint}>No reusable ChatGPT login found.</p>
-                  )}
-                  <button
-                    className={
-                      detected?.canReuse || status.ready
-                        ? s.textButton
-                        : s.primary
-                    }
-                    type="button"
-                    disabled={saving || !validSelection}
-                    onClick={startLogin}
-                  >
-                    {saving
-                      ? "Connecting…"
-                      : detected?.canReuse
-                        ? "Connect another account"
-                        : "Connect ChatGPT"}
-                    <ArrowRight />
-                  </button>
-                  {chatgpt && (
-                    <button
-                      className={s.textButton}
-                      type="button"
-                      disabled={saving}
-                      onClick={() => {
-                        setChoosing(false);
-                        setAttempt(null);
-                        setError(null);
-                      }}
-                    >
-                      Keep current login
-                    </button>
-                  )}
-                </div>
-              )}
-              {attempt?.state === "cancelled" && (
-                <p className={s.hint}>{attempt.message}</p>
-              )}
-              {attempt?.state === "complete" && (
-                <p className={s.hint}>{attempt.message}</p>
-              )}
-              {pollError && (
-                <p className={s.error} role="status">
-                  {pollError}
+                <p className={s.muted}>
+                  On another browser, open {attempt.verificationUri}.
                 </p>
-              )}
-              {visibleError && (
-                <p className={s.error} role="alert">
-                  {visibleError}
-                </p>
-              )}
-            </div>
-            <div className={s.privacy}>
-              <button
-                className={s.textButton}
-                type="button"
-                popoverTarget="connection-help"
-              >
-                Storage &amp; privacy
-              </button>
-              {chatgpt && (
+              </>
+            ) : (
+              <div className={s.flowRow}>
+                <span>
+                  <SpinnerGap className="spin" aria-hidden="true" /> Starting
+                  sign-in…
+                </span>
                 <button
-                  className={`${s.textButton} ${s.disconnect}`}
                   type="button"
-                  disabled={saving || working}
-                  onClick={() => {
-                    setDisconnectError(null);
-                    setConfirmDisconnect("chatgpt");
-                  }}
-                >
-                  Disconnect
-                </button>
-              )}
-            </div>
-          </section>
-          <section className={s.section} aria-labelledby="openrouter-heading">
-            <h2 id="openrouter-heading">
-              <span className={s.step}>{openRouter ? <Check /> : "2"}</span>
-              OpenRouter
-              {(chatgpt || !openRouter) && (
-                <span className={s.optional}>optional</span>
-              )}
-            </h2>
-            {openRouter ? (
-              <div className={s.accountRow}>
-                <div>
-                  <strong className={s.saved}>
-                    <Check /> Key saved
-                  </strong>
-                  <p>
-                    Claude, Gemini and others, paid per use from your OpenRouter
-                    credit. OpenRouter checks the key when you send a message.
-                  </p>
-                </div>
-                <button
-                  className={`${s.textButton} ${s.disconnect}`}
-                  type="button"
+                  className={`${s.link} ${s.quiet}`}
                   disabled={saving}
-                  onClick={() => {
-                    setDisconnectError(null);
-                    setConfirmDisconnect("openrouter");
-                  }}
+                  onClick={cancelLogin}
                 >
-                  Disconnect
+                  Cancel sign-in
                 </button>
               </div>
-            ) : (
-              // An offer, not a request: drawn in the calm "done" frame, not
-              // the amber one that says someone is needed.
-              <RequestCard
-                plain
-                state="done"
-                asks="can use OpenRouter"
-                label="Connect OpenRouter"
-              >
-                <OpenRouterConnect quiet onSaved={reload} />
-              </RequestCard>
             )}
-          </section>
-          <details className={`${s.section} ${s.preferences}`} open>
-            <summary id="model-heading">Model preferences</summary>
-            <div className={s.fields}>
-              <label htmlFor="pi-model">
-                Model
-                <select
-                  id="pi-model"
-                  value={optionKey({ providerId, id: modelId })}
-                  disabled={saving || working || !models.length}
-                  onChange={(event) => {
-                    const next = models.find(
-                      (model) => optionKey(model) === event.target.value,
-                    );
-                    if (!next) return;
-                    setProviderId(next.providerId);
-                    setModelId(next.id);
-                    if (!next.reasoningEfforts.includes(effort))
-                      setEffort(
-                        next.reasoningEfforts.includes("high")
-                          ? "high"
-                          : next.reasoningEfforts[0],
-                      );
-                  }}
-                >
-                  {!selectedModel && (
-                    <option
-                      value={optionKey({ providerId, id: modelId })}
-                      disabled
-                    >
-                      {modelId} — unavailable
-                    </option>
-                  )}
-                  {groups.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.models.map((model) => (
-                        <option key={optionKey(model)} value={optionKey(model)}>
-                          {model.name}
-                          {model.price
-                            ? ` · ${dollars(model.price.input)} / ${dollars(model.price.output)}`
-                            : ""}
-                          {isDefault(model) ? " · Default" : ""}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </label>
-              <label htmlFor="pi-effort">
-                Reasoning effort
-                <select
-                  id="pi-effort"
-                  value={effort}
-                  disabled={saving || working || !selectedModel}
-                  onChange={(event) => {
-                    const next = selectedModel?.reasoningEfforts.find(
-                      (level) => level === event.target.value,
-                    );
-                    if (next) setEffort(next);
-                  }}
-                >
-                  {!validSelection && (
-                    <option value={effort} disabled>
-                      {effortLabel(effort)} — unavailable
-                    </option>
-                  )}
-                  {selectedModel?.reasoningEfforts.map((level) => (
-                    <option key={level} value={level}>
-                      {effortLabel(level)}
-                      {level === "high" ? " · Default" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className={s.hint}>
-                {selectedModel && !selectedConnected
-                  ? `Connect ${providerId === OPENROUTER_PROVIDER_ID ? "OpenRouter" : "ChatGPT"} above to use this model.`
-                  : "Higher effort allows more reasoning, usually with a longer wait."}
-              </p>
-            </div>
-          </details>
-          <footer className={s.footer}>
-            <span className={s.hint}>
-              {working
-                ? "Finish sign-in to continue."
-                : !status.ready
-                  ? "Connect ChatGPT or OpenRouter to continue."
-                  : hasChanges
-                    ? "Your model preferences will be saved."
-                    : "Access is checked when you send a message."}
+          </div>
+        )}
+        {(attempt?.state === "cancelled" || attempt?.state === "complete") && (
+          <p className={s.fine}>{attempt.message}</p>
+        )}
+        {pollError && (
+          <p className={s.error} role="status">
+            {pollError}
+          </p>
+        )}
+        {visibleError && (
+          <p className={s.error} role="alert">
+            {visibleError}
+          </p>
+        )}
+        <ul className={`${s.rows} ${chatgpt ? "" : s.dim}`}>
+          {(older ? chatgptModels : featured).map((model) =>
+            row(model, chatgpt, () =>
+              chatgpt ? void save(model) : void startLogin(model),
+            ),
+          )}
+        </ul>
+        {!older && chatgptModels.length > featured.length && (
+          <button
+            type="button"
+            className={`${s.link} ${s.more}`}
+            onClick={() => setOlder(true)}
+          >
+            {chatgptModels.length - featured.length} older models
+          </button>
+        )}
+      </section>
+
+      {/* OpenRouter: pay per use. */}
+      <section aria-labelledby="openrouter-heading">
+        <header className={s.groupHead}>
+          <Mark account="openrouter" />
+          <div>
+            <strong id="openrouter-heading">OpenRouter</strong>
+            <span>{ACCOUNTS.openrouter.billing}</span>
+          </div>
+          {openRouter ? (
+            <span className={s.rowSide}>
+              <span className={s.ok}>
+                <span className={s.dot} /> Key saved
+              </span>
+              <button
+                type="button"
+                className={`${s.link} ${s.quiet}`}
+                disabled={saving}
+                onClick={() => {
+                  setDisconnectError(null);
+                  setConfirmDisconnect("openrouter");
+                }}
+              >
+                Disconnect
+              </button>
             </span>
-            <button
-              className={s.primary}
-              type="button"
-              disabled={
-                !status.ready ||
-                working ||
-                saving ||
-                !validSelection ||
-                !selectedConnected
-              }
-              onClick={viewApplications}
+          ) : (
+            !openRouterOpen && (
+              <button
+                type="button"
+                className={s.btn}
+                onClick={() => setOpenRouterOpen(true)}
+              >
+                Connect OpenRouter
+              </button>
+            )
+          )}
+        </header>
+        {!openRouter && openRouterOpen && (
+          // An offer, not a request: the calm frame, not the amber one that
+          // says someone is needed.
+          <div className={h.openRouterCard}>
+            <RequestCard
+              plain
+              state="done"
+              asks="can use OpenRouter"
+              label="Connect OpenRouter"
             >
-              {saving ? "Saving…" : (returnTo?.label ?? "View applications")}
-              <ArrowRight />
-            </button>
-          </footer>
-        </section>
-      </div>
+              <OpenRouterConnect
+                onSaved={async () => {
+                  await reload();
+                  show("OpenRouter connected · using Claude Sonnet 5");
+                }}
+                actions={
+                  <button
+                    type="button"
+                    className="hv-ob-quiet"
+                    onClick={() => setOpenRouterOpen(false)}
+                  >
+                    Not now
+                  </button>
+                }
+              />
+            </RequestCard>
+          </div>
+        )}
+        <ul className={`${s.rows} ${openRouter ? "" : s.dim}`}>
+          {openRouterModels.map((model) =>
+            row(model, openRouter, () =>
+              openRouter ? void save(model) : setOpenRouterOpen(true),
+            ),
+          )}
+        </ul>
+      </section>
+
+      <p className={s.fine}>
+        Hallvi never switches models by itself. Logins stay on this computer.{" "}
+        <button
+          className={s.link}
+          type="button"
+          popoverTarget="connection-help"
+        >
+          Storage &amp; privacy
+        </button>
+      </p>
+      {toast}
       <aside
         popover="auto"
         id="connection-help"
-        className={s.help}
+        className={h.help}
         aria-labelledby="connection-help-title"
       >
         <header>
           <h2 id="connection-help-title">Storage &amp; privacy</h2>
           <button
-            className={s.close}
+            className={h.close}
             type="button"
             popoverTarget="connection-help"
             popoverTargetAction="hide"
@@ -802,7 +850,7 @@ export function PiSetupScreen({
             <p>{file.description}</p>
             <code>{file.path}</code>
             <button
-              className={s.textButton}
+              className={h.textButton}
               type="button"
               onClick={async () => {
                 try {
@@ -978,6 +1026,6 @@ export function PiSetupScreen({
           onConfirm={() => void disconnect()}
         />
       )}
-    </main>
+    </SettingsShell>
   );
 }

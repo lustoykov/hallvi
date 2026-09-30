@@ -75,8 +75,9 @@ describe("account-first setup and progressive disclosure", () => {
     const { html, defaultView } = render();
     expect(defaultView).toContain("Settings");
     expect(defaultView).toContain(
-      "The accounts Hallvi thinks through, and the model it uses.",
+      "What Hallvi thinks with, and who pays for it.",
     );
+    expect(defaultView).toContain("Pick what Hallvi thinks with");
     expect(defaultView).not.toContain("Login stored where Hallvi runs.");
     expect(defaultView).toContain("Connect ChatGPT");
     expect(defaultView).not.toContain(initialStatus.separateAuthPath);
@@ -93,9 +94,8 @@ describe("account-first setup and progressive disclosure", () => {
     );
     expect(defaultView).not.toContain("Check for a saved login");
     expect(html).toContain("/hallvi/pi-auth-&lt;login-id&gt;.json");
-    expect(html.match(/<aside\b/g)).toHaveLength(1);
+    expect(html.match(/<aside\b[^>]*popover/g)).toHaveLength(1);
     expect(html).not.toContain("Demo state");
-    expect(defaultView).toMatch(/<button[^>]*disabled[^>]*>View applications/);
     for (const role of ["Hallvi", "Pi", "ChatGPT"]) {
       expect(html).toContain(`<dt>${role}</dt>`);
     }
@@ -121,11 +121,9 @@ describe("account-first setup and progressive disclosure", () => {
         source: "/pi/auth.json",
       },
     });
-    expect(defaultView).toContain("Existing ChatGPT login found");
+    expect(defaultView).toContain("A ChatGPT login was found in Pi");
     expect(defaultView).toContain("Use existing login");
-    expect(defaultView).toContain(
-      "Share Pi’s login file and copy its model settings.",
-    );
+    expect(defaultView).toContain("Using it shares Pi’s login file.");
     expect(defaultView).toContain("Connect another account");
     expect(defaultView).not.toContain("Check for a saved login");
     expect(defaultView).toContain("GPT-6 Sol / High");
