@@ -145,15 +145,18 @@ For HTML, CSS and panel JavaScript changes:
 1. Replace `panel.html` beside the **running adapter** (on the remote host for
    an SSH connection). Use a temporary file and rename for an atomic update.
    Keep the marketplace's source copy up to date for future installs too.
-2. Click **Reload UI** in the panel, or ask Codex to call `hallvi_reload_ui`.
+2. Choose **Check for a panel update** in the panel's `⋯` menu, or ask Codex
+   to call `hallvi_reload_ui`.
    This reads the new file and emits standard MCP tool/resource list-change
    notifications on the existing connection. It does not restart any process.
-3. Close and reopen Hallvi, then compare the panel's **UI** version with the
-   version returned by the reload tool. An already rendered iframe does not
-   replace itself. A successful reload-tool response alone is not proof that
-   the host has refreshed its cached tool metadata or rendered the new panel.
+3. Open Hallvi again, then compare the version in the `⋯` menu with the one
+   the check reported. An already rendered iframe does not replace itself. In
+   the Codex desktop app (September 2026 build), a new chat opened the new
+   version; opening Hallvi again in the same chat still showed the old one. A
+   successful reload-tool response alone is not proof that the host has
+   refreshed its cached tool metadata or rendered the new panel.
 
-**Refresh** rereads application records; **Reload UI** checks the installed
+**Refresh** rereads application records; **Check for a panel update** checks the installed
 panel file. Failed UI reads preserve the last working resource and tools.
 The reload tool cannot download updates, run shell commands, change the
 controller, or load new adapter code.

@@ -79,10 +79,11 @@ in-thread.
 - **Its words** render as safe Markdown (paragraphs, lists, code, links, bold).
   Long answers fold with *Show all*. Saved records follow as a one-line card:
   certainty tag, title, checks.
-- **Afterwards:** *Copy reply* and *Discuss in Codex*, which puts the reply into
-  Codex's composer without sending it (falls back to copying where the host
-  refuses). This is the plugin's native move: Hallvi describes an application
-  problem, the coding agent beside it has the repository.
+- **Afterwards:** *Copy reply* and *Send to Codex*, which posts the reply to the
+  Codex conversation as the user's message (Codex sends it at once; it offers
+  no draft) and falls back to copying where the host refuses. This is the
+  plugin's native move: Hallvi describes an application problem, the coding
+  agent beside it has the repository.
 
 ## Now
 

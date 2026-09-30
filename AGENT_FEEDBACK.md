@@ -12,7 +12,9 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
 | [AF-025 — Refuse a second preview before attaching retained state](#af-025--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
-| [AF-026 — Native host checks must exercise link and clipboard failures](#af-026--native-host-checks-must-exercise-link-and-clipboard-failures) | 1 | New |
+| [AF-026 — Native host checks must exercise link and clipboard failures](#af-026--native-host-checks-must-exercise-link-and-clipboard-failures) | 2 | New |
+| [AF-029 — Say "awaiting approval" while request_approval waits](#af-029--say-awaiting-approval-while-request_approval-waits) | 1 | New |
+| [AF-030 — Let the plugin label the messages it sends](#af-030--let-the-plugin-label-the-messages-it-sends) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -79,6 +81,30 @@ A remote adapter cannot supply its panel while disconnected; distinguish
 network reachability from cached UI before recommending plugin resets.
 
 **+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
+**+1:** 2026-09-30 — operator panel: the local test host accepted
+`ui/message` with `send: false` as a draft, while Codex sent it as a user turn
+at once; the test host reloaded the panel on demand, while Codex kept the old
+resource in the same chat and loaded the new one only in a new chat.
+
+### AF-029 — Say "awaiting approval" while request_approval waits
+
+While Pi's `request_approval` call waited for the owner (Hallvi decides), the
+conversation snapshot's `status` stayed `working`; only an Always-ask command
+record made it `awaiting-approval`. The page words it from the call itself, and
+the plugin panel now does the same, but every reader of `status` has to know
+this. Reporting the owner as the one being waited on in the snapshot would let
+one field answer it.
+
+**+1:** 2026-09-30 — Codex operator panel
+
+### AF-030 — Let the plugin label the messages it sends
+
+A message the owner types in the Codex panel reaches Hallvi's page labelled
+**CLI**, because `origin` accepts only `cli` and the adapter keeps it for older
+controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
+retried as `cli` on a refusal, would say where the owner wrote it.
+
+**+1:** 2026-09-30 — Codex operator panel
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.

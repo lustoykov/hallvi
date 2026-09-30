@@ -54,7 +54,7 @@
   .muted { color: var(--muted); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  #app { display: flex; flex-direction: column; height: 100vh; max-width: 820px; margin: 0 auto; }
+  #app { position: relative; display: flex; flex-direction: column; height: 100vh; max-width: 820px; margin: 0 auto; }
   :root[data-mode="inline"] #app { height: min(640px, 100vh); }
 
   /* Which application, and what its operator is doing. */
@@ -89,7 +89,7 @@
   .context-toggle .summary { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .context-toggle svg { flex: none; transition: transform var(--base); }
   .context-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-  .context { margin: 6px 12px 0; padding: 4px 12px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); max-height: 58vh; overflow: auto; }
+  .context { margin: 6px 12px 4px; padding: 4px 12px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); max-height: 58vh; overflow: auto; }
   .context section { padding: 10px 0; border-bottom: 1px solid var(--line); }
   .context section:last-child { border-bottom: 0; padding-bottom: 2px; }
   .context h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
@@ -515,8 +515,9 @@ async function discuss(text, button) {
   const name = app()?.name ?? "the application";
   const said = `Hallvi's operator for ${name} said:\n\n${text.split("\n").map((line) => `> ${line}`).join("\n")}\n\n`;
   try {
-    await request("ui/message", { role: "user", content: [{ type: "text", text: said }], options: { send: false } }, 10_000);
-    button.textContent = "Added to Codex";
+    // Codex sends an app's message as the user's turn; it is not a draft.
+    await request("ui/message", { role: "user", content: [{ type: "text", text: said }] }, 10_000);
+    button.textContent = "Sent to Codex";
   } catch {
     host.canMessage = false;
     await copyText(said, button);
@@ -588,6 +589,7 @@ async function follow(now = false) {
   try {
     const data = await call("hallvi_conversation", { application_id: state.selected, turns: 5, known: previous?.revision });
     if (mine !== generation) return;
+    const recovered = Boolean(state.conversationError);
     state.readAt = data.readAt; state.failures = 0; state.conversationError = null;
     if (!data.unchanged) {
       const was = previous?.status;
@@ -598,7 +600,7 @@ async function follow(now = false) {
       renderComposer();
       if (was && was !== data.status) void readContext();
       describeToModel();
-    } else renderBanner();
+    } else if (recovered) { renderThread(); renderIdentity(); renderComposer(); }
   } catch (error) {
     if (mine !== generation) return;
     state.failures++;
@@ -729,7 +731,7 @@ function renderIdentity() {
   const traffic = context?.traffic;
   if (traffic && !traffic.unavailable) {
     if (["live", "catching-up"].includes(traffic.state) && traffic.totals) {
-      parts.push(`${count(traffic.totals.views)} ${traffic.totals.views === 1 ? "view" : "views"} today`);
+      parts.push(`${count(traffic.totals.views)} ${traffic.totals.views === 1 ? "view" : "views"} in 24 h`);
       if (traffic.totals.errors) parts.push(`${plural(traffic.totals.errors, "error", "errors")}`);
     }
   }
@@ -776,8 +778,8 @@ function renderContext() {
     const t = traffic.totals ?? {};
     trafficSection.append(el("div", { class: "numbers" },
       el("span", {}, el("b", {}, count(t.views ?? 0)), " views"),
-      el("span", {}, el("b", {}, count(t.visitors ?? 0)), " visitors (est.)"),
-      el("span", { style: t.errors ? "color:var(--failed)" : null }, el("b", {}, count(t.errors ?? 0)), " server errors"),
+      t.visitorsPer === "today" && t.visitors ? el("span", {}, el("b", {}, count(t.visitors)), " visitors today (est.)") : null,
+      el("span", { style: t.errors ? "color:var(--failed)" : null }, el("b", {}, count(t.errors ?? 0)), t.errors === 1 ? " server error" : " server errors"),
       t.p95Ms != null ? el("span", {}, el("b", {}, `${t.p95AtLeast ? "≥" : ""}${Math.round(t.p95Ms)} ms`), " p95") : null));
     const series = traffic.series ?? [];
     const peak = Math.max(1, ...series.map((point) => point.views));
@@ -798,6 +800,7 @@ function renderContext() {
   const counted = traffic && !traffic.unavailable && ["live", "catching-up"].includes(traffic.state);
   const errors = el("section", {}, el("h3", {}, "Errors"));
   if (problems.length) errors.append(el("ul", { class: "problems" }, problems));
+  else if (counted && traffic.totals?.errors) errors.append(el("p", { class: "muted" }, `${plural(traffic.totals.errors, "server error", "server errors")} in the last day; the log did not keep which page.`));
   else errors.append(el("p", { class: "muted" }, counted ? "No server errors in the last day's log." : "Server errors aren't counted without traffic history."));
   if (runs.length) errors.append(el("p", { class: "muted" }, `${plural(runs.length, "command", "commands")} Hallvi ran in the last day failed; its replies say what it did next.`));
   sections.push(errors);
@@ -933,7 +936,7 @@ function renderReply(reply, c) {
     node.append(el("div", { class: "card waiting" }, el("h4", {}, "Interrupted"), el("p", {}, "Hallvi's worker stopped during this reply. Whether its last command finished is not known, and nothing runs until you choose Continue or Stop in Hallvi."), el("button", { type: "button", class: "secondary", onclick: () => void openAddress(pageOf()) }, "Continue or stop in Hallvi")));
   } else if (reply.status === "completed" && reply.body) {
     const copy = el("button", { type: "button", class: "text-button quiet", "data-focus": `copy:${reply.id}`, onclick: (event) => void copyText(reply.body, event.currentTarget) }, "Copy reply");
-    const codex = el("button", { type: "button", class: "text-button quiet", "data-focus": `codex:${reply.id}`, onclick: (event) => void discuss(reply.body, event.currentTarget) }, "Discuss in Codex");
+    const codex = el("button", { type: "button", class: "text-button quiet", "data-focus": `codex:${reply.id}`, onclick: (event) => void discuss(reply.body, event.currentTarget) }, "Send to Codex");
     node.append(el("div", { class: "actions" }, copy, host.canMessage ? codex : null));
   }
   return node;
