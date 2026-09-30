@@ -6,7 +6,6 @@ import {
   CaretDown,
   CaretRight,
   ChatCircle,
-  GearSix,
   Plus,
 } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -282,11 +281,10 @@ export function ApplicationNavigation({
         ))}
       </nav>
       <div className="hv-navigation-foot">
-        <Link className="hv-navigation-settings" href={settingsHref}>
-          <GearSix /> Settings
-        </Link>
-        {/* What's new leads back to the same conversation Settings does. */}
+        {/* Hallvi itself: Settings, What's new and updates, in one menu.
+            What's new leads back to the same conversation Settings does. */}
         <ThisHallvi
+          settingsHref={settingsHref}
           whatsNewHref={settingsHref.replace(/^[^?]*/, "/whats-new")}
         />
       </div>

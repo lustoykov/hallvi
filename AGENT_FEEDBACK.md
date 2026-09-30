@@ -5,14 +5,20 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 3 | Partially improved; pause remains |
+| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
-| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
-| [AF-025 — Refuse a second preview before attaching retained state](#af-025--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
-| [AF-026 — Native host checks must exercise link and clipboard failures](#af-026--native-host-checks-must-exercise-link-and-clipboard-failures) | 1 | New |
+| [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
+| [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
+| [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
+| [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
+
+| [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
+
+| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -62,24 +68,6 @@ changing their decision.
 
 ## Requests
 
-### AF-026 — Native host checks must exercise link and clipboard failures
-
-The plugin’s local preview acknowledged every open-link request, hiding the
-installed Codex host’s silent rejection of HTTP URLs. A successful bridge
-reply did not establish that a browser opened. The panel now offers a copyable
-HTTP address and handles clipboard denial and explicit host link failures.
-Keep native host behavior separate from fixture results when reporting proof.
-Replacing panel bytes at one resource URI also left the native host showing
-an older interface. The follow-up adds content-versioned resources and an
-explicit UI reload; protocol acknowledgment must still be distinguished from
-the host actually rendering the new version. A later failure to open the
-plugin was an SSH startup failure: the `.local` Mac mini name no longer
-resolved on the laptop's current network, and its known LAN address timed out.
-A remote adapter cannot supply its panel while disconnected; distinguish
-network reachability from cached UI before recommending plugin resets.
-
-**+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
-
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
 
@@ -90,17 +78,6 @@ What you would like or what bothered you, in your own words.
 
 **+1:** YYYY-MM-DD — task ID or PR reference
 ```
-
-### AF-025 — Refuse a second preview before attaching retained state
-
-Attaching a retained application from a checkout that already serves a
-snapshot on another port takes a backup and ownership, then Next.js refuses
-its second dev server. The retained runtime is left needing `--after-crash`
-even though no application work ran. A preflight check could reject this
-before attaching. The verification guide now tells contributors to stop the
-snapshot pair first.
-
-**+1:** 2026-09-29 — Codex/ChatGPT plugin proof of concept
 
 ### AF-001 — Record the waiting messages Stop drops
 
@@ -180,11 +157,209 @@ a production first-use cost but does not fully attribute that original spike.
 Its authoritative runs isolate both Hallvi's account and standalone Pi discovery;
 initial runs which only isolated Hallvi's account were excluded.
 
+A 30 September investigation on current source (`8502eb83`) reproduces the
+SDK import itself blocking under Node 22.23.2 on the shared Apple-silicon Mac:
+one standalone asynchronous public-entry import took 587 ms with 569 ms maximum
+event-loop delay. The earlier nonblocking standalone result was not reproduced
+in this environment; it remains historical evidence. CPU and module-loading
+profiles show synchronous Node module reads, parsing and SDK dependency
+initialization, including its terminal, YAML and HTTP libraries. This attributes
+a substantial loading cost locally, not every part of the signed release's
+separately observed 342–351 ms pause.
+
+A supported public-package bundling comparison then found a concrete boundary.
+Bundling the coding SDK and Pi AI reduced six fresh production browser openings
+from a median 832 ms usable / 309 ms maximum web-loop delay to 777 ms / 186 ms.
+However, the relocated program's OAuth login failed before reaching the provider:
+Pi AI's variable provider import became “Cannot find module as expression is too
+dynamic”. Keeping Pi AI external restored real device-code login and cancellation,
+but six fresh openings became slower at 877 ms usable / 250 ms maximum delay.
+The external baseline also reached device-code login and cancelled cleanly.
+The experiment was reverted: a partial pause reduction does not justify slower
+usable opening, and the faster variant breaks connection setup.
+
+These are unsigned current-source production fixtures, Node 22.23.2 and isolated
+synthetic accounts on one shared Mac; no model calls. Readiness required both an
+enabled composer and the initial full SSE snapshot. All eight model choices and
+preference changes worked, and the relocated programs honored the isolated
+standalone Pi account. The original signed-release measurements remain separate.
+A supported narrow SDK runtime export or a bundler-compatible OAuth loader could
+remove this boundary; neither was implemented. Profiles and the disposable
+comparison harness remain under ignored `work/cold-pause/` in the owning worktree.
+
 **+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
 
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
 
 **+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
+
+**+1:** 2026-09-30 — current-source cold-opening attribution, codex/remaining-acceptance-verification
+
+### AF-025 — Distinguish a saved-route HTTP check from browser usability
+
+A saved private-route check can succeed while the owner's browser blocks the
+address. On 30 September the ordinary AI-profile Chrome returned
+`ERR_BLOCKED_BY_CLIENT` for both harmless plain-text and JSON responses served on
+the same local port 3760, while independent HTTP requests returned 200. This
+reproduces outside the application and deployment. The blocking component remains
+unknown; no browser protection was bypassed, and the probes were stopped and
+removed. Keep server-side reachability evidence separate from client browser
+acceptance when describing a usable private link.
+
+**+1:** 2026-09-30 — remaining browser acceptance diagnosis, codex/remaining-acceptance-verification
+
+### AF-022 — Send one review's findings to one branch
+
+The traffic v1 review findings were fixed twice in parallel: on main (c0e4bf05)
+and on the feature branch (round 2). Both fixed query-routed pages with
+different event shapes (`q: {k, v}` against `k`), the first live script
+arrival and serialization, and the follow-up merge had to pick one of each
+and port the tests. Naming one branch as the owner of a review's findings, or
+noting on the other which findings are taken, would save that merge.
+
+**+1:** 2026-09-29 — traffic follow-up (`claude/traffic-v1-followup`)
+
+### AF-024 — Explain local leftovers after Forget
+
+In the release rehearsal, forgetting the idle test application removed its
+registration and history but left its managed SSH tunnel and application-specific
+operator configuration on the controller. Cleanup needed a separate exact-process
+and exact-directory check. I would like Forget to explain those retained local
+resources and provide a clear scoped cleanup path. This is not a request to delete
+remote deployments or shared credentials automatically.
+
+**+1:** 2026-09-30 — factory coordinator, task `01a0e897-125b-7fb2-82c5-0da106e25ea1`
+
+### AF-027 — Let a checkout show the installed-only update states
+
+The Hallvi menu at the foot of the sidebar has its own states: a release
+waiting, an update running, failed or finished, and a release source that could
+not be reached. Only an installed Hallvi reaches them; a checkout, `npm run
+scenarios` and the retained dev applications all read as a development
+checkout. Looking at them took a throwaway Playwright script answering
+`/api/hallvi/update` from fixtures. A scenario, or a development-only way to
+pick the update state, would make that one command.
+
+**+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
+
+### AF-028 — Notice browser journeys that stop passing while checks are off
+
+The GitHub consent journey (`tests/browser/github.spec.ts`, first test) had
+failed since #179 reworded the Storage & privacy popover on 20 September
+("contents" where the test expected "code"). Nothing ran it after the checks
+workflow was switched off, and it surfaced only because a later step of the same
+test changed. A cheap way to see which journeys currently fail on main would
+separate old breakage from a new change's.
+
+**+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
+
+### AF-033 — Refuse a second preview before attaching retained state
+
+Attaching a retained application from a checkout that already serves a
+snapshot on another port takes a backup and ownership, then Next.js refuses
+its second dev server. The retained runtime is left needing `--after-crash`
+even though no application work ran. A preflight check could reject this
+before attaching. The verification guide now tells contributors to stop the
+snapshot pair first.
+
+**+1:** 2026-09-29 — Codex/ChatGPT plugin proof of concept
+
+### AF-034 — Native host checks must exercise link and clipboard failures
+
+The plugin’s local preview acknowledged every open-link request, hiding the
+installed Codex host’s silent rejection of HTTP URLs. A successful bridge
+reply did not establish that a browser opened. The panel now offers a copyable
+HTTP address and handles clipboard denial and explicit host link failures.
+Keep native host behavior separate from fixture results when reporting proof.
+Replacing panel bytes at one resource URI also left the native host showing
+an older interface. The follow-up adds content-versioned resources and an
+explicit UI reload; protocol acknowledgment must still be distinguished from
+the host actually rendering the new version. A later failure to open the
+plugin was an SSH startup failure: the `.local` Mac mini name no longer
+resolved on the laptop's current network, and its known LAN address timed out.
+A remote adapter cannot supply its panel while disconnected; distinguish
+network reachability from cached UI before recommending plugin resets.
+
+**+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
+
+Use this small template; add detail only when useful. Link the overview row to
+the request heading.
+
+```markdown
+## Archive
+
+| Request ID / title | +1 | Status |
+| --- | --- | --- |
+| [AF-023 — Discover newer releases despite GitHub listing order](#af-023--discover-newer-releases-despite-github-listing-order) | 1 | Fixed in #285 |
+| [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fixed in #282 |
+| [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
+| [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fixed in #280 |
+| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Fixed in #275 |
+| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
+| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fixed in #276 |
+| [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
+| [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Resolved in #266 |
+| [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Resolved in #265 |
+| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
+| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
+| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
+| [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
+| [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-023 — Discover newer releases despite GitHub listing order
+
+After alpha.10 publication, GitHub listed alpha.9, alpha.8, then alpha.10.
+The installed updater stopped at its cached alpha.9 and said nothing newer was
+available; the official bootstrap also chose the first manifest. Rank update
+candidates before the cache shortcut and use GitHub's latest-release object
+for the default bootstrap, while preserving signed manifest verification.
+
+**+1:** 2026-09-29 — published alpha.10 updater acceptance
+(`codex/release-discovery-order`).
+
+**Disposition:** Fixed in [#285](https://github.com/lustoykov/hallvi/pull/285). The running updater ranks version tags before its verified-cache shortcut; the normal installer selects GitHub’s latest published release. Signature and archive checks remain unchanged. A real public-feed check found and verified alpha.10 despite the older cached tag. Older affected installations need the corrected official installer to recover.
+
+### AF-021 — Let manual public deployment proceed without GitHub login
+
+A fresh account could read a public repository and connect its existing server,
+then “Deploy master when I ask” failed with a request to connect GitHub so Hallvi
+could watch the branch. Manual branch selection should use the existing public
+reader; automatic watching and private repository access still need a connection.
+
+**+1:** 2026-09-29 — fresh-account alpha.10 onboarding acceptance
+(`codex/manual-public-deployment`).
+
+**Disposition:** Fixed in merged [#282](https://github.com/lustoykov/hallvi/pull/282) makes the branch read mode-aware, including a
+manual-to-automatic transition check. Verification guidance worked as written.
+
+### AF-020 — Name failed check groups without claiming they passed
+
+The same rehearsal's app timeline shows a red failed moment labelled “7 checks
+passed”. `lane-rails.tsx` turns every counted check group into that phrase,
+including groups containing failures. Keep a failed group's label consistent
+with its recorded outcomes.
+
+**+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
+(`codex/overview-subject-verdict`), observed again in its isolated browser proof.
+
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) labels only passing groups as
+passed; failed, informational and planned groups keep a neutral check count.
+
+### AF-019 — Keep deployment failures out of passing server checks
+
+An installed alpha.9 rehearsal correctly recorded a failed application smoke
+check and three passed host checks, but Overview answered “No” to “Is the server
+up?” beside “3 checks passed”. The server lane inherited the failed deployment
+event's overall status through its passing neighbor-preservation check.
+Only a judgement about a subject in that lane should apply; individual failed
+host checks must still report failure.
+
+**+1:** 2026-09-29 — real alpha.10 release rehearsal acceptance
+(`codex/overview-subject-verdict`).
+
+**Disposition:** [#280](https://github.com/lustoykov/hallvi/pull/280) corrects the projection; the regression
+keeps the application failure visible and the passed host checks consistent
+with the timeline. Verification workflow guidance worked as written.
 
 ### AF-017 — Make record validation easier for Pi to recover from
 
@@ -194,25 +369,10 @@ explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
 the calls and finished, but saving the useful result added avoidable churn.
 Make the tool contract easier to follow without relaxing record validation.
 
-**Status:** Owner-authorized correction in review on `codex/record-basis-contract`: explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. Archive after the fix merges.
+**Status:** Fixed in [#275](https://github.com/lustoykov/hallvi/pull/275): explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. A bounded real-Pi trial saved valid observed, planned and reported values; future retry-free behavior is not guaranteed.
 
 **+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
 [release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
-
-## Archive
-
-| Request ID / title | +1 | Status |
-| --- | --- | --- |
-| [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
-| [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fix in review #276 |
-| [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
-| [AF-014 — Preserve why an operator turn ended early](#af-014--preserve-why-an-operator-turn-ended-early) | 1 | Resolved in #266 |
-| [AF-015 — Clear stale fetch errors after reconnection](#af-015--clear-stale-fetch-errors-after-reconnection) | 1 | Resolved in #265 |
-| [AF-007 — Keep architecture explanations in step with code](#af-007--keep-architecture-explanations-in-step-with-code) | 1 | Implemented in #247 |
-| [AF-003 — Open-link checks in the shared-information smoke match nothing](#af-003--open-link-checks-in-the-shared-information-smoke-match-nothing) | 1 | Fixed in #245 |
-| [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
-| [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
-| [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
 
 ### AF-018 — Load the updated interface after an installed upgrade
 
@@ -226,7 +386,7 @@ without losing unsent work, or make the required reload clear.
 **+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
 [release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
 
-**Disposition:** Fix in review in [#276](https://github.com/lustoykov/hallvi/pull/276).
+**Disposition:** Fixed in [#276](https://github.com/lustoykov/hallvi/pull/276).
 An open page that observes completion offers an explicit, confirmed Reload page
 action. The warning asks the owner to keep unsent work, images and unsaved
 settings first. Existing browser recovery preserves text drafts and pending

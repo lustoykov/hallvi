@@ -4,6 +4,27 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.11 — 30 September 2026
+
+Find the newest signed release even when GitHub lists older releases first, and keep traffic observations clearer.
+
+- **Reliable release discovery.** Hallvi checks newer version tags before reusing a previously verified release. The normal installer follows GitHub’s latest published release; signature and archive checks still apply. Older installed versions affected by release ordering can recover by running the official installer again.
+- **More accurate traffic observations.** Traffic retains partial-count labels, validates query-routed page values, and handles log rotation, catch-up and closing browser views more consistently.
+- **Cloudflare cache rules.** Pi can inspect cache rules and maintain Hallvi’s own rule for a hostname while preserving existing owner rules.
+
+## 0.1.1-alpha.10 — 29 September 2026
+
+See application traffic, follow long conversations with less repeated loading, and hand a diagnosed code problem to a coding agent.
+
+- **Traffic in Hallvi.** See recorded visits, pages, sources, errors and response times from supported server access logs. History collection is optional; Stop keeps saved totals and Forget removes them. An optional site script adds navigation and engagement observations.
+- **Lighter live conversations.** Open chats receive changed records instead of repeatedly downloading their entire history. Reconnecting still restores the full conversation. Opening a conversation also does less startup work, and simultaneous readers of one chat share pending history reads.
+- **Clearer interruption evidence.** Recovery names the latest recorded tool result and unresolved action, and shows waiting follow-ups. Stop does not claim that a remote command stopped or that nothing ran.
+- **A complete coding-agent handoff.** Ask Hallvi to save a standalone problem packet with the observed revision, reproduction, evidence, uncertainty and an acceptance check. Copy reply carries the complete packet to your coding agent.
+- **Clearer saved checks.** Record instructions distinguish an observed check, a reported fact and a planned check, with useful guidance when an invalid value is rejected.
+- **Consistent Overview checks.** An application failure no longer marks passing server checks as failed. Failed or informational timeline groups do not claim their checks passed.
+- **Deploy public repositories manually.** Choose “Only when I ask” and a public repository branch without connecting GitHub. Automatic deployment and private repositories still require a GitHub connection.
+- **Load the updated interface.** After this page observes an update finish, Reload page explicitly loads the new interface. The confirmation asks you to preserve attached images and unsaved settings first; existing text-draft recovery remains. Older pages without this action still need a normal browser reload.
+
 ## 0.1.1-alpha.9 — 29 September 2026
 
 Reconnect a saved private address and get clearer information when a conversation loses its connection or ends early.

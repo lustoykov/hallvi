@@ -47,13 +47,19 @@ function Rows({
   empty,
   mono,
   partial,
+  sampled,
 }: {
   rows: Row[];
   empty: string;
   /** Paths read better in the monospaced face. */
   mono?: boolean;
-  /** A day in the range kept only its busiest entries: counts are floors. */
+  /**
+   * A day in the range kept only its busiest entries, or was counted in
+   * parts: counts are floors.
+   */
   partial?: boolean;
+  /** Some day's values come from part of its views: a sample. */
+  sampled?: boolean;
 }) {
   const [all, setAll] = useState(false);
   if (!rows.length) return <p className="tf-rank-empty">{empty}</p>;
@@ -81,8 +87,12 @@ function Rows({
       </ol>
       {partial && (
         <p className="tf-card-quiet">
-          At least these: some days kept only their {STORED_PER_LIST} busiest.
+          At least these: some days were counted only in part, or kept only
+          their {STORED_PER_LIST} busiest.
         </p>
+      )}
+      {sampled && (
+        <p className="tf-card-quiet">From part of the views on some days.</p>
       )}
       {rows.length > SHOWN && (
         <button
@@ -176,7 +186,14 @@ const rating = (metric: VitalName, value: number) =>
       ? "fair"
       : "poor";
 
-function Speed({ vitals }: { vitals: TrafficHistory["vitals"] }) {
+function Speed({
+  vitals,
+  sampled,
+}: {
+  vitals: TrafficHistory["vitals"];
+  /** Some day's figures come from part of its views: a sample. */
+  sampled: boolean;
+}) {
   const pages = [...new Set(vitals.map((vital) => vital.path))]
     .map((path) => ({
       path,
@@ -195,7 +212,8 @@ function Speed({ vitals }: { vitals: TrafficHistory["vitals"] }) {
   return (
     <table className="tf-speed">
       <caption className="tf-card-quiet">
-        Three visits in four were at least this fast.
+        Three visits in four were at least this fast
+        {sampled ? "; some days measured only part of their visits." : "."}
       </caption>
       <thead>
         <tr>
@@ -245,15 +263,12 @@ export function Breakdowns({
   history,
   script,
   locked,
-  countriesAside,
 }: {
   history: TrafficHistory;
   /** Whether Hallvi's script is counting: it alone measures some tabs. */
   script: boolean;
   /** What a script-only tab says without the script: the offer. */
   locked: (asked: ScriptAsk) => ReactNode;
-  /** A small map above the countries, in the looks that move it there. */
-  countriesAside?: ReactNode;
 }) {
   const partial = (list: TrafficHistory["partialLists"][number]) =>
     history.partialLists.includes(list);
@@ -289,6 +304,7 @@ export function Breakdowns({
               <Rows
                 mono
                 rows={time}
+                sampled={history.partialSamples.includes("engagement")}
                 empty="No visit has ended with a measured time yet."
               />
             ) : (
@@ -330,7 +346,6 @@ export function Breakdowns({
       />
       <Card
         title="Countries"
-        aside={countriesAside}
         tabs={[
           {
             id: "countries",
@@ -412,7 +427,12 @@ export function Breakdowns({
               {
                 id: "speed",
                 label: "Page speed",
-                body: <Speed vitals={history.vitals} />,
+                body: (
+                  <Speed
+                    vitals={history.vitals}
+                    sampled={history.partialSamples.includes("vitals")}
+                  />
+                ),
               },
             ]}
           />

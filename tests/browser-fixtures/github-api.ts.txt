@@ -74,7 +74,7 @@ export async function githubJson(path: string, _token: string | null, options: {
       const body = contentsResponse(fullName, decodeURIComponent(encoded), new URLSearchParams(query).get("ref") ?? "");
       if (!body) throw new GithubAccessError("The repository is missing or this login cannot access it.", "access");
       data = body;
-    } else if (route === "commits") data = { sha: fixtureCommitSha(fullName, revision) };
+    } else if (route === "commits") data = { sha: fixtureCommitSha(fullName, revision), commit: { committer: { date: "2026-01-01T00:00:00Z" } } };
     else data = { id: 99, full_name: fullName, visibility: "private", default_branch: "main", permissions: { pull: true, push: current.push !== "denied", admin: false } };
   }
   return { data, scopes: ["repo"] };

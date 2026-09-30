@@ -49,7 +49,7 @@ category Pi or a plugin can add to:
 | Machine check | The owner pressing Check on a connection card | A fixed probe of OS, Docker, memory and disk |
 | The way in | An application page being open | A local check of the tunnel, or a request to the public address |
 | Requests as they arrive | Overview or Traffic being open | A fixed follow of the proxy's access log, where an `access-log` record says it is |
-| Traffic history | The owner turning on Keep traffic history | A fixed follow and read of the same log, recounting each day |
+| Traffic history | An access log to read, unless the owner turned Keep traffic history off | A fixed follow and read of the same log, recounting each day |
 
 An observation has to meet every one of these, or it is Pi's work and goes
 through the modes:
@@ -61,13 +61,14 @@ through the modes:
 - The owner's own action starts it, the page shows that it is running, and it
   ends when that page goes away.
 
-**Traffic history is the one standing observation.** When the owner turns on
-Keep traffic history, the worker follows the same access log with the same kind
-of fixed, read-only command, and keeps what it counted: totals per day, never an
-address, a user agent or a query string. It meets the first two conditions. In
-place of the third, the owner's choice starts it, the Traffic page shows that
-it is running and how far back it reaches, and turning it off ends it; stored
-totals remain until the owner deletes them. Setting the log up on the server is
+**Traffic history is the one standing observation.** Keep traffic history is
+on by default once an application has Hallvi's access log, and the worker
+follows that log with the same kind of fixed, read-only command, keeping what
+it counted: totals per day, never an address, a user agent or a query string.
+It meets the first two conditions. In place of the third, the Traffic page
+shows that it is running and how far back it reaches, and the owner's choice
+to turn it off ends it for good; stored totals remain until the owner deletes
+them. Setting the log up on the server is
 Pi's work under the modes. [Traffic](docs/design/traffic.md) owns the design.
 
 So observations do not prompt in any mode, and a dropped connection that

@@ -5,8 +5,7 @@
 // on invented numbers (`fixtures.ts`). The collector and its routes are built
 // separately; until they exist this is the only way to look at every state.
 //
-// ?scenario= picks a state, ?page= a destination, and the page's own
-// ?variant= switcher picks a treatment.
+// ?scenario= picks a state and ?page= a destination.
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 

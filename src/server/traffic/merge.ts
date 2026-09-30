@@ -12,9 +12,11 @@
 import {
   LATENCY_BUCKETS_MS,
   OTHER,
+  TRAFFIC_LISTS,
   VITAL_BUCKETS,
   type Collection,
   type Coverage,
+  type DayFigure,
   type Gap,
   type HourTotals,
   type RangeTotals,
@@ -75,6 +77,12 @@ function coveredIn(days: Stored[], from: number, to: number) {
   }
   return total;
 }
+
+/** Whether a day counted `figure` from part of itself only: a floor. */
+const floored = (
+  day: Pick<TrafficDay, "partial"> | undefined,
+  figure: DayFigure,
+) => Boolean(day?.partial?.includes(figure));
 
 function share(part: number, whole: number) {
   return whole > 0 ? Math.min(1, Math.max(0, part / whole)) : 0;
@@ -145,22 +153,24 @@ function summed(hours: HourTotals[]) {
 
 /**
  * One bucket of a chart. An hour's visitors are its own estimate; a day's
- * come from the day, never from its hours added up.
+ * come from the day, never from its hours added up, and are floors where
+ * the day was counted in parts.
  */
 function point(
   at: number,
   hours: HourTotals[],
   covered: number,
-  estimate?: { visitors: number; errorVisitors: number },
+  day?: Pick<TrafficDay, "visitors" | "errorVisitors" | "partial">,
 ): SeriesPoint {
   const total = summed(hours);
   return {
     at: new Date(at).toISOString(),
     requests: total.requests,
     views: total.views,
-    visitors: estimate ? estimate.visitors : total.visitors,
+    visitors: day ? day.visitors : total.visitors,
     errors: total.errors,
-    errorVisitors: estimate ? estimate.errorVisitors : total.errorVisitors,
+    errorVisitors: day ? day.errorVisitors : total.errorVisitors,
+    visitorsAtLeast: floored(day, "visitors"),
     bots: total.bots,
     ...p95(total.latency),
     covered,
@@ -172,6 +182,7 @@ function totalsOf(
   visitors: number,
   errorVisitors: number,
   visitorsPer: RangeTotals["visitorsPer"],
+  visitorsAtLeast: boolean,
 ): RangeTotals {
   const total = summed(hours);
   return {
@@ -183,6 +194,7 @@ function totalsOf(
     ...p95(total.latency),
     visitors,
     visitorsPer,
+    visitorsAtLeast,
   };
 }
 
@@ -410,24 +422,11 @@ export function historyDays(
   return { from: addDays(today, 1 - 2 * DAYS_IN[range]), to: today };
 }
 
-const LISTS = [
-  "pages",
-  "sources",
-  "campaigns",
-  "countries",
-  "devices",
-  "browsers",
-  "systems",
-  "errors",
-  "goals",
-  "bots",
-] as const;
-
 interface Stretch {
   series: SeriesPoint[];
   totals: RangeTotals;
   previous: RangeTotals | null;
-  /** The days the lists come from, and how many whole days they span. */
+  /** The days the lists come from, and how many of them the log covered. */
   listed: TrafficDay[];
   perDay: number;
   /** The local days the range touches, and its first moment. */
@@ -479,6 +478,7 @@ function lastHours({
       current?.visitors ?? 0,
       current?.errorVisitors ?? 0,
       "today",
+      floored(current, "visitors"),
     ),
     previous:
       share(coveredIn(all, earlier, from), from - earlier) >= COMPARABLE
@@ -487,6 +487,7 @@ function lastHours({
             yesterday?.visitors ?? 0,
             yesterday?.errorVisitors ?? 0,
             "today",
+            floored(yesterday, "visitors"),
           )
         : null,
     listed: current ? [current] : [],
@@ -509,17 +510,19 @@ function lastDays(
   const before = run(count);
   const from = dayBounds(names[0], timeZone).start;
   const earlier = dayBounds(before[0], timeZone).start;
-  // How many whole days the log covered: a day half covered counts half, so
-  // a partly read day neither vanishes from an average nor drags it down.
-  const wholeDays = (list: string[]) =>
-    list.reduce((sum, name) => {
+  // How many days the log covered any of. A visitor estimate is a distinct
+  // count, which does not grow with the time it was counted over: ten
+  // browsers seen in half an hour are not five hundred a day. So a day read
+  // in part counts as a whole day, and can only understate the average.
+  const coveredDays = (list: string[]) =>
+    list.filter((name) => {
       const day = byName.get(name);
-      if (!day) return sum;
+      if (!day) return false;
       const { start, end } = dayBounds(day.day, day.timeZone);
-      return sum + share(coveredMs(day.coverage, start, end), end - start);
-    }, 0);
+      return coveredMs(day.coverage, start, Math.min(end, now)) > 0;
+    }).length;
   const perDay = (list: string[], field: "visitors" | "errorVisitors") => {
-    const whole = wholeDays(list);
+    const whole = coveredDays(list);
     const sum = list.reduce(
       (total, name) => total + (byName.get(name)?.[field] ?? 0),
       0,
@@ -532,6 +535,7 @@ function lastDays(
       perDay(list, "visitors"),
       perDay(list, "errorVisitors"),
       "day",
+      list.some((name) => floored(byName.get(name), "visitors")),
     );
   return {
     series: names.map((name) => {
@@ -553,7 +557,7 @@ function lastDays(
         ? totals(before)
         : null,
     listed: names.flatMap((name) => byName.get(name) ?? []),
-    perDay: wholeDays(names) || 1,
+    perDay: coveredDays(names) || 1,
     names,
     from,
   };
@@ -587,20 +591,27 @@ export function historyOf(
     range === "24h" ? lastHours(reading) : lastDays(DAYS_IN[range], reading);
   const { listed, perDay, names } = stretch;
   const lists = Object.fromEntries(
-    LISTS.map((name) => [
+    TRAFFIC_LISTS.map((name) => [
       name,
       mergedLists(
         listed.map((day) => day[name]),
         perDay,
       ),
     ]),
-  ) as Record<(typeof LISTS)[number], Ranked[]>;
-  const partialLists = LISTS.filter((name) =>
-    partial(
-      listed.map((day) => day[name]),
-      lists[name],
+  ) as Record<(typeof TRAFFIC_LISTS)[number], Ranked[]>;
+  const inPart = (figure: DayFigure) =>
+    listed.some((day) => floored(day, figure));
+  const partialLists: TrafficHistory["partialLists"] = [
+    ...TRAFFIC_LISTS.filter(
+      (name) =>
+        inPart(name) ||
+        partial(
+          listed.map((day) => day[name]),
+          lists[name],
+        ),
     ),
-  );
+    ...(inPart("scriptErrors") ? (["scriptErrors"] as const) : []),
+  ];
   const inRange = all.filter(({ day }) => names.includes(day.day));
   return {
     range,
@@ -611,6 +622,7 @@ export function historyOf(
     previous: stretch.previous,
     ...lists,
     partialLists,
+    partialSamples: (["engagement", "vitals"] as const).filter(inPart),
     engagement: mergedEngagement(listed),
     vitals: mergedVitals(listed),
     scriptErrors: mergedScriptErrors(listed),

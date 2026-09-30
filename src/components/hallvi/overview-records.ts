@@ -201,12 +201,19 @@ function byLane(records: SavedInformation[]) {
  * and printed a green "Checked 5 min ago" under the word Backups, which is
  * the most reassuring thing the page could have said and among the least
  * true. `failed` and `warning` are judgements: like a failed check they do not
- * age, and they outrank a passing one on the same record.
+ * age, and they outrank a passing one on the same record. That judgement
+ * belongs only to the lane of the subject the record states: a deployment
+ * event can fail an application check and pass a host check without saying
+ * the host failed.
  */
-function readLane(held: Held[], now: number): Certainty {
+function readLane(held: Held[], id: Lane, now: number): Certainty {
   if (!held.length) return "unknown";
   return worstReading(
-    held.map((item) => item.record.presentation?.status),
+    held.map((item) =>
+      laneOf(item.record.presentation?.states?.ref) === id
+        ? item.record.presentation?.status
+        : undefined,
+    ),
     held.map((item) => checkAsNow(item.check, item.record, now)),
   );
 }
@@ -470,7 +477,7 @@ export function overviewFromRecords({
           ? "absent"
           : verdict
             ? verdictCertainty[verdict.tone]
-            : readLane(held, now);
+            : readLane(held, id, now);
     const facts: Fact[] = subjects.flatMap((ref) =>
       [...currentFacts(live, ref).values()].map((item) => ({
         label: item.value.label,

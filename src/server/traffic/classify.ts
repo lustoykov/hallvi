@@ -155,6 +155,19 @@ function probeOf(path: string, status: number) {
 }
 
 const HTML = /^(text\/html|application\/xhtml\+xml)$/i;
+/** Files a page loads, which a browser may still open on their own. */
+const ASSET =
+  /\.(m?js|css|map|json|xml|txt|webmanifest|wasm|png|jpe?g|gif|webp|avif|svg|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|mov|mp3|wav|ogg|pdf|zip|gz)$/i;
+
+/**
+ * A page rather than a file: an HTML answer, or, when the log does not say
+ * what was answered (a 304 usually does not), a path that is not a file a
+ * page loads. An image or a script opened in a tab is not a page view.
+ */
+function pageShaped(line: TrafficLine) {
+  if (line.contentType !== null) return HTML.test(line.contentType.trim());
+  return !ASSET.test(line.path.split("/").pop() ?? "");
+}
 
 /**
  * Without fetch metadata: an HTML answer, or a page-shaped path when the
@@ -221,9 +234,9 @@ function requestOf(line: TrafficLine, agent: Agent): Request {
     line.method === "GET" &&
     !redirect &&
     (line.fetchDest
-      ? line.fetchDest === "document"
+      ? line.fetchDest === "document" && pageShaped(line)
       : line.fetchMode
-        ? line.fetchMode === "navigate"
+        ? line.fetchMode === "navigate" && pageShaped(line)
         : htmlish(line));
   const answered =
     (line.status >= 200 && line.status < 300) || line.status === 304;

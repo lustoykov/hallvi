@@ -4,9 +4,9 @@ The active delivery sequence for the application operator redesign. [Product](PR
 
 ## Current priority and sequencing boundary
 
-**Current priority: run the public self-service beta.** On 18 September 2026, the owner asked for a pleasant experience without additional machinery and to move into launch preparation once further polish has diminishing returns. The owner-authorized alpha.8 release rehearsal is complete; use beta feedback to guide the next increments rather than expanding application complexity.
+**Current priority: run the public self-service beta.** On 18 September 2026, the owner asked for a pleasant experience without additional machinery and to move into launch preparation once further polish has diminishing returns. The owner-authorized alpha.11 release rehearsal is complete; use beta feedback to guide the next increments rather than expanding application complexity.
 
-Connect real saved records and execution evidence to the accepted reference designs through the [presentation contract](docs/presentation-contract.md). Pi supplies structured observations; deterministic view projections and components own the layout and visual hierarchy. Polish the journey from adding a repository through permissions, visible progress and a verified result to opening the application from the user's PC. Continue the owner’s beta review of this complete experience, including refresh and return visits; fresh external-user onboarding remains unverified.
+Connect real saved records and execution evidence to the accepted reference designs through the [presentation contract](docs/presentation-contract.md). Pi supplies structured observations; deterministic view projections and components own the layout and visual hierarchy. Polish the journey from adding a repository through permissions, visible progress and a verified result to opening the application from the user's PC. Continue the owner’s beta review of this complete experience, including refresh and return visits. A fresh isolated account completed sign-in, public-repository inspection and manual deployment with real API checks; Chrome blocked opening that private route, so complete fresh-user browser acceptance and independent external onboarding remain unverified.
 
 Keep the scope on the views and interactions needed by that journey. Medium and more complicated applications and broader ongoing care follow this UI/UX checkpoint. Broad security hardening is deferred until after beta; during beta, communicate current risks and practical precautions without turning this into a new architecture project.
 
@@ -28,13 +28,17 @@ The 29 September batch implements the three selected increments:
   Continue/Stop, with truthful Stop wording and readable before/after evidence.
 - **05 — Coding-agent handoff**, [#270](https://github.com/lustoykov/hallvi/pull/270):
   a saved, redacted Markdown problem packet through the existing Copy reply action.
-  A bounded real-Pi trial established saving, reply equality and copying after refresh;
-  diagnosis, downstream adoption and a repaired deployment remain unproven.
+  A real rehearsal copied the complete packet to an independent coding worker,
+  merged its repair only into the rehearsal branch, and returned it through Pi
+  redeployment. Browser/API checks passed and both original records were preserved
+  exactly. This proves one repair loop; broader downstream adoption remains untested.
 - **11 — Existing CLI example**, [#269](https://github.com/lustoykov/hallvi/pull/269):
   a source-checked read-only example with request identity and honest outcome handling.
   This is documentation, not evidence of broader adoption.
 
-These are source changes merged as one reviewed batch, not a published release.
+These increments shipped in alpha.10. Alpha.11 adds release-discovery and Traffic
+corrections; the [release acceptance](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065)
+records the tested revisions and remaining limits.
 The [research plan index](https://github.com/lustoykov/hallvi/pull/246) preserves
 the proposals; larger mechanisms in those plans are not implementation requirements.
 
@@ -44,6 +48,14 @@ also passed: actual saved-route approval/reopen, laptop access and preserved dat
 through an installed restart. Return brief, quiet care, recovery rehearsal, learned
 procedures, existing-stack adoption and update rehearsal are deferred. The eleven
 research plans do not constitute eleven implementation commitments.
+
+AF-013’s roughly 300 ms loading pause remains open. Current-source profiles
+attribute substantial cold-opening cost to SDK module loading; the supported web
+bundling experiment was reverted after exposing an OAuth import failure or slower
+usable opening. [AF-013](AGENT_FEEDBACK.md#af-013--investigate-the-first-navigation-event-loop-pause)
+keeps those local results separate from signed-release measurements. The loading
+and shared-read improvements have narrower measured results; the earlier missed
+development wave remains unattributed. Neither is claimed fixed by this release.
 
 ## Sprint TODO
 
@@ -79,7 +91,7 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 The owner runs the beta. On 29 September 2026, the owner authorized publication once the final integrated candidate has strong end-to-end evidence and no material unresolved release defect. A separate external tester is not a publication gate. Record which steps the owner performed, which agents exercised with real services, and which used fixtures; keep untested external onboarding explicit.
 
-- [x] **A release people can install — alpha.8 published 29 September 2026.** [Release](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.8), source `daac8dc3d89088a3438daac5eb9217b66801f5cc`. [Native verification](https://github.com/lustoykov/hallvi/actions/runs/36596548667) passed clean installs and alpha.7 installer upgrades on macOS arm64 and Ubuntu 24.04 x64, preserving applications, chats, greetings and permission settings. Restart with an open chat passed on both platforms after the bounded-shutdown fix in [#258](https://github.com/lustoykov/hallvi/pull/258). Public latest manifest, signature and installer matched the verified draft. These checks exercise installer-mediated upgrades, not the public automatic-update discovery/downloader path. Independent external onboarding and private-repository GitHub App connection remain explicit follow-up gaps, not gates for this owner-authorized release.
+- [x] **A release people can install — alpha.11 published, 29–30 September 2026.** [Release](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.11), source `e5db6eae370f248f0d93a45be481a275c70b0712`. [Native verification](https://github.com/lustoykov/hallvi/actions/runs/36631563481) passed clean installs and alpha.10 upgrades on macOS arm64 and Ubuntu 24.04 x64. The public signed release matched the verified draft. The actual Mac mini upgraded with the ordinary latest installer, preserving all three applications’ messages and saved records, the unsent draft and the rehearsal app’s data. Its browser and installed discovery now identify the newest alpha correctly. Older releases’ discovery failure required installer recovery; their browser-to-update path is not claimed as passed. [Acceptance and scoped cleanup](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065) also establish the real packet → independent repair PR → Pi redeploy loop. Independent external onboarding, complete fresh-user browser acceptance and private-repository GitHub App acceptance remain explicit gaps, not gates for this owner-authorized release.
 - [x] **No local Docker prerequisite — merged in [PR #153](https://github.com/lustoykov/hallvi/pull/153).** Pi's repository workspace runs in a scratch folder on the user's machine by default, with Hallvi's credentials kept out of its environment and its file tools confined to the folder; Docker isolation is an explicit choice in Settings → Workspace that stops the workspace, with its reason, when Docker is unavailable. [Installation](docs/installation.md#pis-workspace), [boundary](docs/architecture.md#repository-workspace-architecture), [evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-19-optional-local-docker.md). Application servers still need Docker Compose.
 - [x] **Agent-assisted deployment, use and return — [#254](https://github.com/lustoykov/hallvi/pull/254), 29 September 2026.** With the owner’s existing account, real GPT-6 Sol deployed and redeployed an isolated todo app on the registered development host. Its UI-created item survived container replacement, refresh, controller restart and a fresh managed SSH connection; neighboring applications were preserved. Deployment and live progress were exercised on signed `d93564e0`; the final `daac8dc3` changes only launcher shutdown/service grace, and its exact signed archive passed open-browser shutdown and same-address return with the same item, settings and 15 messages. Native installed-service checks used disposable runners; the real deployment used a task-owned foreground controller. This is agent execution with reused accounts and developer assistance, not fresh external-user onboarding. [Walkthrough](docs/beta-walkthrough.md) remains the repeatable acceptance path.
 - [x] **Authority reviewed in the owner/agent rehearsal.** The managed-machine flow names the ability to sign in and run commands, including as administrator, and explains the application-specific key. Its permission-mode wording, scoped test-server guidance and independent-recovery-copy advice were reviewed in the product source and [beta precautions](docs/beta-safety.md). The live rehearsal used the normal managed-key flow, Hallvi decides and manual deployment, verified a retained-state backup before attachment, and confined work to its disposable application. Always ask execution gating was separately verified in [#252](https://github.com/lustoykov/hallvi/pull/252). No claim of external-user comprehension or a tested production recovery is made.

@@ -48,6 +48,8 @@ let root: string;
 let applicationId: string;
 let chatId: string;
 let tip = "a".repeat(40);
+const committed = (sha: string) =>
+  sha === "a".repeat(40) ? "2026-09-01T10:00:00Z" : "2026-09-02T11:30:00Z";
 const staged: string[] = [];
 const binary = Buffer.from([0, 255, 1, 129]);
 beforeAll(async () => {
@@ -81,7 +83,10 @@ beforeAll(async () => {
         scopes: [],
       };
     expect(path).toBe("/repos/qa/private/commits/main");
-    return { data: { sha: tip }, scopes: [] };
+    return {
+      data: { sha: tip, commit: { committer: { date: committed(tip) } } },
+      scopes: [],
+    };
   });
   vi.mocked(api.githubArchive).mockImplementation(async (repo, sha, token) => {
     expect([repo, sha, token]).toEqual(["qa/private", tip, state.token]);
@@ -137,6 +142,13 @@ it("copies private main twice with the same connection, preserves exact files an
     binary,
   );
   expect(statSync(join(second.directory, "start.sh")).mode & 0o111).toBe(0o111);
+  // Served files carry their commit's time, never 1970: nginx's ETag is
+  // mtime-size, so the same-size edit to index.html must change it.
+  for (const result of [first, second])
+    for (const path of ["index.html", "assets/icon.bin"])
+      expect(statSync(join(result.directory, path)).mtime.toISOString()).toBe(
+        new Date(committed(result.commit)).toISOString(),
+      );
   expect(
     JSON.stringify([
       state.calls,
