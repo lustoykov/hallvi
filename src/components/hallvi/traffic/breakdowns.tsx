@@ -48,6 +48,7 @@ function Rows({
   mono,
   partial,
   sampled,
+  ghost,
 }: {
   rows: Row[];
   empty: string;
@@ -60,6 +61,8 @@ function Rows({
   partial?: boolean;
   /** Some day's values come from part of its views: a sample. */
   sampled?: boolean;
+  /** An empty column for what only the script measures. */
+  ghost?: boolean;
 }) {
   const [all, setAll] = useState(false);
   if (!rows.length) return <p className="tf-rank-empty">{empty}</p>;
@@ -67,7 +70,18 @@ function Rows({
   const shown = all ? rows.slice(0, 30) : rows.slice(0, SHOWN);
   return (
     <>
-      <ol className="tf-rank" data-mono={mono || undefined}>
+      <ol
+        className="tf-rank"
+        data-mono={mono || undefined}
+        data-ghost={ghost || undefined}
+      >
+        {ghost && (
+          <li className="tf-rank-columns" aria-hidden="true">
+            <span />
+            <span>Time on page</span>
+            <span>Views</span>
+          </li>
+        )}
         {shown.map((row) => (
           <li key={row.key}>
             <span
@@ -79,6 +93,7 @@ function Rows({
               {row.icon}
               {row.label}
             </span>
+            {ghost && <span className="tf-rank-ghost" aria-hidden="true" />}
             <span className="tf-rank-count">
               {row.says ?? atLeast(count(row.value), Boolean(partial))}
             </span>
@@ -119,11 +134,14 @@ function Card({
   tabs,
   aside,
   wide,
+  action,
 }: {
   title: string;
   tabs: Tab[];
   aside?: ReactNode;
   wide?: boolean;
+  /** A button beside the title. */
+  action?: ReactNode;
 }) {
   const [open, setOpen] = useState(tabs[0].id);
   const tab = tabs.find((one) => one.id === open) ?? tabs[0];
@@ -131,6 +149,7 @@ function Card({
     <section className="tf-card" data-wide={wide || undefined}>
       <header className="tf-card-head">
         <h3>{title}</h3>
+        {action}
         {tabs.length > 1 && (
           <div className="tf-tabs" role="tablist" aria-label={title}>
             {tabs.map((one) => (
@@ -264,6 +283,7 @@ export function Breakdowns({
   script,
   locked,
   countriesAside,
+  ghost,
 }: {
   history: TrafficHistory;
   /** Whether Hallvi's script is counting: it alone measures some tabs. */
@@ -272,6 +292,8 @@ export function Breakdowns({
   locked: (asked: ScriptAsk) => ReactNode;
   /** A small map above the countries, in the looks that move it there. */
   countriesAside?: ReactNode;
+  /** The script offered in the Pages list itself, as an empty column. */
+  ghost?: { says: string; onAdd: () => void } | null;
 }) {
   const partial = (list: TrafficHistory["partialLists"][number]) =>
     history.partialLists.includes(list);
@@ -287,6 +309,25 @@ export function Breakdowns({
     <div className="tf-grid">
       <Card
         title="Pages"
+        action={
+          ghost && !script ? (
+            <button
+              type="button"
+              className="tf-primary tf-card-action"
+              onClick={ghost.onAdd}
+            >
+              Add Hallvi&apos;s script
+            </button>
+          ) : null
+        }
+        aside={
+          ghost && !script ? (
+            <p className="tf-card-quiet tf-ghost-says">
+              {ghost.says} The empty column fills once Hallvi&apos;s script
+              runs.
+            </p>
+          ) : null
+        }
         tabs={[
           {
             id: "views",
@@ -296,6 +337,7 @@ export function Breakdowns({
                 mono
                 rows={ranked(history.pages)}
                 partial={partial("pages")}
+                ghost={Boolean(ghost && !script)}
                 empty="No page views in this range."
               />
             ),

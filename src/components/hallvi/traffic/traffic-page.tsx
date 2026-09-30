@@ -57,7 +57,8 @@ import { useMoment } from "./moment";
 import { useCollection, useHistory } from "./source";
 import { SimulateTraffic } from "./simulate";
 import { TrafficChart } from "./traffic-chart";
-import { useVariant, VariantSwitch, type Variant } from "./variants";
+import { ScriptOffers } from "./script-offer";
+import { useOffer, useVariant, VariantSwitch, type Variant } from "./variants";
 import { WorldMap } from "./world-map";
 import "./traffic.css";
 
@@ -65,6 +66,12 @@ const RANGE_LABEL: Record<TrafficRange, string> = {
   "24h": "24 h",
   "7d": "7 d",
   "30d": "30 d",
+};
+
+const RANGE_WORDS: Record<TrafficRange, string> = {
+  "24h": "24 hours",
+  "7d": "7 days",
+  "30d": "30 days",
 };
 
 const day = (at: string | null) =>
@@ -177,78 +184,6 @@ export function Strip({ history }: { history: TrafficHistory }) {
 
 const offerKey = (applicationId: string) =>
   `hallvi.traffic.script-offer.${applicationId}`;
-
-/**
- * The script, offered near the top while the log counts alone: what it
- * would see, and one button. "Not now" folds it to one line that stays in
- * place, until the reason changes.
- */
-function ScriptCard({
-  says,
-  name,
-  folded,
-  onAsk,
-  onFold,
-}: {
-  says: string;
-  name: string;
-  folded: boolean;
-  onAsk: (draft: string) => void;
-  onFold: (folded: boolean) => void;
-}) {
-  const add = (
-    <button
-      type="button"
-      className={folded ? "tf-button" : "tf-primary"}
-      onClick={() => onAsk(scriptDraft(name))}
-    >
-      Add Hallvi&apos;s script
-    </button>
-  );
-  if (folded)
-    return (
-      <section
-        className="tf-script-card"
-        data-folded
-        aria-label="Hallvi's traffic script"
-      >
-        <p>
-          Hallvi&apos;s traffic script is not added yet.{" "}
-          <button
-            type="button"
-            className="tf-link"
-            onClick={() => onFold(false)}
-          >
-            What it adds
-          </button>
-        </p>
-        {add}
-      </section>
-    );
-  return (
-    <section className="tf-script-card" aria-label="Hallvi's traffic script">
-      <div>
-        <h3>Hallvi&apos;s traffic script</h3>
-        <p>
-          {says} Hallvi&apos;s script sees them there: one line in your layout,
-          no cookies, nothing kept in the browser.
-        </p>
-        <ul>
-          <li>Time on page</li>
-          <li>Pages changed in the browser</li>
-          <li>Pages a CDN served</li>
-          <li>Goals and page speed</li>
-        </ul>
-      </div>
-      <div className="tf-script-actions">
-        {add}
-        <button type="button" className="tf-link" onClick={() => onFold(true)}>
-          Not now
-        </button>
-      </div>
-    </section>
-  );
-}
 
 /** One sentence and one button, where a list only the script fills. */
 function ScriptOffer({
@@ -529,6 +464,7 @@ export function TrafficPage({
   onAsk: (draft: string) => void;
 }) {
   const variant = useVariant();
+  const offerLook = useOffer();
   const { collection, act } = useCollection(applicationId);
   const listed = trafficListed(collection);
   const [range, setRange] = useState<TrafficRange>("7d");
@@ -698,12 +634,14 @@ export function TrafficPage({
         moment={moment}
         onAsk={onAsk}
       />
-      {offer && (
-        <ScriptCard
+      {offer && offerLook !== "column" && (
+        <ScriptOffers
+          variant={offerLook}
           says={offer.says}
-          name={applicationName}
+          views={history && hasTotals(history) ? history.totals.views : null}
+          range={RANGE_WORDS[range]}
           folded={dismissed === offer.reason}
-          onAsk={onAsk}
+          onAdd={() => onAsk(scriptDraft(applicationName))}
           onFold={(folded) => {
             setDismissed(folded ? offer.reason : null);
             try {
@@ -807,6 +745,14 @@ export function TrafficPage({
               script={script}
               locked={lockedOffer}
               countriesAside={smallMap}
+              ghost={
+                offer && offerLook === "column"
+                  ? {
+                      says: offer.says,
+                      onAdd: () => onAsk(scriptDraft(applicationName)),
+                    }
+                  : null
+              }
             />
           )}
           <Responses history={history} />
