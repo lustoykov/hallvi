@@ -10,23 +10,23 @@ import { useSyncExternalStore, type ReactNode } from "react";
 /** How the page offers Hallvi's script, for the owner to choose between. */
 export const OFFERS = [
   {
-    id: "compare",
-    label: "Two counters",
-    note: "What the server's log counted beside an empty counter for what only the browser sees.",
+    id: "checks",
+    label: "Checklist",
+    note: "The two counters head two columns; each row says what the log and the script see, and this app's row is marked.",
   },
   {
-    id: "column",
-    label: "In the list",
-    note: "No banner: the Pages list shows an empty Time on page column, with the button in its header.",
+    id: "visit",
+    label: "One visit",
+    note: "One visit through this app's own pages, as the log records it and as the script does.",
   },
   {
-    id: "server",
-    label: "Little Server asks",
-    note: "Little Server stands under the map and asks, in one sentence, whether to count what the log misses.",
+    id: "lists",
+    label: "Before / after",
+    note: "This app's Pages list now, and as it would read with the script.",
   },
 ] as const;
 export type Offer = (typeof OFFERS)[number]["id"];
-const DEFAULT_OFFER: Offer = "compare";
+const DEFAULT_OFFER: Offer = "checks";
 
 const CHANGED = "hv-traffic-offer";
 

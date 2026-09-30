@@ -621,11 +621,12 @@ export function TrafficPage({
         moment={moment}
         onAsk={onAsk}
       />
-      {offer && offerLook !== "column" && (
+      {offer && (
         <ScriptOffers
           variant={offerLook}
-          says={offer.says}
+          reason={offer.reason}
           views={history && hasTotals(history) ? history.totals.views : null}
+          pages={history && hasTotals(history) ? history.pages : []}
           range={RANGE_WORDS[range]}
           folded={dismissed === offer.reason}
           onAdd={() => onAsk(scriptDraft(applicationName))}
@@ -731,14 +732,6 @@ export function TrafficPage({
               history={history}
               script={script}
               locked={lockedOffer}
-              ghost={
-                offer && offerLook === "column"
-                  ? {
-                      says: offer.says,
-                      onAdd: () => onAsk(scriptDraft(applicationName)),
-                    }
-                  : null
-              }
             />
           )}
           <Responses history={history} />
