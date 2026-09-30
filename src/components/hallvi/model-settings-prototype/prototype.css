@@ -173,7 +173,7 @@
 }
 .msp-a-now h2 {
   margin: 6px 0 6px;
-  font-size: 26px;
+  font-size: 24px;
   letter-spacing: -0.025em;
 }
 .msp-a-now p {
@@ -742,4 +742,336 @@
 .msp-switcher-states button[data-on] {
   background: #fff;
   color: #151b28;
+}
+
+/* ——— Settings shell (tabs or sidebar) ——— */
+.msp-shell {
+  min-height: 100vh;
+  background: #f5f7fb;
+  color: #202838;
+}
+.msp-tabs-layout {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 20px 0;
+}
+.msp-nav {
+  display: flex;
+  gap: 4px;
+}
+.msp-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #536078;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+.msp-nav[data-shell="tabs"] {
+  padding: 4px;
+  width: fit-content;
+  border-radius: 12px;
+  background: #e9eef9;
+}
+.msp-nav[data-shell="tabs"] a {
+  padding: 7px 14px;
+  border-radius: 9px;
+}
+.msp-nav[data-shell="tabs"] a[aria-current="page"] {
+  background: #fff;
+  color: #202838;
+  box-shadow: 0 1px 2px rgb(28 52 110 / 12%);
+}
+.msp-page-head {
+  margin: 30px 2px 22px;
+}
+.msp-page-head h1,
+.msp-page-head h2 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+}
+.msp-page-head p {
+  margin: 6px 0 0;
+  color: #687183;
+  font-size: 15px;
+}
+.msp-sidebar-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 700px);
+  justify-content: center;
+  gap: 48px;
+  padding: 36px 24px 0;
+}
+.msp-sidebar-layout aside {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+}
+.msp-sidebar-layout aside h1 {
+  margin: 0 0 16px 12px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.msp-nav[data-shell="sidebar"] {
+  flex-direction: column;
+}
+.msp-nav[data-shell="sidebar"] a {
+  padding: 9px 12px;
+  border-radius: 9px;
+}
+.msp-nav[data-shell="sidebar"] a:hover {
+  background: #edf1f8;
+}
+.msp-nav[data-shell="sidebar"] a[aria-current="page"] {
+  background: #e3e9f6;
+  color: #202838;
+}
+.msp-nav svg {
+  font-size: 18px;
+}
+.msp-sidebar-layout .msp-page-head {
+  margin-top: 4px;
+}
+.msp-sidebar-layout .msp-page-head h2 {
+  font-size: 24px;
+}
+
+/* ——— Shared page parts ——— */
+.msp-hero,
+.msp-a-now {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 26px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f1f5fd 0%, #fff 100%);
+  border: 1px solid #dfe6f4;
+  box-shadow: var(--raise);
+  margin-bottom: 30px;
+}
+.msp-hero > div {
+  flex: 1;
+}
+.msp-hero h2 {
+  margin: 6px 0 6px;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+.msp-hero p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.msp-hero-row,
+.msp-hero-account {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.msp-hero-row > div,
+.msp-hero-account > div:not(.msp-hero-side) {
+  flex: 1;
+}
+.msp-hero-side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.msp-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+.msp-code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 30px !important;
+  letter-spacing: 0.12em;
+}
+.msp-avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #202838;
+  color: #fff;
+  font-weight: 700;
+  font-size: 20px;
+}
+.msp-hero-dots {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.msp-hero-dots li {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #eef1f6;
+  color: #a3aabb;
+  font-size: 16px;
+}
+.msp-hero-dots li[data-on] {
+  background: #e3f4ec;
+  color: #0f7a4e;
+}
+.msp-group-title {
+  margin: 0 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.msp-rows {
+  list-style: none;
+  margin: 0 0 28px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+.msp-rows > li + li {
+  border-top: 1px solid #f1f3f6;
+}
+.msp-row,
+.msp-choice button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+.msp-row-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #f1f4f9;
+  color: #536078;
+  font-size: 18px;
+}
+.msp-rows li[data-on] .msp-row-icon {
+  background: #edf3ff;
+  color: #285ad8;
+}
+.msp-row-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.msp-row-text strong {
+  font-size: 14.5px;
+  font-weight: 550;
+}
+.msp-row-text small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.msp-row-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #a3aabb;
+  text-decoration: none;
+}
+.msp-rows li:has(.msp-row-go):hover {
+  background: #f8fafd;
+  border-radius: 10px;
+}
+.msp-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+.msp-ok,
+.msp-warn,
+.msp-muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.msp-ok {
+  color: var(--verified);
+  font-weight: 550;
+}
+.msp-warn {
+  color: #9a4b10;
+}
+.msp-muted {
+  color: var(--muted);
+}
+.msp-row-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 12px 14px 60px;
+}
+.msp-row-form input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #ccd5e3;
+  font: inherit;
+  font-size: 14px;
+}
+.msp-row-form a {
+  font-size: 13px;
+  color: #315bc6;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.msp-rows-plain .msp-row {
+  min-height: 52px;
+}
+.msp-choice button {
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.msp-choice button:hover {
+  background: #f6f8fc;
+}
+.msp-choice button[aria-checked="true"] {
+  background: var(--selected);
+}
+.msp-choice button[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.75;
+}
+.msp-choice button[aria-disabled="true"]:hover {
+  background: none;
+}
+.msp-explain {
+  margin: 8px 4px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f3f6fb;
+  font-size: 13.5px;
+  color: #3a4458;
+}
+.msp-explain p {
+  margin: 0 0 8px;
+}
+.msp-explain p:last-child {
+  margin: 0;
+}
+.msp-page .msp-a-more {
+  margin: 0 4px;
 }

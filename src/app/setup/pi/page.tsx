@@ -1,6 +1,5 @@
 import { PiSetupScreen } from "@/components/hallvi/pi-setup-screen";
-import { ModelSettingsPrototype } from "@/components/hallvi/model-settings-prototype";
-import { PrototypeSwitcher } from "@/components/hallvi/model-settings-prototype/switcher";
+import { settingsPrototype } from "@/components/hallvi/model-settings-prototype/route";
 import { getPiSetupStatus } from "@/server/pi-setup";
 import { setupReturnDestination } from "@/server/setup-return";
 
@@ -14,6 +13,7 @@ export default async function PiSetupPage({
     chat?: string | string[];
     // PROTOTYPE — Settings → Model directions.
     variant?: string;
+    shell?: string;
     state?: string;
   }>;
 }) {
@@ -21,17 +21,8 @@ export default async function PiSetupPage({
     getPiSetupStatus(),
     searchParams,
   ]);
-  // PROTOTYPE — ?variant=A|B|C (default A), ?variant=current for today's page.
-  const variant = typeof params.variant === "string" ? params.variant : "A";
-  const state = typeof params.state === "string" ? params.state : "none";
-  if (variant !== "current" && process.env.NODE_ENV !== "production")
-    return (
-      <ModelSettingsPrototype
-        variant={variant}
-        state={state}
-        status={initialStatus}
-      />
-    );
+  const prototype = await settingsPrototype("pi", params);
+  if (prototype?.page) return prototype.page;
   return (
     <>
       <PiSetupScreen
@@ -40,7 +31,7 @@ export default async function PiSetupPage({
         // can do is name a conversation that exists.
         returnTo={(await setupReturnDestination(params)) ?? undefined}
       />
-      <PrototypeSwitcher variant={variant} state={state} />
+      {prototype?.bar}
     </>
   );
 }

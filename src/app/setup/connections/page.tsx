@@ -11,6 +11,7 @@ import { listApplications } from "@/server/db";
 import { getGithubSetupStatus } from "@/server/github-setup";
 import { getPiSetupStatus } from "@/server/pi-setup";
 import { hetznerConnectionId } from "@/server/hetzner";
+import { settingsPrototype } from "@/components/hallvi/model-settings-prototype/route";
 import { setupReturnDestination } from "@/server/setup-return";
 import { workspaceSettingStatus } from "@/server/workspace-isolation";
 
@@ -27,8 +28,14 @@ export default async function ConnectionsPage({
   searchParams: Promise<{
     application?: string | string[];
     chat?: string | string[];
+    // PROTOTYPE
+    variant?: string;
+    shell?: string;
+    state?: string;
   }>;
 }) {
+  const prototype = await settingsPrototype("connections", await searchParams);
+  if (prototype?.page) return prototype.page;
   const returnTo =
     (await setupReturnDestination(await searchParams)) ?? undefined;
   const cloudflare = await verifyCloudflare();
@@ -47,48 +54,51 @@ export default async function ConnectionsPage({
   ]);
 
   return (
-    <ConnectionsScreen
-      returnTo={returnTo}
-      recoveryKit={
-        kit
-          ? {
-              confirmedAt: kit.confirmedAt,
-              bucket: kit.bucket,
-              host: new URL(kit.endpoint).hostname,
-            }
-          : undefined
-      }
-      connections={connectionRows({
-        own: {
-          model: {
-            saved: model.ready,
-            issue: model.issue,
-            provider: model.selection.provider,
-            model: model.selection.model,
+    <>
+      <ConnectionsScreen
+        returnTo={returnTo}
+        recoveryKit={
+          kit
+            ? {
+                confirmedAt: kit.confirmedAt,
+                bucket: kit.bucket,
+                host: new URL(kit.endpoint).hostname,
+              }
+            : undefined
+        }
+        connections={connectionRows({
+          own: {
+            model: {
+              saved: model.ready,
+              issue: model.issue,
+              provider: model.selection.provider,
+              model: model.selection.model,
+            },
+            github: {
+              account: github.issue
+                ? null
+                : (github.connection?.account.login ?? null),
+              issue: github.issue,
+              signIn: Boolean(github.registration),
+            },
+            workspace: {
+              isolation: workspace.isolation,
+              problem: workspace.problem,
+            },
           },
-          github: {
-            account: github.issue
-              ? null
-              : (github.connection?.account.login ?? null),
-            issue: github.issue,
-            signIn: Boolean(github.registration),
-          },
-          workspace: {
-            isolation: workspace.isolation,
-            problem: workspace.problem,
-          },
-        },
-        hetznerConnected: Boolean(hetznerConnectionId()),
-        cloudflare,
-        buckets: buckets?.length ?? null,
-        // What the owner saved for backups, Hallvi's own copies included.
-        storage: backupDestination(),
-        uploadGaps: r2UploadGaps(),
-        applications: (await listApplications()).map(({ id, name }) => ({
-          id,
-          name,
-        })),
-      })}
-    />
+          hetznerConnected: Boolean(hetznerConnectionId()),
+          cloudflare,
+          buckets: buckets?.length ?? null,
+          // What the owner saved for backups, Hallvi's own copies included.
+          storage: backupDestination(),
+          uploadGaps: r2UploadGaps(),
+          applications: (await listApplications()).map(({ id, name }) => ({
+            id,
+            name,
+          })),
+        })}
+      />
+      {prototype?.bar}
+    </>
   );
 }

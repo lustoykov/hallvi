@@ -1,30 +1,53 @@
 "use client";
 
-// PROTOTYPE — the floating bar that flips between variants (← →) and between
-// the account states each variant has to handle. Never shipped.
+// PROTOTYPE — the floating bar: new design vs today's (← →), the settings
+// shell (top tabs or a sidebar), and the states each page has to handle.
+// Never shipped.
 
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 export const VARIANTS = [
-  { key: "A", name: "Model first" },
-  { key: "B", name: "Two doors" },
-  { key: "C", name: "Settings list" },
+  { key: "A", name: "New design" },
   { key: "current", name: "Today’s page" },
 ] as const;
-export const STATES = [
-  { key: "none", name: "Nothing connected" },
-  { key: "chatgpt", name: "ChatGPT" },
-  { key: "openrouter", name: "OpenRouter" },
-  { key: "both", name: "Both" },
+export const SHELLS = [
+  { key: "tabs", name: "Tabs" },
+  { key: "sidebar", name: "Sidebar" },
 ] as const;
+export type SettingsPage = "connections" | "pi" | "github" | "workspace";
+export const STATES: Record<SettingsPage, { key: string; name: string }[]> = {
+  pi: [
+    { key: "none", name: "Nothing" },
+    { key: "chatgpt", name: "ChatGPT" },
+    { key: "openrouter", name: "OpenRouter" },
+    { key: "both", name: "Both" },
+  ],
+  connections: [
+    { key: "none", name: "Fresh" },
+    { key: "some", name: "Partly" },
+    { key: "all", name: "Everything" },
+  ],
+  github: [
+    { key: "none", name: "Signed out" },
+    { key: "some", name: "Signed in" },
+  ],
+  workspace: [
+    { key: "none", name: "Docker running" },
+    { key: "some", name: "Docker stopped" },
+  ],
+};
 
 export function PrototypeSwitcher({
+  page,
   variant,
+  shell,
   state,
 }: {
+  page: SettingsPage;
   variant: string;
+  shell: string;
   state: string;
 }) {
   const router = useRouter();
@@ -34,10 +57,9 @@ export function PrototypeSwitcher({
     0,
     VARIANTS.findIndex((item) => item.key === variant),
   );
-  const go = (next: { variant?: string; state?: string }) => {
+  const go = (next: Record<string, string>) => {
     const query = new URLSearchParams(params.toString());
-    if (next.variant) query.set("variant", next.variant);
-    if (next.state) query.set("state", next.state);
+    for (const [key, value] of Object.entries(next)) query.set(key, value);
     router.replace(`${pathname}?${query}`, { scroll: false });
   };
   const step = (by: number) =>
@@ -67,25 +89,37 @@ export function PrototypeSwitcher({
       <button type="button" onClick={() => step(-1)} aria-label="Previous">
         <CaretLeft weight="bold" />
       </button>
-      <span className="msp-switcher-label">
-        <b>{VARIANTS[index]!.key}</b> {VARIANTS[index]!.name}
-      </span>
+      <span className="msp-switcher-label">{VARIANTS[index]!.name}</span>
       <button type="button" onClick={() => step(1)} aria-label="Next">
         <CaretRight weight="bold" />
       </button>
       {variant !== "current" && (
-        <span className="msp-switcher-states">
-          {STATES.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              data-on={item.key === state ? "" : undefined}
-              onClick={() => go({ state: item.key })}
-            >
-              {item.name}
-            </button>
-          ))}
-        </span>
+        <>
+          <span className="msp-switcher-states">
+            {SHELLS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                data-on={item.key === shell ? "" : undefined}
+                onClick={() => go({ shell: item.key })}
+              >
+                {item.name}
+              </button>
+            ))}
+          </span>
+          <span className="msp-switcher-states">
+            {STATES[page].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                data-on={item.key === state ? "" : undefined}
+                onClick={() => go({ state: item.key })}
+              >
+                {item.name}
+              </button>
+            ))}
+          </span>
+        </>
       )}
     </div>
   );
