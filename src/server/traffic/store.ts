@@ -192,6 +192,25 @@ export function setCollection(applicationId: string, choice: "keep" | "stop") {
 }
 
 /**
+ * History is kept by default: the first time an application has a log to
+ * read and nobody has chosen either way, it starts. Stop and Forget are
+ * choices, and a choice is never overridden.
+ */
+export function keepByDefault(applicationId: string) {
+  let started = false;
+  store()
+    .transaction(() => {
+      const current = recorded(applicationId);
+      if (current.enabledAt || current.disabledAt) return;
+      const at = new Date().toISOString();
+      save(applicationId, { ...current, enabledAt: at, state: "catching-up" });
+      started = true;
+    })
+    .immediate();
+  return started;
+}
+
+/**
  * What the collector saw, merged into the record. Nothing is recorded while
  * collection is off: a collector that has not stopped yet cannot say it is
  * live, nor bring back the record of an application that was removed.
@@ -224,7 +243,8 @@ export function recordCollector(
 /**
  * Deletes an application's totals and its collection record. Collection
  * ends with them: a collector left running would count the retained log
- * straight back.
+ * straight back. What stays is that the owner stopped it, so the default
+ * does not start it again.
  */
 export function forget(applicationId: string) {
   if (!existsSync(trafficDatabasePath())) return;
@@ -236,5 +256,6 @@ export function forget(applicationId: string) {
     client
       .prepare("DELETE FROM collections WHERE application_id = ?")
       .run(applicationId);
+    save(applicationId, { ...NEVER, disabledAt: new Date().toISOString() });
   })();
 }

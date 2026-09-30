@@ -10,7 +10,6 @@
 // reaches and the one standing choice behind it. docs/design/traffic.md owns
 // the design.
 
-import { X } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
@@ -179,8 +178,11 @@ export function Strip({ history }: { history: TrafficHistory }) {
 const offerKey = (applicationId: string) =>
   `hallvi.traffic.script-offer.${applicationId}`;
 
-/** One sentence and one button, offered once, never pushed. */
-function ScriptOffer({
+/**
+ * The script, offered near the top while the log counts alone: what it
+ * would see, and one button. "Not now" hides it until the reason changes.
+ */
+function ScriptCard({
   says,
   name,
   onAsk,
@@ -189,7 +191,48 @@ function ScriptOffer({
   says: string;
   name: string;
   onAsk: (draft: string) => void;
-  onDismiss?: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <section className="tf-script-card" aria-label="Hallvi's script">
+      <div>
+        <h3>See what the log cannot</h3>
+        <p>
+          {says} Hallvi&apos;s script sees them there: one line in your layout,
+          no cookies, nothing kept in the browser.
+        </p>
+        <ul>
+          <li>Time on page</li>
+          <li>Pages changed in the browser</li>
+          <li>Pages a CDN served</li>
+          <li>Goals and page speed</li>
+        </ul>
+      </div>
+      <div className="tf-script-actions">
+        <button
+          type="button"
+          className="tf-primary"
+          onClick={() => onAsk(scriptDraft(name))}
+        >
+          Add Hallvi&apos;s script
+        </button>
+        <button type="button" className="tf-link" onClick={onDismiss}>
+          Not now
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** One sentence and one button, where a list only the script fills. */
+function ScriptOffer({
+  says,
+  name,
+  onAsk,
+}: {
+  says: string;
+  name: string;
+  onAsk: (draft: string) => void;
 }) {
   return (
     <div className="tf-offer-line">
@@ -204,17 +247,6 @@ function ScriptOffer({
       >
         Add Hallvi&apos;s script
       </button>
-      {onDismiss && (
-        <button
-          type="button"
-          className="tf-dismiss"
-          aria-label="Not now"
-          title="Not now"
-          onClick={onDismiss}
-        >
-          <X aria-hidden="true" />
-        </button>
-      )}
     </div>
   );
 }
@@ -484,12 +516,12 @@ export function TrafficPage({
   const [problem, setProblem] = useState<string | null>(null);
   const [forgetting, setForgetting] = useState(false);
   const [asked, setAsked] = useState<ScriptAsk | null>(null);
-  // Offered once: "not now" is remembered in this browser.
-  const [dismissed, setDismissed] = useState(() => {
+  // "Not now" is remembered in this browser, for the reason it was given.
+  const [dismissed, setDismissed] = useState<string | null>(() => {
     try {
-      return Boolean(window.localStorage.getItem(offerKey(applicationId)));
+      return window.localStorage.getItem(offerKey(applicationId));
     } catch {
-      return false;
+      return null;
     }
   });
   const [lists, setLists] = useState(false);
@@ -640,6 +672,24 @@ export function TrafficPage({
         moment={moment}
         onAsk={onAsk}
       />
+      {offer && dismissed !== offer.reason && (
+        <ScriptCard
+          says={offer.says}
+          name={applicationName}
+          onAsk={onAsk}
+          onDismiss={() => {
+            setDismissed(offer.reason);
+            try {
+              window.localStorage.setItem(
+                offerKey(applicationId),
+                offer.reason,
+              );
+            } catch {
+              // It comes back next time; that is all.
+            }
+          }}
+        />
+      )}
       {collection.scriptSilentSince && (
         <p className="tf-state" data-tone="warn">
           <span>
@@ -706,21 +756,6 @@ export function TrafficPage({
         )}
       </section>
 
-      {offer && !dismissed && (
-        <ScriptOffer
-          says={offer.says}
-          name={applicationName}
-          onAsk={onAsk}
-          onDismiss={() => {
-            setDismissed(true);
-            try {
-              window.localStorage.setItem(offerKey(applicationId), "no");
-            } catch {
-              // It comes back next time; that is all.
-            }
-          }}
-        />
-      )}
       {history && hasTotals(history) && (
         <>
           <Errors history={history} name={applicationName} onAsk={onAsk} />

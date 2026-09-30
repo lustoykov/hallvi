@@ -160,8 +160,9 @@ describe("a usual day", () => {
 });
 
 describe("the script offer", () => {
-  it("is made only on evidence that the log misses something", () => {
-    expect(scriptOffer(collection())).toBeNull();
+  it("leads with evidence that the log misses something", () => {
+    // Without evidence it still offers what only the script measures.
+    expect(scriptOffer(collection())?.reason).toBe("more");
     expect(
       scriptOffer(collection({ logMisses: ["browser-pages"] } as never))
         ?.reason,

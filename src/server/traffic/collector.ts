@@ -47,7 +47,13 @@ import {
   type LogFile,
   type Span,
 } from "./sources";
-import { collectionOf, readDays, recordCollector, writeDay } from "./store";
+import {
+  collectionOf,
+  keepByDefault,
+  readDays,
+  recordCollector,
+  writeDay,
+} from "./store";
 
 type Host = NonNullable<Awaited<ReturnType<typeof operatorSettings>>["host"]>;
 
@@ -859,7 +865,15 @@ export function trafficCollector(signal: AbortSignal) {
   };
 
   async function care(applicationId: string) {
-    const collection = collectionOf(applicationId);
+    let collection = collectionOf(applicationId);
+    // On by default once there is a log to read, unless the owner chose.
+    if (
+      !collection.enabledAt &&
+      !collection.disabledAt &&
+      (await accessLogRecord(applicationId)) &&
+      keepByDefault(applicationId)
+    )
+      collection = collectionOf(applicationId);
     if (!collection.enabledAt) return stop(applicationId);
     const host = (await operatorSettings(applicationId)).host ?? null;
     const log = host ? await accessLogRecord(applicationId) : null;

@@ -259,11 +259,15 @@ describe("traffic.db", () => {
     expect(readDays("owner", DAY, DAY)).toHaveLength(1);
     forget("owner");
     expect(readDays("owner", DAY, DAY)).toEqual([]);
-    expect(collectionOf("owner")).toMatchObject({
+    // What stays is that the owner stopped it, so the default cannot restart it.
+    const forgotten = collectionOf("owner");
+    expect(forgotten).toMatchObject({
       enabledAt: null,
-      disabledAt: null,
+      state: "off",
+      lastLineAt: null,
       storedFrom: null,
     });
+    expect(forgotten.disabledAt).not.toBeNull();
     // Another application's totals are untouched.
     expect(readDays("restarted", DAY, DAY)).toHaveLength(1);
     expect(existsSync(trafficDatabasePath())).toBe(true);

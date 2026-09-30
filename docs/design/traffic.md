@@ -123,9 +123,12 @@ away, the log was unreadable). Charts draw a gap as a gap, never as zero.
 
 ### Counting
 
-- **A view** is a real browser navigation: `GET`, 2xx or 304, `Sec-Fetch-Dest:
-  document`, not a prefetch or prerender (`Sec-Purpose`/`Purpose`). Without
-  fetch metadata, an HTML response to a browser-shaped request.
+- **A view** is a real browser navigation to a page: `GET`, 2xx or 304,
+  `Sec-Fetch-Dest: document`, answered with HTML (or, when the log has no
+  content type, not a file such as `.js`, `.webp` or `.pdf`), not a prefetch
+  or prerender (`Sec-Purpose`/`Purpose`). An image or script opened in a tab
+  is a request, not a view. Without fetch metadata, an HTML response to a
+  browser-shaped request.
 - **Bots and scanners** — known crawler agents, self-declared bots, browser
   agents that a modern browser's fetch metadata gives away as imitations, and
   probes for `/wp-login.php`, `/.env` and the like — are counted as their own
@@ -206,13 +209,16 @@ internet, no cookies and nothing stored in the browser.
   is not, and Hallvi refuses an event carrying one. The count and the live
   view keep the value only when `q`'s key is the record's, so pages are named
   as the log names them; any other key names the page by its path alone.
-- **Offered, not pushed.** Nothing is said about the script during deployment
-  unless the owner asks for analytics then. The Traffic page offers it, once,
-  when the evidence says the log misses something: the application changes
-  pages in the browser (in-page requests name pages, in their referrer, that
-  were never loaded as a document), a CDN caches its pages (a `cdn` record
-  with `caches-pages`), or the owner opens something only the script measures
-  (time on page, goals, page speed). Otherwise at most a quiet link.
+- **Offered where it is seen, not pushed.** Nothing is said about the script
+  during deployment unless the owner asks for analytics then. The Traffic page
+  offers it as a card near the top whenever history is counted from the log
+  alone. The card leads with the evidence when there is some: the application
+  changes pages in the browser (in-page requests name pages, in their
+  referrer, that were never loaded as a document), or a CDN caches its pages
+  (a `cdn` record with `caches-pages`). Otherwise it says what only the script
+  measures: time on page, goals and page speed. "Not now" hides it in that
+  browser until a different reason appears, and the lists only the script
+  fills still offer it when opened.
 - **No double counting.** The log and the script are never added together.
   Each application has one switch point, the first script event Hallvi
   counts: before it, views and visitors come from the log; after it, only from
@@ -227,10 +233,14 @@ internet, no cookies and nothing stored in the browser.
   being served pages, the page says "script silent since …" rather than
   quietly falling back.
 
-### Collection is a standing choice
+### Collection is on by default, and a standing choice
 
-Turning on **Keep traffic history** is the owner's decision, like choosing
-automatic deploys, and stays on until they turn it off.
+**Keep traffic history** starts by itself the first time an application has
+an `access-log` record, so a deployment with Hallvi's log is counted from its
+first day. From then on it is the owner's choice, like automatic deploys:
+turning it off, or deleting the totals, is remembered and never undone by the
+default. An application without a log offers the choice on its Traffic page,
+and keeping it drafts the log setup for Pi.
 
 - **Setting it up** — JSON logging, retention, stripping the query string,
   serving `/_hv/` — is Pi's work on the server and goes through the

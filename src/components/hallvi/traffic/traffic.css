@@ -727,21 +727,72 @@
   line-height: 1.5;
   color: var(--ax-ink-2);
 }
-.tf-dismiss {
+.tf-script-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 28px;
+  padding: 18px 20px;
+  border: 1px solid var(--tf-tint-line);
+  border-radius: 16px;
+  background: linear-gradient(120deg, #eef4ff, var(--tf-tint) 55%, #fff);
+}
+.tf-script-card > div:first-child {
+  flex: 1 1 380px;
   display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
+  gap: 6px;
+}
+.tf-script-card h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+  color: var(--ax-ink);
+}
+.tf-script-card p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+}
+.tf-script-card ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
   padding: 0;
+  list-style: none;
+}
+.tf-script-card li {
+  padding: 2px 9px;
+  border: 1px solid var(--tf-tint-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.tf-script-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tf-primary {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
   border: 0;
-  border-radius: 7px;
-  background: none;
-  color: var(--ax-faint);
+  border-radius: 8px;
+  background: var(--blue);
+  box-shadow: var(--button-shadow);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 560;
+  color: #fff;
   cursor: pointer;
 }
-.tf-dismiss:hover {
-  background: #eaf0fb;
-  color: var(--ax-ink-2);
+.tf-primary:hover {
+  background: var(--blue-hover);
 }
 
 /* ---------- Breakdowns */

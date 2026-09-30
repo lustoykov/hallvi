@@ -218,17 +218,18 @@ const ASKED: Record<ScriptAsk, string> = {
 /**
  * Whether the page offers the script, and in which sentence.
  *
- * Only when the evidence says the log misses something: the application
- * changes pages in the browser, a CDN serves its pages from a cache, or the
- * owner just opened something only the script measures. Never while the
- * script already runs, never before history is kept, and never while there
- * is no log to carry its events.
+ * Whenever history is counted from the log alone. The sentence is the
+ * evidence when there is some — the application changes pages in the
+ * browser, a CDN serves its pages from a cache, or the owner just opened
+ * something only the script measures — and otherwise what only the script
+ * measures. Never while the script already runs, never before history is
+ * kept, and never while there is no log to carry its events.
  */
 export function scriptOffer(
   collection: Collection | null,
   asked: ScriptAsk | null = null,
 ): {
-  reason: ScriptAsk | "browser-pages" | "cached-pages";
+  reason: ScriptAsk | "browser-pages" | "cached-pages" | "more";
   says: string;
 } | null {
   if (!collection?.enabledAt || collection.scriptSince) return null;
@@ -245,7 +246,10 @@ export function scriptOffer(
       reason: "cached-pages",
       says: "A CDN answers some pages from its cache, so those visits never reach the log.",
     };
-  return null;
+  return {
+    reason: "more",
+    says: "The server's log sees page loads. Time on page, goals and page speed happen in the browser.",
+  };
 }
 
 /** What the owner sends Pi when they take the offer. */
