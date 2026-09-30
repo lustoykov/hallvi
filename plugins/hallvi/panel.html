@@ -22,6 +22,7 @@
     --failed: #a6312b; --failed-bg: #fdf1f0; --failed-line: #f2d3d0;
     --unknown-bg: #eef1f6;
     --ask-bg: #eef2f9;
+    --shade: 28 52 110;
     --sans: var(--font-sans, "Geist", system-ui, -apple-system, "Segoe UI", sans-serif);
     --mono: var(--font-mono, "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace);
     --fast: 120ms; --base: 200ms;
@@ -42,6 +43,7 @@
     --failed: #ff9d95; --failed-bg: #3a1f1e; --failed-line: #5c2d2a;
     --unknown-bg: #2c313b;
     --ask-bg: #2a2f3a;
+    --shade: 0 0 0;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -53,76 +55,113 @@
   a { color: var(--blue); text-underline-offset: 3px; }
   .muted { color: var(--muted); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .icon { display: inline-flex; flex: none; }
+  .icon svg { display: block; }
 
-  #app { position: relative; display: flex; flex-direction: column; height: 100vh; max-width: 820px; margin: 0 auto; }
+  /* A compact Hallvi: wider frames centre it rather than stretch it. */
+  #app { position: relative; display: flex; flex-direction: column; height: 100vh; max-width: 640px; margin: 0 auto; }
   :root[data-mode="inline"] #app { height: min(640px, 100vh); }
 
-  /* Which application, and what its operator is doing. */
-  .top { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
-  .who { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; border-radius: 8px; padding: 3px 6px 3px 3px; }
+  /* Which application, and the way into Hallvi. */
+  .top { display: flex; align-items: center; gap: 6px; padding: 10px 12px 8px; }
+  .identity { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .who { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; border-radius: 8px; padding: 3px 6px 3px 3px; }
+  .address-link { max-width: calc(100% - 35px); margin: -4px 0 0 35px; font-size: 11.5px; color: var(--muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .address-link:hover { color: var(--blue); text-decoration: underline; }
   .who:hover { background: var(--sunken); }
   .who:focus-within { outline: 2px solid var(--blue); outline-offset: 1px; }
   .who select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+  .who select:disabled { cursor: default; }
   .avatar { flex: none; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-weight: 650; font-size: 12px; color: #fff; background: #7a8bd6; }
   .name { font-weight: 620; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chev { flex: none; color: var(--muted); }
-  .chip { flex: none; display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; line-height: 1.7; white-space: nowrap; }
-  .chip.working { background: var(--working-bg); color: var(--working-text); }
-  .chip.waiting { background: var(--waiting-bg); color: var(--waiting-text); }
-  .chip.failed { background: var(--failed-bg); color: var(--failed); }
-  .chip.unknown { background: var(--unknown-bg); color: var(--muted); }
+  .open-hallvi { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 9px 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--working-text); font-size: 12px; font-weight: 560; transition: background var(--fast); }
+  .open-hallvi:hover { background: var(--working-bg); border-color: var(--working-line); }
   .icon-button { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted); }
   .icon-button:hover { background: var(--sunken); color: var(--ink); }
 
+  /* Two views of one application, the selected one raised off the track. */
+  .tabs { display: flex; gap: 2px; margin: 0 12px 8px; padding: 3px; border-radius: 10px; background: var(--sunken); }
+  .tab { position: relative; flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 560; white-space: nowrap; transition: color var(--fast), background var(--fast); }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px rgb(var(--shade) / .07), 0 1px 3px rgb(var(--shade) / .13); }
+  /* In the dark, what is raised is lighter than its track. */
+  :root[data-theme="dark"] .tab[aria-selected="true"] { background: rgb(255 255 255 / .1); box-shadow: 0 0 0 1px rgb(255 255 255 / .06), 0 1px 3px rgb(0 0 0 / .45); }
+  .tab-state { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; font-size: 11.5px; font-weight: 600; }
+  .tab-state.working { color: var(--working-text); }
+  .tab-state.waiting { color: var(--waiting-text); }
+  .tab-state.unknown { color: var(--muted); }
+  .tab-state.fresh { color: var(--blue); }
+  .tab-state .words { overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 359px) { .tab-state .words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } }
+
   .spinner { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent; animation: spin 0.9s linear infinite; flex: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .7; }
   .pulse { flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
-  .dot.live { background: var(--verified); }
-  .dot.warn { background: #b25a16; }
-  .dot.bad { background: var(--failed); }
+  .dot.live { background: var(--verified); opacity: 1; }
+  .dot.warn { background: #b25a16; opacity: 1; }
+  .dot.bad { background: var(--failed); opacity: 1; }
 
-  /* One line of context; it opens the application's details in place. */
-  .context-toggle { display: flex; align-items: center; gap: 6px; width: calc(100% - 24px); margin: 0 12px; padding: 4px 6px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; text-align: left; }
-  .context-toggle:hover { background: var(--sunken); color: var(--ink); }
-  .context-toggle .summary { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .context-toggle svg { flex: none; transition: transform var(--base); }
-  .context-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-  .context { margin: 6px 12px 4px; padding: 4px 12px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); max-height: 58vh; overflow: auto; }
-  .context section { padding: 10px 0; border-bottom: 1px solid var(--line); }
-  .context section:last-child { border-bottom: 0; padding-bottom: 2px; }
-  .context h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
-  .context p { margin: 2px 0; }
-  .facts { display: grid; grid-template-columns: 88px 1fr; gap: 3px 10px; margin: 0; font-size: 12.5px; }
-  .facts dt { color: var(--muted); }
-  .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-  .numbers { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 2px; font-size: 12.5px; }
-  .numbers b { font-weight: 650; font-variant-numeric: tabular-nums; }
-  .bars { display: flex; align-items: flex-end; gap: 2px; height: 34px; margin-top: 8px; }
+  .views { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .notice { display: flex; gap: 8px; align-items: flex-start; margin: 0 12px 8px; padding: 8px 10px; border-radius: 8px; background: var(--unknown-bg); font-size: 12.5px; }
+  .notice p { margin: 0; flex: 1; }
+
+  /* Overview: one row per part of the application, marked as Hallvi's sidebar
+     marks it, with its time at the right edge and the way to it. */
+  .overview { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px; }
+  .item { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline; padding: 11px 0; border-top: 1px solid var(--line); }
+  .item:first-child { border-top: 0; padding-top: 4px; }
+  .item > .glyph { align-self: start; display: grid; place-items: center; width: 16px; height: 20px; color: var(--muted); }
+  .item > .glyph svg { width: 16px; height: 16px; }
+  .item > .glyph .mark { width: 16px; height: 15px; }
+  .item.lead > .glyph { height: 21px; }
+  .item > .main { min-width: 0; }
+  .item > .side { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .item > .more { grid-column: 2 / 4; min-width: 0; }
+  .primary { margin: 0; overflow-wrap: anywhere; }
+  .primary code { font: 12.5px var(--mono); }
+  .item.lead .primary { font-size: 15px; font-weight: 620; line-height: 1.4; }
+  .primary.failed, .sub.failed { color: var(--failed); }
+  .primary.needs { color: var(--waiting-text); font-weight: 600; }
+  .primary.quiet { color: var(--muted); }
+  .sub { margin: 1px 0 0; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+  .sub.one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .out { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: -4px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
+  .out:hover { color: var(--blue); background: var(--sunken); }
+  .pill { display: inline-block; padding: 0 7px; border-radius: 999px; background: var(--unknown-bg); font-size: 11.5px; line-height: 1.6; }
+  .asks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .ask { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: var(--surface); color: var(--working-text); font-size: 12px; transition: background var(--fast); }
+  .ask:hover { background: var(--working-bg); border-color: var(--working-line); }
+  .figures { margin: 0; }
+  .figures .figure { white-space: nowrap; }
+  .figures b { font-weight: 650; font-variant-numeric: tabular-nums; }
+  .figures .bad { color: var(--failed); }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 26px; margin-top: 8px; }
   .bars i { flex: 1; min-height: 2px; border-radius: 2px 2px 0 0; background: var(--working-line); }
   .bars i.error { background: var(--failed); opacity: .75; }
-  .bars i.gap { background: repeating-linear-gradient(135deg, var(--line) 0 2px, transparent 2px 4px); height: 100% !important; opacity: .7; }
-  .bars-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
-  .problems { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12.5px; }
-  .problems li { display: flex; gap: 8px; padding: 3px 0; }
-  .problems li > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .bars i.gap { background: repeating-linear-gradient(135deg, var(--line) 0 2px, transparent 2px 4px); height: 100% !important; opacity: .8; }
+  .gap-key { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+  .gap-key i { width: 8px; height: 8px; border-radius: 1px; background: repeating-linear-gradient(135deg, var(--muted) 0 1px, transparent 1px 3px); opacity: .7; }
+  .problems { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12.5px; }
+  .problems li { display: flex; gap: 8px; padding: 1px 0; }
+  .problems li > code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11.5px/1.6 var(--mono); }
   .problems .n { color: var(--failed); font-variant-numeric: tabular-nums; font-weight: 600; }
-  .context-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-top: 10px; font-size: 12px; }
+  .item .secondary { margin-top: 8px; }
 
   /* The conversation with the main operator. */
-  .thread { flex: 1; overflow-y: auto; padding: 8px 12px 16px; scroll-behavior: smooth; overscroll-behavior: contain; }
-  .banner.read { position: sticky; top: 0; z-index: 2; box-shadow: 0 2px 8px rgb(28 52 110 / .08); }
+  .operator { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .thread { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 12px 16px; overscroll-behavior: contain; }
   .banner { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0 10px; padding: 8px 10px; border-radius: 8px; background: var(--unknown-bg); font-size: 12.5px; }
-  .banner.failed { background: var(--failed-bg); }
   .banner p { margin: 0; flex: 1; }
   .earlier { display: block; margin: 4px 0 10px; font-size: 12px; color: var(--muted); text-align: center; }
   .turn { margin: 0 0 18px; }
-  .ask { display: flex; flex-direction: column; align-items: flex-end; margin: 0 0 10px; }
-  .ask p { margin: 0; max-width: 88%; padding: 7px 11px; border-radius: 12px 12px 4px 12px; background: var(--ask-bg); white-space: pre-wrap; overflow-wrap: anywhere; }
-  .ask small { margin-top: 3px; font-size: 11px; color: var(--muted); }
-  .ask.waiting p { background: transparent; border: 1px dashed var(--field-line); }
-  .ask.failed p { background: var(--failed-bg); }
+  .ask-turn { display: flex; flex-direction: column; align-items: flex-end; margin: 0 0 10px; }
+  .ask-turn p { margin: 0; max-width: 88%; padding: 7px 11px; border-radius: 12px 12px 4px 12px; background: var(--ask-bg); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ask-turn small { margin-top: 3px; font-size: 11px; color: var(--muted); }
+  .ask-turn.waiting p { background: transparent; border: 1px dashed var(--field-line); }
+  .ask-turn.failed p { background: var(--failed-bg); }
   .reply { min-width: 0; }
   .byline { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 11.5px; color: var(--muted); }
   .byline b { color: var(--ink); font-weight: 620; }
@@ -162,7 +201,7 @@
   .step pre { margin: 5px 0 6px 19px; padding: 7px 9px; border-radius: 7px; background: var(--sunken); font: 11.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; }
   .step .note { margin: 0 0 4px 19px; font-size: 11.5px; color: var(--muted); }
 
-  /* Now: under the reply it belongs to. */
+  /* Now: under the reply it belongs to, and on the overview. */
   .live { display: flex; align-items: center; gap: 7px; margin: 6px 0 2px; color: var(--working-text); font-size: 12.5px; }
   .live .says { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .live .since { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -173,9 +212,11 @@
   .card.waiting { border-color: var(--waiting-line); background: var(--waiting-surface); }
   .card.failed { border-color: var(--failed-line); }
   .card h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12.5px; font-weight: 620; }
+  .card.waiting h4 { color: var(--waiting-text); }
   .card p { margin: 3px 0; }
   .card code { font: 11.5px/1.5 var(--mono); padding: 0 3px; border-radius: 4px; background: var(--sunken); }
   .card code.command { display: block; margin: 6px 0; padding: 6px 8px; border-radius: 6px; background: var(--sunken); font: 11.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 6em; overflow: hidden; }
+  .card .secondary { margin-top: 4px; }
   .record { display: flex; gap: 8px; align-items: baseline; margin: 6px 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; }
   .record .title { flex: 1; min-width: 0; }
   .record .meta { flex: none; color: var(--muted); font-size: 11.5px; }
@@ -196,25 +237,27 @@
   /* Ask, follow up. */
   .composer { padding: 8px 12px 10px; border-top: 1px solid var(--line); background: var(--surface); }
   .needs { margin: 0 0 8px; }
-  .field { border: 1px solid var(--field-line); border-radius: 12px; background: var(--surface); padding: 8px 8px 6px 11px; transition: border-color var(--fast); }
+  .needs .card { margin: 0; }
+  .field { border: 1px solid var(--field-line); border-radius: 12px; background: var(--surface); padding: 8px 8px 6px 11px; transition: border-color var(--fast); box-shadow: 0 1px 3px rgb(var(--shade) / .06); }
   .field:focus-within { border-color: var(--blue); }
   .field:has(textarea:disabled) { background: var(--sunken); }
   .field textarea { display: block; width: 100%; min-height: 1.5em; border: 0; outline: 0; resize: none; background: transparent; line-height: 1.5; max-height: 9em; padding: 0; }
   .field textarea::placeholder { color: var(--muted); opacity: .8; }
   .field-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
   .field-row .hint { flex: 1; min-width: 0; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .send { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 0; border-radius: 8px; background: var(--blue); color: var(--blue-ink); font-size: 12.5px; font-weight: 560; box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 1px 2px rgb(28 52 110 / .2); }
+  .send { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 0; border-radius: 8px; background: var(--blue); color: var(--blue-ink); font-size: 12.5px; font-weight: 560; box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 1px 2px rgb(var(--shade) / .2); }
   .send:hover { background: var(--blue-hover); }
   .send:disabled { opacity: .45; cursor: default; box-shadow: none; }
   .sending-note { margin: 6px 2px 0; font-size: 12px; }
   .sending-note.failed { color: var(--failed); }
 
-  .popover { position: absolute; left: 12px; right: 12px; top: 42px; z-index: 6; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(28 52 110 / .14); font-size: 12.5px; }
+  .popover { position: absolute; left: 12px; right: 12px; top: 0; z-index: 6; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(var(--shade) / .14); font-size: 12.5px; }
   .popover p { margin: 0 0 6px; }
-  .menu { position: absolute; right: 12px; top: 42px; z-index: 5; min-width: 200px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(28 52 110 / .14); }
+  .popover .what { font-weight: 620; }
+  .menu { position: absolute; right: 12px; top: 42px; z-index: 7; min-width: 210px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(var(--shade) / .14); }
   .menu button, .menu .item { display: block; width: 100%; padding: 6px 10px; border: 0; border-radius: 7px; background: none; text-align: left; font-size: 12.5px; }
   .menu button:hover, .menu button:focus-visible { background: var(--sunken); }
-  .panel-update { flex: none; margin: 6px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); font-size: 12.5px; overflow-wrap: anywhere; }
+  .panel-update { flex: none; margin: 0 12px 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); font-size: 12.5px; overflow-wrap: anywhere; }
   .panel-update p { margin: 0 0 6px; }
   .panel-update .actions { display: flex; flex-wrap: wrap; gap: 8px; }
   button:disabled { cursor: default; opacity: .6; }
@@ -228,13 +271,14 @@
   .blank h2 { font-size: 15px; margin: 8px 0 4px; }
   .blank .mark { width: 40px; height: 38px; }
   .blank p { margin: 0 0 12px; color: var(--muted); }
-  .secondary { border: 1px solid var(--field-line); border-radius: 8px; padding: 4px 12px; background: var(--surface); font-size: 12.5px; }
+  .blank-host { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+  .secondary { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--field-line); border-radius: 8px; padding: 4px 12px; background: var(--surface); font-size: 12.5px; }
   .secondary:hover { background: var(--sunken); }
+  .loading { color: var(--muted); }
 
   @media (prefers-reduced-motion: reduce) {
     .spinner { animation: none; border-right-color: currentColor; opacity: .7; }
     .pulse { animation: none; }
-    .thread { scroll-behavior: auto; }
     * { transition: none !important; }
   }
 </style>
@@ -242,24 +286,30 @@
 <body>
 <div id="app">
   <header class="top" id="top" hidden>
-    <label class="who" title="Choose an application">
-      <span class="avatar" id="avatar" aria-hidden="true"></span>
-      <span class="name" id="name"></span>
-      <svg class="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <select id="application" aria-label="Application"></select>
-    </label>
-    <span id="state" role="status" aria-live="polite"></span>
+    <div class="identity">
+      <label class="who" title="Choose an application">
+        <span class="avatar" id="avatar" aria-hidden="true"></span>
+        <span class="name" id="name"></span>
+        <svg class="chev" id="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <select id="application" aria-label="Application"></select>
+      </label>
+      <a class="address-link" id="address" target="_blank" rel="noreferrer" hidden></a>
+    </div>
+    <button class="open-hallvi" id="open-hallvi" type="button">Hallvi <span class="icon" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 12 12"><path d="M4.5 3H9v4.5M9 3L3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
     <button class="icon-button" id="more" type="button" aria-label="More" aria-haspopup="menu" aria-expanded="false">
       <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></svg>
     </button>
     <div class="menu" id="menu" role="menu" hidden>
-      <button type="button" role="menuitem" id="menu-open">Open in Hallvi</button>
       <button type="button" role="menuitem" id="menu-refresh">Refresh</button>
       <hr />
       <span class="item">Panel <span id="ui-version">__HALLVI_UI_VERSION__</span></span>
       <button type="button" role="menuitem" id="menu-reload">Check for a panel update</button>
     </div>
   </header>
+  <div class="tabs" id="tabs" role="tablist" aria-label="Views" hidden>
+    <button class="tab" type="button" role="tab" id="tab-overview" aria-controls="overview" aria-selected="true">Overview</button>
+    <button class="tab" type="button" role="tab" id="tab-operator" aria-controls="operator" aria-selected="false" tabindex="-1"><span>Operator</span><span id="operator-state" class="tab-state"></span></button>
+  </div>
   <section class="panel-update" id="panel-update" aria-label="Panel update" hidden>
     <div id="panel-update-status" role="status" aria-live="polite"></div>
     <div class="actions">
@@ -267,35 +317,45 @@
       <button class="secondary" type="button" id="update-dismiss">Dismiss</button>
     </div>
   </section>
-  <button class="context-toggle" id="context-toggle" type="button" aria-expanded="false" aria-controls="context" hidden>
-    <span class="dot" id="condition-dot" aria-hidden="true"></span>
-    <span class="summary" id="context-summary">Reading…</span>
-    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  </button>
-  <div class="context" id="context" hidden></div>
-  <div class="popover" id="link-help" role="dialog" aria-label="Hallvi's address" hidden></div>
-  <main class="thread" id="thread" tabindex="-1" aria-label="Conversation with Hallvi"></main>
-  <form class="composer" id="composer" hidden>
-    <div id="needs" class="needs" hidden></div>
-    <div class="field">
-      <label class="sr" for="draft">Message to Hallvi</label>
-      <textarea id="draft" rows="1" placeholder="Ask Hallvi…" autocomplete="off"></textarea>
-      <div class="field-row">
-        <span class="hint" id="hint"></span>
-        <button class="send" id="send" type="submit" disabled>
-          <span id="send-label">Send</span>
-          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 10V2.5M2.8 5.5L6 2.3l3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-    </div>
-    <p id="sending-note" class="sending-note" role="status" hidden></p>
-  </form>
+  <div class="popover" id="link-help" role="dialog" aria-label="Address" hidden></div>
+  <main class="views" id="views" hidden>
+    <div class="notice" id="notice" role="status" hidden></div>
+    <div class="overview" id="overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="-1"></div>
+    <section class="operator" id="operator" role="tabpanel" aria-labelledby="tab-operator" hidden>
+      <div class="thread" id="thread" tabindex="-1" aria-label="Conversation with Hallvi"></div>
+      <form class="composer" id="composer" hidden>
+        <div id="needs" class="needs" hidden></div>
+        <div class="field">
+          <label class="sr" for="draft">Message to Hallvi</label>
+          <textarea id="draft" rows="1" placeholder="Ask Hallvi…" autocomplete="off"></textarea>
+          <div class="field-row">
+            <span class="hint" id="hint"></span>
+            <button class="send" id="send" type="submit" disabled>
+              <span id="send-label">Send</span>
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 10V2.5M2.8 5.5L6 2.3l3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <p id="sending-note" class="sending-note" role="status" hidden></p>
+      </form>
+    </section>
+  </main>
+  <div class="blank-host" id="blank"></div>
 </div>
 <template id="mascot"><svg class="mark" viewBox="4 1 30 34" aria-hidden="true"><path d="M13 9V4M23 9V4" stroke="#3e4a60" stroke-width="1.6"/><circle cx="13" cy="3" r="2" fill="#c5d2f7"/><circle cx="23" cy="3" r="2" fill="#c5d2f7"/><rect x="5" y="8" width="26" height="24" rx="5.5" fill="#7a8bd6"/><rect x="7.5" y="11" width="21" height="11" rx="3.5" fill="#192338"/><rect x="13" y="14" width="2.4" height="4.6" rx="1.2" fill="#edf3ff"/><rect x="20.6" y="14" width="2.4" height="4.6" rx="1.2" fill="#edf3ff"/><path d="M12 26v3M15 26v3M18 26v3M21 26v3M24 26v3" stroke="#5b6bb5" stroke-width="1.3" stroke-linecap="round"/></svg></template>
 <script type="module">
 const $ = (id) => document.getElementById(id);
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const PALETTE = ["#7a8bd6", "#5f9e8f", "#c07a5a", "#9a7ac4", "#5b8fc4", "#b58a3c"];
+// Out of the panel, into Hallvi's page; and across to the other view.
+const ICONS = {
+  out: '<svg width="11" height="11" viewBox="0 0 12 12"><path d="M4.5 3H9v4.5M9 3L3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  in: '<svg width="11" height="11" viewBox="0 0 12 12"><path d="M2.5 6h7M6.5 3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  // The marks Hallvi's sidebar gives Deployment, Traffic and Architecture (Phosphor, regular).
+  rocket: '<svg viewBox="0 0 256 256" fill="currentColor"><path d="M223.85,47.12a16,16,0,0,0-15-15c-12.58-.75-44.73.4-71.41,27.07L132.69,64H74.36A15.91,15.91,0,0,0,63,68.68L28.7,103a16,16,0,0,0,9.07,27.16l38.47,5.37,44.21,44.21,5.37,38.49a15.94,15.94,0,0,0,10.78,12.92,16.11,16.11,0,0,0,5.1.83A15.91,15.91,0,0,0,153,227.3L187.32,193A15.91,15.91,0,0,0,192,181.64V123.31l4.77-4.77C223.45,91.86,224.6,59.71,223.85,47.12ZM74.36,80h42.33L77.16,119.52,40,114.34Zm74.41-9.45a76.65,76.65,0,0,1,59.11-22.47,76.46,76.46,0,0,1-22.42,59.16L128,164.68,91.32,128ZM176,181.64,141.67,216l-5.19-37.17L176,139.31Zm-74.16,9.5C97.34,201,82.29,224,40,224a8,8,0,0,1-8-8c0-42.29,23-57.34,32.86-61.85a8,8,0,0,1,6.64,14.56c-6.43,2.93-20.62,12.36-23.12,38.91,26.55-2.5,36-16.69,38.91-23.12a8,8,0,1,1,14.56,6.64Z"/></svg>',
+  footprints: '<svg viewBox="0 0 256 256" fill="currentColor"><path d="M208.06,184H152a8,8,0,0,0-8,8v12a36,36,0,0,0,72.05,0V192A8,8,0,0,0,208.06,184Zm-8,20a20,20,0,0,1-40,0v-4h40ZM104,160h-56a8,8,0,0,0-8,8v12A36,36,0,0,0,112,180V168A8,8,0,0,0,104,160Zm-8,20a20,20,0,0,1-40,0v-4H96ZM76,16C64.36,16,53.07,26.31,44.2,45c-13.93,29.38-18.56,73,.29,96a8,8,0,0,0,6.2,2.93h50.55a8,8,0,0,0,6.2-2.93c18.85-23,14.22-66.65.29-96C98.85,26.31,87.57,16,76,16ZM97.15,128H54.78c-11.4-18.1-7.21-52.7,3.89-76.11C65.14,38.22,72.17,32,76,32s10.82,6.22,17.3,19.89C104.36,75.3,108.55,109.9,97.15,128Zm57.61,40h50.55a8,8,0,0,0,6.2-2.93c18.85-23,14.22-66.65.29-96C202.93,50.31,191.64,40,180,40s-22.89,10.31-31.77,29c-13.93,29.38-18.56,73,.29,96A8.05,8.05,0,0,0,154.76,168Zm8-92.11C169.22,62.22,176.25,56,180,56s10.82,6.22,17.29,19.89c11.1,23.41,15.29,58,3.9,76.11H158.85C147.45,133.9,151.64,99.3,162.74,75.89Z"/></svg>',
+  graph: '<svg viewBox="0 0 256 256" fill="currentColor"><path d="M200,152a31.84,31.84,0,0,0-19.53,6.68l-23.11-18A31.65,31.65,0,0,0,160,128c0-.74,0-1.48-.08-2.21l13.23-4.41A32,32,0,1,0,168,104c0,.74,0,1.48.08,2.21l-13.23,4.41A32,32,0,0,0,128,96a32.59,32.59,0,0,0-5.27.44L115.89,81A32,32,0,1,0,96,88a32.59,32.59,0,0,0,5.27-.44l6.84,15.4a31.92,31.92,0,0,0-8.57,39.64L73.83,165.44a32.06,32.06,0,1,0,10.63,12l25.71-22.84a31.91,31.91,0,0,0,37.36-1.24l23.11,18A31.65,31.65,0,0,0,168,184a32,32,0,1,0,32-32Zm0-64a16,16,0,1,1-16,16A16,16,0,0,1,200,88ZM80,56A16,16,0,1,1,96,72,16,16,0,0,1,80,56ZM56,208a16,16,0,1,1,16-16A16,16,0,0,1,56,208Zm56-80a16,16,0,1,1,16,16A16,16,0,0,1,112,128Zm88,72a16,16,0,1,1,16-16A16,16,0,0,1,200,200Z"/></svg>',
+};
 
 // ---------------------------------------------------------------- host bridge
 let rpcId = 0;
@@ -372,7 +432,9 @@ const store = {
 const state = {
   apps: [], selected: store.get("application"), context: null, contextAt: null, contextError: null,
   conversation: null, conversationError: null, readAt: null, failures: 0,
-  send: null, contextOpen: false, open: new Set(), unfolded: new Set(),
+  send: null, open: new Set(), unfolded: new Set(),
+  // The panel opens on the application; the conversation is one step away.
+  view: "overview", thread: { top: 0, atBottom: true }, seen: undefined,
 };
 let stopped = false;
 let generation = 0;
@@ -390,6 +452,7 @@ function ago(at, now = Date.now()) {
   if (seconds < 45) return "just now";
   if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
   if (seconds < 86_400) return `${Math.round(seconds / 3600)} h ago`;
+  if (seconds < 7 * 86_400) return `${Math.round(seconds / 86_400)} d ago`;
   return new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 function clock(at) {
@@ -405,6 +468,10 @@ function spell(seconds) {
 }
 const since = (at) => { const s = Math.floor((Date.now() - Date.parse(at)) / 1000); return Number.isFinite(s) && s >= 0 ? spell(s) : ""; };
 const count = (n) => n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+const short = (revision) => String(revision ?? "").slice(0, 7);
+/** Pi writes a revision as it likes; seven characters of one commit is it. */
+const sameCommit = (a, b) => { const [s, l] = String(a).length <= String(b).length ? [String(a), String(b)] : [String(b), String(a)]; return s.length >= 7 && l.startsWith(s); };
+const hostOf = (address) => { try { const url = new URL(address); return url.host + (url.pathname === "/" ? "" : url.pathname); } catch { return address; } };
 const MODES = { "always-ask": "Always ask", "pi-decides": "Hallvi decides", bypass: "Bypass" };
 
 /** "3 commands and 2 records", as the page says it. */
@@ -450,10 +517,11 @@ function inline(text, into) {
     if (match.index > last) into.append(text.slice(last, match.index));
     const [whole] = match;
     if (match[1]) into.append(el("code", {}, whole.slice(1, -1)));
-    else if (match[2]) into.append(el("strong", {}, whole.slice(2, -2)));
+    // Emphasis can hold code: **`OK`** is bold code, not bold backticks.
+    else if (match[2]) into.append(inline(whole.slice(2, -2), el("strong")));
     else if (match[3]) into.append(link(whole.slice(1, whole.indexOf("](")), match[4]));
     else if (match[5]) into.append(link(whole, whole));
-    else into.append(el("em", {}, whole.slice(1, -1)));
+    else into.append(inline(whole.slice(1, -1), el("em")));
     last = match.index + whole.length;
   }
   if (last < text.length) into.append(text.slice(last));
@@ -503,20 +571,30 @@ function el(tag, attributes = {}, ...children) {
   return node;
 }
 const mascot = () => $("mascot").content.firstElementChild.cloneNode(true);
-function link(label, href) {
-  return el("a", { href, target: "_blank", rel: "noreferrer", onclick: (event) => { event.preventDefault(); void openAddress(href); } }, label);
+function icon(name) {
+  const node = el("span", { class: "icon", "aria-hidden": "true" });
+  node.innerHTML = ICONS[name];
+  return node;
+}
+function link(label, href, kind = "page") {
+  return el("a", { href, target: "_blank", rel: "noreferrer", onclick: (event) => { event.preventDefault(); void openAddress(href, { kind }); } }, label);
 }
 
 /** Open an address through the host; HTTP stays copyable, since hosts may ignore it. */
-async function openAddress(address) {
+async function openAddress(address, { kind = "page", what = null } = {}) {
   let url;
   try { url = new URL(address, pageOrigin()); } catch { return; }
+  closeAddress();
   if (url.protocol === "https:") {
     try { const result = await request("ui/open-link", { url: url.href }); if (!result?.isError) return; } catch {}
   }
-  showAddress(url.href, url.protocol === "https:" ? "The host could not open this link. Copy it into your browser." : "Codex cannot open this local address itself. Paste it into your browser; for a remote Hallvi, keep its SSH forward open.");
+  const help = url.protocol === "https:" ? "The host could not open this link. Copy it into your browser."
+    : kind === "hallvi" ? "Codex doesn't open local addresses itself. Paste it into your browser; for a remote Hallvi, keep its SSH forward open."
+    : kind === "private" ? "Codex doesn't open this address itself. It is private: it works in a browser on the machine running Hallvi while its tunnel is open."
+    : "Codex doesn't open http:// addresses itself. Paste it into your browser.";
+  showAddress(url.href, help, what);
 }
-function showAddress(address, help) {
+function showAddress(address, help, what) {
   const panel = $("link-help");
   const input = el("input", { value: address, readonly: true, "aria-label": "Address" });
   const status = el("p", { class: "muted", role: "status", style: "margin:6px 0 0;font-size:12px;min-height:1em" });
@@ -525,11 +603,14 @@ function showAddress(address, help) {
     catch { input.focus(); input.select(); status.textContent = "Copy the selected address."; }
   } }, "Copy");
   panel.replaceChildren(
+    what ? el("p", { class: "what" }, what) : null,
     el("p", {}, help),
     el("div", { class: "address" }, input, copy),
     status,
     el("div", { style: "text-align:right" }, el("button", { type: "button", class: "text-button quiet", onclick: closeAddress }, "Close")),
   );
+  // Under the header and views when they show, else at the top of a blank panel.
+  panel.style.top = `${$("views").hidden ? 12 : $("views").offsetTop}px`;
   panel.hidden = false;
   copy.focus();
 }
@@ -560,7 +641,7 @@ function setApplications(list) {
   if (!list.some((item) => item.id === state.selected)) state.selected = list[0]?.id ?? null;
   renderIdentity();
   if (state.selected) select(state.selected, { keepDraft: true });
-  else renderBlank("No applications yet", "Add an application in Hallvi, then refresh this panel.", [["Open Hallvi", () => void openAddress(pageOrigin())], ["Refresh", start]]);
+  else renderBlank("No applications yet", "Add an application in Hallvi, then refresh this panel.", [["Open Hallvi", () => void openAddress(pageOrigin(), { kind: "hallvi", what: "Hallvi" })], ["Refresh", start]]);
 }
 function pageOrigin() {
   const page = state.home ?? state.apps[0]?.page;
@@ -589,12 +670,12 @@ function select(id, { keepDraft = false } = {}) {
   store.set("application", id);
   state.context = null; state.contextAt = null; state.contextError = null; state.conversation = null; state.conversationError = null;
   state.failures = 0; state.open.clear(); state.unfolded.clear();
+  state.seen = undefined; state.thread = { top: 0, atBottom: true };
   if (!keepDraft) state.send = null;
+  closeAddress();
   restoreDraft();
   renderIdentity();
-  renderContext();
-  renderThread();
-  renderComposer();
+  renderEverything();
   void shareContext(`The Hallvi panel is switching to ${app()?.name ?? "an application"}. Confirm the application with hallvi_apps before sending work.`);
   void readContext();
   void follow(true);
@@ -614,7 +695,7 @@ async function readContext() {
   } finally {
     if (contextReading === mine) contextReading = null;
   }
-  renderIdentity(); renderContext(); renderComposer();
+  renderEverything();
 }
 /** Read the conversation now, then again at a pace that suits what it is doing. */
 async function follow(now = false) {
@@ -632,18 +713,17 @@ async function follow(now = false) {
       const was = previous?.status;
       state.conversation = data;
       settleSend();
-      renderThread();
-      renderIdentity();
-      renderComposer();
+      noticeReplies();
+      renderEverything();
       if (was && was !== data.status) void readContext();
       describeToModel();
-    } else if (recovered) { renderThread(); renderIdentity(); renderComposer(); }
+    } else if (recovered) renderEverything();
     if (recovered || !state.contextAt || Date.now() - Date.parse(state.contextAt) >= 30_000) void readContext();
   } catch (error) {
     if (mine !== generation) return;
     state.failures++;
     state.conversationError = error;
-    renderThread(); renderIdentity(); renderComposer();
+    renderEverything();
   }
   if (mine !== generation) return;
   const status = state.conversation?.status;
@@ -658,7 +738,7 @@ function describeToModel() {
   const a = app(); const c = state.conversation;
   if (!a || !c) return;
   const last = c.turns?.at(-1);
-  const reply = last?.reply;
+  const reply = replyTurn(c)?.reply;
   const now = reply && ["running", "waiting"].includes(reply.status) ? doing(reply, c.worker?.alive).says : null;
   void shareContext([
     `The Hallvi panel shows application "${a.name}" (application_id ${a.id}) on the Hallvi controller ${c.controller ?? state.context?.controller ?? ""}.`,
@@ -667,6 +747,63 @@ function describeToModel() {
     reply?.body ? `Latest reply (${reply.status}): ${reply.body.slice(0, 900)}` : "",
     "Use hallvi_conversation for details and hallvi_exec with this application_id to ask for work. Approvals stay in Hallvi.",
   ].filter(Boolean).join("\n"));
+}
+
+// ---------------------------------------------------------------- views
+/** Switch between the overview and the conversation; neither loses its place. */
+function setView(view, { focus = null } = {}) {
+  if (view !== state.view) {
+    const thread = $("thread");
+    if (state.view === "operator") state.thread = { top: thread.scrollTop, atBottom: thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60 };
+    state.view = view;
+    closeAddress();
+    $("overview").hidden = view !== "overview";
+    $("operator").hidden = view !== "operator";
+    if (view === "operator") {
+      autosize();
+      renderThread();
+      // Back where the reader left it, or at the latest turn.
+      if (thread.dataset.placed !== state.selected || state.thread.atBottom) { thread.scrollTop = thread.scrollHeight; thread.dataset.placed = state.selected; }
+      else thread.scrollTop = state.thread.top;
+      state.seen = latestReply();
+    } else renderOverview();
+    renderTabs();
+    labelOpenHallvi();
+  }
+  if (focus === "tab") $(`tab-${view}`).focus();
+  if (focus === "draft") { const draft = $("draft"); draft.focus(); draft.setSelectionRange(draft.value.length, draft.value.length); }
+}
+/** The newest reply's turn: a follow-up queued after it does not replace it. */
+const replyTurn = (c) => c?.turns?.findLast((turn) => turn.reply) ?? null;
+/** A settled reply, as something a reader has or has not seen. */
+function latestReply() {
+  const reply = replyTurn(state.conversation)?.reply;
+  return reply && !["running", "waiting"].includes(reply.status) ? `${reply.id}:${reply.status}` : null;
+}
+/** A reply that settles while the overview is open is news until it is seen. */
+function noticeReplies() {
+  if (state.seen === undefined || state.view === "operator") state.seen = latestReply();
+}
+/** Put a request in the composer without sending it, and go there. */
+function draftRequest(text) {
+  const draft = $("draft");
+  // Never over a message being sent, or one the reader has started.
+  if (text && !draft.disabled && !draft.value.trim()) { draft.value = text; saveDraft(); }
+  setView("operator", { focus: draft.disabled ? "tab" : "draft" });
+  autosize();
+  renderComposer();
+}
+const pageOf = () => state.conversation?.page ?? state.context?.page ?? app()?.page ?? pageOrigin();
+/** A destination in Hallvi's page, by the fragment its sidebar uses. */
+const pageFor = (section) => `${pageOf().split("#")[0]}#${section}`;
+
+function renderEverything() {
+  renderIdentity();
+  renderTabs();
+  renderNotice();
+  renderOverview();
+  renderThread();
+  renderComposer();
 }
 
 // ---------------------------------------------------------------- sending
@@ -691,7 +828,7 @@ async function send(event) {
   state.send = { key, text, state: "sending" };
   // Persist before crossing the host boundary: closing or switching cannot lose identity.
   store.set(`draft:${id}`, { text, key, unknown: true });
-  renderComposer(); renderThread();
+  renderComposer(); renderThread(); renderTabs();
   let result = null;
   try {
     result = await call("hallvi_exec", { application_id: id, message: text, request_key: key });
@@ -714,9 +851,9 @@ async function send(event) {
   } else {
     state.send = { key: null, text, state: "refused", message: result.error?.message ?? "Hallvi did not take this message." };
   }
-  renderComposer(); renderThread();
+  renderEverything();
   void follow(true);
-  if (result.accepted === true) $("draft").focus();
+  if (result.accepted === true && state.view === "operator") $("draft").focus();
 }
 /** Once the conversation shows the message, it speaks for itself. */
 function settleSend() {
@@ -737,11 +874,11 @@ function canSend() {
   return { ok: true };
 }
 
-// ---------------------------------------------------------------- rendering: identity and context
+// ---------------------------------------------------------------- rendering: frame
 function renderIdentity() {
   const a = app();
-  $("top").hidden = !a;
-  $("context-toggle").hidden = !a;
+  for (const id of ["top", "tabs", "views"]) $(id).hidden = !a;
+  $("blank").hidden = Boolean(a);
   if (!a) return;
   const select = $("application");
   if (select.options.length !== state.apps.length || [...select.options].some((option, i) => option.value !== state.apps[i].id)) {
@@ -749,130 +886,294 @@ function renderIdentity() {
   }
   select.value = a.id;
   select.disabled = state.apps.length < 2;
+  $("chev").style.visibility = state.apps.length < 2 ? "hidden" : "";
   $("name").textContent = a.name;
   const index = Math.abs([...a.id].reduce((sum, ch) => sum + ch.charCodeAt(0), 0)) % PALETTE.length;
   $("avatar").textContent = a.name.trim().charAt(0).toUpperCase();
   $("avatar").style.background = PALETTE[index];
-
-  // The operator's state, only when there is something to say.
-  const c = state.conversation;
-  let chip = null;
-  if (state.conversationError && state.failures > 1) chip = ["unknown", "Can't reach Hallvi"];
-  else if (c && !c.worker?.alive) chip = ["unknown", "Worker stopped"];
-  else if (c?.status === "awaiting-approval" || waitingOnApproval(c)) chip = ["waiting", "Needs your approval"];
-  else if (c?.status === "interrupted") chip = ["waiting", "Interrupted"];
-  else if (c?.status === "working" || state.send?.state === "sending") chip = ["working", "Working"];
-  $("state").replaceChildren(chip ? el("span", { class: `chip ${chip[0]}` }, chip[0] === "working" ? el("span", { class: "pulse", "aria-hidden": "true" }) : null, chip[1]) : "");
-
-  // The one line of context under the name.
-  const context = state.context;
-  const parts = [];
-  const tone = context?.condition?.tone ?? a.condition?.tone;
-  $("condition-dot").className = `dot ${tone ?? ""}`;
-  parts.push(context?.condition?.text ?? a.condition?.text ?? "Condition not read yet");
-  const traffic = context?.traffic;
-  if (traffic && !traffic.unavailable) {
-    if (["live", "catching-up"].includes(traffic.state) && traffic.totals) {
-      parts.push(`${count(traffic.totals.views)} ${traffic.totals.views === 1 ? "view" : "views"} in 24 h`);
-      if (traffic.totals.errors) parts.push(`${plural(traffic.totals.errors, "error", "errors")}`);
-    }
+  // Where the application itself is reached, under its name.
+  const access = state.context?.saved?.access ?? (a.address ? { url: a.address, mode: null } : null);
+  const address = $("address");
+  address.hidden = !access;
+  if (access) {
+    const kind = access.mode === "private" ? "private" : "app";
+    address.textContent = `${hostOf(access.url)}${kind === "private" ? " · private" : ""}`;
+    address.href = access.url;
+    address.title = kind === "private" ? "Private: it opens on the machine running Hallvi, through its tunnel" : `Open ${hostOf(access.url)}`;
+    address.onclick = (event) => { event.preventDefault(); void openAddress(access.url, { kind, what: a.name }); };
   }
-  $("context-summary").textContent = parts.join(" · ");
-  $("context-toggle").setAttribute("aria-expanded", String(state.contextOpen));
-  $("context-toggle").setAttribute("aria-label", `${parts.join(", ")}. ${state.contextOpen ? "Hide" : "Show"} application details`);
+  labelOpenHallvi();
+}
+/** Into Hallvi at the same place: its Overview, or this conversation. */
+function labelOpenHallvi() {
+  const label = state.view === "overview" ? "Open the overview in Hallvi" : "Open the conversation in Hallvi";
+  $("open-hallvi").setAttribute("aria-label", label);
+  $("open-hallvi").title = label;
 }
 
 /** An approval the latest reply is waiting on, whatever the lane's own status says. */
 function waitingOnApproval(c) {
-  const reply = c?.turns?.at(-1)?.reply;
+  const reply = replyTurn(c)?.reply;
   return Boolean(reply && ["running", "waiting"].includes(reply.status) && reply.steps.some((step) => step.status === "awaiting-approval" || (step.tool === "request_approval" && step.status === "running")));
 }
-function renderContext() {
-  const box = $("context");
-  box.hidden = !state.contextOpen;
-  if (!state.contextOpen) return;
-  const a = app(); const context = state.context;
-  if (!context) {
-    box.replaceChildren(el("section", {}, el("p", { class: "muted" }, state.contextError ? `Details unavailable: ${state.contextError.message}` : "Reading details…")));
-    return;
-  }
-  const application = context.application ?? {};
-  const deployment = context.deployment;
-  const facts = el("dl", { class: "facts" });
-  const fact = (label, value) => { if (value) facts.append(el("dt", {}, label), el("dd", {}, value)); };
-  if (a.address) fact("Address", link(a.address.replace(/^https?:\/\//, ""), a.address));
-  if (context.condition?.nextStep) fact("Next", context.condition.nextStep);
-  if (deployment) fact("Deploys", deployment.mode === "automatic"
-    ? `Automatically from ${deployment.branch ?? "its branch"}${deployment.paused ? " · paused" : ""}${deployment.latest ? ` · latest ${String(deployment.latest).slice(0, 7)}` : ""}`
-    : deployment.mode === "manual" ? "When you ask" : "Not chosen yet");
-  if (application.host?.address) fact("Server", `${application.host.address}${application.host.provider ? ` · ${application.host.provider}` : ""}`);
-  if (a.stack) fact("Runs", a.stack);
-  fact("Permissions", `${MODES[application.permissionMode] ?? application.permissionMode ?? "Unknown"} · change in Hallvi`);
-  const sections = [el("section", {}, facts)];
-
-  // Traffic: counted by Hallvi from the proxy's log, or honestly not.
-  const traffic = context.traffic;
-  const trafficSection = el("section", {}, el("h3", {}, "Last day"));
-  if (!traffic || traffic.unavailable) trafficSection.append(el("p", { class: "muted" }, "This Hallvi does not offer traffic history."));
-  else if (traffic.state === "off" || !traffic.state) trafficSection.append(el("p", { class: "muted" }, "Traffic history is off, so visits and server errors are not being counted. That is not a claim there were none."), el("button", { type: "button", class: "text-button", onclick: () => void openAddress(`${pageOf()}#traffic`) }, "Keep traffic history in Hallvi"));
-  else if (["no-log", "unsupported", "lost"].includes(traffic.state)) trafficSection.append(...[el("p", {}, { "no-log": "Hallvi has no access log to read for this application yet.", unsupported: "Hallvi can't read this proxy's log.", lost: "Hallvi lost the access log." }[traffic.state]), traffic.detail ? el("p", { class: "muted" }, traffic.detail) : null].filter(Boolean));
-  else {
-    const t = traffic.totals ?? {};
-    trafficSection.append(el("div", { class: "numbers" },
-      el("span", {}, el("b", {}, count(t.views ?? 0)), " views"),
-      t.visitorsPer === "today" && t.visitors ? el("span", {}, el("b", {}, count(t.visitors)), " visitors today (est.)") : null,
-      el("span", { style: t.errors ? "color:var(--failed)" : null }, el("b", {}, count(t.errors ?? 0)), t.errors === 1 ? " server error" : " server errors"),
-      t.p95Ms != null ? el("span", {}, el("b", {}, `${t.p95AtLeast ? "≥" : ""}${Math.round(t.p95Ms)} ms`), " p95") : null));
-    const series = traffic.series ?? [];
-    const peak = Math.max(1, ...series.map((point) => point.views));
-    const bars = el("div", { class: "bars", role: "img", "aria-label": `Views per hour over the last day, peak ${peak}` });
-    for (const point of series) bars.append(el("i", { class: point.covered === 0 ? "gap" : point.errors ? "error" : null, style: `height:${Math.max(4, (point.views / peak) * 100)}%`, title: `${clock(point.at)} · ${point.covered === 0 ? "not covered by the log" : `${point.views} views${point.errors ? `, ${point.errors} errors` : ""}`}` }));
-    trafficSection.append(bars, el("div", { class: "bars-axis" }, el("span", {}, series[0] ? clock(series[0].at) : ""), el("span", {}, "now")));
-    if (traffic.state === "catching-up") trafficSection.append(el("p", { class: "muted" }, "Still catching up on the log."));
-  }
-  sections.push(trafficSection);
-
-  // Errors: what failed, from the log and from Hallvi's own runs.
-  const problems = [];
-  for (const item of traffic?.errors ?? []) problems.push(el("li", {}, el("span", {}, el("code", {}, item.key)), el("span", { class: "n" }, `${item.count}×`)));
-  for (const record of (context.records ?? []).filter((r) => r.status === "failed").slice(0, 3))
-    problems.push(el("li", {}, el("span", {}, record.title), el("span", { class: "n" }, "failed")));
-  // Hallvi's own failed commands are part of its work, not the application's errors.
-  const runs = (context.executions ?? []).filter((e) => e.status === "failed" && Date.now() - Date.parse(e.startedAt) < 86_400_000);
-  const counted = traffic && !traffic.unavailable && ["live", "catching-up"].includes(traffic.state);
-  const errors = el("section", {}, el("h3", {}, "Errors"));
-  if (problems.length) errors.append(el("ul", { class: "problems" }, problems));
-  else if (counted && traffic.totals?.errors) errors.append(el("p", { class: "muted" }, `${plural(traffic.totals.errors, "server error", "server errors")} in the last day; the log did not keep which page.`));
-  else errors.append(el("p", { class: "muted" }, counted ? "No server errors in the last day's log." : "Server errors aren't counted without traffic history."));
-  if (runs.length) errors.append(el("p", { class: "muted" }, `${plural(runs.length, "command", "commands")} Hallvi ran in the last day failed; its replies say what it did next.`));
-  sections.push(errors);
-  sections.push(el("div", { class: "context-foot muted" },
-    el("span", {}, `Recorded state, read ${ago(state.contextAt)}`),
-    el("button", { type: "button", class: "text-button", onclick: () => void openAddress(pageOf()) }, "Open in Hallvi"),
-    el("button", { type: "button", class: "text-button quiet", onclick: () => { void readContext(); } }, "Refresh")));
-  box.replaceChildren(...sections);
+/** The operator's state, only when there is something to say. */
+function operatorState() {
+  const c = state.conversation;
+  // An open input request can outlive the work that asked for it: it never
+  // stands in for the operator's state (see openRequests).
+  if (c && !c.worker?.alive) return ["unknown", "Worker not running", "Not running"];
+  if (c?.status === "awaiting-approval" || waitingOnApproval(c)) return ["waiting", "Needs your approval", "Needs you"];
+  if (c?.status === "interrupted") return ["waiting", "Interrupted"];
+  if (c?.status === "working" || state.send?.state === "sending") return ["working", "Working"];
+  if (state.send?.state === "unknown") return ["waiting", "Message not confirmed", "Not confirmed"];
+  if (state.view !== "operator" && state.seen !== undefined && latestReply() && latestReply() !== state.seen) return ["fresh", "New reply"];
+  return null;
 }
-const pageOf = () => state.conversation?.page ?? state.context?.page ?? app()?.page ?? pageOrigin();
-
-// ---------------------------------------------------------------- rendering: the conversation
-function renderBanner() {
-  const existing = $("thread").querySelector(".banner.read");
-  if (existing) existing.remove();
-  const error = state.conversationError;
-  if (!error || !state.conversation) return;
-  $("thread").prepend(el("div", { class: "banner read", role: "status" },
-    el("p", {}, `Can't reach Hallvi. Showing what was read at ${clock(state.readAt)}; it may have changed. Retrying…`),
-    el("button", { type: "button", class: "text-button", onclick: () => void follow(true) }, "Retry")));
+function renderTabs() {
+  for (const view of ["overview", "operator"]) {
+    const tab = $(`tab-${view}`);
+    const selected = state.view === view;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  }
+  const now = operatorState();
+  const mark = !now ? null : now[0] === "working" ? el("span", { class: "pulse", "aria-hidden": "true" }) : el("span", { class: "dot", style: "opacity:1;background:currentColor;width:6px;height:6px", "aria-hidden": "true" });
+  $("operator-state").className = `tab-state ${now?.[0] ?? ""}`;
+  $("operator-state").replaceChildren(...(now ? [mark, el("span", { class: "words" }, now[2] ?? now[1])] : []));
+  $("tab-operator").setAttribute("aria-label", now ? `Operator, ${lower(now[1])}` : "Operator");
+}
+/** Read before, unreachable now: say so above whichever view is open. */
+function renderNotice() {
+  const notice = $("notice");
+  const error = state.conversationError && state.conversation ? state.conversationError : state.contextError && state.context ? state.contextError : null;
+  notice.hidden = !error;
+  if (!error) { notice.replaceChildren(); return; }
+  const at = state.conversationError && state.conversation ? state.readAt : state.contextAt;
+  notice.replaceChildren(
+    el("p", {}, `Can't reach Hallvi. Showing what was read at ${clock(at)}; it may have changed. Retrying…`),
+    el("button", { type: "button", class: "text-button", onclick: () => { void readContext(); void follow(true); } }, "Retry"));
 }
 function renderBlank(title, text, actions = []) {
-  $("top").hidden = true; $("context-toggle").hidden = true; $("context").hidden = true; $("composer").hidden = true;
+  for (const id of ["top", "tabs", "views"]) $(id).hidden = true;
+  $("blank").hidden = false;
   const box = el("div", { class: "blank" }, title ? mascot() : el("span", { class: "spinner", style: "display:inline-block;color:var(--muted)" }), title ? el("h2", {}, title) : null, el("p", {}, text),
     el("div", { class: "suggestions" }, actions.map(([label, action]) => el("button", { type: "button", onclick: action }, label))));
-  $("thread").replaceChildren(box);
+  $("blank").replaceChildren(box);
 }
 
+// ---------------------------------------------------------------- rendering: overview
+function renderOverview() {
+  const box = $("overview");
+  const a = app();
+  if (!a || box.hidden) return;
+  // Redraws while Hallvi works must not take a reader's place or focus away.
+  const focused = box.contains(document.activeElement) ? document.activeElement.closest("[data-focus]")?.dataset.focus : null;
+  const top = box.scrollTop;
+  const asks = overviewAsks(a);
+  box.replaceChildren(...[attentionItem(), conditionItem(a, asks.condition), requestsItem(), deploymentItem(), trafficItem(asks.errors), setupItem(a)].filter(Boolean));
+  box.scrollTop = top;
+  if (focused) box.querySelector(`[data-focus="${CSS.escape(focused)}"]`)?.focus();
+  tick();
+}
+/** One part of the application: its mark, what is true, when, and the way to it. */
+function item(label, { glyph, main = [], meta = null, go = null, more = [], lead = false }) {
+  const extra = more.filter(Boolean);
+  return el("section", { class: `item${lead ? " lead" : ""}`, "aria-label": label },
+    el("span", { class: "glyph", "aria-hidden": "true" }, glyph),
+    el("div", { class: "main" }, main.filter(Boolean)),
+    el("div", { class: "side" }, meta, go),
+    extra.length ? el("div", { class: "more" }, extra) : null);
+}
+function glyph(name) {
+  const node = el("span");
+  node.innerHTML = ICONS[name];
+  return node.firstElementChild;
+}
+const dot = (tone) => el("span", { class: `dot ${tone ?? ""}` });
+/** A destination in Hallvi, named for where it goes. */
+function outTo(what, fragment) {
+  return el("button", { type: "button", class: "out", "data-focus": `go:${fragment}`, "aria-label": `Open ${what} in Hallvi`, title: `Open ${what} in Hallvi`, onclick: () => void openAddress(pageFor(fragment), { kind: "hallvi", what: `${what} in Hallvi` }) }, icon("out"));
+}
+function askButton(label, text, key) {
+  return el("button", { type: "button", class: "ask", "data-focus": key, title: text || null, onclick: () => draftRequest(text) }, label);
+}
+/**
+ * Offers, not alarms: each drafts a request in the conversation and sends
+ * nothing. One per concern, the failing condition before the errors it
+ * explains, and none while the composer could not send them.
+ */
+function overviewAsks(a) {
+  if (!a.mainChatId || !canSend().ok) return {};
+  const condition = state.context?.condition ?? a.condition ?? {};
+  const failing = ["bad", "warn"].includes(condition.tone);
+  const unchecked = ["Not checked yet", "Recorded, not established"].includes(condition.text) || (condition.tone === "live" && condition.text !== "Checks held");
+  const traffic = state.context?.traffic;
+  const top = traffic?.errors?.[0]?.key;
+  return {
+    condition: failing ? ["Ask Hallvi about it", condition.nextStep ?? `Look into this and tell me what you find: ${condition.text}. Don't change anything yet.`]
+      : unchecked ? ["Ask Hallvi to check it", `Check that ${a.name} is answering correctly. Read-only: don't change anything.`] : null,
+    errors: !failing && ["live", "catching-up"].includes(traffic?.state) && traffic.totals?.errors
+      ? ["Ask about these errors", `Look into the server errors in the last day${top ? `, most on ${top}` : ""}, and tell me what you find. Don't change anything yet.`] : null,
+  };
+}
+const line = (text, className = "sub") => el("p", { class: className }, text);
+const pendingLine = (text = "Reading…") => el("p", { class: "sub loading" }, text);
+const primary = (text, className = "") => el("p", { class: `primary ${className}`.trim() }, text);
+
+/** When the condition's evidence was recorded, where the records say. */
+function conditionTime(condition, context) {
+  if (!condition || !context) return null;
+  if (condition.tone === "live" && condition.text === "Checks held" && context.saved?.checkedAt) return ago(context.saved.checkedAt);
+  if (condition.tone === "bad" || condition.tone === "warn") {
+    const status = condition.tone === "bad" ? "failed" : "warning";
+    const record = (context.records ?? []).find((item) => item.title === condition.text && item.status === status);
+    if (record?.establishedAt) return ago(record.establishedAt);
+  }
+  return null;
+}
+function conditionItem(a, ask) {
+  const context = state.context;
+  const condition = context?.condition ?? a.condition ?? { tone: "muted", text: "Condition not read yet" };
+  const when = conditionTime(condition, context);
+  return item("Condition", {
+    lead: true,
+    glyph: dot(condition.tone),
+    main: [el("p", { class: "primary", title: condition.nextStep ? `Next: ${condition.nextStep}` : null }, condition.text)],
+    meta: when ? el("span", { title: condition.tone === "live" ? "When a check was last recorded" : "When this was recorded" }, when) : null,
+    more: [ask ? el("div", { class: "asks" }, askButton(ask[0], ask[1], "ask:condition")) : null],
+  });
+}
+
+/**
+ * The operator is on the overview only when it needs you. Its work and words
+ * are the Operator view's, and that view's tab carries its state.
+ */
+function attentionItem() {
+  const c = state.conversation;
+  const alive = c?.worker?.alive;
+  const reply = alive ? replyTurn(c)?.reply : null;
+  const now = reply && ["running", "waiting"].includes(reply.status) ? doing(reply, true) : null;
+  const go = el("button", { type: "button", class: "out", "data-focus": "go:operator", "aria-label": "Open the conversation", title: "Open the conversation", onclick: () => setView("operator") }, icon("in"));
+  // Each decision is made in Hallvi, never here.
+  const decide = (label, page, key) => el("button", { type: "button", class: "secondary", "data-focus": key, onclick: () => void openAddress(page ?? pageOf(), { kind: "hallvi", what: label }) }, label, icon("out"));
+  const needs = (main, action, meta = null) => item("Needs you", { glyph: mascot(), main, meta, go, more: [action] });
+  if (alive && c.status === "interrupted") {
+    const waiting = (c.turns ?? []).filter((entry) => entry.request?.status === "waiting").length;
+    return needs([primary("Interrupted", "needs"), line(`Nothing runs until you choose Continue or Stop${waiting ? `; ${plural(waiting, "follow-up waits", "follow-ups wait")}` : ""}.`)],
+      decide("Continue or stop in Hallvi", null, "interrupted"));
+  }
+  if (now?.waiting && now.step)
+    return needs([primary("Waiting for your approval", "needs"), el("p", { class: "sub one" }, now.step.title)],
+      decide("Decide in Hallvi", state.context?.attention?.find((entry) => entry.kind === "approval")?.page, `decide:${now.step.id}`),
+      el("span", { "data-since": now.step.startedAt }, since(now.step.startedAt)));
+  return null;
+}
+/**
+ * Input Hallvi asked for through its cards (a secret, where to run, DNS, how
+ * to deploy) that nobody has answered. A request can outlive the work that
+ * asked for it, so it is dated and quiet, never "Needs you".
+ */
+function requestsItem() {
+  const inputs = (state.context?.attention ?? []).filter((entry) => entry.kind === "input");
+  if (!inputs.length) return null;
+  const asked = inputs[0].requestedAt && clock(inputs[0].requestedAt);
+  return item("Open requests", {
+    glyph: mascot(),
+    main: [primary(plural(inputs.length, "open request", "open requests")), ...inputs.slice(0, 2).map((entry) => el("p", { class: "sub one", title: entry.reason }, entry.reason))],
+    meta: asked ? el("span", { title: "When it was asked" }, ago(inputs[0].requestedAt)) : null,
+    more: [el("button", { type: "button", class: "secondary", "data-focus": "review", onclick: () => void openAddress(inputs[0].page ?? pageOf(), { kind: "hallvi", what: "Review in Hallvi" }) }, "Review in Hallvi", icon("out"))],
+  });
+}
+
+function deploymentItem() {
+  const context = state.context;
+  const go = outTo("Deployment", "deployment");
+  if (!context) return item("Deployment", { glyph: glyph("rocket"), main: [state.contextError ? primary("Couldn't be read just now", "quiet") : pendingLine()], go });
+  const d = context.deployment ?? {};
+  const saved = context.saved;
+  const release = saved?.release;
+  const main = [];
+  let meta = null;
+  // A panel updated in place can be newer than the adapter that serves it.
+  if (!saved) main.push(primary("Reconnect the Hallvi plugin to see releases", "quiet"));
+  else if (saved.unavailable) main.push(primary("Releases couldn't be read just now", "quiet"));
+  else if (!release) main.push(primary("No release is recorded yet", "quiet"));
+  else {
+    const { running, latest } = release;
+    if (running) { main.push(primary(["Running ", el("code", {}, short(running.revision))])); meta = ago(running.at); }
+    if (!running || latest.id !== running.id) {
+      const failed = latest.outcome === "failed";
+      const says = failed ? (running ? `Update to ${short(latest.revision)} failed` : "No successful release is recorded") : `${short(latest.revision)} was attempted, outcome unknown`;
+      main.push(running ? line(`${says} · ${ago(latest.at)}`, `sub${failed ? " failed" : ""}`) : primary(says, failed ? "failed" : "quiet"));
+      if (!running) meta = ago(latest.at);
+    }
+  }
+  const deployed = d.deployed ?? release?.running?.revision;
+  const how = d.mode === "automatic"
+    ? [`Auto from ${d.branch ?? "its branch"}`, d.paused ? "paused" : d.latest && deployed ? (sameCommit(d.latest, deployed) ? "up to date" : `${d.branch ?? "branch"} at ${short(d.latest)}`) : null, !d.paused && d.watching === false ? "not watching" : null].filter(Boolean).join(" · ")
+    : d.mode === "manual" ? "Deploys when you ask" : null;
+  if (how && release) main.push(line(how));
+  if (d.blocked) main.push(line(`Waiting: ${d.blocked}`));
+  return item("Deployment", { glyph: glyph("rocket"), main, meta, go });
+}
+
+function trafficItem(ask) {
+  const context = state.context;
+  const go = outTo("Traffic", "traffic");
+  const mark = glyph("footprints");
+  if (!context) return item("Traffic", { glyph: mark, main: [state.contextError ? primary("Couldn't be read just now", "quiet") : pendingLine()], go });
+  const traffic = context.traffic;
+  // Nothing counted is unassessed: never drawn as quiet, never as zero.
+  if (!traffic || traffic.unavailable) return item("Traffic", { glyph: mark, go: traffic?.offered === false ? null : go,
+    main: [primary(traffic?.offered === false ? "Not counted by this Hallvi version" : "Traffic couldn't be read just now", "quiet")] });
+  if (traffic.state === "off" || !traffic.state) return item("Traffic", { glyph: mark, go,
+    main: [primary("Not counted: traffic history is off", "quiet")],
+    more: [el("div", { class: "asks" }, el("button", { type: "button", class: "ask", "data-focus": "traffic:keep", onclick: () => void openAddress(pageFor("traffic"), { kind: "hallvi", what: "Traffic in Hallvi" }) }, "Keep traffic history", icon("out")))] });
+  if (["no-log", "unsupported", "lost"].includes(traffic.state)) return item("Traffic", { glyph: mark, go,
+    main: [el("p", { class: "primary quiet", title: traffic.detail ?? null }, { "no-log": "Not counted: no access log to read yet", unsupported: "Not counted: Hallvi can't read this proxy's log", lost: "Counting stopped: Hallvi lost the access log" }[traffic.state])] });
+  const t = traffic.totals ?? {};
+  const series = traffic.series ?? [];
+  const gaps = series.filter((point) => point.covered === 0).length;
+  const figure = (n, words, className, title) => el("span", { class: `figure${className ? ` ${className}` : ""}`, title }, el("b", {}, n), ` ${words}`);
+  // Views, failures and the day's shape; visitors, pages and sources are Traffic's to tell.
+  const figures = el("p", { class: "primary figures" },
+    figure(count(t.views ?? 0), t.views === 1 ? "view" : "views"), " · ",
+    figure(count(t.errors ?? 0), t.errors === 1 ? "server error" : "server errors", t.errors ? "bad" : null));
+  const more = [];
+  if (series.length) {
+    const peak = Math.max(1, ...series.map((point) => point.views));
+    const bars = el("div", { class: "bars", role: "img", "aria-label": `Views per hour over the last day, peak ${peak}${gaps ? `; ${plural(gaps, "hour", "hours")} not covered by the log` : ""}` });
+    for (const point of series) bars.append(el("i", { class: point.covered === 0 ? "gap" : point.errors ? "error" : null, style: `height:${Math.max(4, (point.views / peak) * 100)}%`, title: `${clock(point.at)} · ${point.covered === 0 ? "not covered by the log" : `${point.views} views${point.errors ? `, ${point.errors} server errors` : ""}`}` }));
+    more.push(bars);
+    // An hour the log did not cover is a gap, not a quiet hour.
+    if (gaps) more.push(el("p", { class: "gap-key" }, el("i", { "aria-hidden": "true" }), `${gaps} h not in the log`));
+  }
+  const paths = (traffic.errors ?? []).slice(0, 2);
+  if (paths.length) more.push(el("ul", { class: "problems", "aria-label": "Server errors by path" }, paths.map((item) => el("li", {}, el("code", { title: item.key }, item.key), el("span", { class: "n" }, count(item.count))))));
+  if (ask) more.push(el("div", { class: "asks" }, askButton(ask[0], ask[1], "ask:errors")));
+  return item("Traffic", { glyph: mark, main: [figures], meta: traffic.state === "catching-up" ? "catching up" : "24 h", go, more });
+}
+
+function setupItem(a) {
+  const context = state.context;
+  const application = context?.application ?? {};
+  const host = application.host;
+  const server = host?.address ? `${host.address}${host.provider ? ` · ${host.provider[0].toUpperCase()}${host.provider.slice(1)}` : ""}` : context ? "No server connected yet" : null;
+  const mode = application.permissionMode ?? a.permissionMode;
+  const rest = [a.stack || null, a.source ?? application.repositoryUrl?.replace(/^https:\/\/github\.com\//, "") ?? null].filter(Boolean).join(" · ");
+  if (!server && !rest && !mode) return null;
+  return item("Setup", {
+    glyph: glyph("graph"),
+    main: [server ? primary(server, host?.address ? "" : "quiet") : null,
+      rest || mode ? el("p", { class: "sub" }, rest, rest && mode ? " " : null, mode ? el("span", { class: "pill", title: "Permission mode: change it in Hallvi, beside its composer" }, MODES[mode] ?? mode) : null) : null],
+    go: outTo("Architecture", "architecture"),
+  });
+}
+
+// ---------------------------------------------------------------- rendering: the conversation
 function renderThread() {
   const thread = $("thread");
+  const visible = !$("operator").hidden;
   // Redrawing must not take a keyboard reader's place away.
   const focused = thread.contains(document.activeElement) ? document.activeElement.closest("[data-focus]")?.dataset.focus : null;
   const nearBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
@@ -887,24 +1188,26 @@ function renderThread() {
   if (!c.worker?.alive) {
     nodes.push(el("div", { class: "banner", role: "status" }, el("p", {}, "Hallvi's worker isn't running, so the conversation can't be read or continued. It will appear here when Hallvi's worker is back.")));
   }
-  if (c.turnsOmitted) nodes.push(el("button", { type: "button", class: "text-button quiet earlier", onclick: () => void openAddress(pageOf()) }, `${plural(c.turnsOmitted, "earlier exchange", "earlier exchanges")} in Hallvi`));
+  if (c.turnsOmitted) nodes.push(el("button", { type: "button", class: "text-button quiet earlier", onclick: () => void openAddress(pageOf(), { kind: "hallvi", what: "The whole conversation in Hallvi" }) }, `${plural(c.turnsOmitted, "earlier exchange", "earlier exchanges")} in Hallvi`));
   for (const turn of c.turns ?? []) nodes.push(renderTurn(turn, c));
   // A send the conversation does not show yet.
   const s = state.send;
   if (s && s.state !== "refused" && !(c.turns ?? []).some((turn) => turn.request?.requestKey === s.key))
-    nodes.push(el("div", { class: "turn" }, el("div", { class: "ask waiting" }, el("p", {}, s.text), el("small", {}, s.state === "sending" ? "Sending…" : s.state === "unknown" ? "Not confirmed" : "Sent"))));
+    nodes.push(el("div", { class: "turn" }, el("div", { class: "ask-turn waiting" }, el("p", {}, s.text), el("small", {}, s.state === "sending" ? "Sending…" : s.state === "unknown" ? "Not confirmed" : "Sent"))));
   if (c.worker?.alive && !(c.turns ?? []).length && !s) nodes.push(renderEmpty());
   thread.replaceChildren(...nodes);
   if (focused) thread.querySelector(`[data-focus="${CSS.escape(focused)}"]`)?.focus();
-  renderBanner();
-  // Open at the latest turn once, then follow only a reader who is already there.
-  const placed = thread.dataset.placed === state.selected;
-  if (nearBottom || !placed) { thread.scrollTop = thread.scrollHeight; thread.dataset.placed = state.selected; }
+  // Hidden, it measures nothing: its place is settled when it is shown.
+  if (visible) {
+    // Open at the latest turn once, then follow only a reader who is already there.
+    const placed = thread.dataset.placed === state.selected;
+    if (nearBottom || !placed) { thread.scrollTop = thread.scrollHeight; thread.dataset.placed = state.selected; }
+  }
   tick();
 }
 function renderEmpty() {
   const a = app();
-  const ask = (text) => () => { $("draft").value = text; autosize(); $("draft").focus(); renderComposer(); };
+  const ask = (text) => () => { $("draft").value = text; saveDraft(); autosize(); $("draft").focus(); renderComposer(); };
   return el("div", { class: "empty" }, mascot(), el("h2", {}, `Hallvi looks after ${a?.name ?? "this application"}`),
     el("p", {}, "Ask it to check, change or explain something. It works on the server with your permission settings."),
     el("div", { class: "suggestions" },
@@ -920,7 +1223,7 @@ function renderTurn(turn, c) {
     const key = `ask:${r.id}`;
     const long = r.body.length > 280 && !state.unfolded.has(key);
     const text = long ? `${r.body.slice(0, 240).trimEnd()}…` : r.body;
-    node.append(el("div", { class: `ask${waiting ? " waiting" : ""}${r.status === "cancelled" ? " failed" : ""}` },
+    node.append(el("div", { class: `ask-turn${waiting ? " waiting" : ""}${r.status === "cancelled" ? " failed" : ""}` },
       el("p", {}, text || (r.images ? plural(r.images, "image", "images") : "")),
       el("small", {}, note, long ? [" · ", el("button", { type: "button", class: "text-button quiet", onclick: () => { state.unfolded.add(key); renderThread(); } }, "Show all")] : null)));
   }
@@ -966,22 +1269,24 @@ function renderReply(reply, c) {
 
   if (live) {
     const now = doing(reply, c.worker?.alive);
-    if (now.waiting && now.step) node.append(renderApproval(now.step));
-    else if (state.conversationError) {
-      // Unreachable: say what was last known, and stop the clock on it.
-      node.append(el("div", { class: "live stale" }, el("span", { class: "says" }, `At ${clock(state.readAt)}: ${lower(now.says)}`)));
-    } else {
-      node.append(el("div", { class: "live", "aria-live": "polite" }, el("span", { class: "spinner", "aria-hidden": "true" }), el("span", { class: "says" }, now.says), el("span", { class: "since", "data-since": now.at ?? "" }, now.at ? since(now.at) : "")));
-      if (now.step?.output) node.append(el("div", { class: "tailing", "aria-hidden": "true" }, now.step.output.split("\n").slice(-5).join("\n")));
+    if (now.waiting && now.step) node.append(approvalCard(now.step));
+    else {
+      node.append(liveLine(now));
+      if (!state.conversationError && now.step?.output) node.append(el("div", { class: "tailing", "aria-hidden": "true" }, now.step.output.split("\n").slice(-5).join("\n")));
     }
   } else if (c.status === "interrupted" && ["running", "waiting"].includes(reply.status)) {
-    node.append(el("div", { class: "card waiting" }, el("h4", {}, "Interrupted"), el("p", {}, "Hallvi's worker stopped during this reply. Whether its last command finished is not known, and nothing runs until you choose Continue or Stop in Hallvi."), el("button", { type: "button", class: "secondary", onclick: () => void openAddress(pageOf()) }, "Continue or stop in Hallvi")));
+    node.append(interruptedCard());
   } else if (reply.status === "completed" && reply.body) {
     const copy = el("button", { type: "button", class: "text-button quiet", "data-focus": `copy:${reply.id}`, onclick: (event) => void copyText(reply.body, event.currentTarget) }, "Copy reply");
     const codex = el("button", { type: "button", class: "text-button quiet", "data-focus": `codex:${reply.id}`, onclick: (event) => void discuss(reply.body, event.currentTarget) }, "Send to Codex");
     node.append(el("div", { class: "actions" }, copy, host.canMessage ? codex : null));
   }
   return node;
+}
+/** Now, under the reply it belongs to; frozen at the last read when Hallvi can't be reached. */
+function liveLine(now) {
+  if (state.conversationError) return el("div", { class: "live stale" }, el("span", { class: "says" }, `At ${clock(state.readAt)}: ${lower(now.says)}`));
+  return el("div", { class: "live" }, el("span", { class: "spinner", "aria-hidden": "true" }), el("span", { class: "says" }, now.says), el("span", { class: "since", "data-since": now.at ?? "" }, now.at ? since(now.at) : ""));
 }
 function toggle(key, open) { open ? state.open.add(key) : state.open.delete(key); }
 function renderStep(step) {
@@ -995,7 +1300,7 @@ function renderStep(step) {
   if (step.output) details.append(el("pre", {}, step.output));
   if (step.excerpted && !step.executionId) details.append(el("p", { class: "note" }, "Its details are in Hallvi's conversation."));
   const notes = [step.exitCode != null ? `exit ${step.exitCode}` : null, step.finishedAt ? spell(Math.max(0, Math.round((Date.parse(step.finishedAt) - Date.parse(step.startedAt)) / 1000))) : null].filter(Boolean);
-  if (notes.length || step.executionId) details.append(el("p", { class: "note" }, notes.join(" · "), step.executionId ? [notes.length ? " · " : "", el("button", { type: "button", class: "text-button", onclick: (event) => void fullOutput(step, event.currentTarget) }, step.excerpted ? "Show what ran" : "Full output")] : null));
+  if (notes.length || step.executionId) details.append(el("p", { class: "note" }, notes.join(" · "), step.executionId ? el("span", { class: "full" }, notes.length ? " · " : "", el("button", { type: "button", class: "text-button", onclick: (event) => void fullOutput(step, event.currentTarget) }, step.excerpted ? "Show what ran" : "Full output")) : null));
   details.open = state.open.has(key);
   return details;
 }
@@ -1018,7 +1323,7 @@ async function fullOutput(step, button) {
       input ? el("pre", { tabindex: "0" }, input) : null,
       el("pre", { tabindex: "0", style: "max-height:360px" }, text || "No output was recorded."),
       data.execution?.outputTruncated || data.outputTruncated ? el("p", { class: "note" }, "The last part of the output, as Hallvi kept it.") : null].filter(Boolean));
-    button.remove();
+    button.closest(".full").remove();
   } catch (error) {
     button.disabled = false; button.textContent = "Couldn't read it — try again";
   }
@@ -1029,7 +1334,9 @@ function renderRecord(record) {
   const checks = record.checks.total ? `${record.checks.failed ? `${record.checks.failed} of ${record.checks.total} checks failed` : plural(record.checks.passed, "check passed", "checks passed")}` : null;
   return el("div", { class: "record" }, el("span", { class: `tag ${tone}` }, word), el("span", { class: "title" }, record.title), checks ? el("span", { class: "meta" }, checks) : null);
 }
-function renderApproval(step) {
+
+// ---------------------------------------------------------------- decisions stay in Hallvi
+function approvalCard(step) {
   // A question Pi wrote is prose; a command waiting under Always ask is code.
   const question = step.tool === "request_approval";
   const place = question ? "" : where(step);
@@ -1038,7 +1345,25 @@ function renderApproval(step) {
     question ? inline(step.command || step.title, el("p")) : el("p", {}, step.title, place ? el("span", { class: "muted" }, ` · ${place}`) : null),
     !question && step.command && step.command !== step.title ? el("code", { class: "command" }, step.command) : null,
     el("p", { class: "muted" }, "Nothing runs until you decide. Approve or decline in Hallvi, where the permission mode lives."),
-    el("button", { type: "button", class: "secondary", onclick: () => void openAddress(state.context?.attention?.find((item) => item.kind === "approval")?.page ?? pageOf()) }, "Decide in Hallvi"));
+    el("button", { type: "button", class: "secondary", "data-focus": `decide:${step.id}`, onclick: () => void openAddress(state.context?.attention?.find((item) => item.kind === "approval")?.page ?? pageOf(), { kind: "hallvi", what: "Decide in Hallvi" }) }, "Decide in Hallvi", icon("out")));
+}
+function interruptedCard() {
+  return el("div", { class: "card waiting" }, el("h4", {}, "Interrupted"),
+    el("p", {}, "Hallvi's worker stopped during this reply. Whether its last command finished is not known, and nothing runs until you choose Continue or Stop in Hallvi."),
+    el("button", { type: "button", class: "secondary", "data-focus": "interrupted", onclick: () => void openAddress(pageOf(), { kind: "hallvi", what: "Continue or stop in Hallvi" }) }, "Continue or stop in Hallvi", icon("out")));
+}
+/**
+ * Unanswered input requests above the composer. An open card may belong to
+ * earlier work: it keeps its date and is not the operator's blocking state.
+ */
+function inputCard(inputs) {
+  return el("div", { class: "card" },
+    el("h4", {}, plural(inputs.length, "open request", "open requests")),
+    inputs.slice(0, 3).map((item) => el("div", {},
+      el("p", {}, item.reason),
+      el("p", { class: "muted" }, item.requestedAt && clock(item.requestedAt) ? `Asked ${clock(item.requestedAt)}` : "Request date unavailable"))),
+    inputs.length > 3 ? el("p", { class: "muted" }, `${inputs.length - 3} more in Hallvi`) : null,
+    el("button", { type: "button", class: "secondary", "data-focus": "review", onclick: () => void openAddress(inputs[0].page ?? pageOf(), { kind: "hallvi", what: "Review in Hallvi" }) }, "Review in Hallvi", icon("out")));
 }
 
 // ---------------------------------------------------------------- rendering: composer
@@ -1066,18 +1391,10 @@ function renderComposer() {
   else if (s?.state === "refused") { note.hidden = false; note.classList.add("failed"); note.textContent = s.message; }
   else note.hidden = true;
 
-  // An open card may belong to earlier work. Keep its date and do not
-  // present it as the current operator's blocking state.
   const inputs = (state.context?.attention ?? []).filter((item) => item.kind === "input");
   const needs = $("needs");
   needs.hidden = !inputs.length;
-  if (inputs.length) needs.replaceChildren(el("div", { class: "card" },
-    el("h4", {}, plural(inputs.length, "open request", "open requests")),
-    inputs.slice(0, 3).map((item) => el("div", {},
-      el("p", {}, item.reason),
-      el("p", { class: "muted" }, item.requestedAt && clock(item.requestedAt) ? `Asked ${clock(item.requestedAt)}` : "Request date unavailable"))),
-    inputs.length > 3 ? el("p", { class: "muted" }, `${inputs.length - 3} more in Hallvi`) : null,
-    el("button", { type: "button", class: "secondary", onclick: () => void openAddress(inputs[0].page ?? pageOf()) }, "Review in Hallvi")));
+  if (inputs.length) needs.replaceChildren(inputCard(inputs));
 }
 function autosize() {
   const draft = $("draft");
@@ -1097,7 +1414,17 @@ function tick() {
 
 // ---------------------------------------------------------------- controls
 $("application").addEventListener("change", (event) => select(event.target.value));
-$("context-toggle").addEventListener("click", () => { state.contextOpen = !state.contextOpen; renderIdentity(); renderContext(); if (state.contextOpen && !state.context) void readContext(); });
+$("tab-overview").addEventListener("click", () => setView("overview"));
+$("tab-operator").addEventListener("click", () => setView("operator"));
+$("tabs").addEventListener("keydown", (event) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  setView(event.key === "Home" ? "overview" : event.key === "End" ? "operator" : state.view === "overview" ? "operator" : "overview", { focus: "tab" });
+});
+$("open-hallvi").addEventListener("click", () => {
+  if (state.view === "overview") void openAddress(pageFor("overview"), { kind: "hallvi", what: "Overview in Hallvi" });
+  else void openAddress(pageOf(), { kind: "hallvi", what: "This conversation in Hallvi" });
+});
 $("composer").addEventListener("submit", send);
 $("draft").addEventListener("input", () => { autosize(); saveDraft(); renderComposer(); });
 $("draft").addEventListener("keydown", (event) => {
@@ -1115,7 +1442,6 @@ $("menu").addEventListener("keydown", (event) => {
   if (event.key === "ArrowDown") { event.preventDefault(); items[(i + 1) % items.length].focus(); }
   if (event.key === "ArrowUp") { event.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
 });
-$("menu-open").addEventListener("click", () => { closeMenu(); void openAddress(pageOf()); });
 $("menu-refresh").addEventListener("click", () => { closeMenu(); void readContext(); void follow(true); });
 // The adapter's resource version and this rendered document are separate facts.
 let updateChecking = false;
@@ -1137,7 +1463,7 @@ function showPanelUpdate(error = null) {
     different ? el("p", {}, "Reopen Hallvi; in Codex, use a new chat. If the earlier version remains, reconnect the Hallvi plugin.") : null,
     different && $("draft").value ? el("p", {}, "Copy your unsent message before leaving.") : null,
     availablePanelVersion ? el("p", { class: "muted" }, `Shown: ${shown}. Available: ${availablePanelVersion}.`) : null,
-    !different ? el("p", { class: "muted" }, "This checks the panel file only. Adapter code changes require a plugin reconnect.") : null
+    !different ? el("p", { class: "muted" }, "This checks the panel file only. Adapter code changes require a plugin reconnect.") : null,
   ].filter(Boolean));
 }
 async function checkPanelUpdate() {
@@ -1169,7 +1495,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!$("menu").hidden) { closeMenu(); $("more").focus(); }
   else if (!$("link-help").hidden) closeAddress();
-  else if (state.contextOpen) { state.contextOpen = false; renderIdentity(); renderContext(); $("context-toggle").focus(); }
 });
 document.addEventListener("click", (event) => {
   if (!$("menu").hidden && !event.target.closest("#menu, #more")) closeMenu();

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type FrameLocator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
 const first = "3ee7c9a7-5da8-434a-8222-cccac5089141";
@@ -79,6 +79,7 @@ async function panel(page: Page, empty = false) {
             text: `${args.application_id === first ? "First" : "Second"}: ${state.condition}`,
           },
           traffic: { unavailable: true },
+          saved: { release: null, access: null, checkedAt: null },
           attention: state.attention,
         };
       else
@@ -111,16 +112,20 @@ async function panel(page: Page, empty = false) {
       frame.getByRole("heading", { name: "No applications yet" }),
     ).toBeVisible();
   else
-    await expect(
-      frame.getByRole("button", { name: /First: Initial condition/ }),
-    ).toBeVisible();
+    await expect(frame.getByRole("region", { name: "Condition" })).toHaveText(
+      /First: Initial condition/,
+    );
   return { frame, sends, state, release: () => release?.() };
 }
+/** The panel opens on the overview; the composer is in the conversation. */
+const operator = (frame: FrameLocator) =>
+  frame.getByRole("tab", { name: /^Operator/ }).click();
 
 test("an in-flight send keeps its key across app switches and panel reload", async ({
   page,
 }) => {
   const p = await panel(page);
+  await operator(p.frame);
   p.state.hold = true;
   await p.frame
     .getByRole("textbox", { name: "Message to Hallvi" })
@@ -140,6 +145,7 @@ test("an in-flight send keeps its key across app switches and panel reload", asy
     p.frame.getByRole("button", { name: "Send again" }),
   ).toBeVisible();
   await page.reload();
+  await operator(p.frame);
   await expect(
     p.frame.getByRole("button", { name: "Send again" }),
   ).toBeVisible();
@@ -161,9 +167,6 @@ test("details refresh after recovery even when the conversation revision is unch
   page,
 }) => {
   const p = await panel(page);
-  await p.frame
-    .getByRole("button", { name: /First: Initial condition/ })
-    .click();
   p.state.offline = true;
   await p.frame.getByRole("button", { name: "More", exact: true }).click();
   await p.frame.getByRole("menuitem", { name: "Refresh", exact: true }).click();
@@ -171,9 +174,9 @@ test("details refresh after recovery even when the conversation revision is unch
   p.state.condition = "Recovered condition";
   p.state.offline = false;
   await p.frame.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(
-    p.frame.getByRole("button", { name: /First: Recovered condition/ }),
-  ).toBeVisible();
+  await expect(p.frame.getByRole("region", { name: "Condition" })).toHaveText(
+    /First: Recovered condition/,
+  );
   await expect(p.frame.getByText(/Can't reach Hallvi. Showing/)).toHaveCount(0);
   const overflow = await page
     .locator("iframe")
@@ -197,6 +200,7 @@ test("late acceptance settles the original app when browser storage is unavailab
     }),
   );
   const p = await panel(page);
+  await operator(p.frame);
   p.state.hold = true;
   p.state.accepted = true;
   await p.frame
@@ -238,6 +242,7 @@ test("a failed storage write keeps the uncertain send key and settles its origin
     };
   }, first);
   const p = await panel(page);
+  await operator(p.frame);
   p.state.hold = true;
   await p.frame
     .getByRole("textbox", { name: "Message to Hallvi" })
@@ -314,16 +319,21 @@ test("old input requests keep their date without overriding the operator's state
   p.state.working = true;
   await p.frame.getByRole("button", { name: "More", exact: true }).click();
   await p.frame.getByRole("menuitem", { name: "Refresh", exact: true }).click();
+  const requests = p.frame.getByRole("region", { name: "Open requests" });
+  await expect(requests).toContainText("1 open request");
+  await expect(
+    requests.getByRole("button", { name: "Review in Hallvi" }),
+  ).toBeVisible();
+  await expect(
+    p.frame.getByRole("tab", { name: "Operator, working" }),
+  ).toBeVisible();
+  await expect(p.frame.getByText("Needs you", { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: "tests/results/plugin-dated-request.png" });
+  await operator(p.frame);
   await expect(
     p.frame.getByRole("heading", { name: "1 open request" }),
   ).toBeVisible();
   await expect(p.frame.getByText(/Asked .*24|Asked 24/)).toBeVisible();
-  await expect(p.frame.getByText("Working", { exact: true })).toBeVisible();
-  await expect(p.frame.getByText("Needs you", { exact: true })).toHaveCount(0);
-  await expect(
-    p.frame.getByRole("button", { name: "Review in Hallvi" }),
-  ).toBeVisible();
-  await page.screenshot({ path: "tests/results/plugin-dated-request.png" });
   p.state.attention = [];
   p.state.working = false;
   await p.frame.getByRole("button", { name: "More", exact: true }).click();
@@ -331,12 +341,16 @@ test("old input requests keep their date without overriding the operator's state
   await expect(
     p.frame.getByRole("heading", { name: "1 open request" }),
   ).toHaveCount(0);
+  await expect(
+    p.frame.getByRole("region", { name: "Open requests" }),
+  ).toHaveCount(0);
 });
 
 test("a cached panel reports the version mismatch even when the adapter already reloaded", async ({
   page,
 }) => {
   const p = await panel(page);
+  await operator(p.frame);
   await p.frame
     .getByRole("textbox", { name: "Message to Hallvi" })
     .fill("Keep this unsent message");
@@ -424,5 +438,29 @@ test("an unanswered update check times out, permits retry, and never sends opera
     "Adapter code changes require a plugin reconnect",
   );
   expect(p.state.updateCalls).toBe(2);
+  expect(p.sends).toHaveLength(0);
+});
+
+test("the overview comes first; the operator's work and a draft outlast switching views", async ({
+  page,
+}) => {
+  const p = await panel(page);
+  await expect(p.frame.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await operator(p.frame);
+  const draft = p.frame.getByRole("textbox", { name: "Message to Hallvi" });
+  await draft.fill("Half-written request");
+  p.state.working = true;
+  await p.frame.getByRole("tab", { name: "Overview" }).click();
+  await p.frame.getByRole("button", { name: "More", exact: true }).click();
+  await p.frame.getByRole("menuitem", { name: "Refresh", exact: true }).click();
+  // What Hallvi is doing stays in sight from the overview.
+  await expect(
+    p.frame.getByRole("tab", { name: "Operator, working" }),
+  ).toBeVisible();
+  await operator(p.frame);
+  await expect(draft).toHaveValue("Half-written request");
   expect(p.sends).toHaveLength(0);
 });

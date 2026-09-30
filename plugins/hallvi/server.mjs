@@ -17,8 +17,9 @@ import {
   selectController,
 } from "../../scripts/controller-client.mjs";
 import { projectConversation, projectTraffic } from "./conversation.mjs";
+import { projectRecords } from "./overview.mjs";
 
-export const PLUGIN_VERSION = "0.2.0";
+export const PLUGIN_VERSION = "0.3.0";
 
 export function panelResource(html) {
   const version = createHash("sha256").update(html).digest("hex").slice(0, 16);
@@ -128,7 +129,7 @@ export function createHallviServer({
     {
       title: "Inspect a Hallvi application",
       description:
-        "Read application identity, permission mode, pending attention and bounded execution evidence. Optionally read one execution in full. No new model call or server probe.",
+        "Read application identity, permission mode, pending attention, how it deploys, the running and latest release, the current way in, the last day's stored traffic and bounded execution evidence. Optionally read one execution in full. No new model call or server probe.",
       inputSchema: { application_id: id, execution_id: id.optional() },
       annotations: readOnly,
     },
@@ -142,15 +143,33 @@ export function createHallviServer({
           applicationId: application_id,
           page: page(application_id),
         };
-      const [inspection, traffic] = await Promise.all([
+      const [inspection, traffic, saved] = await Promise.all([
         client.inspection(application_id, { signal }),
         // Traffic is context: a controller without it still inspects.
-        client.traffic(application_id, { signal }).then(projectTraffic, () => ({
-          unavailable: true,
-        })),
+        client
+          .traffic(application_id, { signal })
+          .then(projectTraffic, (error) => ({
+            unavailable: true,
+            // Older controllers have no traffic routes; anything else may pass.
+            offered: !["not-hallvi", "not-found"].includes(error?.code),
+          })),
+        // Releases and the way in, by the page's own rules, from the records
+        // the conversation read carries. Unknown when it cannot be read.
+        client
+          .application(application_id, { signal })
+          .then((app) =>
+            app.mainChatId
+              ? client.conversation(application_id, app.mainChatId, { signal })
+              : { information: [] },
+          )
+          .then(
+            (snapshot) => projectRecords(snapshot.information, application_id),
+            () => ({ unavailable: true }),
+          ),
       ]);
       return {
         ...inspection,
+        saved,
         // The controller's pages are its own paths; give the browser's address.
         attention: (inspection.attention ?? []).map((item) => ({
           ...item,
@@ -380,7 +399,7 @@ export function createHallviServer({
     {
       title: "Open Hallvi",
       description:
-        "Open Hallvi beside this conversation or from the sidebar: talk to an application's main operator, follow its work and read the application's condition, traffic and errors. The selected application is shared with this conversation. Approvals, input cards, Continue and Stop stay in Hallvi's page.",
+        "Open Hallvi beside this conversation or from the sidebar: an overview of an application (what needs the owner, its condition, deployment, traffic and errors) and its main operator's conversation to ask for work and follow it. The selected application is shared with this conversation. Approvals, input cards, Continue and Stop stay in Hallvi's page.",
       inputSchema: {},
       annotations: readOnly,
       _meta: openMeta(currentPanel.uri),

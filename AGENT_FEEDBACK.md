@@ -6,6 +6,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
+| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
+| [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
@@ -19,17 +21,11 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | New |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | New |
 | [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | New |
-| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | New |
-
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
-
-| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
-
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
-
-| [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
-
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
+| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | New |
+| [AF-042 — Ask the host for a taller panel inside a conversation](#af-042--ask-the-host-for-a-taller-panel-inside-a-conversation) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
 
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
@@ -430,6 +426,12 @@ application details after recovery with an unchanged transcript. Fixed in #293:
 save the key before sending, settle the original app after switching, and refresh
 context after recovery. The checks also cover storage-denied frames.
 
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`). Checked
+natively in Codex with an instrumented copy: `ui/open-link` for an HTTP address
+answers `{}` and opens nothing, `window.open` returns `null` and a
+`target=_blank` link does nothing in the frame; HTTPS opens Codex's browser and
+clipboard writes work. An acknowledged link request is still not an opened page.
+
 ### AF-035 — Say "awaiting approval" while request_approval waits
 
 While Pi's `request_approval` call waited for the owner (Hallvi decides), the
@@ -449,6 +451,17 @@ controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
 retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`): a real
+read-only request sent from the panel was recorded with origin `cli`.
+
+### AF-042 — Ask the host for a taller panel inside a conversation
+
+Opened inside a Codex conversation, the panel's frame is about 330px tall, so
+the overview's traffic bars and setup scroll inside it; the side panel shows it
+whole. Asking the host for the overview's height, if MCP Apps and Codex allow an
+app to, might show it without inner scrolling; neither is checked yet.
+
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`)
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
