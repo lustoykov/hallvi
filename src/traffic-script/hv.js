@@ -95,7 +95,15 @@
       fetch(url, { method: "POST", keepalive: true }).catch(() => {});
   };
   const emit = (t, more) =>
-    view && send({ t, s: view.s, p: view.p, q: view.q, h: view.h, ...more });
+    view &&
+    send({
+      t,
+      s: view.s,
+      p: view.p,
+      q: view.q,
+      h: view.h || undefined,
+      ...more,
+    });
 
   // The page: its path, and the page key with its value when the tag names
   // one and the address carries it.
@@ -109,6 +117,9 @@
   };
   const hashRoute = () => {
     if (!HASH_ROUTING) return;
+    // An empty fragment is the app's physical root. Keep it distinct from
+    // an ignored anchor or credential fragment without sending an h value.
+    if (!location.hash) return "";
     const prefix = location.hash.startsWith("#/")
       ? "#"
       : location.hash.startsWith("#!/")
