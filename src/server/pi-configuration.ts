@@ -43,6 +43,10 @@ const selectionSchema = z.object({
   modelId: z.string().min(1).max(200),
   reasoningEffort: effortSchema,
 });
+const chatgptConnectionSchema = z.object({
+  mode: z.enum(["shared", "separate"]),
+  authPath: z.string().min(1),
+});
 /**
  * The active model, and the ChatGPT sign-in when there is one. An OpenRouter
  * key is not recorded here: it is its own file, and holding it is what makes
@@ -50,8 +54,8 @@ const selectionSchema = z.object({
  */
 const configurationSchema = selectionSchema
   .extend({
-    mode: z.enum(["shared", "separate"]).optional(),
-    authPath: z.string().min(1).optional(),
+    mode: chatgptConnectionSchema.shape.mode.optional(),
+    authPath: chatgptConnectionSchema.shape.authPath.optional(),
   })
   .refine((value) => !value.mode === !value.authPath);
 export type PiConfiguration = z.infer<typeof configurationSchema>;
@@ -108,7 +112,7 @@ function readJsonFile(path: string): unknown {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     // JSON parser errors can contain credential fragments. Never expose them.
     throw new Error(
-      "The Pi configuration or credential file could not be read. Repair it or use a new ChatGPT connection.",
+      "The Pi configuration or credential file could not be read. Repair it or connect the model account again.",
     );
   }
 }
@@ -185,6 +189,17 @@ export const openRouterKeySchema = z.strictObject({
  */
 export function saveOpenRouterKey(key: string) {
   const directory = piAccountDir();
+  // Connecting also recovers damaged model settings. Retain only validated
+  // ChatGPT connection metadata, and resolve it before replacing the key.
+  let connection: z.infer<typeof chatgptConnectionSchema> | undefined;
+  try {
+    const parsed = chatgptConnectionSchema.safeParse(
+      readJsonFile(join(directory, "pi-settings.json")),
+    );
+    if (parsed.success) connection = parsed.data;
+  } catch {
+    // Unreadable settings contain no connection we can safely reuse.
+  }
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const temporary = join(directory, `openrouter-auth-${randomUUID()}.tmp`);
   writeFileSync(
@@ -194,7 +209,7 @@ export function saveOpenRouterKey(key: string) {
   );
   renameSync(temporary, openRouterAuthPath());
   savePiConfiguration({
-    ...readPiConfiguration(),
+    ...connection,
     ...defaultOpenRouterSelection,
   });
 }
@@ -466,6 +481,14 @@ export async function configuredPiRuntime(sdk: PiSdk) {
     modelsPath: null,
     refreshOnCreate: false,
   });
+  if (credential.type === "api_key") {
+    // Pin this turn's account in memory; replacing or disconnecting the saved
+    // key changes future turns without interrupting one already underway.
+    await modelRuntime.setRuntimeApiKey(
+      configuration.providerId,
+      credential.key,
+    );
+  }
   const model = validatePiSelection(modelRuntime, configuration);
   if (!(await modelRuntime.getAuth(model)))
     throw new Error("Provider is not configured");

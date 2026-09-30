@@ -50,6 +50,13 @@ owns the product's overall visual language.
 - **Calm by default.** Not set up is an offer: quiet buttons, dimmed rows. Blue
   is kept for what someone is needed for — no model at all, or a credential
   that stopped working — and amber only for the latter.
+- **Connection lifetime.** Cancelling or replacing a pending sign-in — or
+  saving another model meanwhile — prevents its later callback from changing
+  the account or model. Once a turn starts, it keeps its OpenRouter key in
+  memory until that turn ends; replacing or disconnecting the saved key applies
+  to future turns. A saved ChatGPT connection remains usable when an unused
+  OpenRouter credential file is damaged, and connecting OpenRouter recovers
+  invalid model settings while keeping a valid ChatGPT connection.
 - **Saved is not proven.** A login or key is "saved" and "checked when you send
   a message", never "working", until a message has used it.
 

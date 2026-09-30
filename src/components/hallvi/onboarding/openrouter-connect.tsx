@@ -77,18 +77,23 @@ export function OpenRouterConnect({
   // Waiting on the other tab: OpenRouter sends it back to Hallvi, which
   // settles this attempt.
   useEffect(() => {
-    if (login?.state !== "awaiting-user") return;
+    if (
+      busy ||
+      (login?.state !== "awaiting-user" && login?.state !== "exchanging")
+    )
+      return;
     const current = login;
+    let active = true;
     const timer = window.setTimeout(async () => {
       try {
         const next = await request<OpenRouterLogin>(
           `/api/pi/setup/openrouter/${current.id}`,
         );
-        if (!alive.current) return;
+        if (!active || !alive.current) return;
         if (next.state === "complete") await saved.current();
-        setLogin(next);
+        if (active && alive.current) setLogin(next);
       } catch (caught) {
-        if (!alive.current) return;
+        if (!active || !alive.current) return;
         const lost = caught instanceof RequestFailed && caught.status === 404;
         setLogin((latest) =>
           latest?.id !== current.id
@@ -104,8 +109,32 @@ export function OpenRouterConnect({
         );
       }
     }, 1_500);
-    return () => window.clearTimeout(timer);
-  }, [login]);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [login, busy]);
+
+  async function cancel() {
+    if (!login || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await request<OpenRouterLogin>(
+        `/api/pi/setup/openrouter/${login.id}`,
+        { method: "DELETE" },
+      );
+      if (!alive.current) return;
+      // The callback may have completed before the cancel reached Hallvi.
+      if (next.state === "complete") await saved.current();
+      if (alive.current) setLogin(next);
+    } catch (caught) {
+      if (alive.current)
+        setError(caught instanceof Error ? caught.message : "Try again.");
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  }
 
   async function start() {
     if (busy) return;
@@ -120,6 +149,10 @@ export function OpenRouterConnect({
         method: "POST",
         body: "{}",
       });
+      if (!alive.current) {
+        tab?.close();
+        return;
+      }
       if (tab) tab.location.href = next.authorizeUrl;
       setLogin(next);
     } catch (caught) {
@@ -130,29 +163,43 @@ export function OpenRouterConnect({
     }
   }
 
-  const waiting = login?.state === "awaiting-user";
+  const waiting =
+    login?.state === "awaiting-user" || login?.state === "exchanging";
   if (waiting)
     return (
       <>
         <p className="hv-ob-fine" role="status">
-          <SpinnerGap className="spin" aria-hidden="true" /> Waiting for you to
-          approve Hallvi on OpenRouter. Nothing else is happening.
+          <SpinnerGap className="spin" aria-hidden="true" />{" "}
+          {login.state === "exchanging"
+            ? "Finishing OpenRouter sign-in…"
+            : "Waiting for you to approve Hallvi on OpenRouter. Nothing else is happening."}
         </p>
         <div className="hv-ob-row">
           <Away href={login.authorizeUrl}>Open OpenRouter</Away>
           <button
             type="button"
             className="hv-ob-quiet"
-            onClick={() => setLogin(null)}
+            disabled={busy}
+            onClick={() => void cancel()}
           >
             Cancel
           </button>
         </div>
+        {error && (
+          <Problem title="Could not cancel sign-in">
+            <p>{error}</p>
+          </Problem>
+        )}
       </>
     );
 
   return (
     <>
+      {login?.state === "cancelled" && (
+        <p className="hv-ob-fine" role="status">
+          {login.message}
+        </p>
+      )}
       {login?.state === "failed" && (
         <Problem title="OpenRouter wasn’t connected">
           <p>{login.message}</p>

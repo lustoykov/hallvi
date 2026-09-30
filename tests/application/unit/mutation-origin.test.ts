@@ -17,6 +17,7 @@ const effects = vi.hoisted(() => ({
   updatePiPreferences: vi.fn(),
   start: vi.fn(() => ({ id: "attempt" })),
   cancel: vi.fn(() => ({ id: "attempt" })),
+  cancelAll: vi.fn(),
   disconnect: vi.fn(),
 }));
 vi.mock("../../../src/server/applications", () => ({
