@@ -7,6 +7,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | --- | --- | --- |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
+| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 2 | Basis fixed in #275; absence-record friction remains |
 | [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | New |
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
@@ -28,6 +29,32 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-017 — Make record validation easier for Pi to recover from
+
+During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
+then nine save calls failed because `presentation.checks[].basis` contained
+explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
+the calls and finished, but saving the useful result added avoidable churn.
+Make the tool contract easier to follow without relaxing record validation.
+
+**Status:** The basis-value problem was fixed in [#275](https://github.com/lustoykov/hallvi/pull/275): explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. A bounded real-Pi trial saved valid observed, planned and reported values; future retry-free behavior is not guaranteed.
+
+**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
+[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
+
+
+**+1:** 2026-09-30 — post-merge audit, task
+`01a0f19e-1f49-7d70-947b-28c911465e09`.
+
+A different contract mismatch occurred after verified Linkding cleanup on
+`7013e270`: seven absent-state writes included passed removal checks (and two
+included facts). Validation rejected them; Pi recovered by saving the absence
+states without those fields. The original basis fix is unaffected. Make the
+absence/event distinction easier to write correctly on the first attempt,
+without weakening the rule that an absent application cannot appear healthy.
+This is observed authoring friction, not failed remote cleanup or lost data.
+
 
 ### AF-047 — Investigate stdout listener warnings during real Pi turns
 
@@ -437,7 +464,6 @@ limit from the account balance; the request error now names both possibilities.
 | [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fixed in #282 |
 | [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
 | [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fixed in #280 |
-| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Fixed in #275 |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
 | [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fixed in #276 |
 | [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
@@ -645,18 +671,6 @@ host checks must still report failure.
 keeps the application failure visible and the passed host checks consistent
 with the timeline. Verification workflow guidance worked as written.
 
-### AF-017 — Make record validation easier for Pi to recover from
-
-During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
-then nine save calls failed because `presentation.checks[].basis` contained
-explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
-the calls and finished, but saving the useful result added avoidable churn.
-Make the tool contract easier to follow without relaxing record validation.
-
-**Status:** Fixed in [#275](https://github.com/lustoykov/hallvi/pull/275): explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. A bounded real-Pi trial saved valid observed, planned and reported values; future retry-free behavior is not guaranteed.
-
-**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
-[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
 
 ### AF-018 — Load the updated interface after an installed upgrade
 
