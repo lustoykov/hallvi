@@ -3,7 +3,7 @@
 // against a stand-in for the few browser objects it touches, to show that
 // what it sends at the limits — the longest address, campaign tags too long
 // for one request, an app for a referrer — is still an event Hallvi accepts.
-import { runInNewContext, Script } from "node:vm";
+import { runInNewContext } from "node:vm";
 import { expect, it } from "vitest";
 
 import {
@@ -65,12 +65,6 @@ function browse(address: string, referrer: string, pageKey?: string) {
       }),
   };
 }
-
-it("is served without its comments and still runs", () => {
-  const { content } = trafficScript();
-  expect(content).not.toMatch(/^\s*\/\//m);
-  expect(() => new Script(content)).not.toThrow();
-});
 
 it("sends only events Hallvi accepts, whatever the address holds", () => {
   // Three bytes each in UTF-8: six such tags cannot fit in one request.

@@ -777,10 +777,6 @@
   color: #b8c0cc;
   font-size: 15px;
 }
-.tf-script {
-  --tf-script: #3b5fd9;
-}
-
 /* Checklist */
 .tf-script-checks {
   width: 100%;
@@ -790,29 +786,10 @@
   font-size: 13px;
 }
 .tf-script-checks thead th {
-  padding: 0 14px 10px;
+  padding: 0 6px 10px;
   text-align: center;
   font-weight: 400;
   vertical-align: bottom;
-}
-.tf-script-checks thead th > * {
-  display: block;
-}
-.tf-script-checks thead strong {
-  margin-top: 2px;
-  font-size: 24px;
-  font-weight: 640;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--ax-ink);
-}
-.tf-script-checks thead small {
-  font-size: 12px;
-  white-space: nowrap;
-  color: var(--ax-muted);
-}
-.tf-script-checks thead th[data-script] strong {
-  color: #7f97d8;
 }
 .tf-script-checks th[data-script],
 .tf-script-checks td[data-script] {
@@ -830,11 +807,10 @@
   text-align: left;
   font-weight: 450;
   color: var(--ax-ink-2);
-  white-space: nowrap;
 }
 .tf-script-checks tbody td {
-  width: 160px;
-  padding: 5px 14px;
+  width: 25%;
+  padding: 5px 6px;
   text-align: center;
 }
 .tf-script-checks tbody td svg {

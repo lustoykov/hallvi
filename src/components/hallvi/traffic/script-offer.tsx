@@ -8,17 +8,12 @@
 
 import { AppWindow, Check, FileText, Minus } from "@phosphor-icons/react";
 
-import { count } from "./model";
-
 /** Why the page offers it: the evidence, or only what the script adds. */
 export type OfferReason =
   "browser-pages" | "cached-pages" | "time" | "goals" | "speed" | "more";
 
 interface Props {
   reason: OfferReason;
-  /** Page loads the log counted in the range, when there are totals. */
-  views: number | null;
-  range: string;
   folded: boolean;
   onAdd: () => void;
   onFold: (folded: boolean) => void;
@@ -69,14 +64,10 @@ const No = () => <Minus className="tf-script-no" aria-label="No" />;
 const HERE: Partial<Record<OfferReason, string>> = {
   "browser-pages": "spa",
   "cached-pages": "cdn",
-  time: "time",
-  more: "time",
-  goals: "goals",
-  speed: "speed",
 };
 
-/** The two counters as column heads, and what each sees. */
-function Checklist({ reason, views, range }: Props) {
+/** What the server log sees and what the browser script adds. */
+function Checklist({ reason }: Props) {
   const rows: { id: string; label: string; log: boolean }[] = [
     { id: "loads", label: "Page loads", log: true },
     { id: "spa", label: "Pages changed in the app", log: false },
@@ -95,15 +86,11 @@ function Checklist({ reason, views, range }: Props) {
             <span className="tf-script-head">
               <FileText aria-hidden="true" /> Server log
             </span>
-            <strong>{views === null ? "—" : count(views)}</strong>
-            <small>page loads · {range}</small>
           </th>
           <th data-script>
             <span className="tf-script-head">
-              <AppWindow aria-hidden="true" /> + Script
+              <AppWindow aria-hidden="true" /> With script
             </span>
-            <strong>?</strong>
-            <small>runs in the browser</small>
           </th>
         </tr>
       </thead>
