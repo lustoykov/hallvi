@@ -152,6 +152,8 @@ try {
     "dist/worker.mjs.map",
     "dist/database-worker.mjs",
     "dist/database-worker.mjs.map",
+    "dist/traffic-worker.mjs",
+    "dist/traffic-worker.mjs.map",
     "dist/schema.sql",
     "dist/schema-version.json",
   ])
@@ -205,6 +207,19 @@ try {
   worker.postMessage({ id: 2, operation: "close", args: [] });
   const [code] = await exited;
   if (code !== 0) throw new Error("Packaged database worker did not close cleanly.");
+  // The separate Traffic queue ships too, and opens the existing day/choice
+  // format with the recipient's native SQLite dependency.
+  worker = new Worker(resolve("dist/traffic-worker.mjs"), { workerData: { path }, execArgv: [] });
+  const kept = once(worker, "message");
+  worker.postMessage({ id: 1, operation: "setCollection", args: ["fixture", "keep"] });
+  const [traffic] = await kept;
+  if (traffic.error || !traffic.result?.enabledAt || traffic.result.state !== "catching-up")
+    throw new Error("Packaged Traffic worker could not save its fixture: " + JSON.stringify(traffic));
+  const trafficExited = once(worker, "exit");
+  worker.postMessage({ id: 2, operation: "close", args: [] });
+  const [trafficCode] = await trafficExited;
+  if (trafficCode !== 0) throw new Error("Packaged Traffic worker did not close cleanly.");
+
 } finally {
   await worker?.terminate();
   rmSync(directory, { recursive: true, force: true });

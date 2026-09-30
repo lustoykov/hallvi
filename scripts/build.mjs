@@ -19,6 +19,7 @@ await build({
   entryPoints: {
     worker: "src/worker.ts",
     "database-worker": "src/server/database-worker.ts",
+    "traffic-worker": "src/server/traffic-worker.ts",
   },
   outdir: "dist",
   outExtension: { ".js": ".mjs" },

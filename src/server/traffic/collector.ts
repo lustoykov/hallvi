@@ -215,8 +215,12 @@ function followedCoverage(
  * browsers have been served pages with no event, cleared once one arrives.
  * Answers whether the switch point moved earlier.
  */
-function noteScript(applicationId: string, counter: DayCounter, live: boolean) {
-  const recorded = collectionOf(applicationId);
+async function noteScript(
+  applicationId: string,
+  counter: Pick<DayCounter, "switchAt" | "lastEventAt" | "silentSince">,
+  live: boolean,
+) {
+  const recorded = await collectionOf(applicationId);
   const seen: Partial<Collection> = {};
   const since = recorded.scriptSince ? Date.parse(recorded.scriptSince) : null;
   const moved =
@@ -235,7 +239,7 @@ function noteScript(applicationId: string, counter: DayCounter, live: boolean) {
     else if (silent === null && counter.silentSince !== null)
       seen.scriptSilentSince = iso(counter.silentSince);
   }
-  if (Object.keys(seen).length) recordCollector(applicationId, seen);
+  if (Object.keys(seen).length) await recordCollector(applicationId, seen);
   return moved;
 }
 
@@ -443,11 +447,11 @@ export function combined(
 }
 
 /** Whether a finished day should be counted again from the log. */
-function due(applicationId: string, day: string, timeZone: string) {
-  const stored = readDays(applicationId, day, day)[0];
+async function due(applicationId: string, day: string, timeZone: string) {
+  const stored = (await readDays(applicationId, day, day))[0];
   if (!stored || !stored.final) return true;
   if (stored.coverage.gaps.some((gap) => gap.why === "unreadable")) return true;
-  const since = collectionOf(applicationId).scriptSince;
+  const since = (await collectionOf(applicationId)).scriptSince;
   return (
     stored.viewSource === "log" &&
     since !== null &&
@@ -459,7 +463,7 @@ function due(applicationId: string, day: string, timeZone: string) {
 async function finishDay(target: Target, day: string) {
   const { applicationId, host, log, timeZone, signal } = target;
   const bounds = dayBounds(day, timeZone);
-  const collection = collectionOf(applicationId);
+  const collection = await collectionOf(applicationId);
   if (!collection.enabledAt) return false;
   const counter = new DayCounter({
     day,
@@ -488,8 +492,8 @@ async function finishDay(target: Target, day: string) {
   const recount = counter.day({ coverage });
   // What was counted while the log still held it is kept where the log no
   // longer answers for it.
-  const stored = readDays(applicationId, day, day)[0];
-  writeDay(applicationId, {
+  const stored = (await readDays(applicationId, day, day))[0];
+  await writeDay(applicationId, {
     ...(stored ? combined(stored, recount, bounds) : recount),
     final: true,
   });
@@ -513,7 +517,7 @@ async function finishDays(target: Target, oldest: number | null) {
   for (; day < today; day = addDays(day, 1)) {
     target.signal.throwIfAborted();
     if (now < dayBounds(day, timeZone).end + FINAL_AFTER_MS) break;
-    if (due(applicationId, day, timeZone))
+    if (await due(applicationId, day, timeZone))
       moved = (await finishDay(target, day)) || moved;
   }
   return moved;
@@ -522,7 +526,7 @@ async function finishDays(target: Target, oldest: number | null) {
 /** The oldest line the log holds now, recorded; null for an empty log. */
 async function reach({ applicationId, host, log, signal }: Target) {
   const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
-  recordCollector(applicationId, {
+  await recordCollector(applicationId, {
     oldestRetainedAt: oldest === null ? null : iso(oldest),
   });
   return oldest;
@@ -558,7 +562,10 @@ async function connection(target: Target, announce: boolean) {
   const scope = { ...target, signal };
 
   if (announce)
-    recordCollector(applicationId, { state: "catching-up", detail: null });
+    await recordCollector(applicationId, {
+      state: "catching-up",
+      detail: null,
+    });
   await finishDays(scope, await reach(scope));
   signal.throwIfAborted();
   // Listed again for the follow, which reads exactly these files and stops
@@ -566,7 +573,8 @@ async function connection(target: Target, announce: boolean) {
   const files = await listLog(host, log, signal);
   const unreadable = new Set<string>();
 
-  const collection = collectionOf(applicationId);
+  const collection = await collectionOf(applicationId);
+  signal.throwIfAborted();
   const enabledAt = collection.enabledAt
     ? Date.parse(collection.enabledAt)
     : null;
@@ -576,7 +584,12 @@ async function connection(target: Target, announce: boolean) {
     const counter = new DayCounter({
       day,
       timeZone,
-      scriptSince: collectionOf(applicationId).scriptSince,
+      // Carry a switch point learned by the running follow into the next
+      // day without a synchronous database read from the log callback.
+      scriptSince:
+        days.at(-1)?.counter.switchAt != null
+          ? iso(days.at(-1)!.counter.switchAt!)
+          : collection.scriptSince,
       hosts: log.hosts,
       pageKey: log.pageKey,
       hashRouting: log.hashRouting,
@@ -609,7 +622,7 @@ async function connection(target: Target, announce: boolean) {
   let dirty = false;
   let writtenAt = 0;
   let lastLine: number | null = null;
-  let finishing = false;
+  let finishing: Promise<void> | null = null;
   let finishAt = nextFinish(timeZone);
   let rebuild = false;
   // How far the backlog has been read, and what was last said about it.
@@ -619,31 +632,50 @@ async function connection(target: Target, announce: boolean) {
   let said: string | null = null;
   let saidAt = 0;
 
+  // Log callbacks are synchronous. Queue their snapshots, then drain them
+  // before the follow ends; an asynchronous storage failure ends this follow.
+  let writing = Promise.resolve();
+  let writeError: unknown;
+  const saveLater = (save: () => Promise<unknown>) => {
+    writing = writing
+      .then(() => (writeError ? undefined : save()))
+      .then(() => undefined)
+      .catch((error) => {
+        writeError = error;
+        inner.abort();
+      });
+  };
   const write = (aliveTo: number) => {
     const now = Date.now();
-    for (const entry of days) {
+    const totals = days.flatMap((entry) => {
       const to = Math.min(entry.end, aliveTo);
-      if (!(to > entry.start)) continue;
-      // Provisional, even past the day's close: only the recount from the
-      // files may make a day final, and a final day is not recounted.
-      writeDay(applicationId, {
-        ...entry.counter.day({ now, coverage: entry.coverage(to) }),
-        final: false,
-      });
-    }
-    // The day being written now; the next one may be open a few minutes
-    // early, with nothing of its own yet.
+      if (!(to > entry.start)) return [];
+      // Only a recount from the files may make a day final.
+      return [
+        {
+          ...entry.counter.day({ now, coverage: entry.coverage(to) }),
+          final: false,
+        },
+      ];
+    });
     const newest = (
       days.findLast((entry) => entry.start <= now) ?? days.at(-1)!
     ).counter;
+    const script = {
+      switchAt: newest.switchAt,
+      silentSince: newest.silentSince,
+      lastEventAt: newest.lastEventAt,
+    };
     const seen = Math.max(
       ...days.map((entry) => entry.counter.lastLineAt ?? 0),
     );
-    if (seen > (lastLine ?? 0)) {
-      lastLine = seen;
-      recordCollector(applicationId, { lastLineAt: iso(seen) });
-    }
-    noteScript(applicationId, newest, true);
+    const line = seen > (lastLine ?? 0) ? iso(seen) : null;
+    if (line) lastLine = seen;
+    saveLater(async () => {
+      for (const day of totals) await writeDay(applicationId, day);
+      if (line) await recordCollector(applicationId, { lastLineAt: line });
+      await noteScript(applicationId, script, true);
+    });
     writtenAt = now;
     dirty = false;
   };
@@ -652,7 +684,9 @@ async function connection(target: Target, announce: boolean) {
     if (live) return;
     live = true;
     write(Date.now());
-    recordCollector(applicationId, { state: "live", detail: null });
+    saveLater(() =>
+      recordCollector(applicationId, { state: "live", detail: null }),
+    );
   };
 
   const timer = setInterval(() => {
@@ -671,7 +705,7 @@ async function connection(target: Target, announce: boolean) {
       if (words !== said && now - saidAt >= PROGRESS_MS) {
         said = words;
         saidAt = now;
-        recordCollector(applicationId, { detail: words });
+        saveLater(() => recordCollector(applicationId, { detail: words }));
       }
       return;
     }
@@ -685,17 +719,16 @@ async function connection(target: Target, announce: boolean) {
       write(now);
     // Ten minutes after midnight the day before is counted from the files.
     if (!finishing && now >= finishAt) {
-      finishing = true;
       for (let index = days.length - 1; index >= 0; index--)
         if (now >= days[index].end + FINAL_AFTER_MS) days.splice(index, 1);
       let retry = false;
       // Listed again first: a log that was empty when the follow began has
       // lines now, and rotation has moved its oldest on since.
-      reach(scope)
+      finishing = reach(scope)
         .then((oldest) => finishDays(scope, oldest))
-        .then((moved) => {
+        .then(async (moved) => {
           const counting = days.at(-1)!.counter.switchAt;
-          const since = collectionOf(applicationId).scriptSince;
+          const since = (await collectionOf(applicationId)).scriptSince;
           // An earlier switch point changes how today counts: count it again.
           if (
             moved &&
@@ -708,9 +741,11 @@ async function connection(target: Target, announce: boolean) {
         })
         // A listing or a read that failed is tried again in a minute, not
         // at the next midnight.
-        .catch(() => (retry = true))
+        .catch(() => {
+          retry = true;
+        })
         .finally(() => {
-          finishing = false;
+          finishing = null;
           finishAt = retry ? Date.now() + 60_000 : nextFinish(timeZone);
         });
     }
@@ -739,10 +774,12 @@ async function connection(target: Target, announce: boolean) {
           readyAt = Date.now();
           heardAt = readyAt;
           // Connected, and counting today again before it is live.
-          recordCollector(applicationId, {
-            state: "catching-up",
-            detail: null,
-          });
+          saveLater(() =>
+            recordCollector(applicationId, {
+              state: "catching-up",
+              detail: null,
+            }),
+          );
         },
         heard: () => (heardAt = Date.now()),
         backlog: (at) => {
@@ -781,13 +818,16 @@ async function connection(target: Target, announce: boolean) {
     };
   } finally {
     clearInterval(timer);
+    await finishing;
+    await writing;
+    if (writeError) throw writeError;
   }
 }
 
 /** Collection for one application, reconnecting until it is stopped. */
 async function collect(target: Target) {
   const { applicationId, log, signal } = target;
-  recordCollector(applicationId, {
+  await recordCollector(applicationId, {
     source: sourceOf(log),
   });
   let failures = 0;
@@ -816,7 +856,7 @@ async function collect(target: Target) {
           : "The log could not be read.";
     }
     announce = false;
-    recordCollector(applicationId, { state: "lost", detail });
+    await recordCollector(applicationId, { state: "lost", detail });
     await delay(BACKOFF_MS[Math.min(failures, BACKOFF_MS.length - 1)], null, {
       signal,
     }).catch(() => undefined);
@@ -867,19 +907,19 @@ export function trafficCollector(signal: AbortSignal) {
   };
 
   async function care(applicationId: string) {
-    let collection = collectionOf(applicationId);
+    let collection = await collectionOf(applicationId);
     // On by default once there is a log to read, unless the owner chose.
     if (
       !collection.enabledAt &&
       !collection.disabledAt &&
       (await accessLogRecord(applicationId)) &&
-      keepByDefault(applicationId)
+      (await keepByDefault(applicationId))
     )
-      collection = collectionOf(applicationId);
+      collection = await collectionOf(applicationId);
     if (!collection.enabledAt) return stop(applicationId);
     const host = (await operatorSettings(applicationId)).host ?? null;
     const log = host ? await accessLogRecord(applicationId) : null;
-    if (signal.aborted || !collectionOf(applicationId).enabledAt)
+    if (signal.aborted || !(await collectionOf(applicationId)).enabledAt)
       return stop(applicationId);
     const reason = blocked(host, log);
     if (reason || !host || !log) {
@@ -889,7 +929,7 @@ export function trafficCollector(signal: AbortSignal) {
         (collection.state !== reason.state ||
           collection.detail !== reason.detail)
       )
-        recordCollector(applicationId, {
+        await recordCollector(applicationId, {
           ...reason,
           source: log ? sourceOf(log) : null,
         });

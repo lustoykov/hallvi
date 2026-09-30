@@ -36,8 +36,8 @@ export async function POST(
     const { applicationId } = await context.params;
     await loadApplication(applicationId);
     const { action } = await parseJsonRequest(request, choice);
-    if (action === "forget") forget(applicationId);
-    else setCollection(applicationId, action);
+    if (action === "forget") await forget(applicationId);
+    else await setCollection(applicationId, action);
     return currentCollection(applicationId);
   });
 }

@@ -273,7 +273,7 @@ export async function removeApplication(
   await askWorker("forget", { scope: { applicationId: application.id } });
   // Its traffic totals go with it. They live in traffic.db, which no foreign
   // key reaches; removed first, so a failure leaves the application to retry.
-  forgetTraffic(application.id);
+  await forgetTraffic(application.id);
   await deleteApplication(application.id);
   return { removedApplicationId: application.id };
 }

@@ -21,36 +21,36 @@ beforeAll(() => {
   vi.stubEnv("HALLVI_DB_PATH", join(root, "hallvi.db"));
 });
 
-afterAll(() => {
-  globalThis.__hallviTraffic?.client.close();
+afterAll(async () => {
+  await globalThis.__hallviTraffic?.client.close();
   delete globalThis.__hallviTraffic;
   rmSync(root, { recursive: true, force: true });
   vi.unstubAllEnvs();
 });
 
 describe("keeping traffic history by default", () => {
-  it("starts once for an application nobody chose for", () => {
-    expect(keepByDefault("fresh")).toBe(true);
-    expect(collectionOf("fresh").enabledAt).not.toBeNull();
-    expect(keepByDefault("fresh")).toBe(false);
+  it("starts once for an application nobody chose for", async () => {
+    expect(await keepByDefault("fresh")).toBe(true);
+    expect((await collectionOf("fresh")).enabledAt).not.toBeNull();
+    expect(await keepByDefault("fresh")).toBe(false);
   });
 
-  it("never restarts what the owner stopped or forgot", () => {
-    setCollection("stopped", "keep");
-    setCollection("stopped", "stop");
-    expect(keepByDefault("stopped")).toBe(false);
-    expect(collectionOf("stopped").enabledAt).toBeNull();
+  it("never restarts what the owner stopped or forgot", async () => {
+    await setCollection("stopped", "keep");
+    await setCollection("stopped", "stop");
+    expect(await keepByDefault("stopped")).toBe(false);
+    expect((await collectionOf("stopped")).enabledAt).toBeNull();
 
-    setCollection("forgotten", "keep");
-    forget("forgotten");
-    expect(keepByDefault("forgotten")).toBe(false);
-    expect(collectionOf("forgotten")).toMatchObject({
+    await setCollection("forgotten", "keep");
+    await forget("forgotten");
+    expect(await keepByDefault("forgotten")).toBe(false);
+    expect(await collectionOf("forgotten")).toMatchObject({
       enabledAt: null,
       state: "off",
       storedFrom: null,
     });
     // Keeping it again is still the owner's to do.
-    setCollection("forgotten", "keep");
-    expect(collectionOf("forgotten").enabledAt).not.toBeNull();
+    await setCollection("forgotten", "keep");
+    expect((await collectionOf("forgotten")).enabledAt).not.toBeNull();
   });
 });

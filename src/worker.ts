@@ -6,6 +6,7 @@ import {
 import { shutdownTracing } from "./server/tracing";
 
 import { closeDatabase } from "./server/db";
+import { closeTrafficDatabase } from "./server/traffic/store";
 
 const controller = new AbortController();
 for (const signal of ["SIGINT", "SIGTERM"] as const)
@@ -27,6 +28,6 @@ runPiWorker(controller.signal)
       error instanceof PiWorkerBusyError ? WORKER_BUSY_EXIT : 1;
   })
   .finally(async () => {
-    await closeDatabase();
+    await Promise.all([closeDatabase(), closeTrafficDatabase()]);
     await shutdownTracing();
   });
