@@ -263,15 +263,12 @@ export function Breakdowns({
   history,
   script,
   locked,
-  countriesAside,
 }: {
   history: TrafficHistory;
   /** Whether Hallvi's script is counting: it alone measures some tabs. */
   script: boolean;
   /** What a script-only tab says without the script: the offer. */
   locked: (asked: ScriptAsk) => ReactNode;
-  /** A small map above the countries, in the looks that move it there. */
-  countriesAside?: ReactNode;
 }) {
   const partial = (list: TrafficHistory["partialLists"][number]) =>
     history.partialLists.includes(list);
@@ -349,7 +346,6 @@ export function Breakdowns({
       />
       <Card
         title="Countries"
-        aside={countriesAside}
         tabs={[
           {
             id: "countries",

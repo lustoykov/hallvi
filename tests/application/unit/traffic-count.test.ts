@@ -165,6 +165,17 @@ describe("what a logged request is", () => {
     expect(classify(page({ status: 304, contentType: null }))).toMatchObject({
       view: true,
     });
+    // A script or an image opened in a tab is a request, not a page.
+    expect(
+      classify(
+        page({ path: "/assets/mascot.js", contentType: "text/javascript" }),
+      ),
+    ).toMatchObject({ view: false, document: false });
+    expect(
+      classify(
+        page({ path: "/assets/img/hero.webp", status: 304, contentType: null }),
+      ),
+    ).toMatchObject({ view: false });
     expect(
       classify(
         page({ userAgent: GOOGLEBOT, fetchDest: null, fetchMode: null }),

@@ -3405,13 +3405,20 @@ function isView(line: Seen) {
     return false;
   // A prefetch or prerender is not somebody looking at the page.
   if (line.purpose && /prefetch|prerender/i.test(line.purpose)) return false;
-  if (line.dest) return line.dest === "document";
+  const html = line.type?.split(";")[0].trim() === "text/html";
+  // A file a page loads is not a page, even opened in a tab of its own.
+  if (line.dest)
+    return (
+      line.dest === "document" &&
+      (line.type
+        ? html
+        : !/\.(m?js|css|json|png|jpe?g|gif|webp|avif|svg|ico|woff2?|pdf)$/i.test(
+            line.path,
+          ))
+    );
   // Without fetch metadata: an HTML answer to something that says it is a
   // browser.
-  return (
-    line.type?.split(";")[0].trim() === "text/html" &&
-    line.ua.startsWith("Mozilla/5.0")
-  );
+  return html && line.ua.startsWith("Mozilla/5.0");
 }
 
 function verify(flags: Record<string, string>, files: string[]) {
