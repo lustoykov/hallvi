@@ -82,14 +82,14 @@ for it to update, and every worktree polling GitHub hourly would be rude.
 A look that finds the release it already knows about stops at the listing
 rather than downloading and re-verifying the same two assets. A look that
 cannot reach the source keeps the answer it had and records why, so the
-version line can say when it last tried and what went wrong instead of
-quietly showing stale certainty. **Check for updates** forces one regardless.
+Hallvi menu at the foot of the sidebar can say when it last looked and what
+went wrong instead of quietly showing stale certainty. **Check for updates** forces one regardless.
 
 Installing stays a button. Nothing in the worker starts an update.
 After the owner starts one, the interface keeps a visible update notice in the
 viewport through download, verification, installation and reconnection. It
 shows the recorded phase and result; a completed or failed notice stays until
-the owner dismisses it. The version line remains in the sidebar, but is not
+the owner dismisses it. Hallvi's row in the sidebar says so too, but is not
 the only place progress appears.
 
 ## What the owner has to supply

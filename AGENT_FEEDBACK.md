@@ -13,6 +13,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
+| [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -223,6 +225,29 @@ resources and provide a clear scoped cleanup path. This is not a request to dele
 remote deployments or shared credentials automatically.
 
 **+1:** 2026-09-30 — factory coordinator, task `01a0e897-125b-7fb2-82c5-0da106e25ea1`
+
+### AF-027 — Let a checkout show the installed-only update states
+
+The Hallvi menu at the foot of the sidebar has its own states: a release
+waiting, an update running, failed or finished, and a release source that could
+not be reached. Only an installed Hallvi reaches them; a checkout, `npm run
+scenarios` and the retained dev applications all read as a development
+checkout. Looking at them took a throwaway Playwright script answering
+`/api/hallvi/update` from fixtures. A scenario, or a development-only way to
+pick the update state, would make that one command.
+
+**+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
+
+### AF-028 — Notice browser journeys that stop passing while checks are off
+
+The GitHub consent journey (`tests/browser/github.spec.ts`, first test) had
+failed since #179 reworded the Storage & privacy popover on 20 September
+("contents" where the test expected "code"). Nothing ran it after the checks
+workflow was switched off, and it surfaced only because a later step of the same
+test changed. A cheap way to see which journeys currently fail on main would
+separate old breakage from a new change's.
+
+**+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
 
 ## Archive
 

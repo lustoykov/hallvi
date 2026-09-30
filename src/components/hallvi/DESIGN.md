@@ -313,6 +313,19 @@ destination, or the current conversation. There
 is one place to switch application. `application-identity.tsx` also carries
 `topbar` and `breadcrumb` placements, compared live in `/prototype/shell`.
 
+**Hallvi at the foot (30 September).** The head of the column is the
+application; the foot is Hallvi itself, as the account row is in Claude: its
+face, its name and its installed version on one row with the switcher's
+up-down caret, raised while open. It opens a menu upward — Settings, What's
+new, Check for updates, then the revision, machine and last look in small
+type. News wears the row: a 7px mark and a second line in its state's colour
+("Update ready", "Updating · 42%", "Update failed"), and the menu leads with
+one block for it, the most urgent first. Checking stays inside the menu,
+because the worker already looks every hour; the viewport notice still carries
+a running update. `hallvi-version.tsx` draws it. Chosen over a one-line
+Settings row with a version tag and over the version in the Alpha strip, from
+a switchable prototype on the real shell.
+
 Before the first request, the welcome explains the next action. During first
 setup, a compact row beside the composer shows the four recorded milestones:
 Read it, A place to run, Deploy, Open it. Completed setup removes it.
