@@ -14,7 +14,7 @@ Keep the scope on the views and interactions needed by that journey. Medium and 
 
 **Implemented in [#283](https://github.com/lustoykov/hallvi/pull/283) and
 [#293](https://github.com/lustoykov/hallvi/pull/293), reviewed 30 September 2026;
-redesigned overview-first in PR_LINK.**
+redesigned overview-first in [#309](https://github.com/lustoykov/hallvi/pull/309).**
 The owner requested using an existing Hallvi controller through Codex locally
 or over SSH, with a ChatGPT application panel. The [plugin proof of
 concept](docs/hallvi-plugin.md) reuses the existing operator and CLI contract.
