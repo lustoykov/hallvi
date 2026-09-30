@@ -29,7 +29,7 @@ export function serveDatabaseThread(store: {
     startupError = error;
   }
 
-  // Every operation finishes before the next starts, including an online backup.
+  // Operations finish in order, including an online backup.
   // Transaction bodies remain synchronous and entirely inside one operation.
   let queue = Promise.resolve();
   port.on(
