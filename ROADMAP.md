@@ -43,11 +43,18 @@ The 29 September batch implements the three selected increments:
 
 These increments shipped in alpha.10. Alpha.11 adds release-discovery and Traffic
 corrections; the [release acceptance](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065)
-records the tested revisions and remaining limits. Alpha.12 is being prepared
-with the merged plugin/operator panel, Traffic defaults and script checklist,
-Hallvi menu, deployment timestamps and patched runtime dependencies. Publication
-requires native clean-install and alpha.11 upgrade checks on both supported
-platforms; existing plugin and Traffic limits remain explicit in its notes.
+records the tested revisions and remaining limits. [Alpha.12](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.12)
+was published on 30 September 2026 from `5f42edd7746707a89632671e2330d54871656577`,
+following [release preparation #296](https://github.com/lustoykov/hallvi/pull/296).
+It includes the merged plugin/operator panel, Traffic defaults and script
+checklist, Hallvi menu, deployment timestamps, setup-request corrections and
+patched WebSocket runtime. [Native verification](https://github.com/lustoykov/hallvi/actions/runs/36704624693)
+passed clean installs and alpha.11 upgrades on macOS arm64 and Ubuntu 24.04 x64,
+including saved records and restart with an open conversation stream. Public
+signature, asset hashes, archive metadata, the latest installer and ordinary
+discovery from alpha.11 were verified. Existing plugin, Traffic and upstream Pi
+dependency limits remain explicit in its notes; no owner installation was
+upgraded during this release task.
 The [research plan index](https://github.com/lustoykov/hallvi/pull/246) preserves
 the proposals; larger mechanisms in those plans are not implementation requirements.
 
