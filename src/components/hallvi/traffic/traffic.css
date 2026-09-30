@@ -756,6 +756,13 @@
   align-items: center;
   gap: 8px;
 }
+
+.tf-script-privacy {
+  margin: 12px 0 0;
+  color: var(--ax-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
 .tf-script-head {
   display: inline-flex;
   align-items: center;

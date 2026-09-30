@@ -24,7 +24,7 @@ export function SettingsNav({
         href={`/setup/pi${query}`}
         aria-current={current === "pi" ? "page" : undefined}
       >
-        ChatGPT &amp; model
+        Model
       </Link>
       <Link
         href={`/setup/github${query}`}

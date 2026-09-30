@@ -362,15 +362,20 @@ export function keyedPage(path: string, key?: string, value?: string) {
 }
 
 /**
- * An event's page. The record, not the event, chooses the key: an event
- * naming any other key is named by its path alone.
+ * An event's page. The record chooses the query key and hash-routing
+ * opt-in; an event cannot choose to expose either by itself.
  */
-export function eventPage(event: ScriptEvent, pageKey?: string) {
-  return keyedPage(
+export function eventPage(
+  event: ScriptEvent,
+  pageKey?: string,
+  hashRouting = false,
+) {
+  const page = keyedPage(
     event.p,
     pageKey,
     pageKey && event.q?.k === pageKey ? event.q.v : undefined,
   );
+  return hashRouting && event.h ? page + event.h : page;
 }
 
 /**

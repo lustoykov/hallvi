@@ -61,7 +61,7 @@ import {
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import { useConnectionRequests } from "./onboarding/connection-requests";
-import { ChatgptConnect } from "./onboarding/chatgpt-connect";
+import { ModelConnect } from "./onboarding/model-connect";
 import { GithubConnect } from "./onboarding/github-connect";
 import {
   JourneyRail,
@@ -326,7 +326,7 @@ export function ChatPane({
   onCheckRepository,
   onModelConnected,
 }: {
-  /** A ChatGPT login was saved from the conversation: sending is possible. */
+  /** A model login was saved from the conversation: sending is possible. */
   onModelConnected?: () => void;
   /** The repository check the owner asked for is still running. */
   checkingRepository?: boolean;
@@ -621,7 +621,7 @@ export function ChatPane({
   const showFirstWelcome =
     firstConversation && !requestPending && pendingMessage === null;
   /**
-   * The welcome is already asking for ChatGPT, with the button that connects
+   * The welcome is already asking for a model, with the button that connects
    * it. While it is on screen the strip above the composer would be the third
    * place saying so, after it and the composer's own placeholder, so it waits
    * until the welcome has gone.
@@ -651,7 +651,7 @@ export function ChatPane({
       : false;
 
   /**
-   * Connecting ChatGPT is a request here too. It opens where the reader asked
+   * Connecting a model is a request here too. It opens where the reader asked
    * for it, and stays for the visit so it can fold into its receipt.
    */
   const [modelOpen, setModelOpen] = useState(false);
@@ -663,7 +663,7 @@ export function ChatPane({
     setModelOpen(true);
     requestAnimationFrame(() =>
       document
-        .querySelector('[aria-label="Connect ChatGPT"]')
+        .querySelector('[aria-label="Connect a model"]')
         ?.scrollIntoView({ block: "nearest" }),
     );
   };
@@ -1092,7 +1092,7 @@ export function ChatPane({
             />
           )}
           {modelOpen && application && onModelConnected && !archived && (
-            <ChatgptConnect
+            <ModelConnect
               settingsHref={settingsHref}
               onConnected={onModelConnected}
               onClose={() => setModelOpen(false)}
@@ -1220,7 +1220,7 @@ export function ChatPane({
           <div className="hv-pi-required">
             <WarningCircle weight="bold" />
             <div>
-              <strong>Connect ChatGPT to chat</strong>
+              <strong>Connect a model to chat</strong>
               <p>
                 Your applications and chat history are still available, and
                 anything you have typed here is kept.
@@ -1231,7 +1231,7 @@ export function ChatPane({
                   someone who wants the model preferences. */}
             {onModelConnected && !modelOpen ? (
               <button type="button" onClick={openModel}>
-                Connect ChatGPT
+                Connect a model
               </button>
             ) : (
               <Link href={settingsHref}>Open Settings</Link>
@@ -1332,7 +1332,7 @@ export function ChatPane({
               archived
                 ? "This chat is archived"
                 : !piReady
-                  ? "Write it now; connect ChatGPT to send it"
+                  ? "Write it now; connect a model to send it"
                   : application
                     ? "Ask Hallvi, correct a decision, or add context…"
                     : "Add an application to start chatting"

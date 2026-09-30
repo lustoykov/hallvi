@@ -17,7 +17,15 @@ import type { DetectedPiSetup } from "@/server/pi-configuration";
 import type { PiLoginAttempt, PiSetupStatus } from "@/server/pi-setup";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import type { SetupReturn } from "@/server/setup-return";
-import { PI_MODEL_ID } from "@/server/pi-settings";
+import {
+  OPENROUTER_MODEL_ID,
+  OPENROUTER_PROVIDER_ID,
+  PI_MODEL_ID,
+  PI_PROVIDER_ID,
+} from "@/server/pi-settings";
+import type { PiModelOption } from "@/server/pi-models";
+import { OpenRouterConnect } from "./onboarding/openrouter-connect";
+import { RequestCard } from "./onboarding/pieces";
 import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
 
@@ -46,6 +54,13 @@ function effortLabel(effort: string) {
     ? "Extra high"
     : effort.charAt(0).toUpperCase() + effort.slice(1);
 }
+const optionKey = (model: { providerId: string; id: string }) =>
+  `${model.providerId} ${model.id}`;
+const isDefault = (model: PiModelOption) =>
+  model.id ===
+  (model.providerId === PI_PROVIDER_ID ? PI_MODEL_ID : OPENROUTER_MODEL_ID);
+const dollars = (value: number) =>
+  `$${Number.isInteger(value) ? value : value.toFixed(2)}`;
 
 export function PiSetupScreen({
   initialStatus,
@@ -64,7 +79,7 @@ export function PiSetupScreen({
   const [detected, setDetected] = useState<DetectedPiSetup | null>(
     initialStatus.detected,
   );
-  const [choosing, setChoosing] = useState(!initialStatus.ready);
+  const [choosing, setChoosing] = useState(!initialStatus.connections.chatgpt);
   const [attempt, setAttempt] = useState<PiLoginAttempt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
@@ -74,21 +89,53 @@ export function PiSetupScreen({
     path: string;
     result: "copied" | "failed";
   } | null>(null);
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState<
+    "chatgpt" | "openrouter" | null
+  >(null);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
+  const [providerId, setProviderId] = useState(
+    initialStatus.selection.providerId,
+  );
   const [modelId, setModelId] = useState(initialStatus.selection.modelId);
   const [effort, setEffort] = useState(initialStatus.selection.reasoningEffort);
   const working = active(attempt);
-  const models = [...status.models].sort(
-    (a, b) => Number(b.id === PI_MODEL_ID) - Number(a.id === PI_MODEL_ID),
+  // Every offered model, so the choice is visible before an account is
+  // connected; one from an account that is not connected yet cannot be saved.
+  const { chatgpt, openRouter } = status.connections;
+  const groups = [
+    {
+      label: "ChatGPT plan",
+      models: status.models.filter(
+        (model) => model.providerId === PI_PROVIDER_ID,
+      ),
+    },
+    {
+      label: "OpenRouter · $ per million tokens in / out",
+      models: status.models.filter(
+        (model) => model.providerId === OPENROUTER_PROVIDER_ID,
+      ),
+    },
+  ]
+    .map((group) => ({
+      ...group,
+      models: [...group.models].sort(
+        (a, b) => Number(isDefault(b)) - Number(isDefault(a)),
+      ),
+    }))
+    .filter((group) => group.models.length);
+  const models = groups.flatMap((group) => group.models);
+  const selectedModel = models.find(
+    (model) => model.providerId === providerId && model.id === modelId,
   );
-  const selectedModel = models.find((model) => model.id === modelId);
   const validSelection =
     selectedModel?.reasoningEfforts.includes(effort) ?? false;
+  const selectedConnected =
+    providerId === OPENROUTER_PROVIDER_ID ? openRouter : chatgpt;
   const hasChanges =
+    providerId !== status.selection.providerId ||
     modelId !== status.selection.modelId ||
     effort !== status.selection.reasoningEffort;
-  const connectionReady = status.ready && !choosing;
+  const connectionReady = chatgpt && !choosing;
   const visibleError =
     error ??
     (attempt?.state === "failed" ? attempt.message : null) ??
@@ -97,9 +144,18 @@ export function PiSetupScreen({
   function applyStatus(next: PiSetupStatus) {
     setStatus(next);
     setDetected(next.detected);
+    setProviderId(next.selection.providerId);
     setModelId(next.selection.modelId);
     setEffort(next.selection.reasoningEffort);
-    setChoosing(!next.ready);
+    setChoosing(!next.connections.chatgpt);
+  }
+  async function reload() {
+    applyStatus(
+      await readJson<PiSetupStatus>(
+        await fetch("/api/pi/setup", { cache: "no-store" }),
+      ),
+    );
+    router.refresh();
   }
 
   async function disconnect() {
@@ -108,17 +164,22 @@ export function PiSetupScreen({
     try {
       applyStatus(
         await readJson<PiSetupStatus>(
-          await fetch("/api/pi/setup", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ confirm: "disconnect" }),
-          }),
+          await fetch(
+            confirmDisconnect === "openrouter"
+              ? "/api/pi/setup/openrouter"
+              : "/api/pi/setup",
+            {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ confirm: "disconnect" }),
+            },
+          ),
         ),
       );
       setAttempt(null);
       setError(null);
       setPollError(null);
-      setConfirmDisconnect(false);
+      setConfirmDisconnect(null);
       router.refresh();
     } catch (caught) {
       setDisconnectError(
@@ -242,10 +303,15 @@ export function PiSetupScreen({
         await fetch("/api/pi/setup/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ modelId, reasoningEffort: effort }),
+          body: JSON.stringify({
+            providerId,
+            modelId,
+            reasoningEffort: effort,
+          }),
         }),
       );
       setAttempt(next);
+      setProviderId(next.selection.providerId);
       setModelId(next.selection.modelId);
       setEffort(next.selection.reasoningEffort);
     } catch (caught) {
@@ -273,7 +339,7 @@ export function PiSetupScreen({
       setError(null);
       setPollError(null);
       if (saved) applyStatus(saved);
-      else setChoosing(!status.ready);
+      else setChoosing(!status.connections.chatgpt);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -294,7 +360,11 @@ export function PiSetupScreen({
             await fetch("/api/pi/setup", {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ modelId, reasoningEffort: effort }),
+              body: JSON.stringify({
+                providerId,
+                modelId,
+                reasoningEffort: effort,
+              }),
             }),
           ),
         );
@@ -338,16 +408,17 @@ export function PiSetupScreen({
         <header className={s.heading}>
           <div>
             <h1>Settings</h1>
-            <p>ChatGPT account and model preferences.</p>
+            <p>The accounts Hallvi thinks through, and the model it uses.</p>
           </div>
         </header>
-        <section className={s.card} aria-label="ChatGPT and model settings">
+        <section className={s.card} aria-label="Model settings">
           <section className={s.section} aria-labelledby="account-heading">
             <h2 id="account-heading">
               <span className={s.step}>
                 {connectionReady && !working ? <Check /> : "1"}
               </span>
               ChatGPT account
+              {openRouter && <span className={s.optional}>optional</span>}
             </h2>
             <div aria-live="polite">
               {working ? (
@@ -455,7 +526,7 @@ export function PiSetupScreen({
                         Share Pi’s login file and copy its model settings.
                       </p>
                       <button
-                        className={s.primary}
+                        className={status.ready ? s.textButton : s.primary}
                         type="button"
                         disabled={saving}
                         onClick={reuse}
@@ -468,7 +539,11 @@ export function PiSetupScreen({
                     <p className={s.hint}>No reusable ChatGPT login found.</p>
                   )}
                   <button
-                    className={detected?.canReuse ? s.textButton : s.primary}
+                    className={
+                      detected?.canReuse || status.ready
+                        ? s.textButton
+                        : s.primary
+                    }
                     type="button"
                     disabled={saving || !validSelection}
                     onClick={startLogin}
@@ -480,7 +555,7 @@ export function PiSetupScreen({
                         : "Connect ChatGPT"}
                     <ArrowRight />
                   </button>
-                  {status.ready && (
+                  {chatgpt && (
                     <button
                       className={s.textButton}
                       type="button"
@@ -521,20 +596,64 @@ export function PiSetupScreen({
               >
                 Storage &amp; privacy
               </button>
-              {status.hasSavedConfiguration && (
+              {chatgpt && (
                 <button
                   className={`${s.textButton} ${s.disconnect}`}
                   type="button"
                   disabled={saving || working}
                   onClick={() => {
                     setDisconnectError(null);
-                    setConfirmDisconnect(true);
+                    setConfirmDisconnect("chatgpt");
                   }}
                 >
                   Disconnect
                 </button>
               )}
             </div>
+          </section>
+          <section className={s.section} aria-labelledby="openrouter-heading">
+            <h2 id="openrouter-heading">
+              <span className={s.step}>{openRouter ? <Check /> : "2"}</span>
+              OpenRouter
+              {(chatgpt || !openRouter) && (
+                <span className={s.optional}>optional</span>
+              )}
+            </h2>
+            {openRouter ? (
+              <div className={s.accountRow}>
+                <div>
+                  <strong className={s.saved}>
+                    <Check /> Key saved
+                  </strong>
+                  <p>
+                    Claude, Gemini and others, paid per use from your OpenRouter
+                    credit. OpenRouter checks the key when you send a message.
+                  </p>
+                </div>
+                <button
+                  className={`${s.textButton} ${s.disconnect}`}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    setDisconnectError(null);
+                    setConfirmDisconnect("openrouter");
+                  }}
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              // An offer, not a request: drawn in the calm "done" frame, not
+              // the amber one that says someone is needed.
+              <RequestCard
+                plain
+                state="done"
+                asks="can use OpenRouter"
+                label="Connect OpenRouter"
+              >
+                <OpenRouterConnect quiet onSaved={reload} />
+              </RequestCard>
+            )}
           </section>
           <details className={`${s.section} ${s.preferences}`} open>
             <summary id="model-heading">Model preferences</summary>
@@ -543,13 +662,14 @@ export function PiSetupScreen({
                 Model
                 <select
                   id="pi-model"
-                  value={modelId}
+                  value={optionKey({ providerId, id: modelId })}
                   disabled={saving || working || !models.length}
                   onChange={(event) => {
                     const next = models.find(
-                      (model) => model.id === event.target.value,
+                      (model) => optionKey(model) === event.target.value,
                     );
                     if (!next) return;
+                    setProviderId(next.providerId);
                     setModelId(next.id);
                     if (!next.reasoningEfforts.includes(effort))
                       setEffort(
@@ -560,15 +680,25 @@ export function PiSetupScreen({
                   }}
                 >
                   {!selectedModel && (
-                    <option value={modelId} disabled>
+                    <option
+                      value={optionKey({ providerId, id: modelId })}
+                      disabled
+                    >
                       {modelId} — unavailable
                     </option>
                   )}
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                      {model.id === PI_MODEL_ID ? " · Default" : ""}
-                    </option>
+                  {groups.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.models.map((model) => (
+                        <option key={optionKey(model)} value={optionKey(model)}>
+                          {model.name}
+                          {model.price
+                            ? ` · ${dollars(model.price.input)} / ${dollars(model.price.output)}`
+                            : ""}
+                          {isDefault(model) ? " · Default" : ""}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </label>
@@ -599,7 +729,9 @@ export function PiSetupScreen({
                 </select>
               </label>
               <p className={s.hint}>
-                Higher effort allows more reasoning, usually with a longer wait.
+                {selectedModel && !selectedConnected
+                  ? `Connect ${providerId === OPENROUTER_PROVIDER_ID ? "OpenRouter" : "ChatGPT"} above to use this model.`
+                  : "Higher effort allows more reasoning, usually with a longer wait."}
               </p>
             </div>
           </details>
@@ -607,8 +739,8 @@ export function PiSetupScreen({
             <span className={s.hint}>
               {working
                 ? "Finish sign-in to continue."
-                : !connectionReady
-                  ? "Connect your account to continue."
+                : !status.ready
+                  ? "Connect ChatGPT or OpenRouter to continue."
                   : hasChanges
                     ? "Your model preferences will be saved."
                     : "Access is checked when you send a message."}
@@ -616,8 +748,10 @@ export function PiSetupScreen({
             <button
               className={s.primary}
               type="button"
+              // The chosen model's own account decides, not the current one: a
+              // broken active account must not trap the owner on it.
               disabled={
-                !connectionReady || working || saving || !validSelection
+                working || saving || !validSelection || !selectedConnected
               }
               onClick={viewApplications}
             >
@@ -738,6 +872,12 @@ export function PiSetupScreen({
             <dt>ChatGPT</dt>
             <dd>Your OpenAI account and subscription provide model access.</dd>
           </div>
+          <div>
+            <dt>OpenRouter</dt>
+            <dd>
+              Optional. Your OpenRouter credit pays for other models, per use.
+            </dd>
+          </div>
         </dl>
         <h3>Login files</h3>
         <p>
@@ -767,6 +907,8 @@ export function PiSetupScreen({
             </code>
           </>
         )}
+        <strong>OpenRouter key</strong>
+        <code>{status.openRouterAuthPath}</code>
         {detected && (
           <>
             <strong>Pi login checked</strong>
@@ -786,10 +928,13 @@ export function PiSetupScreen({
         </p>
         <h3>Disconnecting</h3>
         <p>
-          Disconnect removes Hallvi’s saved connection choice and model
-          preferences. New messages require setup again. Credential files remain
-          on disk, and messages already running may finish. It does not revoke
-          OAuth tokens or sign you out of ChatGPT or Pi.
+          Disconnecting ChatGPT removes Hallvi’s saved connection choice.
+          Credential files remain on disk, and messages already running may
+          finish. It does not revoke OAuth tokens or sign you out of ChatGPT or
+          Pi. Disconnecting OpenRouter deletes Hallvi’s saved copy of the key; a
+          running turn keeps its key in memory until it ends. Revoke the key
+          itself on openrouter.ai. Either way, the other account, when
+          connected, takes over new messages.
         </p>
         <h3>What leaves this machine?</h3>
         <p>
@@ -798,9 +943,11 @@ export function PiSetupScreen({
           Traces omit prompts, replies, tool arguments and credentials.
         </p>
         <p>
-          Sign-in goes to OpenAI. Chat messages and relevant context go to its
-          model. Your subscription limits apply; there’s no automatic switch to
-          API billing.
+          Sign-in goes to OpenAI or OpenRouter. Chat messages and relevant
+          context go to the chosen model: through OpenAI on your ChatGPT plan,
+          whose limits apply, or through OpenRouter to the model’s maker, paid
+          from your OpenRouter credit. Hallvi never switches between them by
+          itself.
         </p>
         <p>
           Detection is read-only. A saved login is not proof of provider access;
@@ -810,12 +957,23 @@ export function PiSetupScreen({
       </aside>
       {confirmDisconnect && (
         <ConfirmActionDialog
-          title="Disconnect ChatGPT?"
-          description="Stops new messages across all applications and clears Hallvi’s connection preferences. Chats and credential files stay intact. This does not sign you out of ChatGPT or Pi."
+          title={
+            confirmDisconnect === "openrouter"
+              ? "Disconnect OpenRouter?"
+              : "Disconnect ChatGPT?"
+          }
+          description={
+            (confirmDisconnect === "openrouter"
+              ? "Deletes Hallvi’s copy of the key; revoke the key itself on openrouter.ai. "
+              : "Clears Hallvi’s ChatGPT connection. Credential files stay intact, and this does not sign you out of ChatGPT or Pi. ") +
+            ((confirmDisconnect === "openrouter" ? chatgpt : openRouter)
+              ? `New messages use ${confirmDisconnect === "openrouter" ? "ChatGPT" : "OpenRouter"}. Chats stay intact.`
+              : "Stops new messages across all applications. Chats stay intact.")
+          }
           action="Disconnect"
           busy={saving}
           error={disconnectError}
-          onCancel={() => setConfirmDisconnect(false)}
+          onCancel={() => setConfirmDisconnect(null)}
           onConfirm={() => void disconnect()}
         />
       )}

@@ -151,7 +151,7 @@ export function OperatorShell({
   const [view, setView] = useState(initialView);
   /**
    * Whether a message can be sent at all. This arrives with the page, but
-   * the reader may have just connected ChatGPT — in this tab or another one
+   * the reader may have just connected a model — in this tab or another one
    * — and the composer should not stay disabled until they think to reload.
    * Asking once when the tab comes back into view is enough.
    */
@@ -184,7 +184,7 @@ export function OperatorShell({
   const [contexts, setContexts] = useState<
     Record<string, ConversationContext | null>
   >({});
-  // What this browser kept while the reader was away — connecting ChatGPT,
+  // What this browser kept while the reader was away — connecting a model,
   // for instance. Anything typed since wins over it.
   const chatIds = view.chats.map((chat) => chat.id).join(" ");
   useEffect(() => {

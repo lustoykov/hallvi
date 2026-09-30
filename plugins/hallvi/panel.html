@@ -214,6 +214,10 @@
   .menu { position: absolute; right: 12px; top: 42px; z-index: 5; min-width: 200px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(28 52 110 / .14); }
   .menu button, .menu .item { display: block; width: 100%; padding: 6px 10px; border: 0; border-radius: 7px; background: none; text-align: left; font-size: 12.5px; }
   .menu button:hover, .menu button:focus-visible { background: var(--sunken); }
+  .panel-update { flex: none; margin: 6px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); font-size: 12.5px; overflow-wrap: anywhere; }
+  .panel-update p { margin: 0 0 6px; }
+  .panel-update .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  button:disabled { cursor: default; opacity: .6; }
   .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
   .menu .item { color: var(--muted); font-size: 11.5px; cursor: default; }
   .address { display: flex; gap: 6px; margin-top: 6px; }
@@ -256,6 +260,13 @@
       <button type="button" role="menuitem" id="menu-reload">Check for a panel update</button>
     </div>
   </header>
+  <section class="panel-update" id="panel-update" aria-label="Panel update" hidden>
+    <div id="panel-update-status" role="status" aria-live="polite"></div>
+    <div class="actions">
+      <button class="secondary" type="button" id="update-check">Check again</button>
+      <button class="secondary" type="button" id="update-dismiss">Dismiss</button>
+    </div>
+  </section>
   <button class="context-toggle" id="context-toggle" type="button" aria-expanded="false" aria-controls="context" hidden>
     <span class="dot" id="condition-dot" aria-hidden="true"></span>
     <span class="summary" id="context-summary">Reading…</span>
@@ -307,6 +318,7 @@ window.addEventListener("message", (event) => {
   } else if (message.method === "ui/notifications/host-context-changed") {
     applyHostContext(message.params);
   } else if (message.method === "ui/notifications/tool-result") {
+    noticePanelVersion(message.params?.structuredContent?.ui?.version);
     const list = message.params?.structuredContent?.applications;
     if (Array.isArray(list) && !state.apps.length) {
       state.home = message.params.structuredContent.page ?? message.params.structuredContent.controller;
@@ -325,8 +337,8 @@ function applyHostContext(context = {}) {
 if (!document.documentElement.dataset.theme) document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 
 /** A tool's answer, or an error carrying the adapter's code. */
-async function call(name, args = {}) {
-  const response = await request("tools/call", { name, arguments: args });
+async function call(name, args = {}, timeoutMs) {
+  const response = await request("tools/call", { name, arguments: args }, timeoutMs);
   const data = response?.structuredContent;
   if (response?.isError || data?.error) {
     const error = new Error(data?.error?.message || "Hallvi could not be read.");
@@ -341,13 +353,26 @@ const shareContext = (text) => request("ui/update-model-context", { content: [{ 
 // ---------------------------------------------------------------- state
 const drafts = new Map();
 const store = {
-  get(key) { try { return JSON.parse(localStorage.getItem(`hallvi:${key}`)); } catch { return drafts.get(key) ?? null; } },
-  set(key, value) { drafts.set(key, value); try { value == null ? localStorage.removeItem(`hallvi:${key}`) : localStorage.setItem(`hallvi:${key}`, JSON.stringify(value)); } catch {} },
+  get(key) {
+    const draft = drafts.get(key);
+    // Reads can work while a write fails, leaving older text or no saved key.
+    if (draft?.stored === false) return draft.value;
+    try { return JSON.parse(localStorage.getItem(`hallvi:${key}`)); }
+    catch { return draft?.value ?? null; }
+  },
+  set(key, value) {
+    const draft = { value, stored: false };
+    drafts.set(key, draft);
+    try {
+      value == null ? localStorage.removeItem(`hallvi:${key}`) : localStorage.setItem(`hallvi:${key}`, JSON.stringify(value));
+      draft.stored = true;
+    } catch {}
+  },
 };
 const state = {
   apps: [], selected: store.get("application"), context: null, contextAt: null, contextError: null,
   conversation: null, conversationError: null, readAt: null, failures: 0,
-  send: null, sent: new Set(), contextOpen: false, open: new Set(), unfolded: new Set(),
+  send: null, contextOpen: false, open: new Set(), unfolded: new Set(),
 };
 let stopped = false;
 let generation = 0;
@@ -545,6 +570,7 @@ async function start() {
   renderBlank(null, "Connecting to Hallvi…");
   try {
     const data = await call("hallvi_apps");
+    noticePanelVersion(data.ui?.version);
     state.home = data.page ?? data.controller;
     setApplications(data.applications ?? []);
   } catch (error) {
@@ -681,7 +707,6 @@ async function send(event) {
   if (id !== state.selected || state.send?.key !== key) return;
   if (result.accepted === true) {
     state.send = { key, text, state: "accepted" };
-    state.sent.add(key);
     $("draft").value = ""; store.set(`draft:${id}`, null); autosize();
   } else if (result.accepted === null) {
     state.send = { key, text, state: "unknown" };
@@ -700,7 +725,6 @@ function settleSend() {
   const seen = state.conversation?.turns?.some((turn) => turn.request?.requestKey === key);
   if (!seen) return;
   if (state.send.state === "unknown") { $("draft").value = ""; store.set(`draft:${state.selected}`, null); autosize(); }
-  state.sent.add(key);
   state.send = null;
 }
 function canSend() {
@@ -1093,14 +1117,54 @@ $("menu").addEventListener("keydown", (event) => {
 });
 $("menu-open").addEventListener("click", () => { closeMenu(); void openAddress(pageOf()); });
 $("menu-refresh").addEventListener("click", () => { closeMenu(); void readContext(); void follow(true); });
-$("menu-reload").addEventListener("click", async () => {
-  const button = $("menu-reload");
-  button.textContent = "Checking…";
+// The adapter's resource version and this rendered document are separate facts.
+let updateChecking = false;
+let availablePanelVersion = null;
+function noticePanelVersion(version) {
+  if (typeof version !== "string" || !/^[a-f0-9]{16}$/.test(version)) return false;
+  availablePanelVersion = version;
+  if (version !== $("ui-version").textContent) showPanelUpdate();
+  return true;
+}
+function showPanelUpdate(error = null) {
+  const shown = $("ui-version").textContent;
+  const different = availablePanelVersion && availablePanelVersion !== shown;
+  const title = error ? "Panel update check failed" : different ? "Panel update available" : "This panel matches the installed UI";
+  $("panel-update").hidden = false;
+  $("panel-update-status").replaceChildren(...[
+    el("p", {}, el("strong", {}, title)),
+    error ? el("p", {}, error) : null,
+    different ? el("p", {}, "Reopen Hallvi; in Codex, use a new chat. If the earlier version remains, reconnect the Hallvi plugin.") : null,
+    different && $("draft").value ? el("p", {}, "Copy your unsent message before leaving.") : null,
+    availablePanelVersion ? el("p", { class: "muted" }, `Shown: ${shown}. Available: ${availablePanelVersion}.`) : null,
+    !different ? el("p", { class: "muted" }, "This checks the panel file only. Adapter code changes require a plugin reconnect.") : null
+  ].filter(Boolean));
+}
+async function checkPanelUpdate() {
+  if (updateChecking) return;
+  updateChecking = true;
+  closeMenu();
+  $("more").focus();
+  $("panel-update").hidden = false;
+  $("panel-update-status").replaceChildren(el("p", {}, "Checking the installed panel…"));
+  $("menu-reload").disabled = $("update-check").disabled = true;
   try {
-    const result = await call("hallvi_reload_ui");
-    button.textContent = result.version === $("ui-version").textContent ? "This panel is up to date" : `Panel ${result.version} is ready: open Hallvi in a new Codex chat`;
-  } catch { button.textContent = "Couldn't check. Reconnect the plugin and try again."; }
-});
+    const result = await call("hallvi_reload_ui", {}, 15_000);
+    if (!noticePanelVersion(result?.version)) throw new Error("The plugin did not return a panel version.");
+    showPanelUpdate();
+  } catch (error) {
+    const detail = error.code === "host-timeout"
+      ? "The host did not answer in time. The check may still finish; try again. If it keeps failing, reconnect the Hallvi plugin."
+      : `${error.message} Try again; if it keeps failing, reconnect the Hallvi plugin.`;
+    showPanelUpdate(detail);
+  } finally {
+    updateChecking = false;
+    $("menu-reload").disabled = $("update-check").disabled = false;
+  }
+}
+$("menu-reload").addEventListener("click", checkPanelUpdate);
+$("update-check").addEventListener("click", checkPanelUpdate);
+$("update-dismiss").addEventListener("click", () => { $("panel-update").hidden = true; $("more").focus(); });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!$("menu").hidden) { closeMenu(); $("more").focus(); }

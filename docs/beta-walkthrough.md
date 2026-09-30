@@ -17,8 +17,8 @@ and platform boundaries explicit in the release evidence.
    **On this computer** setting for a machine without local Docker. If you
    deliberately choose **In Docker**, start the local Docker Engine before
    inspecting a repository.
-2. Add a public repository for an app you want to try. Connect ChatGPT when
-   Hallvi asks, then choose **Read repository**. Confirm that the explanation
+2. Add a public repository for an app you want to try. Connect ChatGPT (or
+   OpenRouter) when Hallvi asks, then choose **Read repository**. Confirm that the explanation
    matches the app and gives you a clear next step. Stop here if it cannot
    inspect the source or asks you to repair development tooling.
 3. Choose a dedicated test server: either a new server in a separate Hetzner

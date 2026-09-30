@@ -171,7 +171,7 @@ describe("the script offer", () => {
       scriptOffer(collection({ logMisses: ["cached-pages"] } as never))?.reason,
     ).toBe("cached-pages");
     // The owner opening something only the script measures is evidence too.
-    expect(scriptOffer(collection(), "goals")?.reason).toBe("goals");
+    expect(scriptOffer(collection(), "speed")?.reason).toBe("speed");
   });
 
   it("is never made while the script runs, history is off, or there is no log", () => {
