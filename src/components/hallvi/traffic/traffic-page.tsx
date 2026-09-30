@@ -56,6 +56,7 @@ import {
 } from "./model";
 import { useMoment } from "./moment";
 import { useCollection, useHistory } from "./source";
+import { SimulateTraffic } from "./simulate";
 import { TrafficChart } from "./traffic-chart";
 import { useVariant, VariantSwitch, type Variant } from "./variants";
 import { WorldMap } from "./world-map";
@@ -604,7 +605,9 @@ export function TrafficPage({
           traffic={traffic}
           onKeep={() => perform("keep")}
         />
-        <VariantSwitch value={variant} />
+        <VariantSwitch value={variant}>
+          <SimulateTraffic applicationId={applicationId} />
+        </VariantSwitch>
       </div>
     );
 
@@ -768,7 +771,9 @@ export function TrafficPage({
           onConfirm={() => perform("forget")}
         />
       )}
-      <VariantSwitch value={variant} />
+      <VariantSwitch value={variant}>
+        <SimulateTraffic applicationId={applicationId} />
+      </VariantSwitch>
     </div>
   );
 }
