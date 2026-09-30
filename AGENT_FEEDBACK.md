@@ -95,7 +95,8 @@ changing their decision.
 
 ### AF-042 — Include consent and notices in traffic setup
 
-**+1:** 2026-09-30 — owner's traffic privacy task.
+**+1:** 2026-09-30 — owner's traffic privacy task,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
 
 The cookie-free script started collecting immediately; setup offered only
 the include and proxy. Raw event requests still enter logs with IP/browser
@@ -106,7 +107,8 @@ It does not establish legal compliance or update existing deployed sites.
 
 ### AF-043 — Do not imply automatic sign-up tracking
 
-**+1:** 2026-09-30 — owner's traffic privacy and goals task.
+**+1:** 2026-09-30 — owner's traffic privacy and goals task,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
 
 “Goals, like sign-ups” appeared as a default benefit although the owner must
 mark those actions in application code. This task removes that checklist row

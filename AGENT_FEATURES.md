@@ -12,7 +12,7 @@ Completed scopes and their remaining evidence limits are in the Archive.
 
 | Proposal | +1 | Status | Assignment |
 | --- | --- | --- | --- |
-| [Traffic consent and privacy notice](#traffic-consent-and-privacy-notice) | 1 | In progress | `codex/traffic-consent` |
+| [Traffic consent and privacy notice](#traffic-consent-and-privacy-notice) | 1 | In progress | [PR #306](https://github.com/lustoykov/hallvi/pull/306) |
 
 ### Traffic consent and privacy notice
 
@@ -34,9 +34,11 @@ checks. The checklist omits goals, and the Goals card requires recorded events.
 controls remain application-specific; local checks do not certify them.
 **Assignment:** Owner's 30 September request to fix analytics privacy notice and
 consent, explicit selection to offer a prompt/notice where absent, and request
-to remove the default goals claim. Branch `codex/traffic-consent`.
+to remove the default goals claim. Branch `codex/traffic-consent`,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
 
-**+1:** 2026-09-30 — this owner's traffic privacy and goals task.
+**+1:** 2026-09-30 — owner's traffic privacy and goals task,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306).
 
 ### Post-merge fixes and simplification
 
@@ -54,7 +56,6 @@ offer and feature deletions remain product choices.
 [PR #292](https://github.com/lustoykov/hallvi/pull/292).
 
 **+1:** 2026-09-30 — owner-requested scope in the task above.
-
 
 Votes show interest, not priority or approval. Each count comes from the task
 references in that proposal, including its initial proposal task.
