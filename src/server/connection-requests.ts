@@ -143,7 +143,16 @@ export function requestDomain(applicationId: string, name = "") {
   const open = listConnectionRequests(applicationId).find(
     (item) => item.kind === "domain" && !item.settledAt,
   );
-  if (open) return open;
+  if (open?.kind === "domain") {
+    // A card opened from the page can precede Pi learning the hostname.
+    // Fill that blank without resetting the owner's existing choice or guide.
+    if (!open.progress.name && name)
+      return put(applicationId, {
+        ...open,
+        progress: { ...open.progress, name },
+      });
+    return open;
+  }
   return put(applicationId, {
     kind: "domain",
     requestedAt: new Date().toISOString(),
@@ -205,10 +214,9 @@ export function dismissConnectionRequest(
   applicationId: string,
   kind: ConnectionRequest["kind"],
 ) {
-  write(
-    applicationId,
-    listConnectionRequests(applicationId).filter(
-      (item) => item.kind !== kind || item.settledAt,
-    ),
-  );
+  const requests = listConnectionRequests(applicationId);
+  const kept = requests.filter((item) => item.kind !== kind || item.settledAt);
+  if (kept.length === requests.length) return { cancelled: false };
+  write(applicationId, kept);
+  return { cancelled: true };
 }

@@ -25,8 +25,19 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
 
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
+| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-037 — Close setup requests handled in conversation
+
+**+1:** 2026-09-30 — stale DNS request repair.
+
+Completing DNS through the conversation left its guided card unanswered. The
+plugin promoted it into a current blocker without a date, even after later
+successful releases. This fix gives Pi explicit withdrawal for obsolete open
+setup cards, preserves a hostname supplied after a blank card was opened, and
+shows dated open requests separately from the operator's activity.
 
 ## How to contribute
 

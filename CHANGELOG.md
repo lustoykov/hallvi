@@ -13,6 +13,7 @@ Ask the existing Hallvi operator from Codex, understand Traffic setup, and find 
 - **More accurate page counts.** Static assets no longer count as page visits, and query-routed applications retain their configured page routes.
 - **One Hallvi menu.** Open the Hallvi row at the bottom of the sidebar for Settings, What's new and Check for updates, with update status shown there too.
 - **Deployment file timestamps.** Transferred repository files keep the selected commit's modification time instead of the deployment time.
+- **Clearer open setup requests.** Pi can withdraw an obsolete host or domain setup card after verifying work completed in conversation. The plugin shows when open requests were asked without presenting an older card as the operator's current blocking state.
 - **Patched dependencies.** Update the WebSocket runtime and development brace-expansion dependencies within their supported major versions to address published security advisories. Pi's shrinkwrapped runtime copy of brace-expansion remains an upstream dependency limitation.
 
 **Known Traffic limits:** hash-based application routes are counted as one page, the supplied Traefik script labels need unique names when used for several applications, and Traffic database contention and live country-cache retention remain recorded follow-ups. See the [merge audit](https://github.com/lustoykov/hallvi/pull/292) for the reproductions and scope.

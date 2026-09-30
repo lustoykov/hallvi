@@ -11,6 +11,13 @@ async function panel(page: Page, empty = false) {
   const sends: { application_id: string; request_key: string }[] = [];
   const state = {
     offline: false,
+    attention: [] as {
+      kind: string;
+      reason: string;
+      requestedAt?: string;
+      page: string;
+    }[],
+    working: false,
     condition: "Initial condition",
     hold: false,
     accepted: null as boolean | null,
@@ -61,13 +68,13 @@ async function panel(page: Page, empty = false) {
             text: `${args.application_id === first ? "First" : "Second"}: ${state.condition}`,
           },
           traffic: { unavailable: true },
-          attention: [],
+          attention: state.attention,
         };
       else
         data = {
-          revision: "same",
-          unchanged: args.known === "same",
-          status: "idle",
+          revision: state.working ? "working" : "same",
+          unchanged: args.known === (state.working ? "working" : "same"),
+          status: state.working ? "working" : "idle",
           worker: { alive: true },
           readAt: new Date().toISOString(),
           turns: [],
@@ -216,4 +223,39 @@ test("an empty controller opens its configured Hallvi address", async ({
   await expect(
     p.frame.getByRole("textbox", { name: "Address", exact: true }),
   ).toHaveValue("http://127.0.0.1:5147/");
+});
+
+test("old input requests keep their date without overriding the operator's state", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 820 });
+  const p = await panel(page);
+  p.state.attention = [
+    {
+      kind: "input",
+      reason: "How to reach the DNS of shop.test.",
+      requestedAt: "2026-09-24T14:54:00Z",
+      page: `${origin}/applications/${first}`,
+    },
+  ];
+  p.state.working = true;
+  await p.frame.getByRole("button", { name: "More", exact: true }).click();
+  await p.frame.getByRole("menuitem", { name: "Refresh", exact: true }).click();
+  await expect(
+    p.frame.getByRole("heading", { name: "1 open request" }),
+  ).toBeVisible();
+  await expect(p.frame.getByText(/Asked .*24|Asked 24/)).toBeVisible();
+  await expect(p.frame.getByText("Working", { exact: true })).toBeVisible();
+  await expect(p.frame.getByText("Needs you", { exact: true })).toHaveCount(0);
+  await expect(
+    p.frame.getByRole("button", { name: "Review in Hallvi" }),
+  ).toBeVisible();
+  await page.screenshot({ path: "tests/results/plugin-dated-request.png" });
+  p.state.attention = [];
+  p.state.working = false;
+  await p.frame.getByRole("button", { name: "More", exact: true }).click();
+  await p.frame.getByRole("menuitem", { name: "Refresh", exact: true }).click();
+  await expect(
+    p.frame.getByRole("heading", { name: "1 open request" }),
+  ).toHaveCount(0);
 });
