@@ -33,7 +33,7 @@ export function poll() {
         entry.attempt.message = "QA simulated sign-in failure. Your previous login is unchanged.";
       } else {
         writeFileSync(entry.attempt.authPath, JSON.stringify({ "openai-codex": { type: "oauth", access: "QA-ONLY", refresh: "QA-ONLY", expires: Date.now() + 86_400_000 } }), { mode: 0o600 });
-        savePiConfiguration({ ...entry.attempt.selection, mode: "separate", credentialType: "oauth", authPath: entry.attempt.authPath });
+        savePiConfiguration({ ...entry.attempt.selection, mode: "separate", authPath: entry.attempt.authPath });
         entry.attempt.state = "complete";
         entry.attempt.message = "QA ChatGPT login saved.";
       }

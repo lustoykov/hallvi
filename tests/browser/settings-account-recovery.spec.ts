@@ -21,7 +21,7 @@ test("Settings status can retry and account management returns to its chat", asy
   await page.goto(`/setup/connections${query}`);
   const chatgpt = page
     .locator(".hv-connection")
-    .filter({ has: page.getByRole("heading", { name: "ChatGPT" }) });
+    .filter({ has: page.getByRole("heading", { name: "Model" }) });
   const statusPath = "**/api/pi/setup";
   await page.route(statusPath, (route) =>
     route.fulfill({
@@ -30,9 +30,9 @@ test("Settings status can retry and account management returns to its chat", asy
     }),
   );
   await chatgpt
-    .getByRole("button", { name: "Connect ChatGPT", exact: true })
+    .getByRole("button", { name: "Connect a model", exact: true })
     .click();
-  const card = page.getByRole("region", { name: "Connect ChatGPT" });
+  const card = page.getByRole("region", { name: "Connect a model" });
   await expect(card).toContainText("Temporary status failure");
   await page.unroute(statusPath);
   await card.getByRole("button", { name: "Try again", exact: true }).click();

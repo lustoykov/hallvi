@@ -8,7 +8,7 @@ const startLogin = vi.hoisted(() =>
 );
 vi.mock("../../../src/server/pi-setup", () => ({
   getPiSetupStatus: async () => ({ state: "needs-auth" }),
-  piLoginCoordinator: { start: startLogin },
+  piLoginCoordinator: { start: startLogin, cancelAll: vi.fn() },
 }));
 
 import { PATCH, POST } from "../../../src/app/api/pi/setup/route";

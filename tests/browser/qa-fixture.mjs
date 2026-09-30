@@ -160,7 +160,6 @@ if (initialSetup === "ready") {
     JSON.stringify({
       ...model,
       mode: "separate",
-      credentialType: "oauth",
       authPath: join(state, "pi-auth.json"),
     }),
     { mode: 0o600 },

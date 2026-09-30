@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ChatgptConnect } from "./onboarding/chatgpt-connect";
+import { ModelConnect } from "./onboarding/model-connect";
 import { GithubConnect } from "./onboarding/github-connect";
 import { ProviderTokenForm } from "./provider-token-form";
 import type { SetupReturn } from "@/server/setup-return";
@@ -20,7 +20,7 @@ export type ConnectionForm =
   | "cloudflare"
   | "backup-storage"
   /** The two accounts Hallvi itself signs in to, as their own cards. */
-  | "chatgpt"
+  | "model"
   | "github";
 
 /**
@@ -288,10 +288,10 @@ export function ConnectionsScreen({
                     className={s.connectForm}
                     onConnected={async () => connected()}
                   />
-                ) : item.action.form === "chatgpt" ? (
+                ) : item.action.form === "model" ? (
                   // The same card the conversation draws, so there is one
                   // account sign-in in the product rather than two.
-                  <ChatgptConnect
+                  <ModelConnect
                     plain
                     settingsHref={`/setup/pi${returnTo?.query ?? ""}`}
                     onConnected={connected}

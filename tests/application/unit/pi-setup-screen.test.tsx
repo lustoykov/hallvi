@@ -19,17 +19,28 @@ const initialStatus: PiSetupStatus = {
   state: "needs-choice",
   ready: false,
   mode: null,
+  connections: { chatgpt: false, openRouter: false },
   billing: "subscription",
   detected: null,
   hasSavedConfiguration: false,
   models: [
     {
+      providerId: "openai-codex",
       id: selection.modelId,
       name: selection.model,
       reasoningEfforts: ["high"],
+      price: null,
+    },
+    {
+      providerId: "openrouter",
+      id: "anthropic/claude-sonnet-5",
+      name: "Claude Sonnet 5",
+      reasoningEfforts: ["high"],
+      price: { input: 2, output: 10 },
     },
   ],
   separateAuthPath: "/hallvi/pi-auth.json",
+  openRouterAuthPath: "/hallvi/openrouter-auth.json",
   diagnosticLogPath: "/custom/logs/replies.ndjson",
   localTracePath: "/custom/logs/spans.ndjson",
   traceExport: { mode: "off", destination: null },
@@ -63,7 +74,9 @@ describe("account-first setup and progressive disclosure", () => {
   it("keeps storage discoverable and explains the real protection without a security claim", () => {
     const { html, defaultView } = render();
     expect(defaultView).toContain("Settings");
-    expect(defaultView).toContain("ChatGPT account and model preferences.");
+    expect(defaultView).toContain(
+      "The accounts Hallvi thinks through, and the model it uses.",
+    );
     expect(defaultView).not.toContain("Login stored where Hallvi runs.");
     expect(defaultView).toContain("Connect ChatGPT");
     expect(defaultView).not.toContain(initialStatus.separateAuthPath);
@@ -128,6 +141,7 @@ describe("account-first setup and progressive disclosure", () => {
       state: "ready",
       ready: true,
       mode: "shared",
+      connections: { chatgpt: true, openRouter: false },
       hasSavedConfiguration: true,
       authentication: {
         configured: true,

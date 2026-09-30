@@ -31,6 +31,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
+| [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
@@ -449,6 +450,19 @@ controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
 retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
+
+### AF-041 — Show OpenRouter credit beside the saved key
+
+OpenRouter is paid per use, and an empty balance only shows up as a refused
+message (402). OpenRouter's `GET /api/v1/key` answers usage and limit without a
+model request; Settings could say "$4.20 left" beside **Key saved**, and the
+Model row could warn before the credit runs out rather than after.
+
+**+1:** 2026-09-30 — OpenRouter models (`claude/openrouter-models`)
+
+Review of [#297](https://github.com/lustoykov/hallvi/pull/297) also found that a
+402 can report a key spending limit. A credit display should distinguish that
+limit from the account balance; the request error now names both possibilities.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
