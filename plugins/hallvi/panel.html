@@ -353,13 +353,26 @@ const shareContext = (text) => request("ui/update-model-context", { content: [{ 
 // ---------------------------------------------------------------- state
 const drafts = new Map();
 const store = {
-  get(key) { try { return JSON.parse(localStorage.getItem(`hallvi:${key}`)); } catch { return drafts.get(key) ?? null; } },
-  set(key, value) { drafts.set(key, value); try { value == null ? localStorage.removeItem(`hallvi:${key}`) : localStorage.setItem(`hallvi:${key}`, JSON.stringify(value)); } catch {} },
+  get(key) {
+    const draft = drafts.get(key);
+    // Reads can work while a write fails, leaving older text or no saved key.
+    if (draft?.stored === false) return draft.value;
+    try { return JSON.parse(localStorage.getItem(`hallvi:${key}`)); }
+    catch { return draft?.value ?? null; }
+  },
+  set(key, value) {
+    const draft = { value, stored: false };
+    drafts.set(key, draft);
+    try {
+      value == null ? localStorage.removeItem(`hallvi:${key}`) : localStorage.setItem(`hallvi:${key}`, JSON.stringify(value));
+      draft.stored = true;
+    } catch {}
+  },
 };
 const state = {
   apps: [], selected: store.get("application"), context: null, contextAt: null, contextError: null,
   conversation: null, conversationError: null, readAt: null, failures: 0,
-  send: null, sent: new Set(), contextOpen: false, open: new Set(), unfolded: new Set(),
+  send: null, contextOpen: false, open: new Set(), unfolded: new Set(),
 };
 let stopped = false;
 let generation = 0;
@@ -694,7 +707,6 @@ async function send(event) {
   if (id !== state.selected || state.send?.key !== key) return;
   if (result.accepted === true) {
     state.send = { key, text, state: "accepted" };
-    state.sent.add(key);
     $("draft").value = ""; store.set(`draft:${id}`, null); autosize();
   } else if (result.accepted === null) {
     state.send = { key, text, state: "unknown" };
@@ -713,7 +725,6 @@ function settleSend() {
   const seen = state.conversation?.turns?.some((turn) => turn.request?.requestKey === key);
   if (!seen) return;
   if (state.send.state === "unknown") { $("draft").value = ""; store.set(`draft:${state.selected}`, null); autosize(); }
-  state.sent.add(key);
   state.send = null;
 }
 function canSend() {
