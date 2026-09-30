@@ -91,6 +91,36 @@
   }
 }
 
+/* ---------- What is unresolved, drawn rather than named ---------- */
+
+.hv-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+}
+.hv-marks i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--waiting-text, #9a4b10);
+  opacity: 0.85;
+}
+.hv-marks i[data-tone="failed"] {
+  background: var(--failed, #a6312b);
+  box-shadow: none;
+  opacity: 1;
+}
+/* On a dark surface the marks keep their meaning in lighter tints. */
+.hv-marks[data-inverse] i {
+  box-shadow: inset 0 0 0 2px #f0b27a;
+  opacity: 1;
+}
+.hv-marks[data-inverse] i[data-tone="failed"] {
+  background: #f0918a;
+  box-shadow: none;
+}
+
 /* ---------- A destination that reads saved records ---------- */
 
 .hv-section-fresh {

@@ -1,6 +1,6 @@
 // Hallvi never labels anything by who it needs: the owner found "Needs you"
-// too attention demanding and panic inducing. Open work is Unresolved, a
-// decision is Awaiting approval, Pi's warning is Worth a look. The rule is
+// too attention demanding and panic inducing. Open work is drawn as marks,
+// a decision is Awaiting approval, Pi's warning is Worth a look. The rule is
 // "Calm by default" in src/components/hallvi/DESIGN.md.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

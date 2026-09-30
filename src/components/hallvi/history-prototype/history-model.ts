@@ -38,6 +38,8 @@ export interface Day {
 }
 export interface HistoryRecord {
   counts: Record<Filter, number>;
+  /** One per unresolved operation, for the marks its filter draws. */
+  unresolvedTones: ("waiting" | "failed")[];
   open: Entry[];
   days: Day[];
   total: number;
@@ -128,6 +130,9 @@ export function buildHistory(
         operations.filter((op) => matches(op, value)).length,
       ]),
     ) as Record<Filter, number>,
+    unresolvedTones: operations
+      .filter((op) => unresolved.has(op.id))
+      .map((op) => (op.state === "failed" ? "failed" : "waiting")),
     open: shown.filter((item) => rank(item.op) < 3),
     days,
     total: operations.length,

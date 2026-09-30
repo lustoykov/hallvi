@@ -5,7 +5,7 @@
 // A page built on a last-known state is stale between looks, so the largest
 // thing here is not a state at all: it is the proxy's access log, followed
 // while the page is open. Around it sit the things Hallvi has actually
-// recorded — the way in, what wants the owner, the last day it read, what it
+// recorded — the way in, what is unresolved, the last day it read, what it
 // has assessed — each saying when it was true. Chosen from a switchable
 // prototype on the real route; the options and the verdict are on the
 // `prototype/landing-page-directions` branch.
@@ -23,7 +23,7 @@ import {
 } from "../deployment-prototype/page-head";
 import type { Usage } from "../monitoring-records";
 import type { Overview } from "../overview-prototype/overview-model";
-import { Tag } from "../presentation";
+import { Tag, UnresolvedMarks } from "../presentation";
 import { hasTotals, trafficListed } from "../traffic/model";
 import { VisitorsToday } from "../traffic/overview-tile";
 import { useCollection, useHistory } from "../traffic/source";
@@ -435,7 +435,11 @@ export function OverviewLive({
             its place, and a healthy application's page carries no heading
             about what might be wrong with it. */}
         {built.needs.length > 0 && (
-          <Tile label="Unresolved">
+          <Tile
+            label={
+              <UnresolvedMarks tones={built.needs.map((need) => need.tone)} />
+            }
+          >
             <ul className="ovl-needs">
               {built.needs.slice(0, 2).map((need) => (
                 <li key={need.id} data-tone={need.tone}>

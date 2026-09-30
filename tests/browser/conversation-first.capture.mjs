@@ -359,7 +359,7 @@ await shot("08-logs-inspected");
 await post("fail-now");
 await nav.getByRole("button", { name: "Overview", exact: true }).click();
 await page
-  .getByText("Unresolved", { exact: true })
+  .getByRole("img", { name: /^Unresolved/ })
   .first()
   .waitFor()
   .catch(() => {});

@@ -29,7 +29,7 @@ import { usageFromRecords } from "./monitoring-records";
 import { OverviewLive } from "./overview-live/overview-live";
 import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
-import { Tag } from "./presentation";
+import { Tag, UnresolvedMarks } from "./presentation";
 import "./overview-prototype/overview.css";
 import "./overview-plain.css";
 
@@ -319,7 +319,9 @@ export function OverviewPage({
 
           {built.needs.length > 0 && (
             <section>
-              <h2>Unresolved</h2>
+              <h2>
+                <UnresolvedMarks tones={built.needs.map((need) => need.tone)} />
+              </h2>
               <ul>
                 {built.needs.map((need) => (
                   <li key={need.id} data-tone={need.tone}>

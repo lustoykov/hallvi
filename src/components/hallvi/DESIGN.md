@@ -500,7 +500,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 
 - **Before a recorded deployment:** lead with one stage-specific continuation based on the latest application record and stored connection settings. Missing records mean “No deployment is recorded yet”, not “Not deployed”. Hide repeated unknown vital rows. Failed or limited latest deployments take precedence over older verified records.
 - **Condition row:** status dot (green only when the last verification is under 24 hours old), application name, one line of condition with the relative verification time and “no continuous monitoring yet”. When stale, a secondary button drafts a re-verification request.
-- **Unresolved:** items with a state chip, title, one sentence, and two links: review or open the conversation, and open the destination. Amber surface; red border when failed. With nothing unresolved the block is not drawn, and no empty state stands in for it.
+- **Unresolved:** headed by its marks rather than a word, then items with a state chip, title, one sentence, and two links: review or open the conversation, and open the destination. Amber surface; red border when failed. With nothing unresolved the block is not drawn, and no empty state stands in for it.
 - **Running:** a four-row fact list (application, host, database, protection) with a 110px label column; protection is coloured by state.
 - **Recent changes:** rows of chip, title with origin and time, and destination links beneath the title.
 - **Evidence freshness:** a three-column table; the fact is a text link to its destination, the last-checked cell shows local time and relative time, the freshness cell is Fresh (green), Stale · over 24 h (amber, 600) or No evidence (muted).
@@ -545,14 +545,22 @@ application with nothing wrong.
   No label, heading, filter, chip, tile or empty state says the owner is
   needed, wanted or waited on, or asks for attention: never "Needs you",
   "What wants you", "Waiting for you", "Needs your approval" or "Needs
-  attention". Name the thing and its state instead. Open work is
-  **Unresolved** (History's filter, Overview's list), a decision is
+  attention". Name the thing and its state instead: a decision is
   **Awaiting approval**, Pi's `warning` is **Worth a look**, a failure is
-  **Failed**; the item's own title and tint carry the weight. With nothing
-  unresolved nothing is said: the list and its heading go, and no empty
-  state reassures in their place. A sentence explaining a permission mode
-  describes a policy, not a summons, and stays.
+  **Failed**; the item's own title and tint carry the weight. A sentence
+  explaining a permission mode describes a policy, not a summons, and stays.
   `tests/application/unit/calm-labels.test.ts` keeps the phrases out.
+- **What is unresolved is drawn, not named.** Where History's filter,
+  Overview's list and its headline would say how much is open, they draw
+  one mark per open thing (`UnresolvedMarks` in `presentation.tsx`): an open
+  ring for a decision awaiting approval, a filled red dot for a failure, so
+  the difference survives without colour. A screen reader hears
+  "Unresolved" and what it holds. With nothing unresolved nothing is drawn:
+  the list, its marks and the filter go, and no empty state reassures in
+  their place. Chosen the same day from a switchable prototype, over the
+  word itself, over pinning open things into What happened with no list of
+  their own, and over Little Server holding up a note; the options are on
+  the `prototype/calm-asks-visuals` branch.
 
 ### The register
 

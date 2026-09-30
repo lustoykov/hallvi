@@ -28,6 +28,7 @@ import {
 } from "react";
 
 import { labelOf } from "../operation-model";
+import { UnresolvedMarks } from "../presentation";
 import { ago, type LogLine } from "../architecture-prototype/model";
 import { reducedMotion } from "../architecture-prototype/motion";
 import type { HeroProps } from "./hero";
@@ -345,14 +346,10 @@ export function TimelineHero({
   // Attention first. The condition sentence is scoped to the application's
   // own record, so it can honestly say every check held while a domain check
   // on the same page did not — which reads as reassurance the page has not
-  // earned. When something is unresolved, the verdict says so before it says
-  // anything reassuring, and the cards below say what it is.
+  // earned. When something is unresolved, its marks come before anything
+  // reassuring, and the cards below say what it is.
   const verdict = subline(model, overview);
   const waiting = overview.needs.length;
-  const sub =
-    verdict && waiting
-      ? `${waiting === 1 ? "One thing is unresolved" : `${waiting} things are unresolved`}. ${verdict}`
-      : verdict;
   const showLog = !planned && logOpen;
   const lines = guy.lines.slice(-6);
   const newest = lines.at(-1);
@@ -584,8 +581,13 @@ export function TimelineHero({
               already, while the sentence that answers "what is true right
               now" sat underneath it in muted 15px — or, when anything needed
               attention, was not rendered at all. */}
-          <h2 className="axt-say" key={sub ?? overview.headline}>
-            {sub ?? overview.headline}
+          <h2 className="axt-say" key={verdict ?? overview.headline}>
+            {verdict && waiting > 0 && (
+              <UnresolvedMarks
+                tones={overview.needs.map((need) => need.tone)}
+              />
+            )}
+            {verdict ?? overview.headline}
           </h2>
         </div>
       </div>

@@ -48,6 +48,9 @@ export function HistoryPage({
     () => buildHistory(operations, chats, filter),
     [operations, chats, filter],
   );
+  // The Unresolved filter goes once the last unresolved thing settles, so a
+  // page left on it goes back to everything rather than to an empty list.
+  if (filter === "Unresolved" && !history.counts.Unresolved) setFilter("All");
 
   return (
     <div className="ax-root" data-variant="transit">

@@ -62,7 +62,7 @@ try {
   await page.goto(
     `${base}/prototype/app?scenario=rich&step=28&section=history`,
   );
-  await page.getByRole("button", { name: "Unresolved", exact: true }).click();
+  await page.getByRole("button", { name: /^Unresolved/ }).click();
   await expect(history).toContainText("The worker definition changed");
   await expect(
     page.getByRole("button", { name: "Approve updated change", exact: true }),

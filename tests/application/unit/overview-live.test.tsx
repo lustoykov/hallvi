@@ -41,4 +41,7 @@ it("gives a pending approval its conversation action on the live Overview", () =
     />,
   );
   expect(html).toMatch(/<button[^>]*>Open the conversation →<\/button>/);
+  // The tile draws marks instead of a word; a screen reader still hears it.
+  expect(html).toContain('aria-label="Unresolved: 1 awaiting approval"');
+  expect(html).not.toMatch(/>Unresolved</);
 });
