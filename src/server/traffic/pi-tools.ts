@@ -19,6 +19,7 @@ import {
   OTHER,
   PAGE_KEY_ATTRIBUTE,
   PAGE_KEY_NAME,
+  SCRIPT_PATH,
   eventPath,
   type Collection,
   type Gap,
@@ -37,6 +38,7 @@ import {
   SCRIPT_DIRECTORY,
   SCRIPT_FILE,
   SCRIPT_INCLUDES,
+  SCRIPT_PRIVACY,
   SCRIPT_SERVING,
   SCRIPT_TAG,
   trafficScript,
@@ -206,6 +208,7 @@ export function trafficReading(
       history.viewSource === "script"
         ? "Page views and visitors come from Hallvi's script; requests, errors, response times and bots from the log."
         : "Page views and visitors switch from the log to Hallvi's script inside this range, at the script's switch point; they are never added together.",
+      "Consent-gated script measurements cover visitors who allow analytics, so they can understate total use. Access-log coverage does not establish consent or the proportion of visitors measured.",
     );
   if (history.collection.scriptSilentSince)
     notes.push(
@@ -763,11 +766,16 @@ export function trafficScriptFor(
     ...(pageKey ? [`${PAGE_KEY_ATTRIBUTE}="${pageKey}"`] : []),
     ...(hashRouting ? [`${HASH_ROUTING_ATTRIBUTE}="true"`] : []),
   ];
-  const configuredTag = (text: string) =>
-    attributes.length
-      ? text.replaceAll("<script", `<script ${attributes.join(" ")}`)
-      : text;
   const script = trafficScript();
+  const configuredTag = (text: string) => {
+    const versioned = text.replaceAll(
+      SCRIPT_PATH,
+      `${SCRIPT_PATH}?v=${script.version}`,
+    );
+    return attributes.length
+      ? versioned.replaceAll("<script", `<script ${attributes.join(" ")}`)
+      : versioned;
+  };
   const check = eventPath({ t: "ping", s: "hallvicheck1", p: "/" });
   return {
     file: SCRIPT_FILE,
@@ -791,12 +799,15 @@ export function trafficScriptFor(
       line: configuredTag(include.line),
       ...(include.note ? { note: configuredTag(include.note) } : {}),
     })),
+    privacy: SCRIPT_PRIVACY,
     goals:
       "Goals are the owner's to mark in their own code: window.hv?.('signup') after the action, or data-hv-goal=\"signup\" on a link or button (letters, digits, _ and -, up to 40). That is application code, outside the operability pull request: tell the owner how rather than writing it, and keep anything personal out of a goal's name.",
     check: [
       `curl -sS -A 'Hallvi access check' https://<host>/_hv/s.js | sha256sum — the same sha256.`,
       `curl -sS -o /dev/null -w '%{http_code}\\n' -A 'Hallvi access check' 'https://<host>${check}' — 204, and the newest log line has that ${EVENT_PREFIX} path whole. Hallvi's user agent keeps it from being counted.`,
-      "After the owner merges the include and it is released: the page's HTML has the tag. The first real visitor's event sets the switch point Traffic shows.",
+      "Propose the include, consent integration and completed notice together through open_pull_request (or the software's own code-injection setting). Offer a prompt and notice when none exist, fitting the site's design. Never merge the PR; opening it deploys nothing. An owner-merged change follows the application's ordinary release policy.",
+      "After the owner merges and it is released, verify in a fresh browser: no /_hv/e/ requests before a choice or after refusal, one current view after Allow analytics, and no later events after withdrawal, including on navigation and in other open tabs. Reload preserves the choice according to the site's policy. Check the notice and preference link. Fetching /_hv/s.js can still appear in ordinary server logs.",
+      "Check that pages do not retain a cached older script: compare the publicly served sha256 after any proxy/CDN cache changes, and verify the browser behavior rather than the tag alone. One shared server file serves all applications, so replacing it disables measurement on older tags until each application's consent integration is released. The first allowed visitor's event sets the switch point Traffic shows.",
     ],
   };
 }
