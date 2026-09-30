@@ -433,11 +433,13 @@ All of it reads stored totals immediately; none of it waits for Pi.
 - **Monitoring:** requests, errors and response times from the same totals,
   instead of asking Pi to read a day.
 
-**The look.** Light surfaces, soft motion, few words; visits land on the map
-as soft dots. Little Server stops by for nice moments — a first visitor, a new
+**The look.** Light surfaces, soft motion, few words; countries glow on the
+map by their share of the day, and a visit brightens its country (the owner
+chose this "country tint" on 29 September 2026). Little Server stops by for nice moments — a first visitor, a new
 country, a record day — briefly, then leaves. Amber and red only for what
 needs the owner ([calm by default](../../src/components/hallvi/DESIGN.md)).
-Treatments are chosen from `?variant=` prototypes on the real pages.
+Treatments are chosen from switchable prototypes on the real pages
+(`?offer=` for the script offer), shown only outside a production build.
 
 ## Proof
 

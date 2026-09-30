@@ -282,7 +282,6 @@ export function Breakdowns({
   history,
   script,
   locked,
-  countriesAside,
   ghost,
 }: {
   history: TrafficHistory;
@@ -290,8 +289,6 @@ export function Breakdowns({
   script: boolean;
   /** What a script-only tab says without the script: the offer. */
   locked: (asked: ScriptAsk) => ReactNode;
-  /** A small map above the countries, in the looks that move it there. */
-  countriesAside?: ReactNode;
   /** The script offered in the Pages list itself, as an empty column. */
   ghost?: { says: string; onAdd: () => void } | null;
 }) {
@@ -391,7 +388,6 @@ export function Breakdowns({
       />
       <Card
         title="Countries"
-        aside={countriesAside}
         tabs={[
           {
             id: "countries",

@@ -58,8 +58,7 @@ import { useCollection, useHistory } from "./source";
 import { SimulateTraffic } from "./simulate";
 import { TrafficChart } from "./traffic-chart";
 import { ScriptOffers } from "./script-offer";
-import { useOffer, useVariant, VariantSwitch, type Variant } from "./variants";
-import { WorldMap } from "./world-map";
+import { DevPanel, useOffer } from "./variants";
 import "./traffic.css";
 
 const RANGE_LABEL: Record<TrafficRange, string> = {
@@ -463,7 +462,6 @@ export function TrafficPage({
   onReopen?: () => void;
   onAsk: (draft: string) => void;
 }) {
-  const variant = useVariant();
   const offerLook = useOffer();
   const { collection, act } = useCollection(applicationId);
   const listed = trafficListed(collection);
@@ -583,7 +581,7 @@ export function TrafficPage({
 
   if (!collection)
     return (
-      <div className="ax-root tf" data-variant={variant}>
+      <div className="ax-root tf">
         {head}
         <p className="tf-reading">Reading what Hallvi has counted…</p>
       </div>
@@ -591,7 +589,7 @@ export function TrafficPage({
 
   if (!listed)
     return (
-      <div className="ax-root tf" data-variant={variant}>
+      <div className="ax-root tf">
         {head}
         <Offer
           busy={busy}
@@ -599,25 +597,15 @@ export function TrafficPage({
           traffic={traffic}
           onKeep={() => perform("keep")}
         />
-        <VariantSwitch value={variant}>
+        <DevPanel>
           <SimulateTraffic applicationId={applicationId} />
-        </VariantSwitch>
+        </DevPanel>
       </div>
     );
 
   const countriesToday = today.history?.countries ?? [];
-  const smallMap: ReactNode =
-    variant === "calm" ? (
-      <div className="tf-card-map">
-        <WorldMap
-          countries={history?.countries ?? []}
-          label="Where this range's visits came from"
-        />
-      </div>
-    ) : null;
-
   return (
-    <div className="ax-root tf" data-variant={variant as Variant}>
+    <div className="ax-root tf">
       {head}
       <CollectionLine
         collection={collection}
@@ -630,7 +618,6 @@ export function TrafficPage({
       <LiveArea
         traffic={traffic}
         countries={countriesToday}
-        variant={variant}
         moment={moment}
         onAsk={onAsk}
       />
@@ -744,7 +731,6 @@ export function TrafficPage({
               history={history}
               script={script}
               locked={lockedOffer}
-              countriesAside={smallMap}
               ghost={
                 offer && offerLook === "column"
                   ? {
@@ -781,9 +767,9 @@ export function TrafficPage({
           onConfirm={() => perform("forget")}
         />
       )}
-      <VariantSwitch value={variant}>
+      <DevPanel>
         <SimulateTraffic applicationId={applicationId} />
-      </VariantSwitch>
+      </DevPanel>
     </div>
   );
 }

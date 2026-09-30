@@ -170,19 +170,12 @@
   align-items: start;
   gap: 12px 28px;
 }
-.tf-live[data-variant="list"] .tf-live-body {
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  align-items: start;
-}
-.tf-live[data-variant="tint"] .tf-now b {
+.tf-live .tf-now b {
   font-size: 30px;
 }
 .tf-live-map {
   position: relative;
   min-width: 0;
-}
-.tf-live-map[data-small] {
-  padding-top: 18px;
 }
 .tf-live-countries {
   display: flex;
@@ -934,31 +927,6 @@
   }
 }
 
-/* The preview panel's second switch. */
-.tf-variants-more {
-  display: grid;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--ax-line);
-}
-.tf-variants-more > span {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ax-faint);
-}
-.tf-variants-more [role="radiogroup"] {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.tf-variants-more small {
-  line-height: 1.45;
-  color: var(--ax-muted);
-}
-
 .tf-primary {
   display: inline-flex;
   align-items: center;
@@ -1513,7 +1481,6 @@
 
 @media (max-width: 960px) {
   .tf-live-body,
-  .tf-live[data-variant="list"] .tf-live-body,
   .tf-grid,
   .tf-offer {
     grid-template-columns: minmax(0, 1fr);
