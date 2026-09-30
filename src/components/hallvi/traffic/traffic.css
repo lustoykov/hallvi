@@ -1330,3 +1330,59 @@
     display: none;
   }
 }
+
+/* ---------- Simulated traffic (development only) */
+
+.tf-simulate {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ax-line);
+}
+.tf-simulate > span {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ax-faint);
+}
+.tf-simulate p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ax-ink-2);
+}
+.tf-simulate select {
+  padding: 2px 6px;
+  border: 1px solid var(--ax-line);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ax-ink-2);
+}
+.tf-variants .tf-simulate-start {
+  border-color: var(--ax-working-line);
+  background: var(--ax-working-bg);
+  font-weight: 600;
+  color: var(--ax-working-text);
+}
+.tf-simulate-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ax-working-text);
+  animation: tf-simulate-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tf-simulate-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.tf-simulate-error {
+  color: var(--ax-failed) !important;
+}

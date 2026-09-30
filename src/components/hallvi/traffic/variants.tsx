@@ -4,7 +4,7 @@
 // with `?variant=` on the real page. The switcher itself exists only outside
 // a production build; the product always draws the default.
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 
 export const VARIANTS = [
   {
@@ -64,8 +64,17 @@ function choose(variant: Variant) {
   window.dispatchEvent(new Event(CHANGED));
 }
 
-/** A small switcher for the owner's review. Absent in production. */
-export function VariantSwitch({ value }: { value: Variant }) {
+/**
+ * A small switcher for the owner's review, with any other development tools
+ * below it. Absent in production.
+ */
+export function VariantSwitch({
+  value,
+  children,
+}: {
+  value: Variant;
+  children?: ReactNode;
+}) {
   if (process.env.NODE_ENV === "production") return null;
   const current = VARIANTS.find((variant) => variant.id === value)!;
   return (
@@ -85,6 +94,7 @@ export function VariantSwitch({ value }: { value: Variant }) {
         ))}
       </div>
       <small>{current.note}</small>
+      {children}
     </aside>
   );
 }

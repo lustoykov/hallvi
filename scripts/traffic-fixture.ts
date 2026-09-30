@@ -6,7 +6,7 @@
 //     [--releases 2026-09-20T10:00:00Z,…] [--host example.test]
 //     [--end <iso>] [--name access.log]
 //   node --import tsx scripts/traffic-fixture.ts live --url https://example.test
-//     --shape spa --rate 20 [--minutes 10] [--seed 7]
+//     --shape spa --rate 20 [--minutes 10] [--seed 7] [--report 30]
 //   node --import tsx scripts/traffic-fixture.ts verify --format caddy-json
 //     [--time-zone Europe/Sofia] <files…>
 //   node --import tsx scripts/traffic-fixture.ts ranges [<dbip-country.mmdb>]
@@ -108,10 +108,11 @@ const HELP = `Realistic traffic through the real pipeline, and an independent co
       and never overwrites a file. The same arguments write the same bytes.
 
   live --url <base> --shape <shape> --rate <visits a minute>
-       [--minutes <n>] [--seed <n>]
+       [--minutes <n>] [--seed <n>] [--report <seconds, default 30>]
       Sends real requests with browsers' headers, bots and, for spa, script
       events, until --minutes pass or Ctrl-C. Every request comes from this
       machine's one address, so the visitor estimate counts user agents.
+      The Traffic page's development-only simulator runs this too.
 
   verify --format <format> [--time-zone <IANA zone>] <files…>
       Counts the files per day (default: this machine's time zone) and
@@ -2876,6 +2877,8 @@ async function live(flags: Record<string, string>) {
   if (!(rate > 0 && rate <= 600))
     fail("Give --rate, visits a minute, up to 600.");
   const minutes = flags.minutes ? Number(flags.minutes) : Infinity;
+  const every = flags.report ? Number(flags.report) : 30;
+  if (!(every >= 1)) fail("Give --report, seconds between reports, 1 or more.");
   const plan = makePlan({
     seed: flags.seed ?? `${Date.now()}`,
     shape,
@@ -3248,7 +3251,7 @@ async function live(flags: Record<string, string>) {
           .map(([key, value]) => `${value} ${key}`)
           .join(", ")}; ${running.size} visits open`,
       ),
-    30 * SECOND,
+    every * SECOND,
   );
   let index = 0;
   const bots = shape === "tiny" ? 0.6 : shape === "busy" ? 0.25 : 0.15;

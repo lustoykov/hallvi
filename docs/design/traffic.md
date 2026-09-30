@@ -440,6 +440,10 @@ Treatments are chosen from `?variant=` prototypes on the real pages.
 3. **The development applications seeded through the real pipeline:** a
    generator writes realistic history into each application's log and sends
    live traffic; the numbers on screen come from the counting code. Nothing is
-   written into the databases directly.
+   written into the databases directly. Outside a production build, the
+   Traffic page's preview panel starts the same live traffic against the
+   application's public address for a few minutes. The requests are real
+   and come from one machine, so they count in that application's totals
+   from one country.
 4. **No double counting:** page loads with the script, in-app route changes and
    `curl` requests produce exactly the expected views and requests.
