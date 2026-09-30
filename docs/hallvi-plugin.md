@@ -56,10 +56,22 @@ Then, for a fresh check:
 hosts. Tools work without the panel; Codex UI extension parity with ChatGPT
 has not been established by the local protocol tests.
 
-To install the skill and tools together as a local plugin, add the generated
-`dist` directory as a local marketplace with `codex plugin marketplace add
-/absolute/path/to/dist`, restart the desktop app, and install Hallvi from the
-**hallvi-poc** source. Choose either this route or the direct MCP configuration
+To install the skill and tools together as a local plugin:
+
+```sh
+codex plugin marketplace add /absolute/path/to/dist
+codex plugin add hallvi@hallvi-poc
+```
+
+This installs and enables Hallvi in the active Codex profile. For daily use,
+copy the generated marketplace to a stable location outside the worktree
+before registering it. For a remote controller, replace the generated
+`hallvi-plugin/.mcp.json` connection with the SSH command below before
+installing. The controller must already be running; installation does not
+start Hallvi. If the desktop app has not refreshed its plugin list, restart
+it after finishing active work. Check that Hallvi actually opens from the
+sidebar: successful installation and tool discovery alone do not verify that
+UI. Choose either this route or the direct MCP configuration
 to avoid duplicate tools. The generated local manifest uses the build
 machine's Node path; it is not a public distribution package. Preserve the
 bundle directory while that connection is configured.
