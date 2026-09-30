@@ -26,10 +26,30 @@ test.use({
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
 });
 
-const html = (body: string, pageKey?: string, hashRouting?: boolean) =>
-  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", "traffic-script-fixture", pageKey, hashRouting).tag}</head><body>${body}</body></html>`;
+// Existing measurement cases have already granted analytics. /consent starts
+// with no choice and exercises the site's controls across the full lifecycle.
+const html = (
+  body: string,
+  pageKey?: string,
+  hashRouting?: boolean,
+  allowed = true,
+) =>
+  `<!doctype html><html><head><meta charset="utf-8">${allowed ? "<script>window.hvConsent = true</script>" : ""}${trafficScriptFor("caddy", "traffic-script-fixture", pageKey, hashRouting).tag}</head><body>${body}</body></html>`;
 
 const pages: Record<string, string> = {
+  "/consent": html(
+    `<main>
+      <p>Allow analytics to measure page views and page performance?</p>
+      <button onclick="window.hv.consent(true)">Allow analytics</button>
+      <button onclick="window.hv.consent(false)">Decline</button>
+      <button onclick="window.hv.consent(false)">Withdraw analytics</button>
+      <button data-hv-goal="signup">Sign up</button>
+      <button onclick="throw new Error('private message')">Throw</button>
+    </main>`,
+    undefined,
+    true,
+    false,
+  ),
   // Big enough text to be the largest paint, a banner that pushes it down
   // before anyone touches the page, goals, and code that fails.
   "/landing": html(`<main>
@@ -167,6 +187,100 @@ const setVisibility = (page: Page, state: "hidden" | "visible") =>
     });
     document.dispatchEvent(new Event("visibilitychange"));
   }, state);
+
+test("consent gates every measurement and withdrawal does not replay activity", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto(`${site}/consent`);
+  await page.waitForFunction(
+    () => typeof (window as unknown as { hv?: unknown }).hv === "function",
+  );
+  expect(paths).toEqual([]);
+  const move = (path: string) =>
+    page.evaluate((path) => history.pushState({}, "", path), path);
+
+  await page.getByRole("button", { name: "Decline", exact: true }).click();
+  await page.getByRole("button", { name: "Sign up" }).click();
+  await page.getByRole("button", { name: "Throw" }).click();
+  await move("/consent/before-grant");
+  await page.clock.runFor(PING_SECONDS * 2_000);
+  await setVisibility(page, "hidden");
+  await setVisibility(page, "visible");
+  expect(paths).toEqual([]);
+
+  // A truthy string is not a grant. The API intentionally accepts only true.
+  await page.evaluate(() =>
+    (window as unknown as { hv: { consent(value: unknown): void } }).hv.consent(
+      "true",
+    ),
+  );
+  await page.clock.runFor(PING_SECONDS * 1_000);
+  expect(paths).toEqual([]);
+
+  await page.getByRole("button", { name: "Allow analytics" }).click();
+  const [first] = await until("view", 1);
+  expect(first.p).toBe("/consent/before-grant");
+  expect(ofType("goal")).toEqual([]);
+  expect(ofType("error")).toEqual([]);
+  expect(ofType("vital")).toEqual([]);
+  await page.getByRole("button", { name: "Allow analytics" }).click();
+  await page.getByRole("button", { name: "Sign up" }).click();
+  await page.getByRole("button", { name: "Throw" }).click();
+  await until("goal", 1);
+  await until("error", 1);
+  await page.clock.runFor(PING_SECONDS * 1_000);
+  await until("ping", 1);
+  expect(ofType("view")).toHaveLength(1);
+
+  await page.getByRole("button", { name: "Withdraw analytics" }).click();
+  const afterWithdrawal = paths.length;
+  await page.getByRole("button", { name: "Sign up" }).click();
+  await page.getByRole("button", { name: "Throw" }).click();
+  await move("/consent/while-refused");
+  await page.evaluate(() => {
+    location.hash = "#/refused-route";
+  });
+  await setVisibility(page, "hidden");
+  await setVisibility(page, "visible");
+  await page.evaluate(() => {
+    dispatchEvent(new Event("pagehide"));
+    dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+  });
+  await page.clock.runFor(PING_SECONDS * 2_000);
+  expect(paths).toHaveLength(afterWithdrawal);
+  expect(ofType("leave")).toEqual([]);
+
+  await page.getByRole("button", { name: "Allow analytics" }).click();
+  const second = (await until("view", 2))[1];
+  expect(second.p).toBe("/consent/while-refused");
+  expect(second).toMatchObject({ h: "#/refused-route" });
+  expect(second.s).not.toBe(first.s);
+  await page.getByRole("button", { name: "Sign up" }).click();
+  await page.getByRole("button", { name: "Throw" }).click();
+  await until("goal", 2);
+  await until("error", 2);
+  await page.clock.runFor(10_000);
+  await move("/consent/allowed-route");
+  const [leave] = await until("leave", 1, second.s);
+  expect(leave.e).toBeLessThan(15_000);
+  await until("view", 3);
+  expect(ofType("goal")).toHaveLength(2);
+  expect(ofType("error")).toHaveLength(2);
+
+  // The tracker does not persist a preference or identifier of its own.
+  expect(await page.context().cookies()).toEqual([]);
+  expect(
+    await page.evaluate(() => [localStorage.length, sessionStorage.length]),
+  ).toEqual([0, 0]);
+  await page.goto(`${site}/consent`);
+  const afterReload = paths.length;
+  await page.waitForFunction(
+    () => typeof (window as unknown as { hv?: unknown }).hv === "function",
+  );
+  await page.clock.runFor(PING_SECONDS * 2_000);
+  expect(paths).toHaveLength(afterReload);
+});
 
 test("a page reached from another site: its view, goals, errors, page speed and leave", async ({
   page,
