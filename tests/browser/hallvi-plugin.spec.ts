@@ -224,6 +224,68 @@ test("late acceptance settles the original app when browser storage is unavailab
   ).toHaveValue("");
 });
 
+test("a failed storage write keeps the uncertain send key and settles its original draft", async ({
+  page,
+}) => {
+  await page.addInitScript((applicationId) => {
+    localStorage.setItem(
+      `hallvi:draft:${applicationId}`,
+      JSON.stringify({ text: "Previously saved text" }),
+    );
+    // A full store can still read its old values while every write fails.
+    Storage.prototype.setItem = Storage.prototype.removeItem = () => {
+      throw new DOMException("Storage is full", "QuotaExceededError");
+    };
+  }, first);
+  const p = await panel(page);
+  p.state.hold = true;
+  await p.frame
+    .getByRole("textbox", { name: "Message to Hallvi" })
+    .fill("Read-only check");
+  await p.frame.getByRole("button", { name: "Send", exact: true }).click();
+  await expect.poll(() => p.sends.length).toBe(1);
+  const original = p.sends[0].request_key;
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(second);
+  await p.frame
+    .getByRole("textbox", { name: "Message to Hallvi" })
+    .fill("Second draft");
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(first);
+  await expect(
+    p.frame.getByRole("button", { name: "Send again" }),
+  ).toBeVisible();
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("Read-only check");
+  p.state.hold = false;
+  const acknowledged = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/call") &&
+      response.request().postDataJSON().name === "hallvi_exec",
+  );
+  p.release();
+  await acknowledged;
+  p.state.accepted = true;
+  await p.frame.getByRole("button", { name: "Send again" }).click();
+  await expect.poll(() => p.sends.length).toBe(2);
+  expect(p.sends[1]).toMatchObject({
+    application_id: first,
+    request_key: original,
+    message: "Read-only check",
+  });
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("");
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(second);
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("Second draft");
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(first);
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("");
+  expect(p.sends).toHaveLength(2);
+});
+
 test("an empty controller opens its configured Hallvi address", async ({
   page,
 }) => {
