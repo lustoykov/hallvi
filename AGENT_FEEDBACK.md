@@ -16,10 +16,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
 | [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 2 | New |
-| [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Accepted; fix in #310 |
-| [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Accepted; fixes in #303 and #308 |
-| [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | Accepted; fix in #301 |
-| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | Accepted; fix in #301 |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -28,7 +24,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
 | [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
-| [AF-045 — Keep simulated SPA route identities honest](#af-045--keep-simulated-spa-route-identities-honest) | 1 | Accepted; fix in #308 |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
 | [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
 
@@ -90,18 +85,6 @@ changing their decision.
 
 ## Requests
 
-### AF-045 — Keep simulated SPA route identities honest
-
-The live traffic generator fetched the landing document and script again after
-an in-page navigation, then reused that route's view ID for the landing page.
-An actual HTTP run produced five views with only three identities. The fix in
-[PR #308](https://github.com/lustoykov/hallvi/pull/308) keeps one document load and
-a distinct identity per route. Its focused regression checks delivered events;
-the simulator still synthesizes instrumentation, so real browser-script tests
-remain a separate proof. UI scenario fixtures serve a different visual purpose.
-
-**+1:** 2026-09-30 — post-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
-
 ### AF-040 — Say whether a Pi upgrade keeps the shared login readable
 
 Attach guards Pi's history format, but every checkout reads the ChatGPT login
@@ -149,72 +132,6 @@ empty. A fresh worktree also has no saved eval answers, so the Eval archive's
 review layout could only be checked after copying `tests/results/evals` from
 another checkout.
 
-### AF-039 — Keep new tests tied to useful behavior
-
-**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the redundant parse/comment assertion, narrows installation-link checks, and asserts the accessible missing-data description instead of CSS structure. Concrete privacy, ownership and retained-state regressions remain.
-
-The audit follow-up found a redundant script-compilation assertion in
-`traffic-script.test.ts:69`: the neighboring contract tests already execute the
-same served script. Checking that whole-line comments disappeared pins the
-current minification technique without protecting event delivery.
-
-Two checks should be narrowed, not deleted wholesale. `traffic-pages.test.tsx:256`
-requires an exact CSS class and attribute sequence; keep proof that a real gap is
-shown and future hours are not treated as missing. `install-line.test.ts:15`
-forbids versioned installer links in every root/docs Markdown file, including
-historical examples. Check the current installation entry points instead; retain
-the regression coverage for the stale installer users actually received.
-
-These are source-review recommendations on `9c99cf3`, not a tested pruning patch
-or evidence that the full suite is unnecessary. Keep privacy, approval,
-Stop/Forget, retained-state ownership and cross-stack behavior coverage.
-
-**+1:** 2026-09-30 — recent-merge audit follow-up, task `01a0f19e-1f49-7d70-947b-28c911465e09`
-
-### AF-029 — Keep Traffic database waits off the event loop
-
-**Implementation:** [PR #310](https://github.com/lustoykov/hallvi/pull/310) moves Traffic to its own database worker and queue, sharing the existing dispatch handling. A real two-second Traffic write lock left production application reads and Pi-alive chat creation responsive. The same work fixes a standalone worker-close exit before the awaited close settled. Combined acceptance is recorded in the audit PR.
-
-Traffic adds synchronous `better-sqlite3` calls in the web and Pi processes,
-after #252 moved the main database work into threads. On merged `9c99cf3`,
-holding a disposable traffic database's write lock for 350 ms made
-`recordCollector` and an unrelated 10 ms timer both take 359 ms. This is a
-contention reproduction, not a measured production incident. Use the existing
-asynchronous database boundary pattern for Traffic while keeping the atomic
-Stop/Forget checks that prevent stale writes from restoring totals.
-
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
-
-### AF-031 — Account for hash-routed pages before promising SPA coverage
-
-**Implementation:** [PR #303](https://github.com/lustoykov/hallvi/pull/303) adds explicit hash routing while ignoring anchors and credential fragments. Review also reproduced a missed Back navigation to the empty fragment; [PR #308](https://github.com/lustoykov/hallvi/pull/308) distinguishes that physical root from an ignored fragment. The existing browser cases cover both hash forms and distinct Back/Forward views.
-
-The Traffic script compares `location.pathname` and a configured query key;
-`/#/home`, `/#/inbox` and `/#/settings` all become one `/` page. Running the
-shipped script with those route changes emitted one view, while equivalent
-history routes emitted three. The script offer currently promises "Pages
-changed in the app" without this boundary. Support an explicit hash-routing
-mode or state the limitation. Do not collect arbitrary URL fragments: ordinary
-anchors and credential-bearing fragments are not page identities.
-
-A second check with the actual script in the in-app browser and a local HTTP
-event receiver confirmed three history views versus one hash-route view.
-
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
-
-### AF-032 — Bound the live Traffic country cache
-
-**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the country map. Warm direct lookup cost was about 52 ms per 100,000 lookups locally, and three arrival/expiry cycles retained no country entries. This is a controlled lookup/retention check, not a production capacity claim.
-
-`LiveWindow` expires browsers, open pages and loaded-page keys, but never its
-country lookup map. Feeding it 10,000 distinct browser identities, then calling
-`now` 24 hours later, left all 10,000 country entries with zero active browsers
-and zero loaded-page keys. An open Traffic/Overview stream retains every
-identity until it closes, including bot requests. Remove the cache if lookup
-cost allows, or bound/expire it with the live window; avoid another permanent
-visitor registry. This proves retention, not a production memory-exhaustion rate.
-
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 ### AF-038 — Check installed versions behind upstream shrinkwraps
 
@@ -507,6 +424,11 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Resolved in #310 |
+| [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Resolved in #303 and #308 |
+| [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | Resolved in #301 |
+| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | Resolved in #301 |
+| [AF-045 — Keep simulated SPA route identities honest](#af-045--keep-simulated-spa-route-identities-honest) | 1 | Resolved in #308 and #312 |
 | [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | Resolved in #302 |
 | [AF-046 — Preserve uncertain sends when browser storage writes fail](#af-046--preserve-uncertain-sends-when-browser-storage-writes-fail) | 1 | Resolved in #307 |
 | [AF-023 — Discover newer releases despite GitHub listing order](#af-023--discover-newer-releases-despite-github-listing-order) | 1 | Fixed in #285 |
@@ -524,6 +446,100 @@ limit from the account balance; the request error now names both possibilities.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-029 — Keep Traffic database waits off the event loop
+
+**Status:** Resolved in #310.
+
+**Implementation:** [PR #310](https://github.com/lustoykov/hallvi/pull/310) moves Traffic to its own database worker and queue, sharing the existing dispatch handling. A real two-second Traffic write lock left production application reads and Pi-alive chat creation responsive. The same work fixes a standalone worker-close exit before the awaited close settled. Combined acceptance is recorded in the audit PR.
+
+Traffic adds synchronous `better-sqlite3` calls in the web and Pi processes,
+after #252 moved the main database work into threads. On merged `9c99cf3`,
+holding a disposable traffic database's write lock for 350 ms made
+`recordCollector` and an unrelated 10 ms timer both take 359 ms. This is a
+contention reproduction, not a measured production incident. Use the existing
+asynchronous database boundary pattern for Traffic while keeping the atomic
+Stop/Forget checks that prevent stale writes from restoring totals.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-031 — Account for hash-routed pages before promising SPA coverage
+
+**Status:** Resolved in #303 and #308.
+
+**Implementation:** [PR #303](https://github.com/lustoykov/hallvi/pull/303) adds explicit hash routing while ignoring anchors and credential fragments. Review also reproduced a missed Back navigation to the empty fragment; [PR #308](https://github.com/lustoykov/hallvi/pull/308) distinguishes that physical root from an ignored fragment. The existing browser cases cover both hash forms and distinct Back/Forward views.
+
+The Traffic script compares `location.pathname` and a configured query key;
+`/#/home`, `/#/inbox` and `/#/settings` all become one `/` page. Running the
+shipped script with those route changes emitted one view, while equivalent
+history routes emitted three. The script offer currently promises "Pages
+changed in the app" without this boundary. Support an explicit hash-routing
+mode or state the limitation. Do not collect arbitrary URL fragments: ordinary
+anchors and credential-bearing fragments are not page identities.
+
+A second check with the actual script in the in-app browser and a local HTTP
+event receiver confirmed three history views versus one hash-route view.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-032 — Bound the live Traffic country cache
+
+**Status:** Resolved in #301.
+
+**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the country map. Warm direct lookup cost was about 52 ms per 100,000 lookups locally, and three arrival/expiry cycles retained no country entries. This is a controlled lookup/retention check, not a production capacity claim.
+
+`LiveWindow` expires browsers, open pages and loaded-page keys, but never its
+country lookup map. Feeding it 10,000 distinct browser identities, then calling
+`now` 24 hours later, left all 10,000 country entries with zero active browsers
+and zero loaded-page keys. An open Traffic/Overview stream retains every
+identity until it closes, including bot requests. Remove the cache if lookup
+cost allows, or bound/expire it with the live window; avoid another permanent
+visitor registry. This proves retention, not a production memory-exhaustion rate.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-039 — Keep new tests tied to useful behavior
+
+**Status:** Resolved in #301.
+
+**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the redundant parse/comment assertion, narrows installation-link checks, and asserts the accessible missing-data description instead of CSS structure. Concrete privacy, ownership and retained-state regressions remain.
+
+The audit follow-up found a redundant script-compilation assertion in
+`traffic-script.test.ts:69`: the neighboring contract tests already execute the
+same served script. Checking that whole-line comments disappeared pins the
+current minification technique without protecting event delivery.
+
+Two checks should be narrowed, not deleted wholesale. `traffic-pages.test.tsx:256`
+requires an exact CSS class and attribute sequence; keep proof that a real gap is
+shown and future hours are not treated as missing. `install-line.test.ts:15`
+forbids versioned installer links in every root/docs Markdown file, including
+historical examples. Check the current installation entry points instead; retain
+the regression coverage for the stale installer users actually received.
+
+The recommendations on `9c99cf3` are implemented in #301. The retained default
+suite passed on the combined candidate. Privacy, approval, Stop/Forget,
+retained-state ownership and cross-stack behavior coverage remain.
+
+**+1:** 2026-09-30 — recent-merge audit follow-up, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-045 — Keep simulated SPA route identities honest
+
+**Status:** Resolved in #308 and #312.
+
+The live traffic generator fetched the landing document and script again after
+an in-page navigation, then reused that route's view ID for the landing page.
+An actual HTTP run produced five views with only three identities. The fix in
+[PR #308](https://github.com/lustoykov/hallvi/pull/308) keeps one document load and
+a distinct identity per route. Its focused regression checks delivered events;
+the simulator still synthesizes instrumentation, so real browser-script tests
+remain a separate proof. UI scenario fixtures serve a different visual purpose.
+
+The same review found that completed waits retained their abort listeners.
+[PR #312](https://github.com/lustoykov/hallvi/pull/312) removes each listener when
+its wait settles, including cancellation. Actual CLI diagnostics confirmed zero
+listeners after completion and SIGINT; existing HTTP regressions still pass.
+
+**+1:** 2026-09-30 — post-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 ### AF-030 — Make the Traffic script template safe for a shared Traefik
 

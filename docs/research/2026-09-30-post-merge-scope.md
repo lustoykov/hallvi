@@ -16,12 +16,11 @@ This scope was refreshed against remote main
 The four reproduced Traffic implementations and the three test-cleanup targets
 are unchanged between those revisions. That is a source check, not a new test run.
 
-## Recommended first batch
+## Selected correctness and test work
 
-Five independently reviewable changes. T1–T4 each carry their own regression
-check; they do not wait for the broad acceptance run. T5 follows the fixes so it
-can prune against the coverage that remains. Start with T1/T2; T3/T4 can proceed
-independently. The owner selected all five together with the follow-up work.
+The owner selected five independently reviewable changes together with the
+follow-up work. T1–T4 carry focused regression evidence; T5 prunes against the
+behavior coverage that remains.
 
 | Scope | Concrete change and preserved behavior | Acceptance |
 | --- | --- | --- |
@@ -102,8 +101,10 @@ cutoff. Release [#296](https://github.com/lustoykov/hallvi/pull/296) followed du
 setup requests and native-host behavior before proposing new cuts. The stale
 setup-request repair is already merged. Open
 [#294](https://github.com/lustoykov/hallvi/pull/294) owns plugin-update work;
-do not duplicate it. These later changes have not received the original full
-audit's depth of review.
+do not duplicate it. The supplemental source review covers those PRs plus #298/#299 through
+`f63092bb`. [#307](https://github.com/lustoykov/hallvi/pull/307) fixes failed-write
+draft/request-key retention and removes the unused sent-key set. Native host
+rendering and remote SSH transport remain separate evidence boundaries.
 
 ## T10 — Fresh-user walkthrough
 
@@ -119,5 +120,16 @@ was removed or simplified, evidence for acceptance, and remaining stack limits.
 Include a Mermaid flow when an ownership boundary changes and before/after
 screenshots when user-visible behavior changes. Keep raw screenshots, logs and
 per-run reports in ignored output directories. The original scoping pass
-performed no production fixes or new application acceptance; implementation
-results belong to their subsequent PRs and the updated local report.
+performed no production fixes or new application acceptance. Subsequent fixes
+are in [#302](https://github.com/lustoykov/hallvi/pull/302) (shared proxy routes),
+[#310](https://github.com/lustoykov/hallvi/pull/310) (Traffic worker ownership),
+[#303](https://github.com/lustoykov/hallvi/pull/303) and
+[#308](https://github.com/lustoykov/hallvi/pull/308) (route identities),
+[#312](https://github.com/lustoykov/hallvi/pull/312) (simulator wait cleanup),
+[#307](https://github.com/lustoykov/hallvi/pull/307) (plugin draft retention),
+and [#301](https://github.com/lustoykov/hallvi/pull/301) (cache, tests, checklist
+and combined acceptance). Their descriptions and the local HTML report retain
+the detailed evidence. The measured reader load justified retaining the current
+per-subscription follower; independent generator, oracle and UI fixtures retain
+different verification roles. No generic reader bus or simulation framework
+was added.
