@@ -40,27 +40,6 @@ to remove the default goals claim. Branch `codex/traffic-consent`,
 **+1:** 2026-09-30 — owner's traffic privacy and goals task,
 [PR #306](https://github.com/lustoykov/hallvi/pull/306).
 
-### Post-merge fixes and simplification
-
-**Status:** In progress; the owner selected all ten scopes on 30 September 2026.
-**Problem and intended result:** Keep recent capabilities while removing
-unnecessary complexity and closing demonstrated bugs and generalization gaps.
-**Smallest scope:** [Four bounded Traffic fixes, focused test pruning, a small
-UI pass and broader acceptance](docs/research/2026-09-30-post-merge-scope.md).
-Larger simulator/log-reader reductions depend on evidence.
-**Evidence and acceptance:** The linked scope records the audited and refreshed
-revisions, AF-029–AF-032/AF-039, and a concrete completion check for each package.
-**Open decisions:** Larger reductions must earn their place through measurement
-or demonstrated friction; there is no feature-removal quota.
-**Assignment:** Implementation and acceptance in task
-`01a0f19e-1f49-7d70-947b-28c911465e09`, following
-[the scoped proposal](https://github.com/lustoykov/hallvi/pull/292). The owner
-authorized the four fixes, test pruning, UI simplification, broader acceptance,
-measured reductions, supplemental audit and fresh-user walkthrough, with review
-between increments.
-
-**+1:** 2026-09-30 — owner-requested scope in the task above.
-
 Votes show interest, not priority or approval. Each count comes from the task
 references in that proposal, including its initial proposal task.
 
@@ -152,9 +131,45 @@ into Pi's product sessions or publish private application data in proposals.
 
 | Proposal | +1 | Status | Delivered scope |
 | --- | --- | --- | --- |
+| [Post-merge fixes and simplification](#post-merge-fixes-and-simplification) | 1 | Done | Ten selected scopes; bounded acceptance and measured reductions |
 | [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | Done | Saved route through Pi, with installed acceptance |
 | [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | Done | Work line and truthful existing recovery panel |
 | [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | Done | Saved Markdown and existing Copy reply |
+
+### Post-merge fixes and simplification
+
+**Status:** Done (the ten scopes selected on 30 September 2026).
+**Problem and intended result:** Keep recent capabilities while removing
+unnecessary complexity and closing demonstrated bugs and generalization gaps.
+**Smallest scope:** [Four bounded Traffic fixes, focused test pruning, a small
+UI pass and broader acceptance](docs/research/2026-09-30-post-merge-scope.md).
+The measured reader load did not justify another shared-reader abstraction;
+independent generator, oracle and UI fixtures keep distinct verification roles.
+**Evidence and acceptance:** The linked scope records the audited and refreshed
+revisions, AF-029–AF-032/AF-039, and a concrete completion check for each package.
+**Delivered:** [#301](https://github.com/lustoykov/hallvi/pull/301),
+[#302](https://github.com/lustoykov/hallvi/pull/302),
+[#303](https://github.com/lustoykov/hallvi/pull/303),
+[#307](https://github.com/lustoykov/hallvi/pull/307),
+[#308](https://github.com/lustoykov/hallvi/pull/308),
+[#310](https://github.com/lustoykov/hallvi/pull/310),
+[#312](https://github.com/lustoykov/hallvi/pull/312) and
+[#313](https://github.com/lustoykov/hallvi/pull/313). Acceptance includes real
+proxy isolation, explicit routing and consent, retained Paperless ingestion and
+a fresh-controller Linkding bookmark across container recreation, controller
+restart and reconnection.
+**Remaining limits:** The walkthrough reused an existing account and a packaged
+foreground controller. Native plugin hosts, fresh-account installation, external
+user comprehension and production capacity are separate evidence boundaries.
+No recovery/backup claim, release publication or feature-removal quota was added.
+**Assignment:** Implementation and acceptance in task
+`01a0f19e-1f49-7d70-947b-28c911465e09`, following
+[the scoped proposal](https://github.com/lustoykov/hallvi/pull/292). The owner
+authorized the four fixes, test pruning, UI simplification, broader acceptance,
+measured reductions, supplemental audit and fresh-user walkthrough, with review
+between increments.
+
+**+1:** 2026-09-30 — owner-requested scope in the task above.
 
 ### Reconnect to a known private application
 

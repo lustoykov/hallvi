@@ -7,6 +7,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | --- | --- | --- |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
+| [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | New |
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
@@ -20,7 +21,6 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
-| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 2 | Resolved in #295 and #313 |
 | [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
 | [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
@@ -29,23 +29,16 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
-### AF-037 — Close setup requests handled in conversation
+### AF-047 — Investigate stdout listener warnings during real Pi turns
 
-**+1:** 2026-09-30 — stale DNS request repair.
+**+1:** 2026-09-30 — post-merge audit, task
+`01a0f19e-1f49-7d70-947b-28c911465e09`.
 
-**+1:** 2026-09-30 — independent post-merge audit, task
-`01a0f19e-1f49-7d70-947b-28c911465e09`: the fresh-controller walkthrough
-connected and SSH-verified the application's host through Pi, while its original
-host card still asked where it should run. The controller had a host attached
-but the request remained open. Pi's successful `connect_server` now dismisses
-only that open host request; failed connections, other requests and settled
-receipts stay intact. The manual machine-card flow still creates its receipt.
-
-Completing DNS through the conversation left its guided card unanswered. The
-plugin promoted it into a current blocker without a date, even after later
-successful releases. This fix gives Pi explicit withdrawal for obsolete open
-setup cards, preserves a hostname supplied after a blank card was opened, and
-shows dated open requests separately from the operator's activity.
+The retained Paperless development controller at `8bbc1ad3` logged
+`MaxListenersExceededWarning` for `SyncWriteStream` during real Pi turns.
+The requests completed normally and browser error logs were empty. Determine
+which listener owner accumulates before proposing a fix; this observation does
+not establish a product failure or justify raising the listener limit.
 
 ## How to contribute
 
@@ -432,6 +425,7 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 2 | Resolved in #295 and #313 |
 | [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Resolved in #310 |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Resolved in #303 and #308 |
 | [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | Resolved in #301 |
@@ -454,6 +448,27 @@ limit from the account balance; the request error now names both possibilities.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-037 — Close setup requests handled in conversation
+
+**Status:** Resolved in #295 and #313. The fresh-controller acceptance verified
+that normal reconnection removes the stale host card while preserving history.
+
+**+1:** 2026-09-30 — stale DNS request repair.
+
+**+1:** 2026-09-30 — independent post-merge audit, task
+`01a0f19e-1f49-7d70-947b-28c911465e09`: the fresh-controller walkthrough
+connected and SSH-verified the application's host through Pi, while its original
+host card still asked where it should run. The controller had a host attached
+but the request remained open. Pi's successful `connect_server` now dismisses
+only that open host request; failed connections, other requests and settled
+receipts stay intact. The manual machine-card flow still creates its receipt.
+
+Completing DNS through the conversation left its guided card unanswered. The
+plugin promoted it into a current blocker without a date, even after later
+successful releases. This fix gives Pi explicit withdrawal for obsolete open
+setup cards, preserves a hostname supplied after a blank card was opened, and
+shows dated open requests separately from the operator's activity.
 
 ### AF-029 — Keep Traffic database waits off the event loop
 

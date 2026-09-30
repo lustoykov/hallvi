@@ -1,6 +1,6 @@
 # Post-merge fixes and simplification
 
-**Status: In progress.** After reviewing the scopes, the owner selected all ten
+**Status: Complete for the selected scope.** After reviewing the scopes, the owner selected all ten
 work packages on 30 September 2026 in task
 `01a0f19e-1f49-7d70-947b-28c911465e09`: implement, verify, review and simplify
 in bounded increments. Implementation starts from
@@ -108,12 +108,20 @@ rendering and remote SSH transport remain separate evidence boundaries.
 
 ## T10 — Fresh-user walkthrough
 
-Run the existing [beta walkthrough](../beta-walkthrough.md) against the combined
-changes with fresh isolated controller state. Follow setup, deployment, useful
-application behavior and return through the browser; fix concrete friction or
-bugs found. Keep real-account reuse, scripted fixtures and unfamiliar-user
-comprehension distinct. An agent rehearsal cannot prove external-user
-comprehension. Preserve all existing retained application records and data.
+The [beta walkthrough](../beta-walkthrough.md) was exercised with fresh isolated
+controller state and an existing real account. Linkding provided a server-rendered
+Django/SQLite application with a real login and browser-created bookmark. The
+same bookmark survived container recreation, controller restart and reopening
+its private SSH route. The rehearsal exposed a stale host setup card after Pi
+connected successfully; [#313](https://github.com/lustoykov/hallvi/pull/313)
+settles only that open request after a successful connection.
+
+Retained Paperless supplied the contrasting PostgreSQL/Redis/Celery case:
+existing documents/history survived, and a fresh PDF completed background
+ingestion, indexing and authenticated browser search. Disposable test data was
+removed while the original data and services remained. This is bounded
+agent-assisted acceptance, not fresh-account native installation, native plugin
+host rendering, unfamiliar-user comprehension or a backup/restore claim.
 
 Each implementation PR should state its trigger and resulting behavior, what
 was removed or simplified, evidence for acceptance, and remaining stack limits.
@@ -127,6 +135,7 @@ are in [#302](https://github.com/lustoykov/hallvi/pull/302) (shared proxy routes
 [#308](https://github.com/lustoykov/hallvi/pull/308) (route identities),
 [#312](https://github.com/lustoykov/hallvi/pull/312) (simulator wait cleanup),
 [#307](https://github.com/lustoykov/hallvi/pull/307) (plugin draft retention),
+[#313](https://github.com/lustoykov/hallvi/pull/313) (settled host setup),
 and [#301](https://github.com/lustoykov/hallvi/pull/301) (cache, tests, checklist
 and combined acceptance). Their descriptions and the local HTML report retain
 the detailed evidence. The measured reader load justified retaining the current
