@@ -349,21 +349,23 @@ export async function readTraffic(
   const timeZone = controllerTimeZone();
   const { from, to } = historyDays(range, now, timeZone);
   const history = historyOf(
-    readDays(applicationId, from, to),
+    await readDays(applicationId, from, to),
     range,
     now,
     await currentCollection(applicationId, now),
     timeZone,
   );
-  const releases = releaseAts.map((at) => {
-    const days = impactDays(Date.parse(at), RELEASE_WINDOW, timeZone);
-    return releaseImpact(
-      readDays(applicationId, days.from, days.to),
-      at,
-      RELEASE_WINDOW,
-      now,
-    );
-  });
+  const releases = await Promise.all(
+    releaseAts.map(async (at) => {
+      const days = impactDays(Date.parse(at), RELEASE_WINDOW, timeZone);
+      return releaseImpact(
+        await readDays(applicationId, days.from, days.to),
+        at,
+        RELEASE_WINDOW,
+        now,
+      );
+    }),
+  );
   return trafficReading(history, releases);
 }
 

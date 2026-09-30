@@ -19,7 +19,10 @@ function restoreError(data: DatabaseErrorData): Error {
 }
 
 /** One connection, owned by one thread. Only named storage operations cross. */
-export class DatabaseClient {
+export class DatabaseClient<
+  Operations extends Record<string, (...args: never[]) => unknown> =
+    typeof operations,
+> {
   readonly worker: Worker;
   private nextId = 0;
   private pending = new Map<
@@ -33,13 +36,17 @@ export class DatabaseClient {
   private closing?: Promise<void>;
   private exited: Promise<void>;
 
-  constructor(path: string, onFailure?: () => void) {
+  constructor(
+    path: string,
+    onFailure?: () => void,
+    entry: "database-worker" | "traffic-worker" = "database-worker",
+  ) {
     this.worker = new Worker(
       resolve(
         /* turbopackIgnore: true */ process.cwd(),
         process.env.NODE_ENV === "production"
-          ? "dist/database-worker.mjs"
-          : "scripts/database-worker.mjs",
+          ? `dist/${entry}.mjs`
+          : `scripts/${entry}.mjs`,
       ),
       { workerData: { path }, execArgv: [] },
     );
@@ -61,7 +68,7 @@ export class DatabaseClient {
         const request = this.pending.get(message.id);
         if (!request) return;
         this.pending.delete(message.id);
-        if (!this.pending.size) this.worker.unref();
+        if (!this.pending.size && !this.closing) this.worker.unref();
         if (message.error) request.reject(restoreError(message.error));
         else request.resolve(message.result);
       },
@@ -90,17 +97,17 @@ export class DatabaseClient {
     this.worker.unref();
   }
 
-  call<K extends keyof typeof operations>(
+  call<K extends keyof Operations>(
     operation: K,
-    args: Parameters<(typeof operations)[K]>,
-  ): Promise<Awaited<ReturnType<(typeof operations)[K]>>> {
+    args: Parameters<Operations[K]>,
+  ): Promise<Awaited<ReturnType<Operations[K]>>> {
     if (this.closing) return Promise.reject(new Error("Database is closing."));
     return this.send(operation, args) as Promise<
-      Awaited<ReturnType<(typeof operations)[K]>>
+      Awaited<ReturnType<Operations[K]>>
     >;
   }
 
-  private send(operation: keyof typeof operations | "close", args: unknown[]) {
+  private send(operation: keyof Operations | "close", args: unknown[]) {
     if (this.failure) return Promise.reject(this.failure);
     const id = ++this.nextId;
     return new Promise<unknown>((resolve, reject) => {
@@ -110,7 +117,7 @@ export class DatabaseClient {
         this.worker.postMessage({ id, operation, args });
       } catch (error) {
         this.pending.delete(id);
-        if (!this.pending.size) this.worker.unref();
+        if (!this.pending.size && !this.closing) this.worker.unref();
         reject(error);
       }
     });

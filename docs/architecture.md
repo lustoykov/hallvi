@@ -28,6 +28,11 @@ flowchart TD
     API -->|worker.sock: send, continue, stop, read| Worker
     Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] -->|await named operation| PiDB[Database thread in Pi process]
     PiDB --> DB
+    API -->|await Traffic operation| WebTraffic[Traffic database thread in web process]
+    Worker --> Collector[Traffic collector]
+    Collector -->|await Traffic operation| PiTraffic[Traffic database thread in Pi process]
+    WebTraffic --> TrafficDB[(traffic.db: day totals and collection choice)]
+    PiTraffic --> TrafficDB
     Worker --> Tools[Operator tools]
     Tools --> Host[Application server over SSH]
     Tools --> Providers[Hetzner, Cloudflare, GitHub, object storage]
@@ -147,13 +152,24 @@ history. See the [notification measurements](https://github.com/lustoykov/hallvi
 ## Asynchronous SQLite boundary
 
 [db.ts](../src/server/db.ts) exposes asynchronous storage operations. Each
-process owns one [database thread](../src/server/database-worker.ts), which
+process owns one main-record [database thread](../src/server/database-worker.ts), which
 opens the existing SQLite file and executes the Drizzle operations in
 [database-store.ts](../src/server/database-store.ts). Query execution, lock
 waits, schema checks, retained-state ownership checks and SQLite backups run
 there. Web requests and Pi await the result while their event loops remain
 available. A busy connection still queues its own requests; this does not
 remove SQLite's single-writer limit.
+
+[Traffic storage](../src/server/traffic/store.ts) uses the same named-operation
+transport with its own [thread](../src/server/traffic-worker.ts) and connection
+to `traffic.db` in each process. Traffic SQL, JSON decoding, retained ownership
+and backups run there. Its queue is separate from the main-record queue: a
+Traffic write lock cannot hold up a chat or application-record operation.
+The existing day/collection tables and WAL format are unchanged. Collector
+callbacks enqueue counted snapshots and drain them when the follow ends.
+Stop and Forget still acquire the Traffic write lock before changing the
+choice; collector writes acquire it before reading that choice, so late
+observations cannot restore collection or deleted totals.
 
 WAL, foreign keys and the five-second busy timeout are unchanged. Creating
 an application and its first conversation is one `BEGIN IMMEDIATE` transaction
@@ -175,7 +191,10 @@ connection after its sessions have closed. The existing five-second forced
 exit limit still applies. Idle database threads do not keep
 a process alive; Node ends them with their owning process. Development loads
 the source thread through `scripts/database-worker.mjs`; the build and package
-include `dist/database-worker.mjs`, which needs no TypeScript loader.
+include `dist/database-worker.mjs` and `dist/traffic-worker.mjs`, which need no
+TypeScript loader. Traffic development uses `scripts/traffic-worker.mjs`.
+Packaging starts both database bundles with the packaged Node and SQLite
+dependency before creating the release archive.
 
 The separate `.worker-lock` remains synchronous: it is acquired once, with a
 zero timeout, before Pi serves requests and is held for process ownership.

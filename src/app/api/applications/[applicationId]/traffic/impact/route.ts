@@ -40,9 +40,16 @@ export async function GET(
     const timeZone = controllerTimeZone();
     // Each release reads the day or two around it, not every day between
     // the oldest release and the newest.
-    return asked.map((at) => {
-      const { from, to } = impactDays(Date.parse(at), 120, timeZone);
-      return releaseImpact(readDays(applicationId, from, to), at, 120, now);
-    });
+    return Promise.all(
+      asked.map(async (at) => {
+        const { from, to } = impactDays(Date.parse(at), 120, timeZone);
+        return releaseImpact(
+          await readDays(applicationId, from, to),
+          at,
+          120,
+          now,
+        );
+      }),
+    );
   });
 }
