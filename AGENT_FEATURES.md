@@ -7,6 +7,39 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 
 ## Proposals
 
+The owner selected the traffic-consent setup below on 30 September.
+Completed scopes and their remaining evidence limits are in the Archive.
+
+| Proposal | +1 | Status | Assignment |
+| --- | --- | --- | --- |
+| [Traffic consent and privacy notice](#traffic-consent-and-privacy-notice) | 1 | In progress | [PR #306](https://github.com/lustoykov/hallvi/pull/306) |
+
+### Traffic consent and privacy notice
+
+**Status:** In progress
+**Problem and intended result:** Cookie-free script measurement started immediately,
+without consent integration or a site-specific notice. The default checklist
+also implied automatic sign-up tracking that requires manual application code.
+**Smallest scope:** Default-off script with grant/withdrawal API; Pi's setup
+includes existing consent controls or offers a small prompt and completed notice
+in the site's design. Keep the owner-reviewed application PR boundary. Remove
+the default goal claim while retaining manually instrumented events. No CMP
+framework, live-site mutation or automatic compliance certification.
+**Evidence:** [Design, current collection behavior and dated primary sources](docs/design/traffic.md#analytics-consent-and-privacy-notice).
+**Acceptance:** In a real browser, unknown/refused consent sends no events,
+grant starts the current view, withdrawal stops measurement, and regrant never
+replays refused activity. Setup includes missing notice facts and rollout/cache
+checks. The checklist omits goals, and the Goals card requires recorded events.
+**Open decisions:** Each site's missing legal/retention details and implemented
+controls remain application-specific; local checks do not certify them.
+**Assignment:** Owner's 30 September request to fix analytics privacy notice and
+consent, explicit selection to offer a prompt/notice where absent, and request
+to remove the default goals claim. Branch `codex/traffic-consent`,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
+
+**+1:** 2026-09-30 — owner's traffic privacy and goals task,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306).
+
 ### Post-merge fixes and simplification
 
 **Status:** Proposed; scoped at the owner's request, no implementation assigned.
@@ -24,16 +57,12 @@ offer and feature deletions remain product choices.
 
 **+1:** 2026-09-30 — owner-requested scope in the task above.
 
-No selected implementation remains assigned after the 29 September batch.
-Completed selected scopes and their remaining evidence limits are in the Archive.
-
 Votes show interest, not priority or approval. Each count comes from the task
 references in that proposal, including its initial proposal task.
 
-These are candidates from the [29 September intake](docs/research/2026-09-29-feature-intake.md),
+Earlier candidate research is in the [29 September intake](docs/research/2026-09-29-feature-intake.md),
 which rechecked the existing research in [PR #246](https://github.com/lustoykov/hallvi/pull/246)
-against current code and open work. The detailed plans remain in that PR; this
-list indexes their selection and assignment instead of copying the plans.
+against current code and open work. The detailed plans remain in that PR; completed selections are archived below.
 Performance work from #248/#249 merged through [#252](https://github.com/lustoykov/hallvi/pull/252)
 and is not proposed again. The
 fresh-user beta walkthrough remains open; these ideas add no beta prerequisites.
