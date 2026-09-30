@@ -1,4 +1,3 @@
-import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
 import {
   createCipheriv,
@@ -31,7 +30,7 @@ import { backupDestinationAccess } from "./backup-connection";
 import { backupDatabase, databasePath } from "./db";
 import { piAccountDir, piConfigDir } from "./pi-configuration";
 import { readTar, writeTar } from "./tar";
-import { trafficDatabasePath } from "./traffic/store";
+import { backupTrafficDatabase, trafficDatabasePath } from "./traffic/store";
 
 /**
  * Hallvi's own records and keys, copied to the destination the owner
@@ -247,20 +246,7 @@ export async function captureControllerPayload(): Promise<{
       if (name === "traffic.db" && !existsSync(source)) continue;
       const target = join(/* turbopackIgnore: true */ staging, name);
       if (name === "hallvi.db") await backupDatabase(target);
-      else {
-        const reader = new Database(source, { readonly: true });
-        try {
-          await reader.backup(target);
-        } finally {
-          reader.close();
-        }
-        const copy = new Database(target);
-        try {
-          copy.pragma("journal_mode = DELETE");
-        } finally {
-          copy.close();
-        }
-      }
+      else await backupTrafficDatabase(target);
       entries.push({
         path: `payload/database/${name}`,
         content: readFileSync(/* turbopackIgnore: true */ target),

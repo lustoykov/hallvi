@@ -253,8 +253,11 @@ and keeping it drafts the log setup for Pi.
 - **Turning it off** stops the follow at once. Stored totals remain until the
   owner deletes them; the server's logs keep their own retention; Hallvi
   changes nothing on the server by itself.
-- The web process's choice and the worker's writes take the same SQLite write
-  lock before reading whether collection is enabled. A concurrent stop or
+- Traffic storage runs on a dedicated database thread in each process,
+  separate from the thread serving application and conversation records. A
+  Traffic write lock leaves those records and the caller's event loop free.
+  The web process's choice and the collector's writes take the same SQLite
+  write lock before reading whether collection is enabled. A concurrent stop or
   deletion therefore cannot be overwritten by an older collector observation
   or recreate deleted totals.
 - **Removing the application** removes its totals.

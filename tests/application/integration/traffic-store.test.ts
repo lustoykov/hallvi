@@ -6,7 +6,11 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { once } from "node:events";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { createServer } from "node:http";
+import { setTimeout as delay } from "node:timers/promises";
+import { DatabaseClient } from "../../../src/server/database-client";
+import { pushTestDatabase } from "../../test-database";
 import { Worker } from "node:worker_threads";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +18,7 @@ import type { TrafficDay, TrafficLine } from "@/server/traffic/contract";
 import { countDay, DayCounter } from "@/server/traffic/count";
 import { dayBounds } from "@/server/traffic/days";
 import {
+  closeTrafficDatabase,
   collectionOf,
   forget,
   readDays,
@@ -34,10 +39,11 @@ let root: string;
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hv-traffic-store-"));
   vi.stubEnv("HALLVI_DB_PATH", join(root, "hallvi.db"));
+  pushTestDatabase(join(root, "hallvi.db"));
 });
 
-afterAll(() => {
-  globalThis.__hallviTraffic?.client.close();
+afterAll(async () => {
+  await globalThis.__hallviTraffic?.client.close();
   globalThis.__hallviTraffic = undefined;
   rmSync(root, { recursive: true, force: true });
   vi.unstubAllEnvs();
@@ -78,12 +84,88 @@ function view(at: number, address: string): TrafficLine {
 }
 
 describe("traffic.db", () => {
+  it("keeps timers, HTTP and main-record writes moving while Traffic waits for an external write lock", async () => {
+    const mainPath = join(root, "hallvi.db");
+    const records = new DatabaseClient(mainPath);
+    const holdMs = 800;
+    const gaps: number[] = [];
+    let last = performance.now();
+    const timer = setInterval(() => {
+      const now = performance.now();
+      gaps.push(now - last);
+      last = now;
+    }, 10);
+    const http = createServer(async (_request, response) => {
+      const chat = await records.call("insertChat", ["responsive"]);
+      response.end(chat.applicationId);
+    });
+    let lock: Worker | undefined;
+    try {
+      await records.call("createApplicationRecords", [
+        {
+          name: "Responsive",
+          repositoryUrl: "https://github.com/fixture/responsive",
+          repositoryOwner: "fixture",
+          repositoryName: "responsive",
+        },
+        "responsive",
+      ]);
+      await setCollection("responsive", "keep");
+      http.listen(0, "127.0.0.1");
+      await once(http, "listening");
+      lock = new Worker(resolve("tests/fixtures/database-lock.mjs"), {
+        workerData: { path: trafficDatabasePath(), holdMs },
+      });
+      const ended = once(lock, "exit");
+      await once(lock, "message");
+      let completed = false;
+      const began = performance.now();
+      const waiting = recordCollector("responsive", { state: "live" }).then(
+        () => {
+          completed = true;
+        },
+      );
+      await delay(50);
+      const requestAt = performance.now();
+      const { port } = http.address() as { port: number };
+      expect(await (await fetch(`http://127.0.0.1:${port}`)).text()).toBe(
+        "responsive",
+      );
+      const requestMs = Math.round(performance.now() - requestAt);
+      expect(completed).toBe(false);
+      expect(
+        await records.call("listApplicationChats", ["responsive"]),
+      ).toHaveLength(2);
+      await waiting;
+      const trafficWriteMs = Math.round(performance.now() - began);
+      await ended;
+      expect(trafficWriteMs).toBeGreaterThan(holdMs / 2);
+      expect(requestMs).toBeLessThan(holdMs / 2);
+      const maxTimerGap = Math.round(Math.max(...gaps));
+      expect(maxTimerGap).toBeLessThan(holdMs / 2);
+      process.stdout.write(
+        JSON.stringify({
+          fixture: "Traffic 800ms write lock",
+          trafficWriteMs,
+          requestMs,
+          maxTimerGap,
+        }) + "\n",
+      );
+    } finally {
+      clearInterval(timer);
+      await lock?.terminate();
+      http.closeAllConnections();
+      await new Promise<void>((done) => http.close(() => done()));
+      await records.close();
+    }
+  });
+
   it.each(["stop", "forget"] as const)(
     "a concurrent %s wins over collector writes",
     async (action) => {
       for (const update of ["observation", "day"] as const) {
         const id = `race-${action}-${update}`;
-        setCollection(id, "keep");
+        await setCollection(id, "keep");
         // The web process holds an uncommitted stop/delete while the collector
         // starts. WAL readers can still see the old enabled record; a writer
         // must acquire its lock before deciding whether collection is allowed.
@@ -120,14 +202,15 @@ describe("traffic.db", () => {
           await once(writer, "message");
           const exited = once(writer, "exit");
           writer.postMessage("commit");
-          if (update === "observation") recordCollector(id, { state: "live" });
-          else expect(writeDay(id, counted(12, false))).toBe(false);
+          if (update === "observation")
+            await recordCollector(id, { state: "live" });
+          else expect(await writeDay(id, counted(12, false))).toBe(false);
           await exited;
-          expect(collectionOf(id)).toMatchObject({
+          expect(await collectionOf(id)).toMatchObject({
             enabledAt: null,
             state: "off",
           });
-          expect(readDays(id, DAY, DAY)).toEqual([]);
+          expect(await readDays(id, DAY, DAY)).toEqual([]);
         } finally {
           await writer.terminate();
         }
@@ -135,26 +218,26 @@ describe("traffic.db", () => {
     },
   );
 
-  it("keeps a recount only when it covers at least as much, and never a provisional one over a final one", () => {
-    setCollection("replacing", "keep");
-    const kept = () => readDays("replacing", DAY, DAY)[0];
-    expect(writeDay("replacing", counted(12, false))).toBe(true);
+  it("keeps a recount only when it covers at least as much, and never a provisional one over a final one", async () => {
+    await setCollection("replacing", "keep");
+    const kept = async () => (await readDays("replacing", DAY, DAY))[0];
+    expect(await writeDay("replacing", counted(12, false))).toBe(true);
     // Today is recounted whenever the collector starts: always the latest.
-    expect(writeDay("replacing", counted(6, false))).toBe(true);
-    expect(kept().coverage.to).toBe(iso(start + 6 * HOUR));
-    expect(writeDay("replacing", counted(20, true))).toBe(true);
-    expect(writeDay("replacing", counted(24, false))).toBe(false);
-    expect(writeDay("replacing", counted(10, true))).toBe(false);
-    expect(kept()).toMatchObject({
+    expect(await writeDay("replacing", counted(6, false))).toBe(true);
+    expect((await kept()).coverage.to).toBe(iso(start + 6 * HOUR));
+    expect(await writeDay("replacing", counted(20, true))).toBe(true);
+    expect(await writeDay("replacing", counted(24, false))).toBe(false);
+    expect(await writeDay("replacing", counted(10, true))).toBe(false);
+    expect(await kept()).toMatchObject({
       final: true,
       coverage: { to: iso(start + 20 * HOUR) },
     });
-    expect(writeDay("replacing", counted(24, true))).toBe(true);
-    expect(kept().coverage.to).toBe(iso(end));
+    expect(await writeDay("replacing", counted(24, true))).toBe(true);
+    expect((await kept()).coverage.to).toBe(iso(end));
   });
 
-  it("counts a day again after a restart, and never adds to what it stored", () => {
-    setCollection("restarted", "keep");
+  it("counts a day again after a restart, and never adds to what it stored", async () => {
+    await setCollection("restarted", "keep");
     const lines = Array.from({ length: 40 }, (_, index) =>
       view(start + 8 * HOUR + index * 60_000, `203.0.113.${index % 7}`),
     );
@@ -168,20 +251,24 @@ describe("traffic.db", () => {
     // Following the log, then stopped part way through the day.
     const before = new DayCounter(options);
     for (const line of lines.slice(0, 25)) before.add(line);
-    writeDay("restarted", before.day({ now }));
+    await writeDay("restarted", before.day({ now }));
+    await closeTrafficDatabase();
+    expect((await readDays("restarted", DAY, DAY))[0]).toEqual(
+      before.day({ now }),
+    );
     // On restart the collector counts today again from the log, which still
     // holds every line, the ones already counted included.
     const after = new DayCounter(options);
     for (const line of lines) after.add(line);
-    writeDay("restarted", after.day({ now }));
-    const [stored] = readDays("restarted", DAY, DAY);
+    await writeDay("restarted", after.day({ now }));
+    const [stored] = await readDays("restarted", DAY, DAY);
     expect(stored).toEqual(countDay(lines, { ...options, now }));
     expect(stored.hours[8].views).toBe(40);
     expect(stored.visitors).toBe(7);
   });
 
-  it("never stores a page's query or fragment, even from a forged event", () => {
-    setCollection("forged", "keep");
+  it("never stores a page's query or fragment, even from a forged event", async () => {
+    await setCollection("forged", "keep");
     const at = start + 10 * HOUR;
     const event = (payload: object) =>
       `/_hv/e/1/${Buffer.from(JSON.stringify(payload)).toString("base64url")}`;
@@ -227,8 +314,8 @@ describe("traffic.db", () => {
       coverage: { from: iso(start), to: iso(end), gaps: [] },
       now: end + HOUR,
     };
-    expect(writeDay("forged", countDay(lines, options))).toBe(true);
-    const [kept] = readDays("forged", DAY, DAY);
+    expect(await writeDay("forged", countDay(lines, options))).toBe(true);
+    const [kept] = await readDays("forged", DAY, DAY);
     // Malformed events are nothing at all: not a view, not a switch.
     expect(kept.viewSource).toBe("log");
     expect(kept.pages).toEqual([{ key: "/", count: 1, visitors: 1 }]);
@@ -236,31 +323,33 @@ describe("traffic.db", () => {
     expect(JSON.stringify(kept)).not.toMatch(/token|reset|cmVzZXQ/);
   });
 
-  it("writes nothing while collection is off, and forgetting ends it", () => {
-    expect(writeDay("owner", counted(24, true))).toBe(false);
-    expect(collectionOf("owner")).toMatchObject({
+  it("writes nothing while collection is off, and forgetting ends it", async () => {
+    expect(await writeDay("owner", counted(24, true))).toBe(false);
+    expect(await collectionOf("owner")).toMatchObject({
       enabledAt: null,
       state: "off",
       storedFrom: null,
     });
-    setCollection("owner", "keep");
-    expect(writeDay("owner", counted(24, true))).toBe(true);
-    expect(recordCollector("owner", { state: "live" })).toMatchObject({
+    await setCollection("owner", "keep");
+    expect(await writeDay("owner", counted(24, true))).toBe(true);
+    expect(await recordCollector("owner", { state: "live" })).toMatchObject({
       state: "live",
       storedFrom: DAY,
     });
     // Stopping keeps the totals and what was seen, and a collector that has
     // not stopped yet can neither write nor say it is live.
-    const stopped = setCollection("owner", "stop");
+    const stopped = await setCollection("owner", "stop");
     expect(stopped).toMatchObject({ enabledAt: null, state: "off" });
     expect(stopped.disabledAt).not.toBeNull();
-    expect(writeDay("owner", counted(24, true))).toBe(false);
-    expect(recordCollector("owner", { state: "live" }).state).toBe("off");
-    expect(readDays("owner", DAY, DAY)).toHaveLength(1);
-    forget("owner");
-    expect(readDays("owner", DAY, DAY)).toEqual([]);
+    expect(await writeDay("owner", counted(24, true))).toBe(false);
+    expect((await recordCollector("owner", { state: "live" })).state).toBe(
+      "off",
+    );
+    expect(await readDays("owner", DAY, DAY)).toHaveLength(1);
+    await forget("owner");
+    expect(await readDays("owner", DAY, DAY)).toEqual([]);
     // The owner stopped it, so the default cannot restart it.
-    const forgotten = collectionOf("owner");
+    const forgotten = await collectionOf("owner");
     expect(forgotten).toMatchObject({
       enabledAt: null,
       state: "off",
@@ -269,7 +358,7 @@ describe("traffic.db", () => {
     });
     expect(forgotten.disabledAt).not.toBeNull();
     // Another application's totals are untouched.
-    expect(readDays("restarted", DAY, DAY)).toHaveLength(1);
+    expect(await readDays("restarted", DAY, DAY)).toHaveLength(1);
     expect(existsSync(trafficDatabasePath())).toBe(true);
   });
 });
