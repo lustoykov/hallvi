@@ -134,8 +134,9 @@ never takes one key twice. A refusal keeps the draft and says why. The hint
 under the field names the permission mode. The message and key are saved before
 calling the host, and the text stays locked until acceptance is resolved. App
 switches keep that pending identity even when the sandbox denies local storage;
-reopening the panel can restore it only where the host allows storage. A late
-acknowledgement settles the original application's draft, never another one's.
+the in-memory draft also wins when writes fail but storage still reads older text.
+Reopening the panel can restore it only where the host successfully saved it.
+A late acknowledgement settles the original application's draft, never another one's.
 
 ## Honest states
 
