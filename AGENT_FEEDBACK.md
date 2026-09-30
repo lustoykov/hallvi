@@ -352,6 +352,10 @@ Model row could warn before the credit runs out rather than after.
 
 **+1:** 2026-09-30 — OpenRouter models (`claude/openrouter-models`)
 
+Review of [#297](https://github.com/lustoykov/hallvi/pull/297) also found that a
+402 can report a key spending limit. A credit display should distinguish that
+limit from the account balance; the request error now names both possibilities.
+
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
 

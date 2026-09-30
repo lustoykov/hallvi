@@ -205,12 +205,16 @@ export function describePiFailure(error: unknown): string {
   const normalized = (
     error instanceof Error ? error.message : ""
   ).toLowerCase();
-  if (/usage limit|rate limit|quota|status:? 429/.test(normalized))
+  if (/usage limit|rate limit|quota|^429\b|\bstatus:?\s*429\b/.test(normalized))
     return "The selected model reports a usage or rate limit. Check the account’s allowance, then retry.";
-  if (/status:? 402|insufficient credits|more credits/.test(normalized))
-    return "OpenRouter has no credit left for this model. Add credit on openrouter.ai, then retry.";
   if (
-    /invalid_grant|unauthorized|status:? 401|provider is not configured/.test(
+    /^402\b|\bstatus:?\s*402\b|insufficient credits|more credits/.test(
+      normalized,
+    )
+  )
+    return "OpenRouter has insufficient credit for this request. Add credit or check the key’s spending limit on openrouter.ai, then retry.";
+  if (
+    /invalid_grant|unauthorized|^401\b|\bstatus:?\s*401\b|provider is not configured/.test(
       normalized,
     )
   )

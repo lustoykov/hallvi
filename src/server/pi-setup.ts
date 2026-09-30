@@ -28,6 +28,7 @@ import {
 } from "./pi-settings";
 import { traceExportConfiguration } from "./tracing-config";
 import { diagnosticLogPath } from "./diagnostics";
+import { openRouterLogin } from "./openrouter-login";
 import {
   piModelOptions,
   validatePiSelection,
@@ -141,12 +142,18 @@ export async function getPiSetupStatus(
     let configuration;
     try {
       configuration = readPiConfiguration();
-      status.connections.openRouter = Boolean(readOpenRouterKey());
     } catch (error) {
       if (!preview) throw error;
     }
     status.hasSavedConfiguration = Boolean(configuration);
     status.connections.chatgpt = Boolean(configuration?.mode);
+    // Damage to an unused account must not disable the selected one. The
+    // active credential is checked below and still reports its own error.
+    try {
+      status.connections.openRouter = Boolean(readOpenRouterKey());
+    } catch {
+      status.connections.openRouter = false;
+    }
     if (!configuration || preview) {
       const detected = status.detected;
       const selection = detected.canReuse
@@ -276,6 +283,7 @@ export class PiLoginCoordinator {
     },
   ): PiLoginAttempt {
     this.cleanup();
+    openRouterLogin.cancelAll();
     // Signing in to ChatGPT from an OpenRouter model starts on ChatGPT's own.
     if (preferences.providerId && preferences.providerId !== PI_PROVIDER_ID)
       preferences = defaultPiSelection;
@@ -334,10 +342,14 @@ export class PiLoginCoordinator {
     return { ...record.public };
   }
 
+  cancelAll() {
+    for (const id of this.attempts.keys()) this.cancel(id);
+  }
+
   disconnect() {
     // A pending login must not reconnect this installation after disconnect
     // returns.
-    for (const id of this.attempts.keys()) this.cancel(id);
+    this.cancelAll();
     forgetChatgpt();
   }
 

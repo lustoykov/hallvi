@@ -2,11 +2,10 @@ import { z } from "zod";
 
 import { openRouterLogin } from "@/server/openrouter-login";
 import {
-  forgetOpenRouter,
   openRouterKeySchema,
   saveOpenRouterKey,
 } from "@/server/pi-configuration";
-import { getPiSetupStatus } from "@/server/pi-setup";
+import { getPiSetupStatus, piLoginCoordinator } from "@/server/pi-setup";
 import { handle } from "@/server/http";
 import { disconnectPiRequestSchema, parseJsonRequest } from "@/server/schemas";
 
@@ -16,6 +15,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   return handle(async () => {
     await parseJsonRequest(request, z.strictObject({}));
+    piLoginCoordinator.cancelAll();
     // The same-origin check has already required a loopback Host.
     return openRouterLogin.start(`http://${request.headers.get("host")}`);
   });
@@ -26,6 +26,8 @@ export async function PUT(request: Request) {
   return handle(async () => {
     const { key } = await parseJsonRequest(request, openRouterKeySchema);
     saveOpenRouterKey(key);
+    openRouterLogin.cancelAll();
+    piLoginCoordinator.cancelAll();
     return getPiSetupStatus();
   });
 }
@@ -33,7 +35,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   return handle(async () => {
     await parseJsonRequest(request, disconnectPiRequestSchema);
-    forgetOpenRouter();
+    openRouterLogin.disconnect();
     return getPiSetupStatus();
   });
 }

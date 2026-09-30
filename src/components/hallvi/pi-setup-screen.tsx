@@ -526,7 +526,7 @@ export function PiSetupScreen({
                         Share Pi’s login file and copy its model settings.
                       </p>
                       <button
-                        className={s.primary}
+                        className={status.ready ? s.textButton : s.primary}
                         type="button"
                         disabled={saving}
                         onClick={reuse}
@@ -933,8 +933,9 @@ export function PiSetupScreen({
           Disconnecting ChatGPT removes Hallvi’s saved connection choice.
           Credential files remain on disk, and messages already running may
           finish. It does not revoke OAuth tokens or sign you out of ChatGPT or
-          Pi. Disconnecting OpenRouter deletes Hallvi’s copy of the key; revoke
-          the key itself on openrouter.ai. Either way, the other account, when
+          Pi. Disconnecting OpenRouter deletes Hallvi’s saved copy of the key; a
+          running turn keeps its key in memory until it ends. Revoke the key
+          itself on openrouter.ai. Either way, the other account, when
           connected, takes over new messages.
         </p>
         <h3>What leaves this machine?</h3>
