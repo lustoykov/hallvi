@@ -738,6 +738,14 @@
   border-radius: 16px;
   background: linear-gradient(120deg, #eef4ff, var(--tf-tint) 55%, #fff);
 }
+.tf-script-card[data-folded] {
+  padding: 10px 14px 10px 16px;
+  border-radius: 14px;
+  background: var(--tf-tint);
+}
+.tf-script-card[data-folded] p {
+  flex: 1 1 320px;
+}
 .tf-script-card > div:first-child {
   flex: 1 1 380px;
   display: grid;

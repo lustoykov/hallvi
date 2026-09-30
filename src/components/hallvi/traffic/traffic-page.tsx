@@ -180,21 +180,53 @@ const offerKey = (applicationId: string) =>
 
 /**
  * The script, offered near the top while the log counts alone: what it
- * would see, and one button. "Not now" hides it until the reason changes.
+ * would see, and one button. "Not now" folds it to one line that stays in
+ * place, until the reason changes.
  */
 function ScriptCard({
   says,
   name,
+  folded,
   onAsk,
-  onDismiss,
+  onFold,
 }: {
   says: string;
   name: string;
+  folded: boolean;
   onAsk: (draft: string) => void;
-  onDismiss: () => void;
+  onFold: (folded: boolean) => void;
 }) {
+  const add = (
+    <button
+      type="button"
+      className={folded ? "tf-button" : "tf-primary"}
+      onClick={() => onAsk(scriptDraft(name))}
+    >
+      Add Hallvi&apos;s script
+    </button>
+  );
+  if (folded)
+    return (
+      <section
+        className="tf-script-card"
+        data-folded
+        aria-label="Hallvi's traffic script"
+      >
+        <p>
+          Hallvi&apos;s traffic script is not added yet.{" "}
+          <button
+            type="button"
+            className="tf-link"
+            onClick={() => onFold(false)}
+          >
+            What it adds
+          </button>
+        </p>
+        {add}
+      </section>
+    );
   return (
-    <section className="tf-script-card" aria-label="Hallvi's script">
+    <section className="tf-script-card" aria-label="Hallvi's traffic script">
       <div>
         <h3>Hallvi&apos;s traffic script</h3>
         <p>
@@ -209,14 +241,8 @@ function ScriptCard({
         </ul>
       </div>
       <div className="tf-script-actions">
-        <button
-          type="button"
-          className="tf-primary"
-          onClick={() => onAsk(scriptDraft(name))}
-        >
-          Add Hallvi&apos;s script
-        </button>
-        <button type="button" className="tf-link" onClick={onDismiss}>
+        {add}
+        <button type="button" className="tf-link" onClick={() => onFold(true)}>
           Not now
         </button>
       </div>
@@ -672,18 +698,21 @@ export function TrafficPage({
         moment={moment}
         onAsk={onAsk}
       />
-      {offer && dismissed !== offer.reason && (
+      {offer && (
         <ScriptCard
           says={offer.says}
           name={applicationName}
+          folded={dismissed === offer.reason}
           onAsk={onAsk}
-          onDismiss={() => {
-            setDismissed(offer.reason);
+          onFold={(folded) => {
+            setDismissed(folded ? offer.reason : null);
             try {
-              window.localStorage.setItem(
-                offerKey(applicationId),
-                offer.reason,
-              );
+              if (folded)
+                window.localStorage.setItem(
+                  offerKey(applicationId),
+                  offer.reason,
+                );
+              else window.localStorage.removeItem(offerKey(applicationId));
             } catch {
               // It comes back next time; that is all.
             }

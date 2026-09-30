@@ -216,8 +216,8 @@ internet, no cookies and nothing stored in the browser.
   changes pages in the browser (in-page requests name pages, in their
   referrer, that were never loaded as a document), or a CDN caches its pages
   (a `cdn` record with `caches-pages`). Otherwise it says what only the script
-  measures: time on page, goals and page speed. "Not now" hides it in that
-  browser until a different reason appears, and the lists only the script
+  measures: time on page, goals and page speed. "Not now" folds it to one line
+  in place, in that browser, until a different reason appears, and the lists only the script
   fills still offer it when opened.
 - **No double counting.** The log and the script are never added together.
   Each application has one switch point, the first script event Hallvi
