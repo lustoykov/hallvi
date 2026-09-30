@@ -106,6 +106,7 @@ export async function GET(
         const window = new LiveWindow({
           hosts: log.hosts,
           pageKey: log.pageKey,
+          hashRouting: log.hashRouting,
           script,
         });
         let pending: Arrival[] = [];

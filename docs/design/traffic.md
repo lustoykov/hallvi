@@ -192,6 +192,11 @@ internet, no cookies and nothing stored in the browser.
   its sha256, the proxy's serving snippet and the include line per stack
   ([`script.ts`](../../src/server/traffic/script.ts)); Pi writes the file and
   the proxy change through its server tools, under the permission modes.
+  Traefik's router, service and Compose service names come from the
+  application's existing Hallvi identity, so two applications can install
+  it on the same proxy and a repeated setup reuses the same names. The script
+  file and the helper's Caddyfile remain shared; removing one application's
+  routing leaves those files and the other application's routing in place.
 - **Getting it into the application:** a one-line pull request that puts
   `<script defer src="/_hv/s.js"></script>` in the layout every page shares,
   through Hallvi's existing operability pull requests; for software the owner
@@ -209,6 +214,23 @@ internet, no cookies and nothing stored in the browser.
   is not, and Hallvi refuses an event carrying one. The count and the live
   view keep the value only when `q`'s key is the record's, so pages are named
   as the log names them; any other key names the page by its path alone.
+- **Hash-routed pages:** Pi sets `hashRouting:true` on the existing
+  access-log record only when the application uses hash routing.
+  `traffic_script` then adds `data-hv-hash-routing="true"` to its include
+  lines. Both `#/home` and `#!/home` path forms are supported, including new
+  routes added later; initial load, route changes and back/forward each send
+  one view. The event carries the route separately (`h`), and Hallvi appends
+  it to the physical page name only when the record opts in.
+  Hash query values and secondary anchors are stripped. Ordinary anchors,
+  key-value fragments (including encoded or malformed credential forms),
+  malformed percent encoding and other fragment routing forms are ignored;
+  an ignored fragment change keeps the current view. Decoded paths are at
+  most 200 characters, with no spaces, controls, `%`, `?`, `#`, `&` or
+  `=`. Path segments are retained just as history path segments are, so
+  applications must keep secrets out of route paths.
+  At the initial log-to-script switch, a physical page load already counted
+  by the log pairs with its script view once; its historical physical page
+  name stays. Subsequent views use the configured hash route.
 - **Offered where it is seen, not pushed.** Nothing is said about the script
   during deployment unless the owner asks for analytics then. The Traffic page
   offers it as a checklist card near the top whenever history is counted from

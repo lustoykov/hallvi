@@ -17,13 +17,67 @@ import {
   LOG_SETUP,
   setupVariant,
   trafficReading,
+  trafficScriptFor,
   trafficSetup,
 } from "@/server/traffic/pi-tools";
 
 const ZONE = "Europe/Sofia";
+
+it("the shared script opts in to hash routing only through the application's tag", () => {
+  const plain = trafficScriptFor("caddy", "routing-fixture");
+  const configured = trafficScriptFor("caddy", "routing-fixture", "p", true);
+  expect(configured.content).toBe(plain.content);
+  expect(plain.tag).not.toContain("data-hv-hash-routing");
+  expect(
+    trafficScriptFor("caddy", "routing-fixture", undefined, false).tag,
+  ).toBe(plain.tag);
+  expect(configured.tag).toContain('data-hv-page-key="p"');
+  expect(configured.tag).toContain('data-hv-hash-routing="true"');
+  expect(
+    configured.includes.every(({ line }) =>
+      line.includes('data-hv-hash-routing="true"'),
+    ),
+  ).toBe(true);
+  expect(() =>
+    trafficScriptFor(
+      "caddy",
+      "routing-fixture",
+      undefined,
+      "true" as unknown as boolean,
+    ),
+  ).toThrow();
+});
 const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 const noon = (day: string) => dayBounds(day, ZONE).start + 12 * HOUR;
+
+describe("traffic_script", () => {
+  it("keeps two applications' Traefik routers and services separate across repeat setup", () => {
+    const first = trafficScriptFor("traefik", "first-application");
+    const second = trafficScriptFor("traefik", "second-application");
+    expect(trafficScriptFor("traefik", "first-application")).toEqual(first);
+    expect(second.file).toBe(first.file);
+    expect(second.content).toBe(first.content);
+    const serving = (result: typeof first) => {
+      if (typeof result.serving === "string") throw new Error("Not Traefik");
+      return result.serving;
+    };
+    const names = [first, second].map((result) => {
+      const { compose, dynamic } = serving(result);
+      const name = compose.split(":")[0];
+      expect(name).toMatch(/^hallvi-script-[a-f0-9]+$/);
+      expect(compose).toContain(`traefik.http.routers.${name}.rule=`);
+      expect(compose).toContain(`traefik.http.routers.${name}.service=${name}`);
+      expect(compose).toContain(`traefik.http.services.${name}.loadbalancer.`);
+      expect(dynamic.match(new RegExp(`    ${name}:`, "g"))).toHaveLength(2);
+      expect(dynamic).toContain(`service: ${name}`);
+      expect(dynamic).toContain(`url: http://${name}:80`);
+      return name;
+    });
+    expect(names[0]).not.toBe(names[1]);
+    expect(serving(first).caddyfile).toBe(serving(second).caddyfile);
+  });
+});
 
 const collection: Collection = {
   enabledAt: "2026-09-01T00:00:00.000Z",

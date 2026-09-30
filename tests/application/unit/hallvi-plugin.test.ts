@@ -461,6 +461,13 @@ it("reloads UI on the same MCP connection, preserves revision bytes and recovers
       .structuredContent,
   ).toMatchObject({ changed: false, resourceUri: second });
   expect(changed).toBe(1);
+  const listed = await client.callTool({ name: "hallvi_apps", arguments: {} });
+  expect(listed.structuredContent).toMatchObject({
+    ui: {
+      version: (updated.structuredContent as { version: string }).version,
+      resourceUri: second,
+    },
+  });
   await rm(panelPath);
   expect(
     (await client.callTool({ name: "hallvi_reload_ui", arguments: {} }))

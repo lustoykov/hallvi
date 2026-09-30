@@ -471,6 +471,7 @@ async function finishDay(target: Target, day: string) {
     scriptSince: collection.scriptSince,
     hosts: log.hosts,
     pageKey: log.pageKey,
+    hashRouting: log.hashRouting,
     coverage: { from: null, to: null, gaps: [] },
   });
   const read = await readLog(
@@ -591,6 +592,7 @@ async function connection(target: Target, announce: boolean) {
           : collection.scriptSince,
       hosts: log.hosts,
       pageKey: log.pageKey,
+      hashRouting: log.hashRouting,
       coverage: { from: null, to: null, gaps: [] },
     });
     const entry: Open = {
