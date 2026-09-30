@@ -10,6 +10,15 @@ Connect real saved records and execution evidence to the accepted reference desi
 
 Keep the scope on the views and interactions needed by that journey. Medium and more complicated applications and broader ongoing care follow this UI/UX checkpoint. Broad security hardening is deferred until after beta; during beta, communicate current risks and practical precautions without turning this into a new architecture project.
 
+## Private Codex and ChatGPT plugin proof of concept
+
+**In review, 29 September 2026; do not merge without the owner's review.**
+The owner requested using an existing Hallvi controller through Codex locally
+or over SSH, with a ChatGPT application panel. The [plugin proof of
+concept](docs/hallvi-plugin.md) reuses the existing operator and CLI contract.
+Approvals remain in Hallvi. Public hosting, account infrastructure and
+directory submission are outside this experiment.
+
 ## Selected product increments
 
 The 29 September batch implements the three selected increments:

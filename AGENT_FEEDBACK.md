@@ -16,6 +16,10 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
 | [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
 
+| [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
+
+| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 1 | New |
+
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
 ## How to contribute
@@ -249,6 +253,39 @@ separate old breakage from a new change's.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
 
+### AF-033 — Refuse a second preview before attaching retained state
+
+Attaching a retained application from a checkout that already serves a
+snapshot on another port takes a backup and ownership, then Next.js refuses
+its second dev server. The retained runtime is left needing `--after-crash`
+even though no application work ran. A preflight check could reject this
+before attaching. The verification guide now tells contributors to stop the
+snapshot pair first.
+
+**+1:** 2026-09-29 — Codex/ChatGPT plugin proof of concept
+
+### AF-034 — Native host checks must exercise link and clipboard failures
+
+The plugin’s local preview acknowledged every open-link request, hiding the
+installed Codex host’s silent rejection of HTTP URLs. A successful bridge
+reply did not establish that a browser opened. The panel now offers a copyable
+HTTP address and handles clipboard denial and explicit host link failures.
+Keep native host behavior separate from fixture results when reporting proof.
+Replacing panel bytes at one resource URI also left the native host showing
+an older interface. The follow-up adds content-versioned resources and an
+explicit UI reload; protocol acknowledgment must still be distinguished from
+the host actually rendering the new version. A later failure to open the
+plugin was an SSH startup failure: the `.local` Mac mini name no longer
+resolved on the laptop's current network, and its known LAN address timed out.
+A remote adapter cannot supply its panel while disconnected; distinguish
+network reachability from cached UI before recommending plugin resets.
+
+**+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
+
+Use this small template; add detail only when useful. Link the overview row to
+the request heading.
+
+```markdown
 ## Archive
 
 | Request ID / title | +1 | Status |

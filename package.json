@@ -22,7 +22,9 @@
     "retained": "node scripts/retained-application.mjs",
     "scenarios": "node --import tsx scripts/scenarios.ts",
     "test:operator": "python3 -m unittest discover -s tests/application/operator -t tests/application/operator",
-    "test:dashboard": "node --experimental-strip-types tests/dashboard/server.ts"
+    "test:dashboard": "node --experimental-strip-types tests/dashboard/server.ts",
+    "plugin:build": "node scripts/build-hallvi-plugin.mjs",
+    "plugin:serve": "node plugins/hallvi/server.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",
@@ -56,6 +58,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@playwright/test": "1.62.1",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "24.5.2",

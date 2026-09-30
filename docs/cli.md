@@ -5,7 +5,8 @@ running Hallvi controller already has, and read back what was recorded. They
 are for three kinds of caller:
 
 - a coding agent checking a deployed application without driving Hallvi's page;
-- a script or agent building a workflow on Hallvi, and later an MCP adapter,
+- a script or agent building a workflow on Hallvi, and the
+  [proof-of-concept MCP adapter](hallvi-plugin.md),
   which uses the same interface
   ([`controller-client.mjs`](../scripts/controller-client.mjs));
 - a person operating an application from a terminal.
@@ -306,5 +307,5 @@ and the attach/snapshot commands. This document owns the CLI contract.
 - Following is a poll about once a second. Streaming JSON events, name lookup,
   an interactive conversation (`attach`) and explicitly continuing interrupted
   work (`resume`) are not built; those two names are kept for them.
-- An MCP adapter is not built. It would call the same client and add its own
-  origin label.
+- The [MCP adapter proof of concept](hallvi-plugin.md) calls the same client
+  and retains the CLI origin label for compatibility with existing controllers.
