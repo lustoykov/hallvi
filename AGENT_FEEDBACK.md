@@ -36,6 +36,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
+| [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -129,6 +130,18 @@ It does not establish legal compliance or update existing deployed sites.
 mark those actions in application code. This task removes that checklist row
 and shows the Goals card only when the selected range has recorded goal events.
 Manual event support remains.
+
+### AF-044 — Keep dashboard UI checks away from real learning progress
+
+**+1:** 2026-09-30 — developer dashboard polish task.
+
+A worktree's own dashboard (`HALLVI_DASHBOARD_PORT=… node --experimental-strip-types
+tests/dashboard/server.ts`) opens the learning store in the Git common
+directory, so checking Learn Hallvi's quiz from a branch reads, and would
+write, the owner's real progress. `HALLVI_LEARNING_DB_PATH` exists but starts
+empty. A fresh worktree also has no saved eval answers, so the Eval archive's
+review layout could only be checked after copying `tests/results/evals` from
+another checkout.
 
 ### AF-039 — Keep new tests tied to useful behavior
 
