@@ -207,11 +207,10 @@ export function usualDay(series: SeriesPoint[]) {
   };
 }
 
-export type ScriptAsk = "time" | "goals" | "speed";
+export type ScriptAsk = "time" | "speed";
 
 const ASKED: Record<ScriptAsk, string> = {
   time: "Time on page is measured in the browser, by Hallvi's script.",
-  goals: "Goals are counted in the browser, by Hallvi's script.",
   speed: "Page speed is measured in the browser, by Hallvi's script.",
 };
 
@@ -248,13 +247,13 @@ export function scriptOffer(
     };
   return {
     reason: "more",
-    says: "The server's log sees page loads. Time on page, goals and page speed happen in the browser.",
+    says: "The server's log sees page loads. Time on page and page speed happen in the browser.",
   };
 }
 
 /** What the owner sends Pi when they take the offer. */
 export function scriptDraft(name: string) {
-  return `Add Hallvi's traffic script to ${name}: open the one-line pull request that loads /_hv/s.js from the layout every page shares, and make sure the proxy serves /_hv/. Don't change anything at the proxy that rewrites pages.`;
+  return `Add Hallvi's traffic script to ${name}: use the site's existing analytics consent controls and update its privacy notice. If it has none, offer a small consent prompt and notice using the site's existing design. Keep measurement off until the visitor allows analytics, with an equally easy refusal and later withdrawal. Ask me for missing notice details rather than inventing them. Open a pull request for the include, consent integration and notice, and make sure the proxy serves /_hv/. Don't change anything at the proxy that rewrites pages.`;
 }
 
 /**

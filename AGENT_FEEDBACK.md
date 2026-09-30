@@ -32,6 +32,9 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
 
+| [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
+| [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
+
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
 ### AF-037 — Close setup requests handled in conversation
@@ -89,6 +92,26 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-042 — Include consent and notices in traffic setup
+
+**+1:** 2026-09-30 — owner's traffic privacy task.
+
+The cookie-free script started collecting immediately; setup offered only
+the include and proxy. Raw event requests still enter logs with IP/browser
+information, and a shared server file plus cached or already-loaded older
+scripts complicates rollout. This task adds explicit grant/withdrawal and
+site-specific notice/control setup, with versioned includes and browser checks.
+It does not establish legal compliance or update existing deployed sites.
+
+### AF-043 — Do not imply automatic sign-up tracking
+
+**+1:** 2026-09-30 — owner's traffic privacy and goals task.
+
+“Goals, like sign-ups” appeared as a default benefit although the owner must
+mark those actions in application code. This task removes that checklist row
+and shows the Goals card only when the selected range has recorded goal events.
+Manual event support remains.
 
 ### AF-039 — Keep new tests tied to useful behavior
 
