@@ -431,8 +431,11 @@ export function OverviewLive({
           </Tile>
         )}
 
-        <Tile label="What wants you">
-          {built.needs.length ? (
+        {/* With nothing unresolved there is no tile saying so: Speed takes
+            its place, and a healthy application's page carries no heading
+            about what might be wrong with it. */}
+        {built.needs.length > 0 && (
+          <Tile label="Unresolved">
             <ul className="ovl-needs">
               {built.needs.slice(0, 2).map((need) => (
                 <li key={need.id} data-tone={need.tone}>
@@ -452,12 +455,14 @@ export function OverviewLive({
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="ovl-empty">Nothing needs you right now.</p>
-          )}
-        </Tile>
+          </Tile>
+        )}
 
-        <Tile label="Speed" onOpen={() => onOpenDestination("monitoring")}>
+        <Tile
+          wide={built.needs.length === 0}
+          label="Speed"
+          onOpen={() => onOpenDestination("monitoring")}
+        >
           {typical !== undefined ? (
             <>
               <p className="ovl-number is-small">

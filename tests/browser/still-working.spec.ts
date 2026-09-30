@@ -127,9 +127,9 @@ test(
     await composer.fill("");
 
     // A decision nobody has made is not the turn working. It outranks
-    // everything else and says who it is waiting on.
+    // everything else and says what it is waiting for.
     update({ status: "awaiting-approval" });
-    await expect(line).toContainText("Waiting for you to approve a command");
+    await expect(line).toContainText("Waiting for approval to run a command");
 
     // The turn finishes.
     update({

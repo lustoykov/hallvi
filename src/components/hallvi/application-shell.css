@@ -1449,7 +1449,7 @@
   margin: 0;
 }
 
-/* Overview: condition, needs you, running, recent changes, freshness. */
+/* Overview: condition, unresolved, running, recent changes, freshness. */
 .hv-overview-condition {
   display: flex;
   align-items: center;

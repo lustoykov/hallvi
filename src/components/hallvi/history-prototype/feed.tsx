@@ -49,7 +49,7 @@ export function sentenceOf(history: HistoryRecord) {
   const failures = !history.failed
     ? ""
     : unresolved
-      ? // "and still needs you" is a claim about the present, and nothing on
+      ? // "and still unresolved" is a claim about the present, and nothing on
         // record supports it: failure-and-repair pairing is deferred, so a
         // failure someone fixed an hour later still counts here. The number is
         // a fact; what it means for you is not yet knowable.

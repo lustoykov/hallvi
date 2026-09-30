@@ -257,7 +257,9 @@ test("old input requests keep their date without overriding the operator's state
   ).toBeVisible();
   await expect(p.frame.getByText(/Asked .*24|Asked 24/)).toBeVisible();
   await expect(p.frame.getByText("Working", { exact: true })).toBeVisible();
-  await expect(p.frame.getByText("Needs you", { exact: true })).toHaveCount(0);
+  await expect(
+    p.frame.getByText("Awaiting approval", { exact: true }),
+  ).toHaveCount(0);
   await expect(
     p.frame.getByRole("button", { name: "Review in Hallvi" }),
   ).toBeVisible();

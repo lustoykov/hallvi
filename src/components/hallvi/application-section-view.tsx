@@ -39,7 +39,7 @@ import { TrafficPage } from "./traffic/traffic-page";
 const descriptions: Record<ApplicationSection, string> = {
   history: "What has happened to this application, and the commands behind it.",
   overview:
-    "What is running, what needs you, what changed, and how fresh the evidence is.",
+    "What is running, what is unresolved, what changed, and how fresh the evidence is.",
   architecture: "How your source, application, host and data fit together.",
   deployment:
     "What is running, what ran before it, and how the latest attempt went.",
@@ -364,8 +364,8 @@ export function ApplicationSectionView({
   const currentAccessId = currentAccessRecord(information, app.id)?.id;
   const records = information
     .filter((r) => !r.retiredAt && r.presentation?.views.includes(section))
-    // What needs you comes first, what is simply true next, what Pi
-    // suggests last; within a group, the most recently established.
+    // What failed or earned a warning comes first, what is simply true next,
+    // what Pi suggests last; within a group, the most recently established.
     .sort(
       (a, b) =>
         rank(a) - rank(b) ||

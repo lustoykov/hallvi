@@ -420,7 +420,7 @@ function doing(reply, worker) {
   if (worker === false) return { says: "The worker stopped. Nothing is running.", waiting: true };
   const steps = reply.steps.filter((step) => step.kind === "tool");
   const asking = steps.find((step) => step.status === "awaiting-approval" || (step.tool === "request_approval" && step.status === "running"));
-  if (asking) return { says: "Waiting for your approval", at: asking.startedAt, waiting: true, step: asking };
+  if (asking) return { says: "Awaiting approval", at: asking.startedAt, waiting: true, step: asking };
   const running = steps.findLast((step) => step.status === "running");
   if (running) {
     const place = where(running);
@@ -748,7 +748,7 @@ function renderIdentity() {
   let chip = null;
   if (state.conversationError && state.failures > 1) chip = ["unknown", "Can't reach Hallvi"];
   else if (c && !c.worker?.alive) chip = ["unknown", "Worker stopped"];
-  else if (c?.status === "awaiting-approval" || waitingOnApproval(c)) chip = ["waiting", "Needs your approval"];
+  else if (c?.status === "awaiting-approval" || waitingOnApproval(c)) chip = ["waiting", "Awaiting approval"];
   else if (c?.status === "interrupted") chip = ["waiting", "Interrupted"];
   else if (c?.status === "working" || state.send?.state === "sending") chip = ["working", "Working"];
   $("state").replaceChildren(chip ? el("span", { class: `chip ${chip[0]}` }, chip[0] === "working" ? el("span", { class: "pulse", "aria-hidden": "true" }) : null, chip[1]) : "");
@@ -1014,7 +1014,7 @@ async function fullOutput(step, button) {
 }
 function renderRecord(record) {
   const tone = record.retired ? "info" : record.status === "verified" ? "verified" : record.status === "failed" ? "failed" : record.status === "warning" ? "warning" : "info";
-  const word = { verified: "Verified", failed: "Failed", warning: "Needs attention", info: "Recorded" }[tone];
+  const word = { verified: "Verified", failed: "Failed", warning: "Worth a look", info: "Recorded" }[tone];
   const checks = record.checks.total ? `${record.checks.failed ? `${record.checks.failed} of ${record.checks.total} checks failed` : plural(record.checks.passed, "check passed", "checks passed")}` : null;
   return el("div", { class: "record" }, el("span", { class: `tag ${tone}` }, word), el("span", { class: "title" }, record.title), checks ? el("span", { class: "meta" }, checks) : null);
 }
@@ -1022,8 +1022,8 @@ function renderApproval(step) {
   // A question Pi wrote is prose; a command waiting under Always ask is code.
   const question = step.tool === "request_approval";
   const place = question ? "" : where(step);
-  return el("div", { class: "card waiting", role: "group", "aria-label": "Waiting for your approval" },
-    el("h4", {}, "Waiting for your approval", el("span", { class: "muted", style: "font-weight:400", "data-since": step.startedAt }, since(step.startedAt))),
+  return el("div", { class: "card waiting", role: "group", "aria-label": "Awaiting approval" },
+    el("h4", {}, "Awaiting approval", el("span", { class: "muted", style: "font-weight:400", "data-since": step.startedAt }, since(step.startedAt))),
     question ? inline(step.command || step.title, el("p")) : el("p", {}, step.title, place ? el("span", { class: "muted" }, ` · ${place}`) : null),
     !question && step.command && step.command !== step.title ? el("code", { class: "command" }, step.command) : null,
     el("p", { class: "muted" }, "Nothing runs until you decide. Approve or decline in Hallvi, where the permission mode lives."),

@@ -55,13 +55,12 @@ export function InformationContent({
   const recommendation = presentation.role === "recommendation";
   const attention =
     presentation.status === "failed" || presentation.status === "warning";
+  // The tag says how it went; the kind never says who it wants.
   const kind = recommendation
     ? "Recommendation"
-    : attention
-      ? "Needs attention"
-      : presentation.role === "outcome"
-        ? "Result"
-        : "Update";
+    : presentation.role === "outcome"
+      ? "Result"
+      : "Update";
   const details =
     content.kind === "deployment" ? (
       <>

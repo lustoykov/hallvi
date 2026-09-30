@@ -45,7 +45,7 @@
 }
 
 /* A titled band. The rule above the title is the only separator needed;
-   surfaces are reserved for things that need attention. */
+   surfaces are reserved for what failed or is waiting. */
 .hv-band {
   display: flex;
   flex-direction: column;

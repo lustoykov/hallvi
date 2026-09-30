@@ -124,7 +124,7 @@ test("current work keeps findings in order and waits for the owner", async ({
     ).toBe(true);
     await page.goto(`/applications/${appId}`);
     const line = page.locator(".hv-still-working");
-    await expect(line).toContainText("Waiting for you to approve a command");
+    await expect(line).toContainText("Waiting for approval to run a command");
     await expect(
       page.getByRole("button", { name: "Approve", exact: true }),
     ).toBeVisible();
@@ -132,7 +132,7 @@ test("current work keeps findings in order and waits for the owner", async ({
       page.getByRole("button", { name: "Decline", exact: true }),
     ).toBeVisible();
     await page.reload();
-    await expect(line).toContainText("Waiting for you to approve a command");
+    await expect(line).toContainText("Waiting for approval to run a command");
     await page.screenshot({
       path: testInfo.outputPath("approval-desktop.png"),
     });
@@ -175,7 +175,7 @@ test("current work keeps findings in order and waits for the owner", async ({
     saveExecution();
     changed();
     await expect(page.getByText(finding, { exact: true })).toHaveCount(1);
-    await expect(line).toContainText("Waiting for you to approve a command");
+    await expect(line).toContainText("Waiting for approval to run a command");
     // A separate approval belongs to this second execution.
     execution = { ...execution, status: "running" };
     saveExecution();

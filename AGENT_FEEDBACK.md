@@ -31,6 +31,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
+| [AF-040 — Keep Pi's replies from summoning the owner](#af-040--keep-pis-replies-from-summoning-the-owner) | 1 | New |
+| [AF-041 — Retire or rewrite the conversation-first capture](#af-041--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -173,6 +175,25 @@ claiming a dependency is patched. A compatible upstream Pi update remains a
 follow-up; this release patches Hallvi's direct `ws` runtime to 8.22.0.
 
 **+1:** 2026-09-30 — alpha.12 release preparation, `codex/release-alpha12`
+
+### AF-040 — Keep Pi's replies from summoning the owner
+
+The product no longer says "Needs you", "Waiting for you" or "Needs
+attention", and `calm-labels.test.ts` keeps them out of the sources. Pi's
+instructions still end by asking for "what needs attention"
+(`src/server/pi.ts`), so a reply can still open on a "Needs attention:"
+heading the guard cannot see. Rewording it wants a live-model check.
+
+**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
+
+### AF-041 — Retire or rewrite the conversation-first capture
+
+`tests/browser/conversation-first.capture.mjs` still waits for the receipts
+retired on 20 September ("Proposed change · not applied", "Review and approve
+in…", groups named by state), so it cannot run against the current shell.
+Only its wording was updated.
+
+**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.

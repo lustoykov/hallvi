@@ -497,7 +497,7 @@ export function GithubSetupScreen({
                         (check) => check.status === "passed",
                       )
                         ? "Repository checks passed."
-                        : "Repository checks finished. Some need attention."}
+                        : "Repository checks finished. Some did not pass."}
                     </p>
                     <ul>
                       {visibleCheck.results.map((check) => (

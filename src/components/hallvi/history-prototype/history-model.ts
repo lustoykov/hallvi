@@ -13,7 +13,7 @@ export const FILTERS = [
   "Changes",
   "Inspections",
   "Outside chat",
-  "Needs you",
+  "Unresolved",
 ] as const;
 export type Filter = (typeof FILTERS)[number];
 
@@ -30,7 +30,6 @@ export interface Entry {
   resolver: ApplicationOperation | null;
   /** The failure this work resolved. */
   resolves: ApplicationOperation | null;
-  needsYou: boolean;
 }
 export interface Day {
   key: string;
@@ -78,13 +77,13 @@ export function buildHistory(
   chats: ChatSummary[],
   filter: Filter,
 ): HistoryRecord {
-  const needs = new Set(attentionItems(operations).map((item) => item.id));
+  const unresolved = new Set(attentionItems(operations).map((item) => item.id));
   const matches = (op: ApplicationOperation, value: Filter) =>
     value === "All" ||
     (value === "Changes" && op.kind === "change") ||
     (value === "Inspections" && op.kind === "inspection") ||
     (value === "Outside chat" && !op.origin) ||
-    (value === "Needs you" && needs.has(op.id));
+    (value === "Unresolved" && unresolved.has(op.id));
   const byId = new Map(operations.map((op) => [op.id, op]));
   const entry = (op: ApplicationOperation): Entry => {
     const resolver = op.resolvedById ? byId.get(op.resolvedById) : undefined;
@@ -107,7 +106,6 @@ export function buildHistory(
         operations.find(
           (other) => other.resolvedById === op.id && other.state === "failed",
         ) ?? null,
-      needsYou: needs.has(op.id),
     };
   };
   const shown = operations

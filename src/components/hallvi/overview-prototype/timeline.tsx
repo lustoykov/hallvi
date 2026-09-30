@@ -345,13 +345,13 @@ export function TimelineHero({
   // Attention first. The condition sentence is scoped to the application's
   // own record, so it can honestly say every check held while a domain check
   // on the same page did not — which reads as reassurance the page has not
-  // earned. When something needs the reader, the verdict says so before it
-  // says anything reassuring, and the cards below say what it is.
+  // earned. When something is unresolved, the verdict says so before it says
+  // anything reassuring, and the cards below say what it is.
   const verdict = subline(model, overview);
   const waiting = overview.needs.length;
   const sub =
     verdict && waiting
-      ? `${waiting === 1 ? "One thing needs you" : `${waiting} things need you`}. ${verdict}`
+      ? `${waiting === 1 ? "One thing is unresolved" : `${waiting} things are unresolved`}. ${verdict}`
       : verdict;
   const showLog = !planned && logOpen;
   const lines = guy.lines.slice(-6);
@@ -477,7 +477,7 @@ export function TimelineHero({
 
   // Arrival: one decision a visit, 1.8 s in. Little Server points at the
   // label only on a settled page, fully in view, that you haven't touched,
-  // with nothing that needs you: once to introduce the log, then at most
+  // with nothing unresolved: once to introduce the log, then at most
   // weekly and only for news. Otherwise news gets one answer, the first
   // time the label is fully on screen.
   const point = guy.point;

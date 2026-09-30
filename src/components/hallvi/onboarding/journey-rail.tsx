@@ -274,7 +274,7 @@ export function JourneyRail({
                 {state === "done"
                   ? ", done"
                   : state === "waiting"
-                    ? ", waiting for you"
+                    ? ", waiting for an answer"
                     : state === "current"
                       ? ", current"
                       : ""}

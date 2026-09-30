@@ -47,7 +47,7 @@ the visual authority, and this file records what changes in a narrow frame.
 1. **Who and what now.** The application's initial, its name as a switcher
    (a native select laid over the name, so keyboard and screen readers get a
    real control), and a state chip that appears only when there is something to
-   say: *Working* (Hallvi's pulsing mark, not a spinner), *Needs your approval*,
+   say: *Working* (Hallvi's pulsing mark, not a spinner), *Awaiting approval*,
    *Interrupted*, *Worker stopped*, *Can't reach Hallvi*. Idle
    says nothing. `⋯` holds Open in Hallvi, Refresh and the panel version with
    its update check.
@@ -107,13 +107,14 @@ panel retries with back-off.
 
 ## Decisions stay in Hallvi
 
-An approval wait becomes an amber card in the reply: what is asked, where it
-would run, the command, "Nothing runs until you decide", and **Decide in
+An approval wait becomes an amber card in the reply, *Awaiting approval*: what
+is asked, where it would run, the command, "Nothing runs until you decide", and **Decide in
 Hallvi**. Unanswered input requests (a secret, where to run, DNS, how to deploy)
 show above the composer as neutral **open requests**, with their original asking
 time and **Review in Hallvi**. A request can outlive the work that asked for it;
-its presence alone never replaces the operator's state with "Needs you" or
-claims the current work is blocked. An older controller without request dates
+its presence alone never replaces the operator's state with *Awaiting
+approval* or claims the current work is blocked. As in the workspace, nothing
+is labelled by who it needs. An older controller without request dates
 says the date is unavailable. All requests remain discoverable in Hallvi. Interruption shows **Continue or stop in
 Hallvi** and disables the composer with the reason. The panel never approves,
 declines, continues or stops: an MCP host cannot prove that a person, rather

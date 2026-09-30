@@ -18,8 +18,7 @@ import "./presentation.css";
 
 /**
  * `aged` is a pass nobody has needed to repeat: calm, dated, never amber.
- * `stale` is the amber one, and is kept for what needs the owner — Pi's own
- * warning on a record.
+ * `stale` is the amber one, kept for Pi's own warning on a record.
  */
 export type Tone =
   "verified" | "aged" | "stale" | "failed" | "unknown" | "absent";
@@ -63,7 +62,7 @@ export function toneOf(record: SavedInformation): { tone: Tone; word: string } {
   const status = record.presentation?.status ?? "info";
   if (status === "verified") return { tone: "verified", word: "Verified" };
   if (status === "failed") return { tone: "failed", word: "Failed" };
-  if (status === "warning") return { tone: "stale", word: "Needs attention" };
+  if (status === "warning") return { tone: "stale", word: "Worth a look" };
   return { tone: "unknown", word: "Recorded" };
 }
 

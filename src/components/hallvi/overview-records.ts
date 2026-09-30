@@ -365,7 +365,7 @@ export function overviewFromRecords({
     now,
   );
 
-  // ---- what wants you -------------------------------------------------
+  // ---- what is unresolved ----------------------------------------------
   const needs: NeedItem[] = [];
   for (const [id, gatheredLane] of Object.entries(gathered) as [
     Lane,
@@ -400,8 +400,8 @@ export function overviewFromRecords({
             destination: chrome[id].destination,
           },
         });
-  // Work that stopped on a failed command is waiting for the owner, the
-  // same rule History's "Needs you" uses. One Hallvi carried on past is not.
+  // Work that stopped on a failed command stays unresolved, the same rule
+  // History's "Unresolved" filter uses. One Hallvi carried on past is not.
   for (const execution of executions)
     if (execution.status === "failed" && !carriedOnAfter(execution, executions))
       needs.push({

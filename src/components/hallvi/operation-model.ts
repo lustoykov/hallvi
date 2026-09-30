@@ -10,7 +10,7 @@ import type {
 } from "@/server/operation-record";
 
 export const stateLabel: Record<OperationState, string> = {
-  proposed: "Waiting for you",
+  proposed: "Awaiting approval",
   working: "Working",
   queued: "Queued",
   declined: "Not run",
