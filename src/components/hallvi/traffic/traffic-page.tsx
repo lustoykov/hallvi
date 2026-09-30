@@ -196,7 +196,7 @@ function ScriptCard({
   return (
     <section className="tf-script-card" aria-label="Hallvi's script">
       <div>
-        <h3>See what the log cannot</h3>
+        <h3>Hallvi&apos;s traffic script</h3>
         <p>
           {says} Hallvi&apos;s script sees them there: one line in your layout,
           no cookies, nothing kept in the browser.
