@@ -1,8 +1,11 @@
 # Post-merge fixes and simplification
 
-**Status: Proposed.** The owner requested scopes, not implementation, on
-30 September 2026 in task `01a0f19e-1f49-7d70-947b-28c911465e09`.
-No implementation task or new delivery priority is assigned by this document.
+**Status: In progress.** After reviewing the scopes, the owner selected all ten
+work packages on 30 September 2026 in task
+`01a0f19e-1f49-7d70-947b-28c911465e09`: implement, verify, review and simplify
+in bounded increments. Implementation starts from
+[`d5094503`](https://github.com/lustoykov/hallvi/commit/d50945031e9242983ce91ff59e5407def15e1a94).
+The original audit cutoff below remains unchanged.
 
 The goal is to understand recent changes, keep useful capabilities, remove
 unnecessary complexity, find bugs, simplify the experience, and establish which
@@ -15,10 +18,10 @@ are unchanged between those revisions. That is a source check, not a new test ru
 
 ## Recommended first batch
 
-Five independently reviewable code PRs. T1–T4 each carry their own regression
+Five independently reviewable changes. T1–T4 each carry their own regression
 check; they do not wait for the broad acceptance run. T5 follows the fixes so it
 can prune against the coverage that remains. Start with T1/T2; T3/T4 can proceed
-independently. All five remain proposals pending selection.
+independently. The owner selected all five together with the follow-up work.
 
 | Scope | Concrete change and preserved behavior | Acceptance |
 | --- | --- | --- |
@@ -69,7 +72,7 @@ costs stay within the execution task's authorized scope. No new scheduler or
 mandatory cloud test on every PR. The owner does not use CI as a merge gate;
 required local acceptance remains explicit.
 
-## Conditional reductions
+## T8 — Measured reductions
 
 - **Traffic simulator and fixtures:** the generator/data add 5,619 lines and the
   UI fixture 1,279. Trace which audience/network variants exercise distinct
@@ -77,7 +80,7 @@ required local acceptance remains explicit.
   actually reduces maintenance. Keep real-log generation, independently derived
   expected counts and cheap UI-state rendering separate where they prove
   different things. No replacement simulation framework or invented deletion
-  estimate. This starts as a bounded review, not an approved rewrite.
+  estimate. Review first and implement only reductions supported by that review.
 - **Repeated log followers:** use T7's measurements to decide whether multiple
   views create meaningful avoidable work. If justified, scope one reader per
   application/source with bounded fanout and correct disconnect cleanup.
@@ -86,7 +89,7 @@ required local acceptance remains explicit.
   evidence of user value before deletion. Code size alone does not settle that
   decision. Preserve safeguards with known data/privacy/approval consequences.
 
-## Keep the review current
+## T9 — Supplemental audit and report
 
 Goal 1 already has the local HTML report and matched screenshots. Append work
 status and before/after evidence as scopes finish; keep the original cutoff and
@@ -102,9 +105,19 @@ setup-request repair is already merged. Open
 do not duplicate it. These later changes have not received the original full
 audit's depth of review.
 
+## T10 — Fresh-user walkthrough
+
+Run the existing [beta walkthrough](../beta-walkthrough.md) against the combined
+changes with fresh isolated controller state. Follow setup, deployment, useful
+application behavior and return through the browser; fix concrete friction or
+bugs found. Keep real-account reuse, scripted fixtures and unfamiliar-user
+comprehension distinct. An agent rehearsal cannot prove external-user
+comprehension. Preserve all existing retained application records and data.
+
 Each implementation PR should state its trigger and resulting behavior, what
 was removed or simplified, evidence for acceptance, and remaining stack limits.
 Include a Mermaid flow when an ownership boundary changes and before/after
 screenshots when user-visible behavior changes. Keep raw screenshots, logs and
-per-run reports in ignored output directories. No production fixes or new
-application acceptance were performed by this scoping task.
+per-run reports in ignored output directories. The original scoping pass
+performed no production fixes or new application acceptance; implementation
+results belong to their subsequent PRs and the updated local report.

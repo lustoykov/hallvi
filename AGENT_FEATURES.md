@@ -9,7 +9,7 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 
 ### Post-merge fixes and simplification
 
-**Status:** Proposed; scoped at the owner's request, no implementation assigned.
+**Status:** In progress; the owner selected all ten scopes on 30 September 2026.
 **Problem and intended result:** Keep recent capabilities while removing
 unnecessary complexity and closing demonstrated bugs and generalization gaps.
 **Smallest scope:** [Four bounded Traffic fixes, focused test pruning, a small
@@ -17,14 +17,17 @@ UI pass and broader acceptance](docs/research/2026-09-30-post-merge-scope.md).
 Larger simulator/log-reader reductions depend on evidence.
 **Evidence and acceptance:** The linked scope records the audited and refreshed
 revisions, AF-029–AF-032/AF-039, and a concrete completion check for each package.
-**Open decisions:** Select implementation scopes; a more compact default script
-offer and feature deletions remain product choices.
-**Assignment:** Scoping only, task `01a0f19e-1f49-7d70-947b-28c911465e09`,
-[PR #292](https://github.com/lustoykov/hallvi/pull/292).
+**Open decisions:** Larger reductions must earn their place through measurement
+or demonstrated friction; there is no feature-removal quota.
+**Assignment:** Implementation and acceptance in task
+`01a0f19e-1f49-7d70-947b-28c911465e09`, following
+[the scoped proposal](https://github.com/lustoykov/hallvi/pull/292). The owner
+authorized the four fixes, test pruning, UI simplification, broader acceptance,
+measured reductions, supplemental audit and fresh-user walkthrough, with review
+between increments.
 
 **+1:** 2026-09-30 — owner-requested scope in the task above.
 
-No selected implementation remains assigned after the 29 September batch.
 Completed selected scopes and their remaining evidence limits are in the Archive.
 
 Votes show interest, not priority or approval. Each count comes from the task
