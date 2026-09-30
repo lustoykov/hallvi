@@ -19,7 +19,7 @@ import {
 } from "./results.ts";
 import { browserJourneys } from "../browser/journeys.ts";
 import { suiteGuides } from "./suite-guides.ts";
-import { guidePage, renderMarkdown } from "./markdown.ts";
+import { guidePage, renderMarkdown, sidebar } from "./markdown.ts";
 import { checkout, developmentState, releasesState } from "./development.ts";
 import { createLearning, LearningError } from "./learning.ts";
 import { learningPage, learningSourcePage } from "./learning-page.ts";
@@ -437,7 +437,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         response.end(
           readFileSync(new URL(name, import.meta.url), "utf8")
             .replace("CSRF_TOKEN", token)
-            .replace("HALLVI_APP_URL", appUrl),
+            .replace("<!-- SIDEBAR -->", () => sidebar(appUrl)),
         );
         return;
       }

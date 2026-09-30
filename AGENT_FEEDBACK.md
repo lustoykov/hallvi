@@ -15,7 +15,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 2 | New |
 | [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Accepted; fix in #310 |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Accepted; fixes in #303 and #308 |
 | [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | Accepted; fix in #301 |
@@ -30,6 +30,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
 | [AF-045 — Keep simulated SPA route identities honest](#af-045--keep-simulated-spa-route-identities-honest) | 1 | Accepted; fix in #308 |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
+| [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -135,6 +136,18 @@ It does not establish legal compliance or update existing deployed sites.
 mark those actions in application code. This task removes that checklist row
 and shows the Goals card only when the selected range has recorded goal events.
 Manual event support remains.
+
+### AF-044 — Keep dashboard UI checks away from real learning progress
+
+**+1:** 2026-09-30 — developer dashboard polish task.
+
+A worktree's own dashboard (`HALLVI_DASHBOARD_PORT=… node --experimental-strip-types
+tests/dashboard/server.ts`) opens the learning store in the Git common
+directory, so checking Learn Hallvi's quiz from a branch reads, and would
+write, the owner's real progress. `HALLVI_LEARNING_DB_PATH` exists but starts
+empty. A fresh worktree also has no saved eval answers, so the Eval archive's
+review layout could only be checked after copying `tests/results/evals` from
+another checkout.
 
 ### AF-039 — Keep new tests tied to useful behavior
 
@@ -406,6 +419,10 @@ test changed. A cheap way to see which journeys currently fail on main would
 separate old breakage from a new change's.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
+**+1:** 2026-09-30 — settings redesign (`claude/settings-redesign`): on main,
+`applications.spec.ts` P1-10 stalls on the synthetic reply ("Writing the
+reply") before it reaches Settings, and `controller-protection.spec.ts` looks
+for Backups, which now sits behind "Show more" in the application sidebar.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
@@ -491,7 +508,7 @@ limit from the account balance; the request error now names both possibilities.
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | Resolved in #302 |
-| [AF-044 — Preserve uncertain sends when browser storage writes fail](#af-044--preserve-uncertain-sends-when-browser-storage-writes-fail) | 1 | Resolved in #307 |
+| [AF-046 — Preserve uncertain sends when browser storage writes fail](#af-046--preserve-uncertain-sends-when-browser-storage-writes-fail) | 1 | Resolved in #307 |
 | [AF-023 — Discover newer releases despite GitHub listing order](#af-023--discover-newer-releases-despite-github-listing-order) | 1 | Fixed in #285 |
 | [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fixed in #282 |
 | [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
@@ -522,7 +539,7 @@ names, or explicitly reuse one shared helper/router with all intended hosts.
 
 **+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
-### AF-044 — Preserve uncertain sends when browser storage writes fail
+### AF-046 — Preserve uncertain sends when browser storage writes fail
 
 A readable localStorage can still reject writes because it is full. The panel
 then read an older persisted draft instead of the in-memory draft and request

@@ -208,7 +208,9 @@ test(
     await page
       .getByRole("button", { name: "Copy log path", exact: true })
       .click();
-    await expect(page.getByRole("status")).toHaveText("Path copied.");
+    await expect(
+      page.locator("#connection-help").getByRole("status"),
+    ).toHaveText("Path copied.");
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
       setupStatus.diagnosticLogPath,
     );
@@ -232,11 +234,14 @@ test(
     await disconnect.click();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(disconnect).toBeFocused();
-    await page.getByLabel("Reasoning effort").selectOption("medium");
-    await page.getByRole("button", { name: "View applications" }).click();
-    await expect(page).toHaveURL(/\/applications(?:\/new)?$/);
-    await page.goto("/setup/pi");
-    await expect(page.getByLabel("Reasoning effort")).toHaveValue("medium");
+    // Effort applies when it is picked; there is no Save.
+    const effort = page.getByRole("radiogroup", { name: "Reasoning effort" });
+    await effort.getByRole("radio", { name: "Medium", exact: true }).click();
+    await expect(page.getByText("Saved · Medium effort")).toBeVisible();
+    await page.reload();
+    await expect(
+      effort.getByRole("radio", { name: "Medium", exact: true }),
+    ).toHaveAttribute("aria-checked", "true");
   },
 );
 
@@ -359,9 +364,7 @@ test(
     await expect(
       page.getByRole("button", { name: "Use existing login" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "View applications" }),
-    ).toBeDisabled();
+    await expect(page.getByText("Pick what Hallvi thinks with")).toBeVisible();
     await page.goto(path);
     // A draft can still be written; it cannot be sent until ChatGPT is back.
     await page
