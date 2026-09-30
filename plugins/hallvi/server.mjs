@@ -16,8 +16,9 @@ import {
   requestHandle,
   selectController,
 } from "../../scripts/controller-client.mjs";
+import { projectConversation, projectTraffic } from "./conversation.mjs";
 
-export const PLUGIN_VERSION = "0.1.1";
+export const PLUGIN_VERSION = "0.2.0";
 
 export function panelResource(html) {
   const version = createHash("sha256").update(html).digest("hex").slice(0, 16);
@@ -66,7 +67,7 @@ export function createHallviServer({
     { name: "hallvi", version: PLUGIN_VERSION },
     {
       instructions:
-        "Use hallvi_apps then hallvi_inspect to confirm the application and permission mode before submitting work. Hallvi's existing Pi operator performs the work. Reuse the same request_key and message after uncertain acceptance; never invent a new key to retry. Follow the handle with hallvi_wait. Completed means Pi finished answering, not verified success. Read answer and evidence. Approval, input, Continue and Stop stay in Hallvi; never bypass a wait.",
+        "Use hallvi_apps then hallvi_inspect to confirm the application and permission mode before submitting work. hallvi_conversation shows what the main operator is doing and recently said. Hallvi's existing Pi operator performs the work. Reuse the same request_key and message after uncertain acceptance; never invent a new key to retry. Follow the handle with hallvi_wait. Completed means Pi finished answering, not verified success. Read answer and evidence. Approval, input, Continue and Stop stay in Hallvi; never bypass a wait.",
     },
   );
   const page = (applicationId, chatId) =>
@@ -128,14 +129,70 @@ export function createHallviServer({
       inputSchema: { application_id: id, execution_id: id.optional() },
       annotations: readOnly,
     },
-    async ({ application_id, execution_id }, { signal }) => ({
-      ...(execution_id
-        ? await client.execution(application_id, execution_id, { signal })
-        : await client.inspection(application_id, { signal })),
-      controller,
-      applicationId: application_id,
-      page: page(application_id),
-    }),
+    async ({ application_id, execution_id }, { signal }) => {
+      if (execution_id)
+        return {
+          ...(await client.execution(application_id, execution_id, {
+            signal,
+          })),
+          controller,
+          applicationId: application_id,
+          page: page(application_id),
+        };
+      const [inspection, traffic] = await Promise.all([
+        client.inspection(application_id, { signal }),
+        // Traffic is context: a controller without it still inspects.
+        client.traffic(application_id, { signal }).then(projectTraffic, () => ({
+          unavailable: true,
+        })),
+      ]);
+      return {
+        ...inspection,
+        traffic,
+        controller,
+        applicationId: application_id,
+        page: page(application_id),
+      };
+    },
+  );
+  tool(
+    "hallvi_conversation",
+    {
+      title: "Read the main conversation",
+      description:
+        "Read the latest turns of an application's main conversation: the owner's requests, what each reply did (calls, targets, status, output excerpts), its words and saved records, and whether the operator is idle, working, waiting for approval or interrupted. Read-only: no model call, no server probe. Pass a previous revision as `known` to learn only whether anything changed.",
+      inputSchema: {
+        application_id: id,
+        turns: z.number().int().min(1).max(20).default(3),
+        known: z.string().max(64).optional(),
+      },
+      annotations: readOnly,
+    },
+    async ({ application_id, turns, known }, { signal }) => {
+      const app = await client.application(application_id, { signal });
+      if (!app.mainChatId)
+        throw new ClientError(
+          "not-found",
+          "This application has no main conversation. Open Hallvi to finish setup.",
+        );
+      const conversation = projectConversation(
+        await client.conversation(application_id, app.mainChatId, { signal }),
+        { turns },
+      );
+      const read = {
+        controller,
+        applicationId: application_id,
+        chatId: app.mainChatId,
+        page: page(application_id, app.mainChatId),
+        readAt: new Date().toISOString(),
+        revision: conversation.revision,
+        status: conversation.status,
+        worker: conversation.worker,
+      };
+      return conversation.revision === known
+        ? { ...read, unchanged: true }
+        : { ...read, ...conversation, unchanged: false };
+    },
   );
   tool(
     "hallvi_exec",
@@ -154,7 +211,8 @@ export function createHallviServer({
         openWorldHint: true,
         idempotentHint: true,
       },
-      _meta: { ui: { visibility: ["model"] } },
+      // The panel's composer sends through the same tool and key rules.
+      _meta: { ui: { visibility: ["model", "app"] } },
     },
     async ({ application_id, message, request_key }, { signal }) => {
       const budget = AbortSignal.any([signal, AbortSignal.timeout(40_000)]);
@@ -313,7 +371,7 @@ export function createHallviServer({
     {
       title: "Open Hallvi",
       description:
-        "Open the Hallvi application browser beside this conversation or from the sidebar. Select an application to inspect its evidence and give the conversation context.",
+        "Open Hallvi beside this conversation or from the sidebar: talk to an application's main operator, follow its work and read the application's condition, traffic and errors. The selected application is shared with this conversation. Approvals, input cards, Continue and Stop stay in Hallvi's page.",
       inputSchema: {},
       annotations: readOnly,
       _meta: openMeta(currentPanel.uri),
