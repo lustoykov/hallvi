@@ -58,7 +58,7 @@ import { useCollection, useHistory } from "./source";
 import { SimulateTraffic } from "./simulate";
 import { TrafficChart } from "./traffic-chart";
 import { ScriptOffers } from "./script-offer";
-import { DevPanel, useOffer } from "./variants";
+import { DevPanel } from "./variants";
 import "./traffic.css";
 
 const RANGE_LABEL: Record<TrafficRange, string> = {
@@ -462,7 +462,6 @@ export function TrafficPage({
   onReopen?: () => void;
   onAsk: (draft: string) => void;
 }) {
-  const offerLook = useOffer();
   const { collection, act } = useCollection(applicationId);
   const listed = trafficListed(collection);
   const [range, setRange] = useState<TrafficRange>("7d");
@@ -623,10 +622,8 @@ export function TrafficPage({
       />
       {offer && (
         <ScriptOffers
-          variant={offerLook}
           reason={offer.reason}
           views={history && hasTotals(history) ? history.totals.views : null}
-          pages={history && hasTotals(history) ? history.pages : []}
           range={RANGE_WORDS[range]}
           folded={dismissed === offer.reason}
           onAdd={() => onAsk(scriptDraft(applicationName))}

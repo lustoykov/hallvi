@@ -211,13 +211,15 @@ internet, no cookies and nothing stored in the browser.
   as the log names them; any other key names the page by its path alone.
 - **Offered where it is seen, not pushed.** Nothing is said about the script
   during deployment unless the owner asks for analytics then. The Traffic page
-  offers it as a card near the top whenever history is counted from the log
-  alone. The card leads with the evidence when there is some: the application
-  changes pages in the browser (in-page requests name pages, in their
-  referrer, that were never loaded as a document), or a CDN caches its pages
-  (a `cdn` record with `caches-pages`). Otherwise it says what only the script
-  measures: time on page, goals and page speed. "Not now" folds it to one line
-  in place, in that browser, until a different reason appears, and the lists only the script
+  offers it as a checklist card near the top whenever history is counted from
+  the log alone: the log's page loads and the script head two columns, and
+  rows say what each sees (page loads, pages changed in the app, pages a CDN
+  served, time on page, page speed, goals). The row the evidence points at is
+  marked "this app": the application changes pages in the browser (in-page
+  requests name pages, in their referrer, that were never loaded as a
+  document), a CDN caches its pages (a `cdn` record with `caches-pages`), or
+  otherwise time on page. "Not now" folds it to one line in place, in that
+  browser, until a different reason appears, and the lists only the script
   fills still offer it when opened.
 - **No double counting.** The log and the script are never added together.
   Each application has one switch point, the first script event Hallvi
@@ -438,8 +440,8 @@ map by their share of the day, and a visit brightens its country (the owner
 chose this "country tint" on 29 September 2026). Little Server stops by for nice moments — a first visitor, a new
 country, a record day — briefly, then leaves. Amber and red only for what
 needs the owner ([calm by default](../../src/components/hallvi/DESIGN.md)).
-Treatments are chosen from switchable prototypes on the real pages
-(`?offer=` for the script offer), shown only outside a production build.
+Treatments are chosen from switchable prototypes on the real pages, shown
+only outside a production build.
 
 ## Proof
 
