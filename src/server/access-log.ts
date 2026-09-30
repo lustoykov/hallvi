@@ -82,7 +82,6 @@ export class LiveWindow {
   private readonly hosts: readonly string[];
   private readonly pageKey: string | undefined;
   private readonly hashRouting: boolean;
-  private readonly countries = new Map<string, string>();
   /** Hosts browsers reach with fetch metadata: imitations there are bots. */
   private readonly withMetadata = new Set<string>();
   /** Browsers, by label, and when each was last seen. */
@@ -120,14 +119,6 @@ export class LiveWindow {
       .update(`${line.address}\n${line.userAgent}`)
       .digest("hex")
       .slice(0, 10);
-    const country = () => {
-      let found = this.countries.get(visitor);
-      if (found === undefined) {
-        found = countryOf(line.address, line.cdnCountry);
-        this.countries.set(visitor, found);
-      }
-      return found;
-    };
     if (kind.kind === "event") {
       const { event } = kind;
       this.script = true;
@@ -158,7 +149,7 @@ export class LiveWindow {
         path: page,
         status: line.status,
         ms: line.ms,
-        country: country(),
+        country: countryOf(line.address, line.cdnCountry),
         source:
           arrivalOf({
             referrer: event.r ?? null,
@@ -196,7 +187,7 @@ export class LiveWindow {
           : line.path.slice(0, 200),
       status: line.status,
       ms: line.ms,
-      country: country(),
+      country: countryOf(line.address, line.cdnCountry),
       source: view
         ? (arrivalOf({
             referrer: line.referrer,

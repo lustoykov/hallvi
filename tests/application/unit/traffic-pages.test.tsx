@@ -253,9 +253,11 @@ describe("the chart's running bucket", () => {
         />,
       );
     // Counted only from noon: the morning is missing.
-    expect(render(1 / 3)).toContain('class="tf-chart-gap" data-part="true"');
+    expect(render(1 / 3)).toContain("Some of this period was not counted.");
     // Everything but the last minute the collector has yet to write down.
-    expect(render(1 - 60_000 / (18 * HOUR))).not.toContain("tf-chart-gap");
+    expect(render(1 - 60_000 / (18 * HOUR))).not.toContain(
+      "Some of this period was not counted.",
+    );
   });
 });
 

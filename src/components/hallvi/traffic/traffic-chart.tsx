@@ -194,7 +194,7 @@ export function TrafficChart({
       <div
         className="tf-chart-plot"
         role="img"
-        aria-label={`Estimated visitors and page views, ${history.range === "24h" ? "hour by hour" : "day by day"}.`}
+        aria-label={`Estimated visitors and page views, ${history.range === "24h" ? "hour by hour" : "day by day"}.${gaps.length ? " Some of this period was not counted." : ""}`}
         onPointerMove={onPointerMove}
         onPointerLeave={() => setHover(null)}
       >

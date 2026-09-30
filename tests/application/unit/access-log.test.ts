@@ -67,6 +67,15 @@ const record = (source: unknown) => ({
 });
 
 describe("the access log", () => {
+  it("uses each arrival's country without retaining an old visitor lookup", () => {
+    const window = new LiveWindow({ script: false });
+    for (const agent of [chrome, "Googlebot/2.1"]) {
+      const line = request("/", Date.now(), { agent });
+      expect(window.arrival({ ...line, cdnCountry: "BG" })?.country).toBe("BG");
+      expect(window.arrival({ ...line, cdnCountry: "DE" })?.country).toBe("DE");
+    }
+  });
+
   it("validates an explicit hash-routing choice on the existing record", () => {
     const input = record({ type: "file", path: "/var/log/caddy/access.log" });
     for (const hashRouting of [true, false]) {
