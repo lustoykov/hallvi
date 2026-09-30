@@ -110,7 +110,9 @@ function reply(message, activity, executions, information) {
     said?.kind === "message" && said.text?.trim() === message.body?.trim()
       ? records.slice(0, -1)
       : records
-  ).map((item) => step(item, item.executionId && executions.get(item.executionId)));
+  ).map((item) =>
+    step(item, item.executionId && executions.get(item.executionId)),
+  );
   // Commands waiting on the owner that Pi's history has not written yet.
   for (const execution of executions.values())
     if (
@@ -194,7 +196,7 @@ export function projectConversation(snapshot, { turns: limit = 6 } = {}) {
     if (answered && !answered.reply) answered.reply = projected;
     else turns.push({ request: null, reply: projected });
   }
-  // Older turns keep what each step was; its command and output stay a read away.
+  // Older turns keep what each step was; the rest is one read away.
   const shown = turns.slice(-limit).map((turn, index, all) =>
     index >= all.length - 2 || !turn.reply
       ? turn

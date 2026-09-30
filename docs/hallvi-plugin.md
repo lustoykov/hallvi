@@ -5,11 +5,14 @@ controller**. Hallvi can run on your Mac or another machine. Codex doesn't
 need its own Hallvi installation when the controller is remote: SSH starts
 the small adapter on the controller machine.
 
-The adapter lists applications, reads recorded evidence, submits a request to
-the application's existing Pi operator and follows its result. It neither
-creates applications nor replaces Pi. Approvals, missing input, Continue and
-Stop remain in the Hallvi page. Requests use the existing CLI origin label,
-so the adapter also works with controllers that predate this plugin.
+The adapter lists applications, reads recorded evidence and the main
+conversation, submits a request to the application's existing Pi operator and
+follows its result. Its panel is a compact Hallvi built around that operator:
+ask for work, follow it, read the result and continue, with the application's
+condition, traffic and errors one click away. It neither creates applications
+nor replaces Pi. Approvals, missing input, Continue and Stop remain in the
+Hallvi page. Requests use the existing CLI origin label, so the adapter also
+works with controllers that predate this plugin.
 
 ## Build
 
@@ -52,10 +55,10 @@ Then, for a fresh check:
 > redeployment, restart, configuration changes or data changes. Follow the
 > request and show the evidence.
 
-`hallvi_open` supplies the optional application panel to compatible MCP Apps
-hosts. Tools work without the panel. Rendering and selection have also been
-checked in the installed Codex MCP Apps panel; native ChatGPT rendering
-remains unverified.
+`hallvi_open` supplies the optional panel to compatible MCP Apps hosts.
+Tools work without the panel. The first read-only panel was checked in the
+installed Codex MCP Apps panel; the operator panel's host verification is
+recorded in its pull request, and native ChatGPT rendering remains unverified.
 
 To install the skill and tools together as a local plugin:
 
@@ -174,9 +177,20 @@ reconnection and refreshed native rendering must be tested through the host UI.
 
 The same server exposes an MCP Apps HTML resource. `hallvi_open` declares both
 `global` and `thread` entrypoints through the new OpenAI Plugin Extensions.
-The panel lets you select an application, inspect records and expand execution
-output. Selection shares application identity with the host model. It does
-not execute operations or approve them.
+In the panel you choose an application and talk to its main operator: a
+message goes through `hallvi_exec` exactly as a model's would, as a follow-up
+while Pi works. The latest turns come from `hallvi_conversation`, whichever
+surface wrote them, and are re-read about every 1.5 seconds while Pi works and
+every 8 seconds otherwise, never while the panel is hidden. The details under
+the application's name come from `hallvi_inspect`. The panel shares the
+selected application and what its operator is doing with the host model, so
+"ask Hallvi to…" in the Codex conversation goes to the same application.
+
+The panel never approves, declines, continues or stops. An MCP host cannot
+show the adapter that a person rather than the model pressed a button, so
+those decisions stay in Hallvi's page, which the panel opens (HTTPS) or offers
+to copy (HTTP). [The panel design](../plugins/hallvi/DESIGN.md) describes its
+states.
 
 For private developer-mode testing, use OpenAI's
 [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels).
@@ -209,8 +223,9 @@ this private proof of concept.
 | Tool | Behavior |
 | --- | --- |
 | `hallvi_apps` | List applications and recorded condition. No live probe. |
-| `hallvi_inspect` | Read identity, permission mode, attention and bounded evidence; optionally one execution in full. |
-| `hallvi_exec` | Send one bounded request with a caller-supplied UUID key; return its handle after acceptance. |
+| `hallvi_inspect` | Read identity, permission mode, attention, bounded evidence and the last day's stored traffic totals; optionally one execution in full. |
+| `hallvi_conversation` | Read the latest turns of the main conversation: requests, each reply's calls, words, records and status. Pass a previous `revision` as `known` to learn only whether it changed. |
+| `hallvi_exec` | Send one bounded request with a caller-supplied UUID key; return its handle after acceptance. Also the panel's composer. |
 | `hallvi_wait` | Read that handle, optionally waiting up to 20 seconds. Never restart or resend work. |
 | `hallvi_open` | Read the application list and attach the versioned panel resource. |
 | `hallvi_reload_ui` | Reread installed panel HTML, publish a content-versioned resource and notify the existing MCP connection. No Pi work or controller restart. |
@@ -251,6 +266,15 @@ round trips against a disposable controller stand-in. The tests exercise lost
 acceptance, same-key retries, approval waits, completed-but-unsuccessful
 answers, unavailable workers, foreign handles, invalid IDs and browser-origin
 rejection. They do not prove native host support or a remote SSH deployment.
+
+`npm run plugin:host -- --controller http://127.0.0.1:<port>` renders the
+panel in a local MCP Apps test host: the real adapter over stdio, the panel in
+a sandboxed frame, switches for width, theme, host styles, sidebar or thread
+and `ui/message`, and a log of every bridge call and model-context update.
+Add `?storage=1` to its address to give the frame an origin, which browser
+storage and screenshot tools need. It re-reads `panel.html` on each load
+through `hallvi_reload_ui`. Anything it proves is fixture behavior: link,
+clipboard, message and caching behavior must be checked in the host itself.
 
 For real operational verification, use [the shared workflow](verification.md)
 and send a bounded request through these tools against the exclusively

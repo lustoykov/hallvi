@@ -53,7 +53,8 @@ const STYLES = {
     "--color-text-secondary": "#5d5d5d",
     "--color-border-primary": "#d9d9d9",
     "--color-border-secondary": "#ececec",
-    "--font-sans": 'ui-sans-serif, -apple-system, system-ui, "Segoe UI", sans-serif',
+    "--font-sans":
+      'ui-sans-serif, -apple-system, system-ui, "Segoe UI", sans-serif',
     "--font-mono": 'ui-monospace, "SF Mono", Menlo, monospace',
   },
   dark: {
@@ -64,7 +65,8 @@ const STYLES = {
     "--color-text-secondary": "#afafaf",
     "--color-border-primary": "#424242",
     "--color-border-secondary": "#303030",
-    "--font-sans": 'ui-sans-serif, -apple-system, system-ui, "Segoe UI", sans-serif',
+    "--font-sans":
+      'ui-sans-serif, -apple-system, system-ui, "Segoe UI", sans-serif',
     "--font-mono": 'ui-monospace, "SF Mono", Menlo, monospace',
   },
 };
