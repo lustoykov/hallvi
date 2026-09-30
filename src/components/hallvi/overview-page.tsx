@@ -30,6 +30,12 @@ import { OverviewLive } from "./overview-live/overview-live";
 import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag } from "./presentation";
+import { useCalmVariant } from "./calm-asks-prototype/variant";
+import {
+  CalmAsksBar,
+  NoteMascot,
+  StateMarks,
+} from "./calm-asks-prototype/visuals";
 import "./overview-prototype/overview.css";
 import "./overview-plain.css";
 
@@ -212,27 +218,46 @@ export function OverviewPage({
   const openUrl =
     currentAccessRecord(records, application.id)?.presentation?.url ?? null;
 
+  // PROTOTYPE · prototype/calm-asks-visuals: how "Unresolved" is drawn.
+  const variant = useCalmVariant();
+  const tones = built.needs.map((need) => need.tone);
+  const pinned = variant === "log";
+  const needItems = built.needs.map((need) => (
+    <li key={need.id} data-tone={need.tone}>
+      <b>{need.title}</b>
+      <span>{need.detail}</span>
+      {need.primary.draft && (
+        <button type="button" onClick={() => onAsk(need.primary.draft!)}>
+          {need.primary.label}
+        </button>
+      )}
+    </li>
+  ));
+
   // Deployed: the page is what is happening now, around what is recorded.
   // Everything before that is still a journey, and keeps its own pages.
   if (returnVisit.deployed)
     return (
-      <OverviewLive
-        applicationId={application.id}
-        name={application.name}
-        title={model?.headline ?? application.name}
-        mapped={Boolean(model)}
-        built={built}
-        usage={usage}
-        condition={condition}
-        now={now}
-        chrome={chrome}
-        openUrl={openUrl}
-        restricted={model?.restricted ?? false}
-        reachable={reachable}
-        onReopen={onReopen}
-        onAsk={onAsk}
-        onOpenDestination={onOpenDestination}
-      />
+      <>
+        <OverviewLive
+          applicationId={application.id}
+          name={application.name}
+          title={model?.headline ?? application.name}
+          mapped={Boolean(model)}
+          built={built}
+          usage={usage}
+          condition={condition}
+          now={now}
+          chrome={chrome}
+          openUrl={openUrl}
+          restricted={model?.restricted ?? false}
+          reachable={reachable}
+          onReopen={onReopen}
+          onAsk={onAsk}
+          onOpenDestination={onOpenDestination}
+        />
+        <CalmAsksBar />
+      </>
     );
 
   if (model) {
@@ -273,6 +298,7 @@ export function OverviewPage({
             </button>
           </section>
         )}
+        <CalmAsksBar />
       </div>
     );
   }
@@ -317,25 +343,18 @@ export function OverviewPage({
             </p>
           )}
 
-          {built.needs.length > 0 && (
+          {built.needs.length > 0 && !pinned && (
             <section>
-              <h2>Unresolved</h2>
-              <ul>
-                {built.needs.map((need) => (
-                  <li key={need.id} data-tone={need.tone}>
-                    <b>{need.title}</b>
-                    <span>{need.detail}</span>
-                    {need.primary.draft && (
-                      <button
-                        type="button"
-                        onClick={() => onAsk(need.primary.draft!)}
-                      >
-                        {need.primary.label}
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <h2>
+                {variant === "marks" ? (
+                  <StateMarks tones={tones} />
+                ) : variant === "hallvi" ? (
+                  <NoteMascot tones={tones} />
+                ) : (
+                  "Unresolved"
+                )}
+              </h2>
+              <ul>{needItems}</ul>
             </section>
           )}
 
@@ -390,9 +409,12 @@ export function OverviewPage({
             </section>
           )}
 
-          {built.recent.length > 0 && (
+          {(built.recent.length > 0 || (pinned && built.needs.length > 0)) && (
             <section>
               <h2>What happened</h2>
+              {pinned && built.needs.length > 0 && (
+                <ul className="cap-pinned">{needItems}</ul>
+              )}
               <ul className="hv-overview-recent">
                 {built.recent.map((item) => (
                   <li key={item.id}>
@@ -405,6 +427,7 @@ export function OverviewPage({
           )}
         </div>
       </div>
+      <CalmAsksBar />
     </div>
   );
 }

@@ -39,6 +39,8 @@ export interface Day {
 export interface HistoryRecord {
   counts: Record<Filter, number>;
   open: Entry[];
+  /** PROTOTYPE · calm-asks-visuals: one tone per unresolved operation. */
+  unresolvedTones: ("waiting" | "failed")[];
   days: Day[];
   total: number;
   verified: number;
@@ -76,8 +78,14 @@ export function buildHistory(
   operations: ApplicationOperation[],
   chats: ChatSummary[],
   filter: Filter,
+  /** PROTOTYPE · calm-asks-visuals B: open failures join "Open now". */
+  pinUnresolved = false,
 ): HistoryRecord {
   const unresolved = new Set(attentionItems(operations).map((item) => item.id));
+  const rankOf = (op: ApplicationOperation) =>
+    pinUnresolved && op.state === "failed" && unresolved.has(op.id)
+      ? 2
+      : rank(op);
   const matches = (op: ApplicationOperation, value: Filter) =>
     value === "All" ||
     (value === "Changes" && op.kind === "change") ||
@@ -111,9 +119,11 @@ export function buildHistory(
   const shown = operations
     .filter((op) => matches(op, filter))
     .map(entry)
-    .toSorted((a, b) => rank(a.op) - rank(b.op) || b.at.localeCompare(a.at));
+    .toSorted(
+      (a, b) => rankOf(a.op) - rankOf(b.op) || b.at.localeCompare(a.at),
+    );
   const days: Day[] = [];
-  for (const item of shown.filter((each) => rank(each.op) === 3)) {
+  for (const item of shown.filter((each) => rankOf(each.op) === 3)) {
     // Rendered on the client only, so this is the viewer's own day.
     const key = new Date(item.at).toDateString();
     const last = days.at(-1);
@@ -128,7 +138,10 @@ export function buildHistory(
         operations.filter((op) => matches(op, value)).length,
       ]),
     ) as Record<Filter, number>,
-    open: shown.filter((item) => rank(item.op) < 3),
+    open: shown.filter((item) => rankOf(item.op) < 3),
+    unresolvedTones: operations
+      .filter((op) => unresolved.has(op.id))
+      .map((op) => (op.state === "failed" ? "failed" : "waiting")),
     days,
     total: operations.length,
     verified: operations.filter((op) => op.state === "verified").length,

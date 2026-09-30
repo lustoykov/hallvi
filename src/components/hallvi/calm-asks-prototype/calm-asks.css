@@ -1,0 +1,169 @@
+/* PROTOTYPE · prototype/calm-asks-visuals · throwaway. Prefix: cap-. */
+
+/* A · Marks: an open ring for a decision waiting, a dot for a failure. */
+.cap-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+}
+.cap-marks i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--waiting-text, #9a4b10);
+  opacity: 0.85;
+}
+.cap-marks i[data-tone="failed"] {
+  background: var(--failed, #a6312b);
+  box-shadow: none;
+}
+
+/* C · Little Server holds up a note. */
+.cap-hallvi {
+  display: inline-flex;
+  align-items: flex-end;
+  vertical-align: middle;
+}
+.cap-hallvi-body {
+  width: 33px;
+  height: 30px;
+  flex: none;
+}
+.cap-note {
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 21px;
+  margin: 0 0 12px -6px;
+  padding: 0 4px;
+  border: 1px solid var(--line, #e7e9ee);
+  border-top: 3px solid var(--waiting-text, #9a4b10);
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(28 52 110 / 0.16);
+  color: var(--ink, #202838);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  transform: rotate(-7deg);
+}
+.cap-note[data-tone="failed"] {
+  border-top-color: var(--failed, #a6312b);
+}
+.cap-hallvi[data-small] .cap-hallvi-body {
+  width: 20px;
+  height: 18px;
+}
+.cap-hallvi[data-small] .cap-note {
+  min-width: 11px;
+  height: 12px;
+  margin: 0 0 6px -4px;
+  padding: 0 2px;
+  border-top-width: 2px;
+  align-content: center;
+  gap: 2px;
+}
+.cap-hallvi[data-small] .cap-note i {
+  display: block;
+  width: 7px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: #c3cad8;
+}
+
+/* Where the word used to sit. */
+.ovl-tile h2 .cap-marks,
+.hv-overview-plain h2 .cap-marks {
+  margin: 3px 0 2px;
+}
+.ovl-tile h2 .cap-hallvi {
+  margin: -6px 0 -4px -2px;
+}
+.hv-overview-plain h2:has(.cap-marks, .cap-hallvi) {
+  margin-bottom: 10px;
+}
+.axt-say .cap-marks,
+.axt-say .cap-hallvi {
+  margin-right: 10px;
+}
+
+/* B · In the log: open things pinned above what happened. */
+.cap-pinned {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line, #e7e9ee);
+  list-style: none;
+}
+.hv-overview-plain .cap-pinned {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+}
+
+/* The prototype's own bar: plainly not the product. */
+.cap-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 6px 8px 6px 12px;
+  border-radius: 999px;
+  background: #111827;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+  color: #f3f4f6;
+  font:
+    500 12px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  transform: translateX(-50%);
+}
+.cap-bar-tag {
+  color: #fbbf24;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cap-bar-variant {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.cap-bar button,
+.cap-bar a {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #1f2937;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.cap-bar button:hover,
+.cap-bar a:hover {
+  background: #374151;
+}
+.cap-bar-pages {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+.cap-bar-pages a {
+  color: #cbd5e1;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.cap-pinned .ovl-ask {
+  justify-self: start;
+}

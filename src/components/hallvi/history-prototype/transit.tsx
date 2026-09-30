@@ -32,8 +32,12 @@ export interface HistoryDirectionProps {
   head: ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
+  /** PROTOTYPE · calm-asks-visuals: how "Unresolved" is drawn. */
+  variant?: CalmVariant;
 }
 import "./transit.css";
+import type { CalmVariant } from "../calm-asks-prototype/variant";
+import { NoteMascot, StateMarks } from "../calm-asks-prototype/visuals";
 
 interface Arc {
   id: string;
@@ -54,6 +58,7 @@ export function TransitHistory({
   head,
   onOpenConversation,
   onOpenDestination,
+  variant = "now",
 }: HistoryDirectionProps) {
   const [open, setOpen] = useState<string | null>(null);
   const [lit, setLit] = useState<string | null>(null);
@@ -156,7 +161,12 @@ export function TransitHistory({
             role="group"
             aria-label="Filter operation history"
           >
-            {FILTERS.map((value) => (
+            {FILTERS.filter(
+              (value) =>
+                value !== "Unresolved" ||
+                variant === "now" ||
+                (variant !== "log" && history.counts.Unresolved > 0),
+            ).map((value) => (
               <button
                 key={value}
                 type="button"
@@ -164,7 +174,19 @@ export function TransitHistory({
                 disabled={!history.counts[value] && value !== "All"}
                 onClick={() => onFilter(value)}
               >
-                <span>{value}</span>
+                <span>
+                  {value === "Unresolved" &&
+                  variant === "marks" &&
+                  history.unresolvedTones.length ? (
+                    <StateMarks tones={history.unresolvedTones} />
+                  ) : value === "Unresolved" &&
+                    variant === "hallvi" &&
+                    history.unresolvedTones.length ? (
+                    <NoteMascot tones={history.unresolvedTones} small />
+                  ) : (
+                    value
+                  )}
+                </span>
                 <b>{history.counts[value]}</b>
               </button>
             ))}

@@ -47,6 +47,8 @@ import {
   type Timeline,
 } from "./timeline-model";
 import { Mascot, useHallvi } from "./use-hallvi";
+import { useCalmVariant } from "../calm-asks-prototype/variant";
+import { NoteMascot, StateMarks } from "../calm-asks-prototype/visuals";
 import "./timeline.css";
 import { LaneRails } from "../lane-rails";
 /** Each lane as the question an owner would ask, and what it covers. */
@@ -340,6 +342,9 @@ export function TimelineHero({
   ) as Record<Vital["id"], Vital>;
   const { now } = timeline;
   const nextIn = useCountdown(vitals.backups?.countdownTo, offset);
+  // PROTOTYPE · prototype/calm-asks-visuals: how "Unresolved" is drawn.
+  const variant = useCalmVariant();
+  const tones = overview.needs.map((need) => need.tone);
   const pointedLane = pointed ? laneOf(pointed) : null;
 
   // Attention first. The condition sentence is scoped to the application's
@@ -350,7 +355,7 @@ export function TimelineHero({
   const verdict = subline(model, overview);
   const waiting = overview.needs.length;
   const sub =
-    verdict && waiting
+    verdict && waiting && variant === "now"
       ? `${waiting === 1 ? "One thing is unresolved" : `${waiting} things are unresolved`}. ${verdict}`
       : verdict;
   const showLog = !planned && logOpen;
@@ -585,6 +590,10 @@ export function TimelineHero({
               now" sat underneath it in muted 15px — or, when anything needed
               attention, was not rendered at all. */}
           <h2 className="axt-say" key={sub ?? overview.headline}>
+            {waiting > 0 && variant === "marks" && <StateMarks tones={tones} />}
+            {waiting > 0 && variant === "hallvi" && (
+              <NoteMascot tones={tones} />
+            )}
             {sub ?? overview.headline}
           </h2>
         </div>

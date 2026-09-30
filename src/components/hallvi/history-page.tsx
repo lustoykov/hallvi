@@ -18,6 +18,8 @@ import { PageHead } from "./deployment-prototype/page-head";
 import { historyFromRecords } from "./history-records";
 import { buildHistory, type Filter } from "./history-prototype/history-model";
 import { TransitHistory } from "./history-prototype/transit";
+import { useCalmVariant } from "./calm-asks-prototype/variant";
+import { CalmAsksBar } from "./calm-asks-prototype/visuals";
 import "./history-prototype/transit.css";
 
 export function HistoryPage({
@@ -40,13 +42,22 @@ export function HistoryPage({
   onOpenDestination: (destination: ApplicationSection) => void;
 }) {
   const [filter, setFilter] = useState<Filter>("All");
+  // PROTOTYPE · prototype/calm-asks-visuals: how "Unresolved" is drawn.
+  const variant = useCalmVariant();
+  const pinned = variant === "log";
   const operations = useMemo(
     () => historyFromRecords({ records, executions }),
     [records, executions],
   );
   const history = useMemo(
-    () => buildHistory(operations, chats, filter),
-    [operations, chats, filter],
+    () =>
+      buildHistory(
+        operations,
+        chats,
+        pinned && filter === "Unresolved" ? "All" : filter,
+        pinned,
+      ),
+    [operations, chats, filter, pinned],
   );
 
   return (
@@ -67,7 +78,9 @@ export function HistoryPage({
         }
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
+        variant={variant}
       />
+      <CalmAsksBar />
     </div>
   );
 }

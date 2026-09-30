@@ -11,6 +11,8 @@
 // `prototype/landing-page-directions` branch.
 
 import { agedAs, usePulse, type Pulse } from "../pulse";
+import { useCalmVariant } from "../calm-asks-prototype/variant";
+import { NoteMascot, StateMarks } from "../calm-asks-prototype/visuals";
 import type { ReactNode } from "react";
 
 import type { ApplicationSection } from "../application-sections";
@@ -255,6 +257,29 @@ export function OverviewLive({
 }) {
   const traffic = useTraffic(applicationId);
   const pulse = usePulse();
+  // PROTOTYPE · prototype/calm-asks-visuals: how "Unresolved" is drawn.
+  const variant = useCalmVariant();
+  const tones = built.needs.map((need) => need.tone);
+  const pinned = variant === "log";
+  const needList = (className: string) => (
+    <ul className={className}>
+      {built.needs.slice(0, 2).map((need) => (
+        <li key={need.id} data-tone={need.tone}>
+          <b>{need.title}</b>
+          <span>{need.detail}</span>
+          {(need.primary.open || need.primary.draft) && (
+            <button
+              type="button"
+              className="ovl-ask"
+              onClick={need.primary.open ?? (() => onAsk(need.primary.draft!))}
+            >
+              {need.primary.label} →
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
   // Where traffic history is kept, today's visitors and the last day's
   // response times come from stored totals rather than a day Pi read.
   const { collection } = useCollection(applicationId);
@@ -434,32 +459,24 @@ export function OverviewLive({
         {/* With nothing unresolved there is no tile saying so: Speed takes
             its place, and a healthy application's page carries no heading
             about what might be wrong with it. */}
-        {built.needs.length > 0 && (
-          <Tile label="Unresolved">
-            <ul className="ovl-needs">
-              {built.needs.slice(0, 2).map((need) => (
-                <li key={need.id} data-tone={need.tone}>
-                  <b>{need.title}</b>
-                  <span>{need.detail}</span>
-                  {(need.primary.open || need.primary.draft) && (
-                    <button
-                      type="button"
-                      className="ovl-ask"
-                      onClick={
-                        need.primary.open ?? (() => onAsk(need.primary.draft!))
-                      }
-                    >
-                      {need.primary.label} →
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+        {built.needs.length > 0 && !pinned && (
+          <Tile
+            label={
+              variant === "marks" ? (
+                <StateMarks tones={tones} />
+              ) : variant === "hallvi" ? (
+                <NoteMascot tones={tones} />
+              ) : (
+                "Unresolved"
+              )
+            }
+          >
+            {needList("ovl-needs")}
           </Tile>
         )}
 
         <Tile
-          wide={built.needs.length === 0}
+          wide={built.needs.length === 0 || pinned}
           label="Speed"
           onOpen={() => onOpenDestination("monitoring")}
         >
@@ -536,6 +553,7 @@ export function OverviewLive({
           label="What happened"
           onOpen={() => onOpenDestination("history")}
         >
+          {pinned && built.needs.length > 0 && needList("ovl-needs cap-pinned")}
           {built.recent.length ? (
             <ul className="ovl-recent">
               {built.recent.map((item) => (
