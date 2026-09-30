@@ -99,8 +99,11 @@ test("Hallvi update stays visible and reload preserves drafts and uncertain mess
   expect(attempts).toHaveLength(1);
   const draft = "Keep my newer draft through the interface reload.";
   await composer.fill(draft);
-  await page.getByRole("button", { name: /Hallvi 0\.1\.1-alpha\.1/ }).click();
-  await page.getByRole("button", { name: "Update", exact: true }).click();
+  // A waiting release is news on Hallvi's own row; the menu leads with it.
+  await page
+    .getByRole("button", { name: "Hallvi 0.1.1-alpha.1, update ready" })
+    .click();
+  await page.getByRole("button", { name: "Update and restart" }).click();
 
   const notice = page.getByRole("status").filter({
     has: page.getByRole("list", { name: "Update steps" }),
