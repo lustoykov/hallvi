@@ -14,6 +14,7 @@
 
 import {
   EVENT_PREFIX,
+  HASH_ROUTING_ATTRIBUTE,
   KEPT_QUERY_KEYS,
   OTHER,
   PAGE_KEY_ATTRIBUTE,
@@ -406,7 +407,7 @@ const RECORD = (
   path: string,
   queries: LogQueries,
 ) =>
-  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], queries:'${queries}', retainDays:30} — add pageKey:'p' only where the application routes by that query key. queries says what this setup removes before a line is written, and the Traffic page tells the owner exactly that`;
+  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], queries:'${queries}', retainDays:30} — add pageKey:'p' only where the application routes by that query key, and hashRouting:true only for slash-prefixed #/ or #!/ browser routes. queries says what this setup removes before a line is written, and the Traffic page tells the owner exactly that`;
 
 const CADDY_LOG = "/var/log/caddy/hallvi/access.log";
 
@@ -744,14 +745,24 @@ export function trafficSetup(proxy: Proxy, version: string) {
 // ---------------------------------------------------------------------------
 // traffic_script
 
-export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
+export function trafficScriptFor(
+  proxy: Proxy,
+  pageKey?: string,
+  hashRouting?: boolean,
+) {
   if (pageKey !== undefined && !PAGE_KEY_NAME.test(pageKey))
     throw new Error("Invalid traffic page key.");
+  if (hashRouting !== undefined && typeof hashRouting !== "boolean")
+    throw new Error("Invalid traffic hash routing option.");
   // An application that routes pages by a query key names it on its tag, so
   // the script sends that key's value and the log and script agree on pages.
+  const attributes = [
+    ...(pageKey ? [`${PAGE_KEY_ATTRIBUTE}="${pageKey}"`] : []),
+    ...(hashRouting ? [`${HASH_ROUTING_ATTRIBUTE}="true"`] : []),
+  ];
   const configuredTag = (text: string) =>
-    pageKey
-      ? text.replaceAll("<script", `<script ${PAGE_KEY_ATTRIBUTE}="${pageKey}"`)
+    attributes.length
+      ? text.replaceAll("<script", `<script ${attributes.join(" ")}`)
       : text;
   const script = trafficScript();
   const check = eventPath({ t: "ping", s: "hallvicheck1", p: "/" });
@@ -763,6 +774,8 @@ export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
     install: `mkdir -p ${SCRIPT_DIRECTORY}/_hv, write content to ${SCRIPT_FILE} exactly (mode 0644), and check that \`sha256sum ${SCRIPT_FILE}\` prints sha256. One file serves every application on the server. A proxy in a container mounts ${SCRIPT_DIRECTORY} read-only at the same path.`,
     serving: SCRIPT_SERVING[proxy],
     tag: configuredTag(SCRIPT_TAG),
+    routing:
+      "History paths and the record's pageKey count by default. Only when the application's access-log record has hashRouting:true does the tag opt in to #/… and #!/… route paths. The script strips hash query values and secondary anchors, and ignores ordinary anchors, malformed encoding and key-value credential fragments. Route path segments are retained, just as history path segments are: never put secrets in a route path. Other fragment routing forms are unsupported.",
     includes: SCRIPT_INCLUDES.map((include) => ({
       ...include,
       line: configuredTag(include.line),

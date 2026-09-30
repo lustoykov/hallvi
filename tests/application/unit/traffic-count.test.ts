@@ -145,6 +145,30 @@ it("keeps only the configured page key across the log-to-script switch", () => {
   expect(JSON.stringify(day)).not.toMatch(/token|secret/);
 });
 
+it("keeps hash route names only when the access-log record opts in", () => {
+  const lines = [
+    sent({ t: "view", s: "abcdefgh12", p: "/app", h: "#/home" }),
+    sent(
+      { t: "view", s: "abcdefgh13", p: "/app", h: "#!/settings" },
+      { at: at(10, 0, 1) },
+    ),
+    sent(
+      { t: "leave", s: "abcdefgh13", p: "/app", h: "#!/settings", e: 1000 },
+      { at: at(10, 0, 2) },
+    ),
+  ];
+  const plain = countDay(lines, options);
+  expect(plain.pages.map(({ key }) => key)).toEqual(["/app"]);
+  const configured = countDay(lines, { ...options, hashRouting: true });
+  expect(configured.pages.map(({ key }) => key).sort()).toEqual([
+    "/app#!/settings",
+    "/app#/home",
+  ]);
+  expect(configured.engagement).toEqual([
+    { path: "/app#!/settings", ms: 1000, samples: 1 },
+  ]);
+});
+
 describe("what a logged request is", () => {
   it("tells a page view from a prefetch, a request, a bot, a probe and Hallvi's own", () => {
     expect(classify(page())).toMatchObject({

@@ -81,6 +81,7 @@ export class LiveWindow {
   private readonly salt = randomBytes(16);
   private readonly hosts: readonly string[];
   private readonly pageKey: string | undefined;
+  private readonly hashRouting: boolean;
   private readonly countries = new Map<string, string>();
   /** Hosts browsers reach with fetch metadata: imitations there are bots. */
   private readonly withMetadata = new Set<string>();
@@ -101,10 +102,12 @@ export class LiveWindow {
   constructor(options: {
     hosts?: readonly string[];
     pageKey?: string;
+    hashRouting?: boolean;
     script: boolean;
   }) {
     this.hosts = options.hosts ?? [];
     this.pageKey = options.pageKey;
+    this.hashRouting = options.hashRouting === true;
     this.script = options.script;
   }
 
@@ -136,9 +139,11 @@ export class LiveWindow {
         this.open.set(event.s, page);
       }
       if (event.t !== "view") return null;
-      const page = eventPage(event, this.pageKey);
-      const load = this.loaded.get(`${visitor} ${page}`);
-      this.loaded.delete(`${visitor} ${page}`);
+      const page = eventPage(event, this.pageKey, this.hashRouting);
+      // Fragments never reach the proxy: pair against the physical page.
+      const loadedPage = eventPage(event, this.pageKey);
+      const load = this.loaded.get(`${visitor} ${loadedPage}`);
+      this.loaded.delete(`${visitor} ${loadedPage}`);
       if (
         load !== undefined &&
         load <= line.at &&
