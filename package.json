@@ -1,6 +1,6 @@
 {
   "name": "hallvi",
-  "version": "0.1.1-alpha.11",
+  "version": "0.1.1-alpha.12",
   "private": true,
   "scripts": {
     "db:upgrade": "node scripts/migrate-state.mjs --apply",
@@ -55,7 +55,7 @@
     "tsx": "4.23.13",
     "typebox": "1.3.7",
     "use-stick-to-bottom": "^1.1.6",
-    "ws": "8.18.3",
+    "ws": "8.22.0",
     "zod": "4.5.4"
   },
   "devDependencies": {
