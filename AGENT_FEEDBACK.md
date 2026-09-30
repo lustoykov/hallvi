@@ -19,6 +19,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | New |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | New |
 | [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | New |
+| [AF-037 — Keep new tests tied to useful behavior](#af-037--keep-new-tests-tied-to-useful-behavior) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -67,6 +68,26 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-037 — Keep new tests tied to useful behavior
+
+The audit follow-up found a redundant script-compilation assertion in
+`traffic-script.test.ts:69`: the neighboring contract tests already execute the
+same served script. Checking that whole-line comments disappeared pins the
+current minification technique without protecting event delivery.
+
+Two checks should be narrowed, not deleted wholesale. `traffic-pages.test.tsx:256`
+requires an exact CSS class and attribute sequence; keep proof that a real gap is
+shown and future hours are not treated as missing. `install-line.test.ts:15`
+forbids versioned installer links in every root/docs Markdown file, including
+historical examples. Check the current installation entry points instead; retain
+the regression coverage for the stale installer users actually received.
+
+These are source-review recommendations on `9c99cf3`, not a tested pruning patch
+or evidence that the full suite is unnecessary. Keep privacy, approval,
+Stop/Forget, retained-state ownership and cross-stack behavior coverage.
+
+**+1:** 2026-09-30 — recent-merge audit follow-up, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 ### AF-029 — Keep Traffic database waits off the event loop
 
