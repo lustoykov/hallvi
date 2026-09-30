@@ -44,6 +44,8 @@ const environment = {
   // Isolated too: this command must not read, refresh or disturb the
   // ChatGPT connection the owner's checkouts share.
   HALLVI_PI_CONFIG_DIR: state,
+  // Pi's own directory, where setup looks for a login to reuse.
+  PI_CODING_AGENT_DIR: join(state, "pi"),
   HALLVI_LOG_DIR: join(state, "diagnostics"),
   HALLVI_TRACING: "0",
 };

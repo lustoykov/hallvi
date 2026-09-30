@@ -88,7 +88,7 @@ test("the first application connects ChatGPT and starts one explicitly requested
     name: "Get to know your application",
   });
   const connect = welcome.getByRole("button", {
-    name: "Connect ChatGPT",
+    name: "Connect a model",
     exact: true,
   });
   const endpoint = `/api/applications/${applicationId}/chats/${chatId}/messages`;
@@ -114,7 +114,7 @@ test("the first application connects ChatGPT and starts one explicitly requested
   await expect(
     page
       .locator(".hv-pi-required")
-      .getByRole("button", { name: "Connect ChatGPT", exact: true }),
+      .getByRole("button", { name: "Connect a model", exact: true }),
   ).toBeVisible();
   await page.unroute(connectionsUrl);
   await page.reload();
@@ -132,7 +132,7 @@ test("the first application connects ChatGPT and starts one explicitly requested
 
   // Connecting happens in the conversation: the address never changes.
   await connect.click();
-  const card = page.getByRole("region", { name: "Connect ChatGPT" });
+  const card = page.getByRole("region", { name: "Connect a model" });
   await expect(card).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(applicationPath);
   expect(await userMessages()).toHaveLength(0);

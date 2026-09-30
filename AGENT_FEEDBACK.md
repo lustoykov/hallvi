@@ -24,6 +24,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
 
+| [AF-037 — Show OpenRouter credit beside the saved key](#af-037--show-openrouter-credit-beside-the-saved-key) | 1 | New |
+
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
 ## How to contribute
@@ -315,6 +317,15 @@ controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
 retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
+
+### AF-037 — Show OpenRouter credit beside the saved key
+
+OpenRouter is paid per use, and an empty balance only shows up as a refused
+message (402). OpenRouter's `GET /api/v1/key` answers usage and limit without a
+model request; Settings could say "$4.20 left" beside **Key saved**, and the
+Model row could warn before the credit runs out rather than after.
+
+**+1:** 2026-09-30 — OpenRouter models (`claude/openrouter-models`)
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.

@@ -19,7 +19,12 @@ const GAPS = ["An R2 Access Key ID", "Its Secret Access Key"];
 function facts(overrides: Partial<ConnectionFacts> = {}): ConnectionFacts {
   return {
     own: {
-      model: { saved: false, issue: null },
+      model: {
+        saved: false,
+        issue: null,
+        provider: "ChatGPT",
+        model: "GPT-6 Sol",
+      },
       github: { account: null, issue: null, signIn: true },
       workspace: { isolation: "direct", problem: null },
     },
@@ -47,7 +52,7 @@ describe("what a connection row offers", () => {
     expect(
       rows.map((item) => [item.id, item.action.kind, item.action.label]),
     ).toEqual([
-      ["chatgpt", "form", "Connect ChatGPT"],
+      ["model", "form", "Connect a model"],
       ["github", "form", "Connect GitHub"],
       ["workspace", "link", "Change"],
       ["hetzner", "form", "Connect"],
@@ -57,7 +62,7 @@ describe("what a connection row offers", () => {
     expect(
       rows.map((item) => (item.action.kind === "form" ? item.action.form : "")),
     ).toEqual([
-      "chatgpt",
+      "model",
       "github",
       "",
       "hetzner",
@@ -181,7 +186,12 @@ describe("Hallvi's own accounts", () => {
   const own = (overrides: Partial<ConnectionFacts["own"]>) =>
     facts({
       own: {
-        model: { saved: true, issue: null },
+        model: {
+          saved: true,
+          issue: null,
+          provider: "OpenRouter",
+          model: "Claude Sonnet 5",
+        },
         github: { account: "owner", issue: null, signIn: true },
         workspace: { isolation: "direct", problem: null },
         ...overrides,
@@ -189,15 +199,26 @@ describe("Hallvi's own accounts", () => {
     });
 
   it("says a saved model login is checked on send, not that it works", () => {
-    const saved = row(own({}), "chatgpt");
+    const saved = row(own({}), "model");
     expect(saved.state).toBe("connected");
+    expect(saved.detail).toContain("Claude Sonnet 5 through OpenRouter");
     expect(saved.detail).toContain("checks it when you send");
     expect(saved.detail).not.toMatch(/working|verified/i);
     expect(
-      row(own({ model: { saved: false, issue: null } }), "chatgpt"),
+      row(
+        own({
+          model: {
+            saved: false,
+            issue: null,
+            provider: "ChatGPT",
+            model: "GPT-6 Sol",
+          },
+        }),
+        "model",
+      ),
     ).toMatchObject({
       state: "not-connected",
-      action: { kind: "form", form: "chatgpt", label: "Connect ChatGPT" },
+      action: { kind: "form", form: "model", label: "Connect a model" },
     });
   });
 
@@ -223,7 +244,7 @@ describe("Hallvi's own accounts", () => {
 
   // A card cannot sign an account out or change the model; those pages can.
   it("sends a saved account to the page that can change it", () => {
-    expect(row(own({}), "chatgpt").action).toEqual({
+    expect(row(own({}), "model").action).toEqual({
       kind: "link",
       href: "/setup/pi",
       label: "Change",

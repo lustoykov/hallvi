@@ -3,12 +3,15 @@ import { join, resolve } from "node:path";
 import { mkdirSync, rmSync } from "node:fs";
 
 import {
+  activeCredential,
   createPiCatalog,
   defaultPiSelection,
   detectPiSetup,
-  forgetPiConfiguration,
+  forgetChatgpt,
   loadPiSdk,
+  openRouterAuthPath,
   piAccountDir,
+  readOpenRouterKey,
   readPiConfiguration,
   readPiCredential,
   savePiConfiguration,
@@ -18,7 +21,11 @@ import type {
   PiSdkLoader,
   PiSelection,
 } from "./pi-configuration";
-import { PI_MODEL_LABEL, PI_PROVIDER_ID } from "./pi-settings";
+import {
+  OPENROUTER_PROVIDER_ID,
+  PI_MODEL_LABEL,
+  PI_PROVIDER_ID,
+} from "./pi-settings";
 import { traceExportConfiguration } from "./tracing-config";
 import { diagnosticLogPath } from "./diagnostics";
 import {
@@ -35,15 +42,23 @@ export type PiSetupState =
   | "model-unavailable"
   | "runtime-unavailable";
 
+/**
+ * What the next message would think with. `state`, `ready` and `issue` are
+ * about the active model; `connections` says which accounts are saved, so a
+ * page can offer switching between them.
+ */
 export interface PiSetupStatus {
   state: PiSetupState;
   ready: boolean;
+  /** How ChatGPT is signed in, or null when it is not. */
   mode: "shared" | "separate" | null;
+  connections: { chatgpt: boolean; openRouter: boolean };
   billing: "subscription" | "api";
   detected: DetectedPiSetup | null;
   hasSavedConfiguration: boolean;
   models: PiModelOption[];
   separateAuthPath: string;
+  openRouterAuthPath: string;
   diagnosticLogPath: string;
   localTracePath: string;
   traceExport: ReturnType<typeof traceExportConfiguration>;
@@ -63,16 +78,21 @@ export interface PiSetupStatus {
   issue: string | null;
 }
 
+const providerLabel = (providerId: string) =>
+  providerId === OPENROUTER_PROVIDER_ID ? "OpenRouter" : "ChatGPT";
+
 function baseStatus(): PiSetupStatus {
   return {
     state: "needs-choice",
     ready: false,
     mode: null,
+    connections: { chatgpt: false, openRouter: false },
     billing: "subscription",
     detected: null,
     hasSavedConfiguration: false,
     models: [],
     separateAuthPath: join(piAccountDir(), "pi-auth.json"),
+    openRouterAuthPath: openRouterAuthPath(),
     diagnosticLogPath: resolve(diagnosticLogPath()),
     localTracePath: resolve(diagnosticLogPath("spans.ndjson")),
     traceExport: traceExportConfiguration(),
@@ -87,7 +107,7 @@ function baseStatus(): PiSetupStatus {
     },
     selection: {
       ...defaultPiSelection,
-      provider: "OpenAI Codex",
+      provider: "ChatGPT",
       model: PI_MODEL_LABEL,
     },
     issue: null,
@@ -108,17 +128,25 @@ export async function getPiSetupStatus(
   try {
     const sdk = await sdkLoader();
     const catalog = await createPiCatalog(sdk);
-    status.models = piModelOptions(catalog.getModels(PI_PROVIDER_ID));
+    status.models = piModelOptions(catalog);
+    const modelName = (selection: PiSelection) =>
+      status.models.find(
+        (model) =>
+          model.providerId === selection.providerId &&
+          model.id === selection.modelId,
+      )?.name ?? selection.modelId;
     // Detection is read-only and runs before rendering, including recovery from
     // a broken saved login.
     status.detected = await detectPiSetup(sdk);
     let configuration;
     try {
       configuration = readPiConfiguration();
+      status.connections.openRouter = Boolean(readOpenRouterKey());
     } catch (error) {
       if (!preview) throw error;
     }
     status.hasSavedConfiguration = Boolean(configuration);
+    status.connections.chatgpt = Boolean(configuration?.mode);
     if (!configuration || preview) {
       const detected = status.detected;
       const selection = detected.canReuse
@@ -129,10 +157,8 @@ export async function getPiSetupStatus(
         detected,
         selection: {
           ...selection,
-          provider: "OpenAI Codex",
-          model:
-            catalog.getModel(selection.providerId, selection.modelId)?.name ??
-            selection.modelId,
+          provider: "ChatGPT",
+          model: modelName(selection),
         },
         authentication: {
           configured: detected.canReuse,
@@ -145,21 +171,19 @@ export async function getPiSetupStatus(
         },
       };
     }
-    status.mode = configuration.mode;
+    status.mode = configuration.mode ?? null;
     status.selection = {
       providerId: configuration.providerId,
       modelId: configuration.modelId,
       reasoningEffort: configuration.reasoningEffort,
-      provider: "OpenAI Codex",
+      provider: providerLabel(configuration.providerId),
       model: configuration.modelId,
     };
-    status.authentication.source = configuration.authPath;
+    const expected = activeCredential(configuration);
+    status.authentication.source =
+      expected?.authPath ?? status.separateAuthPath;
     let model;
     try {
-      if (configuration.credentialType !== "oauth")
-        throw new Error(
-          "Hallvi supports ChatGPT subscription access only. Use a new ChatGPT connection.",
-        );
       model = validatePiSelection(catalog, configuration);
     } catch (error) {
       return {
@@ -170,15 +194,14 @@ export async function getPiSetupStatus(
       };
     }
 
-    status.selection.model = model.name;
-    const credential = readPiCredential(
-      configuration.authPath,
-      configuration.providerId,
-    );
-    if (!credential) {
+    status.selection.model = modelName(configuration);
+    const credential = expected
+      ? readPiCredential(expected.authPath, configuration.providerId)
+      : null;
+    if (!expected || !credential) {
       return { ...status, state: "needs-auth", ready: false };
     }
-    if (credential.type !== configuration.credentialType) {
+    if (credential.type !== expected.type) {
       return {
         ...status,
         state: "auth-error",
@@ -188,12 +211,12 @@ export async function getPiSetupStatus(
           configured: true,
           label: "Unsupported credential type",
         },
-        issue: "The credential type changed. Use a new ChatGPT connection.",
+        issue: `The credential type changed. Connect ${status.selection.provider} again.`,
       };
     }
     status.billing =
       credential.type === "oauth" &&
-      catalog.getProvider(configuration.providerId)?.auth.oauth?.isSubscription
+      catalog.getProvider(model.provider)?.auth.oauth?.isSubscription
         ? "subscription"
         : "api";
 
@@ -204,13 +227,15 @@ export async function getPiSetupStatus(
       authentication: {
         ...status.authentication,
         configured: true,
-        label: "ChatGPT connected — checked with provider on send",
+        label: `${status.selection.provider} connected — checked with provider on send`,
       },
     };
   } catch (error) {
     return {
       ...status,
-      state: status.mode ? "auth-error" : "runtime-unavailable",
+      state: status.hasSavedConfiguration
+        ? "auth-error"
+        : "runtime-unavailable",
       ready: false,
       issue: errorMessage(error),
     };
@@ -246,9 +271,14 @@ export class PiLoginCoordinator {
   constructor(private readonly sdkLoader: PiSdkLoader = loadPiSdk) {}
 
   start(
-    preferences: Pick<PiSelection, "modelId" | "reasoningEffort">,
+    preferences: Pick<PiSelection, "modelId" | "reasoningEffort"> & {
+      providerId?: string;
+    },
   ): PiLoginAttempt {
     this.cleanup();
+    // Signing in to ChatGPT from an OpenRouter model starts on ChatGPT's own.
+    if (preferences.providerId && preferences.providerId !== PI_PROVIDER_ID)
+      preferences = defaultPiSelection;
     for (const record of this.attempts.values()) {
       if (
         record.public.state === "starting" ||
@@ -266,7 +296,11 @@ export class PiLoginCoordinator {
         userCode: null,
         message: "Requesting a one-time code from OpenAI…",
         expiresAt: null,
-        selection: { ...preferences, providerId: PI_PROVIDER_ID },
+        selection: {
+          modelId: preferences.modelId,
+          reasoningEffort: preferences.reasoningEffort,
+          providerId: PI_PROVIDER_ID,
+        },
         authPath: join(piAccountDir(), `pi-auth-${id}.json`),
       },
       controller: new AbortController(),
@@ -304,7 +338,7 @@ export class PiLoginCoordinator {
     // A pending login must not reconnect this installation after disconnect
     // returns.
     for (const id of this.attempts.keys()) this.cancel(id);
-    forgetPiConfiguration();
+    forgetChatgpt();
   }
 
   private update(
@@ -383,7 +417,6 @@ export class PiLoginCoordinator {
         ...selection,
         mode: "separate",
         authPath,
-        credentialType: "oauth",
       });
       accepted = true;
       this.update(record, {

@@ -16,6 +16,8 @@ import {
 } from "../../scripts/state-location.mjs";
 
 import {
+  OPENROUTER_MODEL_ID,
+  OPENROUTER_PROVIDER_ID,
   PI_MODEL_ID,
   PI_PROVIDER_ID,
   PI_REASONING_EFFORT,
@@ -41,11 +43,17 @@ const selectionSchema = z.object({
   modelId: z.string().min(1).max(200),
   reasoningEffort: effortSchema,
 });
-const configurationSchema = selectionSchema.extend({
-  mode: z.enum(["shared", "separate"]),
-  authPath: z.string().min(1),
-  credentialType: z.enum(["oauth", "api_key"]),
-});
+/**
+ * The active model, and the ChatGPT sign-in when there is one. An OpenRouter
+ * key is not recorded here: it is its own file, and holding it is what makes
+ * OpenRouter connected.
+ */
+const configurationSchema = selectionSchema
+  .extend({
+    mode: z.enum(["shared", "separate"]).optional(),
+    authPath: z.string().min(1).optional(),
+  })
+  .refine((value) => !value.mode === !value.authPath);
 export type PiConfiguration = z.infer<typeof configurationSchema>;
 export type PiSelection = z.infer<typeof selectionSchema>;
 
@@ -58,6 +66,7 @@ export const choosePiSetupSchema = z.discriminatedUnion("mode", [
 ]);
 
 export const updatePiPreferencesSchema = z.strictObject({
+  providerId: selectionSchema.shape.providerId.optional(),
   modelId: selectionSchema.shape.modelId,
   reasoningEffort: effortSchema,
 });
@@ -126,10 +135,77 @@ export function savePiConfiguration(configuration: PiConfiguration) {
 }
 
 /**
- * Forget Hallvi's consent/selection, never delete a shared or separate
- * credential file.
+ * Forget the ChatGPT sign-in, never delete a shared or separate credential
+ * file. OpenRouter, when connected, becomes the model; otherwise nothing is.
  */
-export function forgetPiConfiguration() {
+export function forgetChatgpt() {
+  const configuration = readPiConfiguration();
+  if (!configuration) return;
+  const rest = {
+    providerId: configuration.providerId,
+    modelId: configuration.modelId,
+    reasoningEffort: configuration.reasoningEffort,
+  };
+  if (configuration.providerId !== PI_PROVIDER_ID)
+    return savePiConfiguration(rest);
+  if (readOpenRouterKey())
+    return savePiConfiguration({
+      ...rest,
+      ...defaultOpenRouterSelection,
+    });
+  rmSync(join(piAccountDir(), "pi-settings.json"), { force: true });
+}
+
+/** Pi's own credential format, holding only the OpenRouter key. */
+export function openRouterAuthPath() {
+  return join(piAccountDir(), "openrouter-auth.json");
+}
+
+export function readOpenRouterKey() {
+  const credential = readPiCredential(
+    openRouterAuthPath(),
+    OPENROUTER_PROVIDER_ID,
+  );
+  return credential?.type === "api_key" ? credential.key : null;
+}
+
+export const openRouterKeySchema = z.strictObject({
+  key: z
+    .string()
+    .trim()
+    .regex(
+      /^sk-or-[\w-]{16,200}$/,
+      "That doesn’t look like an OpenRouter key.",
+    ),
+});
+
+/**
+ * Save the key and think with OpenRouter from the next message: connecting it
+ * is choosing it. The ChatGPT sign-in, if any, stays for switching back.
+ */
+export function saveOpenRouterKey(key: string) {
+  const directory = piAccountDir();
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const temporary = join(directory, `openrouter-auth-${randomUUID()}.tmp`);
+  writeFileSync(
+    temporary,
+    JSON.stringify({ [OPENROUTER_PROVIDER_ID]: { type: "api_key", key } }),
+    { mode: 0o600 },
+  );
+  renameSync(temporary, openRouterAuthPath());
+  savePiConfiguration({
+    ...readPiConfiguration(),
+    ...defaultOpenRouterSelection,
+  });
+}
+
+/** The key is Hallvi's own copy; revoking it is OpenRouter's business. */
+export function forgetOpenRouter() {
+  rmSync(openRouterAuthPath(), { force: true });
+  const configuration = readPiConfiguration();
+  if (configuration?.providerId !== OPENROUTER_PROVIDER_ID) return;
+  if (configuration.mode)
+    return savePiConfiguration({ ...configuration, ...defaultPiSelection });
   rmSync(join(piAccountDir(), "pi-settings.json"), { force: true });
 }
 
@@ -183,6 +259,12 @@ const preferencesSchema = z.object({
 export const defaultPiSelection: PiSelection = {
   providerId: PI_PROVIDER_ID,
   modelId: PI_MODEL_ID,
+  reasoningEffort: PI_REASONING_EFFORT,
+};
+
+export const defaultOpenRouterSelection: PiSelection = {
+  providerId: OPENROUTER_PROVIDER_ID,
+  modelId: OPENROUTER_MODEL_ID,
   reasoningEffort: PI_REASONING_EFFORT,
 };
 
@@ -308,7 +390,6 @@ export async function choosePiSetup(
     savePiConfiguration({
       ...defaultPiSelection,
       mode: "separate",
-      credentialType: "oauth",
       authPath: join(piAccountDir(), "pi-auth.json"),
     });
     return;
@@ -324,8 +405,16 @@ export async function choosePiSetup(
     ...detected.selection,
     mode: "shared",
     authPath: detected.authPath,
-    credentialType: detected.credentialType,
   });
+}
+
+/** Where the active model's credential lives, and the kind it must be. */
+export function activeCredential(configuration: PiConfiguration) {
+  if (configuration.providerId === OPENROUTER_PROVIDER_ID)
+    return { authPath: openRouterAuthPath(), type: "api_key" as const };
+  return configuration.authPath
+    ? { authPath: configuration.authPath, type: "oauth" as const }
+    : null;
 }
 
 export async function updatePiPreferences(
@@ -336,13 +425,17 @@ export async function updatePiPreferences(
   const catalog = await createPiCatalog(await sdkLoader());
   const configuration = readPiConfiguration();
   if (!configuration)
-    throw new Error("Choose a Pi setup before saving model preferences.");
-  if (configuration.credentialType !== "oauth")
-    throw new Error(
-      "Configure ChatGPT subscription access before saving preferences.",
-    );
-  const next = { ...configuration, ...preferences };
+    throw new Error("Connect a model before saving model preferences.");
+  const next = {
+    ...configuration,
+    ...preferences,
+    providerId: preferences.providerId ?? configuration.providerId,
+  };
   validatePiSelection(catalog, next);
+  if (!activeCredential(next))
+    throw new Error("Connect ChatGPT before choosing one of its models.");
+  if (next.providerId === OPENROUTER_PROVIDER_ID && !readOpenRouterKey())
+    throw new Error("Connect OpenRouter before choosing one of its models.");
   savePiConfiguration(next);
 }
 
@@ -354,27 +447,22 @@ export async function configuredPiRuntime(sdk: PiSdk) {
   const configuration = readPiConfiguration();
   if (!configuration)
     throw new Error(
-      "Open Pi setup and choose whether to reuse Pi or use a new ChatGPT connection.",
+      "Open Settings and connect a model: ChatGPT or OpenRouter.",
     );
-  if (
-    configuration.providerId !== PI_PROVIDER_ID ||
-    configuration.credentialType !== "oauth"
-  ) {
-    throw new Error(
-      "ChatGPT subscription access only. Open Pi setup to connect ChatGPT.",
-    );
-  }
+  const expected = activeCredential(configuration);
+  if (!expected)
+    throw new Error("Open Settings and connect ChatGPT for this model.");
   const credential = readPiCredential(
-    configuration.authPath,
+    expected.authPath,
     configuration.providerId,
   );
-  if (!credential || credential.type !== configuration.credentialType) {
+  if (!credential || credential.type !== expected.type) {
     throw new Error(
-      "The chosen Pi credential is missing or its type changed. Open Pi setup and choose a setup again.",
+      "The chosen model's credential is missing or its type changed. Open Settings and connect it again.",
     );
   }
   const modelRuntime = await sdk.ModelRuntime.create({
-    authPath: configuration.authPath,
+    authPath: expected.authPath,
     modelsPath: null,
     refreshOnCreate: false,
   });
