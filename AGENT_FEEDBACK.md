@@ -19,9 +19,29 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | New |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | New |
 | [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | New |
-| [AF-037 — Keep new tests tied to useful behavior](#af-037--keep-new-tests-tied-to-useful-behavior) | 1 | New |
+| [AF-038 — Keep new tests tied to useful behavior](#af-038--keep-new-tests-tied-to-useful-behavior) | 1 | New |
+
+| [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
+
+| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 3 | New |
+
+| [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
+
+| [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
+
+| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-037 — Close setup requests handled in conversation
+
+**+1:** 2026-09-30 — stale DNS request repair.
+
+Completing DNS through the conversation left its guided card unanswered. The
+plugin promoted it into a current blocker without a date, even after later
+successful releases. This fix gives Pi explicit withdrawal for obsolete open
+setup cards, preserves a hostname supplied after a blank card was opened, and
+shows dated open requests separately from the operator's activity.
 
 ## How to contribute
 
@@ -69,7 +89,7 @@ changing their decision.
 
 ## Requests
 
-### AF-037 — Keep new tests tied to useful behavior
+### AF-038 — Keep new tests tied to useful behavior
 
 The audit follow-up found a redundant script-compilation assertion in
 `traffic-script.test.ts:69`: the neighboring contract tests already execute the
@@ -325,6 +345,69 @@ separate old breakage from a new change's.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
 
+### AF-033 — Refuse a second preview before attaching retained state
+
+Attaching a retained application from a checkout that already serves a
+snapshot on another port takes a backup and ownership, then Next.js refuses
+its second dev server. The retained runtime is left needing `--after-crash`
+even though no application work ran. A preflight check could reject this
+before attaching. The verification guide now tells contributors to stop the
+snapshot pair first.
+
+**+1:** 2026-09-29 — Codex/ChatGPT plugin proof of concept
+
+### AF-034 — Native host checks must exercise link and clipboard failures
+
+The plugin’s local preview acknowledged every open-link request, hiding the
+installed Codex host’s silent rejection of HTTP URLs. A successful bridge
+reply did not establish that a browser opened. The panel now offers a copyable
+HTTP address and handles clipboard denial and explicit host link failures.
+Keep native host behavior separate from fixture results when reporting proof.
+Replacing panel bytes at one resource URI also left the native host showing
+an older interface. The follow-up adds content-versioned resources and an
+explicit UI reload; protocol acknowledgment must still be distinguished from
+the host actually rendering the new version. A later failure to open the
+plugin was an SSH startup failure: the `.local` Mac mini name no longer
+resolved on the laptop's current network, and its known LAN address timed out.
+A remote adapter cannot supply its panel while disconnected; distinguish
+network reachability from cached UI before recommending plugin resets.
+
+**+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
+**+1:** 2026-09-30 — operator panel: the local test host accepted
+`ui/message` with `send: false` as a draft, while Codex sent it as a user turn
+at once; the test host reloaded the panel on demand, while Codex kept the old
+resource in the same chat and loaded the new one only in a new chat.
+
+**+1:** 2026-09-30 — PR #293 independent review (`codex/plugin-293-review`).
+Browser regressions reproduced lost pending-send identity on navigation and stale
+application details after recovery with an unchanged transcript. Fixed in #293:
+save the key before sending, settle the original app after switching, and refresh
+context after recovery. The checks also cover storage-denied frames.
+
+### AF-035 — Say "awaiting approval" while request_approval waits
+
+While Pi's `request_approval` call waited for the owner (Hallvi decides), the
+conversation snapshot's `status` stayed `working`; only an Always-ask command
+record made it `awaiting-approval`. The page words it from the call itself, and
+the plugin panel now does the same, but every reader of `status` has to know
+this. Reporting the owner as the one being waited on in the snapshot would let
+one field answer it.
+
+**+1:** 2026-09-30 — Codex operator panel
+
+### AF-036 — Let the plugin label the messages it sends
+
+A message the owner types in the Codex panel reaches Hallvi's page labelled
+**CLI**, because `origin` accepts only `cli` and the adapter keeps it for older
+controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
+retried as `cli` on a refusal, would say where the owner wrote it.
+
+**+1:** 2026-09-30 — Codex operator panel
+
+Use this small template; add detail only when useful. Link the overview row to
+the request heading.
+
+```markdown
 ## Archive
 
 | Request ID / title | +1 | Status |

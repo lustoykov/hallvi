@@ -10,6 +10,20 @@ Connect real saved records and execution evidence to the accepted reference desi
 
 Keep the scope on the views and interactions needed by that journey. Medium and more complicated applications and broader ongoing care follow this UI/UX checkpoint. Broad security hardening is deferred until after beta; during beta, communicate current risks and practical precautions without turning this into a new architecture project.
 
+## Private Codex and ChatGPT plugin proof of concept
+
+**Implemented in [#283](https://github.com/lustoykov/hallvi/pull/283) and
+[#293](https://github.com/lustoykov/hallvi/pull/293), reviewed 30 September 2026.**
+The owner requested using an existing Hallvi controller through Codex locally
+or over SSH, with a ChatGPT application panel. The [plugin proof of
+concept](docs/hallvi-plugin.md) reuses the existing operator and CLI contract.
+Its panel is a compact Hallvi built around the main operator: ask, follow,
+read the result and continue, with condition, traffic and errors as context.
+Approvals remain in Hallvi. Public hosting, account infrastructure and
+directory submission are outside this experiment. Native Codex use has been
+observed; ChatGPT and the installed-plugin sidebar entry remain unverified.
+The updated panel has not been rechecked over SSH to the Mac mini.
+
 ## Selected product increments
 
 The 29 September batch implements the three selected increments:
