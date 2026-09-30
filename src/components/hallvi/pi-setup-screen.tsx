@@ -748,12 +748,10 @@ export function PiSetupScreen({
             <button
               className={s.primary}
               type="button"
+              // The chosen model's own account decides, not the current one: a
+              // broken active account must not trap the owner on it.
               disabled={
-                !status.ready ||
-                working ||
-                saving ||
-                !validSelection ||
-                !selectedConnected
+                working || saving || !validSelection || !selectedConnected
               }
               onClick={viewApplications}
             >

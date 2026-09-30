@@ -441,3 +441,16 @@ describe("two model accounts", () => {
     });
   });
 });
+
+it("disconnects ChatGPT even when an unused OpenRouter key file is damaged", () => {
+  savePiConfiguration({
+    providerId: "openai-codex",
+    modelId: "gpt-6-sol",
+    reasoningEffort: "high",
+    mode: "separate",
+    authPath: join(directory, "pi-auth.json"),
+  });
+  writeFileSync(openRouterAuthPath(), "{broken");
+  forgetChatgpt();
+  expect(readPiConfiguration()).toBeNull();
+});

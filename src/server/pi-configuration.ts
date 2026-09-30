@@ -152,7 +152,7 @@ export function forgetChatgpt() {
   };
   if (configuration.providerId !== PI_PROVIDER_ID)
     return savePiConfiguration(rest);
-  if (readOpenRouterKey())
+  if (usableOpenRouterKey())
     return savePiConfiguration({
       ...rest,
       ...defaultOpenRouterSelection,
@@ -163,6 +163,18 @@ export function forgetChatgpt() {
 /** Pi's own credential format, holding only the OpenRouter key. */
 export function openRouterAuthPath() {
   return join(piAccountDir(), "openrouter-auth.json");
+}
+
+/**
+ * The OpenRouter key as a fallback: a damaged file is no key, so it can never
+ * stand in the way of disconnecting the other account.
+ */
+function usableOpenRouterKey() {
+  try {
+    return readOpenRouterKey();
+  } catch {
+    return null;
+  }
 }
 
 export function readOpenRouterKey() {
