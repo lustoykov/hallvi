@@ -116,7 +116,11 @@ when idle, *Send next* while Hallvi works (a queued follow-up, as in the page).
 If the answer is lost the message stays as the draft with its key, marked "Not
 confirmed", and the button becomes **Send again**, which is safe because Pi
 never takes one key twice. A refusal keeps the draft and says why. The hint
-under the field names the permission mode.
+under the field names the permission mode. The message and key are saved before
+calling the host, and the text stays locked until acceptance is resolved. App
+switches keep that pending identity even when the sandbox denies local storage;
+reopening the panel can restore it only where the host allows storage. A late
+acknowledgement settles the original application's draft, never another one's.
 
 ## Honest states
 

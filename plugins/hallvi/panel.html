@@ -336,9 +336,10 @@ async function call(name, args = {}) {
 const shareContext = (text) => request("ui/update-model-context", { content: [{ type: "text", text }] }).catch(() => {});
 
 // ---------------------------------------------------------------- state
+const drafts = new Map();
 const store = {
-  get(key) { try { return JSON.parse(localStorage.getItem(`hallvi:${key}`)); } catch { return null; } },
-  set(key, value) { try { value == null ? localStorage.removeItem(`hallvi:${key}`) : localStorage.setItem(`hallvi:${key}`, JSON.stringify(value)); } catch {} },
+  get(key) { try { return JSON.parse(localStorage.getItem(`hallvi:${key}`)); } catch { return drafts.get(key) ?? null; } },
+  set(key, value) { drafts.set(key, value); try { value == null ? localStorage.removeItem(`hallvi:${key}`) : localStorage.setItem(`hallvi:${key}`, JSON.stringify(value)); } catch {} },
 };
 const state = {
   apps: [], selected: store.get("application"), context: null, contextAt: null, contextError: null,
@@ -349,6 +350,7 @@ let stopped = false;
 let generation = 0;
 let pollTimer = null;
 let clockTimer = null;
+let contextReading = null;
 const app = () => state.apps.find((item) => item.id === state.selected);
 
 // ---------------------------------------------------------------- words
@@ -555,11 +557,12 @@ function select(id, { keepDraft = false } = {}) {
   generation++;
   state.selected = id;
   store.set("application", id);
-  state.context = null; state.contextError = null; state.conversation = null; state.conversationError = null;
+  state.context = null; state.contextAt = null; state.contextError = null; state.conversation = null; state.conversationError = null;
   state.failures = 0; state.open.clear(); state.unfolded.clear();
   if (!keepDraft) state.send = null;
   restoreDraft();
   renderIdentity();
+  renderContext();
   renderThread();
   renderComposer();
   void shareContext(`The Hallvi panel is switching to ${app()?.name ?? "an application"}. Confirm the application with hallvi_apps before sending work.`);
@@ -569,6 +572,8 @@ function select(id, { keepDraft = false } = {}) {
 async function readContext() {
   const mine = generation;
   const id = state.selected;
+  if (contextReading === mine) return;
+  contextReading = mine;
   try {
     const data = await call("hallvi_inspect", { application_id: id });
     if (mine !== generation) return;
@@ -576,6 +581,8 @@ async function readContext() {
   } catch (error) {
     if (mine !== generation) return;
     state.contextError = error;
+  } finally {
+    if (contextReading === mine) contextReading = null;
   }
   renderIdentity(); renderContext(); renderComposer();
 }
@@ -601,6 +608,7 @@ async function follow(now = false) {
       if (was && was !== data.status) void readContext();
       describeToModel();
     } else if (recovered) { renderThread(); renderIdentity(); renderComposer(); }
+    if (recovered || !state.contextAt || Date.now() - Date.parse(state.contextAt) >= 30_000) void readContext();
   } catch (error) {
     if (mine !== generation) return;
     state.failures++;
@@ -651,14 +659,22 @@ async function send(event) {
   const key = state.send?.state === "unknown" && state.send.text === text ? state.send.key : crypto.randomUUID();
   const id = state.selected;
   state.send = { key, text, state: "sending" };
+  // Persist before crossing the host boundary: closing or switching cannot lose identity.
+  store.set(`draft:${id}`, { text, key, unknown: true });
   renderComposer(); renderThread();
   let result = null;
   try {
     result = await call("hallvi_exec", { application_id: id, message: text, request_key: key });
   } catch (error) {
-    result = error.data ?? { accepted: error.code === "host-timeout" ? null : false, error: { message: error.message } };
+    result = error.data ?? { accepted: null, error: { message: error.message } };
   }
-  if (id !== state.selected) return;
+  // Settle the original application's draft even if the reader switched away.
+  // Never let an older response erase a newer message.
+  if (store.get(`draft:${id}`)?.key === key) {
+    if (result.accepted === true) store.set(`draft:${id}`, null);
+    else if (result.accepted === false) store.set(`draft:${id}`, { text });
+  }
+  if (id !== state.selected || state.send?.key !== key) return;
   if (result.accepted === true) {
     state.send = { key, text, state: "accepted" };
     state.sent.add(key);
@@ -1010,7 +1026,7 @@ function renderComposer() {
   const c = state.conversation;
   const busy = c?.status === "working" || c?.status === "awaiting-approval";
   const draft = $("draft");
-  draft.disabled = !allowed.ok && !!allowed.why;
+  draft.disabled = (!allowed.ok && !!allowed.why) || ["sending", "unknown"].includes(state.send?.state);
   draft.placeholder = busy ? "Add a follow-up for when it finishes…" : `Ask Hallvi about ${a.name}…`;
   const s = state.send;
   $("send-label").textContent = s?.state === "unknown" && s.text === draft.value.trim() ? "Send again" : busy ? "Send next" : "Send";
@@ -1073,7 +1089,7 @@ $("menu-reload").addEventListener("click", async () => {
   button.textContent = "Checking…";
   try {
     const result = await call("hallvi_reload_ui");
-    button.textContent = result.version === $("ui-version").textContent ? "This panel is up to date" : `Panel ${result.version} is ready: close and reopen Hallvi`;
+    button.textContent = result.version === $("ui-version").textContent ? "This panel is up to date" : `Panel ${result.version} is ready: open Hallvi in a new Codex chat`;
   } catch { button.textContent = "Couldn't check. Reconnect the plugin and try again."; }
 });
 document.addEventListener("keydown", (event) => {
