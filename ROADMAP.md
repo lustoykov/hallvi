@@ -43,11 +43,18 @@ The 29 September batch implements the three selected increments:
 
 These increments shipped in alpha.10. Alpha.11 adds release-discovery and Traffic
 corrections; the [release acceptance](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065)
-records the tested revisions and remaining limits. Alpha.12 is being prepared
-with the merged plugin/operator panel, Traffic defaults and script checklist,
-Hallvi menu, deployment timestamps and patched runtime dependencies. Publication
-requires native clean-install and alpha.11 upgrade checks on both supported
-platforms; existing plugin and Traffic limits remain explicit in its notes.
+records the tested revisions and remaining limits. [Alpha.12](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.12)
+was published on 30 September 2026 from `5f42edd7746707a89632671e2330d54871656577`,
+following [release preparation #296](https://github.com/lustoykov/hallvi/pull/296).
+It includes the merged plugin/operator panel, Traffic defaults and script
+checklist, Hallvi menu, deployment timestamps, setup-request corrections and
+patched WebSocket runtime. [Native verification](https://github.com/lustoykov/hallvi/actions/runs/36704624693)
+passed clean installs and alpha.11 upgrades on macOS arm64 and Ubuntu 24.04 x64,
+including saved records and restart with an open conversation stream. Public
+signature, asset hashes, archive metadata, the latest installer and ordinary
+discovery from alpha.11 were verified. Existing plugin, Traffic and upstream Pi
+dependency limits remain explicit in its notes; no owner installation was
+upgraded during this release task.
 The [research plan index](https://github.com/lustoykov/hallvi/pull/246) preserves
 the proposals; larger mechanisms in those plans are not implementation requirements.
 
@@ -133,6 +140,8 @@ The owner runs the beta. On 29 September 2026, the owner authorized publication 
 - [x] **Requests from a terminal — merged in [PR #241](https://github.com/lustoykov/hallvi/pull/241), 29 September 2026.** `hallvi apps`, `exec`, `wait` and `inspect` let a person, a script or a coding agent send work to an application's main conversation through a named controller's loopback API, and read back the Pi operation that took it: its status, Pi's answer and bounded, redacted evidence. Approvals, input and interrupted work are handed back to Hallvi's page, never answered by the command. Checked through the development workflow against retained applications (uptime-kuma, whoami), with Pi 0.87.1 accepted for both after a snapshot trial. [Contract and limits](docs/cli.md). The [MCP adapter proof of concept](docs/hallvi-plugin.md) now reuses this client locally or over SSH. An interactive `attach`, an explicit `resume`, application creation and direct remote-controller CLI access remain deferred.
 
 ## Traffic
+
+- [ ] **Consent and privacy notice for browser analytics — [PR #306](https://github.com/lustoykov/hallvi/pull/306) in review, 30 September 2026.** Default-off measurement with explicit grant and immediate withdrawal; setup reuses existing controls or offers a prompt and completed notice in the site's design through the existing owner-reviewed PR. Versioned includes and browser checks cover stale-script rollout. Remove the default sign-up goal claim; goals still require owner instrumentation. Script figures cover consenting visitors. Local checks do not establish legal compliance or deployed-site acceptance. [Design](docs/design/traffic.md#analytics-consent-and-privacy-notice).
 
 - [x] **Who uses the application, and how it is doing — [PR #259](https://github.com/lustoykov/hallvi/pull/259).** Asked for by the owner on 28–29 September 2026: live arrivals, a world map, 24 h/7 d/30 d history, pages, sources, countries and devices, errors with the visitors they reached, deploy markers and a before/after line per release, shown in Traffic, Overview, Deployment and Monitoring without a model call. Counted from Caddy, nginx or Traefik access logs, and from Hallvi's optional script through the same log; recounted from the log so a restart cannot count twice. The review fixes preserve Stop/Forget across concurrent writes, configured query page routes, and one initial live arrival. [Design](docs/design/traffic.md). Dev-app seeding and live existing-nginx/Cloudflare verification remain follow-up work. Not a prerequisite for the beta.
 

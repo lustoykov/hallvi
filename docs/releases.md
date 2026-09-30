@@ -191,6 +191,12 @@ bootstrap, a custom `HALLVI_RELEASE_SOURCE` can serve an exact release object
 or a newest-first list; bootstrap does not sort custom lists or require a JSON
 parser before downloading the runtime.
 
+GitHub's public release list can briefly lag its latest-release object after
+publication; its observed cache lifetime is 60 seconds. If an immediate public
+discovery check still sees the previous release, allow that cache to expire and
+repeat the same read before concluding publication failed. Do not republish or
+change the release to force a cached listing to refresh.
+
 Merging a pull request never reaches any of this.
 
 ## The manifest

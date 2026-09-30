@@ -134,7 +134,8 @@ name for a second controller so each connection remains explicit.
 
 Each HTML revision gets a content-addressed URI:
 `ui://hallvi/applications-<sha256-prefix>.html`. Tool metadata, resource reads
-and the UI version shown at the bottom of the panel agree. The build prints
+and the available UI version returned by application discovery agree. The menu
+shows the version of the document actually rendered by the host; it may be older. The build prints
 the expected resource URI. A URI retains its
 original bytes within a running stdio connection; it keeps up to eight revisions.
 The stateless HTTP transport serves only the current revision per request.
@@ -149,12 +150,27 @@ For HTML, CSS and panel JavaScript changes:
    to call `hallvi_reload_ui`.
    This reads the new file and emits standard MCP tool/resource list-change
    notifications on the existing connection. It does not restart any process.
-3. Open Hallvi again, then compare the version in the `⋯` menu with the one
-   the check reported. An already rendered iframe does not replace itself. In
-   the Codex desktop app (September 2026 build), a new chat opened the new
-   version; opening Hallvi again in the same chat still showed the old one. A
-   successful reload-tool response alone is not proof that the host has
-   refreshed its cached tool metadata or rendered the new panel.
+   The result says what the adapter serves, not what the host has rendered.
+3. Read the persistent **Panel update** notice. It compares the rendered and
+   available versions, even when `changed: false` means another caller already
+   refreshed the adapter. Application discovery and host tool-result notifications
+   also reveal a mismatch without a manual check. This comparison reflects the
+   adapter's last loaded resource; only the explicit check rereads `panel.html`.
+4. Copy any unsent message before leaving. In Codex, open Hallvi in a new chat.
+   An already rendered iframe does not replace itself; reopening Hallvi in the
+   same chat retained the old version in the September 2026 desktop build.
+   If the version remains old, reconnect the Hallvi plugin in the host app.
+   Other hosts may replace the panel on close/reopen; verify rather than assume.
+5. Compare the version in the **newly rendered panel's** `⋯` menu with the
+   available version. A successful reload-tool response or a fresh standalone
+   adapter check alone does not prove that the native host refreshed.
+
+The panel check stops waiting after 15 seconds, restores **Check again** and
+explains that the host may still finish the request. Retrying only reloads the
+panel resource; it cannot submit or repeat operator work. The result remains
+visible after the menu closes and can be dismissed. A matching version says
+only that the rendered panel matches the installed UI, not that adapter code
+has restarted.
 
 **Refresh** rereads application records; **Check for a panel update** checks the installed
 panel file. Failed UI reads preserve the last working resource and tools.

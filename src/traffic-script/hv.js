@@ -8,6 +8,9 @@
 //
 // No cookie, nothing stored in the browser, nothing that tells people apart:
 // a page view has a random id that joins its own events and nothing else.
+// Measurement starts only after the site's analytics consent controls grant
+// it. window.hvConsent carries a choice made before this deferred file loads;
+// window.hv.consent(true/false) applies later changes, including withdrawal.
 //
 // What is served is this file without its whole-line comments
 // (src/server/traffic/script.ts), so keep every comment on a line of its own
@@ -38,6 +41,11 @@
     ? named
     : null;
   const PAGE_VALUE = /^[^\u0000-\u001f\u007f?#&=]{1,100}$/u;
+  // Hash routes are explicit opt-in. Ordinary anchors and credential
+  // fragments are not routes; only #/… and #!/… path forms are supported.
+  const HASH_ROUTING =
+    document.currentScript?.getAttribute("data-hv-hash-routing") === "true";
+  const HASH_PATH = /^\/[^\u0000-\u0020\u007f%?#&=]{0,199}$/u;
   // An error thrown in a loop would otherwise be a request per frame.
   const ERRORS_PER_VIEW = 10;
 
@@ -67,11 +75,21 @@
   let sessionStart = 0;
   let sessionEnd = 0;
   const observers = [];
+  const cleanup = [];
+  let tracking = false;
+  let consent = window.hvConsent === true;
+  let first = true;
+
+  const on = (target, type, handler, options) => {
+    target.addEventListener(type, handler, options);
+    cleanup.push(() => target.removeEventListener(type, handler, options));
+  };
 
   // One event, one request. sendBeacon survives the page going away, and
   // fetch with keepalive does the same where there is no sendBeacon. The
   // address is absolute so that a <base> pointing elsewhere cannot move it.
   const send = (event) => {
+    if (!consent || !tracking) return;
     const json = JSON.stringify(event);
     const path =
       PREFIX +
@@ -90,7 +108,7 @@
       fetch(url, { method: "POST", keepalive: true }).catch(() => {});
   };
   const emit = (t, more) =>
-    view && send({ t, s: view.s, p: view.p, q: view.q, ...more });
+    view && send({ t, s: view.s, p: view.p, q: view.q, h: view.h, ...more });
 
   // The page: its path, and the page key with its value when the tag names
   // one and the address carries it.
@@ -101,6 +119,23 @@
       .get(PAGE_KEY)
       ?.slice(0, 100);
     if (value && PAGE_VALUE.test(value)) return { k: PAGE_KEY, v: value };
+  };
+  const hashRoute = () => {
+    if (!HASH_ROUTING) return;
+    const prefix = location.hash.startsWith("#/")
+      ? "#"
+      : location.hash.startsWith("#!/")
+        ? "#!"
+        : null;
+    if (!prefix) return;
+    try {
+      // Strip query values and secondary anchors before decoding. Reject
+      // malformed/encoded key-value credentials and nested encodings too.
+      const route = decodeURIComponent(
+        location.hash.slice(prefix.length).split(/[?#]/, 1)[0],
+      );
+      if (HASH_PATH.test(route)) return prefix + route;
+    } catch {}
   };
 
   // Where the page the browser loaded was reached from: the referrer's
@@ -134,6 +169,7 @@
       ).join(""),
       p: path(),
       q: keyed(),
+      h: hashRoute(),
       shown: 0,
       since: visible() ? now() : null,
       left: false,
@@ -177,7 +213,13 @@
   };
 
   const moved = () => {
-    if (path() === view.p && keyed()?.v === view.q?.v) return;
+    const hash = hashRoute();
+    if (
+      path() === view.p &&
+      keyed()?.v === view.q?.v &&
+      (hash === undefined || hash === view.h)
+    )
+      return;
     end();
     start(false);
   };
@@ -185,7 +227,6 @@
   const hv = (name) => {
     if (typeof name === "string" && GOAL.test(name)) emit("goal", { g: name });
   };
-  window.hv = safely(hv);
 
   const observe = (type, handle, options) => {
     if (!window.PerformanceObserver?.supportedEntryTypes?.includes(type))
@@ -193,12 +234,16 @@
     const observer = new PerformanceObserver(
       safely((list) => handle(list.getEntries())),
     );
-    observer.observe({ type, buffered: true, ...options });
+    // Never replay performance entries from before consent (or from a
+    // refused interval). Only measurements observed while allowed count.
+    observer.observe({ type, buffered: false, ...options });
     observers.push([observer, handle]);
     return true;
   };
 
   const init = () => {
+    if (!consent || tracking || document.prerendering) return;
+    tracking = true;
     // Page speed, as Chrome's web-vitals defines it, reduced to what one page
     // view needs:
     // - LCP: the start of the last largest-contentful-paint, which the
@@ -245,19 +290,25 @@
     observe("first-input", interactions);
 
     // Route changes inside the application. The same page again (another
-    // part of the query or the hash changing, a router tidying its state) is
-    // the same page view; a new path or page key's value is a new one.
+    // part of the query changing, a router tidying its state) is the same
+    // view. Hash changes count only with opt-in and a supported route.
     for (const name of ["pushState", "replaceState"]) {
       const original = history[name];
-      history[name] = function (...args) {
+      const wrapped = function (...args) {
         const result = original.apply(this, args);
         safely(moved)();
         return result;
       };
+      history[name] = wrapped;
+      cleanup.push(() => {
+        if (history[name] === wrapped) history[name] = original;
+      });
     }
-    addEventListener("popstate", safely(moved));
+    on(window, "popstate", safely(moved));
+    if (HASH_ROUTING) on(window, "hashchange", safely(moved));
 
-    document.addEventListener(
+    on(
+      document,
       "visibilitychange",
       safely(() => {
         if (visible()) {
@@ -270,21 +321,24 @@
         }
       }),
     );
-    addEventListener("pagehide", safely(end));
+    on(window, "pagehide", safely(end));
     // Back to a page the browser kept whole in memory: the log sees no
     // request, so this is the only place the visit shows.
-    addEventListener(
+    on(
+      window,
       "pageshow",
       safely((event) => event.persisted && start(false)),
     );
 
     // "Open right now" is the views whose tab pinged lately.
-    setInterval(
+    const timer = setInterval(
       safely(() => visible() && emit("ping")),
       PING_MS,
     );
+    cleanup.push(() => clearInterval(timer));
 
-    document.addEventListener(
+    on(
+      document,
       "click",
       safely((event) => {
         const goal = event.target.closest?.("[data-hv-goal]");
@@ -297,11 +351,31 @@
     const failed = safely(
       () => view.errors++ < ERRORS_PER_VIEW && emit("error"),
     );
-    addEventListener("error", failed);
-    addEventListener("unhandledrejection", failed);
+    on(window, "error", failed);
+    on(window, "unhandledrejection", failed);
 
-    start(true);
+    start(first);
+    first = false;
   };
+
+  const setConsent = (granted) => {
+    consent = window.hvConsent = granted === true;
+    if (consent) {
+      init();
+      return;
+    }
+    // Withdrawal sends nothing, including a final leave. Nothing measured
+    // earlier is queued for a later grant.
+    tracking = false;
+    for (const close of cleanup.splice(0)) close();
+    for (const [observer] of observers.splice(0)) observer.disconnect();
+    view = undefined;
+    lcp = inp = undefined;
+    cls = session = sessionStart = sessionEnd = 0;
+    shifts = false;
+  };
+  window.hv = safely(hv);
+  window.hv.consent = safely(setConsent);
 
   // A prerendered page may never be shown. It counts from the moment it is.
   if (document.prerendering)

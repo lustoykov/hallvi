@@ -138,6 +138,34 @@ export function SettingsShell({
   );
 }
 
+/**
+ * Arrow keys for a group of custom radios, as a native radio group has: move
+ * to the neighbour, focus it and choose it. Each radio keeps
+ * `tabIndex={checked ? 0 : -1}` so Tab enters the group once.
+ */
+export function radioKeys(event: React.KeyboardEvent<HTMLElement>) {
+  const step =
+    event.key === "ArrowRight" || event.key === "ArrowDown"
+      ? 1
+      : event.key === "ArrowLeft" || event.key === "ArrowUp"
+        ? -1
+        : 0;
+  if (!step) return;
+  const radios = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]'),
+  ].filter(
+    (radio) =>
+      !radio.hasAttribute("disabled") &&
+      radio.getAttribute("aria-disabled") !== "true",
+  );
+  if (!radios.length) return;
+  event.preventDefault();
+  const at = radios.indexOf(document.activeElement as HTMLElement);
+  const next = radios[(at + step + radios.length) % radios.length]!;
+  next.focus();
+  next.click();
+}
+
 /** The quiet confirmation Claude and Codex show after a setting applies. */
 export function useToast() {
   const [text, setText] = useState<string | null>(null);

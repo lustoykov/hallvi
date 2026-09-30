@@ -258,6 +258,8 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
       .string()
       .regex(/^[A-Za-z_][A-Za-z0-9_]{0,39}$/)
       .optional(),
+    /** Explicit opt-in for slash-prefixed #/… and #!/… browser routes. */
+    hashRouting: z.boolean().optional(),
     /**
      * How many days Pi set the server to keep the log. What it actually
      * still holds is measured from the files, never taken from this.

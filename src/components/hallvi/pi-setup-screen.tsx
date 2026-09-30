@@ -23,7 +23,7 @@ import {
 import type { PiModelOption } from "@/server/pi-models";
 import { OpenRouterConnect } from "./onboarding/openrouter-connect";
 import { RequestCard } from "./onboarding/pieces";
-import { SettingsShell, useToast } from "./settings-shell";
+import { radioKeys, SettingsShell, useToast } from "./settings-shell";
 import s from "./settings.module.css";
 import h from "./pi-setup-screen.module.css";
 
@@ -66,7 +66,8 @@ const generation = (id: string) => /^gpt-(\d+)/.exec(id)?.[1] ?? "";
 
 /** One line on what a model is for; the catalog has only names. */
 const NOTES: Record<string, string> = {
-  "gpt-6-sol": "The everyday choice. Strong at code and servers.",
+  "gpt-6.1-sol": "The everyday choice. Strong at code and servers.",
+  "gpt-6-sol": "The previous everyday model.",
   "gpt-6-astra": "Most capable. Slower; uses more of your plan.",
   "gpt-6-luna": "Fastest and lightest on your plan.",
   "anthropic/claude-sonnet-5": "Careful and thorough. A great default.",
@@ -132,6 +133,9 @@ export function PiSetupScreen({
   const [choosing, setChoosing] = useState(!initialStatus.connections.chatgpt);
   const [attempt, setAttempt] = useState<PiLoginAttempt | null>(null);
   const [openRouterOpen, setOpenRouterOpen] = useState(false);
+  // Saving a choice cancels any sign-in still waiting for approval, so
+  // nothing saves while one is.
+  const [openRouterWaiting, setOpenRouterWaiting] = useState(false);
   const [older, setOlder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
@@ -147,6 +151,7 @@ export function PiSetupScreen({
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const { show, toast } = useToast();
   const working = active(attempt);
+  const pending = working || openRouterWaiting;
   const { chatgpt, openRouter } = status.connections;
   const selection = status.selection;
   const selected = status.models.find(
@@ -458,7 +463,7 @@ export function PiSetupScreen({
           type="button"
           className={`${s.row} ${s.pick}`}
           aria-pressed={on}
-          disabled={saving || working}
+          disabled={saving || pending}
           onClick={onPick}
         >
           <span className={s.check}>{on && <Check weight="bold" />}</span>
@@ -513,6 +518,7 @@ export function PiSetupScreen({
               className={s.seg}
               role="radiogroup"
               aria-label="Reasoning effort"
+              onKeyDown={radioKeys}
             >
               {selected.reasoningEfforts.map((level) => (
                 <button
@@ -520,7 +526,8 @@ export function PiSetupScreen({
                   type="button"
                   role="radio"
                   aria-checked={selection.reasoningEffort === level}
-                  disabled={saving}
+                  tabIndex={selection.reasoningEffort === level ? 0 : -1}
+                  disabled={saving || pending}
                   onClick={() =>
                     level !== selection.reasoningEffort &&
                     void save(selected, level)
@@ -605,6 +612,7 @@ export function PiSetupScreen({
                 <button
                   type="button"
                   className={s.link}
+                  disabled={saving}
                   onClick={() => {
                     setChoosing(false);
                     setAttempt(null);
@@ -774,6 +782,7 @@ export function PiSetupScreen({
               label="Connect OpenRouter"
             >
               <OpenRouterConnect
+                onWaiting={setOpenRouterWaiting}
                 onSaved={async () => {
                   await reload();
                   show("OpenRouter connected · using Claude Sonnet 5");

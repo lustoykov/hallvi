@@ -497,6 +497,15 @@ the same "Dev" chip. The installed Hallvi has none of these.
 
 ## Limits today
 
+- [Alpha.12](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.12)
+  passed [native clean-install and alpha.11 upgrade checks](https://github.com/lustoykov/hallvi/actions/runs/36704624693)
+  on both supported platforms on 30 September 2026, with saved records and the
+  service address preserved. Its public signed archives, latest installer and
+  discovery from alpha.11 were checked separately. This task did not upgrade an
+  existing owner installation or repeat real-provider deployment acceptance.
+  The plugin remains separately built; its native ChatGPT/updated SSH-panel
+  checks, recorded Traffic limits and Pi's shrinkwrapped dependency advisory
+  remain explicit in the release notes.
 - [Alpha.11](https://github.com/lustoykov/hallvi/releases/tag/v0.1.1-alpha.11)
   passed native clean-install and upgrade checks on both supported platforms, and
   the existing Mac mini installation upgraded with its retained records intact.

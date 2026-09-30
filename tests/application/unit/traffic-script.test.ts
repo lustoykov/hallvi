@@ -26,6 +26,8 @@ function browse(address: string, referrer: string, pageKey?: string) {
   };
   let every = 0;
   const window: Record<string, unknown> = {
+    // This fixture represents a site with an existing valid analytics grant.
+    hvConsent: true,
     location,
     document: {
       visibilityState: "visible",
@@ -160,4 +162,24 @@ it("accepts a page key and its value alone", () => {
     12,
   ])
     expect(eventOf(path(bad)), String(bad)).toBeNull();
+});
+
+it("accepts only normalized hash path forms, never credential fragments", () => {
+  const path = (h: unknown) =>
+    `/_hv/e/1/${Buffer.from(JSON.stringify({ t: "view", s: "abcdefgh12", p: "/", h })).toString("base64url")}`;
+  for (const h of ["#/home", "#!/settings/new", "#/héllo"])
+    expect(eventOf(path(h))).toMatchObject({ h });
+  for (const h of [
+    "#billing",
+    "#access_token=secret",
+    "#/token=secret",
+    "#/home?token=secret",
+    "#/home#token",
+    "#/token%3Dsecret",
+    "#/reset&token=secret",
+    "#/bad%ZZsecret",
+    "#/line\nbreak",
+    true,
+  ])
+    expect(eventOf(path(h)), String(h)).toBeNull();
 });

@@ -88,6 +88,8 @@ export interface CountOptions {
   hosts?: readonly string[];
   /** The query key an application routes pages by (WordPress's `p`). */
   pageKey?: string;
+  /** Whether the application uses slash-prefixed hash routes. */
+  hashRouting?: boolean;
   /** What the log covered of the day, as the collector measured it. */
   coverage: Coverage;
   /** When the count is taken: its `computedAt`. */
@@ -698,10 +700,17 @@ export class DayCounter {
     if (this.lastEvent === null || line.at > this.lastEvent)
       this.lastEvent = line.at;
     this.quiet = null;
-    const page = eventPage(event, this.options.pageKey);
+    const page = eventPage(
+      event,
+      this.options.pageKey,
+      this.options.hashRouting,
+    );
     switch (event.t) {
       case "view": {
-        if (this.paired(key, page, line.at)) return;
+        // The proxy never sees a fragment. Pair the first script view with
+        // its physical load; that already-counted load stays in history.
+        if (this.paired(key, eventPage(event, this.options.pageKey), line.at))
+          return;
         this.view(this.main, hour, key, page, this.viewer(key, line, event.w), {
           referrer: event.r ?? null,
           host: line.host,

@@ -14,7 +14,7 @@ import type {
   WorkspaceSettingStatus,
 } from "@/server/workspace-isolation";
 import type { SetupReturn } from "@/server/setup-return";
-import { SettingsShell, useToast } from "./settings-shell";
+import { radioKeys, SettingsShell, useToast } from "./settings-shell";
 import s from "./settings.module.css";
 
 const choices: Array<{
@@ -103,19 +103,25 @@ export function WorkspaceSetupScreen({
         </div>
       </section>
 
-      <ul className={s.rows} role="radiogroup" aria-label="Where Pi works">
+      <ul
+        className={s.rows}
+        role="radiogroup"
+        aria-label="Where Pi works"
+        onKeyDown={radioKeys}
+      >
         {choices.map((choice) => {
           const unavailable =
             choice.value === "docker" &&
             Boolean(status.dockerProblem) &&
             current !== "docker";
           return (
-            <li key={choice.value}>
+            <li key={choice.value} role="none">
               <button
                 type="button"
                 role="radio"
                 className={`${s.row} ${s.pick}`}
                 aria-checked={current === choice.value}
+                tabIndex={current === choice.value ? 0 : -1}
                 aria-disabled={unavailable || Boolean(saving)}
                 onClick={() => !unavailable && void choose(choice.value)}
               >

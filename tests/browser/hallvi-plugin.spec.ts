@@ -7,10 +7,16 @@ const origin = "http://127.0.0.1:3978";
 
 // Actual panel, synthetic MCP host. No controller, model or account access.
 async function panel(page: Page, empty = false) {
-  const html = await readFile("plugins/hallvi/panel.html", "utf8");
+  const html = (await readFile("plugins/hallvi/panel.html", "utf8")).replaceAll(
+    "__HALLVI_UI_VERSION__",
+    "1111111111111111",
+  );
   const sends: { application_id: string; request_key: string }[] = [];
   const state = {
     offline: false,
+    availableVersion: "1111111111111111",
+    dropUpdate: false,
+    updateCalls: 0,
     attention: [] as {
       kind: string;
       reason: string;
@@ -33,6 +39,7 @@ async function panel(page: Page, empty = false) {
       if (name === "hallvi_apps")
         data = {
           page: "http://127.0.0.1:5147",
+          ui: { version: state.availableVersion },
           applications: (empty ? [] : [first, second]).map((id, i) => ({
             id,
             name: i ? "Second app" : "First app",
@@ -41,7 +48,11 @@ async function panel(page: Page, empty = false) {
             page: `${origin}/applications/${id}`,
           })),
         };
-      else if (name === "hallvi_exec") {
+      else if (name === "hallvi_reload_ui") {
+        state.updateCalls++;
+        if (state.dropUpdate) return route.fulfill({ json: { drop: true } });
+        data = { changed: false, version: state.availableVersion };
+      } else if (name === "hallvi_exec") {
         sends.push(args);
         if (state.hold)
           await new Promise<void>((resolve) => {
@@ -88,7 +99,7 @@ async function panel(page: Page, empty = false) {
         const m = e.data; if (m.id == null) return;
         const target = e.source;
         const result = m.method === 'tools/call' ? await (await fetch('/call', {method:'POST', body:JSON.stringify(m.params)})).json() : {};
-        target.postMessage({jsonrpc:'2.0', id:m.id, result}, '*');
+        if (!result.drop) target.postMessage({jsonrpc:'2.0', id:m.id, result}, '*');
       });
     </script>`,
     });
@@ -213,6 +224,68 @@ test("late acceptance settles the original app when browser storage is unavailab
   ).toHaveValue("");
 });
 
+test("a failed storage write keeps the uncertain send key and settles its original draft", async ({
+  page,
+}) => {
+  await page.addInitScript((applicationId) => {
+    localStorage.setItem(
+      `hallvi:draft:${applicationId}`,
+      JSON.stringify({ text: "Previously saved text" }),
+    );
+    // A full store can still read its old values while every write fails.
+    Storage.prototype.setItem = Storage.prototype.removeItem = () => {
+      throw new DOMException("Storage is full", "QuotaExceededError");
+    };
+  }, first);
+  const p = await panel(page);
+  p.state.hold = true;
+  await p.frame
+    .getByRole("textbox", { name: "Message to Hallvi" })
+    .fill("Read-only check");
+  await p.frame.getByRole("button", { name: "Send", exact: true }).click();
+  await expect.poll(() => p.sends.length).toBe(1);
+  const original = p.sends[0].request_key;
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(second);
+  await p.frame
+    .getByRole("textbox", { name: "Message to Hallvi" })
+    .fill("Second draft");
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(first);
+  await expect(
+    p.frame.getByRole("button", { name: "Send again" }),
+  ).toBeVisible();
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("Read-only check");
+  p.state.hold = false;
+  const acknowledged = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/call") &&
+      response.request().postDataJSON().name === "hallvi_exec",
+  );
+  p.release();
+  await acknowledged;
+  p.state.accepted = true;
+  await p.frame.getByRole("button", { name: "Send again" }).click();
+  await expect.poll(() => p.sends.length).toBe(2);
+  expect(p.sends[1]).toMatchObject({
+    application_id: first,
+    request_key: original,
+    message: "Read-only check",
+  });
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("");
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(second);
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("Second draft");
+  await p.frame.getByLabel("Application", { exact: true }).selectOption(first);
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("");
+  expect(p.sends).toHaveLength(2);
+});
+
 test("an empty controller opens its configured Hallvi address", async ({
   page,
 }) => {
@@ -258,4 +331,98 @@ test("old input requests keep their date without overriding the operator's state
   await expect(
     p.frame.getByRole("heading", { name: "1 open request" }),
   ).toHaveCount(0);
+});
+
+test("a cached panel reports the version mismatch even when the adapter already reloaded", async ({
+  page,
+}) => {
+  const p = await panel(page);
+  await p.frame
+    .getByRole("textbox", { name: "Message to Hallvi" })
+    .fill("Keep this unsent message");
+  p.state.availableVersion = "2222222222222222";
+  // The host sends a new tool result but keeps the existing iframe.
+  await page.locator("iframe").evaluate((iframe: HTMLIFrameElement) => {
+    iframe.contentWindow!.postMessage(
+      {
+        jsonrpc: "2.0",
+        method: "ui/notifications/tool-result",
+        params: { structuredContent: { ui: { version: "2222222222222222" } } },
+      },
+      "*",
+    );
+  });
+  const notice = p.frame.getByRole("region", {
+    name: "Panel update",
+    exact: true,
+  });
+  await expect(notice).toContainText("Panel update available");
+  await expect(notice).not.toContainText("null");
+  await expect(notice).toContainText("new chat");
+  await expect(notice).toContainText("reconnect the Hallvi plugin");
+  await expect(notice).toContainText(
+    "Shown: 1111111111111111. Available: 2222222222222222.",
+  );
+  await p.frame.getByRole("button", { name: "More", exact: true }).click();
+  await p.frame
+    .getByRole("menuitem", { name: "Check for a panel update" })
+    .click();
+  await expect.poll(() => p.state.updateCalls).toBe(1);
+  await expect(notice).toContainText("Panel update available");
+  await expect(p.frame.getByRole("menu")).toBeHidden();
+  await expect(
+    p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
+  ).toHaveValue("Keep this unsent message");
+  expect(p.sends).toHaveLength(0);
+  for (const width of [320, 760]) {
+    await page
+      .locator("iframe")
+      .evaluate((iframe: HTMLIFrameElement, width) => {
+        iframe.style.width = `${width}px`;
+      }, width);
+    const overflow = await page
+      .locator("iframe")
+      .evaluate(
+        (iframe: HTMLIFrameElement) =>
+          iframe.contentDocument!.documentElement.scrollWidth -
+          iframe.clientWidth,
+      );
+    expect(overflow).toBe(0);
+    await page.screenshot({ path: `tests/results/plugin-update-${width}.png` });
+  }
+  await notice.getByRole("button", { name: "Dismiss" }).click();
+  await expect(notice).toBeHidden();
+});
+
+test("an unanswered update check times out, permits retry, and never sends operator work", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const p = await panel(page);
+  p.state.dropUpdate = true;
+  await p.frame.getByRole("button", { name: "More", exact: true }).click();
+  await p.frame
+    .getByRole("menuitem", { name: "Check for a panel update" })
+    .click();
+  await expect.poll(() => p.state.updateCalls).toBe(1);
+  const notice = p.frame.getByRole("region", {
+    name: "Panel update",
+    exact: true,
+  });
+  await expect(
+    notice.getByRole("button", { name: "Check again" }),
+  ).toBeDisabled();
+  await page.clock.fastForward(15_001);
+  await expect(notice).toContainText("The check may still finish");
+  await expect(
+    notice.getByRole("button", { name: "Check again" }),
+  ).toBeEnabled();
+  p.state.dropUpdate = false;
+  await notice.getByRole("button", { name: "Check again" }).click();
+  await expect(notice).toContainText("This panel matches the installed UI");
+  await expect(notice).toContainText(
+    "Adapter code changes require a plugin reconnect",
+  );
+  expect(p.state.updateCalls).toBe(2);
+  expect(p.sends).toHaveLength(0);
 });

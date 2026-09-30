@@ -14,10 +14,12 @@
 
 import {
   EVENT_PREFIX,
+  HASH_ROUTING_ATTRIBUTE,
   KEPT_QUERY_KEYS,
   OTHER,
   PAGE_KEY_ATTRIBUTE,
   PAGE_KEY_NAME,
+  SCRIPT_PATH,
   eventPath,
   type Collection,
   type Gap,
@@ -36,6 +38,7 @@ import {
   SCRIPT_DIRECTORY,
   SCRIPT_FILE,
   SCRIPT_INCLUDES,
+  SCRIPT_PRIVACY,
   SCRIPT_SERVING,
   SCRIPT_TAG,
   trafficScript,
@@ -205,6 +208,7 @@ export function trafficReading(
       history.viewSource === "script"
         ? "Page views and visitors come from Hallvi's script; requests, errors, response times and bots from the log."
         : "Page views and visitors switch from the log to Hallvi's script inside this range, at the script's switch point; they are never added together.",
+      "Consent-gated script measurements cover visitors who allow analytics, so they can understate total use. Access-log coverage does not establish consent or the proportion of visitors measured.",
     );
   if (history.collection.scriptSilentSince)
     notes.push(
@@ -406,7 +410,7 @@ const RECORD = (
   path: string,
   queries: LogQueries,
 ) =>
-  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], queries:'${queries}', retainDays:30} — add pageKey:'p' only where the application routes by that query key. queries says what this setup removes before a line is written, and the Traffic page tells the owner exactly that`;
+  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], queries:'${queries}', retainDays:30} — add pageKey:'p' only where the application routes by that query key, and hashRouting:true only for slash-prefixed #/ or #!/ browser routes. queries says what this setup removes before a line is written, and the Traffic page tells the owner exactly that`;
 
 const CADDY_LOG = "/var/log/caddy/hallvi/access.log";
 
@@ -744,16 +748,32 @@ export function trafficSetup(proxy: Proxy, version: string) {
 // ---------------------------------------------------------------------------
 // traffic_script
 
-export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
+export function trafficScriptFor(
+  proxy: Proxy,
+  applicationId: string,
+  pageKey?: string,
+  hashRouting?: boolean,
+) {
   if (pageKey !== undefined && !PAGE_KEY_NAME.test(pageKey))
     throw new Error("Invalid traffic page key.");
+  if (hashRouting !== undefined && typeof hashRouting !== "boolean")
+    throw new Error("Invalid traffic hash routing option.");
   // An application that routes pages by a query key names it on its tag, so
   // the script sends that key's value and the log and script agree on pages.
-  const configuredTag = (text: string) =>
-    pageKey
-      ? text.replaceAll("<script", `<script ${PAGE_KEY_ATTRIBUTE}="${pageKey}"`)
-      : text;
+  const attributes = [
+    ...(pageKey ? [`${PAGE_KEY_ATTRIBUTE}="${pageKey}"`] : []),
+    ...(hashRouting ? [`${HASH_ROUTING_ATTRIBUTE}="true"`] : []),
+  ];
   const script = trafficScript();
+  const configuredTag = (text: string) => {
+    const versioned = text.replaceAll(
+      SCRIPT_PATH,
+      `${SCRIPT_PATH}?v=${script.version}`,
+    );
+    return attributes.length
+      ? versioned.replaceAll("<script", `<script ${attributes.join(" ")}`)
+      : versioned;
+  };
   const check = eventPath({ t: "ping", s: "hallvicheck1", p: "/" });
   return {
     file: SCRIPT_FILE,
@@ -761,19 +781,31 @@ export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
     version: script.version,
     content: script.content,
     install: `mkdir -p ${SCRIPT_DIRECTORY}/_hv, write content to ${SCRIPT_FILE} exactly (mode 0644), and check that \`sha256sum ${SCRIPT_FILE}\` prints sha256. One file serves every application on the server. A proxy in a container mounts ${SCRIPT_DIRECTORY} read-only at the same path.`,
-    serving: SCRIPT_SERVING[proxy],
+    serving:
+      proxy === "traefik"
+        ? SCRIPT_SERVING.traefik(applicationId)
+        : SCRIPT_SERVING[proxy],
+    ...(proxy === "traefik" && {
+      names:
+        "The router, service and Compose service names belong to this application and stay the same on repeat installation. Keep them as given; replace app.example.com with this application's own hosts, and match its entry points, TLS and network. Removing this application's router and service leaves the other applications' names alone. The script file and Caddyfile are shared: keep them while any application uses them.",
+    }),
     tag: configuredTag(SCRIPT_TAG),
+    routing:
+      "History paths and the record's pageKey count by default. Only when the application's access-log record has hashRouting:true does the tag opt in to #/… and #!/… route paths. The script strips hash query values and secondary anchors, and ignores ordinary anchors, malformed encoding and key-value credential fragments. Route path segments are retained, just as history path segments are: never put secrets in a route path. Other fragment routing forms are unsupported.",
     includes: SCRIPT_INCLUDES.map((include) => ({
       ...include,
       line: configuredTag(include.line),
       ...(include.note ? { note: configuredTag(include.note) } : {}),
     })),
+    privacy: SCRIPT_PRIVACY,
     goals:
       "Goals are the owner's to mark in their own code: window.hv?.('signup') after the action, or data-hv-goal=\"signup\" on a link or button (letters, digits, _ and -, up to 40). That is application code, outside the operability pull request: tell the owner how rather than writing it, and keep anything personal out of a goal's name.",
     check: [
       `curl -sS -A 'Hallvi access check' https://<host>/_hv/s.js | sha256sum — the same sha256.`,
       `curl -sS -o /dev/null -w '%{http_code}\\n' -A 'Hallvi access check' 'https://<host>${check}' — 204, and the newest log line has that ${EVENT_PREFIX} path whole. Hallvi's user agent keeps it from being counted.`,
-      "After the owner merges the include and it is released: the page's HTML has the tag. The first real visitor's event sets the switch point Traffic shows.",
+      "Propose the include, consent integration and completed notice together through open_pull_request (or the software's own code-injection setting). Offer a prompt and notice when none exist, fitting the site's design. Never merge the PR; opening it deploys nothing. An owner-merged change follows the application's ordinary release policy.",
+      "After the owner merges and it is released, verify in a fresh browser: no /_hv/e/ requests before a choice or after refusal, one current view after Allow analytics, and no later events after withdrawal, including on navigation and in other open tabs. Reload preserves the choice according to the site's policy. Check the notice and preference link. Fetching /_hv/s.js can still appear in ordinary server logs.",
+      "Check that pages do not retain a cached older script: compare the publicly served sha256 after any proxy/CDN cache changes, and verify the browser behavior rather than the tag alone. One shared server file serves all applications, so replacing it disables measurement on older tags until each application's consent integration is released. The first allowed visitor's event sets the switch point Traffic shows.",
     ],
   };
 }

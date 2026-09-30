@@ -50,7 +50,10 @@ export function OpenRouterConnect({
   onSaved,
   actions,
   quiet = false,
+  onWaiting,
 }: {
+  /** Told while an approval on OpenRouter is outstanding. */
+  onWaiting?: (waiting: boolean) => void;
   /** An offer beside another account's blue button, not the request. */
   quiet?: boolean;
   /** The key is saved; the caller rereads the setup. */
@@ -73,6 +76,16 @@ export function OpenRouterConnect({
       alive.current = false;
     };
   }, []);
+  const outstanding =
+    login?.state === "awaiting-user" || login?.state === "exchanging";
+  const waitingRef = useRef(onWaiting);
+  useEffect(() => {
+    waitingRef.current = onWaiting;
+  }, [onWaiting]);
+  useEffect(() => {
+    waitingRef.current?.(outstanding);
+    return () => waitingRef.current?.(false);
+  }, [outstanding]);
 
   // Waiting on the other tab: OpenRouter sends it back to Hallvi, which
   // settles this attempt.

@@ -557,4 +557,15 @@ li[data-state="expired"] .rowIcon {
   .rowMore {
     padding-left: 12px;
   }
+  /* Account actions go under the account rather than off the edge. */
+  .groupHead,
+  .row {
+    flex-wrap: wrap;
+  }
+  .groupHead > .rowSide,
+  .row > .rowSide {
+    flex-wrap: wrap;
+    width: 100%;
+    padding-left: 48px;
+  }
 }
