@@ -23,7 +23,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 
-| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 3 | New |
+| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
 
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
 
@@ -385,6 +385,13 @@ plugin was an SSH startup failure: the `.local` Mac mini name no longer
 resolved on the laptop's current network, and its known LAN address timed out.
 A remote adapter cannot supply its panel while disconnected; distinguish
 network reachability from cached UI before recommending plugin resets.
+
+**+1:** 2026-09-30 — plugin update recovery (`codex/plugin-update-recovery`).
+The update check completed after the automation observer timed out, and the host
+still displayed the old panel. The menu-only result was easy to lose and the
+adapter's reopen instruction overstated what same-chat reopen could do. This
+fix separates displayed and available versions, retains recovery guidance,
+and tests an unchanged adapter resource against a cached panel and a lost reply.
 
 **+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
 **+1:** 2026-09-30 — operator panel: the local test host accepted
