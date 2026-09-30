@@ -5,13 +5,14 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 3 | Partially improved; pause remains |
+| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
+| [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -150,11 +151,56 @@ a production first-use cost but does not fully attribute that original spike.
 Its authoritative runs isolate both Hallvi's account and standalone Pi discovery;
 initial runs which only isolated Hallvi's account were excluded.
 
+A 30 September investigation on current source (`8502eb83`) reproduces the
+SDK import itself blocking under Node 22.23.2 on the shared Apple-silicon Mac:
+one standalone asynchronous public-entry import took 587 ms with 569 ms maximum
+event-loop delay. The earlier nonblocking standalone result was not reproduced
+in this environment; it remains historical evidence. CPU and module-loading
+profiles show synchronous Node module reads, parsing and SDK dependency
+initialization, including its terminal, YAML and HTTP libraries. This attributes
+a substantial loading cost locally, not every part of the signed release's
+separately observed 342–351 ms pause.
+
+A supported public-package bundling comparison then found a concrete boundary.
+Bundling the coding SDK and Pi AI reduced six fresh production browser openings
+from a median 832 ms usable / 309 ms maximum web-loop delay to 777 ms / 186 ms.
+However, the relocated program's OAuth login failed before reaching the provider:
+Pi AI's variable provider import became “Cannot find module as expression is too
+dynamic”. Keeping Pi AI external restored real device-code login and cancellation,
+but six fresh openings became slower at 877 ms usable / 250 ms maximum delay.
+The external baseline also reached device-code login and cancelled cleanly.
+The experiment was reverted: a partial pause reduction does not justify slower
+usable opening, and the faster variant breaks connection setup.
+
+These are unsigned current-source production fixtures, Node 22.23.2 and isolated
+synthetic accounts on one shared Mac; no model calls. Readiness required both an
+enabled composer and the initial full SSE snapshot. All eight model choices and
+preference changes worked, and the relocated programs honored the isolated
+standalone Pi account. The original signed-release measurements remain separate.
+A supported narrow SDK runtime export or a bundler-compatible OAuth loader could
+remove this boundary; neither was implemented. Profiles and the disposable
+comparison harness remain under ignored `work/cold-pause/` in the owning worktree.
+
 **+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
 
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
 
 **+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
+
+**+1:** 2026-09-30 — current-source cold-opening attribution, codex/remaining-acceptance-verification
+
+### AF-025 — Distinguish a saved-route HTTP check from browser usability
+
+A saved private-route check can succeed while the owner's browser blocks the
+address. On 30 September the ordinary AI-profile Chrome returned
+`ERR_BLOCKED_BY_CLIENT` for both harmless plain-text and JSON responses served on
+the same local port 3760, while independent HTTP requests returned 200. This
+reproduces outside the application and deployment. The blocking component remains
+unknown; no browser protection was bypassed, and the probes were stopped and
+removed. Keep server-side reachability evidence separate from client browser
+acceptance when describing a usable private link.
+
+**+1:** 2026-09-30 — remaining browser acceptance diagnosis, codex/remaining-acceptance-verification
 
 ### AF-022 — Send one review's findings to one branch
 
