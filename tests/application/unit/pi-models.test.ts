@@ -22,7 +22,7 @@ describe("the bundled Pi model catalog", () => {
     const options = piModelOptions(catalog.getModels());
     expect(options.length).toBeGreaterThan(1);
     expect(
-      options.find((model) => model.id === "gpt-6-sol")?.reasoningEfforts,
+      options.find((model) => model.id === "gpt-6.1-sol")?.reasoningEfforts,
     ).toContain("high");
     for (const option of options) {
       const model = catalog.getModel("openai-codex", option.id)!;

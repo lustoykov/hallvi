@@ -29,8 +29,8 @@ import {
 
 const model = {
   provider: "openai-codex",
-  id: "gpt-6-sol",
-  name: "GPT-6 Sol",
+  id: "gpt-6.1-sol",
+  name: "GPT-6.1 Sol",
   reasoning: true,
 };
 const oauth = {

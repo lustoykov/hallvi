@@ -6,8 +6,9 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
+| [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
+| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
-| [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
@@ -24,7 +25,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
 
-| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
+| [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
@@ -85,6 +86,19 @@ changing their decision.
 
 ## Requests
 
+### AF-040 — Say whether a Pi upgrade keeps the shared login readable
+
+Attach guards Pi's history format, but every checkout reads the ChatGPT login
+in `~/.config/hallvi/pi` whatever Pi it bundles, and a refresh written by one
+Pi version has to stay readable by the others. Nothing names that boundary.
+Establishing it for 0.99.1 meant diffing `dist/` against another checkout's
+0.87.1, because `pi-ai` and `pi-agent-core` ship no changelog. A line in
+[the development environment](docs/development-environment.md) naming the
+credential file as a boundary, or a check beside the history-format one,
+would make an upgrade's live run a decision instead of an investigation.
+
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`
+
 ### AF-038 — Check installed versions behind upstream shrinkwraps
 
 Alpha.12 preparation found that Pi 0.87.1 ships an `npm-shrinkwrap.json`
@@ -97,6 +111,9 @@ claiming a dependency is patched. A compatible upstream Pi update remains a
 follow-up; this release patches Hallvi's direct `ws` runtime to 8.22.0.
 
 **+1:** 2026-09-30 — alpha.12 release preparation, `codex/release-alpha12`
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`: 0.99.1's shrinkwrap
+still installs `brace-expansion` 5.0.9 under `pi-coding-agent`, so the upgrade
+does not close this.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
@@ -125,6 +142,9 @@ only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`: Pi's `bash` now
+returns `structuredContent.exit_code`; the workspace bridge drops it today and
+could pass the code on instead.
 
 ### AF-005 — Let the browser suite use a preinstalled Chromium
 

@@ -113,6 +113,11 @@ it("runs Pi's tools in a scratch folder without Hallvi's credentials and keeps f
     /8080[\s\S]*hallvi-workspaces/,
   );
   expect(await run("grep", { pattern: "8080" })).toContain("src/server.js");
+  // A failing command is a failed call, not a result that says so: the
+  // execution record and Pi's tool result both read it as an error.
+  expect(await run("bash", { command: "echo partial; exit 3" })).toMatch(
+    /^Error: partial[\s\S]*Command exited with code 3/,
+  );
 
   // Nothing Hallvi was started with reaches the command.
   const environment = await run("bash", { command: "env" });
