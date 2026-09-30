@@ -99,21 +99,20 @@ export function PiSetupScreen({
   const [modelId, setModelId] = useState(initialStatus.selection.modelId);
   const [effort, setEffort] = useState(initialStatus.selection.reasoningEffort);
   const working = active(attempt);
-  // Models of the accounts that are connected; ChatGPT's before either is,
-  // because signing in to it starts from the one chosen here.
+  // Every offered model, so the choice is visible before an account is
+  // connected; one from an account that is not connected yet cannot be saved.
   const { chatgpt, openRouter } = status.connections;
   const groups = [
     {
       label: "ChatGPT plan",
       models: status.models.filter(
-        (model) =>
-          model.providerId === PI_PROVIDER_ID && (chatgpt || !openRouter),
+        (model) => model.providerId === PI_PROVIDER_ID,
       ),
     },
     {
-      label: "OpenRouter · per million tokens in / out",
+      label: "OpenRouter · $ per million tokens in / out",
       models: status.models.filter(
-        (model) => model.providerId === OPENROUTER_PROVIDER_ID && openRouter,
+        (model) => model.providerId === OPENROUTER_PROVIDER_ID,
       ),
     },
   ]
@@ -130,6 +129,8 @@ export function PiSetupScreen({
   );
   const validSelection =
     selectedModel?.reasoningEfforts.includes(effort) ?? false;
+  const selectedConnected =
+    providerId === OPENROUTER_PROVIDER_ID ? openRouter : chatgpt;
   const hasChanges =
     providerId !== status.selection.providerId ||
     modelId !== status.selection.modelId ||
@@ -728,7 +729,9 @@ export function PiSetupScreen({
                 </select>
               </label>
               <p className={s.hint}>
-                Higher effort allows more reasoning, usually with a longer wait.
+                {selectedModel && !selectedConnected
+                  ? `Connect ${providerId === OPENROUTER_PROVIDER_ID ? "OpenRouter" : "ChatGPT"} above to use this model.`
+                  : "Higher effort allows more reasoning, usually with a longer wait."}
               </p>
             </div>
           </details>
@@ -745,7 +748,13 @@ export function PiSetupScreen({
             <button
               className={s.primary}
               type="button"
-              disabled={!status.ready || working || saving || !validSelection}
+              disabled={
+                !status.ready ||
+                working ||
+                saving ||
+                !validSelection ||
+                !selectedConnected
+              }
               onClick={viewApplications}
             >
               {saving ? "Saving…" : (returnTo?.label ?? "View applications")}

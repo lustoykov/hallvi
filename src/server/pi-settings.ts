@@ -6,16 +6,21 @@ export const PI_REASONING_EFFORT = "high" as const;
 
 export const OPENROUTER_PROVIDER_ID = "openrouter";
 /**
- * The OpenRouter models Hallvi offers, first the default. OpenRouter lists
- * hundreds; these are the ones that hold up over a long session of tool calls,
- * from the strongest to the cheapest. Names and prices come from Pi's catalog.
+ * The OpenRouter models Hallvi offers, first the default: the frontier models
+ * OpenRouter's rankings lead with, as far as the bundled Pi catalog knows
+ * them, then two strong ones at a fraction of the price. Hallvi runs long
+ * sessions of tool calls; a model that cannot hold one is not offered however
+ * cheap. Names and prices come from Pi's catalog, so newer models arrive with
+ * a Pi update.
  */
 export const OPENROUTER_MODEL_IDS = [
   "anthropic/claude-sonnet-5",
   "anthropic/claude-opus-5.5",
-  "google/gemini-3.8-flash",
-  "moonshotai/kimi-k2.7-code",
-  "deepseek/deepseek-v4.1-flash",
+  "openai/gpt-6-sol",
+  "google/gemini-3.1-pro-preview",
+  "qwen/qwen3.8-max-0902",
+  "z-ai/glm-5.3",
+  "deepseek/deepseek-v4-pro-0813",
 ] as const;
 export const OPENROUTER_MODEL_ID = OPENROUTER_MODEL_IDS[0];
 

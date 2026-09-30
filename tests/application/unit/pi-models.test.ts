@@ -63,7 +63,7 @@ describe("the bundled Pi model catalog", () => {
     expect(() =>
       validatePiSelection(catalog, {
         providerId: "openrouter",
-        modelId: "openai/gpt-6-sol",
+        modelId: "x-ai/grok-4.7",
         reasoningEffort: "high",
       }),
     ).toThrow("Hallvi offers");

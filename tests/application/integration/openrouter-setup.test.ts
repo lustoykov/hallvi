@@ -127,7 +127,7 @@ describe("two model accounts", () => {
     await expect(
       updatePiPreferences({
         providerId: "openrouter",
-        modelId: "openai/gpt-6-sol",
+        modelId: "x-ai/grok-4.7",
         reasoningEffort: "high",
       }),
     ).rejects.toThrow("Hallvi offers");
