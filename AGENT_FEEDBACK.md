@@ -15,6 +15,10 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
 | [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
+| [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | New |
+| [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | New |
+| [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | New |
+| [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -63,6 +67,57 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-029 — Keep Traffic database waits off the event loop
+
+Traffic adds synchronous `better-sqlite3` calls in the web and Pi processes,
+after #252 moved the main database work into threads. On merged `9c99cf3`,
+holding a disposable traffic database's write lock for 350 ms made
+`recordCollector` and an unrelated 10 ms timer both take 359 ms. This is a
+contention reproduction, not a measured production incident. Use the existing
+asynchronous database boundary pattern for Traffic while keeping the atomic
+Stop/Forget checks that prevent stale writes from restoring totals.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-030 — Make the Traffic script template safe for a shared Traefik
+
+`traffic_script` returns the same `hallvi-script` router and service names for
+every app. Reusing its labels with two different host rules under one Traefik
+3.7 produced "HTTP router defined multiple times with different configurations"
+and 404 for both script routes. Removing the second test app restored HTTP 200
+for the first. This tested the supplied routing labels with local stand-in
+backends, not Pi's full installation journey. Give the configuration per-app
+names, or explicitly reuse one shared helper/router with all intended hosts.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-031 — Account for hash-routed pages before promising SPA coverage
+
+The Traffic script compares `location.pathname` and a configured query key;
+`/#/home`, `/#/inbox` and `/#/settings` all become one `/` page. Running the
+shipped script with those route changes emitted one view, while equivalent
+history routes emitted three. The script offer currently promises "Pages
+changed in the app" without this boundary. Support an explicit hash-routing
+mode or state the limitation. Do not collect arbitrary URL fragments: ordinary
+anchors and credential-bearing fragments are not page identities.
+
+A second check with the actual script in the in-app browser and a local HTTP
+event receiver confirmed three history views versus one hash-route view.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-032 — Bound the live Traffic country cache
+
+`LiveWindow` expires browsers, open pages and loaded-page keys, but never its
+country lookup map. Feeding it 10,000 distinct browser identities, then calling
+`now` 24 hours later, left all 10,000 country entries with zero active browsers
+and zero loaded-page keys. An open Traffic/Overview stream retains every
+identity until it closes, including bot requests. Remove the cache if lookup
+cost allows, or bound/expire it with the live window; avoid another permanent
+visitor registry. This proves retention, not a production memory-exhaustion rate.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
