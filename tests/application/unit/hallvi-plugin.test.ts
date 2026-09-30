@@ -262,6 +262,7 @@ it("advertises native entrypoints and reads the real panel over MCP", async () =
   expect("text" in panel.contents[0] ? panel.contents[0].text : "").toContain(
     "ui/update-model-context",
   );
+  expect((await call("hallvi_apps")).page).toBe("http://127.0.0.1:8474");
   expect((await call("hallvi_apps")).applications).toEqual([
     expect.objectContaining({
       id: app,

@@ -259,7 +259,7 @@ describe("traffic.db", () => {
     expect(readDays("owner", DAY, DAY)).toHaveLength(1);
     forget("owner");
     expect(readDays("owner", DAY, DAY)).toEqual([]);
-    // What stays is that the owner stopped it, so the default cannot restart it.
+    // The owner stopped it, so the default cannot restart it.
     const forgotten = collectionOf("owner");
     expect(forgotten).toMatchObject({
       enabledAt: null,

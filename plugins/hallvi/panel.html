@@ -308,7 +308,10 @@ window.addEventListener("message", (event) => {
     applyHostContext(message.params);
   } else if (message.method === "ui/notifications/tool-result") {
     const list = message.params?.structuredContent?.applications;
-    if (Array.isArray(list) && !state.apps.length) setApplications(list);
+    if (Array.isArray(list) && !state.apps.length) {
+      state.home = message.params.structuredContent.page ?? message.params.structuredContent.controller;
+      setApplications(list);
+    }
   } else if (message.method === "ui/notifications/request-teardown" || message.method === "ui/resource-teardown") {
     stopped = true;
   }
@@ -535,13 +538,14 @@ function setApplications(list) {
   else renderBlank("No applications yet", "Add an application in Hallvi, then refresh this panel.", [["Open Hallvi", () => void openAddress(pageOrigin())], ["Refresh", start]]);
 }
 function pageOrigin() {
-  const page = state.apps[0]?.page;
+  const page = state.home ?? state.apps[0]?.page;
   try { return new URL(page).origin; } catch { return "http://127.0.0.1:4747"; }
 }
 async function start() {
   renderBlank(null, "Connecting to Hallvi…");
   try {
     const data = await call("hallvi_apps");
+    state.home = data.page ?? data.controller;
     setApplications(data.applications ?? []);
   } catch (error) {
     renderBlank("Can't reach Hallvi", unreachable(error), [["Try again", start]]);
@@ -789,7 +793,7 @@ function renderContext() {
   const trafficSection = el("section", {}, el("h3", {}, "Last day"));
   if (!traffic || traffic.unavailable) trafficSection.append(el("p", { class: "muted" }, "This Hallvi does not offer traffic history."));
   else if (traffic.state === "off" || !traffic.state) trafficSection.append(el("p", { class: "muted" }, "Traffic history is off, so visits and server errors are not being counted. That is not a claim there were none."), el("button", { type: "button", class: "text-button", onclick: () => void openAddress(`${pageOf()}#traffic`) }, "Keep traffic history in Hallvi"));
-  else if (["no-log", "unsupported", "lost"].includes(traffic.state)) trafficSection.append(el("p", {}, { "no-log": "Hallvi has no access log to read for this application yet.", unsupported: "Hallvi can't read this proxy's log.", lost: "Hallvi lost the access log." }[traffic.state]), traffic.detail ? el("p", { class: "muted" }, traffic.detail) : null);
+  else if (["no-log", "unsupported", "lost"].includes(traffic.state)) trafficSection.append(...[el("p", {}, { "no-log": "Hallvi has no access log to read for this application yet.", unsupported: "Hallvi can't read this proxy's log.", lost: "Hallvi lost the access log." }[traffic.state]), traffic.detail ? el("p", { class: "muted" }, traffic.detail) : null].filter(Boolean));
   else {
     const t = traffic.totals ?? {};
     trafficSection.append(el("div", { class: "numbers" },
@@ -988,10 +992,10 @@ async function fullOutput(step, button) {
     const data = await call("hallvi_inspect", { application_id: state.selected, execution_id: step.executionId });
     const text = data.execution?.output ?? data.output ?? "";
     const input = step.excerpted ? commandText(data.execution?.input ?? data.input ?? "") : "";
-    button.closest("details").append(
+    button.closest("details").append(...[
       input ? el("pre", { tabindex: "0" }, input) : null,
       el("pre", { tabindex: "0", style: "max-height:360px" }, text || "No output was recorded."),
-      data.execution?.outputTruncated || data.outputTruncated ? el("p", { class: "note" }, "The last part of the output, as Hallvi kept it.") : null);
+      data.execution?.outputTruncated || data.outputTruncated ? el("p", { class: "note" }, "The last part of the output, as Hallvi kept it.") : null].filter(Boolean));
     button.remove();
   } catch (error) {
     button.disabled = false; button.textContent = "Couldn't read it — try again";

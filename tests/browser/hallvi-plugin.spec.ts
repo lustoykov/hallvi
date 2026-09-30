@@ -6,7 +6,7 @@ const second = "3ee7c9a7-5da8-434a-8222-cccac5089142";
 const origin = "http://127.0.0.1:3978";
 
 // Actual panel, synthetic MCP host. No controller, model or account access.
-async function panel(page: Page) {
+async function panel(page: Page, empty = false) {
   const html = await readFile("plugins/hallvi/panel.html", "utf8");
   const sends: { application_id: string; request_key: string }[] = [];
   const state = {
@@ -25,7 +25,8 @@ async function panel(page: Page) {
       let data: unknown;
       if (name === "hallvi_apps")
         data = {
-          applications: [first, second].map((id, i) => ({
+          page: "http://127.0.0.1:5147",
+          applications: (empty ? [] : [first, second]).map((id, i) => ({
             id,
             name: i ? "Second app" : "First app",
             mainChatId: id,
@@ -87,9 +88,14 @@ async function panel(page: Page) {
   });
   await page.goto(origin);
   const frame = page.frameLocator("iframe");
-  await expect(
-    frame.getByRole("button", { name: /First: Initial condition/ }),
-  ).toBeVisible();
+  if (empty)
+    await expect(
+      frame.getByRole("heading", { name: "No applications yet" }),
+    ).toBeVisible();
+  else
+    await expect(
+      frame.getByRole("button", { name: /First: Initial condition/ }),
+    ).toBeVisible();
   return { frame, sends, state, release: () => release?.() };
 }
 
@@ -198,4 +204,16 @@ test("late acceptance settles the original app when browser storage is unavailab
   await expect(
     p.frame.getByRole("textbox", { name: "Message to Hallvi" }),
   ).toHaveValue("");
+});
+
+test("an empty controller opens its configured Hallvi address", async ({
+  page,
+}) => {
+  const p = await panel(page, true);
+  await p.frame
+    .getByRole("button", { name: "Open Hallvi", exact: true })
+    .click();
+  await expect(
+    p.frame.getByRole("textbox", { name: "Address", exact: true }),
+  ).toHaveValue("http://127.0.0.1:5147/");
 });

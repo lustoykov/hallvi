@@ -104,6 +104,7 @@ export function createHallviServer({
     });
   const apps = async (_, { signal }) => ({
     controller,
+    page: pageOrigin,
     applications: (await client.applications({ signal })).map((app) => ({
       ...app,
       page: page(app.id, app.mainChatId),
