@@ -180,6 +180,18 @@ A destination's question keeps its origin in a removable chip and offers a retur
 
 Contextual read-only side chats remain future work; Pi's session branching primitives are available building blocks.
 
+### Setup requests answered outside their cards
+
+A host or domain card can remain open while the owner completes the same work
+through the conversation. After verifying that work, Pi withdraws the obsolete
+card with `cancel_connection_request`, recording its reason in the tool call.
+The same tool handles an owner abandoning that setup. It removes only an open
+request, preserves settled receipts, and does not change a connection, DNS,
+credentials, approval or deployment evidence. Neither age nor an unrelated
+successful release automatically answers a request. A domain card opened before
+Pi knows the hostname accepts that name later without resetting the owner's
+progress. External readers receive each open request's original asking time.
+
 ### General tools and independent permissions
 
 Pi should have general tools for working on the application server, including shell execution. A request such as “fix this application” authorizes ordinary operational work within that request; Pi should choose individual commands without mandatory command-by-command approval except when the selected mode requires it.

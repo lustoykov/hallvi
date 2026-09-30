@@ -43,7 +43,11 @@ The 29 September batch implements the three selected increments:
 
 These increments shipped in alpha.10. Alpha.11 adds release-discovery and Traffic
 corrections; the [release acceptance](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065)
-records the tested revisions and remaining limits.
+records the tested revisions and remaining limits. Alpha.12 is being prepared
+with the merged plugin/operator panel, Traffic defaults and script checklist,
+Hallvi menu, deployment timestamps and patched runtime dependencies. Publication
+requires native clean-install and alpha.11 upgrade checks on both supported
+platforms; existing plugin and Traffic limits remain explicit in its notes.
 The [research plan index](https://github.com/lustoykov/hallvi/pull/246) preserves
 the proposals; larger mechanisms in those plans are not implementation requirements.
 
@@ -126,7 +130,7 @@ The owner runs the beta. On 29 September 2026, the owner authorized publication 
 
 ## Access for other agents
 
-- [x] **Requests from a terminal — merged in [PR #241](https://github.com/lustoykov/hallvi/pull/241), 29 September 2026.** `hallvi apps`, `exec`, `wait` and `inspect` let a person, a script or a coding agent send work to an application's main conversation through a named controller's loopback API, and read back the Pi operation that took it: its status, Pi's answer and bounded, redacted evidence. Approvals, input and interrupted work are handed back to Hallvi's page, never answered by the command. Checked through the development workflow against retained applications (uptime-kuma, whoami), with Pi 0.87.1 accepted for both after a snapshot trial. [Contract and limits](docs/cli.md). An MCP adapter over the same client, an interactive `attach`, an explicit `resume`, application creation and remote controller access are deferred.
+- [x] **Requests from a terminal — merged in [PR #241](https://github.com/lustoykov/hallvi/pull/241), 29 September 2026.** `hallvi apps`, `exec`, `wait` and `inspect` let a person, a script or a coding agent send work to an application's main conversation through a named controller's loopback API, and read back the Pi operation that took it: its status, Pi's answer and bounded, redacted evidence. Approvals, input and interrupted work are handed back to Hallvi's page, never answered by the command. Checked through the development workflow against retained applications (uptime-kuma, whoami), with Pi 0.87.1 accepted for both after a snapshot trial. [Contract and limits](docs/cli.md). The [MCP adapter proof of concept](docs/hallvi-plugin.md) now reuses this client locally or over SSH. An interactive `attach`, an explicit `resume`, application creation and direct remote-controller CLI access remain deferred.
 
 ## Traffic
 
