@@ -86,7 +86,7 @@ Controls and execution excerpts use a 7px radius. Lists remain open rows with bo
 - **Refresh:** A secondary control that rereads recorded data. Its disabled state during a request and the visible connection, loading and error messages explain what is happening.
 - **Attention and records:** Show the reason or title as plain text. When no attention is listed, say only what was known when records were read; if the operator is unavailable, say pending attention is unknown. No records means unassessed, never healthy.
 - **Execution evidence:** A summary names the tool and status, with time, target and a short input preview. The full recorded input and output start collapsed in a native `details` disclosure. Mark failed runs in red and identify truncated output as an excerpt.
-- **Hallvi link:** Blue underlined text opens the selected application in Hallvi for decisions and controls. The plugin panel does not present approval controls.
+- **Hallvi browser access:** HTTPS addresses use the host’s Open in Hallvi action. HTTP addresses show a read-only address and Copy address because the installed Codex host silently ignores HTTP open-link requests. Clipboard denial selects the address for manual copying. An explicit host link failure exposes the same fallback. The plugin panel does not present approval controls.
 
 ## Do's and Don'ts
 

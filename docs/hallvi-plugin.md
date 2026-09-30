@@ -53,8 +53,9 @@ Then, for a fresh check:
 > request and show the evidence.
 
 `hallvi_open` supplies the optional application panel to compatible MCP Apps
-hosts. Tools work without the panel; Codex UI extension parity with ChatGPT
-has not been established by the local protocol tests.
+hosts. Tools work without the panel. Rendering and selection have also been
+checked in the installed Codex MCP Apps panel; native ChatGPT rendering
+remains unverified.
 
 To install the skill and tools together as a local plugin:
 
@@ -106,7 +107,14 @@ forward open in your laptop terminal:
 ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8474:127.0.0.1:4747 hallvi-host
 ```
 
-Open `http://127.0.0.1:8474`. `--ui-url` controls browser links only; the
+Open `http://127.0.0.1:8474`. The installed Codex host silently ignores HTTP
+open-link requests, so the panel shows **Copy address** for HTTP URLs. Paste
+the address into your browser; keep the SSH forward running. If clipboard
+access is denied, the panel selects the address for manual copying. HTTPS
+URLs retain **Open in Hallvi**, with a copy fallback if the host reports a
+failure. Reopen an already loaded panel after updating its HTML.
+
+`--ui-url` controls browser links only; the
 adapter still talks exclusively to the server's local controller. Request
 handles contain that remote loopback address: pass them back to `hallvi_wait`,
 not to a browser or an HTTP client on your laptop. Use a different MCP server

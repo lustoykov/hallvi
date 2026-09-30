@@ -11,7 +11,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Accepted |
-| [AF-019 — Refuse a second preview before attaching retained state](#af-019--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
+| [AF-025 — Refuse a second preview before attaching retained state](#af-025--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
+| [AF-026 — Native host checks must exercise link and clipboard failures](#af-026--native-host-checks-must-exercise-link-and-clipboard-failures) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -61,6 +62,16 @@ changing their decision.
 
 ## Requests
 
+### AF-026 — Native host checks must exercise link and clipboard failures
+
+The plugin’s local preview acknowledged every open-link request, hiding the
+installed Codex host’s silent rejection of HTTP URLs. A successful bridge
+reply did not establish that a browser opened. The panel now offers a copyable
+HTTP address and handles clipboard denial and explicit host link failures.
+Keep native host behavior separate from fixture results when reporting proof.
+
+**+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
+
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
 
@@ -72,7 +83,7 @@ What you would like or what bothered you, in your own words.
 **+1:** YYYY-MM-DD — task ID or PR reference
 ```
 
-### AF-019 — Refuse a second preview before attaching retained state
+### AF-025 — Refuse a second preview before attaching retained state
 
 Attaching a retained application from a checkout that already serves a
 snapshot on another port takes a backup and ownership, then Next.js refuses

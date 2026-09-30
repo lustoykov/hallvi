@@ -18,7 +18,10 @@
   .muted, small { color:var(--muted); }
   small { font-size:12px; }
   label { display:block; font-weight:600; margin-bottom:6px; }
-  button, select { font:inherit; border:1px solid var(--line); border-radius:7px; color:var(--ink); background:var(--surface); min-height:38px; padding:6px 12px; }
+  button, select, input { font:inherit; border:1px solid var(--line); border-radius:7px; color:var(--ink); background:var(--surface); min-height:38px; padding:6px 12px; }
+  .address-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .address-row input { flex:1; min-width:0; width:100%; }
+  #browser-address { margin-top:12px; }
   button { cursor:pointer; white-space:nowrap; }
   button:hover { background:var(--context); }
   button:disabled { cursor:wait; opacity:.55; }
@@ -55,7 +58,13 @@
     <h2 id="name"></h2>
     <p id="condition" class="muted"></p>
     <dl id="facts"></dl>
-    <a id="open" href="#" target="_blank" rel="noreferrer">Open in Hallvi</a>
+    <a id="open" href="#" target="_blank" rel="noreferrer" hidden>Open in Hallvi</a>
+    <div id="browser-address" hidden>
+      <label for="hallvi-address">Hallvi browser address</label>
+      <div class="address-row"><input id="hallvi-address" readonly /><button id="copy-address" type="button">Copy address</button></div>
+      <small id="address-help">This panel cannot open HTTP links. Paste this address into your browser.</small>
+      <p id="address-status" role="status" class="muted"></p>
+    </div>
     <small style="display:block;margin-top:8px">Approvals, missing input, Continue and Stop are handled in Hallvi.</small>
     <section id="attention-section" hidden><h3>Needs your attention</h3><ul id="attention" class="attention"></ul></section>
     <section><h3>Recorded information</h3><ul id="records"></ul><small id="records-note"></small></section>
@@ -106,6 +115,36 @@ function display(value) {
   if (typeof value === "string") return value;
   return value.text || value.summary || value.label || value.title || JSON.stringify(value);
 }
+function configureHallviLink(url) {
+  const address=url.href;
+  $("open").href=address;
+  $("open").hidden=url.protocol !== "https:";
+  $("browser-address").hidden=url.protocol === "https:";
+  $("hallvi-address").value=address;
+  $("address-help").textContent="This panel cannot open HTTP links. Paste this address into your browser.";
+  $("address-status").textContent="";
+  $("copy-address").onclick=async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      if ($("hallvi-address").value === address) $("address-status").textContent="Address copied. Paste it into your browser.";
+    } catch {
+      if ($("hallvi-address").value !== address) return;
+      $("hallvi-address").focus(); $("hallvi-address").select();
+      $("address-status").textContent="Automatic copying is unavailable. Copy the selected address and paste it into your browser.";
+    }
+  };
+  $("open").onclick=async (event) => {
+    event.preventDefault();
+    try {
+      const result=await request("ui/open-link",{url:address});
+      if (result?.isError) throw new Error("The host could not open this link.");
+    } catch {
+      if ($("hallvi-address").value !== address) return;
+      $("browser-address").hidden=false;
+      $("address-help").textContent="The host could not open Hallvi. Copy this address into your browser.";
+    }
+  };
+}
 function clearSelectionContext() {
   generation++;
   $("detail").hidden=true;
@@ -144,8 +183,7 @@ async function inspect() {
     for (const [label,value] of facts) $("facts").append(text("dt",label),text("dd",display(value)));
     const url=new URL(data.page);
     if (!["http:","https:"].includes(url.protocol)) throw new Error("Hallvi returned an unsupported page address.");
-    $("open").href=url.href;
-    $("open").onclick=async (event) => { event.preventDefault(); try { await request("ui/open-link",{url:url.href}); } catch(error) { showError(error); } };
+    configureHallviLink(url);
     $("attention").replaceChildren(...(data.attention || []).map((item) => text("li",item.reason)));
     $("attention-section").hidden=false;
     if (!data.attention?.length) $("attention").append(text("li", data.main?.worker?.alive ? "Nothing waiting for your input when these records were read." : "Operator unavailable; pending attention is unknown.", "muted"));
