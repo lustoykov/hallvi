@@ -27,7 +27,7 @@ test.use({
 });
 
 const html = (body: string, pageKey?: string, hashRouting?: boolean) =>
-  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", pageKey, hashRouting).tag}</head><body>${body}</body></html>`;
+  `<!doctype html><html><head><meta charset="utf-8">${trafficScriptFor("caddy", "traffic-script-fixture", pageKey, hashRouting).tag}</head><body>${body}</body></html>`;
 
 const pages: Record<string, string> = {
   // Big enough text to be the largest paint, a banner that pushes it down

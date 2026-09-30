@@ -192,6 +192,11 @@ internet, no cookies and nothing stored in the browser.
   its sha256, the proxy's serving snippet and the include line per stack
   ([`script.ts`](../../src/server/traffic/script.ts)); Pi writes the file and
   the proxy change through its server tools, under the permission modes.
+  Traefik's router, service and Compose service names come from the
+  application's existing Hallvi identity, so two applications can install
+  it on the same proxy and a repeated setup reuses the same names. The script
+  file and the helper's Caddyfile remain shared; removing one application's
+  routing leaves those files and the other application's routing in place.
 - **Getting it into the application:** a one-line pull request that puts
   `<script defer src="/_hv/s.js"></script>` in the layout every page shares,
   through Hallvi's existing operability pull requests; for software the owner

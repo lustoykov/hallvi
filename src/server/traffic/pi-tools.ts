@@ -747,6 +747,7 @@ export function trafficSetup(proxy: Proxy, version: string) {
 
 export function trafficScriptFor(
   proxy: Proxy,
+  applicationId: string,
   pageKey?: string,
   hashRouting?: boolean,
 ) {
@@ -772,7 +773,14 @@ export function trafficScriptFor(
     version: script.version,
     content: script.content,
     install: `mkdir -p ${SCRIPT_DIRECTORY}/_hv, write content to ${SCRIPT_FILE} exactly (mode 0644), and check that \`sha256sum ${SCRIPT_FILE}\` prints sha256. One file serves every application on the server. A proxy in a container mounts ${SCRIPT_DIRECTORY} read-only at the same path.`,
-    serving: SCRIPT_SERVING[proxy],
+    serving:
+      proxy === "traefik"
+        ? SCRIPT_SERVING.traefik(applicationId)
+        : SCRIPT_SERVING[proxy],
+    ...(proxy === "traefik" && {
+      names:
+        "The router, service and Compose service names belong to this application and stay the same on repeat installation. Keep them as given; replace app.example.com with this application's own hosts, and match its entry points, TLS and network. Removing this application's router and service leaves the other applications' names alone. The script file and Caddyfile are shared: keep them while any application uses them.",
+    }),
     tag: configuredTag(SCRIPT_TAG),
     routing:
       "History paths and the record's pageKey count by default. Only when the application's access-log record has hashRouting:true does the tag opt in to #/… and #!/… route paths. The script strips hash query values and secondary anchors, and ignores ordinary anchors, malformed encoding and key-value credential fragments. Route path segments are retained, just as history path segments are: never put secrets in a route path. Other fragment routing forms are unsupported.",

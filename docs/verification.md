@@ -65,6 +65,20 @@ on its state. An occupied lock or unclean previous runtime is a reason to
 coordinate/investigate, not to force takeover. The lock protects controller
 state, not neighbours on a shared server; stay within the selected application.
 
+### Native plugin updates
+
+For panel-update changes, use the browser fixture to exercise a host that keeps
+an old iframe while serving a newer resource, plus an unanswered update check.
+Then distinguish native-host evidence in the PR: record the rendered version
+from the panel menu before the update, the available version from
+`hallvi_reload_ui`, and the rendered version after the host actually reopens it.
+In Codex, same-chat reopen and new-chat open are separate observations. Do not
+create another user-owned chat merely to complete a check without authorization.
+If host controls are unavailable, report the native step as unverified; a
+fixture, fresh CLI process or successful resource notification cannot replace it.
+[Plugin update instructions](hallvi-plugin.md#updating-the-plugin-ui) own the
+recovery steps. Never restart the controller to try to clear a host's panel cache.
+
 ## 2. Discover, send, follow, inspect
 
 Run the checkout's `node scripts/cli.mjs` so the client matches the code under
