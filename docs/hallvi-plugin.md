@@ -99,6 +99,14 @@ for the remote shell inside the final argument. SSH authenticates the channel;
 no provider credential passes through MCP. Don't disable host-key checking.
 The remote shell must leave stdout clean for MCP messages.
 
+A `.local` SSH hostname depends on the local network's name discovery; it is
+not an internet address. If the laptop leaves that network, both plugin tools
+and the panel can become unavailable before MCP initialization. Check the SSH
+connection first: a name-resolution failure is not a UI-resource cache problem.
+Reconnect to the server's network or use an already configured private route
+and verified SSH address. Keep host-key verification enabled. The browser's
+local SSH forward must also be restored before copied Hallvi addresses work.
+
 For approvals and other actions that still need Hallvi's page, keep an SSH
 forward open in your laptop terminal:
 

@@ -72,7 +72,11 @@ Keep native host behavior separate from fixture results when reporting proof.
 Replacing panel bytes at one resource URI also left the native host showing
 an older interface. The follow-up adds content-versioned resources and an
 explicit UI reload; protocol acknowledgment must still be distinguished from
-the host actually rendering the new version.
+the host actually rendering the new version. A later failure to open the
+plugin was an SSH startup failure: the `.local` Mac mini name no longer
+resolved on the laptop's current network, and its known LAN address timed out.
+A remote adapter cannot supply its panel while disconnected; distinguish
+network reachability from cached UI before recommending plugin resets.
 
 **+1:** 2026-09-30 — plugin follow-up, [PR #283](https://github.com/lustoykov/hallvi/pull/283)
 
