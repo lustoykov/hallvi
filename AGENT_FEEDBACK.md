@@ -20,7 +20,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
-| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
+| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 2 | Resolved in #295 and #313 |
 | [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
 | [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
@@ -32,6 +32,14 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 ### AF-037 — Close setup requests handled in conversation
 
 **+1:** 2026-09-30 — stale DNS request repair.
+
+**+1:** 2026-09-30 — independent post-merge audit, task
+`01a0f19e-1f49-7d70-947b-28c911465e09`: the fresh-controller walkthrough
+connected and SSH-verified the application's host through Pi, while its original
+host card still asked where it should run. The controller had a host attached
+but the request remained open. Pi's successful `connect_server` now dismisses
+only that open host request; failed connections, other requests and settled
+receipts stay intact. The manual machine-card flow still creates its receipt.
 
 Completing DNS through the conversation left its guided card unanswered. The
 plugin promoted it into a current blocker without a date, even after later

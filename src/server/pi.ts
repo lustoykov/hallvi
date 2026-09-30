@@ -570,12 +570,15 @@ export async function openPiSession(
                   "connect_server",
                   "Application server connection",
                   params,
-                  () =>
-                    connectServer(
+                  async () => {
+                    const connected = await connectServer(
                       scope.applicationId,
                       params,
                       signal ?? options.signal,
-                    ),
+                    );
+                    dismissConnectionRequest(scope.applicationId, "host");
+                    return connected;
+                  },
                   false,
                   id,
                   signal,
