@@ -102,8 +102,10 @@ export function createHallviServer({
         return errorReply(error);
       }
     });
+  let currentPanel;
   const apps = async (_, { signal }) => ({
     controller,
+    ui: { version: currentPanel.version, resourceUri: currentPanel.uri },
     page: pageOrigin,
     applications: (await client.applications({ signal })).map((app) => ({
       ...app,
@@ -319,7 +321,6 @@ export function createHallviServer({
   );
   // Capture each revision's bytes: one URI must never return different HTML.
   const revisions = new Map();
-  let currentPanel;
   let openTool;
   const openMeta = (uri) => ({
     ui: { resourceUri: uri },
@@ -369,8 +370,8 @@ export function createHallviServer({
       version: next.version,
       resourceUri: next.uri,
       message: changed
-        ? "UI resource updated. Close and reopen the Hallvi panel. This does not reload adapter code or restart Hallvi."
-        : "The adapter already serves this UI version. Compare it with the version shown in your panel.",
+        ? "The adapter serves the updated panel file; an already-open panel may still show an earlier version. In Codex, open Hallvi in a new chat. If it stays on the earlier version, reconnect the Hallvi plugin. Compare the displayed version with this result. Adapter code and the controller were not restarted."
+        : "The adapter already serves this panel file. This does not establish which version the host is displaying or reload adapter code. Compare this version with the panel menu; if they differ, open Hallvi in a new Codex chat or reconnect the plugin.",
     };
   }
   reloadPanel();
@@ -384,13 +385,7 @@ export function createHallviServer({
       annotations: readOnly,
       _meta: openMeta(currentPanel.uri),
     },
-    async (args, extra) => ({
-      ...(await apps(args, extra)),
-      ui: {
-        version: currentPanel.version,
-        resourceUri: currentPanel.uri,
-      },
-    }),
+    apps,
   );
   tool(
     "hallvi_reload_ui",
