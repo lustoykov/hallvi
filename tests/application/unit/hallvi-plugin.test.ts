@@ -13,6 +13,7 @@ import {
   startHttp,
   createHallviServer,
 } from "../../../plugins/hallvi/server.mjs";
+import { projectConversation } from "../../../plugins/hallvi/conversation.mjs";
 
 const app = "3ee7c9a7-5da8-434a-8222-cccac5089141";
 const chat = "798e4859-86dc-43d1-a0fd-b2d2bee3be28";
@@ -28,6 +29,30 @@ function keep(server: Server) {
   });
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
+/** A main conversation as the controller's page reads it. */
+function conversationSnapshot() {
+  const reply = `reply:${key}`;
+  return {
+    worker: { alive: true },
+    status: "awaiting-approval",
+    messages: [
+      { id: "greeting", role: "assistant", source: "hallvi", body: "Hi" },
+      { id: key, requestKey: key, role: "user", source: "user", body: "Restart the web process.", status: "delivered", origin: "cli", createdAt: "2026-09-30T10:00:00Z" },
+      { id: reply, role: "assistant", source: "pi", body: "", status: "running", responseTo: key, startedAt: "2026-09-30T10:00:01Z", blocks: [{ type: "saved-information", id: "r1" }, { type: "saved-information", id: "r1" }] },
+    ],
+    piActivity: [
+      { kind: "tool", id: "c1", runId: reply, tool: "server_bash", args: JSON.stringify({ intent: "List containers", command: "docker ps" }), result: JSON.stringify({ output: "web Up" }), status: "succeeded", executionId: "e1", startedAt: "2026-09-30T10:00:02Z", finishedAt: "2026-09-30T10:00:03Z" },
+    ],
+    executions: [
+      { id: "e1", runId: reply, tool: "server_bash", target: "root@203.0.113.7:22", input: JSON.stringify({ intent: "List containers", command: "docker ps" }), status: "succeeded", exitCode: 0, createdAt: "2026-09-30T10:00:02Z" },
+      { id: "e2", runId: reply, toolCallId: "c2", tool: "server_bash", target: "root@203.0.113.7:22", input: JSON.stringify({ intent: "Restart web", command: "docker compose restart web" }), status: "awaiting-approval", createdAt: "2026-09-30T10:00:04Z" },
+    ],
+    information: [
+      { id: "r1", title: "Web answers", presentation: { status: "verified", checks: [{ status: "passed" }, { status: "failed" }] } },
+    ],
+  };
+}
+
 async function fixture() {
   const requests: {
     method: string;
@@ -39,6 +64,8 @@ async function fixture() {
     loseReply: false,
     unavailable: false,
     status: "waiting-for-approval",
+    traffic: true,
+    snapshot: conversationSnapshot(),
   };
   const http = createServer(async (req, res) => {
     let raw = "";
@@ -61,6 +88,17 @@ async function fixture() {
           },
         ],
       });
+    if (req.url?.endsWith("/messages") && req.method === "GET")
+      return answer(200, state.snapshot);
+    if (req.url?.includes("/traffic/history"))
+      return state.traffic
+        ? answer(200, {
+            collection: { state: "live" },
+            totals: { views: 12, errors: 1 },
+            series: [{ at: "2026-09-30T10:00:00Z", views: 12, errors: 1 }],
+            errors: [{ key: "/api", count: 1, visitors: 1 }],
+          })
+        : answer(404, { error: "Not found" });
     if (req.url?.endsWith("/messages")) {
       if (
         accepted.has(body.requestKey) &&
@@ -134,6 +172,7 @@ it("advertises native entrypoints and reads the real panel over MCP", async () =
   expect(tools.map((tool) => tool.name)).toEqual([
     "hallvi_apps",
     "hallvi_inspect",
+    "hallvi_conversation",
     "hallvi_exec",
     "hallvi_wait",
     "hallvi_open",
@@ -165,7 +204,11 @@ it("advertises native entrypoints and reads the real panel over MCP", async () =
   ]);
   expect(await call("hallvi_inspect", { application_id: app })).toMatchObject({
     application: { permissionMode: "always-ask" },
+    traffic: { state: "live", totals: { views: 12 }, errors: [{ key: "/api" }] },
   });
+  expect(
+    tools.find((tool) => tool.name === "hallvi_exec")?._meta,
+  ).toMatchObject({ ui: { visibility: ["model", "app"] } });
   expect(f.requests.every((request) => request.method === "GET")).toBe(true);
 });
 
@@ -363,4 +406,69 @@ it("reloads UI on the same MCP connection, preserves revision bytes and recovers
       .isError,
   ).toBe(false);
   expect(await uri()).not.toBe(second);
+});
+
+it("projects the main conversation: pairs, live approval, bounded steps and an unchanged revision", async () => {
+  const f = await fixture();
+  const { call } = await connect(f.controller);
+  const first = await call("hallvi_conversation", { application_id: app });
+  expect(first).toMatchObject({
+    chatId: chat,
+    status: "awaiting-approval",
+    unchanged: false,
+    turnsOmitted: 0,
+    turns: [
+      {
+        request: { requestKey: key, body: "Restart the web process." },
+        reply: {
+          status: "running",
+          records: [{ title: "Web answers", checks: { passed: 1, failed: 1, total: 2 } }],
+          steps: [
+            { title: "List containers", place: "On the server", host: "203.0.113.7", status: "succeeded", output: "web Up", exitCode: 0 },
+            { title: "Restart web", status: "awaiting-approval", command: "docker compose restart web" },
+          ],
+        },
+      },
+    ],
+  });
+  const again = await call("hallvi_conversation", {
+    application_id: app,
+    known: first.revision,
+  });
+  expect(again).toMatchObject({ unchanged: true, revision: first.revision });
+  expect(again).not.toHaveProperty("turns");
+  // A stopped worker reads as unknown, never as an idle, empty conversation.
+  f.state.snapshot = { worker: { alive: false }, status: "idle", messages: [] };
+  expect(await call("hallvi_conversation", { application_id: app })).toMatchObject({
+    status: null,
+    worker: { alive: false },
+    turns: [],
+  });
+  f.state.traffic = false;
+  expect(await call("hallvi_inspect", { application_id: app })).toMatchObject({
+    traffic: { unavailable: true },
+  });
+  expect(f.requests.every((request) => request.method === "GET")).toBe(true);
+});
+
+it("keeps older turns' steps as titles and only recent ones in detail", () => {
+  const snapshot = conversationSnapshot();
+  const turns = Array.from({ length: 4 }, (_, i) => {
+    const id = `${i}`;
+    return [
+      { id, requestKey: id, role: "user", source: "user", body: `Ask ${i}`, status: "delivered" },
+      { id: `reply:${id}`, role: "assistant", source: "pi", body: `Answer ${i}`, status: "completed", responseTo: id },
+    ];
+  }).flat();
+  const activity = turns
+    .filter((message) => message.role === "assistant")
+    .map((message) => ({ ...snapshot.piActivity[0], id: `call-${message.id}`, runId: message.id }));
+  const projected = projectConversation(
+    { ...snapshot, status: "idle", messages: turns, piActivity: activity },
+    { turns: 3 },
+  );
+  expect(projected.turnsOmitted).toBe(1);
+  expect(projected.turns.map((turn) => turn.request?.body)).toEqual(["Ask 1", "Ask 2", "Ask 3"]);
+  expect(projected.turns[0].reply?.steps[0]).toMatchObject({ title: "List containers", command: "", excerpted: true });
+  expect(projected.turns[2].reply?.steps[0]).toMatchObject({ command: "docker ps", output: "web Up" });
 });

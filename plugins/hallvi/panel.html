@@ -77,6 +77,8 @@
   .spinner { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent; animation: spin 0.9s linear infinite; flex: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .pulse { flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
   .dot.live { background: var(--verified); }
   .dot.warn { background: #b25a16; }
   .dot.bad { background: var(--failed); }
@@ -110,6 +112,7 @@
 
   /* The conversation with the main operator. */
   .thread { flex: 1; overflow-y: auto; padding: 8px 12px 16px; scroll-behavior: smooth; overscroll-behavior: contain; }
+  .banner.read { position: sticky; top: 0; z-index: 2; box-shadow: 0 2px 8px rgb(28 52 110 / .08); }
   .banner { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0 10px; padding: 8px 10px; border-radius: 8px; background: var(--unknown-bg); font-size: 12.5px; }
   .banner.failed { background: var(--failed-bg); }
   .banner p { margin: 0; flex: 1; }
@@ -163,6 +166,7 @@
   .live { display: flex; align-items: center; gap: 7px; margin: 6px 0 2px; color: var(--working-text); font-size: 12.5px; }
   .live .says { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .live .since { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .live.stale { color: var(--muted); }
   .tailing { margin: 4px 0 0 17px; padding: 6px 8px; border-radius: 7px; background: var(--sunken); font: 11px/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 7.5em; overflow: hidden; }
 
   .card { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); font-size: 12.5px; }
@@ -170,7 +174,8 @@
   .card.failed { border-color: var(--failed-line); }
   .card h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12.5px; font-weight: 620; }
   .card p { margin: 3px 0; }
-  .card code { display: block; margin: 6px 0; padding: 6px 8px; border-radius: 6px; background: var(--sunken); font: 11.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 6em; overflow: hidden; }
+  .card code { font: 11.5px/1.5 var(--mono); padding: 0 3px; border-radius: 4px; background: var(--sunken); }
+  .card code.command { display: block; margin: 6px 0; padding: 6px 8px; border-radius: 6px; background: var(--sunken); font: 11.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 6em; overflow: hidden; }
   .record { display: flex; gap: 8px; align-items: baseline; margin: 6px 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; }
   .record .title { flex: 1; min-width: 0; }
   .record .meta { flex: none; color: var(--muted); font-size: 11.5px; }
@@ -193,6 +198,7 @@
   .needs { margin: 0 0 8px; }
   .field { border: 1px solid var(--field-line); border-radius: 12px; background: var(--surface); padding: 8px 8px 6px 11px; transition: border-color var(--fast); }
   .field:focus-within { border-color: var(--blue); }
+  .field:has(textarea:disabled) { background: var(--sunken); }
   .field textarea { display: block; width: 100%; min-height: 1.5em; border: 0; outline: 0; resize: none; background: transparent; line-height: 1.5; max-height: 9em; padding: 0; }
   .field textarea::placeholder { color: var(--muted); opacity: .8; }
   .field-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
@@ -203,6 +209,8 @@
   .sending-note { margin: 6px 2px 0; font-size: 12px; }
   .sending-note.failed { color: var(--failed); }
 
+  .popover { position: absolute; left: 12px; right: 12px; top: 42px; z-index: 6; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(28 52 110 / .14); font-size: 12.5px; }
+  .popover p { margin: 0 0 6px; }
   .menu { position: absolute; right: 12px; top: 42px; z-index: 5; min-width: 200px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(28 52 110 / .14); }
   .menu button, .menu .item { display: block; width: 100%; padding: 6px 10px; border: 0; border-radius: 7px; background: none; text-align: left; font-size: 12.5px; }
   .menu button:hover, .menu button:focus-visible { background: var(--sunken); }
@@ -214,12 +222,14 @@
 
   .blank { margin: auto; padding: 24px; max-width: 38ch; text-align: center; }
   .blank h2 { font-size: 15px; margin: 8px 0 4px; }
+  .blank .mark { width: 40px; height: 38px; }
   .blank p { margin: 0 0 12px; color: var(--muted); }
   .secondary { border: 1px solid var(--field-line); border-radius: 8px; padding: 4px 12px; background: var(--surface); font-size: 12.5px; }
   .secondary:hover { background: var(--sunken); }
 
   @media (prefers-reduced-motion: reduce) {
     .spinner { animation: none; border-right-color: currentColor; opacity: .7; }
+    .pulse { animation: none; }
     .thread { scroll-behavior: auto; }
     * { transition: none !important; }
   }
@@ -252,7 +262,7 @@
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
   <div class="context" id="context" hidden></div>
-  <div class="menu" id="link-help" role="dialog" aria-label="Hallvi's address" hidden></div>
+  <div class="popover" id="link-help" role="dialog" aria-label="Hallvi's address" hidden></div>
   <main class="thread" id="thread" tabindex="-1" aria-label="Conversation with Hallvi"></main>
   <form class="composer" id="composer" hidden>
     <div id="needs" class="needs" hidden></div>
@@ -392,7 +402,7 @@ const where = (step) => [step.place ? lower(step.place) : null, step.host].filte
 function doing(reply, worker) {
   if (worker === false) return { says: "The worker stopped. Nothing is running.", waiting: true };
   const steps = reply.steps.filter((step) => step.kind === "tool");
-  const asking = steps.find((step) => step.status === "awaiting-approval");
+  const asking = steps.find((step) => step.status === "awaiting-approval" || (step.tool === "request_approval" && step.status === "running"));
   if (asking) return { says: "Waiting for your approval", at: asking.startedAt, waiting: true, step: asking };
   const running = steps.findLast((step) => step.status === "running");
   if (running) {
@@ -468,8 +478,9 @@ function link(label, href) {
 }
 
 /** Open an address through the host; HTTP stays copyable, since hosts may ignore it. */
-async function openAddress(address, anchor) {
-  const url = new URL(address);
+async function openAddress(address) {
+  let url;
+  try { url = new URL(address, pageOrigin()); } catch { return; }
   if (url.protocol === "https:") {
     try { const result = await request("ui/open-link", { url: url.href }); if (!result?.isError) return; } catch {}
   }
@@ -478,16 +489,16 @@ async function openAddress(address, anchor) {
 function showAddress(address, help) {
   const panel = $("link-help");
   const input = el("input", { value: address, readonly: true, "aria-label": "Address" });
-  const status = el("p", { class: "muted", role: "status", style: "margin:6px 0 0;font-size:12px" });
+  const status = el("p", { class: "muted", role: "status", style: "margin:6px 0 0;font-size:12px;min-height:1em" });
   const copy = el("button", { type: "button", onclick: async () => {
     try { await navigator.clipboard.writeText(address); status.textContent = "Copied."; }
     catch { input.focus(); input.select(); status.textContent = "Copy the selected address."; }
   } }, "Copy");
   panel.replaceChildren(
-    el("p", { style: "margin:4px 6px;font-size:12.5px" }, help),
-    el("div", { class: "address", style: "margin:6px" }, input, copy),
+    el("p", {}, help),
+    el("div", { class: "address" }, input, copy),
     status,
-    el("div", { style: "text-align:right;margin:4px 6px" }, el("button", { type: "button", class: "text-button quiet", onclick: closeAddress }, "Close")),
+    el("div", { style: "text-align:right" }, el("button", { type: "button", class: "text-button quiet", onclick: closeAddress }, "Close")),
   );
   panel.hidden = false;
   copy.focus();
@@ -610,7 +621,7 @@ function describeToModel() {
   const reply = last?.reply;
   const now = reply && ["running", "waiting"].includes(reply.status) ? doing(reply, c.worker?.alive).says : null;
   void shareContext([
-    `The Hallvi panel shows application "${a.name}" (application_id ${a.id}) on the Hallvi controller ${state.context?.controller ?? ""}.`,
+    `The Hallvi panel shows application "${a.name}" (application_id ${a.id}) on the Hallvi controller ${c.controller ?? state.context?.controller ?? ""}.`,
     `Its main operator is ${c.status ?? "unknown (worker unavailable)"}${now ? `: ${now}` : ""}.`,
     last?.request ? `Latest request: ${last.request.body.slice(0, 300)}` : "",
     reply?.body ? `Latest reply (${reply.status}): ${reply.body.slice(0, 900)}` : "",
@@ -703,11 +714,11 @@ function renderIdentity() {
   let chip = null;
   if (state.conversationError && state.failures > 1) chip = ["unknown", "Can't reach Hallvi"];
   else if (c && !c.worker?.alive) chip = ["unknown", "Worker stopped"];
-  else if (c?.status === "awaiting-approval") chip = ["waiting", "Needs your approval"];
+  else if (c?.status === "awaiting-approval" || waitingOnApproval(c)) chip = ["waiting", "Needs your approval"];
   else if (c?.status === "interrupted") chip = ["waiting", "Interrupted"];
   else if (attention.some((item) => item.kind === "input")) chip = ["waiting", "Needs you"];
   else if (c?.status === "working" || state.send?.state === "sending") chip = ["working", "Working"];
-  $("state").replaceChildren(chip ? el("span", { class: `chip ${chip[0]}` }, chip[0] === "working" ? el("span", { class: "spinner", "aria-hidden": "true" }) : null, chip[1]) : "");
+  $("state").replaceChildren(chip ? el("span", { class: `chip ${chip[0]}` }, chip[0] === "working" ? el("span", { class: "pulse", "aria-hidden": "true" }) : null, chip[1]) : "");
 
   // The one line of context under the name.
   const context = state.context;
@@ -727,6 +738,11 @@ function renderIdentity() {
   $("context-toggle").setAttribute("aria-label", `${parts.join(", ")}. ${state.contextOpen ? "Hide" : "Show"} application details`);
 }
 
+/** An approval the latest reply is waiting on, whatever the lane's own status says. */
+function waitingOnApproval(c) {
+  const reply = c?.turns?.at(-1)?.reply;
+  return Boolean(reply && ["running", "waiting"].includes(reply.status) && reply.steps.some((step) => step.status === "awaiting-approval" || (step.tool === "request_approval" && step.status === "running")));
+}
 function renderContext() {
   const box = $("context");
   box.hidden = !state.contextOpen;
@@ -800,7 +816,7 @@ function renderBanner() {
   const error = state.conversationError;
   if (!error || !state.conversation) return;
   $("thread").prepend(el("div", { class: "banner read", role: "status" },
-    el("p", {}, `Can't reach Hallvi. Showing what was read ${ago(state.readAt)}; it may have changed. Retrying…`),
+    el("p", {}, `Can't reach Hallvi. Showing what was read at ${clock(state.readAt)}; it may have changed. Retrying…`),
     el("button", { type: "button", class: "text-button", onclick: () => void follow(true) }, "Retry")));
 }
 function renderBlank(title, text, actions = []) {
@@ -812,6 +828,8 @@ function renderBlank(title, text, actions = []) {
 
 function renderThread() {
   const thread = $("thread");
+  // Redrawing must not take a keyboard reader's place away.
+  const focused = thread.contains(document.activeElement) ? document.activeElement.closest("[data-focus]")?.dataset.focus : null;
   const nearBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
   const c = state.conversation;
   const nodes = [];
@@ -832,6 +850,7 @@ function renderThread() {
     nodes.push(el("div", { class: "turn" }, el("div", { class: "ask waiting" }, el("p", {}, s.text), el("small", {}, s.state === "sending" ? "Sending…" : s.state === "unknown" ? "Not confirmed" : "Sent"))));
   if (c.worker?.alive && !(c.turns ?? []).length && !s) nodes.push(renderEmpty());
   thread.replaceChildren(...nodes);
+  if (focused) thread.querySelector(`[data-focus="${CSS.escape(focused)}"]`)?.focus();
   renderBanner();
   // Open at the latest turn once, then follow only a reader who is already there.
   const placed = thread.dataset.placed === state.selected;
@@ -852,7 +871,7 @@ function renderTurn(turn, c) {
   const r = turn.request;
   if (r) {
     const waiting = r.status === "waiting";
-    const note = waiting ? (r.delivery === "steer" ? "Waiting · read after the current step" : "Waiting · read after the current work") : r.status === "cancelled" ? "Cancelled · not started" : clock(r.createdAt);
+    const note = waiting && c.status === "interrupted" ? "Waiting until you Continue or Stop" : waiting ? (r.delivery === "steer" ? "Waiting · read after the current step" : "Waiting · read after the current work") : r.status === "cancelled" ? "Cancelled · not started" : clock(r.createdAt);
     const key = `ask:${r.id}`;
     const long = r.body.length > 280 && !state.unfolded.has(key);
     const text = long ? `${r.body.slice(0, 240).trimEnd()}…` : r.body;
@@ -878,7 +897,7 @@ function renderReply(reply, c) {
     const failed = tools.filter((step) => step.status === "failed").length;
     const summary = [summarise(tools) || "Worked", failed ? `${failed} failed` : null, reply.stepsOmitted ? `${reply.stepsOmitted} earlier not shown` : null].filter(Boolean).join(" · ");
     const details = el("details", { class: "work", ontoggle: (event) => toggle(key, event.target.open) },
-      el("summary", {}, el("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" }), summary),
+      el("summary", { "data-focus": key }, el("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" }), summary),
       el("ol", { class: "steps" }, reply.steps.map((step) => step.kind === "said" ? el("li", { class: "said" }, step.text) : el("li", {}, renderStep(step)))));
     details.querySelector("summary svg").innerHTML = '<path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>';
     details.open = state.open.has(key);
@@ -902,16 +921,19 @@ function renderReply(reply, c) {
 
   if (live) {
     const now = doing(reply, c.worker?.alive);
-    if (now.step?.status === "awaiting-approval") node.append(renderApproval(now.step));
-    else {
+    if (now.waiting && now.step) node.append(renderApproval(now.step));
+    else if (state.conversationError) {
+      // Unreachable: say what was last known, and stop the clock on it.
+      node.append(el("div", { class: "live stale" }, el("span", { class: "says" }, `At ${clock(state.readAt)}: ${lower(now.says)}`)));
+    } else {
       node.append(el("div", { class: "live", "aria-live": "polite" }, el("span", { class: "spinner", "aria-hidden": "true" }), el("span", { class: "says" }, now.says), el("span", { class: "since", "data-since": now.at ?? "" }, now.at ? since(now.at) : "")));
       if (now.step?.output) node.append(el("div", { class: "tailing", "aria-hidden": "true" }, now.step.output.split("\n").slice(-5).join("\n")));
     }
   } else if (c.status === "interrupted" && ["running", "waiting"].includes(reply.status)) {
-    node.append(el("div", { class: "card waiting" }, el("h4", {}, "Interrupted"), el("p", {}, "Hallvi's worker stopped during this reply. Whether its last command finished is not known, and nothing runs until you choose Continue or Stop in Hallvi."), el("button", { type: "button", class: "text-button", onclick: () => void openAddress(pageOf()) }, "Continue or stop in Hallvi")));
+    node.append(el("div", { class: "card waiting" }, el("h4", {}, "Interrupted"), el("p", {}, "Hallvi's worker stopped during this reply. Whether its last command finished is not known, and nothing runs until you choose Continue or Stop in Hallvi."), el("button", { type: "button", class: "secondary", onclick: () => void openAddress(pageOf()) }, "Continue or stop in Hallvi")));
   } else if (reply.status === "completed" && reply.body) {
-    const copy = el("button", { type: "button", class: "text-button quiet", onclick: (event) => void copyText(reply.body, event.currentTarget) }, "Copy reply");
-    const codex = el("button", { type: "button", class: "text-button quiet", onclick: (event) => void discuss(reply.body, event.currentTarget) }, "Discuss in Codex");
+    const copy = el("button", { type: "button", class: "text-button quiet", "data-focus": `copy:${reply.id}`, onclick: (event) => void copyText(reply.body, event.currentTarget) }, "Copy reply");
+    const codex = el("button", { type: "button", class: "text-button quiet", "data-focus": `codex:${reply.id}`, onclick: (event) => void discuss(reply.body, event.currentTarget) }, "Discuss in Codex");
     node.append(el("div", { class: "actions" }, copy, host.canMessage ? codex : null));
   }
   return node;
@@ -922,7 +944,7 @@ function renderStep(step) {
   const key = `step:${step.id}`;
   const place = where(step);
   const details = el("details", { class: "step", ontoggle: (event) => toggle(key, event.target.open) },
-    el("summary", {}, el("span", { class: `glyph ${step.status}`, "aria-label": step.status }, step.status === "running" ? el("span", { class: "spinner", style: "display:inline-block;width:9px;height:9px" }) : glyph),
+    el("summary", { "data-focus": key }, el("span", { class: `glyph ${step.status}`, "aria-label": step.status }, step.status === "running" ? el("span", { class: "spinner", style: "display:inline-block;width:9px;height:9px" }) : glyph),
       el("span", { class: "what" }, step.title, place ? el("span", { class: "where" }, ` · ${place}`) : null)));
   if (step.command && step.command !== step.title) details.append(el("pre", {}, step.command));
   if (step.output) details.append(el("pre", {}, step.output));
@@ -963,11 +985,13 @@ function renderRecord(record) {
   return el("div", { class: "record" }, el("span", { class: `tag ${tone}` }, word), el("span", { class: "title" }, record.title), checks ? el("span", { class: "meta" }, checks) : null);
 }
 function renderApproval(step) {
-  const place = where(step);
+  // A question Pi wrote is prose; a command waiting under Always ask is code.
+  const question = step.tool === "request_approval";
+  const place = question ? "" : where(step);
   return el("div", { class: "card waiting", role: "group", "aria-label": "Waiting for your approval" },
     el("h4", {}, "Waiting for your approval", el("span", { class: "muted", style: "font-weight:400", "data-since": step.startedAt }, since(step.startedAt))),
-    el("p", {}, step.title, place ? el("span", { class: "muted" }, ` · ${place}`) : null),
-    step.command && step.command !== step.title ? el("code", {}, step.command) : null,
+    question ? inline(step.command || step.title, el("p")) : el("p", {}, step.title, place ? el("span", { class: "muted" }, ` · ${place}`) : null),
+    !question && step.command && step.command !== step.title ? el("code", { class: "command" }, step.command) : null,
     el("p", { class: "muted" }, "Nothing runs until you decide. Approve or decline in Hallvi, where the permission mode lives."),
     el("button", { type: "button", class: "secondary", onclick: () => void openAddress(state.context?.attention?.find((item) => item.kind === "approval")?.page ?? pageOf()) }, "Decide in Hallvi"));
 }
@@ -1013,7 +1037,7 @@ function autosize() {
 /** Elapsed times move on their own; nothing else re-renders for the clock. */
 function tick() {
   clearInterval(clockTimer);
-  if (!document.querySelector("[data-since]")) return;
+  if (state.conversationError || !document.querySelector("[data-since]")) return;
   clockTimer = setInterval(() => {
     for (const node of document.querySelectorAll("[data-since]")) if (node.dataset.since) node.textContent = since(node.dataset.since);
   }, 1000);

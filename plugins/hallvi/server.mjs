@@ -148,6 +148,13 @@ export function createHallviServer({
       ]);
       return {
         ...inspection,
+        // The controller's pages are its own paths; give the browser's address.
+        attention: (inspection.attention ?? []).map((item) => ({
+          ...item,
+          page: item.page?.startsWith("/")
+            ? `${pageOrigin}${item.page}`
+            : item.page,
+        })),
         traffic,
         controller,
         applicationId: application_id,
