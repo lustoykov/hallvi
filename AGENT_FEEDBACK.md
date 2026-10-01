@@ -41,8 +41,21 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 1 | New |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
+| [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-071 — Refresh compact message dates after midnight
+
+PR #325 memoizes transcript rows, so an unchanged message's `LocalTime` no
+longer reads the current date when the pane's clock ticks or the owner types.
+In a disposable Chromium fixture, moving the browser clock from 1 October
+23:59 to 2 October 00:01 left an earlier message labelled `12:00` after typing;
+the same check on the base revision changed it to `1 Oct, 12:00`. Reproduced
+on `db6b9aa4`, passing on `cac3e2f5`. Give the timestamp its own day-change
+update while keeping the rest of the message memoized.
+
+**+1:** 2026-10-01 — review of [PR #325](https://github.com/lustoykov/hallvi/pull/325), `codex/review-325-feedback`.
 
 ### AF-070 — Land a message link in a long conversation
 
