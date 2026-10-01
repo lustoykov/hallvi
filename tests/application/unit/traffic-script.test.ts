@@ -26,8 +26,6 @@ function browse(address: string, referrer: string, pageKey?: string) {
   };
   let every = 0;
   const window: Record<string, unknown> = {
-    // This fixture represents a site with an existing valid analytics grant.
-    hvConsent: true,
     location,
     document: {
       visibilityState: "visible",

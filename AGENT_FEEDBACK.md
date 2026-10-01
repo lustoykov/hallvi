@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-054 — Check traffic assets after installation](#af-054--check-traffic-assets-after-installation) | 1 | Fix in review |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 2 | Basis fixed in #275; absence-record friction remains |
@@ -24,7 +25,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 2 | New |
 | [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
 | [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
-| [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
+| [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Controls retained; mandatory opt-in removed by owner |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
 | [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
 | [AF-048 — Ask the host for a taller panel inside a conversation](#af-048--ask-the-host-for-a-taller-panel-inside-a-conversation) | 1 | New |
@@ -32,6 +33,16 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-051 — Retire or rewrite the conversation-first capture](#af-051--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-054 — Check traffic assets after installation
+
+Installed alpha.12 contains `src/traffic-script/hv.js` outside `app/`, while
+the worker reads it relative to `app/`. The archive includes the file and the
+service starts, but Pi's `traffic_script` fails with ENOENT. Move `src/` with
+the runtime and check the canonical reader after clean installation and upgrade.
+
+**+1:** 2026-10-01 — hallvi-landing traffic setup repair,
+`codex/traffic-script-package`.
 
 ### AF-050 — Keep Pi's replies from summoning the owner
 
@@ -151,14 +162,13 @@ would make an upgrade's live run a decision instead of an investigation.
 ### AF-042 — Include consent and notices in traffic setup
 
 **+1:** 2026-09-30 — owner's traffic privacy task,
-[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
+[PR #306](https://github.com/lustoykov/hallvi/pull/306), merged.
 
-The cookie-free script started collecting immediately; setup offered only
-the include and proxy. Raw event requests still enter logs with IP/browser
-information, and a shared server file plus cached or already-loaded older
-scripts complicates rollout. This task adds explicit grant/withdrawal and
-site-specific notice/control setup, with versioned includes and browser checks.
-It does not establish legal compliance or update existing deployed sites.
+The cookie-free script's requests enter logs with IP/browser information.
+PR #306 added grant/withdrawal, versioned includes and setup guidance. On
+1 October the owner chose immediate script-only measurement without a banner
+or mandatory grant callback. Optional controls remain for sites that use them;
+this setup makes no consent-exemption or legal-compliance claim.
 
 ### AF-043 — Do not imply automatic sign-up tracking
 

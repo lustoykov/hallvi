@@ -195,7 +195,7 @@ trap 'exit 1' HUP INT TERM
 say "Preparing prebuilt Hallvi for $platform"
 cp -RP "$source_dir/." "$staging/"
 mkdir "$staging/app"
-for part in .next node_modules package.json package-lock.json next.config.ts scripts dist; do
+for part in .next node_modules package.json package-lock.json next.config.ts scripts src dist; do
   mv "$staging/$part" "$staging/app/$part"
 done
 rm "$staging/install.sh"

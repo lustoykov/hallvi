@@ -26,15 +26,15 @@ test.use({
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
 });
 
-// Existing measurement cases have already granted analytics. /consent starts
-// with no choice and exercises the site's controls across the full lifecycle.
+// Ordinary pages use the plain include. /consent explicitly disables the
+// tracker before loading and exercises optional site controls.
 const html = (
   body: string,
   pageKey?: string,
   hashRouting?: boolean,
   allowed = true,
 ) =>
-  `<!doctype html><html><head><meta charset="utf-8">${allowed ? "<script>window.hvConsent = true</script>" : ""}${trafficScriptFor("caddy", "traffic-script-fixture", pageKey, hashRouting).tag}</head><body>${body}</body></html>`;
+  `<!doctype html><html><head><meta charset="utf-8">${allowed ? "" : "<script>window.hvConsent = false</script>"}${trafficScriptFor("caddy", "traffic-script-fixture", pageKey, hashRouting).tag}</head><body>${body}</body></html>`;
 
 const pages: Record<string, string> = {
   "/consent": html(
@@ -188,7 +188,7 @@ const setVisibility = (page: Page, state: "hidden" | "visible") =>
     document.dispatchEvent(new Event("visibilitychange"));
   }, state);
 
-test("consent gates every measurement and withdrawal does not replay activity", async ({
+test("optional site controls stop measurement and do not replay activity", async ({
   page,
 }) => {
   await page.clock.install();

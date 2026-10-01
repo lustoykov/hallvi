@@ -168,6 +168,23 @@ jobs:
           sh candidate/install-hallvi.sh "candidate/hallvi-${RELEASE_VERSION}-${RELEASE_PLATFORM}.tgz"
           "$HOME/.local/bin/hallvi" status
 
+      - name: Read the traffic script from the installed runtime directory
+        run: |
+          set -eu
+          export HALLVI_TRAFFIC_READER="$GITHUB_WORKSPACE/src/server/traffic/script.ts"
+          cd "$HOME/.local/lib/hallvi/app"
+          ../node/bin/node --import ./node_modules/tsx/dist/loader.mjs --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { pathToFileURL } from 'node:url';
+          const { trafficScript } = await import(pathToFileURL(process.env.HALLVI_TRAFFIC_READER));
+          const script = trafficScript();
+          assert.ok(script.content.length > 1000, 'The installed script must contain the tracker.');
+          assert.equal(createHash('sha256').update(script.content).digest('hex'), script.sha256);
+          new Function(script.content);
+          console.log(`Installed traffic script loads: ${script.version} ${script.sha256}`);
+          NODE
+
       - name: Verify service replacement and API data after upgrade
         if: matrix.journey == 'upgrade'
         run: |

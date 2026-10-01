@@ -208,7 +208,7 @@ export function trafficReading(
       history.viewSource === "script"
         ? "Page views and visitors come from Hallvi's script; requests, errors, response times and bots from the log."
         : "Page views and visitors switch from the log to Hallvi's script inside this range, at the script's switch point; they are never added together.",
-      "Consent-gated script measurements cover visitors who allow analytics, so they can understate total use. Access-log coverage does not establish consent or the proportion of visitors measured.",
+      "Script measurements cover browsers where the script runs. Blocking or optional site controls can reduce that coverage; access-log coverage does not establish the proportion of visitors measured.",
     );
   if (history.collection.scriptSilentSince)
     notes.push(
@@ -805,9 +805,9 @@ export function trafficScriptFor(
     check: [
       `curl -sS -A 'Hallvi access check' https://<host>/_hv/s.js | sha256sum — the same sha256.`,
       `curl -sS -o /dev/null -w '%{http_code}\\n' -A 'Hallvi access check' 'https://<host>${check}' — 204, and the newest log line has that ${EVENT_PREFIX} path whole. Hallvi's user agent keeps it from being counted.`,
-      "Propose the include, consent integration and completed notice together through open_pull_request (or the software's own code-injection setting). Offer a prompt and notice when none exist, fitting the site's design. Never merge the PR; opening it deploys nothing. An owner-merged change follows the application's ordinary release policy.",
-      "After the owner merges and it is released, verify in a fresh browser: no /_hv/e/ requests before a choice or after refusal, one current view after Allow analytics, and no later events after withdrawal, including on navigation and in other open tabs. Reload preserves the choice according to the site's policy. Check the notice and preference link. Fetching /_hv/s.js can still appear in ordinary server logs.",
-      "Check that pages do not retain a cached older script: compare the publicly served sha256 after any proxy/CDN cache changes, and verify the browser behavior rather than the tag alone. One shared server file serves all applications, so replacing it disables measurement on older tags until each application's consent integration is released. The first allowed visitor's event sets the switch point Traffic shows.",
+      "Propose the include through open_pull_request (or the software's own code-injection setting). Preserve existing site controls; add a prompt, consent integration or notice only when the owner requests it. Never merge the PR; opening it deploys nothing. An owner-merged change follows the application's ordinary release policy.",
+      "After the owner merges and it is released, verify in a fresh browser that the plain include sends a current view and navigation events with no banner or grant callback. If existing controls are integrated, test initial disable, re-enable and immediate withdrawal too. Fetching /_hv/s.js can still appear in ordinary server logs.",
+      "Check that pages do not retain a cached older script: compare the publicly served sha256 after any proxy/CDN cache changes, and verify the browser behavior rather than the tag alone. One shared server file serves all applications, so coordinate replacement with other applications on that host. The first visitor event sets the switch point Traffic shows.",
     ],
   };
 }

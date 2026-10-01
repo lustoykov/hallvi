@@ -47,8 +47,8 @@ export function ScriptOffers(props: Props) {
       <div>
         <Checklist {...props} />
         <p className="tf-script-privacy">
-          Measures visitors who allow analytics. Hallvi can add consent controls
-          and a privacy notice that fit your site.
+          Starts measuring when the script loads. Uses no cookies or stored
+          visitor identifier. Existing site controls can disable measurement.
         </p>
       </div>
       <div className="tf-script-actions">
