@@ -500,7 +500,7 @@ function doing(reply, worker) {
   if (worker === false) return { says: "The worker stopped. Nothing is running.", waiting: true };
   const steps = reply.steps.filter((step) => step.kind === "tool");
   const asking = steps.find((step) => step.status === "awaiting-approval" || (step.tool === "request_approval" && step.status === "running"));
-  if (asking) return { says: "Waiting for your approval", at: asking.startedAt, waiting: true, step: asking };
+  if (asking) return { says: "Awaiting approval", at: asking.startedAt, waiting: true, step: asking };
   const running = steps.findLast((step) => step.status === "running");
   if (running) {
     const place = where(running);
@@ -924,7 +924,7 @@ function operatorState() {
   // An open input request can outlive the work that asked for it: it never
   // stands in for the operator's state (see openRequests).
   if (c && !c.worker?.alive) return ["unknown", "Worker not running", "Not running"];
-  if (c?.status === "awaiting-approval" || waitingOnApproval(c)) return ["waiting", "Needs your approval", "Needs you"];
+  if (c?.status === "awaiting-approval" || waitingOnApproval(c)) return ["waiting", "Awaiting approval", "Awaiting approval"];
   if (c?.status === "interrupted") return ["waiting", "Interrupted"];
   if (c?.status === "working" || state.send?.state === "sending") return ["working", "Working"];
   if (state.send?.state === "unknown") return ["waiting", "Message not confirmed", "Not confirmed"];
@@ -1047,7 +1047,7 @@ function conditionItem(a, ask) {
 }
 
 /**
- * The operator is on the overview only when it needs you. Its work and words
+ * The operator is on the overview only when a decision is pending. Its work and words
  * are the Operator view's, and that view's tab carries its state.
  */
 function attentionItem() {
@@ -1058,14 +1058,14 @@ function attentionItem() {
   const go = el("button", { type: "button", class: "out", "data-focus": "go:operator", "aria-label": "Open the conversation", title: "Open the conversation", onclick: () => setView("operator") }, icon("in"));
   // Each decision is made in Hallvi, never here.
   const decide = (label, page, key) => el("button", { type: "button", class: "secondary", "data-focus": key, onclick: () => void openAddress(page ?? pageOf(), { kind: "hallvi", what: label }) }, label, icon("out"));
-  const needs = (main, action, meta = null) => item("Needs you", { glyph: mascot(), main, meta, go, more: [action] });
+  const needs = (main, action, meta = null) => item("Operator decision", { glyph: mascot(), main, meta, go, more: [action] });
   if (alive && c.status === "interrupted") {
     const waiting = (c.turns ?? []).filter((entry) => entry.request?.status === "waiting").length;
     return needs([primary("Interrupted", "needs"), line(`Nothing runs until you choose Continue or Stop${waiting ? `; ${plural(waiting, "follow-up waits", "follow-ups wait")}` : ""}.`)],
       decide("Continue or stop in Hallvi", null, "interrupted"));
   }
   if (now?.waiting && now.step)
-    return needs([primary("Waiting for your approval", "needs"), el("p", { class: "sub one" }, now.step.title)],
+    return needs([primary("Awaiting approval", "needs"), el("p", { class: "sub one" }, now.step.title)],
       decide("Decide in Hallvi", state.context?.attention?.find((entry) => entry.kind === "approval")?.page, `decide:${now.step.id}`),
       el("span", { "data-since": now.step.startedAt }, since(now.step.startedAt)));
   return null;
@@ -1073,7 +1073,7 @@ function attentionItem() {
 /**
  * Input Hallvi asked for through its cards (a secret, where to run, DNS, how
  * to deploy) that nobody has answered. A request can outlive the work that
- * asked for it, so it is dated and quiet, never "Needs you".
+ * asked for it, so it is dated and quiet, never "Awaiting approval".
  */
 function requestsItem() {
   const inputs = (state.context?.attention ?? []).filter((entry) => entry.kind === "input");
@@ -1332,7 +1332,7 @@ async function fullOutput(step, button) {
 }
 function renderRecord(record) {
   const tone = record.retired ? "info" : record.status === "verified" ? "verified" : record.status === "failed" ? "failed" : record.status === "warning" ? "warning" : "info";
-  const word = { verified: "Verified", failed: "Failed", warning: "Needs attention", info: "Recorded" }[tone];
+  const word = { verified: "Verified", failed: "Failed", warning: "Worth a look", info: "Recorded" }[tone];
   const checks = record.checks.total ? `${record.checks.failed ? `${record.checks.failed} of ${record.checks.total} checks failed` : plural(record.checks.passed, "check passed", "checks passed")}` : null;
   return el("div", { class: "record" }, el("span", { class: `tag ${tone}` }, word), el("span", { class: "title" }, record.title), checks ? el("span", { class: "meta" }, checks) : null);
 }
@@ -1342,8 +1342,8 @@ function approvalCard(step) {
   // A question Pi wrote is prose; a command waiting under Always ask is code.
   const question = step.tool === "request_approval";
   const place = question ? "" : where(step);
-  return el("div", { class: "card waiting", role: "group", "aria-label": "Waiting for your approval" },
-    el("h4", {}, "Waiting for your approval", el("span", { class: "muted", style: "font-weight:400", "data-since": step.startedAt }, since(step.startedAt))),
+  return el("div", { class: "card waiting", role: "group", "aria-label": "Awaiting approval" },
+    el("h4", {}, "Awaiting approval", el("span", { class: "muted", style: "font-weight:400", "data-since": step.startedAt }, since(step.startedAt))),
     question ? inline(step.command || step.title, el("p")) : el("p", {}, step.title, place ? el("span", { class: "muted" }, ` · ${place}`) : null),
     !question && step.command && step.command !== step.title ? el("code", { class: "command" }, step.command) : null,
     el("p", { class: "muted" }, "Nothing runs until you decide. Approve or decline in Hallvi, where the permission mode lives."),

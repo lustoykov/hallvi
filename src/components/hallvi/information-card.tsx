@@ -75,13 +75,12 @@ function GenericInformationCard({
   const recommendation = presentation.role === "recommendation";
   const attention =
     presentation.status === "failed" || presentation.status === "warning";
+  // The tag says how it went; the kind never says who it wants.
   const kind = recommendation
     ? "Recommendation"
-    : attention
-      ? "Needs attention"
-      : presentation.role === "outcome"
-        ? "Result"
-        : "Update";
+    : presentation.role === "outcome"
+      ? "Result"
+      : "Update";
   /**
    * Retired: a later record replaced this one, so it is history.
    *
@@ -243,7 +242,7 @@ function GenericInformationCard({
   // Routine: it went well, nothing is waiting on the reader, and it is being
   // read in a transcript rather than on the destination it belongs to. A
   // conversation is mostly results that went well; at 726px each they bury
-  // the one that needs attention.
+  // the one that did not.
   const passed = presentation.checks.filter(
     (check) => check.status === "passed",
   ).length;

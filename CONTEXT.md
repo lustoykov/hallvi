@@ -56,6 +56,9 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Inspection** (*projection*): An operation that reads evidence without changing the application.
 
+**Unresolved** (*projection*, `attentionItems` in `operation-model.ts`, `overview-records.ts`): Work still open: a decision awaiting approval, or a failure the work stopped on that nothing verified has resolved since. History filters by it; Overview lists it with the checks that did not pass. Both draw it as one mark per open thing rather than naming it, and say nothing when nothing is unresolved.
+_Avoid_: Needs you, What wants you, Waiting for you, Needs attention
+
 **Unknown remote outcome**: An attempted external action whose result has not been established. A stopped controller does not establish that the external action stopped.
 
 **Observation**: A timestamped fact attributed to its source, such as a probe result, command output, metric sample or provider response.

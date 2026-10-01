@@ -1,8 +1,8 @@
 // Overview's three questions, and the one claim it cannot assemble.
 //
-// What wants you, what is true now, what happened — and the application's own
-// condition, which has to be stated by a record because a deployment event
-// speaks for none of the things it touched.
+// What is unresolved, what is true now, what happened — and the application's
+// own condition, which has to be stated by a record because a deployment
+// event speaks for none of the things it touched.
 
 import { expect, it, describe } from "vitest";
 
@@ -141,7 +141,7 @@ describe("the application's own condition, from the record that states it", () =
   });
 });
 
-describe("what wants you", () => {
+describe("what is unresolved", () => {
   it("raises a failed check, with Pi's own detail", () => {
     const failed = record({
       id: "rec-failed",

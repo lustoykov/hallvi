@@ -61,7 +61,7 @@ visual authority; this file records what changes in a narrow frame.
    segment is raised (surface, hairline ring, short shadow; in the dark it is
    lighter than its track). The Operator segment carries the operator's state
    in a word and a mark, so it stays in sight from the overview: *Working*
-   (pulse), *Needs you* (an approval), *Interrupted* and *Not confirmed*
+   (pulse), *Awaiting approval* (an approval), *Interrupted* and *Not confirmed*
    (amber), *Not running* (grey), *New reply* (blue, until the conversation is
    opened). Under 360px only the mark shows; the tab's accessible name keeps
    the word.
@@ -79,9 +79,9 @@ its time at the right edge, and **↗** to that page of Hallvi (**→** to the
 conversation). No headings, no prose: a row says one thing and links to where
 the rest is.
 
-- **Needs you** (the mascot), first and only while the operator is stopped on
+- **Operator decision** (the mascot), first and only while the operator is stopped on
   the owner, in amber with the one action that belongs to it: *Interrupted* →
-  Continue or stop in Hallvi, *Waiting for your approval* → Decide in Hallvi.
+  Continue or stop in Hallvi, *Awaiting approval* → Decide in Hallvi.
   What the operator is doing or last said is the Operator view's, and its tab
   already says so.
 - **Condition.** Hallvi's own condition, in the words of its home page, with
@@ -92,7 +92,7 @@ the rest is.
 - **Open requests** (the mascot, not amber). Input Hallvi asked for through
   its cards (a secret, where to run, DNS, how to deploy) and nobody answered,
   with when it was asked and **Review in Hallvi**. A request can outlive the
-  work that asked for it, so its presence never says "Needs you" or claims the
+  work that asked for it, so its presence never says "Awaiting approval" or claims the
   current work is blocked.
 - **Deployment** (rocket). What runs, by the Deployment page's own rule (the
   newest release a check proved), and since when; a newer failed or

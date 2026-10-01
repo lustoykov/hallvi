@@ -57,7 +57,7 @@ describe("designed conversation results", () => {
     const html = renderToStaticMarkup(
       <InformationCard record={record("outcome", "failed")} />,
     );
-    expect(html).toContain("Needs attention");
+    expect(html).toContain("Failed");
     expect(html).toContain("A useful next step");
     expect(html.match(/Connect the server and try again\./g)).toHaveLength(1);
   });

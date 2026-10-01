@@ -38,6 +38,9 @@
   text-wrap: pretty;
   animation: axj2-fade 520ms var(--ax-ease-out);
 }
+.axt-say .hv-marks {
+  margin-right: 10px;
+}
 .axt-needs {
   display: grid;
   gap: 10px;

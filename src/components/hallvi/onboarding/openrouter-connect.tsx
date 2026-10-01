@@ -185,7 +185,7 @@ export function OpenRouterConnect({
           <SpinnerGap className="spin" aria-hidden="true" />{" "}
           {login.state === "exchanging"
             ? "Finishing OpenRouter sign-in…"
-            : "Waiting for you to approve Hallvi on OpenRouter. Nothing else is happening."}
+            : "Waiting for approval on OpenRouter. Nothing else is happening."}
         </p>
         <div className="hv-ob-row">
           <Away href={login.authorizeUrl}>Open OpenRouter</Away>

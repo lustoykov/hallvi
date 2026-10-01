@@ -293,7 +293,7 @@ test(
     await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByRole("status").filter({
-        hasText: "Repository checks finished. Some need attention.",
+        hasText: "Repository checks finished. Some did not pass.",
       }),
     ).toBeVisible();
     const repositoryResult = page.getByRole("listitem").filter({

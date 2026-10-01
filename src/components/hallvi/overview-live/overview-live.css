@@ -43,6 +43,9 @@
   text-transform: uppercase;
   color: var(--muted);
 }
+.ovl-tile h2 .hv-marks {
+  margin: 3px 0 2px;
+}
 .ovl-tile h2 button,
 .ovl-ask {
   padding: 0;

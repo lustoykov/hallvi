@@ -4,8 +4,8 @@
 // The Architecture map as a thumbnail, for Overview: the same shape and the
 // same honest states, with light flowing along the way a visit takes. Quiet
 // while all is well. When something is wrong its part pings, and whatever
-// you point at under "needs you" lights up here. Clicking a part opens
-// Architecture with that part's details already open.
+// you point at among the unresolved items lights up here. Clicking a part
+// opens Architecture with that part's details already open.
 
 import { ArrowRight } from "@phosphor-icons/react";
 import { useMemo } from "react";

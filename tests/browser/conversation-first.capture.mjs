@@ -301,7 +301,7 @@ await page
 await page.getByText("Proposed change · not applied").waitFor();
 await shot("02-deployment-view-proposed");
 await page.getByRole("button", { name: /^Review and approve in/ }).click();
-await page.getByRole("group", { name: /^Waiting for you: Deploy/ }).waitFor();
+await page.getByRole("group", { name: /^Awaiting approval: Deploy/ }).waitFor();
 await shot("03-receipt-proposed");
 await page.getByLabel("SECRET_KEY").fill("not-a-real-secret");
 await page.getByRole("button", { name: "Create server and deploy" }).click();
@@ -359,11 +359,10 @@ await shot("08-logs-inspected");
 await post("fail-now");
 await nav.getByRole("button", { name: "Overview", exact: true }).click();
 await page
-  .getByText("This needs you")
+  .getByRole("img", { name: /^Unresolved/ })
   .first()
   .waitFor()
   .catch(() => {});
-await page.getByRole("region", { name: "Needs you" }).waitFor();
 await shot("09-overview-failed");
 await page.getByRole("button", { name: "Open the conversation" }).click();
 await page.getByRole("group", { name: /^Failed: Deploy/ }).waitFor();

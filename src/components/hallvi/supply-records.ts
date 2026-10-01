@@ -258,7 +258,7 @@ export function supplyFromRecords({
           ? secret.origin === "generated"
             ? "Generated and sealed on this computer; put in as the command runs"
             : "Kept sealed on this computer; put in as the command runs"
-          : "Waiting for you",
+          : "Not provided yet",
         why: secret.why,
         pending: !secret.establishedAt,
       });

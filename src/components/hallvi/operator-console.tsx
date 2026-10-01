@@ -49,7 +49,7 @@ const states: Record<
   // happen. The receipt says whose decision it was.
   declined: { tone: "absent", word: "You declined" },
   interrupted: { tone: "stale", word: "Interrupted" },
-  "awaiting-approval": { tone: "stale", word: "Waiting for you" },
+  "awaiting-approval": { tone: "stale", word: "Awaiting approval" },
   running: null,
 };
 

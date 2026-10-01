@@ -1,7 +1,7 @@
 // What Overview says. `overviewFromRecords` builds it from what Pi recorded.
-// What needs you is only what is real: a failure, an approval, a failed copy.
-// Ideas that would make it sturdier are optional and phrased as what you
-// would gain. Vital signs are the few things people check.
+// What is unresolved is only what is real: a failure, an approval, a failed
+// copy. Ideas that would make it sturdier are optional and phrased as what
+// you would gain. Vital signs are the few things people check.
 
 import type { OperationState } from "@/server/operation-record";
 

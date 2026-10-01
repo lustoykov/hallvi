@@ -78,7 +78,7 @@ describe("what a turn in flight says it is doing", () => {
         }),
       ],
     });
-    expect(said.says).toBe("Waiting for you to approve a command");
+    expect(said.says).toBe("Waiting for approval to run a command");
     expect(said.since).toBe("3m 20s");
     expect(said.waitingOnYou).toBe(true);
   });

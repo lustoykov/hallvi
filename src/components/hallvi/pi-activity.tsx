@@ -15,7 +15,7 @@
 //   mixes two, so "read the repository, then ran this on the server" is
 //   legible without opening anything.
 //
-//   What deserves the room of a card. Only a call that wants you, or one
+//   What deserves the room of a card. Only a call awaiting approval, or one
 //   whose output you could still be reading, and once earned it is kept: a
 //   card that appeared for a moment and vanished reads as a glitch, and one
 //   that collapses on finishing takes the output away mid-read.

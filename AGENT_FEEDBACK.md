@@ -28,8 +28,29 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
 | [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
 | [AF-048 — Ask the host for a taller panel inside a conversation](#af-048--ask-the-host-for-a-taller-panel-inside-a-conversation) | 1 | New |
+| [AF-050 — Keep Pi's replies from summoning the owner](#af-050--keep-pis-replies-from-summoning-the-owner) | 1 | New |
+| [AF-051 — Retire or rewrite the conversation-first capture](#af-051--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-050 — Keep Pi's replies from summoning the owner
+
+The product no longer says "Needs you", "Waiting for you" or "Needs
+attention", and `calm-labels.test.ts` keeps them out of the sources. Pi's
+instructions still end by asking for "what needs attention"
+(`src/server/pi.ts`), so a reply can still open on a "Needs attention:"
+heading the guard cannot see. Rewording it wants a live-model check.
+
+**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
+
+### AF-051 — Retire or rewrite the conversation-first capture
+
+`tests/browser/conversation-first.capture.mjs` still waits for the receipts
+retired on 20 September ("Proposed change · not applied", "Review and approve
+in…", groups named by state), so it cannot run against the current shell.
+Only its wording was updated.
+
+**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
 
 ### AF-017 — Make record validation easier for Pi to recover from
 
@@ -879,3 +900,13 @@ be authoritative, including an absent route.
 **+1:** 2026-10-01 — review of #309.
 
 **Status:** Fixed in #309 with a refresh regression check.
+
+### AF-052 — Keep selected history filters readable on hover
+
+The hover background overrode the dark selected background while the count and
+unresolved marks kept their light colors. Clicking a filter left its content
+almost invisible beneath the pointer.
+
+**+1:** 2026-10-01 — independent review of #304.
+
+**Status:** Fixed in #304 by limiting the pale hover treatment to unselected filters; verified in the scenario browser.

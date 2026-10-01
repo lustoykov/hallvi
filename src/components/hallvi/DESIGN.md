@@ -203,7 +203,7 @@ Pi decides what a view says. This decides how it is said, so a destination nobod
 
 **Five tones, five meanings.** Verified (checked, and the check is recent), stale (true once, wants looking at), failed (it did not work), unknown (recorded, not established), absent (retired, or never there). Each carries an icon as well as a tint so the state survives a colour-blind reading. A component never chooses a tone from a literal — it passes the record to `toneOf`.
 
-**Never print the enum.** `status: "info"` reads “Recorded”. `status: "warning"` reads “Needs attention”. A raw field name on screen means the design stopped early.
+**Never print the enum.** `status: "info"` reads “Recorded”. `status: "warning"` reads “Worth a look”. A raw field name on screen means the design stopped early.
 
 **One certainty per record, at the top left.** The tag, then the title, then when it was established. Never a second badge repeating the first, and never a tint without its word.
 
@@ -217,13 +217,13 @@ Pi decides what a view says. This decides how it is said, so a destination nobod
 
 **Evidence is a disclosure.** Counted, closed by default, named for what it is (“What this rests on”), never an open list of ids.
 
-**Attention first.** Views sort with `rank`: failed, then needs attention, then what is simply true, then what Pi suggests, then retired. No group headings — with two or three records they weigh more than the records do.
+**Attention first.** Views sort with `rank`: failed, then Pi's warnings, then what is simply true, then what Pi suggests, then retired. No group headings — with two or three records they weigh more than the records do.
 
 **[Empty means unassessed, never healthy.](../../../PRODUCT.md#empty-means-unassessed-never-healthy)** “Nothing has been established here yet”, and a sentence saying that is not a claim that there is nothing to find. Never an empty state that implies working backups, an absent firewall or a healthy application.
 
 **Motion is for state, not arrival.** `--fast` for the press of a control, `--base` for a state changing, nothing on page entrance. Every transition has a reduced-motion answer in the same file.
 
-**Overview is live once there is something to be live about (19 September).** A page built on a last-known state is stale between looks, so for an application with a verified deployment the largest thing on Overview is not a state: it is the proxy's access log, followed over SSH while the page is open (`overview-live/`, `src/server/access-log.ts`). Requests are drawn as threads — a lane is a bundle of hairlines fanning from the application to one group of paths, as wide as its share of the last five minutes, and a request is a short streak of light along one thread. Nothing moves unless a real line was written; a failed request runs out part way and leaves one small red ring; backlog is counted but never replayed as if it were happening now. Addresses and query strings stay on the controller. Around it sit recorded tiles, each saying when it was true: the way in, the log as it is written, the last day Hallvi read, what wants the owner, speed, what has been assessed, what happened. With no `access-log` record the tile says nobody has looked and offers to ask — never an empty picture that reads as no traffic. One light tint for the live tile, no dark surfaces. Chosen from a switchable prototype on the real route over four rounds; the options and the verdict are on the `prototype/landing-page-directions` branch.
+**Overview is live once there is something to be live about (19 September).** A page built on a last-known state is stale between looks, so for an application with a verified deployment the largest thing on Overview is not a state: it is the proxy's access log, followed over SSH while the page is open (`overview-live/`, `src/server/access-log.ts`). Requests are drawn as threads — a lane is a bundle of hairlines fanning from the application to one group of paths, as wide as its share of the last five minutes, and a request is a short streak of light along one thread. Nothing moves unless a real line was written; a failed request runs out part way and leaves one small red ring; backlog is counted but never replayed as if it were happening now. Addresses and query strings stay on the controller. Around it sit recorded tiles, each saying when it was true: the way in, the log as it is written, the last day Hallvi read, what is unresolved (only while something is; Speed widens into its place otherwise), speed, what has been assessed, what happened. With no `access-log` record the tile says nobody has looked and offers to ask — never an empty picture that reads as no traffic. One light tint for the live tile, no dark surfaces. Chosen from a switchable prototype on the real route over four rounds; the options and the verdict are on the `prototype/landing-page-directions` branch.
 
 **Before a verified deployment, Overview keeps the Timeline composition.** That route uses the reference layout: an application action in the header, a hero of four rails (Checks, Backups, Server, Access; `lane-rails.tsx`, shared with Database), a dark recorded-work log, then an architecture miniature and recent work. It reads shared records directly; the prototype scenario engine and retired operation model do not run here. Check `subject` places an observation on its lane, and `establishedAt` places it in time. A mark proves an observation at that time, never continuous uptime or a backup schedule. Missing evidence reads “Not established”. Clicking a mark opens its original record. Since 17 September the lanes are rails, not dots on a time axis: stops are evenly spaced and worded as things that happened, the quiet between them is written on the line, each lane opens with the question it answers and one plain sentence, only the stretch from the last stop to now wears the lane's state, and "Earlier" pages back through history. Kept deliberately quiet: hairline rails, small rings, colour only on that last stretch.
 
@@ -272,7 +272,7 @@ from opening the application. It makes no new claims about runtime state.
 
 Fable A is the selected experience: conversation first, inline operation receipts and quiet navigation marks, with stable full-page application views. There is no permanent right pane, split mode or floating window. Operations are shared across conversations and application views; completed evidence stays historical while application facts reflect later verified work.
 
-**Built into the shell on 9 September.** `operator-shell.tsx` renders this design against real records: `operation-receipt.tsx` (chip, steps, receipt, destination links, reference chips), `destination-activity.tsx` (activity cards and origin lines above a destination's facts), `overview-page.tsx` (condition, needs you, running, recent changes, evidence freshness) and the marks in `application-navigation.tsx`. The record they read is projected in `src/server/operation-record.ts`. `deployment-decision.tsx` and `application-overview.tsx` were the components of the day; the approval now lives in the receipt itself and Overview is a page composed from records. See the [UI reference](../../../docs/design/screens.md).
+**Built into the shell on 9 September.** `operator-shell.tsx` renders this design against real records: `operation-receipt.tsx` (chip, steps, receipt, destination links, reference chips), `destination-activity.tsx` (activity cards and origin lines above a destination's facts), `overview-page.tsx` (condition, unresolved, running, recent changes, evidence freshness) and the marks in `application-navigation.tsx`. The record they read is projected in `src/server/operation-record.ts`. `deployment-decision.tsx` and `application-overview.tsx` were the components of the day; the approval now lives in the receipt itself and Overview is a page composed from records. See the [UI reference](../../../docs/design/screens.md).
 
 ## The visual vocabulary (later on 9 September)
 
@@ -376,7 +376,7 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 ### State
 
-- **Waiting amber** (`waiting-bg`, `waiting-text`, `waiting-line`, `waiting-surface`, `amber`): anything that needs the user. The Waiting-for-you chip, the amber navigation mark, the approval card’s parent receipt, the Needs-you items on Overview, and the “Proposed change · not applied” card. Amber is the only colour a proposal is allowed to wear.
+- **Waiting amber** (`waiting-bg`, `waiting-text`, `waiting-line`, `waiting-surface`, `amber`): anything waiting on a decision, and Pi's warnings. The Awaiting approval chip, the Worth a look tag, the amber navigation mark, the approval card’s parent receipt, the waiting items under Unresolved on Overview, and the “Proposed change · not applied” card. Amber is the only colour a proposal is allowed to wear.
 - **Verified green** (`verified`, `verified-bg`, `verified-text`): the Verified chip, the evidence line, the “updated since you looked” navigation mark, the Fresh cell in the freshness table, the “Protected” protection line.
 - **Failed red** (`failed`, `failed-bg`, `failed-line`, `failed-surface`): the Failed chip, the failed step, the red navigation mark, the failed attempt in Backups, “Behind policy”, and the border of a failed receipt or activity card.
 - **Simulated** (`simulated-bg`, `simulated-line` with `waiting-text`): the banner and the small “Simulated” tag on invented data. Exploration only; the product never needs it.
@@ -410,7 +410,7 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 ### Named Rules
 
-**The Chip Speaks First Rule.** In a receipt head, an activity card head, a Needs-you item or a Recent-changes row, the state chip comes before the title. The reader learns the state before the subject.
+**The Chip Speaks First Rule.** In a receipt head, an activity card head, an Unresolved item or a Recent-changes row, the state chip comes before the title. The reader learns the state before the subject.
 
 **The Relative Time Rule.** Inside records, time is relative to now (“3 min ago”, “2 days ago”) and set in meta size at the right edge. Absolute local time appears in facts tables, never in chips.
 
@@ -432,7 +432,7 @@ A destination opened from a receipt, a mark or navigation takes the full workspa
 
 Receipts sit under the message that started the work, inside the message column, and stretch to the message width. Activity cards and origin lines sit at the top of a destination’s content, above the first heading, so the first thing a view says is what is happening to it right now.
 
-Overview is a two-column grid at desktop (Needs you beside Running, 28px by 36px gaps), then Recent changes and Evidence freshness at full width. Everything collapses to one column at 640px and below, where navigation becomes the workspace’s horizontal row as in the workspace system.
+Overview is a two-column grid at desktop (Unresolved beside Running, 28px by 36px gaps), then Recent changes and Evidence freshness at full width. Everything collapses to one column at 640px and below, where navigation becomes the workspace’s horizontal row as in the workspace system.
 
 The dark bar at the very bottom of the exploration (variant tabs, scenario stepper, clock) is exploration tooling, not part of the product language. It reserves 44px so it never overlaps the composer.
 
@@ -448,7 +448,7 @@ State is still carried by tint and one-pixel borders. A receipt, approval card o
 
 ## Shapes
 
-Three radii and a pill. Controls keep 7px and cards 8px from the workspace system. Records are softer: receipts, approval cards, activity cards and Needs-you items use 10px, so they read as objects placed in the conversation rather than as panels. Containers keep 12px.
+Three radii and a pill. Controls keep 7px and cards 8px from the workspace system. Records are softer: receipts, approval cards, activity cards and Unresolved items use 10px, so they read as objects placed in the conversation rather than as panels. Containers keep 12px.
 
 Everything that names a state or a place is a pill (999px): state chips, destination links, reference chips, suggestion chips, and the 7px navigation marks. The approval card is the one dashed border in the system: a request is not yet a fact, and the dashed line says so.
 
@@ -458,13 +458,13 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 
 - **Character:** the smallest unit of the language and the most repeated. One icon, one word, optionally one detail.
 - **Shape:** pill, 2px by 8px padding, chip typography, 12px icon before the word.
-- **Variants:** Working (spinner, working tints), Waiting for you (hourglass, waiting tints), Inspected (magnifier, inspected grey), Verified (check, verified tints), Failed (warning, failed tints).
+- **Variants:** Working (spinner, working tints), Awaiting approval (hourglass, waiting tints), Inspected (magnifier, inspected grey), Verified (check, verified tints), Failed (warning, failed tints).
 - **Detail:** “· step 2 of 5” after Working. Nothing else is allowed inside a chip.
 
 ### Receipt (retired)
 
 - **Character:** the durable trace of one action, placed under the message that started it, updating in place as the action changes state.
-- **Anatomy, top to bottom:** head (state chip, action title in 600, relative time at the right edge), one-line summary, then exactly one of: step list while Working or Failed, evidence line in verified green after Verified or Inspected, “Next:” line in waiting amber after Failed; then the approval card while Waiting for you; then destination links with a “Read” or “Changed” prefix once settled.
+- **Anatomy, top to bottom:** head (state chip, action title in 600, relative time at the right edge), one-line summary, then exactly one of: step list while Working or Failed, evidence line in verified green after Verified or Inspected, “Next:” line in waiting amber after Failed; then the approval card while Awaiting approval; then destination links with a “Read” or “Changed” prefix once settled.
 - **Shape and colour:** 10px radius, 12px by 14px padding, white surface, `line` border. Waiting tints the border amber and the surface to `waiting-surface`; Working tints the border blue; Failed tints the border red and the surface to `failed-surface`.
 - **Behaviour:** the receipt never moves and is never duplicated. A later message reports; the receipt records.
 
@@ -475,32 +475,32 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 ### Approval card
 
 - **Character:** the one place a decision is made. Dashed `field-line` border, 10px radius, `card-surface`, 12px padding.
-- **Content:** “Your approval is needed” with a Simulated tag in the exploration, a sentence on scope and cost, password fields with a label and hint each, then a primary button carrying the exact action (“Approve and apply”, “Provide token and retry”) and the sentence “Nothing changes until you approve.”
+- **Content:** “Awaiting approval” with a Simulated tag in the exploration, a sentence on scope and cost, password fields with a label and hint each, then a primary button carrying the exact action (“Approve and apply”, “Provide token and retry”) and the sentence “Nothing changes until you approve.”
 - **Placement:** inside the receipt in conversation-first. The same component can render in a view; this option does not.
 
 ### Destination links and reference chips
 
-- **Record hierarchy:** name the interaction (Recommendation, Needs attention, Result or Update) separately from the evidence grade. Give the outcome title prominence, keep evidence disclosed, and label a recorded next step without inventing an executable action. Retired records remain quiet history with obsolete calls to action removed.
+- **Record hierarchy:** name the interaction (Recommendation, Result or Update) separately from the evidence grade, which the tag carries: a failed result is a Result tagged Failed, never a record named for the attention it wants. Give the outcome title prominence, keep evidence disclosed, and label a recorded next step without inventing an executable action. Retired records remain quiet history with obsolete calls to action removed.
 - **Destination link:** pill, `line` border on white, working-blue text, 11.5px, an arrow icon after the verb and destination (“Open Backups →”). Hover tints the background `working-bg`. The verb is the option’s verb; conversation-first says “Open”.
 - **Reference chip:** the same pill with a state chip inside, the referenced action’s title in ink and “from [conversation]” in muted. It opens that conversation at that message. Used when a reply builds on work from another conversation.
 - **Text link:** the bare blue text button used for “from Database and backups” and the Backups link inside a fact.
 
 ### Activity card and origin line
 
-- **Activity card:** at the top of a destination while an action touching it is Waiting, Working or Failed. Head with state chip and a plain-language title (“Proposed change · not applied”, “Hallvi is applying a change”, “This needs you”), one sentence, step list or next step, then one link: “Review and approve in the conversation” or “Open in [conversation]”. 10px radius, 14px by 16px padding, `card-surface`, border tinted by state.
+- **Activity card:** at the top of a destination while an action touching it is Waiting, Working or Failed. Head with state chip and a plain-language title (“Proposed change · not applied”, “Hallvi is applying a change”, “The change failed”), one sentence, step list or next step, then one link: “Review and approve in the conversation” or “Open in [conversation]”. 10px radius, 14px by 16px padding, `card-surface`, border tinted by state.
 - **Origin line:** once settled, one line of meta text with the last action’s chip, its title, “from [conversation]” as a text link, and the relative time. It is a sentence, not a row.
 
 ### Navigation mark (retired)
 
 - **Style:** a 7px dot at the right edge of a navigation row, with the reason in a title and as the row's accessible description, so the row keeps its plain name.
-- **Tones:** Working (working blue, pulsing at 1.6s, still under reduced motion), Waiting for you (amber), Failed (red), Updated since you looked (verified green).
-- **Rules:** precedence is failed, then waiting for you, then working, then updated, so a new operation cannot hide an issue. A mark never opens anything; the row it sits on does. The green mark clears when the destination is looked at; the others clear when the state changes. Conversations get the same mark for their own live action.
+- **Tones:** Working (working blue, pulsing at 1.6s, still under reduced motion), Awaiting approval (amber), Failed (red), Updated since you looked (verified green).
+- **Rules:** precedence is failed, then awaiting approval, then working, then updated, so a new operation cannot hide an issue. A mark never opens anything; the row it sits on does. The green mark clears when the destination is looked at; the others clear when the state changes. Conversations get the same mark for their own live action.
 
 ### Overview blocks
 
 - **Before a recorded deployment:** lead with one stage-specific continuation based on the latest application record and stored connection settings. Missing records mean “No deployment is recorded yet”, not “Not deployed”. Hide repeated unknown vital rows. Failed or limited latest deployments take precedence over older verified records.
 - **Condition row:** status dot (green only when the last verification is under 24 hours old), application name, one line of condition with the relative verification time and “no continuous monitoring yet”. When stale, a secondary button drafts a re-verification request.
-- **Needs you:** items with a state chip, title, one sentence, and two links: review or open the conversation, and open the destination. Amber surface; red border when failed. Empty state: “Nothing needs you right now.”
+- **Unresolved:** headed by its marks rather than a word, then items with a state chip, title, one sentence, and two links: review or open the conversation, and open the destination. Amber surface; red border when failed. With nothing unresolved the block is not drawn, and no empty state stands in for it.
 - **Running:** a four-row fact list (application, host, database, protection) with a 110px label column; protection is coloured by state.
 - **Recent changes:** rows of chip, title with origin and time, and destination links beneath the title.
 - **Evidence freshness:** a three-column table; the fact is a text link to its destination, the last-checked cell shows local time and relative time, the freshness cell is Fresh (green), Stale · over 24 h (amber, 600) or No evidence (muted).
@@ -536,10 +536,31 @@ application with nothing wrong.
   watcher, Hallvi's own records not copied: each is stated once, plainly, with
   the question that would change it. An application with nothing on disk gets
   no protection line at all: there is nothing there to be unprotected.
-- **Amber means somebody is needed.** Pi's own `warning` on a record, a
-  decision waiting, a watch gone quiet, a backup that was promised and is
-  overdue. Red is a check that ran and failed. If a page shows more than one
-  or two amber marks on a healthy application, the page is wrong.
+- **Amber means something is waiting or slipping.** Pi's own `warning` on a
+  record, a decision waiting, a watch gone quiet, a backup that was promised
+  and is overdue. Red is a check that ran and failed. If a page shows more
+  than one or two amber marks on a healthy application, the page is wrong.
+- **Nothing is labelled by who it needs.** Decided 30 September 2026, when
+  the owner found "Needs you" "too attention demanding and panic inducing".
+  No label, heading, filter, chip, tile or empty state says the owner is
+  needed, wanted or waited on, or asks for attention: never "Needs you",
+  "What wants you", "Waiting for you", "Needs your approval" or "Needs
+  attention". Name the thing and its state instead: a decision is
+  **Awaiting approval**, Pi's `warning` is **Worth a look**, a failure is
+  **Failed**; the item's own title and tint carry the weight. A sentence
+  explaining a permission mode describes a policy, not a summons, and stays.
+  `tests/application/unit/calm-labels.test.ts` keeps the phrases out.
+- **What is unresolved is drawn, not named.** Where History's filter,
+  Overview's list and its headline would say how much is open, they draw
+  one mark per open thing (`UnresolvedMarks` in `presentation.tsx`): an open
+  ring for a decision awaiting approval, a filled red dot for a failure, so
+  the difference survives without colour. A screen reader hears
+  "Unresolved" and what it holds. With nothing unresolved nothing is drawn:
+  the list, its marks and the filter go, and no empty state reassures in
+  their place. Chosen the same day from a switchable prototype, over the
+  word itself, over pinning open things into What happened with no list of
+  their own, and over Little Server holding up a note; the options are on
+  the `prototype/calm-asks-visuals` branch.
 
 ### The register
 

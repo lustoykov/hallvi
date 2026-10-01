@@ -83,7 +83,7 @@ const STEP_TONE: Record<ExecutionRecord["status"], Tone> = {
 };
 
 const STEP_STATE: Record<ExecutionRecord["status"], string> = {
-  "awaiting-approval": "waiting for you",
+  "awaiting-approval": "awaiting approval",
   running: "still running",
   succeeded: "finished",
   failed: "failed",

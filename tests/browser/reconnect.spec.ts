@@ -269,11 +269,11 @@ test("Reconnect uses Main operator, keeps drafts, and exposes queue, decision an
     save();
     worker.changed({ kind: "execution", applicationId: appId });
     await expect(page.locator(".hv-reconnect-notice")).toContainText(
-      "waiting for your decision",
+      "awaiting approval",
     );
     await page.reload();
     await expect(page.locator(".hv-reconnect-notice")).toContainText(
-      "waiting for your decision",
+      "awaiting approval",
     );
     await expect(action).toBeDisabled();
     await expect(

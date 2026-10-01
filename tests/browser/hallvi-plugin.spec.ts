@@ -344,7 +344,9 @@ test("old input requests keep their date without overriding the operator's state
   await expect(
     p.frame.getByRole("tab", { name: "Operator, working" }),
   ).toBeVisible();
-  await expect(p.frame.getByText("Needs you", { exact: true })).toHaveCount(0);
+  await expect(
+    p.frame.getByText("Awaiting approval", { exact: true }),
+  ).toHaveCount(0);
   await page.screenshot({ path: "tests/results/plugin-dated-request.png" });
   await operator(p.frame);
   await expect(

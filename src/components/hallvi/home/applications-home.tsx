@@ -55,7 +55,7 @@ function situationOf(item: HomeApplication): Situation {
 const WORD: Record<Situation, string> = {
   fine: "Fine",
   working: "Working",
-  needs: "Needs attention",
+  needs: "Worth a look",
   stale: "Not checked",
   new: "New",
 };
@@ -85,7 +85,7 @@ function summary(items: HomeApplication[]) {
   const stale = count("stale");
   const fresh = count("new");
   const parts = [
-    needs && `${needs} ${needs === 1 ? "needs" : "need"} attention`,
+    needs && `${needs} worth a look`,
     working && `${working} in progress`,
     stale && `${stale} not checked yet`,
     fresh && `${fresh} new`,
