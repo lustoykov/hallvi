@@ -492,9 +492,9 @@ Development remains separate: `npm run dev` in a checkout, described in
 do not share a database by default. A checkout labels itself so the two are
 not confused on one machine: its tab title starts with "Dev" and the checkout
 name, or the retained application it is attached to, its tab icon is a green
-mascot rather than the blue one, and the strip at the top of every page says
-the same in green beside the machine's name. The installed Hallvi has none of
-these.
+mascot rather than the blue one, and the strip at the top of every page reads
+"Development checkout on" the machine's name where the installed Hallvi reads
+"Running on". The installed Hallvi has none of these.
 
 ## Limits today
 

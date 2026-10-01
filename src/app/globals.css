@@ -160,17 +160,10 @@ textarea:focus-visible {
   margin: 0;
   text-wrap: balance;
 }
-/* Which Hallvi this is, at the far end: the machine and, before it, a
-   checkout's name in the green of its tab icon. The strip is otherwise the
-   same in a checkout, and the installed Hallvi has no such name. */
-.hv-which-hallvi {
-  display: flex;
-  gap: 12px;
-  min-width: 0;
-  margin-left: auto;
-}
-.hv-development-label,
+/* Which Hallvi this is, at the far end. A checkout says so in words there, in
+   the green of its tab icon; nothing else about the strip differs. */
 .hv-host-label {
+  margin-left: auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

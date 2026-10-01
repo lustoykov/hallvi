@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import {
-  DevelopmentLabel,
-  HostLabel,
-  HostTitle,
-} from "@/components/hallvi/host-name";
+import { HostLabel, HostTitle } from "@/components/hallvi/host-name";
 import { StandInNotice } from "@/components/hallvi/stand-in-notice";
 
 import "./globals.css";
@@ -42,10 +38,7 @@ export default function RootLayout({
           <p>
             Expect frequent changes as we figure out the best user experience.
           </p>
-          <span className="hv-which-hallvi">
-            <DevelopmentLabel />
-            <HostLabel />
-          </span>
+          <HostLabel />
         </aside>
         <div className="hv-app-content">{children}</div>
         <StandInNotice />
