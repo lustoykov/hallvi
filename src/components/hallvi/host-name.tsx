@@ -61,7 +61,7 @@ function useThisHallvi() {
 
 /** The mascot from `icon.svg` with a green body: the tab of a checkout. */
 const DEVELOPMENT_ICON = `data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 36"><path d="M13 9V3.5M23 9V3.5" stroke="#0b5e3c" stroke-width="1.4"/><circle cx="13" cy="2.6" r="1.9" fill="#9fe0c0"/><circle cx="23" cy="2.6" r="1.9" fill="#9fe0c0"/><rect x="5" y="8" width="26" height="24" rx="5.5" fill="#14945f"/><rect x="7.5" y="11" width="21" height="11" rx="3.5" fill="#192338"/><rect x="13" y="14" width="2.2" height="4.4" rx="1.1" fill="#eaf8f1"/><rect x="20.8" y="14" width="2.2" height="4.4" rx="1.1" fill="#eaf8f1"/><path d="M9 32h7v2.5H9zM20 32h7v2.5h-7z" fill="#0b5e3c"/></svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 36"><path d="M13 9V3.5M23 9V3.5" stroke="#0b5e3c" stroke-width="1.4"/><circle cx="13" cy="2.6" r="1.9" fill="#9fe0c0"/><circle cx="23" cy="2.6" r="1.9" fill="#9fe0c0"/><rect x="5" y="8" width="26" height="24" rx="5.5" fill="#14945f"/><rect x="7.5" y="11" width="21" height="11" rx="3.5" fill="#101828"/><rect x="13" y="14" width="2.2" height="4.4" rx="1.1" fill="#eaf8f1"/><rect x="20.8" y="14" width="2.2" height="4.4" rx="1.1" fill="#eaf8f1"/><path d="M9 32h7v2.5H9zM20 32h7v2.5h-7z" fill="#0b5e3c"/></svg>`,
 )}`;
 
 /**

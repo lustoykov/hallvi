@@ -33,7 +33,8 @@ await build({
 });
 await cp("plugins/hallvi/panel.html", `${root}/panel.html`);
 await cp("plugins/hallvi/skills", `${root}/skills`, { recursive: true });
-const icon = await readFile("docs/assets/hallvi-mascot.svg", "utf8");
+// The small mascot of the browser tab, which still reads at an icon's size.
+const icon = await readFile("src/app/icon.svg", "utf8");
 await writeFile(
   `${root}/icon.svg`,
   icon.replace(

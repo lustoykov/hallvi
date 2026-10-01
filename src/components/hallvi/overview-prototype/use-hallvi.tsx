@@ -4,7 +4,6 @@
 // Little Server's behaviour on Overview: what he says, how he feels and when
 // he points. The Timeline stages him.
 
-import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -13,20 +12,12 @@ import {
   type RefObject,
 } from "react";
 
-import type { MascotMood } from "../home/mascot-scene";
+import { Mascot as LittleServer, type MascotMood } from "../mascot";
 import type {
   ArchitectureModel,
   LogLine,
 } from "../architecture-prototype/model";
-import {
-  reducedMotion,
-  useReducedMotion,
-} from "../architecture-prototype/motion";
-
-const LittleServer = dynamic(
-  () => import("../home/mascot-scene").then((module) => module.MascotScene),
-  { ssr: false },
-);
+import { reducedMotion } from "../architecture-prototype/motion";
 
 export interface Hallvi {
   mood: MascotMood;
@@ -37,13 +28,11 @@ export interface Hallvi {
   point: (text?: string) => void;
   /** Recorded work. */
   lines: LogLine[];
-  reduced: boolean;
 }
 
 export function useHallvi(
   model: ArchitectureModel,
 ): [Hallvi, RefObject<HTMLDivElement | null>] {
-  const reduced = useReducedMotion();
   const [mood, setMood] = useState<MascotMood | null>(null);
   const [gesture, setGesture] = useState(0);
   const [bubble, setBubble] = useState<string | null>(null);
@@ -131,7 +120,6 @@ export function useHallvi(
     },
     point,
     lines: model.log,
-    reduced,
   };
   return [guy, mascot];
 }
@@ -161,12 +149,7 @@ export function Mascot({
       tabIndex={0}
       aria-label="Little Server. Say hello."
     >
-      <LittleServer
-        color={3}
-        mood={guy.mood}
-        gesture={guy.gesture}
-        paused={guy.reduced}
-      />
+      <LittleServer mood={guy.mood} gesture={guy.gesture} />
       {guy.bubble && (
         <div className="axj2-bubble" key={guy.bubble}>
           {guy.bubble}
