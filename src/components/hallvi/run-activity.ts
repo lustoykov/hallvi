@@ -132,7 +132,7 @@ export function runActivity(input: {
   if (asking) {
     const seconds = secondsSince(asking.createdAt, now);
     return {
-      says: "Waiting for you to approve a command",
+      says: "Waiting for approval to run a command",
       since: seconds === null ? null : spell(seconds),
       waitingOnYou: true,
     };

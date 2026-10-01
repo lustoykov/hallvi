@@ -46,17 +46,21 @@ export async function copyRepositoryToServer(
     .min(1)
     .max(255)
     .parse(ref ?? metadata.default_branch);
-  const commit = (
-    await githubJson(
-      `/repos/${repository}/commits/${encodeURIComponent(revision)}`,
-      token,
-      { signal },
-    )
-  ).data as { sha: string };
-  const sha = z
-    .string()
-    .regex(/^[0-9a-f]{40}$/)
-    .parse(commit.sha);
+  const commit = z
+    .object({
+      sha: z.string().regex(/^[0-9a-f]{40}$/),
+      commit: z.object({ committer: z.object({ date: z.iso.datetime() }) }),
+    })
+    .parse(
+      (
+        await githubJson(
+          `/repos/${repository}/commits/${encodeURIComponent(revision)}`,
+          token,
+          { signal },
+        )
+      ).data,
+    );
+  const sha = commit.sha;
   const gzip = await githubArchive(repository, sha, token, {
     signal,
     maxBytes: ARCHIVE_LIMITS.gzipBytes,
@@ -73,7 +77,14 @@ export async function copyRepositoryToServer(
   const files = entries.filter((entry) => entry.type === "file");
   if (!files.length)
     throw new Error("The repository archive contains no files to deploy.");
-  const archive = treeArchive(files);
+  // Every file carries the commit's committer time, not 1970: web servers
+  // derive Last-Modified and ETag (mtime-size) from it, so a same-size edit
+  // must still change them in the next release. It is the same for every copy
+  // of one commit, so a redeploy or a second server serves the same ETags.
+  const archive = treeArchive(
+    files,
+    Math.floor(Date.parse(commit.commit.committer.date) / 1000),
+  );
   const digest = createHash("sha256").update(archive).digest("hex");
   if (currentGithubConnectionId() !== (connection?.id ?? null))
     throw new Error(

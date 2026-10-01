@@ -30,6 +30,7 @@ import {
   LOG_FORMATS,
   OTHER,
   STORED_PER_LIST,
+  TRAFFIC_LISTS,
   type Collection,
   type Coverage,
   type Gap,
@@ -46,7 +47,13 @@ import {
   type LogFile,
   type Span,
 } from "./sources";
-import { collectionOf, readDays, recordCollector, writeDay } from "./store";
+import {
+  collectionOf,
+  keepByDefault,
+  readDays,
+  recordCollector,
+  writeDay,
+} from "./store";
 
 type Host = NonNullable<Awaited<ReturnType<typeof operatorSettings>>["host"]>;
 
@@ -55,8 +62,15 @@ export const TICK_MS = 2_000;
 /** Today is written this often while lines arrive, and at least each minute. */
 const WRITE_MS = 5_000;
 const IDLE_WRITE_MS = 60_000;
-/** The backlog is read once the follow has been quiet this long. */
+/**
+ * The backlog is read once the follow has sent nothing for this long. A file
+ * log says where its backlog ends, so it waits for that; only a stall that
+ * long without it — the file cut short under the follow — counts instead.
+ */
 const QUIET_MS = 1_500;
+const STALLED_MS = 30_000;
+/** How often the words of a catch-up are written. */
+const PROGRESS_MS = 2_000;
 /** A start recounts at most this many finished days. */
 const REACH_DAYS = 31;
 /**
@@ -201,8 +215,12 @@ function followedCoverage(
  * browsers have been served pages with no event, cleared once one arrives.
  * Answers whether the switch point moved earlier.
  */
-function noteScript(applicationId: string, counter: DayCounter, live: boolean) {
-  const recorded = collectionOf(applicationId);
+async function noteScript(
+  applicationId: string,
+  counter: Pick<DayCounter, "switchAt" | "lastEventAt" | "silentSince">,
+  live: boolean,
+) {
+  const recorded = await collectionOf(applicationId);
   const seen: Partial<Collection> = {};
   const since = recorded.scriptSince ? Date.parse(recorded.scriptSince) : null;
   const moved =
@@ -221,7 +239,7 @@ function noteScript(applicationId: string, counter: DayCounter, live: boolean) {
     else if (silent === null && counter.silentSince !== null)
       seen.scriptSilentSince = iso(counter.silentSince);
   }
-  if (Object.keys(seen).length) recordCollector(applicationId, seen);
+  if (Object.keys(seen).length) await recordCollector(applicationId, seen);
   return moved;
 }
 
@@ -346,7 +364,7 @@ function largerList(a: Ranked[], b: Ranked[]) {
  *   hourly — visitors, lists, time on page, page speed — cannot be split by
  *   hour, so each is the larger of the two counts, per entry. Each count saw
  *   only part of the day, so that is a floor, never a sum: a browser seen by
- *   both would be counted twice by adding.
+ *   both would be counted twice by adding. The day says so in `partial`.
  */
 export function combined(
   stored: TrafficDay,
@@ -380,18 +398,6 @@ export function combined(
       ? { day: recount, spans: a, from, to }
       : { day: stored, spans: b, from, to };
   });
-  const lists = [
-    "pages",
-    "sources",
-    "campaigns",
-    "countries",
-    "devices",
-    "browsers",
-    "systems",
-    "errors",
-    "goals",
-    "bots",
-  ] as const;
   return {
     ...recount,
     computedAt: now,
@@ -402,7 +408,10 @@ export function combined(
     visitors: Math.max(stored.visitors, recount.visitors),
     errorVisitors: Math.max(stored.errorVisitors, recount.errorVisitors),
     ...Object.fromEntries(
-      lists.map((list) => [list, largerList(stored[list], recount[list])]),
+      TRAFFIC_LISTS.map((list) => [
+        list,
+        largerList(stored[list], recount[list]),
+      ]),
     ),
     browserOnlyPages: Math.max(
       stored.browserOnlyPages,
@@ -426,15 +435,23 @@ export function combined(
       (entry) => entry.path,
       (entry) => entry.count,
     ),
+    // Each of those saw part of the day: say so, wherever they are read.
+    partial: [
+      "visitors",
+      ...TRAFFIC_LISTS,
+      "engagement",
+      "vitals",
+      "scriptErrors",
+    ],
   };
 }
 
 /** Whether a finished day should be counted again from the log. */
-function due(applicationId: string, day: string, timeZone: string) {
-  const stored = readDays(applicationId, day, day)[0];
+async function due(applicationId: string, day: string, timeZone: string) {
+  const stored = (await readDays(applicationId, day, day))[0];
   if (!stored || !stored.final) return true;
   if (stored.coverage.gaps.some((gap) => gap.why === "unreadable")) return true;
-  const since = collectionOf(applicationId).scriptSince;
+  const since = (await collectionOf(applicationId)).scriptSince;
   return (
     stored.viewSource === "log" &&
     since !== null &&
@@ -446,7 +463,7 @@ function due(applicationId: string, day: string, timeZone: string) {
 async function finishDay(target: Target, day: string) {
   const { applicationId, host, log, timeZone, signal } = target;
   const bounds = dayBounds(day, timeZone);
-  const collection = collectionOf(applicationId);
+  const collection = await collectionOf(applicationId);
   if (!collection.enabledAt) return false;
   const counter = new DayCounter({
     day,
@@ -454,6 +471,7 @@ async function finishDay(target: Target, day: string) {
     scriptSince: collection.scriptSince,
     hosts: log.hosts,
     pageKey: log.pageKey,
+    hashRouting: log.hashRouting,
     coverage: { from: null, to: null, gaps: [] },
   });
   const read = await readLog(
@@ -474,8 +492,8 @@ async function finishDay(target: Target, day: string) {
   const recount = counter.day({ coverage });
   // What was counted while the log still held it is kept where the log no
   // longer answers for it.
-  const stored = readDays(applicationId, day, day)[0];
-  writeDay(applicationId, {
+  const stored = (await readDays(applicationId, day, day))[0];
+  await writeDay(applicationId, {
     ...(stored ? combined(stored, recount, bounds) : recount),
     final: true,
   });
@@ -499,10 +517,19 @@ async function finishDays(target: Target, oldest: number | null) {
   for (; day < today; day = addDays(day, 1)) {
     target.signal.throwIfAborted();
     if (now < dayBounds(day, timeZone).end + FINAL_AFTER_MS) break;
-    if (due(applicationId, day, timeZone))
+    if (await due(applicationId, day, timeZone))
       moved = (await finishDay(target, day)) || moved;
   }
   return moved;
+}
+
+/** The oldest line the log holds now, recorded; null for an empty log. */
+async function reach({ applicationId, host, log, signal }: Target) {
+  const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
+  await recordCollector(applicationId, {
+    oldestRetainedAt: oldest === null ? null : iso(oldest),
+  });
+  return oldest;
 }
 
 /** When the next day can be finished: ten minutes after its midnight. */
@@ -528,25 +555,26 @@ interface Open {
  * again from the log and follow it until the connection ends. Answers why it
  * ended, and whether it had been following.
  */
-async function connection(target: Target, first: boolean) {
+async function connection(target: Target, announce: boolean) {
   const { applicationId, host, log, timeZone } = target;
   const inner = new AbortController();
   const signal = AbortSignal.any([target.signal, inner.signal]);
   const scope = { ...target, signal };
 
-  const oldest = (await listLog(host, log, signal))[0]?.from ?? null;
-  recordCollector(applicationId, {
-    oldestRetainedAt: oldest === null ? null : iso(oldest),
-    ...(first ? { state: "catching-up" as const, detail: null } : {}),
-  });
-  await finishDays(scope, oldest);
+  if (announce)
+    await recordCollector(applicationId, {
+      state: "catching-up",
+      detail: null,
+    });
+  await finishDays(scope, await reach(scope));
   signal.throwIfAborted();
   // Listed again for the follow, which reads exactly these files and stops
   // if a rotation moved one since: today's coverage is this listing's.
   const files = await listLog(host, log, signal);
   const unreadable = new Set<string>();
 
-  const collection = collectionOf(applicationId);
+  const collection = await collectionOf(applicationId);
+  signal.throwIfAborted();
   const enabledAt = collection.enabledAt
     ? Date.parse(collection.enabledAt)
     : null;
@@ -556,9 +584,15 @@ async function connection(target: Target, first: boolean) {
     const counter = new DayCounter({
       day,
       timeZone,
-      scriptSince: collectionOf(applicationId).scriptSince,
+      // Carry a switch point learned by the running follow into the next
+      // day without a synchronous database read from the log callback.
+      scriptSince:
+        days.at(-1)?.counter.switchAt != null
+          ? iso(days.at(-1)!.counter.switchAt!)
+          : collection.scriptSince,
       hosts: log.hosts,
       pageKey: log.pageKey,
+      hashRouting: log.hashRouting,
       coverage: { from: null, to: null, gaps: [] },
     });
     const entry: Open = {
@@ -588,35 +622,60 @@ async function connection(target: Target, first: boolean) {
   let dirty = false;
   let writtenAt = 0;
   let lastLine: number | null = null;
-  let finishing = false;
+  let finishing: Promise<void> | null = null;
   let finishAt = nextFinish(timeZone);
   let rebuild = false;
+  // How far the backlog has been read, and what was last said about it.
+  let backlog: { file: string; read: number; total: number | null } | null =
+    null;
+  let backlogDone = false;
+  let said: string | null = null;
+  let saidAt = 0;
 
+  // Log callbacks are synchronous. Queue their snapshots, then drain them
+  // before the follow ends; an asynchronous storage failure ends this follow.
+  let writing = Promise.resolve();
+  let writeError: unknown;
+  const saveLater = (save: () => Promise<unknown>) => {
+    writing = writing
+      .then(() => (writeError ? undefined : save()))
+      .then(() => undefined)
+      .catch((error) => {
+        writeError = error;
+        inner.abort();
+      });
+  };
   const write = (aliveTo: number) => {
     const now = Date.now();
-    for (const entry of days) {
+    const totals = days.flatMap((entry) => {
       const to = Math.min(entry.end, aliveTo);
-      if (!(to > entry.start)) continue;
-      // Provisional, even past the day's close: only the recount from the
-      // files may make a day final, and a final day is not recounted.
-      writeDay(applicationId, {
-        ...entry.counter.day({ now, coverage: entry.coverage(to) }),
-        final: false,
-      });
-    }
-    // The day being written now; the next one may be open a few minutes
-    // early, with nothing of its own yet.
+      if (!(to > entry.start)) return [];
+      // Only a recount from the files may make a day final.
+      return [
+        {
+          ...entry.counter.day({ now, coverage: entry.coverage(to) }),
+          final: false,
+        },
+      ];
+    });
     const newest = (
       days.findLast((entry) => entry.start <= now) ?? days.at(-1)!
     ).counter;
+    const script = {
+      switchAt: newest.switchAt,
+      silentSince: newest.silentSince,
+      lastEventAt: newest.lastEventAt,
+    };
     const seen = Math.max(
       ...days.map((entry) => entry.counter.lastLineAt ?? 0),
     );
-    if (seen > (lastLine ?? 0)) {
-      lastLine = seen;
-      recordCollector(applicationId, { lastLineAt: iso(seen) });
-    }
-    noteScript(applicationId, newest, true);
+    const line = seen > (lastLine ?? 0) ? iso(seen) : null;
+    if (line) lastLine = seen;
+    saveLater(async () => {
+      for (const day of totals) await writeDay(applicationId, day);
+      if (line) await recordCollector(applicationId, { lastLineAt: line });
+      await noteScript(applicationId, script, true);
+    });
     writtenAt = now;
     dirty = false;
   };
@@ -625,13 +684,29 @@ async function connection(target: Target, first: boolean) {
     if (live) return;
     live = true;
     write(Date.now());
-    recordCollector(applicationId, { state: "live", detail: null });
+    saveLater(() =>
+      recordCollector(applicationId, { state: "live", detail: null }),
+    );
   };
 
   const timer = setInterval(() => {
     const now = Date.now();
     if (!live) {
-      if (readyAt !== null && now - heardAt >= QUIET_MS) caughtUp();
+      if (readyAt === null) return;
+      const quiet =
+        log.source.type === "file" && !backlogDone ? STALLED_MS : QUIET_MS;
+      if (now - heardAt >= quiet) return caughtUp();
+      // What is being read, every few seconds, for the page to say.
+      const words = backlog
+        ? backlog.total
+          ? `${Math.min(99, Math.floor((backlog.read / backlog.total) * 100))}% of ${backlog.file}`
+          : backlog.file
+        : null;
+      if (words !== said && now - saidAt >= PROGRESS_MS) {
+        said = words;
+        saidAt = now;
+        saveLater(() => recordCollector(applicationId, { detail: words }));
+      }
       return;
     }
     // Past midnight the follow carries on into the next day.
@@ -644,13 +719,16 @@ async function connection(target: Target, first: boolean) {
       write(now);
     // Ten minutes after midnight the day before is counted from the files.
     if (!finishing && now >= finishAt) {
-      finishing = true;
       for (let index = days.length - 1; index >= 0; index--)
         if (now >= days[index].end + FINAL_AFTER_MS) days.splice(index, 1);
-      finishDays(scope, oldest)
-        .then((moved) => {
+      let retry = false;
+      // Listed again first: a log that was empty when the follow began has
+      // lines now, and rotation has moved its oldest on since.
+      finishing = reach(scope)
+        .then((oldest) => finishDays(scope, oldest))
+        .then(async (moved) => {
           const counting = days.at(-1)!.counter.switchAt;
-          const since = collectionOf(applicationId).scriptSince;
+          const since = (await collectionOf(applicationId)).scriptSince;
           // An earlier switch point changes how today counts: count it again.
           if (
             moved &&
@@ -661,10 +739,14 @@ async function connection(target: Target, first: boolean) {
             inner.abort();
           }
         })
-        .catch(() => {})
+        // A listing or a read that failed is tried again in a minute, not
+        // at the next midnight.
+        .catch(() => {
+          retry = true;
+        })
         .finally(() => {
-          finishing = false;
-          finishAt = nextFinish(timeZone);
+          finishing = null;
+          finishAt = retry ? Date.now() + 60_000 : nextFinish(timeZone);
         });
     }
   }, 500);
@@ -677,7 +759,6 @@ async function connection(target: Target, first: boolean) {
       today.start - LOOKBACK_MS,
       {
         line: (line) => {
-          heardAt = Date.now();
           dirty = true;
           const entry = days.at(-1)!;
           // The next day opens a few minutes early, to read what the log
@@ -692,6 +773,21 @@ async function connection(target: Target, first: boolean) {
         ready: () => {
           readyAt = Date.now();
           heardAt = readyAt;
+          // Connected, and counting today again before it is live.
+          saveLater(() =>
+            recordCollector(applicationId, {
+              state: "catching-up",
+              detail: null,
+            }),
+          );
+        },
+        heard: () => (heardAt = Date.now()),
+        backlog: (at) => {
+          backlog = at;
+          if (at.done && !backlogDone) {
+            backlogDone = true;
+            caughtUp();
+          }
         },
         unreadable: (name) => unreadable.add(name),
       },
@@ -722,27 +818,33 @@ async function connection(target: Target, first: boolean) {
     };
   } finally {
     clearInterval(timer);
+    await finishing;
+    await writing;
+    if (writeError) throw writeError;
   }
 }
 
 /** Collection for one application, reconnecting until it is stopped. */
 async function collect(target: Target) {
   const { applicationId, log, signal } = target;
-  recordCollector(applicationId, {
-    source: { proxy: log.proxy, format: log.format },
+  await recordCollector(applicationId, {
+    source: sourceOf(log),
   });
   let failures = 0;
   let moves = 0;
-  let first = true;
+  // Said at the first start and at a start-over; after a failure the state
+  // stays lost until the follow is connected again.
+  let announce = true;
   while (!signal.aborted) {
     const began = Date.now();
     let detail: string;
     try {
-      const ended = await connection(target, first);
+      const ended = await connection(target, announce);
       if (signal.aborted) return;
       // Started over at once; a log that rotates under every start in a row
       // waits like any failure.
       moves = ended.moved ? moves + 1 : 0;
+      announce = true;
       if (ended.rebuild && moves <= 3) continue;
       detail = ended.detail;
       if (ended.live && Date.now() - began >= STEADY_MS) failures = 0;
@@ -753,8 +855,8 @@ async function collect(target: Target) {
           ? error.message.slice(0, 300)
           : "The log could not be read.";
     }
-    first = false;
-    recordCollector(applicationId, { state: "lost", detail });
+    announce = false;
+    await recordCollector(applicationId, { state: "lost", detail });
     await delay(BACKOFF_MS[Math.min(failures, BACKOFF_MS.length - 1)], null, {
       signal,
     }).catch(() => undefined);
@@ -764,6 +866,19 @@ async function collect(target: Target) {
 
 // ---------------------------------------------------------------------------
 // Every application
+
+/**
+ * What wrote the log, as the record says. Traefik cannot rewrite its log,
+ * so that it keeps queries is known from the format alone; anything else is
+ * what the record claims, or unknown.
+ */
+function sourceOf(log: AccessLogRecord): Collection["source"] {
+  return {
+    proxy: log.proxy,
+    format: log.format,
+    queries: log.queries ?? (log.format === "traefik-json" ? "kept" : null),
+  };
+}
 
 /** Why history cannot be read, in the words the Traffic page shows. */
 function blocked(
@@ -792,11 +907,19 @@ export function trafficCollector(signal: AbortSignal) {
   };
 
   async function care(applicationId: string) {
-    const collection = collectionOf(applicationId);
+    let collection = await collectionOf(applicationId);
+    // On by default once there is a log to read, unless the owner chose.
+    if (
+      !collection.enabledAt &&
+      !collection.disabledAt &&
+      (await accessLogRecord(applicationId)) &&
+      (await keepByDefault(applicationId))
+    )
+      collection = await collectionOf(applicationId);
     if (!collection.enabledAt) return stop(applicationId);
     const host = (await operatorSettings(applicationId)).host ?? null;
     const log = host ? await accessLogRecord(applicationId) : null;
-    if (signal.aborted || !collectionOf(applicationId).enabledAt)
+    if (signal.aborted || !(await collectionOf(applicationId)).enabledAt)
       return stop(applicationId);
     const reason = blocked(host, log);
     if (reason || !host || !log) {
@@ -806,9 +929,9 @@ export function trafficCollector(signal: AbortSignal) {
         (collection.state !== reason.state ||
           collection.detail !== reason.detail)
       )
-        recordCollector(applicationId, {
+        await recordCollector(applicationId, {
           ...reason,
-          source: log ? { proxy: log.proxy, format: log.format } : null,
+          source: log ? sourceOf(log) : null,
         });
       return;
     }

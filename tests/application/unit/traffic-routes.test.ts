@@ -24,7 +24,10 @@ import type {
   ReleaseImpact,
   TrafficHistory,
 } from "../../../src/server/traffic/contract";
-import { trafficDatabasePath } from "../../../src/server/traffic/store";
+import {
+  closeTrafficDatabase,
+  trafficDatabasePath,
+} from "../../../src/server/traffic/store";
 
 let root: string;
 const context = { params: Promise.resolve({ applicationId: "notes" }) };
@@ -38,7 +41,8 @@ beforeAll(() => {
   vi.stubEnv("HALLVI_DB_PATH", join(root, "hallvi.db"));
 });
 
-afterAll(() => {
+afterAll(async () => {
+  await closeTrafficDatabase();
   rmSync(root, { recursive: true, force: true });
   vi.unstubAllEnvs();
 });

@@ -35,7 +35,7 @@ backups, server and access. The stretch since anything looked is drawn and
 named ("No check for 26 h"). Little Server stands at now; a re-check lands on
 the lanes and streams into his log, which sits open underneath. A line in
 the log lights its moment on the lanes, and a moment lights its lines. What
-needs you is only ever real and comes first. The map in miniature pings a
+is unresolved is only ever real and comes first. The map in miniature pings a
 failing part and opens Architecture with that part's details open.
 
 The log's label, "What I did last", reads like an agent at work, after Claude
@@ -43,8 +43,8 @@ Code's spinner and the ultracode shimmer. At rest it is a quiet slate star.
 While a check runs, the star steps through its rays, a cool light crosses the
 words and the seconds count. After a pass, or with news since your last
 visit, it answers once. Little Server points at it rarely: once to introduce
-the log, then at most weekly and only for news; never during a check or when
-something needs you, and with reduced motion he only says it. To review it,
+the log, then at most weekly and only for news; never during a check or while
+something is unresolved, and with reduced motion he only says it. To review it,
 `&looked=never` replays the introduction and `&looked=20h` pretends you were
 away for 20 hours.
 

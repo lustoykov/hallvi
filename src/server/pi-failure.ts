@@ -4,7 +4,7 @@ import { redactSecrets } from "./secrets";
 
 export interface NativeFailure {
   source: "model" | "runtime";
-  category: "authentication" | "rate-limit" | "network" | "unknown";
+  category: "authentication" | "credit" | "rate-limit" | "network" | "unknown";
   reason: string | null;
 }
 
@@ -43,11 +43,16 @@ export function nativeFailure(
     source,
     category: /\b(401|403)\b|unauthori|invalid_grant|forbidden/i.test(redacted)
       ? "authentication"
-      : /\b429\b|rate.?limit|usage.?limit|quota/i.test(redacted)
-        ? "rate-limit"
-        : /network|fetch failed|ECONN|ETIMEDOUT|ENOTFOUND/i.test(redacted)
-          ? "network"
-          : "unknown",
+      : // OpenRouter's answer when the balance or the key's limit is spent.
+        /\b402\b|payment required|insufficient credits|more credits/i.test(
+            redacted,
+          )
+        ? "credit"
+        : /\b429\b|rate.?limit|usage.?limit|quota/i.test(redacted)
+          ? "rate-limit"
+          : /network|fetch failed|ECONN|ETIMEDOUT|ENOTFOUND/i.test(redacted)
+            ? "network"
+            : "unknown",
     reason,
   };
 }
@@ -60,10 +65,12 @@ export function failureText(failure: NativeFailure) {
   const next =
     failure.category === "authentication"
       ? "Open Settings and reconnect."
-      : failure.category === "rate-limit"
-        ? "Check the account allowance, then retry."
-        : failure.category === "network"
-          ? "Check your connection and retry."
-          : "Try again, or inspect the conversation if this repeats.";
+      : failure.category === "credit"
+        ? "Add credit on openrouter.ai, or raise the key’s limit there, then retry."
+        : failure.category === "rate-limit"
+          ? "Check the account allowance, then retry."
+          : failure.category === "network"
+            ? "Check your connection and retry."
+            : "Try again, or inspect the conversation if this repeats.";
   return `${reason} ${next} Check execution history for any effects.`;
 }

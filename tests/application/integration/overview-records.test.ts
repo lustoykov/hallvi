@@ -1,8 +1,8 @@
 // Overview's three questions, and the one claim it cannot assemble.
 //
-// What wants you, what is true now, what happened — and the application's own
-// condition, which has to be stated by a record because a deployment event
-// speaks for none of the things it touched.
+// What is unresolved, what is true now, what happened — and the application's
+// own condition, which has to be stated by a record because a deployment
+// event speaks for none of the things it touched.
 
 import { expect, it, describe } from "vitest";
 
@@ -12,6 +12,7 @@ import {
   overviewFromRecords,
 } from "@/components/hallvi/overview-records";
 import { lane } from "@/server/record-projection";
+import { timelineFromRecords } from "@/components/hallvi/overview-timeline-records";
 
 const APP = "11111111-2222-4333-8444-555555555555";
 const application: Ref = { kind: "application", id: APP };
@@ -23,6 +24,7 @@ function record(input: {
   id: string;
   at?: string | null;
   title?: string;
+  about?: Ref[];
   states?: NonNullable<SavedInformation["presentation"]>["states"];
   status?: "info" | "verified" | "failed" | "warning";
   role?: "recommendation" | "status" | "outcome";
@@ -38,6 +40,7 @@ function record(input: {
     evidence: [],
     establishedAt: input.at === undefined ? AT : input.at,
     presentation: {
+      about: input.about,
       states: input.states,
       views: ["overview"],
       role: input.role ?? "outcome",
@@ -138,7 +141,7 @@ describe("the application's own condition, from the record that states it", () =
   });
 });
 
-describe("what wants you", () => {
+describe("what is unresolved", () => {
   it("raises a failed check, with Pi's own detail", () => {
     const failed = record({
       id: "rec-failed",
@@ -202,6 +205,87 @@ describe("what wants you", () => {
 });
 
 describe("what is true now", () => {
+  it("keeps a failed deployment's passing host checks separate from its app failure", () => {
+    // The alpha rehearsal wrote a failed deployment event with a passing
+    // neighbor-preservation check. The host's own SSH and Docker checks also
+    // passed: all three timeline checks passed while the Server answer said No.
+    const host: Ref = { kind: "host", id: "rehearsal-host" };
+    const server = record({
+      id: "rec-host",
+      role: "status",
+      states: { ref: host, presence: "present" },
+      checks: [
+        { ...httpCheck, key: "ssh", label: "SSH access", about: host },
+        {
+          ...httpCheck,
+          key: "docker",
+          label: "Docker and Compose available",
+          claim: "configuration",
+          about: host,
+        },
+      ],
+    });
+    const deployment = record({
+      id: "rec-deploy",
+      at: "2026-09-12T16:10:00.000Z",
+      about: [application, host],
+      role: "outcome",
+      status: "failed",
+      checks: [
+        {
+          ...httpCheck,
+          key: "smoke",
+          label: "Filtered todo lists fail smoke checks",
+          status: "failed",
+          claim: "contents",
+          about: application,
+        },
+        {
+          ...httpCheck,
+          key: "neighbors",
+          label: "Seven neighbor containers remained unchanged",
+          claim: "configuration",
+          about: host,
+        },
+      ],
+    });
+    const records = [deployment, server];
+    const built = overview(records, TEN_MINUTES_ON);
+    expect(built.vitals.find((v) => v.id === "checks")?.status.certainty).toBe(
+      "failed",
+    );
+    expect(built.vitals.find((v) => v.id === "server")?.status.certainty).toBe(
+      "verified",
+    );
+    const timeline = timelineFromRecords({ records, now: TEN_MINUTES_ON });
+    expect(timeline.lanes.find((l) => l.id === "server")?.events).toMatchObject(
+      [{ tone: "pass", title: "3 checks", lines: [{}, {}, {}] }],
+    );
+
+    // A real host check failure still overrides the passes, including when
+    // it comes from that mixed-subject deployment event rather than a status.
+    const failedHost: SavedInformation = {
+      ...deployment,
+      presentation: {
+        ...deployment.presentation!,
+        checks: deployment.presentation!.checks.map((check) =>
+          check.key === "neighbors" ? { ...check, status: "failed" } : check,
+        ),
+      },
+    };
+    expect(
+      overview([failedHost, server], TEN_MINUTES_ON).vitals.find(
+        (v) => v.id === "server",
+      )?.status.certainty,
+    ).toBe("failed");
+    expect(
+      timelineFromRecords({
+        records: [failedHost, server],
+        now: TEN_MINUTES_ON,
+      }).lanes.find((l) => l.id === "server")?.events[0].tone,
+    ).toBe("fail");
+  });
+
   it("puts a volume's check with the application, never with Backups", () => {
     const volume = record({
       id: "rec-volume",

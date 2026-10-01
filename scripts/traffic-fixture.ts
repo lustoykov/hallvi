@@ -6,7 +6,7 @@
 //     [--releases 2026-09-20T10:00:00Z,…] [--host example.test]
 //     [--end <iso>] [--name access.log]
 //   node --import tsx scripts/traffic-fixture.ts live --url https://example.test
-//     --shape spa --rate 20 [--minutes 10] [--seed 7]
+//     --shape spa --rate 20 [--minutes 10] [--seed 7] [--report 30]
 //   node --import tsx scripts/traffic-fixture.ts verify --format caddy-json
 //     [--time-zone Europe/Sofia] <files…>
 //   node --import tsx scripts/traffic-fixture.ts ranges [<dbip-country.mmdb>]
@@ -108,10 +108,11 @@ const HELP = `Realistic traffic through the real pipeline, and an independent co
       and never overwrites a file. The same arguments write the same bytes.
 
   live --url <base> --shape <shape> --rate <visits a minute>
-       [--minutes <n>] [--seed <n>]
+       [--minutes <n>] [--seed <n>] [--report <seconds, default 30>]
       Sends real requests with browsers' headers, bots and, for spa, script
       events, until --minutes pass or Ctrl-C. Every request comes from this
       machine's one address, so the visitor estimate counts user agents.
+      The Traffic page's development-only simulator runs this too.
 
   verify --format <format> [--time-zone <IANA zone>] <files…>
       Counts the files per day (default: this machine's time zone) and
@@ -2339,7 +2340,10 @@ function caddyLine(plan: Plan, hit: Hit) {
     if (hit.size && hit.status !== 304)
       answer["Content-Length"] = [String(hit.size)];
   }
-  for (const [name, value] of hit.answer) answer[name] = [value];
+  // Pi's filter cuts a redirect's Location at ? as well: a login redirect's
+  // ?next= carries the asked-for address, query string and all.
+  for (const [name, value] of hit.answer)
+    answer[name] = [name === "Location" ? value.replace(/\?.*$/, "") : value];
   const kept = keptOf(hit.query);
   const alpn =
     hit.proto === "HTTP/3.0"
@@ -2873,6 +2877,8 @@ async function live(flags: Record<string, string>) {
   if (!(rate > 0 && rate <= 600))
     fail("Give --rate, visits a minute, up to 600.");
   const minutes = flags.minutes ? Number(flags.minutes) : Infinity;
+  const every = flags.report ? Number(flags.report) : 30;
+  if (!(every >= 1)) fail("Give --report, seconds between reports, 1 or more.");
   const plan = makePlan({
     seed: flags.seed ?? `${Date.now()}`,
     shape,
@@ -2893,11 +2899,14 @@ async function live(flags: Record<string, string>) {
   const bad = new Set<string>();
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      stop.signal.addEventListener("abort", () => {
+      const finish = () => {
         clearTimeout(timer);
+        stop.signal.removeEventListener("abort", finish);
         resolve();
-      });
+      };
+      const timer = setTimeout(finish, ms);
+      stop.signal.addEventListener("abort", finish);
+      if (stop.signal.aborted) finish();
     });
 
   const send = async (
@@ -2967,31 +2976,15 @@ async function live(flags: Record<string, string>) {
           "browser",
         ),
       ).then((reply) => reply.status && count(`event ${value.t}`));
+    let route = target.split("?")[0];
+    let routeUrl = new URL(target, base).href;
     try {
       for (let views = 0; views < 12 && !stop.signal.aborted; views++) {
-        let reply = await send(
-          agent,
-          "browser",
-          "GET",
-          target,
-          browserHeaders(
-            person,
-            { dest: "document", mode: "navigate", site, referrer, user: true },
-            "browser",
-          ),
-        );
-        for (
-          let hop = 0;
-          hop < 3 &&
-          reply.status >= 300 &&
-          reply.status < 400 &&
-          reply.location;
-          hop++
-        ) {
-          const next = new URL(reply.location, new URL(target, base));
-          if (next.origin !== base.origin) break;
-          target = next.pathname + next.search;
-          reply = await send(
+        let page = routeUrl;
+        let found: ReturnType<typeof linksIn> = { files: [], pages: [] };
+        // An in-page SPA navigation keeps the document and loaded script.
+        if (shape !== "spa" || views === 0) {
+          let reply = await send(
             agent,
             "browser",
             "GET",
@@ -3008,81 +3001,110 @@ async function live(flags: Record<string, string>) {
               "browser",
             ),
           );
-        }
-        const path = target.split("?")[0];
-        if (reply.status >= 200 && reply.status < 300) good.add(path);
-        else if (reply.status >= 400) {
-          bad.add(path);
-          good.delete(path);
-        }
-        // A browser without fetch metadata is only known by its HTML.
-        const answered =
-          (reply.status >= 200 && reply.status < 300) || reply.status === 304;
-        if (
-          answered &&
-          (!person.browser.noFetchMetadata || reply.type === "text/html")
-        )
-          count("views");
-        const page = new URL(target, base).href;
-        const found = reply.html
-          ? linksIn(reply.html, new URL(page))
-          : { files: [], pages: [] };
-        await Promise.all(
-          found.files.map((file) =>
-            send(
+          for (
+            let hop = 0;
+            hop < 3 &&
+            reply.status >= 300 &&
+            reply.status < 400 &&
+            reply.location;
+            hop++
+          ) {
+            const next = new URL(reply.location, new URL(target, base));
+            if (next.origin !== base.origin) break;
+            target = next.pathname + next.search;
+            reply = await send(
               agent,
               "browser",
               "GET",
-              file.target,
+              target,
               browserHeaders(
                 person,
                 {
-                  dest: file.dest,
-                  mode: file.dest === "font" ? "cors" : "no-cors",
+                  dest: "document",
+                  mode: "navigate",
+                  site,
+                  referrer,
+                  user: true,
+                },
+                "browser",
+              ),
+            );
+          }
+          const path = target.split("?")[0];
+          if (reply.status >= 200 && reply.status < 300) good.add(path);
+          else if (reply.status >= 400) {
+            bad.add(path);
+            good.delete(path);
+          }
+          // A browser without fetch metadata is only known by its HTML.
+          const answered =
+            (reply.status >= 200 && reply.status < 300) || reply.status === 304;
+          if (
+            answered &&
+            (!person.browser.noFetchMetadata || reply.type === "text/html")
+          )
+            count("views");
+          page = new URL(target, base).href;
+          found = reply.html
+            ? linksIn(reply.html, new URL(page))
+            : { files: [], pages: [] };
+          await Promise.all(
+            found.files.map((file) =>
+              send(
+                agent,
+                "browser",
+                "GET",
+                file.target,
+                browserHeaders(
+                  person,
+                  {
+                    dest: file.dest,
+                    mode: file.dest === "font" ? "cors" : "no-cors",
+                    site: "same-origin",
+                    referrer: page,
+                  },
+                  "browser",
+                ),
+              ),
+            ),
+          );
+          for (const link of found.pages.slice(0, 20))
+            if (!bad.has(link.split("?")[0])) good.add(link.split("?")[0]);
+          route = path;
+          routeUrl = page;
+          if (shape === "spa") {
+            await send(
+              agent,
+              "browser",
+              "GET",
+              SCRIPT_PATH,
+              browserHeaders(
+                person,
+                {
+                  dest: "script",
+                  mode: "no-cors",
                   site: "same-origin",
                   referrer: page,
                 },
                 "browser",
               ),
-            ),
-          ),
-        );
-        for (const link of found.pages.slice(0, 20))
-          if (!bad.has(link.split("?")[0])) good.add(link.split("?")[0]);
-        let route = path;
-        let routeUrl = page;
-        if (shape === "spa") {
-          await send(
-            agent,
-            "browser",
-            "GET",
-            SCRIPT_PATH,
-            browserHeaders(
-              person,
-              {
-                dest: "script",
-                mode: "no-cors",
-                site: "same-origin",
-                referrer: page,
-              },
-              "browser",
-            ),
-          );
-          const first: ScriptEvent = {
-            t: "view",
-            s: view,
-            p: route,
-            w: person.width,
-          };
-          if (referrer) first.r = originOf(referrer);
-          const tags = keptOf(landing.query);
-          if (views === 0 && Object.keys(tags).length) first.u = tags;
-          await event(page, first);
+            );
+            const first: ScriptEvent = {
+              t: "view",
+              s: view,
+              p: route,
+              w: person.width,
+            };
+            if (referrer) first.r = originOf(referrer);
+            const tags = keptOf(landing.query);
+            if (views === 0 && Object.keys(tags).length) first.u = tags;
+            await event(page, first);
+          }
         }
         // Stay a while; the script pings while the tab is open.
         const stayed = Math.min(
           own.around(
-            (SECTIONS[sectionOf(plan, path) ?? "home"]?.dwell ?? 30) * SECOND,
+            (SECTIONS[sectionOf(plan, route) ?? "home"]?.dwell ?? 30) * SECOND,
             0.8,
           ),
           3 * MINUTE,
@@ -3103,7 +3125,7 @@ async function live(flags: Record<string, string>) {
             p: route,
             e: Math.round(stayed),
           });
-          if (!own.chance(0.7)) break;
+          if (stop.signal.aborted || views === 11 || !own.chance(0.7)) break;
           // A route change inside the application: no document at all.
           route = pickPage(plan, own, "app");
           routeUrl = new URL(route, base).href;
@@ -3245,7 +3267,7 @@ async function live(flags: Record<string, string>) {
           .map(([key, value]) => `${value} ${key}`)
           .join(", ")}; ${running.size} visits open`,
       ),
-    30 * SECOND,
+    every * SECOND,
   );
   let index = 0;
   const bots = shape === "tiny" ? 0.6 : shape === "busy" ? 0.25 : 0.15;
@@ -3399,13 +3421,20 @@ function isView(line: Seen) {
     return false;
   // A prefetch or prerender is not somebody looking at the page.
   if (line.purpose && /prefetch|prerender/i.test(line.purpose)) return false;
-  if (line.dest) return line.dest === "document";
+  const html = line.type?.split(";")[0].trim() === "text/html";
+  // A file a page loads is not a page, even opened in a tab of its own.
+  if (line.dest)
+    return (
+      line.dest === "document" &&
+      (line.type
+        ? html
+        : !/\.(m?js|css|json|png|jpe?g|gif|webp|avif|svg|ico|woff2?|pdf)$/i.test(
+            line.path,
+          ))
+    );
   // Without fetch metadata: an HTML answer to something that says it is a
   // browser.
-  return (
-    line.type?.split(";")[0].trim() === "text/html" &&
-    line.ua.startsWith("Mozilla/5.0")
-  );
+  return html && line.ua.startsWith("Mozilla/5.0");
 }
 
 function verify(flags: Record<string, string>, files: string[]) {

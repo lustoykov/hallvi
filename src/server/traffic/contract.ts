@@ -18,6 +18,17 @@ export const LOG_FORMATS = [
 export type LogFormat = (typeof LOG_FORMATS)[number];
 
 /**
+ * What the proxy removes before it writes a line, as the setup that was
+ * applied does (`traffic_setup` says which): `removed` — the query string of
+ * the address and of the referrer; `path-only` — the address's, while
+ * referrers keep theirs (Caddy 2.5); `kept` — nothing (Traefik). Hallvi drops
+ * what is left when it reads, but only the proxy decides what the server's
+ * own log holds, so the privacy line says only what the record does.
+ */
+export const LOG_QUERIES = ["removed", "path-only", "kept"] as const;
+export type LogQueries = (typeof LOG_QUERIES)[number];
+
+/**
  * The query keys Hallvi keeps. Everything else in a query string is removed
  * before the proxy writes the line (Caddy, nginx) or when it is read
  * (Traefik). An application that routes by query string may add its own page
@@ -89,8 +100,31 @@ export const PING_SECONDS = 30;
 export type VitalName = "LCP" | "INP" | "CLS";
 
 /**
+ * The attribute on the script's tag that names an application's page key
+ * (`<script defer src="/_hv/s.js" data-hv-page-key="p">`), for one that
+ * routes pages by a query key as the `access-log` record's `pageKey` says.
+ */
+export const PAGE_KEY_ATTRIBUTE = "data-hv-page-key";
+/** A page key's name, as the record, the tag and an event may carry it. */
+export const PAGE_KEY_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,39}$/;
+/**
+ * A page key's value as an event may carry it: the value alone, never
+ * another part of a query. The script checks the same.
+ */
+export const PAGE_KEY_VALUE = /^[^\u0000-\u001f\u007f?#&=]{1,100}$/u;
+
+/** Explicit opt-in for #/… and #!/… routes; absent means ignore fragments. */
+export const HASH_ROUTING_ATTRIBUTE = "data-hv-hash-routing";
+/** A decoded hash route's path, without query, anchor or key-value data. */
+export const HASH_ROUTE_PATH = /^\/[^\u0000-\u0020\u007f%?#&=]{0,199}$/u;
+
+/**
  * What the script sends. `s` is a random id for one page view — it joins a
- * `leave` to its `view` and identifies nobody. `p` is the page's path.
+ * `leave` to its `view` and identifies nobody. `p` is the page's path, and
+ * `q` the page key its tag names with that key's value, when the tag names
+ * one and the address carries it: the only part of a query an event holds.
+ * A count keeps it only when `q.k` is the key the application's record names.
+ * `h` is a decoded #/… or #!/… route path, kept only with hash-routing opt-in.
  */
 export type ScriptEvent = (
   | {
@@ -127,8 +161,10 @@ export type ScriptEvent = (
     }
   | { t: "error"; s: string; p: string }
 ) & {
-  /** Only the application's configured page query key, never the full query. */
+  /** The tag's page key and its value, never the rest of the query. */
   q?: { k: string; v: string };
+  /** A supported hash route, kept only when the record opts in. */
+  h?: string;
 };
 
 const LIMITS = {
@@ -182,7 +218,12 @@ export function eventOf(path: string): ScriptEvent | null {
     /[?#]/.test(p as string)
   )
     return null;
-  const base: { s: string; p: string; q?: { k: string; v: string } } = {
+  const base: {
+    s: string;
+    p: string;
+    q?: { k: string; v: string };
+    h?: string;
+  } = {
     s,
     p: p as string,
   };
@@ -192,11 +233,18 @@ export function eventOf(path: string): ScriptEvent | null {
     const { k, v } = value.q as Record<string, unknown>;
     if (
       typeof k !== "string" ||
-      !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(k) ||
-      !text(v, LIMITS.tag)
+      !PAGE_KEY_NAME.test(k) ||
+      typeof v !== "string" ||
+      !PAGE_KEY_VALUE.test(v)
     )
       return null;
-    base.q = { k, v: v as string };
+    base.q = { k, v };
+  }
+  if (value.h !== undefined) {
+    if (typeof value.h !== "string") return null;
+    const route = /^#!?(\/.*)$/u.exec(value.h)?.[1];
+    if (!route || !HASH_ROUTE_PATH.test(route)) return null;
+    base.h = value.h;
   }
   switch (t) {
     case "view": {
@@ -310,6 +358,25 @@ export const DEVICES = ["desktop", "mobile", "tablet"] as const;
  */
 export const STORED_PER_LIST = 1000;
 
+/** The breakdowns a day stores, each a `Ranked[]`. */
+export const TRAFFIC_LISTS = [
+  "pages",
+  "sources",
+  "campaigns",
+  "countries",
+  "devices",
+  "browsers",
+  "systems",
+  "errors",
+  "goals",
+  "bots",
+] as const;
+export type TrafficList = (typeof TRAFFIC_LISTS)[number];
+
+/** A day's figures that are not kept by the hour. */
+export type DayFigure =
+  "visitors" | TrafficList | "engagement" | "vitals" | "scriptErrors";
+
 export interface Gap {
   from: string;
   to: string;
@@ -359,6 +426,16 @@ export interface TrafficDay {
   engagement: { path: string; ms: number; samples: number }[];
   vitals: { path: string; metric: VitalName; buckets: number[] }[];
   scriptErrors: { path: string; count: number }[];
+  /**
+   * Figures counted from part of the day only. A finished day is put
+   * together from two counts that each missed part of it when the log no
+   * longer holds all of it (collector.ts, `combined`): its hours are exact,
+   * and each figure here is the larger of the two counts. Counts —
+   * `visitors` (and `errorVisitors`), the lists, `scriptErrors` — are then
+   * floors; `engagement` and `vitals` are from part of the day's views.
+   * Absent or empty: every figure is the whole day's.
+   */
+  partial?: DayFigure[];
 }
 
 // ---------------------------------------------------------------------------
@@ -381,8 +458,16 @@ export interface Collection {
   scriptSince: string | null;
   /** Browsers were served pages and no event arrived since this moment. */
   scriptSilentSince: string | null;
-  /** What wrote the log, in words and format, from the `access-log` record. */
-  source: { proxy: string; format: LogFormat } | null;
+  /**
+   * What wrote the log, in words and format, and what it removes before a
+   * line is written (`LogQueries`), from the `access-log` record.
+   */
+  source: {
+    proxy: string;
+    format: LogFormat;
+    /** Null when the record does not say: nothing is claimed. */
+    queries: LogQueries | null;
+  } | null;
   /** The first day with stored totals; null when nothing is stored. */
   storedFrom: string | null;
   /**
@@ -410,6 +495,11 @@ export interface SeriesPoint {
   visitors: number;
   errors: number;
   errorVisitors: number;
+  /**
+   * The day was counted in parts (`TrafficDay.partial`): `visitors` and
+   * `errorVisitors` are only floors. An hour's never are.
+   */
+  visitorsAtLeast: boolean;
   bots: number;
   /** From the bucket's merged histogram; null with no requests. */
   p95Ms: number | null;
@@ -432,6 +522,11 @@ export interface RangeTotals {
   /** Today's estimate for 24 h; the average per covered day otherwise. */
   visitors: number;
   visitorsPer: "today" | "day";
+  /**
+   * A day behind `visitors` was counted in parts: it and `errorVisitors`
+   * are only floors.
+   */
+  visitorsAtLeast: boolean;
 }
 
 /**
@@ -468,21 +563,17 @@ export interface TrafficHistory {
     samples: number;
   }[];
   /**
-   * Lists a day stored only in part (past `STORED_PER_LIST`), so a range's
-   * figures for them are floors, not exact merges.
+   * Lists whose figures are floors, not exact merges: a day stored the list
+   * only in part (past `STORED_PER_LIST`), or counted it from part of the
+   * day (`TrafficDay.partial`).
    */
-  partialLists: (
-    | "pages"
-    | "sources"
-    | "campaigns"
-    | "countries"
-    | "devices"
-    | "browsers"
-    | "systems"
-    | "errors"
-    | "goals"
-    | "bots"
-  )[];
+  partialLists: (TrafficList | "scriptErrors")[];
+  /**
+   * Time on page and page speed measured on part of some day's views only
+   * (`TrafficDay.partial`): a sample, not every view — neither higher nor
+   * lower for it, but less than the whole.
+   */
+  partialSamples: ("engagement" | "vitals")[];
   scriptErrors: { path: string; count: number }[];
   coverage: Coverage;
   viewSource: "log" | "script" | "switch";
@@ -504,8 +595,9 @@ export interface ReleaseImpact {
     before: { from: string; to: string };
     after: { from: string; to: string };
   };
-  before: Omit<RangeTotals, "visitorsPer">;
-  after: Omit<RangeTotals, "visitorsPer">;
+  /** Hours added up: visitor figures are the hours' estimates summed. */
+  before: Omit<RangeTotals, "visitorsPer" | "visitorsAtLeast">;
+  after: Omit<RangeTotals, "visitorsPer" | "visitorsAtLeast">;
   /** Paths whose errors rose, worst first. */
   paths: {
     path: string;

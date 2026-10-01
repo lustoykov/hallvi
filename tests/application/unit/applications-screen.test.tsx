@@ -42,7 +42,7 @@ describe("application navigation", () => {
     );
     expect(html).toContain("Add your first application");
     expect(html).toContain('href="/applications/new"');
-    expect(html).toContain("Settings · Connect ChatGPT");
+    expect(html).toContain("Settings · Connect a model");
     expect(html).not.toContain("todo-fastapi");
     expect(html).not.toContain("upstream image");
   });
@@ -73,7 +73,7 @@ describe("application navigation", () => {
     expect(html).toContain("Not deployed");
     expect(html).toContain("Miniflux data has no backup plan");
     expect(html).toContain("Next: Configure a PostgreSQL backup copy");
-    expect(html).toContain("Needs attention");
+    expect(html).toContain("Worth a look");
     expect(html).not.toContain("Launch Brief");
   });
 
@@ -94,7 +94,7 @@ describe("application navigation", () => {
     expect(html).toContain('href="http://127.0.0.1:18000"');
     expect(html).toContain("Fine");
     expect(html).not.toContain("Not checked");
-    expect(html).not.toContain("Needs attention");
+    expect(html).not.toContain("Worth a look");
     expect(html).not.toContain("deployed yet");
   });
 

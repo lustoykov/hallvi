@@ -1,5 +1,5 @@
 /* PROTOTYPE · claude/architecture-directions · throwaway.
-   The Overview page around its top section: what needs you, the map in
+   The Overview page around its top section: what is unresolved, the map in
    miniature, recent work and ideas. Prefix: axo-. The top section, the
    Timeline, has its own file. */
 
@@ -13,7 +13,7 @@
   margin-bottom: 2px;
 }
 
-/* ---------- What needs you: only what is real, and unmistakable ---------- */
+/* ---------- What is unresolved: only what is real, unmistakable ---------- */
 
 .axo-needs {
   display: grid;
@@ -411,7 +411,7 @@
   margin-top: 2px;
 }
 
-/* Pointing at what needs you lights its part; what is wrong pings. */
+/* Pointing at an unresolved item lights its part; what is wrong pings. */
 .axo-map-card rect,
 .axo-map-door rect {
   transition:

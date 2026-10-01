@@ -343,7 +343,7 @@ export function pageName(path: string) {
   // is where tokens live, and it goes.
   let name = path.replace(/[?#][\s\S]*$/, "");
   try {
-    name = decodeURI(path);
+    name = decodeURI(name);
   } catch {
     // Not valid percent-encoding: keep it as it was sent.
   }
@@ -351,12 +351,31 @@ export function pageName(path: string) {
   return name.slice(0, 300);
 }
 
-/** The record, not a browser event, chooses which query key may be kept. */
-export function eventPage(event: ScriptEvent, pageKey?: string) {
-  const page = pageName(event.p);
-  return pageKey && event.q?.k === pageKey
-    ? `${page}?${pageKey}=${event.q.v}`
-    : page;
+/**
+ * A page of an application that routes by a query key (WordPress's `p`): its
+ * path and that key's value, the same whether the log's kept fields or the
+ * script's event said it. Without a key, or without a value, the path alone.
+ */
+export function keyedPage(path: string, key?: string, value?: string) {
+  const page = pageName(path);
+  return key && value ? `${page}?${key}=${value.slice(0, 100)}` : page;
+}
+
+/**
+ * An event's page. The record chooses the query key and hash-routing
+ * opt-in; an event cannot choose to expose either by itself.
+ */
+export function eventPage(
+  event: ScriptEvent,
+  pageKey?: string,
+  hashRouting = false,
+) {
+  const page = keyedPage(
+    event.p,
+    pageKey,
+    pageKey && event.q?.k === pageKey ? event.q.v : undefined,
+  );
+  return hashRouting && event.h ? page + event.h : page;
 }
 
 /**

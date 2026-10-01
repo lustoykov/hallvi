@@ -15,6 +15,7 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { ApplicationSection } from "../application-sections";
 
 import { reducedMotion } from "../architecture-prototype/motion";
+import { UnresolvedMarks } from "../presentation";
 import { FeedRow, sentenceOf, useJump } from "./feed";
 import {
   dayName,
@@ -156,7 +157,11 @@ export function TransitHistory({
             role="group"
             aria-label="Filter operation history"
           >
-            {FILTERS.map((value) => (
+            {/* What is unresolved is drawn, not named, and only while
+                something is. */}
+            {FILTERS.filter(
+              (value) => value !== "Unresolved" || history.counts[value] > 0,
+            ).map((value) => (
               <button
                 key={value}
                 type="button"
@@ -164,7 +169,16 @@ export function TransitHistory({
                 disabled={!history.counts[value] && value !== "All"}
                 onClick={() => onFilter(value)}
               >
-                <span>{value}</span>
+                <span>
+                  {value === "Unresolved" ? (
+                    <UnresolvedMarks
+                      tones={history.unresolvedTones}
+                      inverse={filter === value}
+                    />
+                  ) : (
+                    value
+                  )}
+                </span>
                 <b>{history.counts[value]}</b>
               </button>
             ))}

@@ -5,7 +5,7 @@ import { currentAccessRecord } from "@/server/access-record";
 // Overview, on real records.
 //
 // The accepted design draws it when Pi has recorded a map. Without one there
-// is still an honest page to draw — what wants you, what is true, what
+// is still an honest page to draw — what is unresolved, what is true, what
 // happened — so this renders that rather than a diagram of nothing or a wall
 // of cards.
 
@@ -29,7 +29,7 @@ import { usageFromRecords } from "./monitoring-records";
 import { OverviewLive } from "./overview-live/overview-live";
 import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
-import { Tag } from "./presentation";
+import { Tag, UnresolvedMarks } from "./presentation";
 import "./overview-prototype/overview.css";
 import "./overview-plain.css";
 
@@ -80,7 +80,7 @@ export function overviewReturnVisit(
     if (status === "failed")
       return {
         deployed: false,
-        stage: "Deployment needs attention",
+        stage: "Deployment failed",
         title: "The latest deployment record reports a failure",
         detail:
           "The earlier result may no longer describe the application. Continue from the latest recorded problem.",
@@ -319,7 +319,9 @@ export function OverviewPage({
 
           {built.needs.length > 0 && (
             <section>
-              <h2>What wants you</h2>
+              <h2>
+                <UnresolvedMarks tones={built.needs.map((need) => need.tone)} />
+              </h2>
               <ul>
                 {built.needs.map((need) => (
                   <li key={need.id} data-tone={need.tone}>

@@ -60,7 +60,12 @@ export default async function ConnectionsPage({
       }
       connections={connectionRows({
         own: {
-          model: { saved: model.ready, issue: model.issue },
+          model: {
+            saved: model.ready,
+            issue: model.issue,
+            provider: model.selection.provider,
+            model: model.selection.model,
+          },
           github: {
             account: github.issue
               ? null

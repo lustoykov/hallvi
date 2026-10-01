@@ -221,7 +221,17 @@ export async function discover({
     throw new ReleaseRefusal(
       "The release source did not answer with a list of releases.",
     );
-  for (const release of listed) {
+  // GitHub's listing order can put an older release ahead of a newer tag.
+  // Tags guide fetch priority only: the signed manifest remains authoritative
+  // for every version, channel and package we offer. Rank before the known-tag
+  // shortcut so a cached older release cannot hide a newer candidate.
+  const candidates = listed.sort((a, b) =>
+    compareVersions(
+      String(b?.tag_name ?? "").replace(/^v/, ""),
+      String(a?.tag_name ?? "").replace(/^v/, ""),
+    ),
+  );
+  for (const release of candidates) {
     if (release?.draft) continue;
     const assets = new Map(
       (release.assets ?? []).map((asset) => [
@@ -231,7 +241,7 @@ export async function discover({
     );
     if (!assets.has(MANIFEST) || !assets.has(SIGNATURE)) continue;
     // The same release as last time: nothing to fetch, nothing to verify
-    // again, and the listing already told us it is still the newest.
+    // again, after considering every higher-priority candidate.
     if (known && release.tag_name === known) return UNCHANGED;
     const [bytes, signature] = await Promise.all([
       fetchOk(assets.get(MANIFEST), get).then((response) =>

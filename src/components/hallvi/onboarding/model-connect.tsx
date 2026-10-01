@@ -1,6 +1,7 @@
 "use client";
 
-// Connecting ChatGPT, as a turn in the conversation.
+// Connecting a model, as a turn in the conversation: ChatGPT by default, or
+// OpenRouter for Claude, Gemini and others, paid per use.
 //
 // The composer used to say "Connect ChatGPT to chat" and send the reader to
 // Settings and back. The sign-in is a short code approved on ChatGPT's own
@@ -9,7 +10,7 @@
 //
 // Two things stay apart. Signing in is not choosing a model: preferences stay
 // in Settings, one link away. And a saved login is not a working one: nothing
-// has been asked of ChatGPT with it until the first message, so the receipt
+// has been asked of the model with it until the first message, so the receipt
 // says saved, never verified. Finishing here never sends anything.
 
 import { SpinnerGap } from "@phosphor-icons/react";
@@ -18,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { PiLoginAttempt, PiSetupStatus } from "@/server/pi-setup";
 
+import { OpenRouterConnect } from "./openrouter-connect";
 import {
   Away,
   CopyLine,
@@ -55,7 +57,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 const pending = (attempt: PiLoginAttempt | null) =>
   attempt?.state === "starting" || attempt?.state === "awaiting-user";
 
-export function ChatgptConnect({
+export function ModelConnect({
   settingsHref,
   onConnected,
   onClose,
@@ -73,6 +75,7 @@ export function ChatgptConnect({
   const [attempt, setAttempt] = useState<PiLoginAttempt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [openRouter, setOpenRouter] = useState(false);
   const alive = useRef(true);
   const connected = useRef(onConnected);
   useEffect(() => {
@@ -149,19 +152,21 @@ export function ChatgptConnect({
     }
   }
 
-  if (status?.ready)
+  if (status?.ready) {
+    const provider = status.selection.provider;
     return (
       <Receipt
         plain={plain}
-        title="ChatGPT login saved · checked with your first message"
+        title={`${provider} ${provider === "ChatGPT" ? "login" : "key"} saved · checked with your first message`}
       >
         <p>
-          Nothing has been sent. If ChatGPT refuses the login, the conversation
-          says so and keeps your message.{" "}
-          <Link href={settingsHref}>Model preferences</Link>
+          Nothing has been sent. Hallvi will think with {status.selection.model}
+          . If {provider} refuses, the conversation says so and keeps your
+          message. <Link href={settingsHref}>Model preferences</Link>
         </p>
       </Receipt>
     );
+  }
 
   if (!status)
     return (
@@ -169,7 +174,7 @@ export function ChatgptConnect({
         plain={plain}
         asks="needs a model to think with"
         state="waiting"
-        label="Connect ChatGPT"
+        label="Connect a model"
       >
         {error ? (
           <Problem title="Hallvi didn’t answer">
@@ -190,7 +195,7 @@ export function ChatgptConnect({
         ) : (
           <p>
             <SpinnerGap className="spin" aria-hidden="true" /> Looking for a
-            ChatGPT login…
+            saved login…
           </p>
         )}
       </RequestCard>
@@ -202,6 +207,7 @@ export function ChatgptConnect({
         await request<PiLoginAttempt>("/api/pi/setup/login", {
           method: "POST",
           body: JSON.stringify({
+            providerId: status.selection.providerId,
             modelId: status.selection.modelId,
             reasoningEffort: status.selection.reasoningEffort,
           }),
@@ -217,12 +223,40 @@ export function ChatgptConnect({
     </button>
   );
 
+  if (openRouter)
+    return (
+      <RequestCard
+        plain={plain}
+        asks="needs a model to think with"
+        state="waiting"
+        label="Connect a model"
+      >
+        <OpenRouterConnect
+          onSaved={async () => {
+            await load();
+          }}
+          actions={
+            <>
+              <button
+                type="button"
+                className="hv-ob-quiet"
+                onClick={() => setOpenRouter(false)}
+              >
+                Use ChatGPT instead
+              </button>
+              {close}
+            </>
+          }
+        />
+      </RequestCard>
+    );
+
   return (
     <RequestCard
       plain={plain}
       asks="needs a model to think with"
       state={pending(attempt) ? "working" : failed ? "failed" : "waiting"}
-      label="Connect ChatGPT"
+      label="Connect a model"
     >
       {pending(attempt) && attempt ? (
         <>
@@ -240,8 +274,8 @@ export function ChatgptConnect({
             <Away href={attempt.verificationUri}>Open ChatGPT</Away>
           )}
           <p className="hv-ob-fine" role="status">
-            <SpinnerGap className="spin" aria-hidden="true" /> Waiting for you
-            to approve on ChatGPT. Nothing else is happening.{" "}
+            <SpinnerGap className="spin" aria-hidden="true" /> Waiting for
+            approval on ChatGPT. Nothing else is happening.{" "}
             {attempt.expiresAt && <Countdown until={attempt.expiresAt} />}
           </p>
           <div className="hv-ob-row">
@@ -332,6 +366,14 @@ export function ChatgptConnect({
                 {stopped || failed ? "Get a new code" : "Connect ChatGPT"}
               </button>
             )}
+            <button
+              type="button"
+              className="hv-ob-quiet"
+              disabled={busy}
+              onClick={() => setOpenRouter(true)}
+            >
+              Use OpenRouter instead
+            </button>
             {close}
           </div>
         </>

@@ -7,16 +7,45 @@ bugs and wishes from ordinary tasks. [Roadmap](ROADMAP.md) owns delivery order.
 
 ## Proposals
 
-No selected implementation remains assigned after the 29 September batch.
-Completed selected scopes and their remaining evidence limits are in the Archive.
+The owner selected the traffic-consent setup below on 30 September.
+Completed scopes and their remaining evidence limits are in the Archive.
+
+| Proposal | +1 | Status | Assignment |
+| --- | --- | --- | --- |
+| [Traffic consent and privacy notice](#traffic-consent-and-privacy-notice) | 1 | In progress | [PR #306](https://github.com/lustoykov/hallvi/pull/306) |
+
+### Traffic consent and privacy notice
+
+**Status:** In progress
+**Problem and intended result:** Cookie-free script measurement started immediately,
+without consent integration or a site-specific notice. The default checklist
+also implied automatic sign-up tracking that requires manual application code.
+**Smallest scope:** Default-off script with grant/withdrawal API; Pi's setup
+includes existing consent controls or offers a small prompt and completed notice
+in the site's design. Keep the owner-reviewed application PR boundary. Remove
+the default goal claim while retaining manually instrumented events. No CMP
+framework, live-site mutation or automatic compliance certification.
+**Evidence:** [Design, current collection behavior and dated primary sources](docs/design/traffic.md#analytics-consent-and-privacy-notice).
+**Acceptance:** In a real browser, unknown/refused consent sends no events,
+grant starts the current view, withdrawal stops measurement, and regrant never
+replays refused activity. Setup includes missing notice facts and rollout/cache
+checks. The checklist omits goals, and the Goals card requires recorded events.
+**Open decisions:** Each site's missing legal/retention details and implemented
+controls remain application-specific; local checks do not certify them.
+**Assignment:** Owner's 30 September request to fix analytics privacy notice and
+consent, explicit selection to offer a prompt/notice where absent, and request
+to remove the default goals claim. Branch `codex/traffic-consent`,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
+
+**+1:** 2026-09-30 — owner's traffic privacy and goals task,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306).
 
 Votes show interest, not priority or approval. Each count comes from the task
 references in that proposal, including its initial proposal task.
 
-These are candidates from the [29 September intake](docs/research/2026-09-29-feature-intake.md),
+Earlier candidate research is in the [29 September intake](docs/research/2026-09-29-feature-intake.md),
 which rechecked the existing research in [PR #246](https://github.com/lustoykov/hallvi/pull/246)
-against current code and open work. The detailed plans remain in that PR; this
-list indexes their selection and assignment instead of copying the plans.
+against current code and open work. The detailed plans remain in that PR; completed selections are archived below.
 Performance work from #248/#249 merged through [#252](https://github.com/lustoykov/hallvi/pull/252)
 and is not proposed again. The
 fresh-user beta walkthrough remains open; these ideas add no beta prerequisites.
@@ -102,9 +131,45 @@ into Pi's product sessions or publish private application data in proposals.
 
 | Proposal | +1 | Status | Delivered scope |
 | --- | --- | --- | --- |
+| [Post-merge fixes and simplification](#post-merge-fixes-and-simplification) | 1 | Done | Ten selected scopes; bounded acceptance and measured reductions |
 | [Reconnect to a known private application](#reconnect-to-a-known-private-application) | 1 | Done | Saved route through Pi, with installed acceptance |
 | [Explain current work and interruption](#explain-current-work-and-interruption) | 1 | Done | Work line and truthful existing recovery panel |
 | [Copy a problem for a coding agent](#copy-a-problem-for-a-coding-agent) | 1 | Done | Saved Markdown and existing Copy reply |
+
+### Post-merge fixes and simplification
+
+**Status:** Done (the ten scopes selected on 30 September 2026).
+**Problem and intended result:** Keep recent capabilities while removing
+unnecessary complexity and closing demonstrated bugs and generalization gaps.
+**Smallest scope:** [Four bounded Traffic fixes, focused test pruning, a small
+UI pass and broader acceptance](docs/research/2026-09-30-post-merge-scope.md).
+The measured reader load did not justify another shared-reader abstraction;
+independent generator, oracle and UI fixtures keep distinct verification roles.
+**Evidence and acceptance:** The linked scope records the audited and refreshed
+revisions, AF-029–AF-032/AF-039, and a concrete completion check for each package.
+**Delivered:** [#301](https://github.com/lustoykov/hallvi/pull/301),
+[#302](https://github.com/lustoykov/hallvi/pull/302),
+[#303](https://github.com/lustoykov/hallvi/pull/303),
+[#307](https://github.com/lustoykov/hallvi/pull/307),
+[#308](https://github.com/lustoykov/hallvi/pull/308),
+[#310](https://github.com/lustoykov/hallvi/pull/310),
+[#312](https://github.com/lustoykov/hallvi/pull/312) and
+[#313](https://github.com/lustoykov/hallvi/pull/313). Acceptance includes real
+proxy isolation, explicit routing and consent, retained Paperless ingestion and
+a fresh-controller Linkding bookmark across container recreation, controller
+restart and reconnection.
+**Remaining limits:** The walkthrough reused an existing account and a packaged
+foreground controller. Native plugin hosts, fresh-account installation, external
+user comprehension and production capacity are separate evidence boundaries.
+No recovery/backup claim, release publication or feature-removal quota was added.
+**Assignment:** Implementation and acceptance in task
+`01a0f19e-1f49-7d70-947b-28c911465e09`, following
+[the scoped proposal](https://github.com/lustoykov/hallvi/pull/292). The owner
+authorized the four fixes, test pruning, UI simplification, broader acceptance,
+measured reductions, supplemental audit and fresh-user walkthrough, with review
+between increments.
+
+**+1:** 2026-09-30 — owner-requested scope in the task above.
 
 ### Reconnect to a known private application
 
@@ -192,16 +257,21 @@ store, generic packet framework or broader handover redesign.
 
 **Acceptance for the selected increment:** Native Pi saves a useful Markdown
 packet and returns its saved body; copying yields that complete body before and
-after refresh. Redaction holds for creation and update. A coding agent
-reproducing/repairing the defect and a deployed repair passing the original
-check remain separate, unproven outcomes.
+after refresh. Redaction holds for creation and update. The
+[29–30 September real repair rehearsal](https://github.com/lustoykov/hallvi/pull/284#issuecomment-5899206065)
+also established one downstream repair: an independent worker reproduced the
+filter defect, its reviewed fix was merged only to the rehearsal branch, and Pi
+redeployed it. The original checks, browser filters and exact record preservation
+passed. This is one observed repair loop, not broad downstream adoption.
 
 **Open decisions:** Broader packet storage, automation and procedure work remain
-deferred. Downstream adoption, real diagnosis and repair/deployment are unproven.
+deferred. Broader downstream adoption remains untested.
 **Assignment:** Selected by the owner on 2026-09-29 and delivered in
 [#270](https://github.com/lustoykov/hallvi/pull/270). A bounded real-Pi trial with
 explicitly synthetic observations made one save call; the saved body equaled the
 final reply and clipboard before and after refresh. Existing records and Copy
-reply are reused; no new schema or UI layout is introduced.
+reply are reused; no new schema or UI layout is introduced. The later installed
+alpha.10 rehearsal copied an 8,339-character packet from observed source/API
+evidence and completed the separate repair/deployment acceptance linked above.
 
 **+1:** 2026-09-29 — initial feature intake, [PR #253](https://github.com/lustoykov/hallvi/pull/253)

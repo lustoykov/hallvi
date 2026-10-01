@@ -108,9 +108,9 @@ export const browserJourneys = [
   },
   {
     id: "connect-and-return",
-    name: "Connect ChatGPT without losing the message",
+    name: "Connect a model without losing the message",
     description:
-      "Type into a composer that cannot send yet, connect ChatGPT from it, and come back to the same conversation with the draft still there — after a cancelled sign-in as well as a saved one.",
+      "Type into a composer that cannot send yet, connect a model from it, and come back to the same conversation with the draft still there — after a cancelled sign-in as well as a saved one.",
     smoke: false,
   },
   {

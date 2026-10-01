@@ -246,8 +246,11 @@ async function callWith<T>(
     .catch(() => null)) as CloudflareBody<T> | null;
   if (!response.ok || !body?.success) {
     const said = body?.errors?.map((item) => item.message).join("; ");
-    throw new Error(
-      `Cloudflare refused the request (HTTP ${response.status})${said ? `: ${said}` : ""}.`,
+    throw Object.assign(
+      new Error(
+        `Cloudflare refused the request (HTTP ${response.status})${said ? `: ${said}` : ""}.`,
+      ),
+      { status: response.status },
     );
   }
   return body.result;
@@ -465,6 +468,8 @@ export interface DomainRecordOutcome {
   proxied: boolean;
   /** What stood at this exact name and type before, when anything did. */
   previous: { content: string; proxied: boolean } | null;
+  /** What changed, said plainly, when only the proxy was turned on or off. */
+  changed?: string;
   /**
    * Every other address record still held for the same name. A stale AAAA
    * beside a fresh A is the failure this field exists to make visible:
@@ -532,12 +537,10 @@ export async function writeDomainRecord(change: {
     throw new Error(
       `${wanted} is a CNAME to ${conflicting[0].content}, and a CNAME cannot sit beside an ${change.type} record. Remove the CNAME first, or pass replace to take the name over, and tell the owner what it was pointing at.`,
     );
-  if (
-    existing &&
-    (existing.content.toLowerCase() !== content.toLowerCase() ||
-      existing.proxied !== proxied) &&
-    !change.replace
-  )
+  const sameAddress = existing?.content.toLowerCase() === content.toLowerCase();
+  // Turning the proxy on or off for the address already there is an update
+  // of that record, not a takeover: the name keeps pointing where it did.
+  if (existing && !sameAddress && !change.replace)
     throw new Error(
       `${wanted} already has an ${change.type} record pointing at ${existing.content}${existing.proxied ? " (proxied)" : ""}. Nothing was changed. Tell the owner what is there and pass replace only once they have decided to take the name over.`,
     );
@@ -553,18 +556,17 @@ export async function writeDomainRecord(change: {
     comment: `managed-by=hallvi${change.owner ? ` app=${change.owner}` : ""}`,
   };
   let action: DomainRecordOutcome["action"] = "created";
+  let changed: string | undefined;
   if (existing) {
-    if (
-      existing.content.toLowerCase() === content.toLowerCase() &&
-      existing.proxied === proxied
-    )
-      action = "unchanged";
+    if (sameAddress && existing.proxied === proxied) action = "unchanged";
     else {
       await call(`/zones/${zone.id}/dns_records/${existing.id}`, {
         method: "PUT",
         body,
       });
       action = "updated";
+      if (sameAddress)
+        changed = `Only the proxy changed: ${wanted} still points at ${content}, and is now ${proxied ? "proxied" : "direct (not proxied)"}.`;
     }
   } else await call(`/zones/${zone.id}/dns_records`, { method: "POST", body });
   return {
@@ -575,6 +577,7 @@ export async function writeDomainRecord(change: {
     content,
     proxied,
     previous,
+    ...(changed ? { changed } : {}),
     others: (await addressRecords(zone.id, wanted)).filter(
       (item) => item.type !== change.type,
     ),
@@ -627,5 +630,262 @@ export async function removeDomainRecord(target: {
     others: (await addressRecords(zone.id, wanted)).filter(
       (item) => item.type !== target.type,
     ),
+  };
+}
+
+/**
+ * Cache rules, written the way DNS records are: one rule for one hostname
+ * per call, so nothing else in the zone can be touched.
+ *
+ * Cloudflare keeps a zone's cache rules as one ordered list, the entrypoint
+ * of the http_request_cache_settings phase, and replacing that list is the
+ * one request that could clobber the owner's own rules. So the list is only
+ * ever read; Hallvi's rule is added, changed and deleted through the rule
+ * endpoints, and a rule counts as Hallvi's only when its description says so.
+ */
+const CACHE_PHASE = "http_request_cache_settings";
+
+interface CloudflareRule {
+  id: string;
+  action?: string;
+  expression?: string;
+  description?: string;
+  enabled?: boolean;
+  action_parameters?: Record<string, unknown>;
+}
+
+interface CloudflareRuleset {
+  id: string;
+  rules?: CloudflareRule[];
+}
+
+export interface CacheRuleSummary {
+  description: string;
+  expression: string;
+  enabled: boolean;
+  action: string;
+  /** What the rule does to caching, as Cloudflare holds it. */
+  settings: Record<string, unknown> | null;
+}
+
+export interface CacheRuleReading {
+  hostname: string;
+  zone: string;
+  /** Hallvi's rule for this hostname, or null when there is none. */
+  rule: CacheRuleSummary | null;
+  /**
+   * Every other cache rule in the zone, in the order Cloudflare runs them.
+   * Where two match the same request the later one wins, and Hallvi's rule
+   * goes first so that every rule the owner wrote wins over it.
+   */
+  others: CacheRuleSummary[];
+}
+
+export interface CacheRuleOutcome extends CacheRuleReading {
+  action: "created" | "updated" | "unchanged" | "removed";
+  /** Hallvi's rule for this hostname before this call, when there was one. */
+  previous: CacheRuleSummary | null;
+}
+
+/**
+ * Eligible for cache, with the application's own Cache-Control deciding
+ * what is kept and for how long: a response that says nothing is not
+ * cached. Only the application knows which of its pages are personal, so
+ * no TTL here overrides it. Hallvi's own traffic events are never cached.
+ */
+function cacheRuleFor(hostname: string, owner?: string) {
+  return {
+    action: "set_cache_settings",
+    expression: `(http.host eq "${hostname}" and not starts_with(http.request.uri.path, "/_hv/e/"))`,
+    description: `managed-by=hallvi cache-pages host=${hostname}${owner ? ` app=${owner}` : ""}`,
+    enabled: true,
+    action_parameters: {
+      cache: true,
+      edge_ttl: { mode: "bypass_by_default" },
+      // Without this the zone's Browser Cache TTL overrides a shorter
+      // max-age from the application.
+      browser_ttl: { mode: "respect_origin" },
+    },
+  };
+}
+
+function isHallviRule(rule: CloudflareRule, hostname: string) {
+  const words = (rule.description ?? "").split(" ");
+  return (
+    words[0] === "managed-by=hallvi" &&
+    words[1] === "cache-pages" &&
+    words[2] === `host=${hostname}`
+  );
+}
+
+function summary(rule: CloudflareRule): CacheRuleSummary {
+  return {
+    description: rule.description ?? "",
+    expression: rule.expression ?? "",
+    enabled: rule.enabled !== false,
+    action: rule.action ?? "",
+    settings: rule.action_parameters ?? null,
+  };
+}
+
+function cloudflareId(value: string, what: string) {
+  if (!/^[0-9a-f]{32}$/.test(value))
+    throw new Error(`Cloudflare returned a ${what} id that is not one.`);
+  return value;
+}
+
+/** The zone's cache-rule list, or null when it has never had one. */
+async function cacheEntrypoint(
+  zone: CloudflareZone,
+): Promise<CloudflareRuleset | null> {
+  try {
+    return await call<CloudflareRuleset>(
+      `/zones/${cloudflareId(zone.id, "zone")}/rulesets/phases/${CACHE_PHASE}/entrypoint`,
+    );
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    if (status === 404) return null;
+    // A token made for pointing a domain may edit DNS and nothing else.
+    if (status === 403)
+      throw new Error(
+        `The Cloudflare token may not read cache rules in ${zone.name}, so nothing was read or changed. It needs Zone › Cache Rules › Edit for that zone, added to the token on Cloudflare's API Tokens page; tell the owner that, rather than trying another way.`,
+      );
+    throw error;
+  }
+}
+
+function reading(
+  hostname: string,
+  zone: string,
+  ruleset: CloudflareRuleset | null,
+): CacheRuleReading {
+  const rules = ruleset?.rules ?? [];
+  const ours = rules.find((rule) => isHallviRule(rule, hostname));
+  return {
+    hostname,
+    zone,
+    rule: ours ? summary(ours) : null,
+    others: rules.filter((rule) => rule !== ours).map(summary),
+  };
+}
+
+/** What the zone's cache rules say about one hostname. This only reads. */
+export async function readCacheRule(name: string): Promise<CacheRuleReading> {
+  const hostname = domainName(name);
+  const zone = await zoneFor(hostname);
+  return reading(hostname, zone.name, await cacheEntrypoint(zone));
+}
+
+function sameRule(
+  held: CloudflareRule,
+  wanted: ReturnType<typeof cacheRuleFor>,
+) {
+  const parameters = held.action_parameters ?? {};
+  const edge = parameters.edge_ttl as { mode?: string } | undefined;
+  const browser = parameters.browser_ttl as { mode?: string } | undefined;
+  return (
+    held.action === wanted.action &&
+    held.expression === wanted.expression &&
+    held.description === wanted.description &&
+    held.enabled !== false &&
+    parameters.cache === true &&
+    edge?.mode === wanted.action_parameters.edge_ttl.mode &&
+    browser?.mode === wanted.action_parameters.browser_ttl.mode &&
+    Object.keys(parameters).length === 3
+  );
+}
+
+/**
+ * Make one hostname's responses eligible for Cloudflare's cache. Adds
+ * Hallvi's rule at the top of the zone's list, or brings it back to what
+ * Hallvi writes, and never addresses any other rule.
+ */
+export async function setCacheRule(change: {
+  hostname: string;
+  /** Written into the rule's description, so an audit can attribute it. */
+  owner?: string;
+}): Promise<CacheRuleOutcome> {
+  const hostname = domainName(change.hostname);
+  const zone = await zoneFor(hostname);
+  const zoneId = cloudflareId(zone.id, "zone");
+  const wanted = cacheRuleFor(hostname, change.owner);
+  const ruleset = await cacheEntrypoint(zone);
+  const ours = ruleset?.rules?.find((rule) => isHallviRule(rule, hostname));
+  let action: CacheRuleOutcome["action"];
+  if (!ruleset) {
+    // Creating the list, rather than writing to the entrypoint, fails when
+    // one appeared meanwhile instead of replacing it.
+    await call(`/zones/${zoneId}/rulesets`, {
+      method: "POST",
+      body: {
+        name: "default",
+        kind: "zone",
+        phase: CACHE_PHASE,
+        rules: [wanted],
+      },
+    });
+    action = "created";
+  } else {
+    const base = `/zones/${zoneId}/rulesets/${cloudflareId(ruleset.id, "ruleset")}/rules`;
+    if (ours && sameRule(ours, wanted)) action = "unchanged";
+    else if (ours) {
+      await call(`${base}/${cloudflareId(ours.id, "rule")}`, {
+        method: "PATCH",
+        body: wanted,
+      });
+      action = "updated";
+    } else {
+      const first = ruleset.rules?.[0];
+      await call(base, {
+        method: "POST",
+        body: first
+          ? { ...wanted, position: { before: cloudflareId(first.id, "rule") } }
+          : wanted,
+      });
+      action = "created";
+    }
+  }
+  return {
+    action,
+    previous: ours ? summary(ours) : null,
+    ...reading(hostname, zone.name, await cacheEntrypoint(zone)),
+  };
+}
+
+/**
+ * Take Hallvi's rule for one hostname away again. A rule that names the
+ * hostname and is not Hallvi's is the owner's, so it is reported and left.
+ */
+export async function removeCacheRule(target: {
+  hostname: string;
+}): Promise<CacheRuleOutcome> {
+  const hostname = domainName(target.hostname);
+  const zone = await zoneFor(hostname);
+  const zoneId = cloudflareId(zone.id, "zone");
+  const ruleset = await cacheEntrypoint(zone);
+  const rules = ruleset?.rules ?? [];
+  const ours = rules.find((rule) => isHallviRule(rule, hostname));
+  if (!ruleset || !ours) {
+    const foreign = rules.find((rule) =>
+      (rule.expression ?? "").includes(`"${hostname}"`),
+    );
+    if (foreign)
+      throw new Error(
+        `The cache rule for ${hostname} in ${zone.name} was not written by Hallvi (${foreign.description || "no description"}). Nothing was removed: it is the owner's, and only they can decide to take it away.`,
+      );
+    return {
+      action: "removed",
+      previous: null,
+      ...reading(hostname, zone.name, ruleset),
+    };
+  }
+  await call(
+    `/zones/${zoneId}/rulesets/${cloudflareId(ruleset.id, "ruleset")}/rules/${cloudflareId(ours.id, "rule")}`,
+    { method: "DELETE" },
+  );
+  return {
+    action: "removed",
+    previous: summary(ours),
+    ...reading(hostname, zone.name, await cacheEntrypoint(zone)),
   };
 }

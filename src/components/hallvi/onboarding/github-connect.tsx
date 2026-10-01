@@ -231,8 +231,8 @@ export function GithubConnect({
           )}
           <Away href={attempt.verificationUrl}>Open GitHub</Away>
           <p className="hv-ob-fine" role="status">
-            <SpinnerGap className="spin" aria-hidden="true" /> Waiting for you
-            to approve on GitHub. Nothing else is happening.{" "}
+            <SpinnerGap className="spin" aria-hidden="true" /> Waiting for
+            approval on GitHub. Nothing else is happening.{" "}
             {attempt.expiresAt && <Countdown until={attempt.expiresAt} />}
           </p>
           <div className="hv-ob-row">

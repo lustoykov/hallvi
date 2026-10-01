@@ -171,134 +171,286 @@
 .hv-navigation-foot {
   flex: none;
   margin-top: auto;
-  padding-top: 14px;
+  padding-top: 8px;
   border-top: 1px solid var(--nav-groove);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%);
 }
-.hv-navigation-settings {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 0 10px;
-  color: var(--muted);
-  text-decoration: none;
-}
 
-/* Hallvi's version and an explicit update check stay under Settings. Active
-   update work gets a viewport notice so it remains visible during restart. */
+/* Hallvi itself, at the foot of the column: one row that answers the
+   application identity at the top, and the menu it opens upward. Scoped past
+   `.hv-application-navigation button` and its 17px icons, which give every
+   button in this column a destination row's size. */
 .hv-this-hallvi {
   position: relative;
-  margin-top: 6px;
 }
-/* Scoped past `.hv-application-navigation button`, which gives every button
-   in this sidebar a row's height, padding and type size. This is a caption,
-   not a row: two stacked lines that keep the version whole when the second
-   one appears. */
-.hv-navigation-foot .hv-this-hallvi-line {
+.hv-navigation-foot .hv-this-hallvi-row {
+  gap: 11px;
+  padding: 7px 10px 7px 9px;
+  border-radius: 11px;
+}
+.hv-navigation-foot .hv-this-hallvi-row.open {
+  background: linear-gradient(180deg, #fff, #fbfcfe);
+  box-shadow: var(--raise);
+}
+.hv-this-hallvi-row .hv-mark {
+  margin-left: 1px;
+}
+.hv-navigation-foot .hv-this-hallvi-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.hv-this-hallvi-name strong {
+  color: #172238;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.hv-this-hallvi-sub {
+  min-height: 1.3em;
+  overflow: hidden;
+  font-size: 11.5px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hv-this-hallvi-sub:not(.hv-sheen) {
+  color: var(--muted);
+}
+.hv-this-hallvi-sub.hv-this-hallvi-tone-ready {
+  color: #2852a6;
+  font-weight: 560;
+}
+.hv-this-hallvi-sub.hv-this-hallvi-tone-failed {
+  color: #a6312b;
+}
+.hv-this-hallvi-sub.hv-this-hallvi-tone-blocked {
+  color: #9a4b10;
+}
+.hv-this-hallvi-sub.hv-this-hallvi-tone-done {
+  color: #0f7a4e;
+}
+/* News is a mark on the row, as a destination's was: blue for a release
+   waiting or running, red for a failure, green for a finished update. */
+.hv-this-hallvi-mark {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--blue, #285ad8);
+}
+.hv-this-hallvi-mark-ready {
+  box-shadow: 0 0 0 3px rgb(40 90 216 / 14%);
+}
+.hv-this-hallvi-mark-working {
+  animation: hv-this-hallvi-pulse 1.6s ease-in-out infinite;
+}
+.hv-this-hallvi-mark-failed {
+  background: #a6312b;
+}
+.hv-this-hallvi-mark-blocked {
+  background: #b25a16;
+}
+.hv-this-hallvi-mark-done {
+  background: #14945f;
+}
+@keyframes hv-this-hallvi-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hv-this-hallvi-mark-working {
+    animation: none;
+  }
+}
+.hv-navigation-foot .hv-this-hallvi-caret {
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  color: #99a2b0;
+}
+.hv-navigation-foot .hv-this-hallvi-mark + .hv-this-hallvi-caret {
+  margin-left: 8px;
+}
+
+/* Above the row, over the conversations, and gone on a click elsewhere. */
+.hv-this-hallvi-menu {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgb(var(--shade) / 8%),
+    0 14px 34px -10px rgb(var(--shade) / 32%);
+}
+.hv-navigation-foot .hv-this-hallvi-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.hv-navigation-foot .hv-this-hallvi-item:hover:not(:disabled) {
+  background: #f1f4fa;
+}
+.hv-navigation-foot .hv-this-hallvi-item:disabled {
+  cursor: default;
+}
+.hv-navigation-foot .hv-this-hallvi-item:focus-visible {
+  outline-offset: -2px;
+}
+.hv-navigation-foot .hv-this-hallvi-item svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+.hv-navigation-foot .hv-this-hallvi-item svg.hv-this-hallvi-ok {
+  color: #14945f;
+}
+.hv-this-hallvi-item em {
+  margin-left: auto;
+  color: #8a93a5;
+  font-size: 11px;
+  font-style: normal;
+}
+.hv-this-hallvi-error {
+  margin: 4px 9px 2px;
+  color: #a6312b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.hv-this-hallvi-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 5px 4px 0;
+  padding: 8px 5px 4px;
+  border-top: 1px solid #eef0f4;
+  color: #8a93a5;
+  font-size: 11px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one piece of news the menu leads with, in its state's own tint. */
+.hv-this-hallvi-news {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
-  width: 100%;
-  min-height: 0;
-  padding: 2px 10px;
-  border: 0;
-  background: none;
+  gap: 2px;
+  margin-bottom: 5px;
+  padding: 10px 10px 11px;
+  border-radius: 9px;
+  background: #f4f7fd;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.hv-this-hallvi-news strong {
+  color: #172238;
+  font-size: 13px;
+  font-weight: 600;
+}
+.hv-navigation-foot .hv-this-hallvi-news small {
+  display: block;
+  margin: 0;
   color: var(--muted);
-  font-size: 11px;
-  text-align: left;
-  cursor: pointer;
+  font-size: 11.5px;
 }
-.hv-navigation-foot .hv-this-hallvi-line:hover {
-  background: none;
-  color: var(--ink);
+.hv-this-hallvi-news a {
+  color: var(--link, #315bc6);
+  text-decoration: none;
 }
-.hv-navigation-foot .hv-this-hallvi-check {
+.hv-this-hallvi-news a:hover {
+  text-decoration: underline;
+}
+.hv-navigation-foot .hv-this-hallvi-news a svg {
+  width: 11px;
+  height: 11px;
+  vertical-align: -1px;
+}
+.hv-this-hallvi-news-ready {
+  background: #edf3ff;
+}
+.hv-this-hallvi-news-ready strong {
+  color: #244d98;
+}
+.hv-this-hallvi-news-failed {
+  background: #fdf1f0;
+}
+.hv-this-hallvi-news-failed strong {
+  color: #a6312b;
+}
+.hv-this-hallvi-news-done {
+  background: #eaf8f1;
+}
+.hv-this-hallvi-news-done strong {
+  color: #0f7a4e;
+}
+.hv-this-hallvi-news-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.hv-this-hallvi-news > .hv-this-hallvi-go {
+  margin-top: 8px;
+}
+.hv-navigation-foot .hv-this-hallvi-go {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   width: auto;
-  min-height: 32px;
-  margin: 2px 0 0;
-  padding: 4px 10px;
+  height: 28px;
+  min-height: 0;
+  padding: 0 12px;
   border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--link, #315bc6);
+  border-radius: 7px;
+  background: var(--blue, #285ad8);
+  box-shadow: var(--button-shadow);
+  color: #fff;
   font-size: 12px;
+  font-weight: 560;
+  white-space: nowrap;
   cursor: pointer;
 }
-.hv-navigation-foot .hv-this-hallvi-check:hover:not(:disabled) {
-  background: var(--blue-soft);
+.hv-navigation-foot .hv-this-hallvi-go:hover:not(:disabled) {
+  background: var(--blue-hover, #2350c4);
 }
-.hv-navigation-foot .hv-this-hallvi-check:disabled {
-  color: var(--muted);
+.hv-navigation-foot .hv-this-hallvi-go:disabled {
+  opacity: 0.6;
   cursor: default;
 }
-
-.hv-this-hallvi-ready {
-  font-style: normal;
-  font-weight: 600;
-  color: var(--link, #315bc6);
-  white-space: nowrap;
-}
-/* Beside the line, not under it. In the flow it grew the footer by a hundred
-   and fifty pixels and pushed Settings and the conversations about; as a
-   layer it costs the sidebar nothing and goes away when it is dismissed. */
-.hv-this-hallvi-panel {
-  position: absolute;
-  bottom: 0;
-  left: calc(100% - 4px);
-  z-index: 30;
-  width: 268px;
-  padding: 12px;
-  border: 1px solid var(--line, #e7e9ee);
-  border-radius: 10px;
-  background: var(--surface, #fff);
-  box-shadow: 0 10px 30px rgb(28 52 110 / 14%);
-  font-size: 11px;
-  line-height: 1.6;
-}
-.hv-this-hallvi-panel p {
-  margin: 0;
-}
-.hv-this-hallvi-panel p + p,
-.hv-this-hallvi-offer,
-.hv-this-hallvi-actions {
-  margin-top: 6px;
-}
-.hv-this-hallvi-quiet {
-  color: var(--muted);
-}
-.hv-this-hallvi-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.hv-navigation-foot .hv-this-hallvi-actions button {
+.hv-navigation-foot .hv-this-hallvi-quiet-button {
   width: auto;
   min-height: 0;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--link, #315bc6);
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 12px;
   cursor: pointer;
 }
-.hv-navigation-foot .hv-this-hallvi-actions button:disabled {
-  color: var(--muted);
-  cursor: default;
-}
-.hv-navigation-foot .hv-this-hallvi-go {
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--blue, #285ad8);
-  color: white;
-  font-weight: 600;
-}
-.hv-navigation-foot .hv-this-hallvi-go:hover:not(:disabled) {
-  background: var(--blue-hover, #2350c4);
+.hv-navigation-foot .hv-this-hallvi-quiet-button:hover {
+  background: none;
+  color: var(--ink);
 }
 
 /* Portaled out of the sidebar, whose footer is hidden on narrow screens. */
@@ -1297,7 +1449,7 @@
   margin: 0;
 }
 
-/* Overview: condition, needs you, running, recent changes, freshness. */
+/* Overview: condition, unresolved, running, recent changes, freshness. */
 .hv-overview-condition {
   display: flex;
   align-items: center;

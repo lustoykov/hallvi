@@ -14,14 +14,21 @@
 
 import {
   EVENT_PREFIX,
+  HASH_ROUTING_ATTRIBUTE,
   KEPT_QUERY_KEYS,
   OTHER,
+  PAGE_KEY_ATTRIBUTE,
+  PAGE_KEY_NAME,
+  SCRIPT_PATH,
   eventPath,
   type Collection,
   type Gap,
+  type LogQueries,
   type Ranked,
+  type RangeTotals,
   type ReleaseImpact,
   type TrafficHistory,
+  type TrafficList,
   type TrafficRange,
 } from "./contract";
 import { currentCollection } from "./collection";
@@ -31,6 +38,7 @@ import {
   SCRIPT_DIRECTORY,
   SCRIPT_FILE,
   SCRIPT_INCLUDES,
+  SCRIPT_PRIVACY,
   SCRIPT_SERVING,
   SCRIPT_TAG,
   trafficScript,
@@ -68,7 +76,7 @@ const STATE_WORDS: Record<Collection["state"], string> = {
 };
 
 /** What each list counts, beside distinct browsers. */
-const LIST_COUNTS: Record<ListName, string> = {
+const LIST_COUNTS: Record<TrafficList, string> = {
   pages: "page views",
   sources: "page views arriving from the source",
   campaigns: "page views arriving from the campaign",
@@ -80,17 +88,6 @@ const LIST_COUNTS: Record<ListName, string> = {
   goals: "goal events",
   bots: "bot and scanner requests",
 };
-type ListName =
-  | "pages"
-  | "sources"
-  | "campaigns"
-  | "countries"
-  | "devices"
-  | "browsers"
-  | "systems"
-  | "errors"
-  | "goals"
-  | "bots";
 
 /** The top of a list, the rest folded into `(other)`, as compact rows. */
 function top(list: Ranked[]) {
@@ -113,18 +110,27 @@ function top(list: Ranked[]) {
   );
 }
 
+/**
+ * A figure that is only a floor says so itself, "at least 10000", so that
+ * no reading can quote it as exact.
+ */
+const floor = (value: number | null, atLeast: boolean) =>
+  value !== null && atLeast ? `at least ${value}` : value;
+
 function totalsOf(
-  totals: Omit<TrafficHistory["totals"], "visitorsPer">,
+  totals: Omit<RangeTotals, "visitorsPer" | "visitorsAtLeast"> &
+    Partial<Pick<RangeTotals, "visitorsAtLeast">>,
   visitors: string,
 ) {
+  const partial = Boolean(totals.visitorsAtLeast);
   return {
     requests: totals.requests,
     pageViews: totals.views,
     errors5xx: totals.errors,
     botRequests: totals.bots,
-    p95ResponseMs: totals.p95Ms,
-    [visitors]: totals.visitors,
-    [`${visitors}HitByErrors`]: totals.errorVisitors,
+    p95ResponseMs: floor(totals.p95Ms, totals.p95AtLeast),
+    [visitors]: floor(totals.visitors, partial),
+    [`${visitors}HitByErrors`]: floor(totals.errorVisitors, partial),
   };
 }
 
@@ -138,6 +144,16 @@ function collectionOf(collection: Collection) {
     stoppedAt: collection.disabledAt,
     log: collection.source
       ? `${collection.source.proxy} (${collection.source.format})`
+      : null,
+    serverLogKeeps: collection.source
+      ? {
+          removed:
+            "no query strings: they are removed from the address and the referrer before a line is written",
+          "path-only":
+            "the referrer's query string; the address's is removed before a line is written",
+          kept: "full addresses, query strings included",
+          unknown: "whatever its setup keeps: the record does not say",
+        }[collection.source.queries ?? "unknown"]
       : null,
     lastLineAt: collection.lastLineAt,
     serverLogReachesBackTo: collection.oldestRetainedAt,
@@ -192,6 +208,7 @@ export function trafficReading(
       history.viewSource === "script"
         ? "Page views and visitors come from Hallvi's script; requests, errors, response times and bots from the log."
         : "Page views and visitors switch from the log to Hallvi's script inside this range, at the script's switch point; they are never added together.",
+      "Consent-gated script measurements cover visitors who allow analytics, so they can understate total use. Access-log coverage does not establish consent or the proportion of visitors measured.",
     );
   if (history.collection.scriptSilentSince)
     notes.push(
@@ -199,12 +216,26 @@ export function trafficReading(
     );
   if (releases.length)
     notes.push(
-      `Release windows compare ${RELEASE_WINDOW} minutes before with ${RELEASE_WINDOW} after; their visitor figures are hourly estimates added together, so they can overstate.`,
+      `Each release compares the whole stored hours in its compared.before with those in compared.after, ${RELEASE_WINDOW} minutes each; the hour the release fell in is in neither, so quote those times, not the release's own. Their visitor figures are hourly estimates added together, so they can overstate.`,
+    );
+  if (
+    history.totals.visitorsAtLeast ||
+    history.series.some((point) => point.visitorsAtLeast || point.p95AtLeast) ||
+    history.totals.p95AtLeast ||
+    history.partialLists.length ||
+    history.vitals.some((row) => row.atLeast)
+  )
+    notes.push(
+      'A figure written "at least N" is only a floor, and so is every count of a list marked atLeast: a response time or page speed past the slowest bucket Hallvi keeps, a day kept only its busiest entries, or part of a day was counted apart from the rest once the log no longer held all of it. Say "at least" whenever you quote one.',
+    );
+  if (history.partialSamples.length)
+    notes.push(
+      `${history.partialSamples.map((name) => (name === "engagement" ? "Time on page" : "Page speed")).join(" and ")}: some day's figures come from part of its views only, a sample rather than every view.`,
     );
 
   const lists: Record<string, unknown> = {};
   const empty: string[] = [];
-  for (const name of Object.keys(LIST_COUNTS) as ListName[]) {
+  for (const name of Object.keys(LIST_COUNTS) as TrafficList[]) {
     const list = history[name];
     if (!list.length) {
       empty.push(name);
@@ -217,6 +248,7 @@ export function trafficReading(
         perDay ? "estimated visitors per day" : "estimated visitors today",
       ],
       rows: top(list),
+      ...(history.partialLists.includes(name) && { atLeast: true }),
     };
   }
 
@@ -250,11 +282,11 @@ export function trafficReading(
               Math.round(point.covered * 100) / 100,
               point.requests,
               point.views,
-              point.visitors,
+              floor(point.visitors, point.visitorsAtLeast),
               point.errors,
-              point.errorVisitors,
+              floor(point.errorVisitors, point.visitorsAtLeast),
               point.bots,
-              point.p95Ms,
+              floor(point.p95Ms, point.p95AtLeast),
             ],
       ),
     },
@@ -269,14 +301,19 @@ export function trafficReading(
       pageSpeedP75: history.vitals.map((row) => [
         row.path,
         row.metric,
-        row.p75,
+        floor(row.p75, row.atLeast),
         row.samples,
       ]),
     }),
     ...(history.scriptErrors.length > 0 && {
-      javascriptErrors: history.scriptErrors
-        .slice(0, LISTED)
-        .map((row) => [row.path, row.count]),
+      javascriptErrors: {
+        rows: history.scriptErrors
+          .slice(0, LISTED)
+          .map((row) => [row.path, row.count]),
+        ...(history.partialLists.includes("scriptErrors") && {
+          atLeast: true,
+        }),
+      },
     }),
     coverage: {
       from: history.coverage.from,
@@ -290,6 +327,7 @@ export function trafficReading(
     ...(releases.length > 0 && {
       releases: releases.map((impact) => ({
         releaseAt: impact.releaseAt,
+        compared: impact.compared,
         notable: impact.notable,
         covered: Math.round(impact.covered * 100) / 100,
         before: totalsOf(impact.before, "estimatedVisitors"),
@@ -311,21 +349,23 @@ export async function readTraffic(
   const timeZone = controllerTimeZone();
   const { from, to } = historyDays(range, now, timeZone);
   const history = historyOf(
-    readDays(applicationId, from, to),
+    await readDays(applicationId, from, to),
     range,
     now,
     await currentCollection(applicationId, now),
     timeZone,
   );
-  const releases = releaseAts.map((at) => {
-    const days = impactDays(Date.parse(at), RELEASE_WINDOW, timeZone);
-    return releaseImpact(
-      readDays(applicationId, days.from, days.to),
-      at,
-      RELEASE_WINDOW,
-      now,
-    );
-  });
+  const releases = await Promise.all(
+    releaseAts.map(async (at) => {
+      const days = impactDays(Date.parse(at), RELEASE_WINDOW, timeZone);
+      return releaseImpact(
+        await readDays(applicationId, days.from, days.to),
+        at,
+        RELEASE_WINDOW,
+        now,
+      );
+    }),
+  );
   return trafficReading(history, releases);
 }
 
@@ -366,8 +406,13 @@ ${
 }
 }`;
 
-const RECORD = (proxy: string, format: string, path: string) =>
-  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], retainDays:30} — add pageKey:'p' only where the application routes by that query key`;
+const RECORD = (
+  proxy: string,
+  format: string,
+  path: string,
+  queries: LogQueries,
+) =>
+  `{kind:'access-log', proxy:'${proxy}', format:'${format}', source:{type:'file', path:'${path}'}, hosts:['shop.example.com','www.shop.example.com'], queries:'${queries}', retainDays:30} — add pageKey:'p' only where the application routes by that query key, and hashRouting:true only for slash-prefixed #/ or #!/ browser routes. queries says what this setup removes before a line is written, and the Traffic page tells the owner exactly that`;
 
 const CADDY_LOG = "/var/log/caddy/hallvi/access.log";
 
@@ -491,7 +536,7 @@ export const LOG_SETUP = {
 			dir_mode 0755`),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
   },
   "caddy-2.8": {
     tested: "Caddy 2.8.4, 2.9.1 and 2.10.2",
@@ -508,7 +553,7 @@ export const LOG_SETUP = {
       "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
     loses: CADDY_OLDER_LOSES,
   },
   "caddy-2.6": {
@@ -528,7 +573,7 @@ export const LOG_SETUP = {
       "/etc/logrotate.d/hallvi-caddy": LOGROTATE(CADDY_LOG, null),
       check: CHECK,
     },
-    record: RECORD("Caddy", "caddy-json", CADDY_LOG),
+    record: RECORD("Caddy", "caddy-json", CADDY_LOG, "removed"),
     loses: `${CADDY_OLDER_LOSES} Campaign tags stay in the logged path's query instead of fields of their own (the same keys, nothing else).`,
   },
   nginx: {
@@ -537,6 +582,7 @@ export const LOG_SETUP = {
       "`install -d -m 0755 /var/log/nginx/hallvi` — Hallvi's log goes in a directory of its own. A file matching /var/log/nginx/*.log duplicates Debian's own logrotate entry, and logrotate then skips the owner's whole nginx configuration.",
       'Write /etc/nginx/conf.d/hallvi-log.conf (it must be included inside `http {}`, as conf.d is on Debian and the official image). In the $hallvi_page map, list each host that routes by a query key with that key\'s $arg_; otherwise keep only `default "";`.',
       "Add `access_log /var/log/nginx/hallvi/access.log hallvi;` to every `server` block that has an access_log of its own: such a block inherits none from `http`.",
+      "An SPA fallback `try_files $uri /index.html;` drops the query on the internal redirect, so $arg_utm_* are empty on every route load: make it `try_files $uri /index.html?$args;` (the same for any fallback URI without ?$args). It changes nothing the application serves.",
       "The access_log in hallvi-log.conf is at the http level, so it is host-wide: every server block without an access_log of its own writes its lines to Hallvi's file. Say so when you ask for approval.",
       "nginx in a container: bind-mount the host directory /var/log/nginx/hallvi at the same path.",
       "`nginx -t`, then reload.",
@@ -557,7 +603,12 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
         '[ ! -f /run/nginx.pid ] || kill -USR1 "$(cat /run/nginx.pid)"',
       check: CHECK,
     },
-    record: RECORD("nginx", "hallvi-json", "/var/log/nginx/hallvi/access.log"),
+    record: RECORD(
+      "nginx",
+      "hallvi-json",
+      "/var/log/nginx/hallvi/access.log",
+      "removed",
+    ),
   },
   traefik: {
     tested: "Traefik 2.0 to 3.7",
@@ -594,7 +645,12 @@ access_log /var/log/nginx/hallvi/access.log hallvi;`,
       ),
       check: CHECK,
     },
-    record: RECORD("Traefik", "traefik-json", "/var/log/traefik/access.log"),
+    record: RECORD(
+      "Traefik",
+      "traefik-json",
+      "/var/log/traefik/access.log",
+      "kept",
+    ),
   },
 } satisfies Record<string, Setup>;
 export type SetupVariant = keyof typeof LOG_SETUP;
@@ -636,7 +692,7 @@ export function setupVariant(
     if (at >= v(2, 5))
       return {
         variant: "caddy-2.6",
-        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
+        note: "Caddy 2.5 accepts the header filters but does not apply them: the server's file keeps the query string of each referrer and redirect Location, and Hallvi removes the referrer's when it reads. Say so, and save the record with queries:'path-only' rather than 'removed'. It also logs no Content-Type, so Hallvi tells pages from files by their paths.",
       };
     // No distribution in support ships these: the oldest found is 2.6.2.
     return {
@@ -694,14 +750,32 @@ export function trafficSetup(proxy: Proxy, version: string) {
 // ---------------------------------------------------------------------------
 // traffic_script
 
-export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
-  if (pageKey !== undefined && !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(pageKey))
+export function trafficScriptFor(
+  proxy: Proxy,
+  applicationId: string,
+  pageKey?: string,
+  hashRouting?: boolean,
+) {
+  if (pageKey !== undefined && !PAGE_KEY_NAME.test(pageKey))
     throw new Error("Invalid traffic page key.");
-  const configuredTag = (text: string) =>
-    pageKey
-      ? text.replaceAll("<script", `<script data-hv-page-key="${pageKey}"`)
-      : text;
+  if (hashRouting !== undefined && typeof hashRouting !== "boolean")
+    throw new Error("Invalid traffic hash routing option.");
+  // An application that routes pages by a query key names it on its tag, so
+  // the script sends that key's value and the log and script agree on pages.
+  const attributes = [
+    ...(pageKey ? [`${PAGE_KEY_ATTRIBUTE}="${pageKey}"`] : []),
+    ...(hashRouting ? [`${HASH_ROUTING_ATTRIBUTE}="true"`] : []),
+  ];
   const script = trafficScript();
+  const configuredTag = (text: string) => {
+    const versioned = text.replaceAll(
+      SCRIPT_PATH,
+      `${SCRIPT_PATH}?v=${script.version}`,
+    );
+    return attributes.length
+      ? versioned.replaceAll("<script", `<script ${attributes.join(" ")}`)
+      : versioned;
+  };
   const check = eventPath({ t: "ping", s: "hallvicheck1", p: "/" });
   return {
     file: SCRIPT_FILE,
@@ -709,19 +783,31 @@ export function trafficScriptFor(proxy: Proxy, pageKey?: string) {
     version: script.version,
     content: script.content,
     install: `mkdir -p ${SCRIPT_DIRECTORY}/_hv, write content to ${SCRIPT_FILE} exactly (mode 0644), and check that \`sha256sum ${SCRIPT_FILE}\` prints sha256. One file serves every application on the server. A proxy in a container mounts ${SCRIPT_DIRECTORY} read-only at the same path.`,
-    serving: SCRIPT_SERVING[proxy],
+    serving:
+      proxy === "traefik"
+        ? SCRIPT_SERVING.traefik(applicationId)
+        : SCRIPT_SERVING[proxy],
+    ...(proxy === "traefik" && {
+      names:
+        "The router, service and Compose service names belong to this application and stay the same on repeat installation. Keep them as given; replace app.example.com with this application's own hosts, and match its entry points, TLS and network. Removing this application's router and service leaves the other applications' names alone. The script file and Caddyfile are shared: keep them while any application uses them.",
+    }),
     tag: configuredTag(SCRIPT_TAG),
+    routing:
+      "History paths and the record's pageKey count by default. Only when the application's access-log record has hashRouting:true does the tag opt in to #/… and #!/… route paths. The script strips hash query values and secondary anchors, and ignores ordinary anchors, malformed encoding and key-value credential fragments. Route path segments are retained, just as history path segments are: never put secrets in a route path. Other fragment routing forms are unsupported.",
     includes: SCRIPT_INCLUDES.map((include) => ({
       ...include,
       line: configuredTag(include.line),
       ...(include.note ? { note: configuredTag(include.note) } : {}),
     })),
+    privacy: SCRIPT_PRIVACY,
     goals:
       "Goals are the owner's to mark in their own code: window.hv?.('signup') after the action, or data-hv-goal=\"signup\" on a link or button (letters, digits, _ and -, up to 40). That is application code, outside the operability pull request: tell the owner how rather than writing it, and keep anything personal out of a goal's name.",
     check: [
       `curl -sS -A 'Hallvi access check' https://<host>/_hv/s.js | sha256sum — the same sha256.`,
       `curl -sS -o /dev/null -w '%{http_code}\\n' -A 'Hallvi access check' 'https://<host>${check}' — 204, and the newest log line has that ${EVENT_PREFIX} path whole. Hallvi's user agent keeps it from being counted.`,
-      "After the owner merges the include and it is released: the page's HTML has the tag. The first real visitor's event sets the switch point Traffic shows.",
+      "Propose the include, consent integration and completed notice together through open_pull_request (or the software's own code-injection setting). Offer a prompt and notice when none exist, fitting the site's design. Never merge the PR; opening it deploys nothing. An owner-merged change follows the application's ordinary release policy.",
+      "After the owner merges and it is released, verify in a fresh browser: no /_hv/e/ requests before a choice or after refusal, one current view after Allow analytics, and no later events after withdrawal, including on navigation and in other open tabs. Reload preserves the choice according to the site's policy. Check the notice and preference link. Fetching /_hv/s.js can still appear in ordinary server logs.",
+      "Check that pages do not retain a cached older script: compare the publicly served sha256 after any proxy/CDN cache changes, and verify the browser behavior rather than the tag alone. One shared server file serves all applications, so replacing it disables measurement on older tags until each application's consent integration is released. The first allowed visitor's event sets the switch point Traffic shows.",
     ],
   };
 }

@@ -14,6 +14,7 @@ import {
 import { Breakdowns } from "@/components/hallvi/traffic/breakdowns";
 import { Errors, Responses } from "@/components/hallvi/traffic/health";
 import { VisitorsToday } from "@/components/hallvi/traffic/overview-tile";
+import { Strip } from "@/components/hallvi/traffic/traffic-page";
 import { TrafficChart } from "@/components/hallvi/traffic/traffic-chart";
 import type {
   Collection,
@@ -49,6 +50,7 @@ const point = (at: number, input: Partial<SeriesPoint> = {}): SeriesPoint => ({
   visitors: 4,
   errors: 0,
   errorVisitors: 0,
+  visitorsAtLeast: false,
   bots: 0,
   p95Ms: 120,
   p95AtLeast: false,
@@ -61,6 +63,7 @@ const totals = (input: Partial<RangeTotals> = {}): RangeTotals => ({
   views: 120,
   errors: 0,
   errorVisitors: 0,
+  visitorsAtLeast: false,
   bots: 0,
   p95Ms: 120,
   p95AtLeast: false,
@@ -93,6 +96,7 @@ const history = (
   engagement: [],
   vitals: [],
   partialLists: [],
+  partialSamples: [],
   scriptErrors: [],
   coverage: { from: null, to: null, gaps: [] },
   viewSource: "log",
@@ -130,6 +134,32 @@ describe("the 24-hour error card", () => {
       "1 server error before midnight reached visitors; none has today.",
     );
     expect(html).not.toContain("0 visitors");
+
+    // Collection stopped before midnight: today was never looked at, so
+    // nothing is said about its errors.
+    const unread = text(
+      renderToStaticMarkup(
+        <Errors
+          history={history(
+            "24h",
+            hours((at) =>
+              at === lateLastNight
+                ? { errors: 1, errorVisitors: 1 }
+                : at >= Date.parse("2026-09-29T00:00:00.000Z")
+                  ? { covered: 0, requests: 0, p95Ms: null }
+                  : {},
+            ),
+            { totals: totals({ errors: 1, errorVisitors: 0 }) },
+          )}
+          name="Shop"
+          onAsk={() => undefined}
+        />,
+      ),
+    );
+    expect(unread).toContain(
+      "1 server error before midnight reached visitors; today has not been counted yet.",
+    );
+    expect(unread).not.toContain("none has today");
   });
 
   it("names today's errors apart from those before midnight", () => {
@@ -223,9 +253,11 @@ describe("the chart's running bucket", () => {
         />,
       );
     // Counted only from noon: the morning is missing.
-    expect(render(1 / 3)).toContain('class="tf-chart-gap" data-part="true"');
+    expect(render(1 / 3)).toContain("Some of this period was not counted.");
     // Everything but the last minute the collector has yet to write down.
-    expect(render(1 - 60_000 / (18 * HOUR))).not.toContain("tf-chart-gap");
+    expect(render(1 - 60_000 / (18 * HOUR))).not.toContain(
+      "Some of this period was not counted.",
+    );
   });
 });
 
@@ -276,6 +308,68 @@ describe("floors", () => {
     );
     expect(lists).toContain("≥ 110");
     expect(lists).toContain("≥ 10 s");
+  });
+
+  it("read as at least where a day was counted in parts, on every page", () => {
+    const parts = history(
+      "7d",
+      Array.from({ length: 7 }, (_, index) =>
+        point(
+          Date.parse("2026-09-23T00:00:00.000Z") + index * DAY,
+          index === 3 ? { visitors: 30, visitorsAtLeast: true } : {},
+        ),
+      ),
+      {
+        totals: totals({
+          visitors: 9,
+          visitorsPer: "day",
+          visitorsAtLeast: true,
+        }),
+        pages: [{ key: "/pricing", count: 110, visitors: 40 }],
+        errors: [{ key: "/pricing", count: 3, visitors: 2 }],
+        engagement: [{ path: "/pricing", averageMs: 30_000, samples: 4 }],
+        vitals: [
+          { path: "/", metric: "LCP", p75: 1200, atLeast: false, samples: 9 },
+        ],
+        scriptErrors: [{ path: "/pricing", count: 2 }],
+        partialLists: ["pages", "errors", "scriptErrors"],
+        partialSamples: ["engagement", "vitals"],
+      },
+    );
+    const monitoring = text(
+      renderToStaticMarkup(
+        <MonitoringUsage
+          usage={null}
+          history={history("24h", hours(), {
+            pages: parts.pages,
+            errors: parts.errors,
+            partialLists: parts.partialLists,
+          })}
+          name="Shop"
+          now={NOW}
+          onAsk={() => undefined}
+        />,
+      ),
+    );
+    expect(monitoring).toContain("≥ 110");
+    expect(monitoring).toContain("≥ 3 failed");
+    const lists = text(
+      renderToStaticMarkup(
+        <Breakdowns history={parts} script locked={() => null} />,
+      ),
+    );
+    expect(lists).toContain("some days measured only part of their visits");
+    expect(
+      text(
+        renderToStaticMarkup(
+          <Errors history={parts} name="Shop" onAsk={() => undefined} />,
+        ),
+      ),
+    ).toContain("/pricing (≥ 2)");
+    const strip = text(renderToStaticMarkup(<Strip history={parts} />));
+    expect(strip).toContain("≥ ~9");
+    expect(strip).toContain("some days counted only in part");
+    expect(strip).toContain("on average, from part of some days");
   });
 });
 

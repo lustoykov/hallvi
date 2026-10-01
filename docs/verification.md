@@ -65,6 +65,20 @@ on its state. An occupied lock or unclean previous runtime is a reason to
 coordinate/investigate, not to force takeover. The lock protects controller
 state, not neighbours on a shared server; stay within the selected application.
 
+### Native plugin updates
+
+For panel-update changes, use the browser fixture to exercise a host that keeps
+an old iframe while serving a newer resource, plus an unanswered update check.
+Then distinguish native-host evidence in the PR: record the rendered version
+from the panel menu before the update, the available version from
+`hallvi_reload_ui`, and the rendered version after the host actually reopens it.
+In Codex, same-chat reopen and new-chat open are separate observations. Do not
+create another user-owned chat merely to complete a check without authorization.
+If host controls are unavailable, report the native step as unverified; a
+fixture, fresh CLI process or successful resource notification cannot replace it.
+[Plugin update instructions](hallvi-plugin.md#updating-the-installed-plugin) own the
+recovery steps. Never restart the controller to try to clear a host's panel cache.
+
 ## 2. Discover, send, follow, inspect
 
 Run the checkout's `node scripts/cli.mjs` so the client matches the code under
@@ -199,4 +213,10 @@ this task, preserving any prior edits. Stop your own previews by recorded PID, r
 Remove only your exact disposable fixtures/snapshots after preserving needed
 redacted evidence. Follow [resource cleanup](development-resources.md) for
 containers, provider resources and anything intentionally left for review.
+For a disposable installed application, **Forget** removes its registration and
+history but currently can leave its managed SSH tunnel and application-specific
+operator configuration behind. After saving evidence and forgetting the idle
+fixture, match the remaining process and directory to that exact application ID
+before removing them. Preserve the owner’s laptop forwards and shared account
+configuration; Forget is not remote deployment cleanup.
 Never prune shared resources or remove a worktree by hand.

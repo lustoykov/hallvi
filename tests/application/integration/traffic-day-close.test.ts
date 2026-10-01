@@ -19,9 +19,23 @@ const server = vi.hoisted(() => ({
   log: [] as TrafficLine[],
   /** The lines the follow hands on: one was lost on the way. */
   followed: [] as TrafficLine[],
-  oldest: 0,
+  /** When the log holds nothing, a listing is empty. */
+  oldest: 0 as number | null,
   reads: [] as { from: number; to: number }[],
   push: (() => {}) as (line: TrafficLine) => void,
+  /** When set, the follow does only what the test says, through `on`. */
+  scripted: false,
+  on: null as null | {
+    line: (line: TrafficLine) => void;
+    ready?: () => void;
+    heard?: () => void;
+    backlog?: (at: {
+      file: string;
+      read: number;
+      total: number | null;
+      done: boolean;
+    }) => void;
+  },
 }));
 vi.mock("@/server/db", async (actual) => ({
   ...(await actual<typeof import("@/server/db")>()),
@@ -48,16 +62,19 @@ vi.mock("@/server/access-log", () => ({
   }),
 }));
 vi.mock("@/server/traffic/sources", () => ({
-  listLog: async () => [
-    {
-      name: "access.log",
-      from: server.oldest,
-      to: Date.now() + 1000,
-      bytes: 1,
-      modified: Date.now(),
-      inode: "1",
-    },
-  ],
+  listLog: async () =>
+    server.oldest === null
+      ? []
+      : [
+          {
+            name: "access.log",
+            from: server.oldest,
+            to: Date.now() + 1000,
+            bytes: 1,
+            modified: Date.now(),
+            inode: "1",
+          },
+        ],
   readLog: async (
     _host: unknown,
     _log: unknown,
@@ -74,32 +91,34 @@ vi.mock("@/server/traffic/sources", () => ({
     _log: unknown,
     _files: unknown,
     since: number,
-    on: { line: (line: TrafficLine) => void; ready?: () => void },
+    on: NonNullable<typeof server.on>,
     signal: AbortSignal,
   ) =>
     new Promise((resolve) => {
-      on.ready?.();
-      for (const line of server.followed) if (line.at >= since) on.line(line);
-      server.push = on.line;
+      server.on = on;
       signal.addEventListener("abort", () =>
         resolve({ exitCode: null, said: "", moved: null }),
       );
+      if (server.scripted) return;
+      on.ready?.();
+      for (const line of server.followed) if (line.at >= since) on.line(line);
+      server.push = on.line;
     }),
 }));
 
 import { trafficCollector } from "@/server/traffic/collector";
 import { FINAL_AFTER_MS, LOOKBACK_MS } from "@/server/traffic/count";
 import { controllerTimeZone, dayBounds, dayOf } from "@/server/traffic/days";
-import { readDays, setCollection } from "@/server/traffic/store";
+import { collectionOf, readDays, setCollection } from "@/server/traffic/store";
 
 let root: string;
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hv-traffic-close-"));
   vi.stubEnv("HALLVI_DB_PATH", join(root, "hallvi.db"));
 });
-afterAll(() => {
+afterAll(async () => {
   vi.useRealTimers();
-  globalThis.__hallviTraffic?.client.close();
+  await globalThis.__hallviTraffic?.client.close();
   globalThis.__hallviTraffic = undefined;
   rmSync(root, { recursive: true, force: true });
   vi.unstubAllEnvs();
@@ -128,27 +147,31 @@ describe("a day's close", () => {
     const zone = controllerTimeZone();
     const day = dayOf(Date.parse("2026-09-29T12:00:00Z"), zone);
     const { start, end } = dayBounds(day, zone);
-    const stored = () => readDays("app", day, day)[0];
-    const requests = () =>
-      stored().hours.reduce((sum, hour) => sum + hour.requests, 0);
+    const stored = async () => (await readDays("app", day, day))[0];
+    const requests = async () =>
+      (await stored()).hours.reduce((sum, hour) => sum + hour.requests, 0);
 
     vi.useFakeTimers({ now: end - 60_000 });
-    setCollection("app", "keep");
+    await setCollection("app", "keep");
     server.oldest = start;
     server.log = [request(end - 50_000), request(end - 40_000)];
     server.followed = [server.log[0]];
 
     const stop = new AbortController();
     const collector = trafficCollector(stop.signal);
+    server.on = null;
     await collector.tick();
+    await vi.waitFor(() => expect(server.on).not.toBeNull());
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(stored()).toMatchObject({ final: false });
-    expect(requests()).toBe(1);
+    await vi.waitFor(async () =>
+      expect(await stored()).toMatchObject({ final: false }),
+    );
+    await vi.waitFor(async () => expect(await requests()).toBe(1));
 
     // Past midnight the day is still written as the follow saw it, and never
     // as final, however late.
     await vi.advanceTimersByTimeAsync(end + FINAL_AFTER_MS - 300 - Date.now());
-    expect(stored().final).toBe(false);
+    expect((await stored()).final).toBe(false);
     expect(server.reads).toEqual([]);
 
     // A request of the new day, so a write is due at the very tick the day
@@ -156,10 +179,12 @@ describe("a day's close", () => {
     server.push(request(Date.now()));
     await vi.advanceTimersByTimeAsync(1_000);
     // From a few minutes before the day, for what the log counted there.
-    expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]);
-    expect(stored().final).toBe(true);
-    expect(requests()).toBe(2);
-    expect(stored().coverage).toEqual({
+    await vi.waitFor(() =>
+      expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]),
+    );
+    await vi.waitFor(async () => expect((await stored())?.final).toBe(true));
+    expect(await requests()).toBe(2);
+    expect((await stored()).coverage).toEqual({
       from: new Date(start).toISOString(),
       to: new Date(end).toISOString(),
       gaps: [],
@@ -167,5 +192,93 @@ describe("a day's close", () => {
 
     stop.abort();
     await collector.stop();
+  });
+
+  it("counts the day again when the log was empty as the follow began", async () => {
+    const zone = controllerTimeZone();
+    const day = dayOf(Date.parse("2026-10-02T12:00:00Z"), zone);
+    const { start, end } = dayBounds(day, zone);
+    const stored = async () => (await readDays("app", day, day))[0];
+    const requests = async () =>
+      (await stored()).hours.reduce((sum, hour) => sum + hour.requests, 0);
+
+    // A container that has written nothing yet: its listing is empty.
+    vi.useFakeTimers({ now: end - 60_000 });
+    server.oldest = null;
+    server.log = [];
+    server.followed = [];
+    server.reads = [];
+    const stop = new AbortController();
+    const collector = trafficCollector(stop.signal);
+    server.on = null;
+    await collector.tick();
+    await vi.waitFor(() => expect(server.on).not.toBeNull());
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    // Then traffic, of which the follow saw one request of two.
+    server.log = [request(end - 50_000), request(end - 40_000)];
+    server.oldest = end - 50_000;
+    server.push(server.log[0]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.waitFor(async () => expect(await requests()).toBe(1));
+
+    await vi.advanceTimersByTimeAsync(
+      end + FINAL_AFTER_MS + 1_000 - Date.now(),
+    );
+    await vi.waitFor(() =>
+      expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]),
+    );
+    await vi.waitFor(async () => expect((await stored())?.final).toBe(true));
+    expect(await requests()).toBe(2);
+
+    stop.abort();
+    await collector.stop();
+  });
+
+  it("says it is catching up until the backlog is read, however long that pauses", async () => {
+    const zone = controllerTimeZone();
+    const day = dayOf(Date.parse("2026-10-05T12:00:00Z"), zone);
+    const { start } = dayBounds(day, zone);
+    vi.useFakeTimers({ now: start + 12 * 3_600_000 });
+    server.oldest = start;
+    server.log = [];
+    server.scripted = true;
+    const stop = new AbortController();
+    const collector = trafficCollector(stop.signal);
+    server.on = null;
+    await collector.tick();
+    await vi.waitFor(() => expect(server.on).not.toBeNull());
+    await vi.advanceTimersByTimeAsync(500);
+    const on = server.on!;
+    on.ready?.();
+    on.backlog?.({ file: "access.log", read: 0, total: 1000, done: false });
+    on.heard?.();
+    on.line(request(start + 3_600_000));
+    // A long pause in the middle of a big backlog is not the end of it.
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.waitFor(async () =>
+      expect(await collectionOf("app")).toMatchObject({
+        state: "catching-up",
+        detail: "0% of access.log",
+      }),
+    );
+    expect(await readDays("app", day, day)).toEqual([]);
+    on.backlog?.({ file: "access.log", read: 1000, total: 1000, done: true });
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.waitFor(async () =>
+      expect(await collectionOf("app")).toMatchObject({
+        state: "live",
+        detail: null,
+      }),
+    );
+    expect(
+      (await readDays("app", day, day))[0].hours.reduce(
+        (sum, hour) => sum + hour.requests,
+        0,
+      ),
+    ).toBe(1);
+    stop.abort();
+    await collector.stop();
+    server.scripted = false;
   });
 });

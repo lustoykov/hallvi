@@ -25,7 +25,12 @@ const chrome =
 const request = (
   path: string,
   at: number,
-  { agent = chrome, address = "203.0.113.9", beacon = false } = {},
+  {
+    agent = chrome,
+    address = "203.0.113.9",
+    beacon = false,
+    pageKey = undefined as string | undefined,
+  } = {},
 ) =>
   parseLine(
     "caddy-json",
@@ -39,7 +44,7 @@ const request = (
         '"headers":{}',
         `"headers":{"User-Agent":["${agent}"],"Sec-Fetch-Dest":["${beacon ? "empty" : "document"}"],"Sec-Fetch-Mode":["${beacon ? "no-cors" : "navigate"}"]}`,
       ),
-    { hosts: ["shop.example"] },
+    { hosts: ["shop.example"], pageKey },
   )!;
 
 const record = (source: unknown) => ({
@@ -62,6 +67,36 @@ const record = (source: unknown) => ({
 });
 
 describe("the access log", () => {
+  it("uses each arrival's country without retaining an old visitor lookup", () => {
+    const window = new LiveWindow({ script: false });
+    for (const agent of [chrome, "Googlebot/2.1"]) {
+      const line = request("/", Date.now(), { agent });
+      expect(window.arrival({ ...line, cdnCountry: "BG" })?.country).toBe("BG");
+      expect(window.arrival({ ...line, cdnCountry: "DE" })?.country).toBe("DE");
+    }
+  });
+
+  it("validates an explicit hash-routing choice on the existing record", () => {
+    const input = record({ type: "file", path: "/var/log/caddy/access.log" });
+    for (const hashRouting of [true, false]) {
+      const content = { ...input.presentation.content, hashRouting };
+      const parsed = informationInputSchema.parse({
+        ...input,
+        presentation: { ...input.presentation, content },
+      });
+      expect(parsed.presentation?.content).toMatchObject({ hashRouting });
+    }
+    expect(
+      informationInputSchema.safeParse({
+        ...input,
+        presentation: {
+          ...input.presentation,
+          content: { ...input.presentation.content, hashRouting: "true" },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it("pairs the first script view with the log load without hiding later navigation", () => {
     const now = Date.now();
     const window = new LiveWindow({ hosts: ["shop.example"], script: false });
@@ -85,6 +120,35 @@ describe("the access log", () => {
       kind: "view",
       path: "/docs",
     });
+  });
+
+  it("pairs loads by browser and page, and names a query-routed page by the record's key", () => {
+    const now = Date.now();
+    const window = new LiveWindow({
+      hosts: ["shop.example"],
+      pageKey: "p",
+      script: false,
+    });
+    // Two tabs loaded before the script is heard: each first view pairs.
+    const load = (path: string, at: number) =>
+      window.arrival(request(path, at, { pageKey: "p" }));
+    expect(load("/?p=1&token=secret", now)).toMatchObject({ path: "/?p=1" });
+    load("/?p=2", now + 10);
+    const event = (q: { k: string; v: string }, s: string, offset: number) =>
+      window.arrival(
+        request(eventPath({ t: "view", s, p: "/", q }), now + offset, {
+          beacon: true,
+        }),
+      );
+    expect(event({ k: "p", v: "1" }, "abcdefgh21", 100)).toBeNull();
+    expect(event({ k: "p", v: "2" }, "abcdefgh22", 110)).toBeNull();
+    expect(event({ k: "p", v: "3" }, "abcdefgh23", 200)).toMatchObject({
+      path: "/?p=3",
+    });
+    // A key the record does not name is never shown.
+    expect(event({ k: "token", v: "secret" }, "abcdefgh24", 300)).toMatchObject(
+      { path: "/" },
+    );
   });
 
   it("tells arrivals apart and leaves the person out of them", () => {
@@ -168,6 +232,82 @@ describe("the access log", () => {
       openNow: 0,
       recentVisitors: 0,
     });
+  });
+
+  it("counts a page open until it leaves, and one tab changing pages as one", () => {
+    const now = Date.now();
+    const sent = (
+      window: LiveWindow,
+      event: Parameters<typeof eventPath>[0],
+      at: number,
+      address = "203.0.113.9",
+    ) =>
+      window.arrival(request(eventPath(event), at, { beacon: true, address }));
+    // One tab: a page, then a route change — the first page's leave may be
+    // logged after the next view, and it still closes it.
+    const one = new LiveWindow({ hosts: ["shop.example"], script: true });
+    sent(one, { t: "view", s: "aaaaaaaa11", p: "/" }, now - 20_000);
+    sent(one, { t: "view", s: "bbbbbbbb22", p: "/next" }, now - 10_000);
+    sent(one, { t: "leave", s: "aaaaaaaa11", p: "/", e: 10_000 }, now - 9_000);
+    expect(one.now(now)).toMatchObject({ openNow: 1, recentVisitors: 1 });
+    // Hidden, then shown again: its leave closes it, the next ping reopens.
+    sent(
+      one,
+      { t: "leave", s: "bbbbbbbb22", p: "/next", e: 5_000 },
+      now - 5_000,
+    );
+    expect(one.now(now)).toMatchObject({ openNow: 0 });
+    sent(one, { t: "ping", s: "bbbbbbbb22", p: "/next" }, now - 1_000);
+    expect(one.now(now)).toMatchObject({ openNow: 1 });
+    // Two tabs of one browser are two open pages.
+    const two = new LiveWindow({ hosts: ["shop.example"], script: true });
+    sent(two, { t: "view", s: "aaaaaaaa11", p: "/" }, now - 20_000);
+    sent(two, { t: "view", s: "bbbbbbbb22", p: "/next" }, now - 10_000);
+    expect(two.now(now)).toMatchObject({ openNow: 2, recentVisitors: 1 });
+  });
+
+  it("never shows what a failed or forged event carried", () => {
+    const now = Date.now();
+    const window = new LiveWindow({ hosts: ["shop.example"], script: false });
+    const secret = eventPath({
+      t: "view",
+      s: "abcdefgh12",
+      p: "/reset?token=REVIEW_SECRET#private",
+    });
+    const bare = (path: string) =>
+      Buffer.from(path.slice("/_hv/e/1/".length), "base64url").toString();
+    expect(bare(secret)).toContain("REVIEW_SECRET");
+    // A GET that reached the application, a failure, and a payload that is
+    // no event at all: each an ordinary request, none showing its payload.
+    const shown = [
+      window.arrival(request(secret, now)),
+      window.arrival(
+        parseLine(
+          "caddy-json",
+          line
+            .replace("/checkout/pay?token=secret#x", secret)
+            .replace(
+              '"headers":{}',
+              `"headers":{"User-Agent":["${chrome}"],"Sec-Fetch-Dest":["empty"]}`,
+            ),
+          { hosts: ["shop.example"] },
+        )!,
+      ),
+      window.arrival(
+        request(
+          `/_hv/e/1/${Buffer.from('{"p":"/reset?token=REVIEW_SECRET"').toString("base64url")}`,
+          now,
+        ),
+      ),
+    ];
+    expect(shown).toMatchObject([
+      { kind: "request", path: "/_hv/e/1/" },
+      { kind: "request", path: "/_hv/e/1/", status: 500 },
+      { kind: "request", path: "/_hv/e/1/" },
+    ]);
+    const text = JSON.stringify(shown);
+    expect(text).not.toContain(secret.slice(9, 40));
+    expect(text).not.toMatch(/REVIEW_SECRET|cmVzZXQ/);
   });
 
   it("accepts a record that says where the log is", () => {

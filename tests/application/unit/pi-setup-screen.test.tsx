@@ -10,26 +10,37 @@ vi.mock("next/navigation", () => ({
 
 const selection = {
   providerId: "openai-codex",
-  modelId: "gpt-6-sol",
+  modelId: "gpt-6.1-sol",
   reasoningEffort: "high" as const,
   provider: "OpenAI Codex",
-  model: "GPT-6 Sol",
+  model: "GPT-6.1 Sol",
 };
 const initialStatus: PiSetupStatus = {
   state: "needs-choice",
   ready: false,
   mode: null,
+  connections: { chatgpt: false, openRouter: false },
   billing: "subscription",
   detected: null,
   hasSavedConfiguration: false,
   models: [
     {
+      providerId: "openai-codex",
       id: selection.modelId,
       name: selection.model,
       reasoningEfforts: ["high"],
+      price: null,
+    },
+    {
+      providerId: "openrouter",
+      id: "anthropic/claude-sonnet-5",
+      name: "Claude Sonnet 5",
+      reasoningEfforts: ["high"],
+      price: { input: 2, output: 10 },
     },
   ],
   separateAuthPath: "/hallvi/pi-auth.json",
+  openRouterAuthPath: "/hallvi/openrouter-auth.json",
   diagnosticLogPath: "/custom/logs/replies.ndjson",
   localTracePath: "/custom/logs/spans.ndjson",
   traceExport: { mode: "off", destination: null },
@@ -63,7 +74,10 @@ describe("account-first setup and progressive disclosure", () => {
   it("keeps storage discoverable and explains the real protection without a security claim", () => {
     const { html, defaultView } = render();
     expect(defaultView).toContain("Settings");
-    expect(defaultView).toContain("ChatGPT account and model preferences.");
+    expect(defaultView).toContain(
+      "What Hallvi thinks with, and who pays for it.",
+    );
+    expect(defaultView).toContain("Pick what Hallvi thinks with");
     expect(defaultView).not.toContain("Login stored where Hallvi runs.");
     expect(defaultView).toContain("Connect ChatGPT");
     expect(defaultView).not.toContain(initialStatus.separateAuthPath);
@@ -80,9 +94,8 @@ describe("account-first setup and progressive disclosure", () => {
     );
     expect(defaultView).not.toContain("Check for a saved login");
     expect(html).toContain("/hallvi/pi-auth-&lt;login-id&gt;.json");
-    expect(html.match(/<aside\b/g)).toHaveLength(1);
+    expect(html.match(/<aside\b[^>]*popover/g)).toHaveLength(1);
     expect(html).not.toContain("Demo state");
-    expect(defaultView).toMatch(/<button[^>]*disabled[^>]*>View applications/);
     for (const role of ["Hallvi", "Pi", "ChatGPT"]) {
       expect(html).toContain(`<dt>${role}</dt>`);
     }
@@ -108,14 +121,12 @@ describe("account-first setup and progressive disclosure", () => {
         source: "/pi/auth.json",
       },
     });
-    expect(defaultView).toContain("Existing ChatGPT login found");
+    expect(defaultView).toContain("A ChatGPT login was found in Pi");
     expect(defaultView).toContain("Use existing login");
-    expect(defaultView).toContain(
-      "Share Pi’s login file and copy its model settings.",
-    );
+    expect(defaultView).toContain("Using it shares Pi’s login file.");
     expect(defaultView).toContain("Connect another account");
     expect(defaultView).not.toContain("Check for a saved login");
-    expect(defaultView).toContain("GPT-6 Sol / High");
+    expect(defaultView).toContain("GPT-6.1 Sol / High");
     expect(html).toContain("/pi/auth.json");
     expect(html).toContain(
       "Reuse shares Pi’s login file and copies its model preferences.",
@@ -128,6 +139,7 @@ describe("account-first setup and progressive disclosure", () => {
       state: "ready",
       ready: true,
       mode: "shared",
+      connections: { chatgpt: true, openRouter: false },
       hasSavedConfiguration: true,
       authentication: {
         configured: true,

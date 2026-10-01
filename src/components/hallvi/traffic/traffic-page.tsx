@@ -10,7 +10,6 @@
 // reaches and the one standing choice behind it. docs/design/traffic.md owns
 // the design.
 
-import { X } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
@@ -32,6 +31,7 @@ import { Breakdowns } from "./breakdowns";
 import { Errors, Responses } from "./health";
 import { LiveArea } from "./live";
 import {
+  atLeast,
   count,
   countryName,
   errorsAcrossMidnight,
@@ -45,6 +45,7 @@ import {
   quietLine,
   quietWhere,
   scriptDraft,
+  serverLogWords,
   scriptOffer,
   storedFrom,
   todayCovered,
@@ -54,9 +55,10 @@ import {
 } from "./model";
 import { useMoment } from "./moment";
 import { useCollection, useHistory } from "./source";
+import { SimulateTraffic } from "./simulate";
 import { TrafficChart } from "./traffic-chart";
-import { useVariant, VariantSwitch, type Variant } from "./variants";
-import { WorldMap } from "./world-map";
+import { ScriptOffers } from "./script-offer";
+import { DevPanel } from "./variants";
 import "./traffic.css";
 
 const RANGE_LABEL: Record<TrafficRange, string> = {
@@ -113,7 +115,8 @@ function errorsNote(
   return [`${count(split.today)} today`, reached].filter(Boolean).join(", ");
 }
 
-function Strip({ history }: { history: TrafficHistory }) {
+/** The range's headline figures. */
+export function Strip({ history }: { history: TrafficHistory }) {
   const { totals, previous } = history;
   const oneDay = history.range === "24h";
   // The visitor estimate is today's; the range began yesterday.
@@ -132,10 +135,15 @@ function Strip({ history }: { history: TrafficHistory }) {
       ) : (
         <Figure
           label={oneDay ? "Visitors today" : "Visitors a day"}
-          value={oneDay ? count(totals.visitors) : `~${count(totals.visitors)}`}
+          value={atLeast(
+            oneDay ? count(totals.visitors) : `~${count(totals.visitors)}`,
+            totals.visitorsAtLeast,
+          )}
           note={
-            change(totals.visitors, previous?.visitors) ??
-            (oneDay ? "estimated" : "estimated, on average")
+            totals.visitorsAtLeast
+              ? "some days counted only in part"
+              : (change(totals.visitors, previous?.visitors) ??
+                (oneDay ? "estimated" : "estimated, on average"))
           }
         />
       )}
@@ -148,7 +156,11 @@ function Strip({ history }: { history: TrafficHistory }) {
         <Figure
           label="Time on page"
           value={onPage(engaged.ms / engaged.samples)}
-          note="on average"
+          note={
+            history.partialSamples.includes("engagement")
+              ? "on average, from part of some days"
+              : "on average"
+          }
         />
       )}
       {errorsHitVisitors(history) && (
@@ -166,24 +178,19 @@ function Strip({ history }: { history: TrafficHistory }) {
 const offerKey = (applicationId: string) =>
   `hallvi.traffic.script-offer.${applicationId}`;
 
-/** One sentence and one button, offered once, never pushed. */
+/** One sentence and one button, where a list only the script fills. */
 function ScriptOffer({
   says,
   name,
   onAsk,
-  onDismiss,
 }: {
   says: string;
   name: string;
   onAsk: (draft: string) => void;
-  onDismiss?: () => void;
 }) {
   return (
     <div className="tf-offer-line">
-      <p>
-        {says} Hallvi&apos;s script counts them in the browser — no cookies,
-        nothing kept there.
-      </p>
+      <p>{says} Measurement starts after analytics consent.</p>
       <button
         type="button"
         className="tf-button"
@@ -191,17 +198,6 @@ function ScriptOffer({
       >
         Add Hallvi&apos;s script
       </button>
-      {onDismiss && (
-        <button
-          type="button"
-          className="tf-dismiss"
-          aria-label="Not now"
-          title="Not now"
-          onClick={onDismiss}
-        >
-          <X aria-hidden="true" />
-        </button>
-      )}
     </div>
   );
 }
@@ -246,6 +242,7 @@ function CollectionLine({
         <span className="hv-sheen">
           Counting what the server&apos;s log still holds…
         </span>
+        {collection.detail && <small> {collection.detail}</small>}
       </p>
     );
   if (collection.state === "lost")
@@ -377,19 +374,21 @@ function Foot({
         )}
         {!script && kept && !asked && (
           <button type="button" className="tf-link" onClick={onAsked}>
-            Goals and page speed
+            Page speed
           </button>
         )}
         {error && <span className="tf-error">{error}</span>}
       </div>
       {asked}
+      {script && (
+        <p className="tf-foot-quiet">
+          Consent-gated script measurements cover visitors who allow analytics,
+          so they can understate total use.
+        </p>
+      )}
       <p className="tf-foot-quiet">
         Hallvi keeps totals on this computer, never an address.{" "}
-        {collection.source?.format === "traefik-json"
-          ? "The server keeps its own access log, as web servers do. Traefik's log cannot be rewritten, so it keeps full addresses, query strings included; Hallvi keeps only campaign tags from them."
-          : collection.source
-            ? "The server keeps its own access log, as web servers do, with the query string removed before it is written."
-            : "The server keeps its own access log, as web servers do."}{" "}
+        {serverLogWords(collection.source)}{" "}
         <a href="https://db-ip.com" target="_blank" rel="noreferrer">
           Country data by DB-IP
         </a>
@@ -460,7 +459,6 @@ export function TrafficPage({
   onReopen?: () => void;
   onAsk: (draft: string) => void;
 }) {
-  const variant = useVariant();
   const { collection, act } = useCollection(applicationId);
   const listed = trafficListed(collection);
   const [range, setRange] = useState<TrafficRange>("7d");
@@ -474,12 +472,12 @@ export function TrafficPage({
   const [problem, setProblem] = useState<string | null>(null);
   const [forgetting, setForgetting] = useState(false);
   const [asked, setAsked] = useState<ScriptAsk | null>(null);
-  // Offered once: "not now" is remembered in this browser.
-  const [dismissed, setDismissed] = useState(() => {
+  // "Not now" is remembered in this browser, for the reason it was given.
+  const [dismissed, setDismissed] = useState<string | null>(() => {
     try {
-      return Boolean(window.localStorage.getItem(offerKey(applicationId)));
+      return window.localStorage.getItem(offerKey(applicationId));
     } catch {
-      return false;
+      return null;
     }
   });
   const [lists, setLists] = useState(false);
@@ -579,7 +577,7 @@ export function TrafficPage({
 
   if (!collection)
     return (
-      <div className="ax-root tf" data-variant={variant}>
+      <div className="ax-root tf">
         {head}
         <p className="tf-reading">Reading what Hallvi has counted…</p>
       </div>
@@ -587,7 +585,7 @@ export function TrafficPage({
 
   if (!listed)
     return (
-      <div className="ax-root tf" data-variant={variant}>
+      <div className="ax-root tf">
         {head}
         <Offer
           busy={busy}
@@ -595,23 +593,15 @@ export function TrafficPage({
           traffic={traffic}
           onKeep={() => perform("keep")}
         />
-        <VariantSwitch value={variant} />
+        <DevPanel>
+          <SimulateTraffic applicationId={applicationId} />
+        </DevPanel>
       </div>
     );
 
   const countriesToday = today.history?.countries ?? [];
-  const smallMap: ReactNode =
-    variant === "calm" ? (
-      <div className="tf-card-map">
-        <WorldMap
-          countries={history?.countries ?? []}
-          label="Where this range's visits came from"
-        />
-      </div>
-    ) : null;
-
   return (
-    <div className="ax-root tf" data-variant={variant as Variant}>
+    <div className="ax-root tf">
       {head}
       <CollectionLine
         collection={collection}
@@ -624,10 +614,29 @@ export function TrafficPage({
       <LiveArea
         traffic={traffic}
         countries={countriesToday}
-        variant={variant}
         moment={moment}
         onAsk={onAsk}
       />
+      {offer && (
+        <ScriptOffers
+          reason={offer.reason}
+          folded={dismissed === offer.reason}
+          onAdd={() => onAsk(scriptDraft(applicationName))}
+          onFold={(folded) => {
+            setDismissed(folded ? offer.reason : null);
+            try {
+              if (folded)
+                window.localStorage.setItem(
+                  offerKey(applicationId),
+                  offer.reason,
+                );
+              else window.localStorage.removeItem(offerKey(applicationId));
+            } catch {
+              // It comes back next time; that is all.
+            }
+          }}
+        />
+      )}
       {collection.scriptSilentSince && (
         <p className="tf-state" data-tone="warn">
           <span>
@@ -694,21 +703,6 @@ export function TrafficPage({
         )}
       </section>
 
-      {offer && !dismissed && (
-        <ScriptOffer
-          says={offer.says}
-          name={applicationName}
-          onAsk={onAsk}
-          onDismiss={() => {
-            setDismissed(true);
-            try {
-              window.localStorage.setItem(offerKey(applicationId), "no");
-            } catch {
-              // It comes back next time; that is all.
-            }
-          }}
-        />
-      )}
       {history && hasTotals(history) && (
         <>
           <Errors history={history} name={applicationName} onAsk={onAsk} />
@@ -730,7 +724,6 @@ export function TrafficPage({
               history={history}
               script={script}
               locked={lockedOffer}
-              countriesAside={smallMap}
             />
           )}
           <Responses history={history} />
@@ -746,7 +739,7 @@ export function TrafficPage({
         asked={asked ? lockedOffer(asked) : null}
         onToggle={() => perform(collection.enabledAt ? "stop" : "keep")}
         onForget={() => setForgetting(true)}
-        onAsked={() => setAsked("goals")}
+        onAsked={() => setAsked("speed")}
       />
       {forgetting && (
         <ConfirmActionDialog
@@ -759,7 +752,9 @@ export function TrafficPage({
           onConfirm={() => perform("forget")}
         />
       )}
-      <VariantSwitch value={variant} />
+      <DevPanel>
+        <SimulateTraffic applicationId={applicationId} />
+      </DevPanel>
     </div>
   );
 }

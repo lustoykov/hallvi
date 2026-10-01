@@ -20,14 +20,14 @@ export async function currentCollection(
   applicationId: string,
   now = Date.now(),
 ): Promise<Collection> {
-  const collection = collectionOf(applicationId);
+  const collection = await collectionOf(applicationId);
   if (collection.scriptSince) return collection;
   const logMisses: Collection["logMisses"] = [];
   const today = dayOf(now, controllerTimeZone());
   if (
-    readDays(applicationId, addDays(today, 1 - RECENT_DAYS), today).some(
-      (day) => day.browserOnlyPages > 0,
-    )
+    (
+      await readDays(applicationId, addDays(today, 1 - RECENT_DAYS), today)
+    ).some((day) => day.browserOnlyPages > 0)
   )
     logMisses.push("browser-pages");
   const records = await listInformation(applicationId);

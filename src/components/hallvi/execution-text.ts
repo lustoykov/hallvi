@@ -154,6 +154,7 @@ const PLACES: Record<string, { said: string; detail?: string }> = {
     detail: "a branch of its own, for you to review and merge",
   },
   set_domain_record: { said: "At the DNS provider" },
+  set_cache_rule: { said: "At the DNS provider" },
   // Each of these runs here and reaches outward: a tunnel this PC holds
   // open, a key this PC keeps, an SSH check this PC makes, a request this
   // PC sends. None of them changes anything on the application's server.

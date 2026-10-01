@@ -14,6 +14,7 @@ import {
   createHallviServer,
 } from "../../../plugins/hallvi/server.mjs";
 import { projectConversation } from "../../../plugins/hallvi/conversation.mjs";
+import { projectRecords } from "../../../plugins/hallvi/overview.mjs";
 
 const app = "3ee7c9a7-5da8-434a-8222-cccac5089141";
 const chat = "798e4859-86dc-43d1-a0fd-b2d2bee3be28";
@@ -115,7 +116,35 @@ function conversationSnapshot() {
           checks: [{ status: "passed" }, { status: "failed" }],
         },
       },
+      savedRecord("release", "2026-09-30T09:00:00Z", {
+        status: "verified",
+        checks: [{ label: "Answers", status: "passed" }],
+        content: { kind: "deployment", revision: "4f2c9d1" },
+      }),
+      savedRecord("way-in", "2026-09-29T09:00:00Z", {
+        url: "https://site.example.org",
+        content: { kind: "application-access", mode: "public" },
+      }),
     ],
+  };
+}
+/** A saved record as the conversation read carries it. */
+function savedRecord(
+  id: string,
+  at: string,
+  presentation: Record<string, unknown>,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    applicationId: app,
+    title: id,
+    createdAt: at,
+    updatedAt: at,
+    establishedAt: at,
+    retiredAt: null,
+    presentation: { views: ["overview"], role: "status", ...presentation },
+    ...extra,
   };
 }
 
@@ -262,6 +291,7 @@ it("advertises native entrypoints and reads the real panel over MCP", async () =
   expect("text" in panel.contents[0] ? panel.contents[0].text : "").toContain(
     "ui/update-model-context",
   );
+  expect((await call("hallvi_apps")).page).toBe("http://127.0.0.1:8474");
   expect((await call("hallvi_apps")).applications).toEqual([
     expect.objectContaining({
       id: app,
@@ -274,6 +304,11 @@ it("advertises native entrypoints and reads the real panel over MCP", async () =
       state: "live",
       totals: { views: 12 },
       errors: [{ key: "/api" }],
+    },
+    // The overview's release and way in, from the records the chat carries.
+    saved: {
+      release: { running: { revision: "4f2c9d1" } },
+      access: { url: "https://site.example.org", mode: "public" },
     },
   });
   expect(
@@ -460,6 +495,13 @@ it("reloads UI on the same MCP connection, preserves revision bytes and recovers
       .structuredContent,
   ).toMatchObject({ changed: false, resourceUri: second });
   expect(changed).toBe(1);
+  const listed = await client.callTool({ name: "hallvi_apps", arguments: {} });
+  expect(listed.structuredContent).toMatchObject({
+    ui: {
+      version: (updated.structuredContent as { version: string }).version,
+      resourceUri: second,
+    },
+  });
   await rm(panelPath);
   expect(
     (await client.callTool({ name: "hallvi_reload_ui", arguments: {} }))
@@ -538,10 +580,62 @@ it("projects the main conversation: pairs, live approval, bounded steps and an u
     turns: [],
   });
   f.state.traffic = false;
+  // A controller without traffic history says so; it is not a quiet day.
   expect(await call("hallvi_inspect", { application_id: app })).toMatchObject({
-    traffic: { unavailable: true },
+    traffic: { unavailable: true, offered: false },
   });
   expect(f.requests.every((request) => request.method === "GET")).toBe(true);
+});
+
+it("says what runs by the Deployment page's rule, never the newest attempt", () => {
+  const release = (revision: string, status: string, check?: string) => ({
+    status,
+    checks: check ? [{ label: "Starts", status: check }] : [],
+    content: { kind: "deployment", revision },
+  });
+  const saved = projectRecords(
+    [
+      savedRecord(
+        "proved",
+        "2026-09-30T08:00:00Z",
+        release("4f2c9d1", "verified", "passed"),
+      ),
+      savedRecord(
+        "broken",
+        "2026-09-30T10:00:00Z",
+        release("9a8b7c6", "info", "failed"),
+      ),
+      // Withdrawn, so it says nothing about now.
+      savedRecord(
+        "withdrawn",
+        "2026-09-30T11:00:00Z",
+        release("1234567", "verified"),
+        {
+          retiredAt: "2026-09-30T11:30:00Z",
+        },
+      ),
+      savedRecord("note", "2026-09-30T12:00:00Z", {
+        checks: [{ label: "Noted", status: "info" }],
+      }),
+    ],
+    app,
+  );
+  expect(saved.release?.running).toMatchObject({
+    id: "proved",
+    outcome: "deployed",
+  });
+  expect(saved.release?.latest).toMatchObject({
+    id: "broken",
+    outcome: "failed",
+  });
+  // The newest check that ran, not a note.
+  expect(saved.checkedAt).toBe("2026-09-30T10:00:00Z");
+  // Nothing recorded is unassessed, never "not deployed".
+  expect(projectRecords([], app)).toEqual({
+    release: null,
+    access: null,
+    checkedAt: null,
+  });
 });
 
 it("keeps older turns' steps as titles and only recent ones in detail", () => {

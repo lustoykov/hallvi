@@ -9,12 +9,15 @@ import {
   standings,
   visibleSections,
 } from "../../../src/components/hallvi/application-sections";
+import { impactQuestion } from "../../../src/components/hallvi/traffic/release-impact";
 import {
+  comparedWords,
   impactLine,
   isQuiet,
   momentsOf,
   quietLine,
   scriptOffer,
+  serverLogWords,
   trafficListed,
   usualDay,
 } from "../../../src/components/hallvi/traffic/model";
@@ -51,6 +54,7 @@ const day = (ago: number, visitors: number, covered = 1): SeriesPoint => ({
   visitors,
   errors: 0,
   errorVisitors: 0,
+  visitorsAtLeast: false,
   bots: 0,
   p95Ms: 200,
   p95AtLeast: false,
@@ -156,8 +160,9 @@ describe("a usual day", () => {
 });
 
 describe("the script offer", () => {
-  it("is made only on evidence that the log misses something", () => {
-    expect(scriptOffer(collection())).toBeNull();
+  it("leads with evidence that the log misses something", () => {
+    // Without evidence it still offers what only the script measures.
+    expect(scriptOffer(collection())?.reason).toBe("more");
     expect(
       scriptOffer(collection({ logMisses: ["browser-pages"] } as never))
         ?.reason,
@@ -166,7 +171,7 @@ describe("the script offer", () => {
       scriptOffer(collection({ logMisses: ["cached-pages"] } as never))?.reason,
     ).toBe("cached-pages");
     // The owner opening something only the script measures is evidence too.
-    expect(scriptOffer(collection(), "goals")?.reason).toBe("goals");
+    expect(scriptOffer(collection(), "speed")?.reason).toBe("speed");
   });
 
   it("is never made while the script runs, history is off, or there is no log", () => {
@@ -219,6 +224,27 @@ describe("Little Server's moments", () => {
     expect(momentsOf({ month: first, day: null, collection: older })).toEqual(
       [],
     );
+  });
+});
+
+describe("the privacy line", () => {
+  it("claims only what the setup's record says the server's log removes", () => {
+    const words = (
+      queries: "removed" | "path-only" | "kept" | null,
+      format: "caddy-json" | "traefik-json" = "caddy-json",
+    ) => serverLogWords({ proxy: "Caddy", format, queries });
+    expect(words("removed")).toMatch(
+      /removed — from the address asked for and from the referrer/,
+    );
+    // Caddy 2.5 keeps referrers' queries: never "removed" for them.
+    expect(words("path-only")).toMatch(/referrers keep theirs/);
+    expect(words("path-only")).not.toMatch(/and from the referrer/);
+    expect(words("kept", "traefik-json")).toMatch(
+      /Traefik's log cannot be rewritten/,
+    );
+    // A record that does not say: nothing is claimed either way.
+    for (const unknown of [words(null), serverLogWords(null)])
+      expect(unknown).not.toMatch(/removed/);
   });
 });
 
@@ -286,5 +312,28 @@ describe("a release's line in Deployment", () => {
       tone: "bad",
       says: "After this release: errors on /checkout 0 → 14, about 9 visitors",
     });
+  });
+
+  it("goes by the hours it compared, not the release's own time", () => {
+    // A release at 12:20: 11:00–13:00 was compared with 13:00 onwards, and
+    // at 15:00 the hours after it are not over yet.
+    const late = (hour: number) =>
+      new Date(
+        Date.parse("2026-09-29T00:00:00.000Z") + hour * 3_600_000,
+      ).toISOString();
+    const straddling = impact({
+      releaseAt: late(12.3333),
+      compared: {
+        before: { from: late(10), to: late(12) },
+        after: { from: late(13), to: late(15.5) },
+      },
+      notable: true,
+      before: { ...impact({}).before, errors: 1 },
+      after: { ...impact({}).after, errors: 9, errorVisitors: 3 },
+    });
+    expect(impactLine(straddling, NOW)?.says).toMatch(/^Since this release/);
+    const words = comparedWords(straddling);
+    expect(words).toMatch(/^\d\d:\d\d–\d\d:\d\d against \d\d:\d\d–\d\d:\d\d$/);
+    expect(impactQuestion(straddling, NOW)).toContain(`(${words})`);
   });
 });

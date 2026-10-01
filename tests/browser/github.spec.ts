@@ -71,7 +71,7 @@ test(
       page.getByRole("heading", { name: "Storage & privacy" }),
     ).toBeVisible();
     await expect(page.locator("#github-storage")).toContainText(
-      "read and write access to code and pull requests",
+      "read and write access to contents and pull requests",
     );
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Disconnect", exact: true }).click();
@@ -160,6 +160,10 @@ test(
       page.getByRole("region", { name: "Repository access" }),
     ).toHaveCount(0);
     // Ordinary Settings uses the same return contract as connection recovery.
+    // It lives in the Hallvi menu at the foot of the column.
+    await page
+      .getByRole("button", { name: /^Hallvi/, expanded: false })
+      .click();
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await page
       .getByRole("link", { name: "Back to the conversation" })
@@ -289,7 +293,7 @@ test(
     await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByRole("status").filter({
-        hasText: "Repository checks finished. Some need attention.",
+        hasText: "Repository checks finished. Some did not pass.",
       }),
     ).toBeVisible();
     const repositoryResult = page.getByRole("listitem").filter({

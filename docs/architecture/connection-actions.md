@@ -19,8 +19,9 @@ flowchart TD
 ```
 
 Three credentials, three rows, because they are obtained separately: the
-Hetzner Cloud API token, the Cloudflare **management** token (zones, DNS, and
-listing or creating R2 buckets), and an **S3 access key pair** that can write
+Hetzner Cloud API token, the Cloudflare **management** token (zones, DNS,
+cache rules, and listing or creating R2 buckets), and an **S3 access key
+pair** that can write
 a backup object into a bucket. A working management token is not a working
 backup destination. The Backup storage row opens the same
 `BackupStorageForm` the application's Backups page uses, posting to the same

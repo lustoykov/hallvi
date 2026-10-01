@@ -23,9 +23,9 @@ collection. An empty collection goes straight to the first-application welcome.
   the others. The header and preview carry the same identity tint. Red, amber
   and green status marks retain their semantic meaning.
 - **The face and prop follow recorded state.** Fine: a coffee mug and a smile.
-  Working: a wrench. Not checked lately: a clipboard. Needs attention: a
-  magnifier and a worried face. New: ready and waving. A caretaker whose
-  application needs attention does not dance.
+  Working: a wrench. Not checked lately: a clipboard. Worth a look: a
+  magnifier and a worried face. New: ready and waving. A caretaker with
+  something worth a look does not dance.
 - **A greeting is earned.** Clicking or keyboard-activating the caretaker
   triggers its existing gesture and a small conversational response. The
   response uses the same situation as its expression; it never claims that

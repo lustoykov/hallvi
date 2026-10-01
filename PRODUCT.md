@@ -49,7 +49,7 @@ category Pi or a plugin can add to:
 | Machine check | The owner pressing Check on a connection card | A fixed probe of OS, Docker, memory and disk |
 | The way in | An application page being open | A local check of the tunnel, or a request to the public address |
 | Requests as they arrive | Overview or Traffic being open | A fixed follow of the proxy's access log, where an `access-log` record says it is |
-| Traffic history | The owner turning on Keep traffic history | A fixed follow and read of the same log, recounting each day |
+| Traffic history | An access log to read, unless the owner turned Keep traffic history off | A fixed follow and read of the same log, recounting each day |
 
 An observation has to meet every one of these, or it is Pi's work and goes
 through the modes:
@@ -61,13 +61,14 @@ through the modes:
 - The owner's own action starts it, the page shows that it is running, and it
   ends when that page goes away.
 
-**Traffic history is the one standing observation.** When the owner turns on
-Keep traffic history, the worker follows the same access log with the same kind
-of fixed, read-only command, and keeps what it counted: totals per day, never an
-address, a user agent or a query string. It meets the first two conditions. In
-place of the third, the owner's choice starts it, the Traffic page shows that
-it is running and how far back it reaches, and turning it off ends it; stored
-totals remain until the owner deletes them. Setting the log up on the server is
+**Traffic history is the one standing observation.** Keep traffic history is
+on by default once an application has Hallvi's access log, and the worker
+follows that log with the same kind of fixed, read-only command, keeping what
+it counted: totals per day, never an address, a user agent or a query string.
+It meets the first two conditions. In place of the third, the Traffic page
+shows that it is running and how far back it reaches, and the owner's choice
+to turn it off ends it for good; stored totals remain until the owner deletes
+them. Setting the log up on the server is
 Pi's work under the modes. [Traffic](docs/design/traffic.md) owns the design.
 
 So observations do not prompt in any mode, and a dropped connection that
@@ -116,6 +117,7 @@ Use one representative application in each of the [three complexity tiers](docs/
 - It surfaces application exceptions, wrong behavior and migration-code defects with a concise Markdown handoff: reproduction, expected/actual behavior, relevant redacted evidence, observed revision or explicit unknown, attempts, uncertainty and an acceptance check. Pi saves it as ordinary application knowledge and returns the saved body for the existing **Copy reply** action; the owner chooses where to paste it. The owner-merged fix returns through ordinary release verification.
 - A missing health endpoint, environment-driven port or start entrypoint can be proposed in a small operability PR: Hallvi publishes the files it changed on a branch of its own and opens a pull request against the branch it read. It never writes to that branch, never merges, and opening a pull request deploys nothing — a merged change reaches the application through an ordinary release afterwards. Publishing is a change like any other and follows the [permission modes](#permission-modes); there is no separate publishing grant or approval flow. Business logic and general bug fixes remain outside its code-writing scope. [GitHub](docs/integrations/github.md#proposing-a-change) owns what the connection makes possible and what Hallvi actually does with it.
 - What describes how the application runs on any host belongs in its repository: Dockerfile, Compose services, volumes and health checks, entrypoint, health endpoint, port and the caching headers the application sends. When a deployment needed such a change to work, Hallvi offers the pull request once at hand-over rather than applying the change again on every release. What belongs to one server stays there: the proxy site for the owner's hostname, certificate storage, port bindings and firewall rules. The proxy adds no caching headers of its own, and secret values never enter the repository.
+- When the owner asks for browser analytics, the script include, its consent integration and privacy notice are small operability changes in the same owner-reviewed PR. Reuse the site's controls; where none exist, offer a small analytics prompt and notice in its existing language and design, with refusal and later withdrawal. Ask for missing notice facts, keep measurement off until a valid grant and never promise automatic legal compliance. Goal instrumentation remains application behavior for the owner to add. [Traffic](docs/design/traffic.md#analytics-consent-and-privacy-notice) owns the details.
 
 **Product and development instructions stay separate.** Pi uses its own runtime
 instructions and the user's application request. Contributor files, local agent

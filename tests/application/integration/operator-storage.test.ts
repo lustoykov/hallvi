@@ -59,7 +59,7 @@ beforeEach(async () => {
 });
 afterAll(async () => {
   await reopen();
-  globalThis.__hallviTraffic?.client.close();
+  await globalThis.__hallviTraffic?.client.close();
   globalThis.__hallviTraffic = undefined;
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
@@ -224,8 +224,8 @@ it("tells an author who invented an ID what to do instead, and never touches ano
 it("removal goes through the worker that owns the histories, and cascades only application data", async () => {
   await saveInformation(app, { title: "Note", body: "Saved" });
   // Traffic totals live in traffic.db, where no foreign key reaches.
-  setCollection(app, "keep");
-  writeDay(
+  await setCollection(app, "keep");
+  await writeDay(
     app,
     countDay([], {
       day: "2026-09-28",
@@ -239,7 +239,7 @@ it("removal goes through the worker that owns the histories, and cascades only a
     /worker is not running/,
   );
   expect(await store.getApplication(app)).toBeTruthy();
-  expect(readDays(app, "2026-09-28", "2026-09-28")).toHaveLength(1);
+  expect(await readDays(app, "2026-09-28", "2026-09-28")).toHaveLength(1);
   const worker = (await ownSessions())!;
   try {
     await removeApplication(app, "example/app");
@@ -249,8 +249,8 @@ it("removal goes through the worker that owns the histories, and cascades only a
   expect(await store.listApplications()).toEqual([]);
   expect(await store.listApplicationChats(app)).toEqual([]);
   expect(await listInformation(app, "", true)).toEqual([]);
-  expect(readDays(app, "2026-09-28", "2026-09-28")).toEqual([]);
-  expect(collectionOf(app).enabledAt).toBeNull();
+  expect(await readDays(app, "2026-09-28", "2026-09-28")).toEqual([]);
+  expect((await collectionOf(app)).enabledAt).toBeNull();
 });
 
 it("persists typed deployment/access facts and shares edits without duplicating records", async () => {

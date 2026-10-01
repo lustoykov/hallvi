@@ -113,9 +113,14 @@ import { ownSessions } from "../../../src/server/pi-owner";
 import { MESSAGE_TAG } from "../../../src/server/pi-transcript";
 import {
   RequestNotFoundError,
+  inspectApplication,
   requestOutcome,
 } from "../../../src/server/requests";
-import { settleDomain } from "../../../src/server/connection-requests";
+import {
+  listConnectionRequests,
+  requestDomain,
+  settleDomain,
+} from "../../../src/server/connection-requests";
 import {
   askWorker,
   WorkerRefusal,
@@ -257,61 +262,78 @@ beforeAll(async () => {
       }
       const message = text.includes("[fail]")
         ? assistant(model, [], "error", "invalid_grant: 401 unauthorized")
-        : text.includes("[domain]")
+        : text.includes("[withdraw-dns]")
           ? assistant(
               model,
               [
-                { type: "text", text: "Reading the name." },
                 {
                   type: "toolCall",
                   id: `call-${++calls}`,
-                  name: "check_domain",
-                  // Secret-shaped, because Pi's history keeps what the model
-                  // sent and a reader must never be handed it.
-                  arguments: { name: "ghp_livesecrettoken0123456789abcdef" },
+                  name: "cancel_connection_request",
+                  arguments: {
+                    kind: "domain",
+                    reason:
+                      "The owner handled DNS outside the card; the recorded check confirms the intended address.",
+                  },
                 },
               ],
               "toolUse",
             )
-          : text.includes("[dns]")
+          : text.includes("[domain]")
             ? assistant(
                 model,
                 [
-                  { type: "text", text: "I need the name's DNS." },
+                  { type: "text", text: "Reading the name." },
                   {
                     type: "toolCall",
                     id: `call-${++calls}`,
-                    name: "request_domain_access",
-                    arguments: { name: "shop.test" },
+                    name: "check_domain",
+                    // Secret-shaped, because Pi's history keeps what the model
+                    // sent and a reader must never be handed it.
+                    arguments: { name: "ghp_livesecrettoken0123456789abcdef" },
                   },
                 ],
                 "toolUse",
               )
-            : text.includes("[approve]")
+            : text.includes("[dns]")
               ? assistant(
                   model,
                   [
-                    { type: "text", text: "I will ask first." },
+                    { type: "text", text: "I need the name's DNS." },
                     {
                       type: "toolCall",
                       id: `call-${++calls}`,
-                      name: "request_approval",
-                      arguments: { action: "Restart the service" },
+                      name: "request_domain_access",
+                      arguments: { name: "shop.test" },
                     },
                   ],
                   "toolUse",
                 )
-              : assistant(
-                  model,
-                  [
-                    {
-                      type: "text",
-                      text:
-                        last.role === "user" ? `reply: ${text}` : "finished",
-                    },
-                  ],
-                  "stop",
-                );
+              : text.includes("[approve]")
+                ? assistant(
+                    model,
+                    [
+                      { type: "text", text: "I will ask first." },
+                      {
+                        type: "toolCall",
+                        id: `call-${++calls}`,
+                        name: "request_approval",
+                        arguments: { action: "Restart the service" },
+                      },
+                    ],
+                    "toolUse",
+                  )
+                : assistant(
+                    model,
+                    [
+                      {
+                        type: "text",
+                        text:
+                          last.role === "user" ? `reply: ${text}` : "finished",
+                      },
+                    ],
+                    "stop",
+                  );
       stream.push({ type: "start", partial: message });
       stream.push(
         message.stopReason === "error"
@@ -731,13 +753,25 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
 it("waits for input only on the card its own operation asked for", async () => {
   const a = await application("shop");
   const [first, second] = [randomUUID(), randomUUID()];
+  // The page opened a blank card before Pi learned the name.
+  const blank = requestDomain(a.id);
   await a.send("[dns] publish it", "next", first);
   await until(async () => expect(await a.status()).toBe("idle"));
   expect(await outcome(a, first)).toMatchObject({
     status: "waiting-for-input",
     attention: { kind: "input", reason: expect.stringMatching(/shop\.test/) },
   });
+  expect((await inspectApplication(a.id)).attention).toContainEqual({
+    kind: "input",
+    reason: "How to reach the DNS of shop.test.",
+    requestedAt: blank.requestedAt,
+    page: expect.any(String),
+  });
   settleDomain(a.id, "manual");
+  const receipt = listConnectionRequests(a.id);
+  await a.send("[withdraw-dns] already handled");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(listConnectionRequests(a.id)).toEqual(receipt);
   expect(await outcome(a, first)).toMatchObject({
     status: "completed",
     attention: null,
@@ -753,6 +787,18 @@ it("waits for input only on the card its own operation asked for", async () => {
     status: "completed",
     attention: null,
   });
+  await a.send("[withdraw-dns] handled in conversation");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(await outcome(a, second)).toMatchObject({
+    status: "completed",
+    attention: null,
+  });
+  expect((await inspectApplication(a.id)).attention).toEqual([]);
+  expect(listConnectionRequests(a.id)).toEqual([]);
+  // A repeated withdrawal does not resurrect a card or touch other state.
+  await a.send("[withdraw-dns] already removed");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(listConnectionRequests(a.id)).toEqual([]);
 });
 
 it("Stop ends an approval wait and a streaming answer, drops what waited, and says what is true", async () => {

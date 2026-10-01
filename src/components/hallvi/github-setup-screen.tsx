@@ -1,13 +1,15 @@
 "use client";
 
-import { HallviMark } from "./hallvi-mark";
 import {
-  ArrowLeft,
-  ArrowRight,
   ArrowSquareOut,
   Check,
   Copy,
+  GitBranch,
+  GitPullRequest,
+  Lock,
+  ProhibitInset,
   SpinnerGap,
+  Warning,
   X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -20,8 +22,9 @@ import type {
 import type { GithubRepositoryCheckResult } from "@/server/applications";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import type { SetupReturn } from "@/server/setup-return";
-import { SettingsNav } from "./settings-nav";
-import s from "./pi-setup-screen.module.css";
+import { SettingsShell } from "./settings-shell";
+import h from "./pi-setup-screen.module.css";
+import s from "./settings.module.css";
 
 async function request<T>(
   url: string,
@@ -44,8 +47,8 @@ async function request<T>(
 const waiting = (attempt: GithubLoginAttempt | null) =>
   attempt?.status === "waiting" || attempt?.status === "starting";
 /**
- * Extend the chosen Pi setup layout: account, repository access, then one
- * Continue action.
+ * The GitHub account in the summary, then each application's repository
+ * access, then what the App may do.
  */
 export function GithubSetupScreen({
   initialStatus,
@@ -233,183 +236,200 @@ export function GithubSetupScreen({
       : null;
 
   return (
-    <main className={`hv-setup-shell ${s.root}`}>
-      <header className="hv-setup-topbar">
-        <Link className="hv-setup-brand" href="/applications">
-          <HallviMark size={22} />
-          <span>Hallvi</span>
-        </Link>
-        <Link
-          className="hv-setup-back"
-          href={returnTo?.href ?? "/applications"}
-        >
-          <ArrowLeft /> {returnTo?.label ?? "All applications"}
-        </Link>
-      </header>
-      <div className={s.page}>
-        <SettingsNav current="github" returnTo={returnTo} />
-        <div className={s.heading}>
-          <h1>Connect GitHub</h1>
-          <p>
-            Connect through the Hallvi GitHub App and choose which repositories
-            it can access.
-          </p>
-        </div>
-        <section className={s.card}>
-          <section
-            className={s.section}
-            aria-labelledby="github-account-heading"
-          >
-            <h2 id="github-account-heading">GitHub account</h2>
-            <p className={s.hint}>
-              The published Hallvi App requests read and write access to code
-              and pull requests in the repositories you select on GitHub.
-              Connecting only checks access; it does not change your repository.
+    <SettingsShell
+      current="github"
+      title="GitHub"
+      lead="Reading the private repositories you choose."
+      returnTo={returnTo}
+      back={
+        returnToAdd
+          ? { href: "/applications/new", label: "Back to add application" }
+          : undefined
+      }
+    >
+      <section className={s.hero} aria-labelledby="github-account-heading">
+        {working && attempt ? (
+          <div>
+            <span className={s.eyebrow} id="github-account-heading">
+              Signing in
+            </span>
+            {connected && status.connection && (
+              <p>
+                Using {status.connection.account.login} until the new sign-in
+                succeeds.
+              </p>
+            )}
+            <p>Enter this code on GitHub:</p>
+            <h3 className={s.code}>{attempt.userCode ?? "Getting code…"}</h3>
+            <p>Then choose the repositories Hallvi may read.</p>
+            <div className={s.heroActions}>
+              <a
+                className={`${s.btn} ${s.primary}`}
+                href={attempt.verificationUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open GitHub <ArrowSquareOut />
+              </a>
+              <button
+                type="button"
+                className={s.link}
+                disabled={!attempt.userCode}
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(attempt.userCode!)
+                    .then(() => setCopied(true))
+                    .catch(() =>
+                      setError("Select the code to copy it manually."),
+                    );
+                }}
+              >
+                <Copy /> {copied ? "Copied" : "Copy code"}
+              </button>
+              <span className={s.muted} role="status">
+                <SpinnerGap className="spin" /> Waiting for sign-in…
+              </span>
+              {remaining !== null && (
+                <span className={s.muted} aria-live="off">
+                  Code expires in {Math.floor(remaining / 60)}:
+                  {String(remaining % 60).padStart(2, "0")}
+                </span>
+              )}
+              <button
+                type="button"
+                className={`${s.link} ${s.quiet}`}
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    generation.current++;
+                    setAttempt(
+                      await request<GithubLoginAttempt>(
+                        `/api/github/setup/login/${attempt.id}`,
+                        "DELETE",
+                        {},
+                      ),
+                    );
+                  })
+                }
+              >
+                Cancel sign-in
+              </button>
+            </div>
+            <p className={s.muted}>
+              On another browser, open {attempt.verificationUrl}.
             </p>
-            {working && attempt ? (
-              <div className={s.device}>
-                {connected && status.connection && (
-                  <p className={s.hint}>
-                    Using {status.connection.account.login} until the new
-                    sign-in succeeds.
-                  </p>
-                )}
-                <p>Enter this code on GitHub:</p>
-                <div className={s.codeRow}>
-                  <code>{attempt.userCode ?? "Getting code…"}</code>
-                  <button
-                    className={s.textButton}
-                    disabled={!attempt.userCode}
-                    onClick={() => {
-                      void navigator.clipboard
-                        .writeText(attempt.userCode!)
-                        .then(() => setCopied(true))
-                        .catch(() =>
-                          setError("Select the code to copy it manually."),
-                        );
-                    }}
-                  >
-                    <Copy />
-                    {copied ? "Copied" : "Copy code"}
-                  </button>
-                </div>
+          </div>
+        ) : connected && !choosing && status.connection ? (
+          <>
+            <span className={s.avatar} aria-hidden="true">
+              {status.connection.account.login.charAt(0).toUpperCase()}
+            </span>
+            <div>
+              <span className={s.eyebrow} id="github-account-heading">
+                Signed in
+              </span>
+              <h3 role="status">
+                Connected as {status.connection.account.login}
+              </h3>
+              <p>Separate login for Hallvi</p>
+              {status.connection.expiresAt && (
+                <p>
+                  {status.connection.automaticRenewal
+                    ? "Access renews automatically."
+                    : "Sign in again to enable automatic renewal."}
+                </p>
+              )}
+            </div>
+            <div className={s.heroSide}>
+              {status.connection.mode === "app" && (
                 <a
-                  className={s.primary}
-                  href={attempt.verificationUrl}
+                  className={s.btn}
+                  href={status.connection.accessUrl}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open GitHub <ArrowSquareOut />
+                  Choose repositories on GitHub <ArrowSquareOut />
                 </a>
-                <p className={s.hint}>
-                  On another browser, open{" "}
-                  <code className={s.verificationUrl}>
-                    {attempt.verificationUrl}
-                  </code>
-                  .
-                </p>
-                <p role="status">
-                  <SpinnerGap className="spin" /> Waiting for sign-in…
-                </p>
-                {remaining !== null && (
-                  <p aria-live="off">
-                    Code expires in {Math.floor(remaining / 60)}:
-                    {String(remaining % 60).padStart(2, "0")}
-                  </p>
-                )}
+              )}
+              <span className={s.rowSide}>
                 <button
-                  className={s.textButton}
+                  type="button"
+                  className={s.link}
+                  disabled={busy}
+                  onClick={() =>
+                    void act(async () => {
+                      await refresh();
+                      setChoosing(true);
+                    })
+                  }
+                >
+                  Change
+                </button>
+                <button
+                  type="button"
+                  className={`${s.link} ${s.quiet}`}
+                  disabled={busy || working}
+                  onClick={() => setConfirmDisconnect(true)}
+                >
+                  Disconnect
+                </button>
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <span className={s.eyebrow} id="github-account-heading">
+                Not signed in
+              </span>
+              <h3>Public repositories just work</h3>
+              <p>
+                Sign in only when an application’s code is private. The Hallvi
+                App reads the repositories you select on GitHub; connecting
+                changes nothing in them.
+              </p>
+              {!status.registration && (
+                <details className={h.connectionHelp} open>
+                  <summary>This Hallvi release can’t sign in to GitHub</summary>
+                  <p>
+                    That’s a gap in the release, not something you missed.
+                    Public repositories work without any GitHub account. Install
+                    a release that includes GitHub sign-in over this one and
+                    Connect GitHub appears here; applications and history are
+                    kept. You never need to register a GitHub App or paste a
+                    token.
+                  </p>
+                </details>
+              )}
+              {status.detected.issue && <p>{status.detected.issue}</p>}
+            </div>
+            <div className={s.heroSide}>
+              {status.registration && (
+                <button
+                  type="button"
+                  className={s.btn}
                   disabled={busy}
                   onClick={() =>
                     void act(async () => {
                       generation.current++;
+                      setCopied(false);
                       setAttempt(
                         await request<GithubLoginAttempt>(
-                          `/api/github/setup/login/${attempt.id}`,
-                          "DELETE",
+                          "/api/github/setup/login",
+                          "POST",
                           {},
                         ),
                       );
                     })
                   }
                 >
-                  Cancel sign-in
+                  Connect GitHub
                 </button>
-              </div>
-            ) : connected && !choosing && status.connection ? (
-              <>
-                <div className={s.accountRow}>
-                  <div>
-                    <strong className={s.success} role="status">
-                      <Check />
-                      Connected as {status.connection.account.login}
-                    </strong>
-                    <p>Separate login for Hallvi</p>
-                  </div>
-                  <button
-                    className={s.textButton}
-                    disabled={busy}
-                    onClick={() =>
-                      void act(async () => {
-                        await refresh();
-                        setChoosing(true);
-                      })
-                    }
-                  >
-                    Change
-                  </button>
-                </div>
-                {status.connection.expiresAt && (
-                  <p className={s.connectionHelp}>
-                    {status.connection.automaticRenewal
-                      ? "Access renews automatically."
-                      : "Sign in again to enable automatic renewal."}
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className={s.actions}>
-                {status.registration && (
-                  <button
-                    className={s.primary}
-                    disabled={busy}
-                    onClick={() =>
-                      void act(async () => {
-                        generation.current++;
-                        setCopied(false);
-                        setAttempt(
-                          await request<GithubLoginAttempt>(
-                            "/api/github/setup/login",
-                            "POST",
-                            {},
-                          ),
-                        );
-                      })
-                    }
-                  >
-                    Connect GitHub
-                  </button>
-                )}
-                {!status.registration && (
-                  <details className={s.connectionHelp} open>
-                    <summary>
-                      This Hallvi release can’t sign in to GitHub
-                    </summary>
-                    <p>
-                      That’s a gap in the release, not something you missed.
-                      Public repositories work without any GitHub account.
-                      Install a release that includes GitHub sign-in over this
-                      one and Connect GitHub appears here; applications and
-                      history are kept. You never need to register a GitHub App
-                      or paste a token.
-                    </p>
-                  </details>
-                )}
-                {status.detected.issue && (
-                  <p className={s.hint}>{status.detected.issue}</p>
-                )}
+              )}
+              <span className={s.rowSide}>
                 <button
-                  className={s.textButton}
+                  type="button"
+                  className={s.link}
                   disabled={busy}
                   onClick={() =>
                     void act(async () => {
@@ -421,7 +441,8 @@ export function GithubSetupScreen({
                 </button>
                 {connected && (
                   <button
-                    className={s.textButton}
+                    type="button"
+                    className={s.link}
                     disabled={busy}
                     onClick={() => {
                       setChoosing(false);
@@ -431,156 +452,178 @@ export function GithubSetupScreen({
                     Keep current connection
                   </button>
                 )}
-              </div>
-            )}
-            {(error ?? status.issue ?? attempt?.message) &&
-              !confirmDisconnect && (
-                <p role="alert" className={s.error}>
-                  {error ?? status.issue ?? attempt?.message}
-                </p>
-              )}
-            <div className={s.privacy}>
-              <button className={s.textButton} popoverTarget="github-storage">
-                Storage &amp; privacy
-              </button>
-              {status.connection && (
-                <button
-                  className={`${s.textButton} ${s.disconnect}`}
-                  disabled={busy || working}
-                  onClick={() => setConfirmDisconnect(true)}
-                >
-                  Disconnect
-                </button>
-              )}
-            </div>
-          </section>
-          <section className={s.section}>
-            <h2>Repository access</h2>
-            <p className={s.hint}>
-              {status.connection?.mode === "app"
-                ? "Choose on GitHub which repositories Hallvi may reach. Existing applications are checked automatically after reconnecting."
-                : connected
-                  ? "Existing applications are checked automatically after reconnecting. New applications are checked when you add them."
-                  : "Connect an account to check repository access for your applications."}
-            </p>
-            {!connected && (
-              <p className={s.hint}>
-                Public repositories work without a GitHub connection. For a
-                private repository, sign in and then give the Hallvi App access
-                to that repository on GitHub.
-              </p>
-            )}
-            {visibleCheck && (
-              <div
-                className={s.repositoryChecks}
-                aria-live="polite"
-                aria-busy={visibleCheck.checking}
-              >
-                {visibleCheck.checking ? (
-                  <p role="status">
-                    <SpinnerGap className="spin" />
-                    Checking repository…
-                  </p>
-                ) : visibleCheck.error ? (
-                  <p role="alert" className={s.error}>
-                    {visibleCheck.error}
-                  </p>
-                ) : visibleCheck.results.length === 0 ? (
-                  <p className={s.hint}>
-                    No applications to check yet. Add an application to verify
-                    its repository.
-                  </p>
-                ) : (
-                  <>
-                    <p role="status">
-                      {visibleCheck.results.every(
-                        (check) => check.status === "passed",
-                      )
-                        ? "Repository checks passed."
-                        : "Repository checks finished. Some need attention."}
-                    </p>
-                    <ul>
-                      {visibleCheck.results.map((check) => (
-                        <li key={check.applicationId}>
-                          <Link
-                            className={s.textButton}
-                            href={`/applications/${check.applicationId}`}
-                          >
-                            {check.repository}
-                            <ArrowRight />
-                          </Link>
-                          <p
-                            className={
-                              check.status === "passed" ? s.success : s.error
-                            }
-                          >
-                            {check.status === "passed"
-                              ? "Repository access passed."
-                              : check.result}
-                          </p>
-                          {check.status !== "passed" && (
-                            <p className={s.hint}>
-                              After fixing access, open this application and
-                              choose Check again.
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
+                {status.connection && (
+                  <button
+                    type="button"
+                    className={`${s.link} ${s.quiet}`}
+                    disabled={busy || working}
+                    onClick={() => setConfirmDisconnect(true)}
+                  >
+                    Disconnect
+                  </button>
                 )}
-              </div>
-            )}
-            {status.connection?.mode === "app" && (
-              <p>
-                <a
-                  className={s.textButton}
-                  href={status.connection.accessUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Choose repositories on GitHub <ArrowSquareOut />
-                </a>
+              </span>
+            </div>
+          </>
+        )}
+      </section>
+      {(error ?? status.issue ?? attempt?.message) && !confirmDisconnect && (
+        <p role="alert" className={s.error}>
+          {error ?? status.issue ?? attempt?.message}
+        </p>
+      )}
+
+      <section aria-label="Repository access">
+        <h3 className={s.groupTitle} id="github-repositories-heading">
+          Repository access
+          {connected && status.connection && !visibleCheck?.checking && (
+            <button
+              type="button"
+              className={s.link}
+              disabled={busy}
+              onClick={() =>
+                void checkRepositories(
+                  status.connection!.id,
+                  generation.current,
+                )
+              }
+            >
+              {visibleCheck ? "Check again" : "Check my applications"}
+            </button>
+          )}
+        </h3>
+        {!visibleCheck && (
+          <p className={s.fine}>
+            {status.connection?.mode === "app"
+              ? "Choose on GitHub which repositories Hallvi may reach. Existing applications are checked automatically after reconnecting."
+              : connected
+                ? "Existing applications are checked automatically after reconnecting. New applications are checked when you add them."
+                : "Connect an account to check repository access for your applications. Public repositories work without a GitHub connection. For a private repository, sign in and then give the Hallvi App access to that repository on GitHub."}
+          </p>
+        )}
+        {visibleCheck && (
+          <div aria-live="polite" aria-busy={visibleCheck.checking}>
+            {visibleCheck.checking ? (
+              <p className={s.fine} role="status">
+                <SpinnerGap className="spin" /> Checking repository…
               </p>
-            )}
-          </section>
-          <footer className={s.footer}>
-            {visibleCheck?.checking ? (
-              <button className={s.primary} disabled>
-                {returnTo?.label ??
-                  (returnToAdd
-                    ? "Back to add application"
-                    : "View applications")}
-                <ArrowRight />
-              </button>
+            ) : visibleCheck.error ? (
+              <p role="alert" className={s.error}>
+                {visibleCheck.error}
+              </p>
+            ) : visibleCheck.results.length === 0 ? (
+              <p className={s.fine}>
+                No applications to check yet. Add an application to verify its
+                repository.
+              </p>
             ) : (
-              <Link
-                className={s.primary}
-                href={
-                  returnTo?.href ??
-                  (returnToAdd ? "/applications/new" : "/applications")
-                }
-              >
-                {returnTo?.label ??
-                  (returnToAdd
-                    ? "Back to add application"
-                    : "View applications")}
-                <ArrowRight />
-              </Link>
+              <>
+                <p className={s.fine} role="status">
+                  {visibleCheck.results.every(
+                    (check) => check.status === "passed",
+                  )
+                    ? "Repository checks passed."
+                    : "Repository checks finished. Some did not pass."}
+                </p>
+                <ul className={s.rows}>
+                  {visibleCheck.results.map((check) => (
+                    <li
+                      key={check.applicationId}
+                      data-state={
+                        check.status === "passed" ? "connected" : "failed"
+                      }
+                    >
+                      <div className={s.row}>
+                        <span className={s.rowIcon}>
+                          {check.status === "passed" ? <GitBranch /> : <Lock />}
+                        </span>
+                        <span className={s.rowText}>
+                          <Link href={`/applications/${check.applicationId}`}>
+                            <strong>{check.repository}</strong>
+                          </Link>
+                          {check.status !== "passed" && (
+                            <small>
+                              {check.result} After fixing access, open this
+                              application and choose Check again.
+                            </small>
+                          )}
+                        </span>
+                        {check.status === "passed" ? (
+                          <span className={s.ok}>
+                            <Check weight="bold" /> Repository access passed.
+                          </span>
+                        ) : (
+                          <span className={s.warn}>
+                            <Warning weight="bold" /> Needs access
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
-          </footer>
-        </section>
-      </div>
+          </div>
+        )}
+      </section>
+
+      <h3 className={s.groupTitle}>What the Hallvi App may do</h3>
+      <ul className={s.rows}>
+        <li>
+          <div className={s.row}>
+            <span className={s.rowIcon}>
+              <GitBranch aria-hidden="true" />
+            </span>
+            <span className={s.rowText}>
+              <strong>Read code</strong>
+              <small>Only in the repositories you pick on GitHub.</small>
+            </span>
+          </div>
+        </li>
+        <li>
+          <div className={s.row}>
+            <span className={s.rowIcon}>
+              <GitPullRequest aria-hidden="true" />
+            </span>
+            <span className={s.rowText}>
+              <strong>Propose changes</strong>
+              <small>
+                On a branch of its own, as a pull request you review.
+              </small>
+            </span>
+          </div>
+        </li>
+        <li>
+          <div className={s.row}>
+            <span className={s.rowIcon}>
+              <ProhibitInset aria-hidden="true" />
+            </span>
+            <span className={s.rowText}>
+              <strong>Never merges</strong>
+              <small>
+                And never writes to the branch you deploy from. GitHub grants
+                the App write access; Hallvi uses less.
+              </small>
+            </span>
+          </div>
+        </li>
+      </ul>
+      <p className={s.fine}>
+        The login stays on this computer.{" "}
+        <button className={s.link} type="button" popoverTarget="github-storage">
+          Storage &amp; privacy
+        </button>
+      </p>
       <aside
         popover="auto"
         id="github-storage"
-        className={s.help}
+        className={h.help}
         aria-labelledby="github-storage-title"
       >
         <header>
           <h2 id="github-storage-title">Storage &amp; privacy</h2>
           <button
-            className={s.close}
+            className={h.close}
             popoverTarget="github-storage"
             popoverTargetAction="hide"
             aria-label="Close GitHub help"
@@ -645,6 +688,6 @@ export function GithubSetupScreen({
           onConfirm={() => void act(disconnect)}
         />
       )}
-    </main>
+    </SettingsShell>
   );
 }

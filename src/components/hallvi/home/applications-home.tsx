@@ -55,7 +55,7 @@ function situationOf(item: HomeApplication): Situation {
 const WORD: Record<Situation, string> = {
   fine: "Fine",
   working: "Working",
-  needs: "Needs attention",
+  needs: "Worth a look",
   stale: "Not checked",
   new: "New",
 };
@@ -85,7 +85,7 @@ function summary(items: HomeApplication[]) {
   const stale = count("stale");
   const fresh = count("new");
   const parts = [
-    needs && `${needs} ${needs === 1 ? "needs" : "need"} attention`,
+    needs && `${needs} worth a look`,
     working && `${working} in progress`,
     stale && `${stale} not checked yet`,
     fresh && `${fresh} new`,
@@ -131,7 +131,7 @@ export function ApplicationsHome({
         </Link>
         <Link className={s.settings} href="/setup/connections">
           <GearSix aria-hidden="true" />
-          <span>{piReady ? "Settings" : "Settings · Connect ChatGPT"}</span>
+          <span>{piReady ? "Settings" : "Settings · Connect a model"}</span>
         </Link>
       </header>
       <div className={s.content}>

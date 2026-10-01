@@ -207,28 +207,28 @@ export function usualDay(series: SeriesPoint[]) {
   };
 }
 
-export type ScriptAsk = "time" | "goals" | "speed";
+export type ScriptAsk = "time" | "speed";
 
 const ASKED: Record<ScriptAsk, string> = {
   time: "Time on page is measured in the browser, by Hallvi's script.",
-  goals: "Goals are counted in the browser, by Hallvi's script.",
   speed: "Page speed is measured in the browser, by Hallvi's script.",
 };
 
 /**
  * Whether the page offers the script, and in which sentence.
  *
- * Only when the evidence says the log misses something: the application
- * changes pages in the browser, a CDN serves its pages from a cache, or the
- * owner just opened something only the script measures. Never while the
- * script already runs, never before history is kept, and never while there
- * is no log to carry its events.
+ * Whenever history is counted from the log alone. The sentence is the
+ * evidence when there is some — the application changes pages in the
+ * browser, a CDN serves its pages from a cache, or the owner just opened
+ * something only the script measures — and otherwise what only the script
+ * measures. Never while the script already runs, never before history is
+ * kept, and never while there is no log to carry its events.
  */
 export function scriptOffer(
   collection: Collection | null,
   asked: ScriptAsk | null = null,
 ): {
-  reason: ScriptAsk | "browser-pages" | "cached-pages";
+  reason: ScriptAsk | "browser-pages" | "cached-pages" | "more";
   says: string;
 } | null {
   if (!collection?.enabledAt || collection.scriptSince) return null;
@@ -245,12 +245,15 @@ export function scriptOffer(
       reason: "cached-pages",
       says: "A CDN answers some pages from its cache, so those visits never reach the log.",
     };
-  return null;
+  return {
+    reason: "more",
+    says: "The server's log sees page loads. Time on page and page speed happen in the browser.",
+  };
 }
 
 /** What the owner sends Pi when they take the offer. */
 export function scriptDraft(name: string) {
-  return `Add Hallvi's traffic script to ${name}: open the one-line pull request that loads /_hv/s.js from the layout every page shares, and make sure the proxy serves /_hv/. Don't change anything at the proxy that rewrites pages.`;
+  return `Add Hallvi's traffic script to ${name}: use the site's existing analytics consent controls and update its privacy notice. If it has none, offer a small consent prompt and notice using the site's existing design. Keep measurement off until the visitor allows analytics, with an equally easy refusal and later withdrawal. Ask me for missing notice details rather than inventing them. Open a pull request for the include, consent integration and notice, and make sure the proxy serves /_hv/. Don't change anything at the proxy that rewrites pages.`;
 }
 
 /**
@@ -377,12 +380,49 @@ export function momentsOf({
 }
 
 /**
+ * What the server's own log keeps, said only as far as the setup's record
+ * says: a variant that keeps referrers' queries, or a record that does not
+ * say, is never described as removing them.
+ */
+export function serverLogWords(source: Collection["source"]) {
+  const log = "The server keeps its own access log, as web servers do";
+  switch (source?.queries ?? null) {
+    case "removed":
+      return `${log}, with query strings removed — from the address asked for and from the referrer — before a line is written.`;
+    case "path-only":
+      return `${log}, with the query string removed from the address asked for before a line is written; referrers keep theirs there. Hallvi keeps only campaign tags from them.`;
+    case "kept":
+      return `${log}${source?.format === "traefik-json" ? ". Traefik's log cannot be rewritten, so it" : ", and it"} keeps full addresses, query strings included; Hallvi keeps only campaign tags from them.`;
+    default:
+      return source
+        ? `${log}. What it keeps of each address depends on how it was set up; Hallvi keeps only campaign tags.`
+        : `${log}.`;
+  }
+}
+
+/**
+ * The hours a release's line compares, as the owner's clock reads them:
+ * "15:00–17:00 against 12:00–14:00". The hour the release fell in is in
+ * neither.
+ */
+export function comparedWords(impact: ReleaseImpact) {
+  const time = (at: string) =>
+    new Date(at).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  const { before, after } = impact.compared;
+  return `${time(after.from)}–${time(after.to)} against ${time(before.from)}–${time(before.to)}`;
+}
+
+/**
  * The line a release row wears when what followed it is worth saying.
  * Nothing at all when it is not: a quiet release is quiet.
  */
 export function impactLine(impact: ReleaseImpact, now: number) {
   if (!impact.notable) return null;
-  const young = now - Date.parse(impact.releaseAt) < impact.windowMinutes * 6e4;
+  // Still inside the hours it is compared by.
+  const young = now < Date.parse(impact.compared.after.to);
   const lead = young ? "Since this release" : "After this release";
   const [worst, ...rest] = impact.paths;
   const { before, after } = impact;

@@ -18,8 +18,7 @@ import "./presentation.css";
 
 /**
  * `aged` is a pass nobody has needed to repeat: calm, dated, never amber.
- * `stale` is the amber one, and is kept for what needs the owner — Pi's own
- * warning on a record.
+ * `stale` is the amber one, kept for Pi's own warning on a record.
  */
 export type Tone =
   "verified" | "aged" | "stale" | "failed" | "unknown" | "absent";
@@ -55,6 +54,45 @@ export function Working({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * What is unresolved, drawn rather than named: one mark per open thing, an
+ * open ring for a decision awaiting approval and a filled dot for something
+ * that failed, so the difference survives without colour. It is read aloud
+ * as "Unresolved" and what it holds, and draws nothing when nothing is open.
+ */
+export function UnresolvedMarks({
+  tones,
+  inverse = false,
+}: {
+  tones: readonly ("waiting" | "failed")[];
+  /** On a dark surface, such as a pressed filter. */
+  inverse?: boolean;
+}) {
+  if (!tones.length) return null;
+  const failed = tones.filter((tone) => tone === "failed").length;
+  const waiting = tones.length - failed;
+  const said = [
+    failed && `${failed} failed`,
+    waiting && `${waiting} awaiting approval`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return (
+    <span
+      className="hv-marks"
+      data-inverse={inverse || undefined}
+      role="img"
+      aria-label={`Unresolved: ${said}`}
+    >
+      {tones
+        .toSorted((a, b) => Number(b === "failed") - Number(a === "failed"))
+        .map((tone, index) => (
+          <i key={index} data-tone={tone} />
+        ))}
+    </span>
+  );
+}
+
 type Presentation = NonNullable<SavedInformation["presentation"]>;
 
 /** The tone a saved record is read in, and the word that names it. */
@@ -63,7 +101,7 @@ export function toneOf(record: SavedInformation): { tone: Tone; word: string } {
   const status = record.presentation?.status ?? "info";
   if (status === "verified") return { tone: "verified", word: "Verified" };
   if (status === "failed") return { tone: "failed", word: "Failed" };
-  if (status === "warning") return { tone: "stale", word: "Needs attention" };
+  if (status === "warning") return { tone: "stale", word: "Worth a look" };
   return { tone: "unknown", word: "Recorded" };
 }
 

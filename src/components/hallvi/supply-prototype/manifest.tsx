@@ -147,7 +147,7 @@ export function ManifestDirection({
 
       {story.waiting.length > 0 && (
         <div className="axma-waiting" role="status">
-          <h3>Waiting for you</h3>
+          <h3>Not provided yet</h3>
           <ul>
             {story.waiting.map((item) => (
               <li key={item.name}>

@@ -82,14 +82,14 @@ for it to update, and every worktree polling GitHub hourly would be rude.
 A look that finds the release it already knows about stops at the listing
 rather than downloading and re-verifying the same two assets. A look that
 cannot reach the source keeps the answer it had and records why, so the
-version line can say when it last tried and what went wrong instead of
-quietly showing stale certainty. **Check for updates** forces one regardless.
+Hallvi menu at the foot of the sidebar can say when it last looked and what
+went wrong instead of quietly showing stale certainty. **Check for updates** forces one regardless.
 
 Installing stays a button. Nothing in the worker starts an update.
 After the owner starts one, the interface keeps a visible update notice in the
 viewport through download, verification, installation and reconnection. It
 shows the recorded phase and result; a completed or failed notice stays until
-the owner dismisses it. The version line remains in the sidebar, but is not
+the owner dismisses it. Hallvi's row in the sidebar says so too, but is not
 the only place progress appears.
 
 ## What the owner has to supply
@@ -157,7 +157,7 @@ Actions → General before building a draft.
 signature with the public key Hallvi ships, so a key that no longer matches is
 a failed release rather than an update nobody can install. Run **Verify Hallvi
 draft** with the draft version, its exact source revision and an explicit older
-published baseline (currently `0.1.1-alpha.8`). It verifies signed manifests,
+published baseline (currently `0.1.1-alpha.11`). It verifies signed manifests,
 source revision, archive sizes and hashes. Four independent native jobs cover
 clean installation and baseline-to-candidate upgrade on macOS arm64 and
 Ubuntu 24.04 x64. Upgrade jobs create application, main/side-chat and permission
@@ -181,6 +181,21 @@ leaves new installations on the previous release's installer.
 **Discover.** Installations following `alpha` find it at their next check, or
 when the owner presses **Check for updates**. Each checks once an hour at most,
 from the last answer in between.
+
+Discovery considers version tags in descending order before its verified-tag
+cache shortcut; GitHub's release-list order is not an update decision. Tags
+only decide which manifest to fetch first: the signed manifest still owns the
+version, channel and package details. The official bootstrap instead reads
+GitHub's latest-release object and follows its immutable asset URLs. For
+bootstrap, a custom `HALLVI_RELEASE_SOURCE` can serve an exact release object
+or a newest-first list; bootstrap does not sort custom lists or require a JSON
+parser before downloading the runtime.
+
+GitHub's public release list can briefly lag its latest-release object after
+publication; its observed cache lifetime is 60 seconds. If an immediate public
+discovery check still sees the previous release, allow that cache to expire and
+repeat the same read before concluding publication failed. Do not republish or
+change the release to force a cached listing to refresh.
 
 Merging a pull request never reaches any of this.
 
@@ -245,7 +260,8 @@ newest: a signed release naming a different channel is refused, not ranked.
 The channel lives in the signed manifest, not in GitHub's release flags.
 Releases are published as ordinary releases, never prereleases, because GitHub
 never makes a prerelease "latest" and the install line depends on it; the
-version still says alpha. Discovery reads neither flag.
+version still says alpha. The updater accepts the signed alpha channel; the
+official bootstrap follows GitHub’s designated latest release.
 
 ## Testing a release without publishing one
 

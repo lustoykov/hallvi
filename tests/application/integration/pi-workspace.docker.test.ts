@@ -212,7 +212,7 @@ describe.skipIf(process.env.HALLVI_DOCKER_TESTS !== "1")(
             .toContain("Could not find the exact text in src/server.js");
           expect
             .soft(await run("bash", { command: "echo partial; exit 3" }))
-            .toMatch(/partial[\s\S]*Command exited with code 3/);
+            .toMatch(/^Error: partial[\s\S]*Command exited with code 3/);
 
           // Cancelling a running command removes the owned container.
           const cancel = new AbortController();

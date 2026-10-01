@@ -11,18 +11,73 @@ import {
   type TrafficDay,
 } from "@/server/traffic/contract";
 import { dayBounds } from "@/server/traffic/days";
-import { historyOf } from "@/server/traffic/merge";
+import { historyOf, releaseImpact } from "@/server/traffic/merge";
 import { caddyKeptField, parseLine } from "@/server/traffic/parse";
 import {
   LOG_SETUP,
   setupVariant,
   trafficReading,
+  trafficScriptFor,
+  trafficSetup,
 } from "@/server/traffic/pi-tools";
 
 const ZONE = "Europe/Sofia";
+
+it("the shared script opts in to hash routing only through the application's tag", () => {
+  const plain = trafficScriptFor("caddy", "routing-fixture");
+  const configured = trafficScriptFor("caddy", "routing-fixture", "p", true);
+  expect(configured.content).toBe(plain.content);
+  expect(plain.tag).not.toContain("data-hv-hash-routing");
+  expect(
+    trafficScriptFor("caddy", "routing-fixture", undefined, false).tag,
+  ).toBe(plain.tag);
+  expect(configured.tag).toContain('data-hv-page-key="p"');
+  expect(configured.tag).toContain('data-hv-hash-routing="true"');
+  expect(
+    configured.includes.every(({ line }) =>
+      line.includes('data-hv-hash-routing="true"'),
+    ),
+  ).toBe(true);
+  expect(() =>
+    trafficScriptFor(
+      "caddy",
+      "routing-fixture",
+      undefined,
+      "true" as unknown as boolean,
+    ),
+  ).toThrow();
+});
 const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 const noon = (day: string) => dayBounds(day, ZONE).start + 12 * HOUR;
+
+describe("traffic_script", () => {
+  it("keeps two applications' Traefik routers and services separate across repeat setup", () => {
+    const first = trafficScriptFor("traefik", "first-application");
+    const second = trafficScriptFor("traefik", "second-application");
+    expect(trafficScriptFor("traefik", "first-application")).toEqual(first);
+    expect(second.file).toBe(first.file);
+    expect(second.content).toBe(first.content);
+    const serving = (result: typeof first) => {
+      if (typeof result.serving === "string") throw new Error("Not Traefik");
+      return result.serving;
+    };
+    const names = [first, second].map((result) => {
+      const { compose, dynamic } = serving(result);
+      const name = compose.split(":")[0];
+      expect(name).toMatch(/^hallvi-script-[a-f0-9]+$/);
+      expect(compose).toContain(`traefik.http.routers.${name}.rule=`);
+      expect(compose).toContain(`traefik.http.routers.${name}.service=${name}`);
+      expect(compose).toContain(`traefik.http.services.${name}.loadbalancer.`);
+      expect(dynamic.match(new RegExp(`    ${name}:`, "g"))).toHaveLength(2);
+      expect(dynamic).toContain(`service: ${name}`);
+      expect(dynamic).toContain(`url: http://${name}:80`);
+      return name;
+    });
+    expect(names[0]).not.toBe(names[1]);
+    expect(serving(first).caddyfile).toBe(serving(second).caddyfile);
+  });
+});
 
 const collection: Collection = {
   enabledAt: "2026-09-01T00:00:00.000Z",
@@ -33,7 +88,7 @@ const collection: Collection = {
   oldestRetainedAt: null,
   scriptSince: null,
   scriptSilentSince: null,
-  source: { proxy: "Caddy", format: "caddy-json" },
+  source: { proxy: "Caddy", format: "caddy-json", queries: "removed" },
   storedFrom: "2026-09-25",
   logMisses: [],
 };
@@ -120,6 +175,67 @@ describe("read_traffic", () => {
     expect(reading.notes.join(" ")).toMatch(/Never add days together/);
   });
 
+  it("keeps every floor a floor, and says which hours a release compared", () => {
+    const slow = new Array<number>(LATENCY_BUCKETS_MS.length + 1).fill(0);
+    slow[LATENCY_BUCKETS_MS.length] = 50;
+    const whole = stored("2026-09-28", 10);
+    // Counted in parts: its visitors, lists and page speed are floors or
+    // samples; one list also kept only its busiest entries on another day.
+    const parts: TrafficDay = {
+      ...stored("2026-09-27", 30),
+      hours: whole.hours.map((one, index) =>
+        index === 15 ? { ...one, requests: 50, latency: slow } : one,
+      ),
+      vitals: [
+        { path: "/", metric: "LCP", buckets: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4] },
+      ],
+      engagement: [{ path: "/", ms: 60_000, samples: 2 }],
+      partial: ["visitors", "pages", "engagement", "vitals"],
+    };
+    const history = historyOf(
+      [parts, whole],
+      "7d",
+      noon("2026-09-29"),
+      collection,
+      ZONE,
+    );
+    const release = releaseImpact(
+      [parts],
+      new Date(
+        dayBounds("2026-09-27", ZONE).start + 14 * HOUR + 20 * 60_000,
+      ).toISOString(),
+      120,
+      noon("2026-09-29"),
+    );
+    const reading = trafficReading(history, [release]);
+    expect(reading.totals).toMatchObject({
+      p95ResponseMs: "at least 10000",
+      estimatedVisitorsPerDay: "at least 20",
+    });
+    const row = reading.series.rows.find((one) => one[0] === "2026-09-27");
+    expect(row?.[4]).toBe("at least 30");
+    expect(row?.[8]).toBe("at least 10000");
+    expect(reading.lists.pages).toMatchObject({ atLeast: true });
+    expect(reading.pageSpeedP75).toEqual([["/", "LCP", "at least 10000", 4]]);
+    expect(reading.releases?.[0]).toMatchObject({
+      compared: {
+        before: {
+          from: iso(dayBounds("2026-09-27", ZONE).start + 12 * HOUR),
+          to: iso(dayBounds("2026-09-27", ZONE).start + 14 * HOUR),
+        },
+        after: {
+          from: iso(dayBounds("2026-09-27", ZONE).start + 15 * HOUR),
+          to: iso(dayBounds("2026-09-27", ZONE).start + 17 * HOUR),
+        },
+      },
+      after: { p95ResponseMs: "at least 10000" },
+    });
+    const notes = reading.notes.join(" ");
+    expect(notes).toMatch(/only a floor/);
+    expect(notes).toMatch(/Time on page and Page speed.*part of its views/);
+    expect(notes).toMatch(/compared\.before/);
+  });
+
   it("says nothing counted means nobody was counting", () => {
     const reading = trafficReading(
       historyOf(
@@ -172,6 +288,14 @@ describe("traffic_setup", () => {
     expect(conf).toContain("map $http_referer $hallvi_referrer");
   });
 
+  // A proof behind an SPA found $arg_utm_* empty on route loads: the
+  // fallback's internal redirect to /index.html had dropped the query.
+  it("keeps the query through an SPA fallback, so campaign tags are logged", () => {
+    expect(LOG_SETUP.nginx.steps.join("\n")).toContain(
+      "try_files $uri /index.html?$args;",
+    );
+  });
+
   it("gives Caddy from 2.8 a field for every kept key, under the name the reader reads", () => {
     for (const variant of ["caddy", "caddy-2.8"] as const)
       for (const key of KEPT_QUERY_KEYS)
@@ -218,6 +342,21 @@ describe("traffic_setup", () => {
       kept: { utm_campaign: "spring", ref: "hn", utm_source: "news" },
     });
     expect(filtered("/?token=reset-secret")).toBe("/?");
+  });
+
+  it("has each setup's record say what it removes, and Caddy 2.5 say less", () => {
+    for (const [proxy, version, queries] of [
+      ["caddy", "v2.11.4", "removed"],
+      ["caddy", "v2.6.2", "removed"],
+      ["nginx", "nginx/1.30.5", "removed"],
+      ["traefik", "3.7.13", "kept"],
+    ] as const)
+      expect(trafficSetup(proxy, version)).toMatchObject({
+        record: expect.stringContaining(`queries:'${queries}'`),
+      });
+    expect(trafficSetup("caddy", "v2.5.2")).toMatchObject({
+      note: expect.stringContaining("queries:'path-only'"),
+    });
   });
 
   it("gives each installed version its own text, never an upgrade", () => {

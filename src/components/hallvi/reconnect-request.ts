@@ -84,7 +84,7 @@ export function reconnectProgress(
     }
   }
   const text = pending
-    ? "Reconnect is waiting for your decision."
+    ? "Reconnect is awaiting approval."
     : declined
       ? "Reconnect was declined."
       : interrupted ||

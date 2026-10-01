@@ -59,7 +59,7 @@
   color: var(--ax-muted);
   font-variant-numeric: tabular-nums;
 }
-.axhm-filters button:hover:not(:disabled) {
+.axhm-filters button:hover:not(:disabled):not([aria-pressed="true"]) {
   background: #f4f6fa;
 }
 .axhm-filters button[aria-pressed="true"] {

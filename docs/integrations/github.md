@@ -136,6 +136,10 @@ branch editable and what automatic authorizes spelled out: every future commit
 on that branch deploys without a question per commit. The owner sets up nothing
 on GitHub: no webhook, no token, no workflow file.
 
+Choosing **Only when I ask** for a public repository needs no GitHub connection.
+Automatic deployment requires the saved App connection for its recurring branch
+reads; private repositories require that connection in either mode.
+
 Hallvi runs on a computer behind a home router, where GitHub cannot call it, so
 it **looks** rather than listens. The worker asks GitHub where the tracked
 branch is about once a minute, through the saved App connection, with a
