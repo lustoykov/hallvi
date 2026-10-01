@@ -27,6 +27,10 @@ async function panel(page: Page, empty = false) {
     condition: "Initial condition",
     hold: false,
     accepted: null as boolean | null,
+    access: { url: "https://old.example.test", mode: "public" } as {
+      url: string;
+      mode: string;
+    } | null,
   };
   let release: (() => void) | undefined;
   await page.route(`${origin}/**`, async (route) => {
@@ -45,6 +49,7 @@ async function panel(page: Page, empty = false) {
             name: i ? "Second app" : "First app",
             mainChatId: id,
             permissionMode: "always-ask",
+            address: "https://old.example.test",
             page: `${origin}/applications/${id}`,
           })),
         };
@@ -79,7 +84,7 @@ async function panel(page: Page, empty = false) {
             text: `${args.application_id === first ? "First" : "Second"}: ${state.condition}`,
           },
           traffic: { unavailable: true },
-          saved: { release: null, access: null, checkedAt: null },
+          saved: { release: null, access: state.access, checkedAt: null },
           attention: state.attention,
         };
       else
@@ -120,6 +125,18 @@ async function panel(page: Page, empty = false) {
 /** The panel opens on the overview; the composer is in the conversation. */
 const operator = (frame: FrameLocator) =>
   frame.getByRole("tab", { name: /^Operator/ }).click();
+
+test("a removed route does not fall back to the application's old address", async ({
+  page,
+}) => {
+  const p = await panel(page);
+  const address = p.frame.locator("#address");
+  await expect(address).toBeVisible();
+  p.state.access = null;
+  await p.frame.getByRole("button", { name: "More", exact: true }).click();
+  await p.frame.getByRole("menuitem", { name: "Refresh", exact: true }).click();
+  await expect(address).toBeHidden();
+});
 
 test("an in-flight send keeps its key across app switches and panel reload", async ({
   page,

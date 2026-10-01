@@ -8,6 +8,7 @@ import {
   updatePiPreferencesSchema,
 } from "@/server/pi-configuration";
 import { handle } from "@/server/http";
+import { openRouterLogin } from "@/server/openrouter-login";
 import { disconnectPiRequestSchema, parseJsonRequest } from "@/server/schemas";
 
 export const runtime = "nodejs";
@@ -24,6 +25,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return handle(async () => {
     await choosePiSetup(await parseJsonRequest(request, choosePiSetupSchema));
+    openRouterLogin.cancelAll();
+    piLoginCoordinator.cancelAll();
     return getPiSetupStatus();
   });
 }
@@ -33,6 +36,8 @@ export async function PATCH(request: Request) {
     await updatePiPreferences(
       await parseJsonRequest(request, updatePiPreferencesSchema),
     );
+    openRouterLogin.cancelAll();
+    piLoginCoordinator.cancelAll();
     return getPiSetupStatus();
   });
 }

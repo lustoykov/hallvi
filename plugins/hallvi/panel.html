@@ -892,7 +892,9 @@ function renderIdentity() {
   $("avatar").textContent = a.name.trim().charAt(0).toUpperCase();
   $("avatar").style.background = PALETTE[index];
   // Where the application itself is reached, under its name.
-  const access = state.context?.saved?.access ?? (a.address ? { url: a.address, mode: null } : null);
+  const saved = state.context?.saved;
+  // A successful read with no current route must not revive the list's old one.
+  const access = saved && !saved.unavailable ? saved.access : (a.address ? { url: a.address, mode: null } : null);
   const address = $("address");
   address.hidden = !access;
   if (access) {

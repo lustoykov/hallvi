@@ -87,7 +87,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await store.closeDatabase();
-  globalThis.__hallviTraffic?.client.close();
+  await globalThis.__hallviTraffic?.client.close();
   globalThis.__hallviTraffic = undefined;
   storage.close();
   rmSync(root, { recursive: true, force: true });
@@ -458,7 +458,7 @@ it("carries traffic history, and it opens again from the copy", async () => {
   // Without it a recovered controller could recount only what the server's
   // log still holds; the months before would be gone.
   const { app } = await application("Counted");
-  setCollection(app.id, "keep");
+  await setCollection(app.id, "keep");
   const counted = countDay([], {
     day: "2026-09-28",
     timeZone: "UTC",
@@ -470,7 +470,7 @@ it("carries traffic history, and it opens again from the copy", async () => {
     },
     now: Date.parse("2026-09-29T01:00:00.000Z"),
   });
-  expect(writeDay(app.id, counted)).toBe(true);
+  expect(await writeDay(app.id, counted)).toBe(true);
   const copy = await protectController("daily", { access });
   expect(copy?.outcome).toBe("succeeded");
   const opened = openControllerCopy(

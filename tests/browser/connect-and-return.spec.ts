@@ -82,9 +82,9 @@ test(
     const draft = "Does this need a bigger server before the weekend?";
     await page
       .locator(".hv-pi-required")
-      .getByRole("button", { name: "Connect ChatGPT", exact: true })
+      .getByRole("button", { name: "Connect a model", exact: true })
       .click();
-    const card = page.getByRole("region", { name: "Connect ChatGPT" });
+    const card = page.getByRole("region", { name: "Connect a model" });
     await expect(card).toBeVisible();
 
     // Hold an already-issued poll across cancellation: its old waiting result

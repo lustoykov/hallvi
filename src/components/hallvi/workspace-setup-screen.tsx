@@ -1,7 +1,12 @@
 "use client";
 
-import { ArrowLeft, Check, SpinnerGap } from "@phosphor-icons/react";
-import Link from "next/link";
+import {
+  Check,
+  Cube,
+  Desktop,
+  SpinnerGap,
+  Warning,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 
 import type {
@@ -9,24 +14,26 @@ import type {
   WorkspaceSettingStatus,
 } from "@/server/workspace-isolation";
 import type { SetupReturn } from "@/server/setup-return";
-import { HallviMark } from "./hallvi-mark";
-import { SettingsNav } from "./settings-nav";
-import s from "./pi-setup-screen.module.css";
+import { radioKeys, SettingsShell, useToast } from "./settings-shell";
+import s from "./settings.module.css";
 
 const choices: Array<{
   value: WorkspaceIsolation;
   title: string;
-  body: string;
+  line: string;
+  icon: React.ReactNode;
 }> = [
   {
     value: "direct",
     title: "On this computer",
-    body: "A scratch folder holding the repository copy. Pi’s commands run as your user account. Hallvi keeps its own credentials out of their environment, and Pi’s file tools stay inside the folder. These are precautions, not a sandbox.",
+    line: "A scratch folder with the repository copy. Commands run as your user.",
+    icon: <Desktop aria-hidden="true" />,
   },
   {
     value: "docker",
     title: "In Docker",
-    body: "An isolated container with no network and none of your files. Needs Docker running on this computer. Choose it for software you don’t trust.",
+    line: "An isolated container: no network, none of your files.",
+    icon: <Cube aria-hidden="true" />,
   },
 ];
 
@@ -39,115 +46,148 @@ export function WorkspaceSetupScreen({
   returnTo?: SetupReturn;
 }) {
   const [status, setStatus] = useState(initialStatus);
-  const [selected, setSelected] = useState<WorkspaceIsolation>(
-    initialStatus.isolation ?? "direct",
-  );
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<WorkspaceIsolation | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const changed = selected !== status.isolation;
+  const [more, setMore] = useState(false);
+  const { show, toast } = useToast();
+  const current = status.isolation ?? "direct";
 
-  async function save() {
-    setSaving(true);
+  // A choice applies when it is made, like the model: there is nothing else on
+  // this page to save it with.
+  async function choose(isolation: WorkspaceIsolation) {
+    if (saving || isolation === status.isolation) return;
+    setSaving(isolation);
     setError(null);
     try {
       const response = await fetch("/api/setup/workspace", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isolation: selected }),
+        body: JSON.stringify({ isolation }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data)
         throw new Error(data?.error ?? "Could not reach Hallvi. Try again.");
       setStatus(data);
+      show("Saved · applies from the next message");
     } catch (failure) {
       setError((failure as Error).message);
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   }
 
   return (
-    <main className={`hv-setup-shell ${s.root}`}>
-      <header className="hv-setup-topbar">
-        <Link className="hv-setup-brand" href="/applications">
-          <HallviMark size={22} />
-          <span>Hallvi</span>
-        </Link>
-        <Link
-          className="hv-setup-back"
-          href={returnTo?.href ?? "/applications"}
-        >
-          <ArrowLeft /> {returnTo?.label ?? "All applications"}
-        </Link>
-      </header>
-      <div className={s.page}>
-        <SettingsNav current="workspace" returnTo={returnTo} />
-        <div className={s.heading}>
-          <h1>Workspace</h1>
-          <p>Where Pi works on its copy of your repository.</p>
+    <SettingsShell
+      current="workspace"
+      title="Workspace"
+      lead="Where Pi works on its copy of your code."
+      returnTo={returnTo}
+    >
+      <section className={s.hero} aria-label="Where Pi works now">
+        <div>
+          <span className={s.eyebrow}>Pi works</span>
+          <h3>{current === "docker" ? "In Docker" : "On this computer"}</h3>
+          <p>
+            {current === "docker"
+              ? "Isolated. For code you don’t trust."
+              : "Fast and simple. Precautions, not a sandbox."}
+          </p>
+          {status.problem && (
+            <p className={s.problem} role="alert">
+              <Warning aria-hidden="true" />
+              {status.isolation === "docker"
+                ? "Pi can’t use its workspace until Docker is running. It won’t switch to this computer by itself."
+                : status.problem}
+            </p>
+          )}
         </div>
-        <section className={s.card}>
-          <fieldset className={`${s.section} ${s.choices}`}>
-            <legend className={s.visuallyHidden}>Where Pi works</legend>
-            {choices.map((choice) => (
-              <label key={choice.value} className={s.choice}>
-                <input
-                  type="radio"
-                  name="isolation"
-                  value={choice.value}
-                  checked={selected === choice.value}
-                  disabled={saving}
-                  onChange={() => setSelected(choice.value)}
-                />
-                <span>
-                  <strong>
-                    {choice.title}
-                    {choice.value === "direct" && <em> Default</em>}
-                  </strong>
-                  <span className={s.hint}>{choice.body}</span>
-                  {choice.value === "docker" &&
-                    (status.dockerProblem ? (
-                      <span className={s.hint}>
-                        Docker isn’t available now. {status.dockerProblem}
-                      </span>
-                    ) : (
-                      <span className={s.success}>
-                        <Check /> Docker is running
-                      </span>
-                    ))}
+      </section>
+
+      <ul
+        className={s.rows}
+        role="radiogroup"
+        aria-label="Where Pi works"
+        onKeyDown={radioKeys}
+      >
+        {choices.map((choice) => {
+          const unavailable =
+            choice.value === "docker" &&
+            Boolean(status.dockerProblem) &&
+            current !== "docker";
+          return (
+            <li key={choice.value} role="none">
+              <button
+                type="button"
+                role="radio"
+                className={`${s.row} ${s.pick}`}
+                aria-checked={current === choice.value}
+                tabIndex={current === choice.value ? 0 : -1}
+                aria-disabled={unavailable || Boolean(saving)}
+                onClick={() => !unavailable && void choose(choice.value)}
+              >
+                <span className={s.check}>
+                  {saving === choice.value ? (
+                    <SpinnerGap className="spin" aria-hidden="true" />
+                  ) : (
+                    current === choice.value && <Check weight="bold" />
+                  )}
                 </span>
-              </label>
-            ))}
-            {status.problem && !changed && (
-              <p className={s.error} role="alert">
-                {status.isolation === "docker"
-                  ? "Pi can’t use its workspace until Docker is running. It won’t switch to this computer by itself."
-                  : status.problem}
-              </p>
-            )}
-            {error && (
-              <p className={s.error} role="alert">
-                {error}
-              </p>
-            )}
-          </fieldset>
-          <footer className={s.footer}>
-            <span className={s.hint}>
-              Applies from the next message. Application servers still run
-              Docker Compose.
-            </span>
-            <button
-              className={s.primary}
-              type="button"
-              disabled={!changed || saving}
-              onClick={() => void save()}
-            >
-              {saving ? <SpinnerGap className="spin" /> : null}
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </footer>
-        </section>
-      </div>
-    </main>
+                <span className={s.rowIcon}>{choice.icon}</span>
+                <span className={s.rowText}>
+                  <strong>{choice.title}</strong>
+                  <small>{choice.line}</small>
+                </span>
+                {choice.value === "direct" ? (
+                  <span className={s.muted}>Default</span>
+                ) : status.dockerProblem ? (
+                  <span className={s.warn}>
+                    <Warning weight="bold" aria-hidden="true" /> Docker isn’t
+                    running
+                  </span>
+                ) : (
+                  <span className={s.ok}>
+                    <Check weight="bold" aria-hidden="true" /> Docker is running
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {status.dockerProblem && (
+        <p className={s.fine}>
+          Docker isn’t available now. {status.dockerProblem}
+        </p>
+      )}
+      {error && (
+        <p className={s.error} role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        className={`${s.link} ${s.more}`}
+        aria-expanded={more}
+        onClick={() => setMore(!more)}
+      >
+        {more ? "Less" : "What each one protects"}
+      </button>
+      {more && (
+        <div className={s.explain}>
+          <p>
+            <b>On this computer.</b> Pi’s commands run as your user account.
+            Hallvi keeps its own credentials out of their environment, and Pi’s
+            file tools stay inside the folder. A command can still reach what
+            your account can.
+          </p>
+          <p>
+            <b>In Docker.</b> The container has no network and sees only the
+            repository copy. Choose it for software you don’t trust. Application
+            servers still run with Docker Compose either way.
+          </p>
+        </div>
+      )}
+      {toast}
+    </SettingsShell>
   );
 }

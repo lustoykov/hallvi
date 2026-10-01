@@ -1172,22 +1172,22 @@ function renderDevelopment(state) {
     ? `<section class="surface"><h2>Retained applications</h2><p class="footnote">Each keeps its own Hallvi records outside every checkout and is deployed on ${escape(state.host?.address ?? "a shared host")}. One checkout at a time attaches one; this list links to whoever has it and opens none of their records.</p><ul class="plain">${applications
         .map(
           (application) =>
-            `<li><strong>${escape(application.directory)}</strong> <code>${escape(application.id.slice(0, 8))}</code> · ${
+            `<li><div class="row-head"><strong>${escape(application.directory)}</strong><code>${escape(application.id.slice(0, 8))}</code><span class="chip${application.owner ? " pass" : ""}">${application.owner ? "Attached" : "Free"}</span>${application.url ? `<a class="row-end" href="${escape(application.url)}" target="_blank" rel="noreferrer">${escape(application.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a>` : ""}</div><p class="footnote">${escape(application.exercises ?? "")} · schema ${escape(String(application.schema))}, Pi ${escape(application.pi)}</p>${
               application.owner
-                ? `attached from <code>${escape(application.owner.worktree ?? "")}</code> on <strong>${escape(application.owner.branch ?? "detached")}</strong> — <a href="${escape(application.owner.address)}" target="_blank" rel="noreferrer">${escape(application.owner.address)}</a>`
+                ? `<p class="footnote">From <code>${escape(application.owner.worktree ?? "")}</code> on <strong>${escape(application.owner.branch ?? "detached")}</strong> · <a href="${escape(application.owner.address)}" target="_blank" rel="noreferrer">${escape(application.owner.address)}</a></p>`
                 : application.lastStop
-                  ? `free; its last runtime ${application.lastStop === "forced" ? "was stopped before Pi was known to be idle" : "did not detach"}`
-                  : "free"
-            }<br><span class="footnote">${escape(application.exercises ?? "")} · schema ${escape(String(application.schema))}, Pi ${escape(application.pi)}</span>${application.url ? `<br><a href="${escape(application.url)}" target="_blank" rel="noreferrer">${escape(application.url)}</a>` : ""}</li>`,
+                  ? `<p class="footnote">Its last runtime ${application.lastStop === "forced" ? "was stopped before Pi was known to be idle" : "did not detach"}.</p>`
+                  : ""
+            }</li>`,
         )
         .join("")}</ul></section>`
     : "";
 
   const copies = state.backups.length
-    ? `<section class="surface"><h2>Retained environment copies</h2><ul class="plain">${state.backups
+    ? `<section class="surface"><h2>Retained environment copies</h2><ul class="plain compact">${state.backups
         .map(
           (backup) =>
-            `<li><code>${escape(backup.path.replace(/^.*hallvi-dev\//, ""))}</code><br><span class="footnote">${escape(backup.kind)} · ${escape(when(backup.takenAt))}</span></li>`,
+            `<li><code>${escape(backup.path.replace(/^.*hallvi-dev\//, ""))}</code><span class="footnote">${escape(backup.kind)} · ${escape(when(backup.takenAt))}</span></li>`,
         )
         .join("")}</ul></section>`
     : `<section class="surface"><h2>Retained environment copies</h2><p class="footnote">None recorded yet.</p></section>`;
@@ -1279,11 +1279,11 @@ function renderReleases(state) {
     ? `<ul class="plain">${drafts
         .map(
           (release) =>
-            `<li><strong>${escape(release.tagName)}</strong> — ${release.isDraft ? "draft" : "published"}${release.isPrerelease ? " · prerelease" : ""}<br><span class="footnote">${escape(when(release.publishedAt ?? release.createdAt))}</span>${
+            `<li><div class="row-head"><strong>${escape(release.tagName)}</strong><span class="chip${release.isDraft ? " discuss" : " pass"}">${release.isDraft ? "Draft" : "Published"}</span>${release.isPrerelease ? `<span class="chip">Prerelease</span>` : ""}<span class="footnote row-end">${escape(when(release.publishedAt ?? release.createdAt))}</span>${
               release.isDraft
-                ? ` <button class="secondary small" type="button" data-publish="${escape(release.tagName)}">Review and publish</button>`
+                ? `<button class="secondary small" type="button" data-publish="${escape(release.tagName)}">Review and publish</button>`
                 : ""
-            }</li>`,
+            }</div></li>`,
         )
         .join("")}</ul>`
     : `<p class="footnote">No releases yet.</p>`;
@@ -1293,7 +1293,7 @@ function renderReleases(state) {
     ? `<ul class="plain">${runs
         .map(
           (run) =>
-            `<li><a href="${escape(run.url)}" target="_blank" rel="noreferrer">run ${escape(run.databaseId)}</a> — ${escape(run.status)}${run.conclusion ? ` · ${escape(run.conclusion)}` : ""}<br><span class="footnote"><code>${escape(String(run.headSha ?? "").slice(0, 9))}</code> · ${escape(when(run.createdAt))}</span></li>`,
+            `<li><div class="row-head"><a href="${escape(run.url)}" target="_blank" rel="noreferrer">Run ${escape(run.databaseId)}</a><span class="chip${run.conclusion === "success" ? " pass" : run.conclusion === "failure" ? " fail" : ""}">${escape(run.conclusion || run.status)}</span><span class="footnote row-end"><code>${escape(String(run.headSha ?? "").slice(0, 9))}</code> · ${escape(when(run.createdAt))}</span></div></li>`,
         )
         .join("")}</ul>`
     : `<p class="footnote">No workflow runs yet.</p>`;

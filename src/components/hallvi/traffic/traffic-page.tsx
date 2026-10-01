@@ -67,12 +67,6 @@ const RANGE_LABEL: Record<TrafficRange, string> = {
   "30d": "30 d",
 };
 
-const RANGE_WORDS: Record<TrafficRange, string> = {
-  "24h": "24 hours",
-  "7d": "7 days",
-  "30d": "30 days",
-};
-
 const day = (at: string | null) =>
   at
     ? new Date(at).toLocaleDateString("en-GB", {
@@ -196,10 +190,7 @@ function ScriptOffer({
 }) {
   return (
     <div className="tf-offer-line">
-      <p>
-        {says} Hallvi&apos;s script measures after analytics consent — no
-        cookies, no visitor identifier stored in your browser.
-      </p>
+      <p>{says} Measurement starts after analytics consent.</p>
       <button
         type="button"
         className="tf-button"
@@ -629,8 +620,6 @@ export function TrafficPage({
       {offer && (
         <ScriptOffers
           reason={offer.reason}
-          views={history && hasTotals(history) ? history.totals.views : null}
-          range={RANGE_WORDS[range]}
           folded={dismissed === offer.reason}
           onAdd={() => onAsk(scriptDraft(applicationName))}
           onFold={(folded) => {

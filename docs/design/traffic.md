@@ -224,6 +224,8 @@ internet, no cookies and nothing stored in the browser.
   routes added later; initial load, route changes and back/forward each send
   one view. The event carries the route separately (`h`), and Hallvi appends
   it to the physical page name only when the record opts in.
+  An empty fragment names the physical page itself, including a Back or
+  Forward return from a hash route; that view carries no `h` value.
   Hash query values and secondary anchors are stripped. Ordinary anchors,
   key-value fragments (including encoded or malformed credential forms),
   malformed percent encoding and other fragment routing forms are ignored;
@@ -366,8 +368,11 @@ and keeping it drafts the log setup for Pi.
 - **Turning it off** stops the follow at once. Stored totals remain until the
   owner deletes them; the server's logs keep their own retention; Hallvi
   changes nothing on the server by itself.
-- The web process's choice and the worker's writes take the same SQLite write
-  lock before reading whether collection is enabled. A concurrent stop or
+- Traffic storage runs on a dedicated database thread in each process,
+  separate from the thread serving application and conversation records. A
+  Traffic write lock leaves those records and the caller's event loop free.
+  The web process's choice and the collector's writes take the same SQLite
+  write lock before reading whether collection is enabled. A concurrent stop or
   deletion therefore cannot be overwritten by an older collector observation
   or recreate deleted totals.
 - **Removing the application** removes its totals.
@@ -571,6 +576,10 @@ only outside a production build.
    Traffic page's preview panel starts the same live traffic against the
    application's public address for a few minutes. The requests are real
    and come from one machine, so they count in that application's totals
-   from one country.
+   from one country. Its SPA shape synthesizes script events with one view
+   identity per route and one initial document load; it does not execute
+   the application's JavaScript. The script's browser tests establish
+   actual instrumentation behavior. The separate Traffic UI fixtures show
+   imagined states for visual review and do not establish traffic counts.
 4. **No double counting:** page loads with the script, in-app route changes and
    `curl` requests produce exactly the expected views and requests.

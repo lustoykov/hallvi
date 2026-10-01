@@ -8,7 +8,7 @@ const startLogin = vi.hoisted(() =>
 );
 vi.mock("../../../src/server/pi-setup", () => ({
   getPiSetupStatus: async () => ({ state: "needs-auth" }),
-  piLoginCoordinator: { start: startLogin },
+  piLoginCoordinator: { start: startLogin, cancelAll: vi.fn() },
 }));
 
 import { PATCH, POST } from "../../../src/app/api/pi/setup/route";
@@ -137,7 +137,7 @@ describe("Pi setup choice route", () => {
     expect(readPiConfiguration()).toMatchObject({
       mode: "separate",
       providerId: "openai-codex",
-      modelId: "gpt-6-sol",
+      modelId: "gpt-6.1-sol",
       reasoningEffort: "high",
     });
   });

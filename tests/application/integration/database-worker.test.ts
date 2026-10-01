@@ -1,4 +1,6 @@
 import Database from "better-sqlite3";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { once } from "node:events";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -181,6 +183,22 @@ it("keeps application creation atomic, rolls back on an inner failure, and drain
     fixture.exec("DROP TRIGGER refuse_fixture_chat");
     fixture.close();
   }
+});
+
+it("finishes close in a process with no other referenced handles", async () => {
+  const { stdout } = await promisify(execFile)(process.execPath, [
+    "--import",
+    "tsx",
+    "--input-type=module",
+    "--eval",
+    `import { DatabaseClient } from "./src/server/database-client.ts";
+const database = new DatabaseClient(process.argv[1]);
+await database.call("listApplications", []);
+await database.close();
+console.log("closed");`,
+    path,
+  ]);
+  expect(stdout.trim()).toBe("closed");
 });
 
 it("rejects pending and future calls on thread failure without replaying writes", async () => {
