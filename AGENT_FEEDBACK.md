@@ -162,7 +162,7 @@ would make an upgrade's live run a decision instead of an investigation.
 ### AF-042 — Include consent and notices in traffic setup
 
 **+1:** 2026-09-30 — owner's traffic privacy task,
-[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
+[PR #306](https://github.com/lustoykov/hallvi/pull/306), merged.
 
 The cookie-free script's requests enter logs with IP/browser information.
 PR #306 added grant/withdrawal, versioned includes and setup guidance. On

@@ -160,8 +160,8 @@ ${caddyHandles.replace(/^/gm, "\t")}
 
 /**
  * Where the tag goes for the stacks Pi meets most: the layout every page
- * shares. The plain include starts measurement; optional existing site controls can
- * disable it (SCRIPT_PRIVACY). A site that sends a nonce-based
+ * shares. The plain include starts measurement; existing site controls can
+ * optionally disable it (SCRIPT_PRIVACY). A site that sends a nonce-based
  * Content-Security-Policy gives the tag its nonce the way its other scripts
  * get one.
  */
