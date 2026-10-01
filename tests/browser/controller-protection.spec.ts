@@ -26,9 +26,16 @@ test(
       timeout: 30_000,
     });
     const openBackups = async () => {
-      const button = page
-        .getByRole("navigation", { name: "Application workspace" })
-        .getByRole("button", { name: /^Backups/ });
+      const navigation = page.getByRole("navigation", {
+        name: "Application workspace",
+      });
+      await expect(navigation).toBeVisible();
+      const more = navigation.getByRole("button", {
+        name: "Show more",
+        exact: true,
+      });
+      if (await more.isVisible()) await more.click();
+      const button = navigation.getByRole("button", { name: /^Backups/ });
       if ((await button.getAttribute("aria-current")) !== "page")
         await button.click();
     };

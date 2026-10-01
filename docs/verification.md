@@ -21,6 +21,12 @@ Keep temporary source archives for before/after comparisons under `work/`.
 TypeScript, ESLint and Prettier exclude that ignored scratch directory; source
 and tests remain in the normal checks. Remove task-owned archives after retaining the evidence.
 
+Coordinate browser runs and builds when several agents share a memory-limited
+machine. Separate ports prevent address conflicts, not memory pressure: run one
+Next.js browser fixture or production build at a time when concurrent runs cause
+cold compilation or fixture-startup timeouts. Stop only task-owned previews and
+rerun the affected check before attributing a setup timeout to the product.
+
 | What the change needs to prove | Start here |
 | --- | --- |
 | Layout, rendering, empty/error states or ordinary UI interactions | `npm run scenarios -- 3730` on a free port; use the printed scenario URLs and existing browser fixtures in [tests](../tests/README.md#commands-and-limits). These are offline synthetic records, not deployments. |

@@ -52,7 +52,11 @@ test("contextual questions preserve a draft across tab closure and return to the
     await composer.fill("");
     await returned
       .getByRole("navigation", { name: "Application workspace" })
-      .getByRole("button", { name: "Backups", exact: true })
+      .getByRole("button", { name: "Show more", exact: true })
+      .click();
+    await returned
+      .getByRole("navigation", { name: "Application workspace" })
+      .getByRole("button", { name: /^Backups/ })
       .click();
     await returned.getByRole("button", { name: /^Ask Hallvi to look/ }).click();
     await expect(
@@ -115,7 +119,7 @@ test("contextual questions preserve a draft across tab closure and return to the
     await expect(
       returned
         .getByRole("navigation", { name: "Application workspace" })
-        .getByRole("button", { name: "Backups", exact: true }),
+        .getByRole("button", { name: /^Backups/ }),
     ).toBeFocused();
   } finally {
     await returned.close();
