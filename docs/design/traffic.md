@@ -336,6 +336,8 @@ and keeping it drafts the log setup for Pi.
 - **Turning it off** stops the follow at once. Stored totals remain until the
   owner deletes them; the server's logs keep their own retention; Hallvi
   changes nothing on the server by itself.
+- **Forgetting stored totals** deletes them and stops collection. The page
+  drops its loaded totals too; keeping history again starts from a fresh read.
 - Traffic storage runs on a dedicated database thread in each process,
   separate from the thread serving application and conversation records. A
   Traffic write lock leaves those records and the caller's event loop free.
