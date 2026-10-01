@@ -22,6 +22,31 @@ import {
 } from "@/server/traffic/pi-tools";
 
 const ZONE = "Europe/Sofia";
+
+it("the shared script opts in to hash routing only through the application's tag", () => {
+  const plain = trafficScriptFor("caddy", "routing-fixture");
+  const configured = trafficScriptFor("caddy", "routing-fixture", "p", true);
+  expect(configured.content).toBe(plain.content);
+  expect(plain.tag).not.toContain("data-hv-hash-routing");
+  expect(
+    trafficScriptFor("caddy", "routing-fixture", undefined, false).tag,
+  ).toBe(plain.tag);
+  expect(configured.tag).toContain('data-hv-page-key="p"');
+  expect(configured.tag).toContain('data-hv-hash-routing="true"');
+  expect(
+    configured.includes.every(({ line }) =>
+      line.includes('data-hv-hash-routing="true"'),
+    ),
+  ).toBe(true);
+  expect(() =>
+    trafficScriptFor(
+      "caddy",
+      "routing-fixture",
+      undefined,
+      "true" as unknown as boolean,
+    ),
+  ).toThrow();
+});
 const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 const noon = (day: string) => dayBounds(day, ZONE).start + 12 * HOUR;

@@ -81,7 +81,7 @@ export class LiveWindow {
   private readonly salt = randomBytes(16);
   private readonly hosts: readonly string[];
   private readonly pageKey: string | undefined;
-  private readonly countries = new Map<string, string>();
+  private readonly hashRouting: boolean;
   /** Hosts browsers reach with fetch metadata: imitations there are bots. */
   private readonly withMetadata = new Set<string>();
   /** Browsers, by label, and when each was last seen. */
@@ -101,10 +101,12 @@ export class LiveWindow {
   constructor(options: {
     hosts?: readonly string[];
     pageKey?: string;
+    hashRouting?: boolean;
     script: boolean;
   }) {
     this.hosts = options.hosts ?? [];
     this.pageKey = options.pageKey;
+    this.hashRouting = options.hashRouting === true;
     this.script = options.script;
   }
 
@@ -117,14 +119,6 @@ export class LiveWindow {
       .update(`${line.address}\n${line.userAgent}`)
       .digest("hex")
       .slice(0, 10);
-    const country = () => {
-      let found = this.countries.get(visitor);
-      if (found === undefined) {
-        found = countryOf(line.address, line.cdnCountry);
-        this.countries.set(visitor, found);
-      }
-      return found;
-    };
     if (kind.kind === "event") {
       const { event } = kind;
       this.script = true;
@@ -136,9 +130,11 @@ export class LiveWindow {
         this.open.set(event.s, page);
       }
       if (event.t !== "view") return null;
-      const page = eventPage(event, this.pageKey);
-      const load = this.loaded.get(`${visitor} ${page}`);
-      this.loaded.delete(`${visitor} ${page}`);
+      const page = eventPage(event, this.pageKey, this.hashRouting);
+      // Fragments never reach the proxy: pair against the physical page.
+      const loadedPage = eventPage(event, this.pageKey);
+      const load = this.loaded.get(`${visitor} ${loadedPage}`);
+      this.loaded.delete(`${visitor} ${loadedPage}`);
       if (
         load !== undefined &&
         load <= line.at &&
@@ -153,7 +149,7 @@ export class LiveWindow {
         path: page,
         status: line.status,
         ms: line.ms,
-        country: country(),
+        country: countryOf(line.address, line.cdnCountry),
         source:
           arrivalOf({
             referrer: event.r ?? null,
@@ -191,7 +187,7 @@ export class LiveWindow {
           : line.path.slice(0, 200),
       status: line.status,
       ms: line.ms,
-      country: country(),
+      country: countryOf(line.address, line.cdnCountry),
       source: view
         ? (arrivalOf({
             referrer: line.referrer,

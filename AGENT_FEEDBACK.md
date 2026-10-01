@@ -6,45 +6,88 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
+| [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
+| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 2 | Basis fixed in #275; absence-record friction remains |
+| [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | New |
+| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 2 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
-| [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 1 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 1 | New |
-| [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | New |
-| [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | New |
-| [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | New |
-| [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | New |
-| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | New |
-
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 2 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
-
-| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
-
+| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
-
-| [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
-
-| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 1 | New |
-| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 1 | Fix in review |
-| [AF-040 — Keep Pi's replies from summoning the owner](#af-040--keep-pis-replies-from-summoning-the-owner) | 1 | New |
-| [AF-041 — Retire or rewrite the conversation-first capture](#af-041--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
+| [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 2 | New |
+| [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
+| [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
+| [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
+| [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
+| [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
+| [AF-048 — Ask the host for a taller panel inside a conversation](#af-048--ask-the-host-for-a-taller-panel-inside-a-conversation) | 1 | New |
+| [AF-050 — Keep Pi's replies from summoning the owner](#af-050--keep-pis-replies-from-summoning-the-owner) | 1 | New |
+| [AF-051 — Retire or rewrite the conversation-first capture](#af-051--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
-### AF-037 — Close setup requests handled in conversation
+### AF-050 — Keep Pi's replies from summoning the owner
 
-**+1:** 2026-09-30 — stale DNS request repair.
+The product no longer says "Needs you", "Waiting for you" or "Needs
+attention", and `calm-labels.test.ts` keeps them out of the sources. Pi's
+instructions still end by asking for "what needs attention"
+(`src/server/pi.ts`), so a reply can still open on a "Needs attention:"
+heading the guard cannot see. Rewording it wants a live-model check.
 
-Completing DNS through the conversation left its guided card unanswered. The
-plugin promoted it into a current blocker without a date, even after later
-successful releases. This fix gives Pi explicit withdrawal for obsolete open
-setup cards, preserves a hostname supplied after a blank card was opened, and
-shows dated open requests separately from the operator's activity.
+**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
+
+### AF-051 — Retire or rewrite the conversation-first capture
+
+`tests/browser/conversation-first.capture.mjs` still waits for the receipts
+retired on 20 September ("Proposed change · not applied", "Review and approve
+in…", groups named by state), so it cannot run against the current shell.
+Only its wording was updated.
+
+**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
+
+### AF-017 — Make record validation easier for Pi to recover from
+
+During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
+then nine save calls failed because `presentation.checks[].basis` contained
+explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
+the calls and finished, but saving the useful result added avoidable churn.
+Make the tool contract easier to follow without relaxing record validation.
+
+**Status:** The basis-value problem was fixed in [#275](https://github.com/lustoykov/hallvi/pull/275): explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. A bounded real-Pi trial saved valid observed, planned and reported values; future retry-free behavior is not guaranteed.
+
+**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
+[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
+
+
+**+1:** 2026-09-30 — post-merge audit, task
+`01a0f19e-1f49-7d70-947b-28c911465e09`.
+
+A different contract mismatch occurred after verified Linkding cleanup on
+`7013e270`: seven absent-state writes included passed removal checks (and two
+included facts). Validation rejected them; Pi recovered by saving the absence
+states without those fields. The original basis fix is unaffected. Make the
+absence/event distinction easier to write correctly on the first attempt,
+without weakening the rule that an absent application cannot appear healthy.
+This is observed authoring friction, not failed remote cleanup or lost data.
+
+
+### AF-047 — Investigate stdout listener warnings during real Pi turns
+
+**+1:** 2026-09-30 — post-merge audit, task
+`01a0f19e-1f49-7d70-947b-28c911465e09`.
+
+The retained Paperless development controller at `8bbc1ad3` logged
+`MaxListenersExceededWarning` for `SyncWriteStream` during real Pi turns.
+The requests completed normally and browser error logs were empty. Determine
+which listener owner accumulates before proposing a fix; this observation does
+not establish a product failure or justify raising the listener limit.
 
 ## How to contribute
 
@@ -92,76 +135,53 @@ changing their decision.
 
 ## Requests
 
-### AF-039 — Keep new tests tied to useful behavior
+### AF-040 — Say whether a Pi upgrade keeps the shared login readable
 
-The audit follow-up found a redundant script-compilation assertion in
-`traffic-script.test.ts:69`: the neighboring contract tests already execute the
-same served script. Checking that whole-line comments disappeared pins the
-current minification technique without protecting event delivery.
+Attach guards Pi's history format, but every checkout reads the ChatGPT login
+in `~/.config/hallvi/pi` whatever Pi it bundles, and a refresh written by one
+Pi version has to stay readable by the others. Nothing names that boundary.
+Establishing it for 0.99.1 meant diffing `dist/` against another checkout's
+0.87.1, because `pi-ai` and `pi-agent-core` ship no changelog. A line in
+[the development environment](docs/development-environment.md) naming the
+credential file as a boundary, or a check beside the history-format one,
+would make an upgrade's live run a decision instead of an investigation.
 
-Two checks should be narrowed, not deleted wholesale. `traffic-pages.test.tsx:256`
-requires an exact CSS class and attribute sequence; keep proof that a real gap is
-shown and future hours are not treated as missing. `install-line.test.ts:15`
-forbids versioned installer links in every root/docs Markdown file, including
-historical examples. Check the current installation entry points instead; retain
-the regression coverage for the stale installer users actually received.
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`
 
-These are source-review recommendations on `9c99cf3`, not a tested pruning patch
-or evidence that the full suite is unnecessary. Keep privacy, approval,
-Stop/Forget, retained-state ownership and cross-stack behavior coverage.
+### AF-042 — Include consent and notices in traffic setup
 
-**+1:** 2026-09-30 — recent-merge audit follow-up, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+**+1:** 2026-09-30 — owner's traffic privacy task,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
 
-### AF-029 — Keep Traffic database waits off the event loop
+The cookie-free script started collecting immediately; setup offered only
+the include and proxy. Raw event requests still enter logs with IP/browser
+information, and a shared server file plus cached or already-loaded older
+scripts complicates rollout. This task adds explicit grant/withdrawal and
+site-specific notice/control setup, with versioned includes and browser checks.
+It does not establish legal compliance or update existing deployed sites.
 
-Traffic adds synchronous `better-sqlite3` calls in the web and Pi processes,
-after #252 moved the main database work into threads. On merged `9c99cf3`,
-holding a disposable traffic database's write lock for 350 ms made
-`recordCollector` and an unrelated 10 ms timer both take 359 ms. This is a
-contention reproduction, not a measured production incident. Use the existing
-asynchronous database boundary pattern for Traffic while keeping the atomic
-Stop/Forget checks that prevent stale writes from restoring totals.
+### AF-043 — Do not imply automatic sign-up tracking
 
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+**+1:** 2026-09-30 — owner's traffic privacy and goals task,
+[PR #306](https://github.com/lustoykov/hallvi/pull/306) in review.
 
-### AF-030 — Make the Traffic script template safe for a shared Traefik
+“Goals, like sign-ups” appeared as a default benefit although the owner must
+mark those actions in application code. This task removes that checklist row
+and shows the Goals card only when the selected range has recorded goal events.
+Manual event support remains.
 
-`traffic_script` returns the same `hallvi-script` router and service names for
-every app. Reusing its labels with two different host rules under one Traefik
-3.7 produced "HTTP router defined multiple times with different configurations"
-and 404 for both script routes. Removing the second test app restored HTTP 200
-for the first. This tested the supplied routing labels with local stand-in
-backends, not Pi's full installation journey. Give the configuration per-app
-names, or explicitly reuse one shared helper/router with all intended hosts.
+### AF-044 — Keep dashboard UI checks away from real learning progress
 
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+**+1:** 2026-09-30 — developer dashboard polish task.
 
-### AF-031 — Account for hash-routed pages before promising SPA coverage
+A worktree's own dashboard (`HALLVI_DASHBOARD_PORT=… node --experimental-strip-types
+tests/dashboard/server.ts`) opens the learning store in the Git common
+directory, so checking Learn Hallvi's quiz from a branch reads, and would
+write, the owner's real progress. `HALLVI_LEARNING_DB_PATH` exists but starts
+empty. A fresh worktree also has no saved eval answers, so the Eval archive's
+review layout could only be checked after copying `tests/results/evals` from
+another checkout.
 
-The Traffic script compares `location.pathname` and a configured query key;
-`/#/home`, `/#/inbox` and `/#/settings` all become one `/` page. Running the
-shipped script with those route changes emitted one view, while equivalent
-history routes emitted three. The script offer currently promises "Pages
-changed in the app" without this boundary. Support an explicit hash-routing
-mode or state the limitation. Do not collect arbitrary URL fragments: ordinary
-anchors and credential-bearing fragments are not page identities.
-
-A second check with the actual script in the in-app browser and a local HTTP
-event receiver confirmed three history views versus one hash-route view.
-
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
-
-### AF-032 — Bound the live Traffic country cache
-
-`LiveWindow` expires browsers, open pages and loaded-page keys, but never its
-country lookup map. Feeding it 10,000 distinct browser identities, then calling
-`now` 24 hours later, left all 10,000 country entries with zero active browsers
-and zero loaded-page keys. An open Traffic/Overview stream retains every
-identity until it closes, including bot requests. Remove the cache if lookup
-cost allows, or bound/expire it with the live window; avoid another permanent
-visitor registry. This proves retention, not a production memory-exhaustion rate.
-
-**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 ### AF-038 — Check installed versions behind upstream shrinkwraps
 
@@ -175,25 +195,9 @@ claiming a dependency is patched. A compatible upstream Pi update remains a
 follow-up; this release patches Hallvi's direct `ws` runtime to 8.22.0.
 
 **+1:** 2026-09-30 — alpha.12 release preparation, `codex/release-alpha12`
-
-### AF-040 — Keep Pi's replies from summoning the owner
-
-The product no longer says "Needs you", "Waiting for you" or "Needs
-attention", and `calm-labels.test.ts` keeps them out of the sources. Pi's
-instructions still end by asking for "what needs attention"
-(`src/server/pi.ts`), so a reply can still open on a "Needs attention:"
-heading the guard cannot see. Rewording it wants a live-model check.
-
-**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
-
-### AF-041 — Retire or rewrite the conversation-first capture
-
-`tests/browser/conversation-first.capture.mjs` still waits for the receipts
-retired on 20 September ("Proposed change · not applied", "Review and approve
-in…", groups named by state), so it cannot run against the current shell.
-Only its wording was updated.
-
-**+1:** 2026-09-30 — calm labels, `claude/calm-asks`
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`: 0.99.1's shrinkwrap
+still installs `brace-expansion` 5.0.9 under `pi-coding-agent`, so the upgrade
+does not close this.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
@@ -222,6 +226,9 @@ only succeeded or failed. Evidence from `hallvi exec` would read the same for
 both if the workspace kept the code too.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+**+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`: Pi's `bash` now
+returns `structuredContent.exit_code`; the workspace bridge drops it today and
+could pass the code on instead.
 
 ### AF-005 — Let the browser suite use a preinstalled Chromium
 
@@ -379,6 +386,10 @@ test changed. A cheap way to see which journeys currently fail on main would
 separate old breakage from a new change's.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
+**+1:** 2026-09-30 — settings redesign (`claude/settings-redesign`): on main,
+`applications.spec.ts` P1-10 stalls on the synthetic reply ("Writing the
+reply") before it reaches Settings, and `controller-protection.spec.ts` looks
+for Backups, which now sits behind "Show more" in the application sidebar.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
@@ -426,6 +437,12 @@ application details after recovery with an unchanged transcript. Fixed in #293:
 save the key before sending, settle the original app after switching, and refresh
 context after recovery. The checks also cover storage-denied frames.
 
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`). Checked
+natively in Codex with an instrumented copy: `ui/open-link` for an HTTP address
+answers `{}` and opens nothing, `window.open` returns `null` and a
+`target=_blank` link does nothing in the frame; HTTPS opens Codex's browser and
+clipboard writes work. An acknowledged link request is still not an opened page.
+
 ### AF-035 — Say "awaiting approval" while request_approval waits
 
 While Pi's `request_approval` call waited for the owner (Hallvi decides), the
@@ -445,20 +462,47 @@ controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
 retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`): a real
+read-only request sent from the panel was recorded with origin `cli`.
 
-Use this small template; add detail only when useful. Link the overview row to
-the request heading.
+### AF-048 — Ask the host for a taller panel inside a conversation
 
-```markdown
+Opened inside a Codex conversation, the panel's frame is about 330px tall, so
+the overview's traffic bars and setup scroll inside it; the side panel shows it
+whole. Asking the host for the overview's height, if MCP Apps and Codex allow an
+app to, might show it without inner scrolling; neither is checked yet.
+
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`)
+
+### AF-041 — Show OpenRouter credit beside the saved key
+
+OpenRouter is paid per use, and an empty balance only shows up as a refused
+message (402). OpenRouter's `GET /api/v1/key` answers usage and limit without a
+model request; Settings could say "$4.20 left" beside **Key saved**, and the
+Model row could warn before the credit runs out rather than after.
+
+**+1:** 2026-09-30 — OpenRouter models (`claude/openrouter-models`)
+
+Review of [#297](https://github.com/lustoykov/hallvi/pull/297) also found that a
+402 can report a key spending limit. A credit display should distinguish that
+limit from the account balance; the request error now names both possibilities.
+
 ## Archive
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 2 | Resolved in #295 and #313 |
+| [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Resolved in #310 |
+| [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Resolved in #303 and #308 |
+| [AF-032 — Bound the live Traffic country cache](#af-032--bound-the-live-traffic-country-cache) | 1 | Resolved in #301 |
+| [AF-039 — Keep new tests tied to useful behavior](#af-039--keep-new-tests-tied-to-useful-behavior) | 1 | Resolved in #301 |
+| [AF-045 — Keep simulated SPA route identities honest](#af-045--keep-simulated-spa-route-identities-honest) | 1 | Resolved in #308 and #312 |
+| [AF-030 — Make the Traffic script template safe for a shared Traefik](#af-030--make-the-traffic-script-template-safe-for-a-shared-traefik) | 1 | Resolved in #302 |
+| [AF-046 — Preserve uncertain sends when browser storage writes fail](#af-046--preserve-uncertain-sends-when-browser-storage-writes-fail) | 1 | Resolved in #307 |
 | [AF-023 — Discover newer releases despite GitHub listing order](#af-023--discover-newer-releases-despite-github-listing-order) | 1 | Fixed in #285 |
 | [AF-021 — Let manual public deployment proceed without GitHub login](#af-021--let-manual-public-deployment-proceed-without-github-login) | 1 | Fixed in #282 |
 | [AF-019 — Keep deployment failures out of passing server checks](#af-019--keep-deployment-failures-out-of-passing-server-checks) | 1 | Fixed in #280 |
 | [AF-020 — Name failed check groups without claiming they passed](#af-020--name-failed-check-groups-without-claiming-they-passed) | 1 | Fixed in #280 |
-| [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 1 | Fixed in #275 |
 | [AF-006 — Reduce full-history response serialization](#af-006--reduce-full-history-response-serialization) | 3 | Implemented in #272 |
 | [AF-018 — Load the updated interface after an installed upgrade](#af-018--load-the-updated-interface-after-an-installed-upgrade) | 1 | Fixed in #276 |
 | [AF-016 — Keep traffic counting consistent with owner choices and page routes](#af-016--keep-traffic-counting-consistent-with-owner-choices-and-page-routes) | 1 | Fixed in #259 |
@@ -469,6 +513,147 @@ the request heading.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-037 — Close setup requests handled in conversation
+
+**Status:** Resolved in #295 and #313. The fresh-controller acceptance verified
+that normal reconnection removes the stale host card while preserving history.
+
+**+1:** 2026-09-30 — stale DNS request repair.
+
+**+1:** 2026-09-30 — independent post-merge audit, task
+`01a0f19e-1f49-7d70-947b-28c911465e09`: the fresh-controller walkthrough
+connected and SSH-verified the application's host through Pi, while its original
+host card still asked where it should run. The controller had a host attached
+but the request remained open. Pi's successful `connect_server` now dismisses
+only that open host request; failed connections, other requests and settled
+receipts stay intact. The manual machine-card flow still creates its receipt.
+
+Completing DNS through the conversation left its guided card unanswered. The
+plugin promoted it into a current blocker without a date, even after later
+successful releases. This fix gives Pi explicit withdrawal for obsolete open
+setup cards, preserves a hostname supplied after a blank card was opened, and
+shows dated open requests separately from the operator's activity.
+
+### AF-029 — Keep Traffic database waits off the event loop
+
+**Status:** Resolved in #310.
+
+**Implementation:** [PR #310](https://github.com/lustoykov/hallvi/pull/310) moves Traffic to its own database worker and queue, sharing the existing dispatch handling. A real two-second Traffic write lock left production application reads and Pi-alive chat creation responsive. The same work fixes a standalone worker-close exit before the awaited close settled. Combined acceptance is recorded in the audit PR.
+
+Traffic adds synchronous `better-sqlite3` calls in the web and Pi processes,
+after #252 moved the main database work into threads. On merged `9c99cf3`,
+holding a disposable traffic database's write lock for 350 ms made
+`recordCollector` and an unrelated 10 ms timer both take 359 ms. This is a
+contention reproduction, not a measured production incident. Use the existing
+asynchronous database boundary pattern for Traffic while keeping the atomic
+Stop/Forget checks that prevent stale writes from restoring totals.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-031 — Account for hash-routed pages before promising SPA coverage
+
+**Status:** Resolved in #303 and #308.
+
+**Implementation:** [PR #303](https://github.com/lustoykov/hallvi/pull/303) adds explicit hash routing while ignoring anchors and credential fragments. Review also reproduced a missed Back navigation to the empty fragment; [PR #308](https://github.com/lustoykov/hallvi/pull/308) distinguishes that physical root from an ignored fragment. The existing browser cases cover both hash forms and distinct Back/Forward views.
+
+The Traffic script compares `location.pathname` and a configured query key;
+`/#/home`, `/#/inbox` and `/#/settings` all become one `/` page. Running the
+shipped script with those route changes emitted one view, while equivalent
+history routes emitted three. The script offer currently promises "Pages
+changed in the app" without this boundary. Support an explicit hash-routing
+mode or state the limitation. Do not collect arbitrary URL fragments: ordinary
+anchors and credential-bearing fragments are not page identities.
+
+A second check with the actual script in the in-app browser and a local HTTP
+event receiver confirmed three history views versus one hash-route view.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-032 — Bound the live Traffic country cache
+
+**Status:** Resolved in #301.
+
+**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the country map. Warm direct lookup cost was about 52 ms per 100,000 lookups locally, and three arrival/expiry cycles retained no country entries. This is a controlled lookup/retention check, not a production capacity claim.
+
+`LiveWindow` expires browsers, open pages and loaded-page keys, but never its
+country lookup map. Feeding it 10,000 distinct browser identities, then calling
+`now` 24 hours later, left all 10,000 country entries with zero active browsers
+and zero loaded-page keys. An open Traffic/Overview stream retains every
+identity until it closes, including bot requests. Remove the cache if lookup
+cost allows, or bound/expire it with the live window; avoid another permanent
+visitor registry. This proves retention, not a production memory-exhaustion rate.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-039 — Keep new tests tied to useful behavior
+
+**Status:** Resolved in #301.
+
+**Implementation:** [PR #301](https://github.com/lustoykov/hallvi/pull/301) removes the redundant parse/comment assertion, narrows installation-link checks, and asserts the accessible missing-data description instead of CSS structure. Concrete privacy, ownership and retained-state regressions remain.
+
+The audit follow-up found a redundant script-compilation assertion in
+`traffic-script.test.ts:69`: the neighboring contract tests already execute the
+same served script. Checking that whole-line comments disappeared pins the
+current minification technique without protecting event delivery.
+
+Two checks should be narrowed, not deleted wholesale. `traffic-pages.test.tsx:256`
+requires an exact CSS class and attribute sequence; keep proof that a real gap is
+shown and future hours are not treated as missing. `install-line.test.ts:15`
+forbids versioned installer links in every root/docs Markdown file, including
+historical examples. Check the current installation entry points instead; retain
+the regression coverage for the stale installer users actually received.
+
+The recommendations on `9c99cf3` are implemented in #301. The retained default
+suite passed on the combined candidate. Privacy, approval, Stop/Forget,
+retained-state ownership and cross-stack behavior coverage remain.
+
+**+1:** 2026-09-30 — recent-merge audit follow-up, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-045 — Keep simulated SPA route identities honest
+
+**Status:** Resolved in #308 and #312.
+
+The live traffic generator fetched the landing document and script again after
+an in-page navigation, then reused that route's view ID for the landing page.
+An actual HTTP run produced five views with only three identities. The fix in
+[PR #308](https://github.com/lustoykov/hallvi/pull/308) keeps one document load and
+a distinct identity per route. Its focused regression checks delivered events;
+the simulator still synthesizes instrumentation, so real browser-script tests
+remain a separate proof. UI scenario fixtures serve a different visual purpose.
+
+The same review found that completed waits retained their abort listeners.
+[PR #312](https://github.com/lustoykov/hallvi/pull/312) removes each listener when
+its wait settles, including cancellation. Actual CLI diagnostics confirmed zero
+listeners after completion and SIGINT; existing HTTP regressions still pass.
+
+**+1:** 2026-09-30 — post-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-030 — Make the Traffic script template safe for a shared Traefik
+
+**Resolution:** [PR #302](https://github.com/lustoykov/hallvi/pull/302) uses stable application-scoped Traefik names. The generated configuration was checked with two apps under Traefik and with actual Caddy and nginx routes. Proxy configuration differs by server; the script/event contract is shared.
+
+`traffic_script` returns the same `hallvi-script` router and service names for
+every app. Reusing its labels with two different host rules under one Traefik
+3.7 produced "HTTP router defined multiple times with different configurations"
+and 404 for both script routes. Removing the second test app restored HTTP 200
+for the first. This tested the supplied routing labels with local stand-in
+backends, not Pi's full installation journey. Give the configuration per-app
+names, or explicitly reuse one shared helper/router with all intended hosts.
+
+**+1:** 2026-09-30 — recent-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
+
+### AF-046 — Preserve uncertain sends when browser storage writes fail
+
+A readable localStorage can still reject writes because it is full. The panel
+then read an older persisted draft instead of the in-memory draft and request
+key; switching apps could lose the identity needed for a safe retry. Resolved
+in [PR #307](https://github.com/lustoykov/hallvi/pull/307): unsaved drafts stay
+authoritative in memory until storage succeeds. One browser regression covers
+app switching, retry of the same key, acknowledgement and failed removal.
+The unused sent-message set was also removed; it had no readers.
+
+**+1:** 2026-09-30 — post-merge audit, task `01a0f19e-1f49-7d70-947b-28c911465e09`
 
 ### AF-023 — Discover newer releases despite GitHub listing order
 
@@ -525,18 +710,6 @@ host checks must still report failure.
 keeps the application failure visible and the passed host checks consistent
 with the timeline. Verification workflow guidance worked as written.
 
-### AF-017 — Make record validation easier for Pi to recover from
-
-During the real alpha.9 acceptance fixture, Pi deployed and verified the app,
-then nine save calls failed because `presentation.checks[].basis` contained
-explanatory prose instead of `observed`, `planned` or `reported`. Pi corrected
-the calls and finished, but saving the useful result added avoidable churn.
-Make the tool contract easier to follow without relaxing record validation.
-
-**Status:** Fixed in [#275](https://github.com/lustoykov/hallvi/pull/275): explicit basis values in the tool description and runtime prompt, a complete check example, and an actionable validation error directing explanations to `detail`. Accepted values and save-time requirements stay the same. A bounded real-Pi trial saved valid observed, planned and reported values; future retry-free behavior is not guaranteed.
-
-**+1:** 2026-09-29 — installed alpha.9 acceptance (`codex/alpha9-acceptance`),
-[release evidence #267](https://github.com/lustoykov/hallvi/pull/267).
 
 ### AF-018 — Load the updated interface after an installed upgrade
 
@@ -717,3 +890,23 @@ together while the surrounding status wraps.
 The [390px capture](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/candidate/finding-narrow.png)
 and [verification report](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md)
 show `2m 0s` and the longer quiet-time phrase together without page overflow.
+
+### AF-049 — Do not revive a removed plugin address
+
+Refreshing the plugin could restore an old application-list address after saved
+records no longer provided a valid current route. A successful records read must
+be authoritative, including an absent route.
+
+**+1:** 2026-10-01 — review of #309.
+
+**Status:** Fixed in #309 with a refresh regression check.
+
+### AF-052 — Keep selected history filters readable on hover
+
+The hover background overrode the dark selected background while the count and
+unresolved marks kept their light colors. Clicking a filter left its content
+almost invisible beneath the pointer.
+
+**+1:** 2026-10-01 — independent review of #304.
+
+**Status:** Fixed in #304 by limiting the pale hover treatment to unselected filters; verified in the scenario browser.

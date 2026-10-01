@@ -67,12 +67,6 @@ const RANGE_LABEL: Record<TrafficRange, string> = {
   "30d": "30 d",
 };
 
-const RANGE_WORDS: Record<TrafficRange, string> = {
-  "24h": "24 hours",
-  "7d": "7 days",
-  "30d": "30 days",
-};
-
 const day = (at: string | null) =>
   at
     ? new Date(at).toLocaleDateString("en-GB", {
@@ -196,10 +190,7 @@ function ScriptOffer({
 }) {
   return (
     <div className="tf-offer-line">
-      <p>
-        {says} Hallvi&apos;s script counts them in the browser — no cookies,
-        nothing kept there.
-      </p>
+      <p>{says} Measurement starts after analytics consent.</p>
       <button
         type="button"
         className="tf-button"
@@ -383,12 +374,18 @@ function Foot({
         )}
         {!script && kept && !asked && (
           <button type="button" className="tf-link" onClick={onAsked}>
-            Goals and page speed
+            Page speed
           </button>
         )}
         {error && <span className="tf-error">{error}</span>}
       </div>
       {asked}
+      {script && (
+        <p className="tf-foot-quiet">
+          Consent-gated script measurements cover visitors who allow analytics,
+          so they can understate total use.
+        </p>
+      )}
       <p className="tf-foot-quiet">
         Hallvi keeps totals on this computer, never an address.{" "}
         {serverLogWords(collection.source)}{" "}
@@ -623,8 +620,6 @@ export function TrafficPage({
       {offer && (
         <ScriptOffers
           reason={offer.reason}
-          views={history && hasTotals(history) ? history.totals.views : null}
-          range={RANGE_WORDS[range]}
           folded={dismissed === offer.reason}
           onAdd={() => onAsk(scriptDraft(applicationName))}
           onFold={(folded) => {
@@ -744,7 +739,7 @@ export function TrafficPage({
         asked={asked ? lockedOffer(asked) : null}
         onToggle={() => perform(collection.enabledAt ? "stop" : "keep")}
         onForget={() => setForgetting(true)}
-        onAsked={() => setAsked("goals")}
+        onAsked={() => setAsked("speed")}
       />
       {forgetting && (
         <ConfirmActionDialog

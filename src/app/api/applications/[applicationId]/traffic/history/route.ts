@@ -31,7 +31,7 @@ export async function GET(
     const timeZone = controllerTimeZone();
     const { from, to } = historyDays(range as TrafficRange, now, timeZone);
     return historyOf(
-      readDays(applicationId, from, to),
+      await readDays(applicationId, from, to),
       range as TrafficRange,
       now,
       await currentCollection(applicationId, now),

@@ -6,23 +6,25 @@ The active delivery sequence for the application operator redesign. [Product](PR
 
 **Current priority: run the public self-service beta.** On 18 September 2026, the owner asked for a pleasant experience without additional machinery and to move into launch preparation once further polish has diminishing returns. The owner-authorized alpha.11 release rehearsal is complete; use beta feedback to guide the next increments rather than expanding application complexity.
 
-Connect real saved records and execution evidence to the accepted reference designs through the [presentation contract](docs/presentation-contract.md). Pi supplies structured observations; deterministic view projections and components own the layout and visual hierarchy. Polish the journey from adding a repository through permissions, visible progress and a verified result to opening the application from the user's PC. Continue the owner’s beta review of this complete experience, including refresh and return visits. A fresh isolated account completed sign-in, public-repository inspection and manual deployment with real API checks; Chrome blocked opening that private route, so complete fresh-user browser acceptance and independent external onboarding remain unverified.
+Connect real saved records and execution evidence to the accepted reference designs through the [presentation contract](docs/presentation-contract.md). Pi supplies structured observations; deterministic view projections and components own the layout and visual hierarchy. Polish the journey from adding a repository through permissions, visible progress and a verified result to opening the application from the user's PC. Continue the owner’s beta review of this complete experience, including refresh and return visits. A fresh isolated account previously completed sign-in, public-repository inspection and manual deployment with real API checks; Chrome blocked opening that private route. The [30 September audit](docs/research/2026-09-30-post-merge-scope.md) separately verified a fresh controller using the existing account and a packaged foreground runtime: a browser-created Linkding bookmark survived container recreation, controller restart and private-route reconnection. Retained Paperless also passed real background ingestion and authenticated search. These agent rehearsals do not establish fresh-account native installation or independent external onboarding.
 
 Keep the scope on the views and interactions needed by that journey. Medium and more complicated applications and broader ongoing care follow this UI/UX checkpoint. Broad security hardening is deferred until after beta; during beta, communicate current risks and practical precautions without turning this into a new architecture project.
 
 ## Private Codex and ChatGPT plugin proof of concept
 
 **Implemented in [#283](https://github.com/lustoykov/hallvi/pull/283) and
-[#293](https://github.com/lustoykov/hallvi/pull/293), reviewed 30 September 2026.**
+[#293](https://github.com/lustoykov/hallvi/pull/293), reviewed 30 September 2026;
+redesigned overview-first in [#309](https://github.com/lustoykov/hallvi/pull/309).**
 The owner requested using an existing Hallvi controller through Codex locally
 or over SSH, with a ChatGPT application panel. The [plugin proof of
 concept](docs/hallvi-plugin.md) reuses the existing operator and CLI contract.
-Its panel is a compact Hallvi built around the main operator: ask, follow,
-read the result and continue, with condition, traffic and errors as context.
-Approvals remain in Hallvi. Public hosting, account infrastructure and
-directory submission are outside this experiment. Native Codex use has been
-observed; ChatGPT and the installed-plugin sidebar entry remain unverified.
-The updated panel has not been rechecked over SSH to the Mac mini.
+Its panel opens on the application (what needs the owner, condition,
+deployment, traffic and setup), with the main operator's conversation one tab
+away and each part linked to its page in Hallvi. Approvals remain in Hallvi. Public hosting,
+account infrastructure and directory submission are outside this experiment.
+Native Codex rendering in a conversation and in the side panel has been
+observed; ChatGPT, a newly installed plugin's sidebar entry and the SSH route
+to a remote controller remain unverified for this panel.
 
 ## Selected product increments
 
@@ -140,6 +142,8 @@ The owner runs the beta. On 29 September 2026, the owner authorized publication 
 - [x] **Requests from a terminal — merged in [PR #241](https://github.com/lustoykov/hallvi/pull/241), 29 September 2026.** `hallvi apps`, `exec`, `wait` and `inspect` let a person, a script or a coding agent send work to an application's main conversation through a named controller's loopback API, and read back the Pi operation that took it: its status, Pi's answer and bounded, redacted evidence. Approvals, input and interrupted work are handed back to Hallvi's page, never answered by the command. Checked through the development workflow against retained applications (uptime-kuma, whoami), with Pi 0.87.1 accepted for both after a snapshot trial. [Contract and limits](docs/cli.md). The [MCP adapter proof of concept](docs/hallvi-plugin.md) now reuses this client locally or over SSH. An interactive `attach`, an explicit `resume`, application creation and direct remote-controller CLI access remain deferred.
 
 ## Traffic
+
+- [ ] **Consent and privacy notice for browser analytics — [PR #306](https://github.com/lustoykov/hallvi/pull/306) in review, 30 September 2026.** Default-off measurement with explicit grant and immediate withdrawal; setup reuses existing controls or offers a prompt and completed notice in the site's design through the existing owner-reviewed PR. Versioned includes and browser checks cover stale-script rollout. Remove the default sign-up goal claim; goals still require owner instrumentation. Script figures cover consenting visitors. Local checks do not establish legal compliance or deployed-site acceptance. [Design](docs/design/traffic.md#analytics-consent-and-privacy-notice).
 
 - [x] **Who uses the application, and how it is doing — [PR #259](https://github.com/lustoykov/hallvi/pull/259).** Asked for by the owner on 28–29 September 2026: live arrivals, a world map, 24 h/7 d/30 d history, pages, sources, countries and devices, errors with the visitors they reached, deploy markers and a before/after line per release, shown in Traffic, Overview, Deployment and Monitoring without a model call. Counted from Caddy, nginx or Traefik access logs, and from Hallvi's optional script through the same log; recounted from the log so a restart cannot count twice. The review fixes preserve Stop/Forget across concurrent writes, configured query page routes, and one initial live arrival. [Design](docs/design/traffic.md). Dev-app seeding and live existing-nginx/Cloudflare verification remain follow-up work. Not a prerequisite for the beta.
 

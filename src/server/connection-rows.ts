@@ -12,8 +12,16 @@ export interface ConnectionApplication {
 
 /** What Hallvi itself is signed in to, as its own settings report it. */
 export interface OwnAccounts {
-  /** A ChatGPT login is saved. It has not necessarily been used. */
-  model: { saved: boolean; issue: string | null };
+  /**
+   * A login for the active model is saved. It has not necessarily been used.
+   * `provider` and `model` name it: "OpenRouter", "Claude Sonnet 5".
+   */
+  model: {
+    saved: boolean;
+    issue: string | null;
+    provider: string;
+    model: string;
+  };
   github: {
     account: string | null;
     issue: string | null;
@@ -106,30 +114,33 @@ export function connectionRows(facts: ConnectionFacts): ConnectionItem[] {
     // Hallvi's own two accounts come first: nothing else can happen without a
     // model, and the rest of this page is about the owner's providers.
     {
-      id: "chatgpt",
-      name: "ChatGPT",
-      purpose: "The model Hallvi thinks and replies with.",
+      id: "model",
+      name: "Model",
+      purpose:
+        "The model Hallvi thinks and replies with, through ChatGPT or OpenRouter.",
       state: facts.own.model.issue
         ? "failed"
         : facts.own.model.saved
           ? "connected"
           : "not-connected",
-      // Saved is not proven: nothing is asked of ChatGPT until a message is
-      // sent, so this never claims the login works.
+      // Saved is not proven: nothing is asked of the model until a message
+      // is sent, so this never claims the login works.
       detail: facts.own.model.issue
         ? facts.own.model.issue
         : facts.own.model.saved
-          ? "Login saved. ChatGPT checks it when you send a message."
+          ? `${facts.own.model.model} through ${facts.own.model.provider}. ${facts.own.model.provider} checks it when you send a message.`
           : "Not connected. Hallvi cannot read, plan or reply without it.",
       credential: facts.own.model.saved
-        ? "Login held by this controller"
+        ? facts.own.model.provider === "OpenRouter"
+          ? "Key held by this controller · paid per use"
+          : "Login held by this controller"
         : null,
       // Signing in belongs here, beside the row that asked for it. Changing
       // an account that is already saved does not: that page holds the model
       // preferences and the way to sign out, and a card cannot.
       action: facts.own.model.saved
         ? { kind: "link", href: "/setup/pi", label: "Change" }
-        : { kind: "form", form: "chatgpt", label: "Connect ChatGPT" },
+        : { kind: "form", form: "model", label: "Connect a model" },
     },
     {
       id: "github",

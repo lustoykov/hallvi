@@ -116,9 +116,9 @@ beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hv-traffic-close-"));
   vi.stubEnv("HALLVI_DB_PATH", join(root, "hallvi.db"));
 });
-afterAll(() => {
+afterAll(async () => {
   vi.useRealTimers();
-  globalThis.__hallviTraffic?.client.close();
+  await globalThis.__hallviTraffic?.client.close();
   globalThis.__hallviTraffic = undefined;
   rmSync(root, { recursive: true, force: true });
   vi.unstubAllEnvs();
@@ -147,27 +147,31 @@ describe("a day's close", () => {
     const zone = controllerTimeZone();
     const day = dayOf(Date.parse("2026-09-29T12:00:00Z"), zone);
     const { start, end } = dayBounds(day, zone);
-    const stored = () => readDays("app", day, day)[0];
-    const requests = () =>
-      stored().hours.reduce((sum, hour) => sum + hour.requests, 0);
+    const stored = async () => (await readDays("app", day, day))[0];
+    const requests = async () =>
+      (await stored()).hours.reduce((sum, hour) => sum + hour.requests, 0);
 
     vi.useFakeTimers({ now: end - 60_000 });
-    setCollection("app", "keep");
+    await setCollection("app", "keep");
     server.oldest = start;
     server.log = [request(end - 50_000), request(end - 40_000)];
     server.followed = [server.log[0]];
 
     const stop = new AbortController();
     const collector = trafficCollector(stop.signal);
+    server.on = null;
     await collector.tick();
+    await vi.waitFor(() => expect(server.on).not.toBeNull());
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(stored()).toMatchObject({ final: false });
-    expect(requests()).toBe(1);
+    await vi.waitFor(async () =>
+      expect(await stored()).toMatchObject({ final: false }),
+    );
+    await vi.waitFor(async () => expect(await requests()).toBe(1));
 
     // Past midnight the day is still written as the follow saw it, and never
     // as final, however late.
     await vi.advanceTimersByTimeAsync(end + FINAL_AFTER_MS - 300 - Date.now());
-    expect(stored().final).toBe(false);
+    expect((await stored()).final).toBe(false);
     expect(server.reads).toEqual([]);
 
     // A request of the new day, so a write is due at the very tick the day
@@ -175,10 +179,12 @@ describe("a day's close", () => {
     server.push(request(Date.now()));
     await vi.advanceTimersByTimeAsync(1_000);
     // From a few minutes before the day, for what the log counted there.
-    expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]);
-    expect(stored().final).toBe(true);
-    expect(requests()).toBe(2);
-    expect(stored().coverage).toEqual({
+    await vi.waitFor(() =>
+      expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]),
+    );
+    await vi.waitFor(async () => expect((await stored())?.final).toBe(true));
+    expect(await requests()).toBe(2);
+    expect((await stored()).coverage).toEqual({
       from: new Date(start).toISOString(),
       to: new Date(end).toISOString(),
       gaps: [],
@@ -192,9 +198,9 @@ describe("a day's close", () => {
     const zone = controllerTimeZone();
     const day = dayOf(Date.parse("2026-10-02T12:00:00Z"), zone);
     const { start, end } = dayBounds(day, zone);
-    const stored = () => readDays("app", day, day)[0];
-    const requests = () =>
-      stored().hours.reduce((sum, hour) => sum + hour.requests, 0);
+    const stored = async () => (await readDays("app", day, day))[0];
+    const requests = async () =>
+      (await stored()).hours.reduce((sum, hour) => sum + hour.requests, 0);
 
     // A container that has written nothing yet: its listing is empty.
     vi.useFakeTimers({ now: end - 60_000 });
@@ -204,7 +210,9 @@ describe("a day's close", () => {
     server.reads = [];
     const stop = new AbortController();
     const collector = trafficCollector(stop.signal);
-    collector.tick();
+    server.on = null;
+    await collector.tick();
+    await vi.waitFor(() => expect(server.on).not.toBeNull());
     await vi.advanceTimersByTimeAsync(2_000);
 
     // Then traffic, of which the follow saw one request of two.
@@ -212,14 +220,16 @@ describe("a day's close", () => {
     server.oldest = end - 50_000;
     server.push(server.log[0]);
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(requests()).toBe(1);
+    await vi.waitFor(async () => expect(await requests()).toBe(1));
 
     await vi.advanceTimersByTimeAsync(
       end + FINAL_AFTER_MS + 1_000 - Date.now(),
     );
-    expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]);
-    expect(stored().final).toBe(true);
-    expect(requests()).toBe(2);
+    await vi.waitFor(() =>
+      expect(server.reads).toEqual([{ from: start - LOOKBACK_MS, to: end }]),
+    );
+    await vi.waitFor(async () => expect((await stored())?.final).toBe(true));
+    expect(await requests()).toBe(2);
 
     stop.abort();
     await collector.stop();
@@ -235,7 +245,9 @@ describe("a day's close", () => {
     server.scripted = true;
     const stop = new AbortController();
     const collector = trafficCollector(stop.signal);
-    collector.tick();
+    server.on = null;
+    await collector.tick();
+    await vi.waitFor(() => expect(server.on).not.toBeNull());
     await vi.advanceTimersByTimeAsync(500);
     const on = server.on!;
     on.ready?.();
@@ -244,16 +256,23 @@ describe("a day's close", () => {
     on.line(request(start + 3_600_000));
     // A long pause in the middle of a big backlog is not the end of it.
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(collectionOf("app")).toMatchObject({
-      state: "catching-up",
-      detail: "0% of access.log",
-    });
-    expect(readDays("app", day, day)).toEqual([]);
+    await vi.waitFor(async () =>
+      expect(await collectionOf("app")).toMatchObject({
+        state: "catching-up",
+        detail: "0% of access.log",
+      }),
+    );
+    expect(await readDays("app", day, day)).toEqual([]);
     on.backlog?.({ file: "access.log", read: 1000, total: 1000, done: true });
     await vi.advanceTimersByTimeAsync(500);
-    expect(collectionOf("app")).toMatchObject({ state: "live", detail: null });
+    await vi.waitFor(async () =>
+      expect(await collectionOf("app")).toMatchObject({
+        state: "live",
+        detail: null,
+      }),
+    );
     expect(
-      readDays("app", day, day)[0].hours.reduce(
+      (await readDays("app", day, day))[0].hours.reduce(
         (sum, hour) => sum + hour.requests,
         0,
       ),

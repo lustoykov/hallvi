@@ -26,6 +26,14 @@ it("keeps a useful reason while omitting secrets, payloads, URLs, paths and stac
   expect(
     nativeFailure("model", "x".repeat(600), (text) => text).reason?.length,
   ).toBe(400);
+  // OpenRouter's spent balance says what to do about it, not "try again".
+  const credit = nativeFailure(
+    "model",
+    "402 This request requires more credits, or fewer max_tokens.",
+    (text) => text,
+  );
+  expect(credit.category).toBe("credit");
+  expect(failureText(credit)).toContain("Add credit on openrouter.ai");
   const missing = nativeFailure("model", undefined, (text) => text);
   expect(missing.reason).toBeNull();
   expect(failureText(missing)).toContain("without recording a reason");

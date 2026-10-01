@@ -42,7 +42,7 @@ describe("application navigation", () => {
     );
     expect(html).toContain("Add your first application");
     expect(html).toContain('href="/applications/new"');
-    expect(html).toContain("Settings · Connect ChatGPT");
+    expect(html).toContain("Settings · Connect a model");
     expect(html).not.toContain("todo-fastapi");
     expect(html).not.toContain("upstream image");
   });

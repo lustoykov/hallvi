@@ -41,7 +41,7 @@ export async function GET(
     };
 
     const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
+      async start(controller) {
         const send = (event: LiveEvent) => {
           if (!session.signal.aborted)
             controller.enqueue(
@@ -98,13 +98,15 @@ export async function GET(
         // in the totals; before that, from the log.
         let script = false;
         try {
-          script = Boolean(collectionOf(applicationId).scriptSince);
+          script = Boolean((await collectionOf(applicationId)).scriptSince);
         } catch {
           // No totals to read: the stream still tells the log's story.
         }
+        if (session.signal.aborted) return;
         const window = new LiveWindow({
           hosts: log.hosts,
           pageKey: log.pageKey,
+          hashRouting: log.hashRouting,
           script,
         });
         let pending: Arrival[] = [];

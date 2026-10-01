@@ -405,22 +405,24 @@ export function Breakdowns({
           at all: the page mentions them once, quietly, in its footer. */}
       {script && (
         <>
-          <Card
-            title="Goals"
-            tabs={[
-              {
-                id: "goals",
-                label: "Goals",
-                body: (
-                  <Rows
-                    rows={ranked(history.goals)}
-                    partial={partial("goals")}
-                    empty="No goal was reached in this range. A goal is hv('signup') in the page, or data-hv-goal on a button."
-                  />
-                ),
-              },
-            ]}
-          />
+          {history.goals.length > 0 && (
+            <Card
+              title="Goals"
+              tabs={[
+                {
+                  id: "goals",
+                  label: "Goals",
+                  body: (
+                    <Rows
+                      rows={ranked(history.goals)}
+                      partial={partial("goals")}
+                      empty="No goal was reached in this range."
+                    />
+                  ),
+                },
+              ]}
+            />
+          )}
           <Card
             title="Page speed"
             tabs={[

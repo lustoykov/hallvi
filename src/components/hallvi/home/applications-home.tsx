@@ -131,7 +131,7 @@ export function ApplicationsHome({
         </Link>
         <Link className={s.settings} href="/setup/connections">
           <GearSix aria-hidden="true" />
-          <span>{piReady ? "Settings" : "Settings · Connect ChatGPT"}</span>
+          <span>{piReady ? "Settings" : "Settings · Connect a model"}</span>
         </Link>
       </header>
       <div className={s.content}>

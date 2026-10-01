@@ -1,7 +1,7 @@
 /* A new learning view inside the developer dashboard's existing world. */
 .learn {
   max-width: 1440px;
-  padding: 32px 36px 60px;
+  padding: 32px 40px 72px;
 }
 .learn-heading,
 .learn-section-heading,
@@ -11,27 +11,48 @@
   justify-content: space-between;
   gap: 24px;
 }
-.learn-heading h1 {
-  font-size: 28px;
-}
 .learn-heading p {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--muted);
 }
+/* Source identity reads as one quiet meta line under the heading. */
 .learn-refresh {
-  margin: 20px 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 14px;
+  margin: 18px 0 8px;
 }
 .learn-refresh .learn-checkout {
-  margin: 0 0 6px;
-  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.learn-refresh .learn-checkout::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green-bar);
+  box-shadow: 0 0 0 3px var(--green-bg);
 }
 .learn-review-summary {
-  margin: 0 0 16px;
+  margin: 0 0 20px;
   font-size: 13px;
 }
 .learn-review-summary summary {
   cursor: pointer;
-  color: var(--muted);
+  color: var(--blue);
+  font-weight: 500;
+  width: fit-content;
+}
+.learn-review-summary summary:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .learn-review-summary p {
   margin-top: 10px;
@@ -45,24 +66,46 @@
 }
 .learn-toolbar {
   border-bottom: 1px solid var(--line);
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 .learn-views {
   display: flex;
-  gap: 28px;
+  gap: 24px;
 }
 .learn-views a {
   display: inline-flex;
-  gap: 8px;
-  padding: 12px 0;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 2px;
+  margin-bottom: -1px;
   color: var(--muted);
+  font-weight: 500;
   text-decoration: none;
   border-bottom: 2px solid transparent;
+  transition:
+    color 0.15s ease-out,
+    border-color 0.15s ease-out;
+}
+.learn-views a:hover {
+  color: var(--ink);
 }
 .learn-views a[aria-current] {
-  color: var(--blue);
+  color: var(--ink);
   border-bottom-color: var(--blue);
   font-weight: 600;
+}
+#due-count:not(:empty) {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.learn-views a[aria-current] #due-count {
+  background: var(--blue-bg);
+  color: var(--blue-deep);
 }
 .learn-section-heading {
   align-items: flex-start;
@@ -137,7 +180,15 @@
   padding: 2px 0;
 }
 .learn-concepts {
-  margin-top: 36px;
+  margin-top: 40px;
+}
+#topics,
+#learning-history:not(:empty) {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-m);
+  overflow: hidden;
 }
 .learn-search {
   display: grid;
@@ -156,17 +207,22 @@
   font-size: 14px;
   width: 100%;
 }
-.learn-topic,
-.learn-history-row {
-  border-bottom: 1px solid var(--line);
+.learn-topic + .learn-topic,
+.learn-history-row + .learn-history-row {
+  border-top: 1px solid var(--line-2);
 }
 .learn-topic summary,
 .learn-history-row summary {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 4px;
+  gap: 14px;
+  padding: 14px 20px;
+  transition: background-color 0.15s ease-out;
+}
+.learn-topic summary:hover,
+.learn-history-row summary:hover {
+  background: var(--paper);
 }
 .learn-topic summary::before,
 .learn-history-row summary::before {
@@ -194,7 +250,7 @@
 }
 .learn-topic-body,
 .learn-history-body {
-  padding: 2px 24px 24px;
+  padding: 4px 24px 24px 40px;
 }
 .learn-topic dl > div {
   margin-top: 24px;
@@ -233,6 +289,11 @@
 }
 .learn-about summary {
   cursor: pointer;
+  width: fit-content;
+  font-weight: 500;
+}
+.learn-about summary:hover {
+  color: var(--ink);
 }
 .learn-about p {
   max-width: 78ch;
@@ -275,7 +336,7 @@
   font-size: 13px;
 }
 #quiz-topics button:hover {
-  background: var(--panel);
+  background: rgb(255 255 255 / 0.7);
 }
 #quiz-topics button[aria-pressed="true"] {
   color: var(--blue-deep);
@@ -309,11 +370,14 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 15px 16px;
+  padding: 14px 16px;
   border: 1px solid var(--line-strong);
-  border-radius: 7px;
+  border-radius: 10px;
   cursor: pointer;
   overflow-wrap: anywhere;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out;
 }
 .learn-option input {
   accent-color: var(--blue);
@@ -377,8 +441,9 @@
   margin: 16px 0 24px;
 }
 .learn-history-empty {
-  padding: 40px 0;
+  padding: 40px 24px;
   color: var(--muted);
+  text-align: center;
 }
 .learn-source {
   white-space: pre-wrap;
@@ -396,19 +461,6 @@
   min-width: 4ch;
   text-align: right;
   user-select: none;
-}
-/* Keep the developer shell usable at a narrower laptop width. */
-body:has(.learn) .topbar,
-body:has(.learn-source) .topbar {
-  height: auto;
-  min-height: 56px;
-  flex-wrap: wrap;
-  padding-block: 12px;
-  gap: 12px 24px;
-}
-body:has(.learn) .topbar .pages,
-body:has(.learn-source) .topbar .pages {
-  flex-wrap: wrap;
 }
 @media (max-width: 760px) {
   .learn {
@@ -456,28 +508,6 @@ body:has(.learn-source) .topbar .pages {
     border-radius: 7px;
     width: 100%;
     font-size: 14px;
-  }
-  body:has(.learn) .topbar,
-  body:has(.learn-source) .topbar {
-    padding-inline: 18px;
-  }
-  body:has(.learn) .topbar .brand,
-  body:has(.learn-source) .topbar .brand {
-    border: 0;
-    padding-right: 0;
-  }
-  body:has(.learn) .topbar .pages,
-  body:has(.learn-source) .topbar .pages {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    order: 3;
-    width: 100%;
-    padding: 3px 0;
-  }
-  body:has(.learn) .topbar .resources,
-  body:has(.learn-source) .topbar .resources {
-    gap: 12px;
-    font-size: 12px;
   }
   .learn-search {
     min-width: 0;

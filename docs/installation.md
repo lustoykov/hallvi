@@ -123,7 +123,7 @@ ordinary user account over SSH or at the machine.
    local Docker Engine before choosing **Read repository**. See
    [Hallvi’s workspace](#hallvis-workspace) for the access each mode permits.
 2. Open Hallvi and add the public GitHub repository you want to deploy.
-3. Connect ChatGPT when prompted, then choose **Read repository**. A public
+3. Connect a model when prompted, ChatGPT or OpenRouter, then choose **Read repository**. A public
    repository does not need GitHub login. Private repositories require the
    separate [GitHub App configuration](integrations/github.md).
 4. Let Hallvi explain the application requirements, then connect Hetzner or
@@ -167,7 +167,7 @@ and private data from any logs you share.
 | The `hallvi` command | `~/.local/bin/hallvi` | Replaced / removed |
 | Database, credentials, SSH keys, conversations, logs | `~/.local/share/hallvi` | Kept |
 | What the last update did, and its log | `~/.local/share/hallvi/update-attempt.json`, `logs/update.log` | Kept |
-| Model account (ChatGPT connection) | `~/.config/hallvi/pi` | Kept |
+| Model accounts (ChatGPT login, OpenRouter key) | `~/.config/hallvi/pi` | Kept |
 | Service definition | `~/Library/LaunchAgents/com.hallvi.plist` or `~/.config/systemd/user/hallvi.service` | Rewritten by `start` |
 
 There is one service per user account, whatever `HOME` or `HALLVI_DATA_DIR`
@@ -299,8 +299,9 @@ printed, for example <http://127.0.0.1:5747>. The tab title says which machine
 you have reached, and so does the Hallvi menu at the foot of the sidebar when
 you open it. A private application
 link Pi opens, for example `http://127.0.0.1:5757`, works in the laptop's
-browser as it is written. Connecting ChatGPT and GitHub uses device codes, so
-both work through the same connection with nothing further to forward. If the
+browser as it is written. Connecting ChatGPT and GitHub uses device codes, and
+OpenRouter returns the browser to the address it came from, so all three work
+through the same connection with nothing further to forward. If the
 SSH session drops, run the second command again; the Hallvi service, saved
 account connections and conversation remain on the other machine. A private
 application link may need Reconnect after a service restart. Reconnect reopens the saved route through Main operator under the existing permission mode, preserving the installation port and URL. It cannot restore the laptop-to-controller SSH connection; run the command above first.

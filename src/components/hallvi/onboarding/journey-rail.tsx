@@ -109,7 +109,7 @@ export function JourneyRail({
   /** A message can be sent: the model is connected and nothing is running. */
   canStart?: boolean;
   onStart?: () => void;
-  /** ChatGPT is not connected; this opens the request for it below. */
+  /** No model is connected; this opens the request for it below. */
   onConnect?: () => void;
   /** A request is open in the transcript: the welcome steps back to a line. */
   requestOpen?: boolean;
@@ -176,14 +176,14 @@ export function JourneyRail({
               <li>
                 <span>
                   <strong>A model to think with</strong>
-                  ChatGPT isn’t connected.
+                  No model is connected yet.
                 </span>
                 <button
                   type="button"
                   className="hv-rail-start"
                   onClick={onConnect}
                 >
-                  Connect ChatGPT <ArrowRight aria-hidden="true" />
+                  Connect a model <ArrowRight aria-hidden="true" />
                 </button>
               </li>
               <li>
@@ -219,14 +219,14 @@ export function JourneyRail({
           ) : onConnect ? (
             <>
               <p className="hv-first-app-next">
-                Connect ChatGPT so I can read {application}.
+                Connect a model so I can read {application}.
               </p>
               <button
                 type="button"
                 className="hv-rail-start"
                 onClick={onConnect}
               >
-                Connect ChatGPT <ArrowRight aria-hidden="true" />
+                Connect a model <ArrowRight aria-hidden="true" />
               </button>
             </>
           ) : (

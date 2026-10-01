@@ -110,12 +110,12 @@ async function mount(){
   $('frame').replaceChildren(frame);
 }
 for(const id of ['width','mode']) $(id).onchange=mount;
-for(const id of ['theme','styles']) $(id).onchange=()=>{document.body.classList.toggle('dark',$('theme').value==='dark');frame.contentWindow.postMessage({jsonrpc:'2.0',method:'ui/notifications/host-context-changed',params:context()},'*')};
+for(const id of ['theme','styles']) $(id).onchange=()=>{document.body.classList.toggle('dark',$('theme').value==='dark');frame.contentWindow?.postMessage({jsonrpc:'2.0',method:'ui/notifications/host-context-changed',params:context()},'*')};
 $('reload').onclick=mount;
 window.addEventListener('message',async(e)=>{
   if(e.source!==frame.contentWindow||e.data?.jsonrpc!=='2.0')return;
   const m=e.data; if(m.id==null){log('notify',m.method);return;}
-  const reply=(body)=>frame.contentWindow.postMessage({jsonrpc:'2.0',id:m.id,...body},'*');
+  const reply=(body)=>e.source.postMessage({jsonrpc:'2.0',id:m.id,...body},'*');
   try{
     if(m.method==='ui/initialize') return reply({result:{protocolVersion:'2026-01-26',hostInfo:{name:'hallvi-test-host',version:'1'},hostCapabilities:{},hostContext:context()}});
     if(m.method==='tools/call'){const started=performance.now();const r=await fetch('/call',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(m.params)});const result=await r.json();log('tools/call '+m.params.name+' '+Math.round(performance.now()-started)+'ms '+JSON.stringify(result).length+'B',m.params.arguments);return reply({result});}

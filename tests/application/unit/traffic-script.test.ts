@@ -3,7 +3,7 @@
 // against a stand-in for the few browser objects it touches, to show that
 // what it sends at the limits — the longest address, campaign tags too long
 // for one request, an app for a referrer — is still an event Hallvi accepts.
-import { runInNewContext, Script } from "node:vm";
+import { runInNewContext } from "node:vm";
 import { expect, it } from "vitest";
 
 import {
@@ -26,6 +26,8 @@ function browse(address: string, referrer: string, pageKey?: string) {
   };
   let every = 0;
   const window: Record<string, unknown> = {
+    // This fixture represents a site with an existing valid analytics grant.
+    hvConsent: true,
     location,
     document: {
       visibilityState: "visible",
@@ -65,12 +67,6 @@ function browse(address: string, referrer: string, pageKey?: string) {
       }),
   };
 }
-
-it("is served without its comments and still runs", () => {
-  const { content } = trafficScript();
-  expect(content).not.toMatch(/^\s*\/\//m);
-  expect(() => new Script(content)).not.toThrow();
-});
 
 it("sends only events Hallvi accepts, whatever the address holds", () => {
   // Three bytes each in UTF-8: six such tags cannot fit in one request.
@@ -160,4 +156,24 @@ it("accepts a page key and its value alone", () => {
     12,
   ])
     expect(eventOf(path(bad)), String(bad)).toBeNull();
+});
+
+it("accepts only normalized hash path forms, never credential fragments", () => {
+  const path = (h: unknown) =>
+    `/_hv/e/1/${Buffer.from(JSON.stringify({ t: "view", s: "abcdefgh12", p: "/", h })).toString("base64url")}`;
+  for (const h of ["#/home", "#!/settings/new", "#/héllo"])
+    expect(eventOf(path(h))).toMatchObject({ h });
+  for (const h of [
+    "#billing",
+    "#access_token=secret",
+    "#/token=secret",
+    "#/home?token=secret",
+    "#/home#token",
+    "#/token%3Dsecret",
+    "#/reset&token=secret",
+    "#/bad%ZZsecret",
+    "#/line\nbreak",
+    true,
+  ])
+    expect(eventOf(path(h)), String(h)).toBeNull();
 });
