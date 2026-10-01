@@ -256,12 +256,13 @@ test(
       .fill("Hello [fail-once]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    // The failed reply offers another go; the provider's words stay out of
-    // the conversation.
+    // The failed reply offers another go and shows Pi's sanitized diagnostic.
+    // Payload and credential redaction is covered by the native-failure tests.
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
-    await expect(page.getByText("QA simulated provider failure.")).toHaveCount(
-      0,
-    );
+    const reason = page.getByRole("status").filter({
+      hasText: "The model stopped: QA simulated provider failure.",
+    });
+    await expect(reason).toBeVisible();
     await expect(
       page.getByRole("textbox", { name: "Message Hallvi" }),
     ).toHaveValue("");
@@ -275,6 +276,7 @@ test(
       before.messages.length + 2,
     );
     await page.reload();
+    await expect(reason).toBeVisible();
     await page.getByRole("button", { name: "Try again" }).click();
     await openConversation(page);
     await expect(

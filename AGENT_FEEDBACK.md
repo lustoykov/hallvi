@@ -37,6 +37,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 | [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Fix in review |
 | [AF-061 — Cancel interrupted work without a model login](#af-061--cancel-interrupted-work-without-a-model-login) | 1 | Fix in review |
+| [AF-064 — Keep completed streamed replies when an older view arrives](#af-064--keep-completed-streamed-replies-when-an-older-view-arrives) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -205,6 +206,17 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-064 — Keep completed streamed replies when an older view arrives
+
+An action fetched a running conversation view, the stream completed the reply,
+and the delayed HTTP response replaced it with the old partial reply and
+“Send next”. A deterministic browser test holds the actual running response
+until after SSE completion and reproduces the regression. Action views should
+preserve stream state that advanced during the request for the same application
+and conversation, while still applying newer HTTP state when the stream is quiet.
+
+**Status:** Fix in review (`codex/qa-operator-core`).
 
 ### AF-061 — Cancel interrupted work without a model login
 
