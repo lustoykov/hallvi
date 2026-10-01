@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
+import { overviewDemoRecords } from "@/components/hallvi/overview-alternatives/demo-records";
 import { ApplicationIdentity } from "@/components/hallvi/application-identity";
 import { ApplicationNavigation } from "@/components/hallvi/application-navigation";
 import { ApplicationSectionView } from "@/components/hallvi/application-section-view";
@@ -68,7 +69,10 @@ function Frame({
     createdAt: new Date(now - 60 * 864e5).toISOString(),
     updatedAt: new Date(now).toISOString(),
   };
-  const records = useMemo(() => recordsOf(scenario, now), [scenario, now]);
+  const records = useMemo(
+    () => overviewDemoRecords(recordsOf(scenario, now)),
+    [scenario, now],
+  );
   const view: OperatorView = {
     application,
     chats: [
@@ -101,7 +105,7 @@ function Frame({
           </strong>
         </div>
         <nav className="tfp-tools" aria-label="Preview">
-          <span>Preview</span>
+          <span>Sample data</span>
           <select
             aria-label="Scenario"
             value={scenario.id}

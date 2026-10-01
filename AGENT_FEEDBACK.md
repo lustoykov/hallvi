@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-055 — Make Overview labels and space serve the summary](#af-055--make-overview-labels-and-space-serve-the-summary) | 1 | Five alternatives in review |
 | [AF-054 — Check traffic assets after installation](#af-054--check-traffic-assets-after-installation) | 1 | Fix in review |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
@@ -33,6 +34,19 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-051 — Retire or rewrite the conversation-first capture](#af-051--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-055 — Make Overview labels and space serve the summary
+
+The installed Overview gives an empty five-minute request diagram most of its
+first viewport. Labels such as “The way in” and “As it is written” require
+interpretation, and the page can be titled “Caddy” while its application is
+hallvi-landing. The owner called out the wording and wants a useful, calm
+summary while retaining the Visitors presentation. Five isolated prototypes
+compare status, recent work and traffic hierarchies with direct labels.
+No direction is selected and no production change is implied.
+
+**+1:** 2026-10-01 — owner's Overview exploration,
+`codex/overview-five-prototypes`.
 
 ### AF-054 — Check traffic assets after installation
 

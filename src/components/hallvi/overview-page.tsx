@@ -10,6 +10,7 @@ import { currentAccessRecord } from "@/server/access-record";
 // of cards.
 
 import { useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
@@ -27,6 +28,10 @@ import {
 } from "./overview-records";
 import { usageFromRecords } from "./monitoring-records";
 import { OverviewLive } from "./overview-live/overview-live";
+import {
+  OverviewAlternatives,
+  isOverviewVariant,
+} from "./overview-alternatives/prototype";
 import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag, UnresolvedMarks } from "./presentation";
@@ -156,6 +161,7 @@ export function OverviewPage({
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
 }) {
+  const variant = useSearchParams().get("variant");
   const model = useMemo(
     () =>
       architectureFromRecords({
@@ -211,6 +217,26 @@ export function OverviewPage({
   // Where the application answers, from the record that says so.
   const openUrl =
     currentAccessRecord(records, application.id)?.presentation?.url ?? null;
+
+  // Throwaway exploration: the existing route, records and data sources stay.
+  if (process.env.NODE_ENV !== "production" && isOverviewVariant(variant))
+    return (
+      <OverviewAlternatives
+        variant={variant}
+        application={application}
+        records={records}
+        built={built}
+        usage={usage}
+        now={now}
+        chrome={chrome}
+        openUrl={openUrl}
+        reachable={reachable}
+        restricted={model?.restricted ?? false}
+        onReopen={onReopen}
+        onOpenDestination={onOpenDestination}
+        onAsk={onAsk}
+      />
+    );
 
   // Deployed: the page is what is happening now, around what is recorded.
   // Everything before that is still a journey, and keeps its own pages.
