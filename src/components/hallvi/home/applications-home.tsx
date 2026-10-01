@@ -218,7 +218,7 @@ export function ApplicationsHome({
                 return (
                   <li
                     key={item.id}
-                    className={`${s.card} ${active ? s.selected : ""}`}
+                    className={`${s.card} ${active && greeting > 0 ? s.selected : ""}`}
                     style={{ "--tint": colors.get(item.id) } as CSSProperties}
                   >
                     <div className={s.cardWelcome}>

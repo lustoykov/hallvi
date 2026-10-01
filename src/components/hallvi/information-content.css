@@ -56,12 +56,14 @@
 .hv-record-body p {
   margin: 0 0 12px;
 }
-.hv-record code {
+.hv-record code,
+.hv-result-inside code {
   font-family: var(--mono);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.hv-record a {
+.hv-record a,
+.hv-result-inside a {
   color: var(--link);
   text-underline-offset: 3px;
 }
@@ -374,6 +376,10 @@
   padding-top: 10px;
   border-top: 1px solid var(--line);
   font-size: 13px;
+}
+.hv-result-inside > .hv-info-go,
+.hv-record > .hv-info-go {
+  margin-top: 14px;
 }
 .hv-result-url code {
   font-size: 12px;

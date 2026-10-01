@@ -106,6 +106,14 @@ const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
 function CopyReply({ body }: { body: string }) {
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
+  // "Copied" answers one click, so it steps back and the next copy can say
+  // it again.
+  useEffect(() => {
+    if (status !== "copied") return;
+    const timer = window.setTimeout(() => setStatus("idle"), 2400);
+    return () => window.clearTimeout(timer);
+  }, [status]);
+
   async function copy() {
     try {
       await navigator.clipboard.writeText(body);
@@ -656,16 +664,17 @@ const TranscriptMessage = memo(
         })}
         {/* The one live line of a turn, at the end of the reply it belongs
             to. The words carry the motion; Little Server visits now and
-            then. Stop lives in the composer. */}
+            then. Stop lives in the composer. A turn waiting on the reader is
+            not working, so nothing on its line moves. */}
         {doing && (
           <div className="hv-still-working">
-            {workerAlive !== false && (
+            {workerAlive !== false && !doing.waitingOnYou && (
               <SpinnerGap className="spin" aria-hidden="true" />
             )}
             <span className="hv-still-what" role="status">
               <Doing activity={doing} />
             </span>
-            {workerAlive !== false && <WorkingMascot />}
+            {workerAlive !== false && !doing.waitingOnYou && <WorkingMascot />}
           </div>
         )}
       </Message>
@@ -1363,7 +1372,7 @@ export function ChatPane({
                   Continue
                 </button>{" "}
                 <button
-                  className="hv-run-action"
+                  className="hv-run-action hv-secondary-button"
                   disabled={busy !== null}
                   onClick={onStop}
                   type="button"

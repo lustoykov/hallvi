@@ -331,6 +331,9 @@
   color: var(--ob-muted);
   font-weight: 500;
 }
+.hv-ob-quiet:hover:not(:disabled) {
+  color: var(--ob-ink);
+}
 a.hv-ob-quiet {
   display: inline-flex;
   align-items: center;

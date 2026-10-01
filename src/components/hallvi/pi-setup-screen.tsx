@@ -761,13 +761,15 @@ export function PiSetupScreen({
             </span>
           ) : (
             !openRouterOpen && (
-              <button
-                type="button"
-                className={s.btn}
-                onClick={() => setOpenRouterOpen(true)}
-              >
-                Connect OpenRouter
-              </button>
+              <span className={s.rowSide}>
+                <button
+                  type="button"
+                  className={s.btn}
+                  onClick={() => setOpenRouterOpen(true)}
+                >
+                  Connect OpenRouter
+                </button>
+              </span>
             )
           )}
         </header>

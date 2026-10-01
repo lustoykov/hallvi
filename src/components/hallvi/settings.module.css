@@ -110,15 +110,27 @@
   flex: 1;
   min-width: 0;
 }
+/* Side content drops under the text rather than squeezing it. */
+@media (min-width: 861px) {
+  .hero {
+    flex-wrap: wrap;
+  }
+  .hero > div:first-child {
+    flex-basis: 240px;
+  }
+}
 .hero h3 {
   margin: 6px 0;
   font-size: 24px;
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 .hero p {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 .heroMeta {
   display: flex;
@@ -277,6 +289,7 @@ li[data-state="expired"] .rowIcon {
   font-size: 13px;
   color: var(--muted);
   line-height: 1.45;
+  text-wrap: pretty;
 }
 .rowSide {
   display: inline-flex;
@@ -320,7 +333,7 @@ li[data-state="expired"] .rowIcon {
 }
 .dim .rowText strong,
 .dim .rowText small {
-  color: #8a92a3;
+  color: var(--muted);
 }
 .dim .price {
   opacity: 0;
@@ -366,6 +379,8 @@ li[data-state="expired"] .rowIcon {
   margin: 0 4px 20px;
   font-size: 13px;
   color: var(--muted);
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 .link {
   padding: 0;
@@ -376,6 +391,9 @@ li[data-state="expired"] .rowIcon {
   font-size: 13.5px;
   text-decoration: none;
   cursor: pointer;
+}
+.link svg {
+  vertical-align: -0.125em;
 }
 .link:hover {
   text-decoration: underline;
@@ -418,6 +436,7 @@ li[data-state="expired"] .rowIcon {
 .primary {
   border-color: var(--blue);
   background: var(--blue);
+  box-shadow: var(--button-shadow);
   color: #fff;
 }
 .primary:hover {
@@ -440,6 +459,9 @@ li[data-state="expired"] .rowIcon {
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+}
+.seg button:hover {
+  color: var(--ink);
 }
 .seg button[aria-checked="true"] {
   background: #fff;
@@ -554,6 +576,12 @@ li[data-state="expired"] .rowIcon {
   .heroSide {
     justify-items: start;
   }
+  /* The effort choices share the track, each on one line. */
+  .seg button {
+    flex: 1 1 auto;
+    padding-inline: 4px;
+    white-space: nowrap;
+  }
   .rowMore {
     padding-left: 12px;
   }
@@ -567,5 +595,26 @@ li[data-state="expired"] .rowIcon {
     flex-wrap: wrap;
     width: 100%;
     padding-left: 48px;
+  }
+  /* An account's mark is narrower than a row's icon. */
+  .groupHead > .rowSide {
+    padding-left: 40px;
+  }
+}
+
+/* A phone: the pills drop their icons so the current page stays in view, and
+   a choice's status goes under its text. */
+@media (max-width: 540px) {
+  .nav a {
+    padding-inline: 10px;
+  }
+  .nav svg {
+    display: none;
+  }
+  .pick > .ok,
+  .pick > .warn,
+  .pick > .muted {
+    width: 100%;
+    padding-left: 82px;
   }
 }

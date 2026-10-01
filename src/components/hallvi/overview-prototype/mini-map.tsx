@@ -212,24 +212,34 @@ export function MiniMap({
             <circle key={`dot:${d}`} r="6" className="axo-map-dot">
               <animateMotion
                 dur="2.8s"
-                begin={`${i * 0.5}s`}
+                // Negative, so each dot is on its path from the first frame
+                // instead of waiting at the map's corner for its turn.
+                begin={`-${i * 0.5}s`}
                 repeatCount="indefinite"
                 path={d}
               />
             </circle>
           ))}
-        {(["gate:http", "gate:ssh"] as const).map((id) => {
-          const r = layout.rects[id];
-          if (!r || !model.byId[id]) return null;
-          return (
-            <g key={id} data-part={id} className="axo-map-door">
-              <rect x={r.x} y={r.y} width={r.w} height={r.h} rx="10" />
-              <text x={r.x + r.w / 2} y={r.y + r.h / 2 + 8} textAnchor="middle">
-                {id === "gate:http" ? "80" : "22"}
-              </text>
-            </g>
-          );
-        })}
+        {/* Every door the layout placed, with the port its record names: a
+            wire must not start from a box that was never drawn. */}
+        {model.parts
+          .filter((part) => part.kind === "gate" && layout.rects[part.id])
+          .map((part) => {
+            const r = layout.rects[part.id];
+            return (
+              <g key={part.id} data-part={part.id} className="axo-map-door">
+                <rect x={r.x} y={r.y} width={r.w} height={r.h} rx="10" />
+                <text
+                  x={r.x + r.w / 2}
+                  y={r.y + r.h / 2 + 8}
+                  textAnchor="middle"
+                >
+                  {part.port?.match(/\d+/)?.[0] ??
+                    (part.id === "gate:ssh" ? "22" : "80")}
+                </text>
+              </g>
+            );
+          })}
         {stops.map((id) => {
           const part = model.byId[id];
           const r = layout.rects[id];

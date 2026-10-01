@@ -31,17 +31,34 @@
   margin: 0;
 }
 .hv-section-header {
-  padding: 24px 36px 20px;
+  padding: 18px 36px 20px;
   align-items: baseline;
 }
+/* A line as tall as the shared head's title row, so the words land on the
+   same line on every destination. */
 .hv-section-header h1 {
-  margin: 0 0 6px;
+  margin: 0 0 3px;
   font-size: var(--view-title);
+  line-height: var(--button-height);
 }
 .hv-section-header p {
   font-size: var(--view-meta);
   line-height: 1.6;
   max-width: 62ch;
+}
+/* Inside .ax-root the page already has its gutters, so the bar, header and
+   content sit on them rather than adding their own. */
+.ax-root > .hv-view-bar {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.ax-root > .hv-section-header {
+  padding: 18px 0 20px;
+}
+.ax-root > .hv-section-content {
+  padding-inline: 0;
+  max-width: none;
 }
 
 /* A titled band. The rule above the title is the only separator needed;
@@ -1223,15 +1240,17 @@
   cursor: default;
   opacity: 0.7;
 }
-/* In the column the application is the first lifted thing. */
+/* In the column the application is the first lifted thing. The white under
+   the gradient is what the hover tint eases from; without it the card would
+   turn see-through for a moment. */
 .hv-identity-navigation .hv-identity {
   padding: 8px 10px;
   border-radius: 11px;
-  background: linear-gradient(180deg, #fff, #fbfcfe);
+  background: #fff linear-gradient(180deg, #fff, #fbfcfe);
   box-shadow: var(--raise);
 }
 .hv-identity-navigation .hv-identity:hover {
-  background: #fff;
+  background: var(--panel);
 }
 .hv-identity-navigation .hv-identity-mark {
   background: linear-gradient(160deg, #35466a, #172238);
@@ -1278,12 +1297,13 @@
   height: 13px;
 }
 
-/* The top bar now carries where you are and what is running. */
+/* The top bar now carries where you are and what is running. Its row is
+   56px and the sheet is set 8px down in it, which leaves the bar 48px. */
 .hv-adaptive-shell .hv-topbar {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 56px;
+  min-height: 48px;
 }
 .hv-topbar-where {
   display: flex;
@@ -1324,7 +1344,7 @@
     gap: 22px;
   }
   .hv-section-header {
-    padding: 18px 16px 16px;
+    padding: 22px 16px 16px;
   }
   .hv-section-facts > div,
   .hv-facts-wide > div {
@@ -1563,6 +1583,25 @@
 .hv-application-navigation .hv-application-menu:popover-open {
   display: block;
 }
+/* Its buttons are menu items like the links beside them, not sidebar rows,
+   on a phone as well, where the strip's rows size to their words. */
+.hv-application-navigation .hv-application-menu button {
+  display: grid;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  border-radius: 7px;
+}
+.hv-application-navigation
+  .hv-application-menu
+  button.hv-application-menu-action {
+  color: var(--ink);
+}
+.hv-application-navigation
+  .hv-application-menu
+  button.hv-application-menu-action:hover {
+  background: #f1f4f9;
+}
 
 @media (max-width: 640px) {
   /* The destinations already scroll sideways; keep the scrollbar quiet. */
@@ -1578,8 +1617,9 @@
     gap: 8px;
     padding-bottom: 8px;
   }
+  /* Padded to a thumb's height; the card beside it still sets the row's. */
   .hv-navigation-home {
-    padding: 0;
+    padding: 12px 0;
     flex-shrink: 0;
   }
   .hv-navigation-head .hv-app-identity {
@@ -1594,10 +1634,11 @@
     height: 24px;
     border-radius: 7px;
   }
-  /* The section heading is directly below; the bar keeps only live work. */
+  /* The section heading is directly below; the bar keeps only live work,
+     set 8px off the strip above it and the page below it. */
   .hv-adaptive-shell .hv-topbar {
     min-height: 0;
-    padding: 0 12px;
+    padding: 8px 12px;
     border-bottom: 0;
   }
   .hv-topbar-where {
@@ -1803,9 +1844,22 @@
     display: none;
   }
 
+  /* The strip runs to the screen edge and fades over the column's own
+     12px, so a label scrolled past the left edge is not cut mid-word. */
+  .hv-application-navigation > nav,
+  .hv-destinations {
+    margin-left: -12px;
+    padding-left: 12px;
+  }
   .hv-destinations {
     padding-right: 24px;
-    mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 12px,
+      #000 calc(100% - 20px),
+      transparent
+    );
   }
 }
 

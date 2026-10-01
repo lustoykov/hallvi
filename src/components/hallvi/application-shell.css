@@ -28,6 +28,13 @@
 .hv-adaptive-shell input {
   font: inherit;
 }
+/* The reset above also takes the buttons' own size and weight; these keep
+   the ones they wear outside an application. */
+.hv-adaptive-shell
+  :is(.hv-primary-button, .hv-secondary-button, .hv-send, .bs-primary) {
+  font-size: 13px;
+  font-weight: 560;
+}
 .hv-adaptive-shell button:focus-visible,
 .hv-adaptive-shell a:focus-visible {
   outline: 2px solid #315bc6;
@@ -40,7 +47,7 @@
   background: #fff;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
-  padding: 0 24px;
+  padding: 0 36px;
 }
 .hv-adaptive-shell .hv-application-picker {
   color: var(--ink);
@@ -642,11 +649,13 @@
   .hv-adaptive-shell .hv-topbar {
     grid-column: 1;
     grid-row: 2;
-    padding: 0 12px;
   }
   .hv-adaptive-shell .hv-workspace {
     grid-column: 1;
     grid-row: 3;
+  }
+  .hv-adaptive-shell .hv-messages {
+    padding: 20px 16px 24px;
   }
 }
 
@@ -800,6 +809,11 @@
     0 0 0 1px rgb(var(--shade) / 8%),
     0 1px 2px rgb(var(--shade) / 12%);
 }
+.hv-application-navigation
+  .hv-conversations-heading
+  button:hover:not(:disabled) {
+  background: #f1f4fa;
+}
 /* The workspace is a sheet resting on the column. Only beside the column:
    on a phone the navigation is a strip above it and there is no edge to
    cast a shadow from. */
@@ -829,8 +843,6 @@
     .axo-map,
     .axo-recent,
     .hv-section-page > .axlr,
-    .rp-now,
-    .rp-list,
     .bs-summary,
     .bs-modes,
     .axmu-card,
@@ -1001,6 +1013,11 @@
   color: var(--ink);
   background: transparent;
 }
+/* The label draws the ring; the page-wide focus rule would add a second one
+   on the input inside it. */
+.hv-log-toolbar input:focus-visible {
+  outline: none;
+}
 .hv-log-toolbar label:focus-within {
   outline: 2px solid #315bc6;
   outline-offset: 2px;
@@ -1051,11 +1068,12 @@
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  font-family: var(--mono);
   font-size: 12px;
   line-height: 1.9;
   color: #303b4e;
   border: 1px solid var(--line);
-  border-radius: 0 0 8px 8px;
+  border-radius: 8px;
 }
 .hv-architecture-view {
   min-width: 0;
@@ -1202,12 +1220,18 @@
   .hv-nav-group-start::before {
     display: none;
   }
+  /* No groove in the strip: neither its line nor the highlight under it. */
   .hv-conversations-heading {
     display: inline-flex;
     margin: 4px 6px 0 0;
     padding: 0;
     border: 0;
+    box-shadow: none;
     vertical-align: middle;
+  }
+  /* A larger target for a thumb, still inside the strip's row. */
+  .hv-application-navigation .hv-conversations-heading button {
+    padding: 8px;
   }
   .hv-application-navigation nav > button {
     display: inline-flex;
@@ -1239,6 +1263,10 @@
   .hv-log-toolbar {
     flex-wrap: wrap;
   }
+  .hv-log-toolbar label {
+    flex-basis: 100%;
+    max-width: none;
+  }
   .hv-log-context {
     flex-direction: column;
     gap: 6px;
@@ -1260,9 +1288,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 24px;
-  border-bottom: 1px solid var(--line);
-  background: #fafbfc;
+  padding: 4px 36px 0;
   font-size: 12px;
 }
 .hv-view-back {
@@ -1276,6 +1302,14 @@
   font-size: 12px;
   padding: 4px 0;
   cursor: pointer;
+}
+.hv-view-back:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* The link sits 4px under the sheet's edge, which clips a wider ring. */
+.hv-adaptive-shell .hv-view-back:focus-visible {
+  outline-offset: 2px;
 }
 .hv-view-back svg {
   width: 14px;
@@ -1332,13 +1366,19 @@
 .hv-op-approval label small {
   color: var(--muted);
 }
-.hv-op-approval input {
+.hv-op-approval input,
+.hv-op-approval select {
   border: 1px solid #ccd5e3;
   border-radius: 7px;
   padding: 8px 10px;
   font: inherit;
   font-size: 12px;
   background: #fff;
+}
+/* A select draws its value further in than an input does: this padding keeps
+   it the inputs' height, with its text on their edge. */
+.hv-op-approval select {
+  padding: 7px 6px;
 }
 .hv-op-approval details {
   font-size: 12px;
@@ -1367,6 +1407,7 @@
 
 .hv-op-approval .hv-primary-button,
 .hv-op-approval .hv-secondary-button {
+  justify-self: start;
   padding: 8px 12px;
   border-radius: 7px;
   min-height: 0;
@@ -1444,19 +1485,6 @@
 }
 
 /* Overview: condition, unresolved, running, recent changes, freshness. */
-.hv-overview-condition {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 0 0 26px;
-  flex-wrap: wrap;
-}
-.hv-overview-condition h2 {
-  margin: 0 0 4px;
-}
-.hv-overview-condition p {
-  margin: 0;
-}
 .hv-overview-ask {
   margin-left: auto;
   font-size: 12px;
@@ -1744,15 +1772,15 @@ dd.hv-protection-warn {
   min-height: 32px;
   padding: 6px 10px;
 }
+/* A smaller caret in the icon's own 17px box, so the label starts where the
+   labels above it do. */
 .hv-application-navigation .hv-nav-reveal svg {
-  width: 13px;
-  height: 13px;
+  padding: 2px;
 }
 /* The activity heading is a destination row, not a footnote: same size and
    same target as the rows above it, with the caret in the icon's place. */
 .hv-application-navigation .hv-nav-activity svg {
-  width: 14px;
-  height: 14px;
+  padding: 2px;
   color: var(--muted);
 }
 .hv-application-navigation .hv-nav-inside {
@@ -2136,9 +2164,18 @@ dd.hv-protection-warn {
   font-size: 11px;
   margin-top: 2px;
 }
+/* A card without a bar keeps its title on the same line as its neighbours. */
+.hv-streams .hv-stream {
+  display: grid;
+  align-content: start;
+}
 .hv-stream.selected {
   border-color: #c7d6f5;
   background: var(--blue-soft);
+}
+.hv-log-toolbar button:hover:not(:disabled),
+.hv-streams .hv-stream:hover:not(.selected) {
+  background: #f4f7fb;
 }
 .hv-stream.errors strong::after {
   content: "";
@@ -2289,7 +2326,8 @@ dd.hv-protection-warn {
   opacity: 1;
   pointer-events: auto;
 }
-.hv-chat-nav-row button:focus-visible {
+/* The list scrolls, so a ring outside a row would be cut at its edges. */
+.hv-application-navigation > nav button:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: -2px;
 }

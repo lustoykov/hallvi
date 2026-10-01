@@ -29,14 +29,14 @@
 .axqu-lede p {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 8px 10px;
   margin: 0;
   color: var(--ax-muted);
   font-size: 13.5px;
   line-height: 1.55;
 }
-.axqu-lede p > span {
+.axqu-lede p > span:not(.ax-tag) {
   flex: 1 1 340px;
   min-width: 0;
 }

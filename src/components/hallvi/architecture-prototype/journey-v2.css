@@ -12,7 +12,6 @@
   position: relative;
   display: grid;
   gap: 10px;
-  padding-top: 10px;
 }
 
 .axj2-condition {
@@ -65,7 +64,7 @@
   transform: scale(0.9) rotate(-50deg);
 }
 .axj2-caption {
-  flex: 1;
+  flex: 1 1 260px;
   min-width: 0;
   margin: 0;
   font-size: 13.5px;
@@ -104,7 +103,7 @@
 .axj2-stage::before {
   content: "";
   position: absolute;
-  inset: -18px -24px;
+  inset: -18px 0;
   z-index: -1;
   background-image: radial-gradient(#dfe5ee 1px, transparent 1.2px);
   background-size: 22px 22px;
@@ -123,7 +122,7 @@
 .axj2-stage::after {
   content: "";
   position: absolute;
-  inset: -18px -24px;
+  inset: -18px 0;
   z-index: 6;
   border-radius: 28px;
   background: linear-gradient(
@@ -254,6 +253,11 @@
   left: 50%;
   transform: translateX(-50%);
   color: var(--ax-muted);
+}
+/* One volume has one wire, down the middle, so the label moves aside. */
+.axj2-shelf[data-single] span {
+  left: 14px;
+  transform: none;
 }
 .axj2-zone {
   position: absolute;
@@ -533,9 +537,8 @@
   overflow-wrap: anywhere;
 }
 .axj2-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  /* A block, because a flex row cannot draw the ellipsis asked for below. */
+  display: block;
   margin-top: 2px;
   font-size: 11.5px;
   font-weight: 560;
@@ -547,11 +550,13 @@
   transition: color 600ms;
 }
 .axj2-status i {
+  display: inline-block;
   width: 7px;
   height: 7px;
+  margin-right: 6px;
   border-radius: 50%;
   background: #aab4c4;
-  flex: none;
+  vertical-align: 1px;
   transition:
     background-color 600ms,
     box-shadow 600ms;
@@ -992,12 +997,15 @@
   border: 0;
   background: none;
 }
+/* As tall as the link that can arrive beside the title, so the page does not
+   move when the address answers. */
 .axj3-title {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px 24px;
+  min-height: var(--button-height);
   margin-top: 6px;
 }
 .axj3-title h1 {
@@ -1021,9 +1029,10 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 13px;
+  height: var(--button-height);
+  padding: 0 14px;
   border: 1px solid var(--ax-line, #dfe4ec);
-  border-radius: 9px;
+  border-radius: 999px;
   background: #ffffff;
   color: inherit;
   font: inherit;
@@ -1407,8 +1416,8 @@
   -webkit-line-clamp: 1;
   line-clamp: 1;
 }
-.axj2-status[data-tight] {
-  gap: 0;
+.axj2-status[data-tight] i {
+  margin-right: 0;
 }
 
 /* Endpoint labels sit in routing lanes, never on the server boundary. */
@@ -1424,7 +1433,7 @@
   pointer-events: none;
 }
 .axj2-connections {
-  margin: 20px 24px 36px;
+  margin: 20px 0 36px;
   color: var(--ax-ink, #202838);
   max-width: 1120px;
 }
@@ -1491,9 +1500,9 @@
 .axj2-connection-check .ax-textlink {
   margin-bottom: 12px;
 }
-@media (max-width: 700px) {
+@media (max-width: 960px) {
   .axj2-connections {
-    margin: 16px 12px 28px;
+    margin: 16px 0 28px;
   }
   .axj2-connection,
   .axj2-connection-check summary {

@@ -4,6 +4,9 @@
 
 .hv-rg-sheet {
   display: grid;
+  /* The column never grows past the page: a table too wide for it scrolls
+     inside its own panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   margin-top: 8px;
   color: var(--ink);
@@ -46,11 +49,12 @@
   display: grid;
   align-content: start;
   gap: 3px;
+  /* Every figure rules its top and left and sits one pixel up and left, so
+     the strip clips the outer rules and a wrapped row keeps the inner ones. */
+  margin: -1px 0 0 -1px;
   padding: 12px 16px;
+  border-top: 1px solid var(--line-2);
   border-left: 1px solid var(--line-2);
-}
-.hv-rg-figure:first-child {
-  border-left: 0;
 }
 .hv-rg-figure small {
   color: var(--muted);
@@ -100,6 +104,7 @@
   background: #fff;
   box-shadow: var(--shadow-s);
   font-size: 13px;
+  line-height: 1.7;
 }
 .hv-rg-line-detail {
   flex: 1 1 260px;
@@ -112,6 +117,13 @@
 .hv-rg-line .hv-rg-ask {
   flex: none;
   margin-left: auto;
+}
+/* Beside the sidebar in a narrow window, and on a phone, the line is too
+   narrow for its sentence, so it wraps there. */
+@media (max-width: 1080px) {
+  .hv-rg-line-detail {
+    white-space: normal;
+  }
 }
 /* -------------------------------------------------------------- controls */
 .hv-rg-chips {
@@ -181,9 +193,11 @@
 }
 .hv-rg-board-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  /* As tall as an ask, so a heading sits the same with tools or without. */
+  min-height: 28px;
   margin-bottom: 9px;
 }
 .hv-rg-board-head h2 {
@@ -211,15 +225,18 @@
   border-radius: var(--radius-l);
   background: #fff;
   box-shadow: var(--shadow-s);
-  overflow: hidden;
+  overflow: auto hidden;
 }
 .hv-rg-table {
   width: 100%;
+  /* Narrower than this the fixed columns leave the name column nothing, so
+     the table keeps its width and the panel scrolls sideways. */
+  min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
   font-variant-numeric: tabular-nums;
 }
-.hv-rg-table thead th {
+.hv-rg-table > thead th {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
@@ -282,9 +299,10 @@
   cursor: pointer;
 }
 .hv-rg-row[data-click="true"]:hover td {
-  background: #fafcff;
+  background: var(--panel);
 }
-.hv-rg-row[data-open="true"] td {
+.hv-rg-row[data-open="true"] td,
+.hv-rg-row[data-open="true"]:hover td {
   background: var(--blue-soft);
 }
 .hv-rg-row[data-tone="bad"] > td:first-child {
@@ -458,6 +476,7 @@
   display: inline-flex;
   gap: 3px;
   align-items: center;
+  vertical-align: middle;
 }
 .hv-rg-pips i {
   width: 9px;
@@ -561,6 +580,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  vertical-align: middle;
 }
 .hv-rg-known em {
   font-style: normal;
@@ -661,7 +681,8 @@
   gap: 6px;
   max-width: 100%;
   min-width: 0;
-  padding: 4px 10px;
+  height: 28px;
+  padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
@@ -805,6 +826,7 @@
 }
 .hv-rg-split .hv-rg-sub th:nth-child(1) {
   width: 34%;
+  padding-left: 8px;
 }
 .hv-rg-split .hv-rg-sub th:nth-child(2) {
   width: 22%;

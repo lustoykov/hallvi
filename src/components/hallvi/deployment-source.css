@@ -55,6 +55,7 @@
 }
 .ds-settings legend,
 .ds-branch {
+  padding: 0;
   color: var(--muted);
   font-size: 12px;
 }
@@ -63,6 +64,10 @@
   align-items: center;
   gap: 8px;
   color: var(--ink);
+}
+.ds-settings fieldset input {
+  margin: 0;
+  accent-color: var(--blue);
 }
 .ds-branch {
   display: grid;

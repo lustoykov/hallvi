@@ -20,12 +20,6 @@
   outline: 2px solid var(--blue);
   outline-offset: 3px;
 }
-.root button svg,
-.root a svg {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
 .page {
   max-width: 680px;
   margin: 50px auto 0;
@@ -76,11 +70,16 @@
   font-size: 13px;
   font-weight: 560 !important;
   text-decoration: none;
+  cursor: pointer;
   flex-shrink: 0;
   transition: background-color var(--fast) var(--ease);
 }
 .primary:hover:not(:disabled) {
   background: var(--blue-hover);
+}
+.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .textButton {
   padding: 4px 0;
@@ -92,6 +91,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 .textButton:hover {
   text-decoration: underline;
@@ -236,11 +236,14 @@
 .connectForm {
   display: grid;
   gap: 12px;
-  margin-top: 18px;
   padding: 18px;
   border: 1px solid #d8e0ec;
   border-radius: 10px;
   background: #f7f9fc;
+}
+/* The backup-storage form's button is a child of the grid itself. */
+.connectForm > button {
+  justify-self: start;
 }
 .connectForm > strong {
   font-weight: 600;
@@ -277,6 +280,7 @@
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
+  font-size: 13px;
 }
 .mark {
   display: inline-grid;

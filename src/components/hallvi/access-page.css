@@ -7,6 +7,12 @@
   align-items: center;
   margin-bottom: 16px;
 }
+/* The offer beside it is that button's height, so the row is one line of
+   controls. */
+.hv-ac .hv-rg-board-tools .hv-rg-ask {
+  height: var(--button-height);
+  padding: 0 14px;
+}
 
 /* Publishing, where no name reaches the application: one sentence and the
    offer, under what a visitor gets today. */
@@ -68,11 +74,10 @@
   border-radius: 50%;
   background: var(--line-2);
 }
+/* A block, so a long address ends in an ellipsis rather than a cut letter. */
 .hv-ac-visit-url {
-  display: inline-flex;
+  display: block;
   flex: 1;
-  align-items: center;
-  gap: 6px;
   min-width: 0;
   padding: 4px 12px;
   border: 1px solid var(--line);
@@ -86,8 +91,9 @@
   text-overflow: ellipsis;
 }
 .hv-ac-visit-url svg {
-  flex-shrink: 0;
+  margin-right: 6px;
   color: var(--green-text);
+  vertical-align: -2px;
 }
 .hv-ac-visit-body {
   display: flex;
@@ -218,7 +224,7 @@
 .hv-ac-node b::before {
   content: "";
   position: absolute;
-  top: 6px;
+  top: 7px;
   left: 0;
   width: 7px;
   height: 7px;
@@ -242,4 +248,32 @@
 }
 .hv-ac-link[data-live] {
   background: color-mix(in srgb, var(--green) 45%, transparent);
+}
+
+/* A port's description wraps rather than clips: it is the row's sentence. */
+.hv-ac .hv-rg-table td:nth-child(2) .hv-rg-clip {
+  white-space: normal;
+}
+
+/* Narrow: the path reads top to bottom, a short line under each dot. */
+@media (max-width: 900px) {
+  .hv-ac-path {
+    flex-direction: column;
+  }
+  .hv-ac-node {
+    max-width: none;
+  }
+  .hv-ac-link {
+    flex: none;
+    width: 1px;
+    min-width: 0;
+    height: 14px;
+    margin: 4px 0 4px 3px;
+  }
+}
+/* The sketch carries no fact, so it goes before the checklist is squeezed. */
+@media (max-width: 760px) {
+  .hv-ac-visit-page {
+    display: none;
+  }
 }

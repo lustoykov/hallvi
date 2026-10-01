@@ -10,7 +10,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
-  padding-top: 10px;
 }
 .axh-group {
   display: grid;
@@ -40,6 +39,10 @@
   top: 16px;
   bottom: 16px;
   left: calc(var(--axh-time) + var(--axh-gap) + var(--axh-dot) / 2 - 0.5px);
+  /* Above a row's hover fill, so the rail runs through the row pointed at,
+     and never the thing pointed at itself. */
+  z-index: 1;
+  pointer-events: none;
   width: 1px;
   background: var(--ax-line-2);
 }
@@ -214,9 +217,6 @@
   background: #ffffff;
   color: var(--ax-ink-2);
   cursor: pointer;
-  transition:
-    border-color var(--ax-base),
-    color var(--ax-base);
 }
 .axh-go:hover {
   border-color: #c3ccdb;

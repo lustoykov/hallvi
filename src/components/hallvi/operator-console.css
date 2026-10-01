@@ -1,6 +1,10 @@
 .hv-operator-console {
   font-size: 13px;
 }
+/* With nothing to show it would still take a gap in the transcript. */
+.hv-operator-console:empty {
+  display: none;
+}
 .hv-operator-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -118,6 +122,9 @@
   padding: 0;
   border: 0;
   background: transparent;
+  /* Command output's place filters share this class and are buttons; a
+     card's output is read, not pressed. */
+  cursor: auto;
 }
 .hv-stream > summary {
   cursor: pointer;
@@ -234,7 +241,9 @@
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
-.hv-stream :focus-visible {
+/* The light ring belongs to the dark pane; the summary above it sits on the
+   white card and keeps the ring every other disclosure has. */
+.hv-stream .hv-stream-terminal :focus-visible {
   outline: 2px solid #8aaaf0;
   outline-offset: -2px;
 }
@@ -335,6 +344,7 @@
   font: inherit;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
 .hv-mode-button:hover {
@@ -391,8 +401,11 @@
   font-size: 12px;
   color: var(--muted);
 }
-.hv-mode-menu :focus-visible,
-.hv-mode-button:focus-visible {
+/* Named through the shell so the ring stays inside the row: the shell's own
+   focus rule for buttons would otherwise push it 3px out, over the rows
+   beside it. */
+.hv-adaptive-shell .hv-mode-menu button:focus-visible,
+.hv-adaptive-shell .hv-mode-button:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: -2px;
 }

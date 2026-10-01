@@ -136,7 +136,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--ax-faint);
+  color: var(--ax-muted);
 }
 
 /* ---------- The rail ---------- */
@@ -155,6 +155,11 @@
 }
 .axlr-end {
   flex: 0.7 1 0;
+}
+/* With nothing on record the last stretch is the whole rail, so every
+   lane's "Now" lands on the same line. */
+.axlr-none + .axlr-end {
+  flex-grow: 1;
 }
 .axlr-leg {
   position: relative;
@@ -415,14 +420,48 @@
   cursor: pointer;
 }
 
-@media (max-width: 900px) {
+/* Beside the sidebar the rail runs out of room for its labels well before
+   the page is narrow, so the lanes stack early. The rail never scrolls: a
+   scroll container would clip the card a stop opens. */
+@media (max-width: 1180px) {
   .axlr-lane {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
   .axlr-rail {
-    overflow-x: auto;
     padding-inline: 40px;
+  }
+}
+/* Beside the sidebar a lane is as narrow as a phone's well before 640px. The
+   card a stop opens is placed against the rail rather than the stop, so it
+   stays inside the lane. */
+@media (max-width: 820px) {
+  .axlr-lane {
+    padding: 14px;
+  }
+  .axlr-rail {
+    position: relative;
+    padding-inline: 0;
+  }
+  .axlr-station {
+    width: 88px;
+    margin: 0 -33px;
+  }
+  .axlr-stop {
+    position: static;
+  }
+  .axlr-pop,
+  .axlr-pop.is-lane {
+    right: 0;
+    left: 0;
+    width: auto;
+  }
+  .axlr-pop:not(.is-lane) {
+    top: 100%;
+  }
+  .axlr-pop > .axj2-pop {
+    width: 100%;
+    max-width: 340px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

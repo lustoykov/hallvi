@@ -96,4 +96,74 @@ describe("chat markdown", () => {
       "<p>Application: todo<br/>Permission policy: Pi decides</p>",
     );
   });
+
+  it("renders a pipe table as a table", () => {
+    const html = render(
+      [
+        "What is covered:",
+        "",
+        "| Copy | Written | Size | Restore tested |",
+        "| --- | --- | --- | --- |",
+        "| `copy-today` | 02:31 | 412 MB | not yet |",
+        "| `copy-yesterday` | 02:30 | 409 MB | yes, 3 min |",
+        "",
+        "To restore one yourself:",
+      ].join("\n"),
+    );
+    expect(html).toBe(
+      "<p>What is covered:</p>" +
+        '<div class="hv-md-table"><table><thead><tr><th>Copy</th><th>Written</th><th>Size</th><th>Restore tested</th></tr></thead>' +
+        "<tbody><tr><td><code>copy-today</code></td><td>02:31</td><td>412 MB</td><td>not yet</td></tr>" +
+        "<tr><td><code>copy-yesterday</code></td><td>02:30</td><td>409 MB</td><td>yes, 3 min</td></tr></tbody></table></div>" +
+        "<p>To restore one yourself:</p>",
+    );
+  });
+
+  it("lets a table follow a paragraph without a blank line, with alignment colons", () => {
+    const html = render("Sizes:\n| a | b |\n|:--|--:|\n| 1 | 2 |\nafter");
+    expect(html).toBe(
+      '<p>Sizes:</p><div class="hv-md-table"><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table></div><p>after</p>',
+    );
+  });
+
+  it("leaves pipes that are not a table alone", () => {
+    expect(render("| just | text |")).toBe("<p>| just | text |</p>");
+    expect(render("a | b\n--- | ---")).toBe("<p>a | b<br/>--- | ---</p>");
+    expect(render("| a |\n| not a rule |")).toBe(
+      "<p>| a |<br/>| not a rule |</p>",
+    );
+    expect(render("run `cat x | grep y` now")).toBe(
+      "<p>run <code>cat x | grep y</code> now</p>",
+    );
+  });
+
+  it("keeps a table that is only its header", () => {
+    expect(render("| a | b |\n| --- | --- |")).toBe(
+      '<div class="hv-md-table"><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody></tbody></table></div>',
+    );
+  });
+
+  it("draws a row that is still being written, as wide as the header", () => {
+    expect(render("| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3")).toBe(
+      '<div class="hv-md-table"><table><thead><tr><th>a</th><th>b</th></tr></thead>' +
+        "<tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td></td></tr></tbody></table></div>",
+    );
+  });
+
+  it("keeps an escaped pipe inside its cell", () => {
+    expect(
+      render(
+        "| Command | Does |\n| --- | --- |\n| `cat x \\| grep y` | filters |",
+      ),
+    ).toBe(
+      '<div class="hv-md-table"><table><thead><tr><th>Command</th><th>Does</th></tr></thead>' +
+        "<tbody><tr><td><code>cat x | grep y</code></td><td>filters</td></tr></tbody></table></div>",
+    );
+  });
+
+  it("does not start a table inside a code fence", () => {
+    expect(render("```\n| a | b |\n| --- | --- |\n```")).toBe(
+      "<pre><code>| a | b |\n| --- | --- |</code></pre>",
+    );
+  });
 });

@@ -29,14 +29,14 @@
 .axog-lede p {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 8px 10px;
   margin: 0;
   color: var(--ax-muted);
   font-size: 13.5px;
   line-height: 1.55;
 }
-.axog-lede p > span {
+.axog-lede p > span:not(.ax-tag) {
   flex: 1 1 340px;
   min-width: 0;
 }
@@ -146,12 +146,13 @@
 }
 .axog-where {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 5px;
   color: var(--ax-muted);
   font-size: 13px;
 }
 .axog-where svg {
+  align-self: center;
   color: var(--ax-blue);
 }
 .axog-address {

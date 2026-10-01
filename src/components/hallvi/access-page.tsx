@@ -145,7 +145,7 @@ function Ports({
         {
           key: "port",
           head: "Port",
-          width: 110,
+          width: 130,
           cell: (row) =>
             row.port && row.port !== "not recorded" ? (
               <Name mono title={row.port} />
@@ -161,7 +161,7 @@ function Ports({
         {
           key: "open",
           head: "Open to",
-          width: 260,
+          width: 220,
           cell: (row) => (
             <span className="hv-ac-open">
               <Meter door={row} />

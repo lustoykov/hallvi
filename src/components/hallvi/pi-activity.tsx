@@ -402,24 +402,24 @@ function Quiet({
           ))}
           {records.length > 12 && <b>+{records.length - 12}</b>}
         </span>
-        {/* Without this the overflow count and the outcome run together:
-            "+1" beside "2 failed" reads as twelve failures. */}
-        <span className="hv-did-gap" aria-hidden="true" />
-        <em>
-          {wrong && !working ? (
-            // A decline is the reader's own decision and a stop is their
-            // interruption; neither is an error, and colouring them like one
-            // would teach them to distrust the colour.
-            <span
-              className="hv-did-wrong"
-              data-tone={count("failed") ? "failed" : "chosen"}
-            >
-              {wrong}
-            </span>
-          ) : (
-            ""
-          )}
-        </em>
+        {wrong && !working && (
+          <>
+            {/* Without this the overflow count and the outcome run together:
+                "+1" beside "2 failed" reads as twelve failures. */}
+            <span className="hv-did-gap" aria-hidden="true" />
+            <em>
+              {/* A decline is the reader's own decision and a stop is their
+                  interruption; neither is an error, and colouring them like
+                  one would teach them to distrust the colour. */}
+              <span
+                className="hv-did-wrong"
+                data-tone={count("failed") ? "failed" : "chosen"}
+              >
+                {wrong}
+              </span>
+            </em>
+          </>
+        )}
       </button>
       {open && (
         <ol className="hv-did-rows">

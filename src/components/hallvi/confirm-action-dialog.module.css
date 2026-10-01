@@ -50,7 +50,9 @@
   gap: 12px;
   margin-top: 26px;
 }
-.dialog button {
+/* Named through the footer so the application shell's button reset, which is
+   as specific as a bare `.dialog button`, cannot take the weight. */
+.dialog footer button {
   border: 1px solid #bdc9dc;
   border-radius: 7px;
   background: white;

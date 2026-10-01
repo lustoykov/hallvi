@@ -386,12 +386,21 @@
   flex-direction: column;
   gap: 22px;
 }
+/* The gap spaces the column; a card's own margin would stack on top of it. */
+.hv-messages > .hv-ob,
+.hv-messages > .hv-secrets {
+  margin: 0;
+}
 .hv-message {
   width: 100%;
   max-width: 92%;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/* The gap spaces the turns; a card that ends a reply does not add its own. */
+.hv-message > :is(.hv-info, .hv-record, .hv-result):last-child {
+  margin-bottom: 0;
 }
 .hv-message-user {
   margin-left: auto;
@@ -440,6 +449,13 @@
   font-size: 14px;
   line-height: 1.55;
 }
+/* A reply drawn by its transcript leaves this box empty, or holding only an
+   empty progress box while it runs. Either still takes a gap under the
+   heading, so it steps aside. */
+.hv-message-content:empty,
+.hv-message-content:has(> .hv-run-progress:only-child:empty) {
+  display: none;
+}
 .hv-message-user .hv-message-content {
   margin-left: auto;
   padding: 10px 14px;
@@ -457,7 +473,8 @@
   font-size: 11px;
   font-weight: 600;
 }
-.hv-message-response {
+.hv-message-response,
+.hv-did-said {
   overflow-wrap: anywhere;
 }
 .hv-message-response > :first-child {
@@ -466,27 +483,29 @@
 .hv-message-response > :last-child {
   margin-bottom: 0;
 }
-.hv-message-response p,
-.hv-message-response ul,
-.hv-message-response ol,
-.hv-message-response blockquote,
-.hv-message-response pre {
+/* What Hallvi says between its calls is the same Markdown as a plain reply,
+   drawn in its own block, so both are named here. */
+:is(.hv-message-response, .hv-did-said) p,
+:is(.hv-message-response, .hv-did-said) ul,
+:is(.hv-message-response, .hv-did-said) ol,
+:is(.hv-message-response, .hv-did-said) blockquote,
+:is(.hv-message-response, .hv-did-said) pre {
   margin: 0 0 10px;
 }
-.hv-message-response .hv-md-heading {
+:is(.hv-message-response, .hv-did-said) .hv-md-heading:not(:first-child) {
   margin-top: 14px;
 }
-.hv-message-response ul,
-.hv-message-response ol {
+:is(.hv-message-response, .hv-did-said) ul,
+:is(.hv-message-response, .hv-did-said) ol {
   padding-left: 22px;
 }
-.hv-message-response li {
+:is(.hv-message-response, .hv-did-said) li {
   margin: 3px 0;
 }
-.hv-message-response li::marker {
+:is(.hv-message-response, .hv-did-said) li::marker {
   color: var(--muted);
 }
-.hv-message-response code {
+:is(.hv-message-response, .hv-did-said) code {
   padding: 1px 5px;
   border-radius: 4px;
   background: #eef1f6;
@@ -496,24 +515,48 @@
 .hv-message-user .hv-message-response code {
   background: rgb(40 90 216 / 10%);
 }
-.hv-message-response pre {
+:is(.hv-message-response, .hv-did-said) pre {
   padding: 12px 14px;
   border: 1px solid var(--line-2);
   border-radius: var(--radius);
   background: #f3f5f9;
   overflow-x: auto;
 }
-.hv-message-response pre code {
+:is(.hv-message-response, .hv-did-said) pre code {
   padding: 0;
   background: none;
   white-space: pre;
 }
-.hv-message-response blockquote {
+:is(.hv-message-response, .hv-did-said) blockquote {
   padding: 2px 0 2px 12px;
   border-left: 2px solid #c9d4e4;
   color: var(--ink-2);
 }
-.hv-message-response a {
+/* Not scoped to a reply: records and What's new draw the same Markdown. A wide
+   table scrolls inside its own box, and its cells break between words so the
+   reply's break-anywhere rule cannot crush a column to single letters. */
+.hv-md-table {
+  margin: 0 0 10px;
+  overflow-x: auto;
+  overflow-wrap: normal;
+}
+.hv-md-table table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.hv-md-table th,
+.hv-md-table td {
+  padding: 5px 16px 5px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.hv-md-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+:is(.hv-message-response, .hv-did-said) a {
   color: var(--blue-text);
   text-underline-offset: 3px;
 }
@@ -530,6 +573,8 @@
   align-items: center;
   gap: 5px;
   min-height: 26px;
+  /* Pulled back by its padding so the icon sits on the text edge. */
+  margin-left: -7px;
   padding: 3px 7px;
   border: 0;
   border-radius: 6px;
@@ -771,14 +816,11 @@
 .hv-run-draft[open] summary {
   margin-bottom: 8px;
 }
-.hv-run-action {
-  justify-self: start;
-  min-height: 30px;
-  padding: 0 12px;
-  font-size: 12px;
-}
-.hv-run-action svg {
-  width: 13px;
+/* The link-coloured disclosures answer the pointer like the text links. */
+:is(.hv-run-draft, .hv-ob-more, .hv-record-details, .hv-stream)
+  > summary:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* ---------- Composer ---------- */
@@ -1026,9 +1068,11 @@
     background-color var(--fast) var(--ease),
     transform var(--fast) var(--ease);
 }
-/* Quiet beside Send next: the same action, at an earlier point. */
+/* Quiet beside Send next: the same action, at an earlier point. The bar
+   spreads its children, so the auto margin is what keeps the two together. */
 .hv-steer {
   flex-shrink: 0;
+  margin-left: auto;
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--line);
@@ -1118,11 +1162,14 @@
   background: var(--amber-soft);
   color: var(--ink);
 }
+/* The mark sits on the title line however many lines follow it. */
 .hv-pi-required > svg {
   width: 18px;
   height: 18px;
   color: var(--amber);
   flex: none;
+  align-self: flex-start;
+  margin-top: 1px;
 }
 .hv-pi-required strong {
   font-weight: 600;
@@ -1131,6 +1178,11 @@
   margin: 0;
   color: #79563b;
   font-size: 12px;
+}
+.hv-pi-required p:has(> .hv-run-action) {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 .hv-pi-required code {
   padding: 1px 4px;
@@ -1361,7 +1413,8 @@
 .hv-primary-button {
   box-shadow: var(--button-shadow);
 }
-.hv-primary-button:disabled {
+.hv-primary-button:disabled,
+.hv-secondary-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -1381,6 +1434,17 @@
 .hv-secondary-button:hover:not(:disabled) {
   background: #f4f7fb;
   border-color: #b4c2d6;
+}
+/* The small button inside the transcript and its banners. It follows the
+   two button rules because it has to win over them at equal weight. */
+.hv-run-action {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.hv-run-action svg {
+  width: 13px;
 }
 
 /* Header and actions stay put; only the body scrolls. The panel slides in
@@ -1427,6 +1491,9 @@
     background: none;
     color: inherit;
     animation: none;
+  }
+  .spin {
+    animation-duration: 2.4s;
   }
 }
 @keyframes hv-spin {
@@ -1495,12 +1562,17 @@
   height: 15px;
 }
 
+/* Beside the sidebar the bar has no room for the hint until about here; it
+   would wrap under the buttons and make the bar taller. */
+@media (max-width: 900px) {
+  .hv-composer-hint {
+    display: none;
+  }
+}
+
 @media (max-width: 540px) {
   .hv-composer {
     padding-inline: 12px;
-  }
-  .hv-composer-hint {
-    display: none;
   }
   .hv-setup-topbar {
     padding: 0 15px;

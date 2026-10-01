@@ -306,7 +306,13 @@ export function TerminalPanel({
         <TerminalLights />
         <strong>Terminal</strong>
         <span className="hv-terminal-target">
-          Application server · <code>{label}</code>
+          Application server
+          {target && (
+            <>
+              {" "}
+              · <code>{label}</code>
+            </>
+          )}
         </span>
         <span className="hv-terminal-status" role="status">
           {status}

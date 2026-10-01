@@ -11,7 +11,6 @@
      it, scrolling the whole transcript sideways. */
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;
-  margin: 2px 0 6px;
 }
 .hv-did-quiet,
 .hv-did-rows,
@@ -28,6 +27,14 @@
   margin-top: 0;
 }
 .hv-did-said > :last-child {
+  margin-bottom: 0;
+}
+/* The message spaces its own ends, so a reply that used tools starts and
+   stops where a plain one does. */
+.hv-did > .hv-did-said:first-child {
+  margin-top: 0;
+}
+.hv-did > .hv-did-said:last-child {
   margin-bottom: 0;
 }
 .hv-did-card {
@@ -65,8 +72,10 @@
 }
 .hv-did-head em {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   color: var(--faint, #8b95a5);
   font-style: normal;
   font-variant-numeric: tabular-nums;
@@ -81,6 +90,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--faint, #8b95a5);
+}
+/* On a phone the place is the part that gives way: it takes only what the
+   count, the marks and the outcome leave, so none of those breaks mid-phrase,
+   and no more than its own words, so the marks stay beside it. */
+@media (max-width: 640px) {
+  .hv-did-where {
+    flex: 1 1 0;
+    max-width: max-content;
+  }
 }
 .hv-did-where code {
   margin-left: 5px;
@@ -213,6 +231,7 @@
    shape: six quiet ticks and one red one is seen, not read. */
 .hv-did-marks {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 3px;
   margin-left: 2px;
