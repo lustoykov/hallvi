@@ -138,6 +138,10 @@ export function useHistory(
     error: string | null;
   }>({ key: "", history: null, error: null });
   const key = `${applicationId}:${range}`;
+  // Forgetting removes Traffic from the list. Drop its loaded totals too,
+  // so keeping history again cannot draw a snapshot the owner deleted.
+  if ((!applicationId || !wanted) && state.key)
+    setState({ key: "", history: null, error: null });
   useEffect(() => {
     if (!applicationId || !wanted) return;
     let live = true;

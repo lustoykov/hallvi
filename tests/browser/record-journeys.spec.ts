@@ -78,7 +78,8 @@ test.describe("what the pages must never stop saying", () => {
         SCENARIO.failing,
         "processes",
       );
-      expect(processes).toMatch(/not answering/i);
+      expect(processes).toMatch(/connection refused on 3000/i);
+      expect(processes).toMatch(/failed/i);
       expect(processes).not.toMatch(/process is running/i);
       // Forty days old and still red, rather than aged into doubt.
       const monitoring = await open(
@@ -97,7 +98,7 @@ test.describe("what the pages must never stop saying", () => {
     async ({ page }) => {
       test.skip(!(await up(page, SCENARIOS)), "no scenario server");
       const lost = await open(page, SCENARIOS, SCENARIO.failing, "storage");
-      expect(lost).toMatch(/did not survive a replacement/i);
+      expect(lost).toMatch(/did not survive a (?:container )?replacement/i);
       expect(lost).not.toMatch(/volumes stay when containers are replaced/i);
     },
   );
@@ -162,10 +163,15 @@ test.describe("what the pages must never stop saying", () => {
       await page.waitForLoadState("networkidle").catch(() => {});
       const id = await page.evaluate(
         () =>
-          document
-            .querySelector<HTMLAnchorElement>("a[href*='/applications/']")
-            ?.getAttribute("href")
-            ?.match(/[0-9a-f-]{36}/)?.[0] ?? null,
+          [
+            ...document.querySelectorAll<HTMLAnchorElement>(
+              "a[href*='/applications/']",
+            ),
+          ]
+            .map(
+              (link) => link.getAttribute("href")?.match(/[0-9a-f-]{36}/)?.[0],
+            )
+            .find(Boolean) ?? null,
       );
       test.skip(!id, "no application");
       const state = await (
@@ -174,21 +180,19 @@ test.describe("what the pages must never stop saying", () => {
       test.skip(state.mode !== "private", "not a private deployment");
 
       await open(page, ACCEPTANCE, id!, "deployment");
-      const header = page.locator(".axj3-open");
+      const header = page.getByRole("region", { name: "What is running" });
       // It settles on one of the two answers; "checking" is only the frame
       // before the answer arrives, and has its own case below.
-      await expect(header).toHaveAttribute(
-        "data-reach",
-        state.open ? "open" : "closed",
-      );
       if (state.open) await expect(header.locator("a")).toBeVisible();
       else {
-        expect(await header.innerText()).toMatch(/tunnel is closed/i);
+        await expect(header).toContainText("The tunnel is closed");
         // No anchor at all: a dead link that looks alive costs the reader a
         // click, a wait and a browser error before it says anything.
         await expect(header.locator("a")).toHaveCount(0);
         await expect(
-          header.getByRole("button", { name: /reopen/i }),
+          header.getByRole("button", {
+            name: /reconnect|review private access/i,
+          }),
         ).toBeVisible();
       }
     },
@@ -205,10 +209,15 @@ test.describe("what the pages must never stop saying", () => {
       await page.waitForLoadState("networkidle").catch(() => {});
       const id = await page.evaluate(
         () =>
-          document
-            .querySelector<HTMLAnchorElement>("a[href*='/applications/']")
-            ?.getAttribute("href")
-            ?.match(/[0-9a-f-]{36}/)?.[0] ?? null,
+          [
+            ...document.querySelectorAll<HTMLAnchorElement>(
+              "a[href*='/applications/']",
+            ),
+          ]
+            .map(
+              (link) => link.getAttribute("href")?.match(/[0-9a-f-]{36}/)?.[0],
+            )
+            .find(Boolean) ?? null,
       );
       test.skip(!id, "no application");
 
@@ -224,35 +233,24 @@ test.describe("what the pages must never stop saying", () => {
         await route.continue();
       });
 
-      const seen: string[] = [];
       await page.goto(`${ACCEPTANCE}/applications/${id}#deployment`, {
         waitUntil: "domcontentloaded",
       });
+      const header = page.getByRole("region", { name: "What is running" });
+      await expect(header).toContainText("Checking access…");
       for (let tick = 0; tick < 12; tick++) {
-        seen.push(
-          ...(await page
-            .locator(".axj3-open")
-            .evaluateAll((nodes) =>
-              nodes.map((node) => node.getAttribute("data-reach") ?? "none"),
-            )),
-        );
         // Nothing may be clickable while the answer is outstanding.
         expect(
-          await page.locator(".axj3-open a").count(),
+          await header.locator("a").count(),
           "an Open link before the answer arrived",
         ).toBe(0);
         await page.waitForTimeout(250);
       }
-      expect(new Set(seen.filter((value) => value !== "none"))).toEqual(
-        new Set(["checking"]),
-      );
+      await expect(header).toContainText("Checking access…");
 
       // Let it through, and the header settles on a real answer.
       released!();
-      await expect(page.locator(".axj3-open")).not.toHaveAttribute(
-        "data-reach",
-        "checking",
-      );
+      await expect(header).not.toContainText("Checking access…");
     },
   );
 

@@ -38,8 +38,19 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Fix in review |
 | [AF-061 — Cancel interrupted work without a model login](#af-061--cancel-interrupted-work-without-a-model-login) | 1 | Fix in review |
 | [AF-064 — Keep completed streamed replies when an older view arrives](#af-064--keep-completed-streamed-replies-when-an-older-view-arrives) | 1 | Fix in review |
+| [AF-062 — Drop loaded traffic totals after Forget](#af-062--drop-loaded-traffic-totals-after-forget) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-062 — Drop loaded traffic totals after Forget
+
+Forget deletes stored totals, but the Traffic page retains its loaded snapshot.
+Keep history again with an interrupted history read and it still displays the
+deleted views and pages, even though the real history route returns zero.
+Drop the loaded snapshot when history is forgotten; stopping collection must
+still preserve stored totals.
+
+**+1:** 2026-10-01 — data and traffic QA, `codex/qa-traffic-data`.
 
 ### AF-060 — Keep named applications distinct in the switcher
 
