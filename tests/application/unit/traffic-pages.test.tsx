@@ -1,7 +1,7 @@
 // What the traffic pages draw from stored totals and the live stream, where
 // a figure could claim more than was measured: a day nobody read, a range
 // whose errors straddle midnight, a percentile past the last bound, a list a
-// day kept only in part, and a script's view in the request counts.
+// day kept only in part, and a script's view among the live visitors.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -9,11 +9,10 @@ import { MonitoringUsage } from "@/components/hallvi/monitoring-usage";
 import {
   summarise,
   type SeenLine,
-  type Traffic,
 } from "@/components/hallvi/overview-live/use-traffic";
 import { Breakdowns } from "@/components/hallvi/traffic/breakdowns";
 import { Errors, Responses } from "@/components/hallvi/traffic/health";
-import { VisitorsToday } from "@/components/hallvi/traffic/overview-tile";
+import { VisitorsToday } from "@/components/hallvi/traffic/overview-visitors";
 import { Strip } from "@/components/hallvi/traffic/traffic-page";
 import { TrafficChart } from "@/components/hallvi/traffic/traffic-chart";
 import type {
@@ -192,12 +191,6 @@ describe("the 24-hour error card", () => {
 });
 
 describe("a day nobody read", () => {
-  const traffic = {
-    state: "live",
-    onArrival: () => () => undefined,
-    openNow: null,
-    recentVisitors: 0,
-  } as unknown as Traffic;
   const month = (input: Partial<Collection>) =>
     history(
       "30d",
@@ -218,18 +211,13 @@ describe("a day nobody read", () => {
             enabledAt: null,
             disabledAt: "2026-09-28T20:00:00.000Z",
           })}
-          traffic={traffic}
         />,
       ),
     );
     expect(off).toContain("History is off, so today is not counted.");
     expect(off).not.toMatch(/0\s*estimated/);
     expect(
-      text(
-        renderToStaticMarkup(
-          <VisitorsToday month={month({})} traffic={traffic} />,
-        ),
-      ),
+      text(renderToStaticMarkup(<VisitorsToday month={month({})} />)),
     ).toContain("Nothing is counted for today yet.");
   });
 });
@@ -374,7 +362,7 @@ describe("floors", () => {
 });
 
 describe("the live stream", () => {
-  it("counts a script's view as a view, never as a request", () => {
+  it("counts a script's view as a visitor who opened a page", () => {
     const line = (input: Partial<SeenLine>): SeenLine => ({
       id: 0,
       at: NOW - 1000,
@@ -389,13 +377,11 @@ describe("the live stream", () => {
       visitor: "a",
       ...input,
     });
-    const seen = summarise(
-      [line({}), line({ id: 1, kind: "view", script: true })],
-      NOW,
-    );
-    expect(seen.requests).toBe(1);
-    expect(seen.perMinute).toBe(1);
-    expect(seen.lanes).toEqual([{ name: "/pricing", requests: 1, failed: 0 }]);
-    expect(seen.viewers).toBe(1);
+    // A file request is not a visit; the script's view of the page is.
+    expect(summarise([line({})], NOW).viewers).toBe(0);
+    expect(
+      summarise([line({}), line({ id: 1, kind: "view", script: true })], NOW)
+        .viewers,
+    ).toBe(1);
   });
 });

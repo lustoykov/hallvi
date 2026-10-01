@@ -31,6 +31,9 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-048 — Ask the host for a taller panel inside a conversation](#af-048--ask-the-host-for-a-taller-panel-inside-a-conversation) | 1 | New |
 | [AF-050 — Keep Pi's replies from summoning the owner](#af-050--keep-pis-replies-from-summoning-the-owner) | 1 | New |
 | [AF-051 — Retire or rewrite the conversation-first capture](#af-051--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
+| [AF-056 — Check the port before rebuilding the scenario database](#af-056--check-the-port-before-rebuilding-the-scenario-database) | 1 | New |
+| [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
+| [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -62,6 +65,39 @@ in…", groups named by state), so it cannot run against the current shell.
 Only its wording was updated.
 
 **+1:** 2026-09-30 — calm labels, `claude/calm-asks`
+
+### AF-056 — Check the port before rebuilding the scenario database
+
+`npm run scenarios -- <port>` deletes and rebuilds `tests/results/scenarios`
+before it starts Next. Run a second time on a port a scenario server already
+holds, it rebuilds the database under the running server and only then fails
+with `EADDRINUSE`. The owner hit this while a preview was open. Checking that
+the port is free before touching the state would let the second run fail
+without side effects.
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+### AF-057 — Say which Node a checkout runs under
+
+This Mac's default `node` is 26. `npm run checks` refuses anything but
+Node 22, but `npm ci`, `npm test` and `npm run scenarios` use whatever is on
+the path. Under Node 26.9.0, `unit/hallvi-plugin-update.test.ts` fails with
+"ssh failed (1)" and reads like a product failure; under Node 22.23.2 the
+suite passes. Native modules installed under one version also fail to load
+under the other. An `.nvmrc` or an `engines` field would say so first.
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+### AF-058 — Give the Overview before a verified deployment the same plain labels
+
+The deployed Overview now says "Recent" and "Checked by Hallvi", and its head
+says how the address reads in plain words. The compositions shown before a
+verified deployment still say "What has been assessed", "What happened" and
+"Is the way in working?". The owner found that family of labels precious on
+the deployed page. Overview's title is also the web part's name, so a static
+site behind Caddy is titled "Caddy".
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
 
 ### AF-017 — Make record validation easier for Pi to recover from
 

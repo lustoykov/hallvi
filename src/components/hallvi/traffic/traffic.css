@@ -4,7 +4,7 @@
    Motion is for arrivals and the one visitor at a time, never for entrance. */
 
 .tf,
-.tf-tile {
+.tf-scope {
   --tf-blue: #285ad8;
   --tf-tint: #f5f8fe;
   --tf-tint-line: #dce5f7;
@@ -1261,59 +1261,217 @@
   }
 }
 
-/* ---------- Overview's tile */
+/* ---------- Overview's visitors card */
 
-.tf-tile {
+.tf-ov {
   display: grid;
-  flex: 1;
-  align-content: start;
-  gap: 6px;
-  min-height: 0;
+  gap: 14px;
 }
-.tf-tile-usual {
+.tf-ov-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 26px;
+}
+.tf-ov-today {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+}
+.tf-ov-today b {
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tf-ov-today span,
+.tf-ov-usual-words {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+/* Thirty days. A column is as tall as the plot so the whole day is a
+   target; the bar inside it is the day's visitors. */
+.tf-ov-chart {
+  display: grid;
+}
+.tf-ov-readout {
+  justify-self: end;
+  min-height: 20px;
   margin: 0;
   font-size: 12.5px;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
-.tf-tile-days {
+.tf-ov-readout b {
+  margin-right: 8px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tf-ov-plot {
+  position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 4px;
-  height: 44px;
-  margin-top: 4px;
+  gap: 3px;
+  height: 172px;
+  margin-top: 6px;
+  border-bottom: 1px solid var(--line-2, #d8dee8);
 }
-.tf-tile-days i {
+.tf-ov-chart[data-quiet] .tf-ov-plot {
+  height: 96px;
+}
+.tf-ov-day {
+  position: relative;
+  z-index: 1;
   flex: 1;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+.tf-ov-day i {
+  width: 100%;
   border-radius: 3px 3px 0 0;
   background: #c9d6f3;
+  transition: background-color var(--fast);
 }
-.tf-tile-days i[data-today] {
+.tf-ov-day[data-pointed] i {
+  background: #a9bdea;
+}
+.tf-ov-day[data-today] i {
   background: var(--tf-blue);
 }
-.tf-tile-days i[data-gap] {
+.tf-ov-day[data-gap] i {
   background: repeating-linear-gradient(
     135deg,
     transparent 0 3px,
     #e2e7ef 3px 4px
   );
 }
-.tf-tile-errors {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 560;
-  color: var(--failed, #a6312b);
+/* The usual day, drawn across the days it is the middle of. */
+.tf-ov-usual {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed #93a0b8;
+  pointer-events: none;
 }
-.tf-tile-now {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0 0;
-  font-size: 12.5px;
+.tf-ov-usual em {
+  position: absolute;
+  left: 0;
+  bottom: 4px;
+  padding-right: 6px;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 11px;
+  font-style: normal;
   color: var(--muted);
 }
-.tf-tile-now b {
+.tf-ov-axis {
+  display: flex;
+  gap: 3px;
+  height: 34px;
+}
+.tf-ov-axis span {
+  position: relative;
+  flex: 1;
+}
+.tf-ov-axis small {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.tf-ov-axis span[data-today] small {
+  left: auto;
+  right: 0;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--tf-blue);
+}
+/* A release, on the day it went out. */
+.tf-ov-release {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--ink);
+  transform: rotate(45deg);
+}
+.tf-ov-axis .tf-ov-release {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  margin-left: -3px;
+}
+.tf-ov-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.tf-ov-tops {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.tf-ov-tops > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+.tf-ov-top h3 {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.tf-ov-top ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tf-ov-top li {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0 8px;
+  font-size: 13px;
+}
+.tf-ov-top li > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tf-ov-top code {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.tf-ov-top li b {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+/* Its share of the list's largest, as a hairline under the row. */
+.tf-ov-top li i {
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: #d6e0f6;
 }
 
 /* ---------- Beside a release, in Deployment */
@@ -1439,6 +1597,19 @@
     left: 8px;
     max-width: none;
   }
+  .tf-ov-today b {
+    font-size: 34px;
+  }
+  .tf-ov-plot {
+    gap: 2px;
+    height: 128px;
+  }
+  .tf-ov-axis {
+    gap: 2px;
+  }
+  .tf-ov-tops {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1449,8 +1620,12 @@
   }
   .tf .tf-map-ripple,
   .tf .tf-map-lit,
-  .tf .tf-pulse i {
+  .tf .tf-pulse i,
+  .tf-scope .tf-pulse i {
     display: none;
+  }
+  .tf-ov-day i {
+    transition: none;
   }
 }
 

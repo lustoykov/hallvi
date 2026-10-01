@@ -231,23 +231,22 @@ test("private route observations stay with their route, survive refresh and lose
         const read = page.waitForRequest(`**/api/applications/${appId}/access`);
         await page.clock.runFor(30_001);
         await read;
+        // Overview's head says how the address reads; no tile repeats it.
         const word =
           state === "closed"
-            ? "The way in is closed"
-            : capture === "baseline"
-              ? "The way in is open"
-              : state === "unknown"
-                ? "Access has not been checked"
-                : state === "controller-unreachable"
-                  ? "Cannot reach Hallvi"
-                  : "The way in is open";
-        await expect(page.locator(".ovl-health-word")).toHaveText(word);
+            ? "The tunnel is closed"
+            : state === "unknown"
+              ? "Access has not been checked"
+              : state === "controller-unreachable"
+                ? "Cannot reach Hallvi"
+                : "Private connection open";
+        await expect(header.locator(".axj3-open")).toContainText(word);
         for (const [device, viewport] of [
           ["desktop", { width: 1440, height: 1000 }],
           ["narrow", { width: 390, height: 844 }],
         ] as const) {
           await page.setViewportSize(viewport);
-          await page.locator(".ovl-health").scrollIntoViewIfNeeded();
+          await header.scrollIntoViewIfNeeded();
           await page.screenshot({
             path: join(dir, `${state}-${device}.png`),
             animations: "disabled",
@@ -272,7 +271,10 @@ test("private route observations stay with their route, survive refresh and lose
     await expect(
       header.getByRole("link", { name: "Open Private Notes" }),
     ).toHaveAttribute("href", selected.presentation!.url!);
-    await expect(page.getByText("It answered just now.")).toHaveCount(0);
+    // A tunnel proves the connection, never the application behind it, so
+    // the head says the connection is open and never that it is answering.
+    await expect(header.getByText("Private connection open")).toBeVisible();
+    await expect(page.getByText("Answering", { exact: true })).toHaveCount(0);
     await page.goto(`/applications/${appId}`);
     const chat = page.locator(".hv-chat-pane");
     await expect(

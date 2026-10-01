@@ -1070,6 +1070,28 @@
   width: 13px;
   height: 13px;
 }
+/* Overview's head says how the address reads: a dot, the word, the host. */
+.axj3-open .axj3-reading {
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.axj3-reading b {
+  font-weight: 560;
+  color: var(--ink);
+}
+.axj3-reading i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verified);
+}
+/* A dropped tunnel is a ring, not a colour: nothing about the application. */
+.axj3-reading[data-closed] i {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px #9aa5b8;
+}
 .axj3-open a {
   display: inline-flex;
   align-items: center;
