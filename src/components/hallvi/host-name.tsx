@@ -102,7 +102,7 @@ export function HostTitle() {
   return null;
 }
 
-/** The chip in the top strip of a checkout; nothing in an installation. */
+/** A checkout's name in the top strip; nothing in an installation. */
 export function DevelopmentLabel() {
   const { development } = useThisHallvi();
   if (!development) return null;

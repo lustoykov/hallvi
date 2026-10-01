@@ -39,11 +39,13 @@ export default function RootLayout({
             already carries it; what is worth a line is what alpha means. */}
         <aside className="hv-alpha-notice" aria-label="Hallvi alpha release">
           <span className="hv-alpha-label">Alpha</span>
-          <DevelopmentLabel />
           <p>
             Expect frequent changes as we figure out the best user experience.
           </p>
-          <HostLabel />
+          <span className="hv-which-hallvi">
+            <DevelopmentLabel />
+            <HostLabel />
+          </span>
         </aside>
         <div className="hv-app-content">{children}</div>
         <StandInNotice />

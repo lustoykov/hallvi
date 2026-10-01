@@ -434,9 +434,11 @@ column's tint with no rule under it, so strip and column are one surface and
 the workspace is the sheet resting in it. Its tag is pressed into that surface
 rather than lifted off it: it is a label, and in this shell only what is
 selected or pressable is raised. The sentence and the machine's name share
-the strip's one ink, the name a step stronger. A checkout keeps its green
-strip and solid chip. This replaced an amber band with a navy chip: amber is
-a state's colour, and alpha is not a state.
+the strip's one ink, the name a step stronger. A checkout's strip is the same
+strip: it names itself in green text before the machine, in the colour of its
+tab icon, where a green band and a chip beside the tag used to make every
+preview look unlike the product. This replaced an amber band with a navy
+chip: amber is a state's colour, and alpha is not a state.
 
 The workspace shell: a 240px navigation column, a 56px top bar, and a workspace that fills the rest. Beside the column the top bar and workspace form one sheet, its top-left corner rounded 14px and set 8px down, casting a soft shadow onto the column; on a phone the navigation is a strip above it and there is no sheet edge. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
 
