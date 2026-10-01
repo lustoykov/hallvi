@@ -238,7 +238,7 @@ export function Mascot({
             <rect x="234" y="300" width="42" height="16" rx="6" />
           </g>
 
-          {/* The raised arm, behind the body; its tools stand in the mitten. */}
+          {/* The raised arm, behind the body. Tools stand in its mitten. */}
           <g className="hv-ms-arm" data-side="r">
             <g className="hv-ms-swing" key={gesture}>
               <path

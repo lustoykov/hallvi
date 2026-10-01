@@ -37,8 +37,32 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 | [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 1 | Guidance added |
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
+| [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 1 | New |
+| [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-068 — Remove the mascot placements nothing draws
+
+`.axbc-guy` in `backup-prototype/calendar.css` and `.axm-guy` in
+`deployment-prototype/transit.css` size a Little Server that no component
+renders. Found while replacing the three.js mascot with the flat drawing, and
+left alone as outside that change.
+
+**+1:** 2026-10-01 — flat mascot, `claude/flat-mascot`.
+
+### AF-067 — Give the scenarios a new application and a one-application home
+
+`npm run scenarios` serves twelve applications that all have records, so three
+layouts never appear on it: Add application on a first run, the applications
+home with a single application, and the welcome in an untouched conversation.
+Checking the flat mascot in them needed the disposable browser fixture and an
+API call, and that fixture copies `src` once, so each edit meant restarting
+it. An application with no records in the scenario file, and a way to see the
+home with one application, would put those states behind the server that
+reloads as you edit.
+
+**+1:** 2026-10-01 — flat mascot, `claude/flat-mascot`.
 
 ### AF-065 — Show a failed recovery-kit read
 
