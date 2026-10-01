@@ -454,7 +454,10 @@ whole suite against main. On main at `4c1e2b17`, five journeys fail.
 the conversation. `controller-protection.spec.ts` and
 `experience-continuity.spec.ts` both wait for Backups behind "Show more". With
 a scenario server up, `record-journeys.spec.ts` no longer finds "not answering"
-on Processes or "did not survive a replacement" on Storage.
+on Processes or "did not survive a replacement" on Storage. Its two private
+access journeys never run at all: their lookup takes `/applications/new` for
+the first application and skips, the fault `interactions.spec.ts` fixed for
+itself.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
