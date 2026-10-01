@@ -76,7 +76,7 @@ In Codex, same-chat reopen and new-chat open are separate observations. Do not
 create another user-owned chat merely to complete a check without authorization.
 If host controls are unavailable, report the native step as unverified; a
 fixture, fresh CLI process or successful resource notification cannot replace it.
-[Plugin update instructions](hallvi-plugin.md#updating-the-plugin-ui) own the
+[Plugin update instructions](hallvi-plugin.md#updating-the-installed-plugin) own the
 recovery steps. Never restart the controller to try to clear a host's panel cache.
 
 ## 2. Discover, send, follow, inspect

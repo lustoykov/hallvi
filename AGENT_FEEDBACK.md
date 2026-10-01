@@ -910,3 +910,16 @@ almost invisible beneath the pointer.
 **+1:** 2026-10-01 — independent review of #304.
 
 **Status:** Fixed in #304 by limiting the pale hover treatment to unselected filters; verified in the scenario browser.
+
+### AF-053 — Update all installed plugin copies in one command
+
+The sidebar kept showing an older plugin while `hallvi-dev` showed the new
+panel. Updating required rebuilding, copying the marketplace, updating the
+adapter on the Mac mini, reinstalling and reconnecting. The owner asked to
+automate that sequence. `npm run plugin:update` now preserves the existing
+connection, updates the installed copies and reports the expected UI version
+and whether adapter code changed. The desktop still owns reconnection.
+
+**+1:** 2026-09-30 — `codex/hallvi-plugin-update`.
+
+**Status:** Fixed in #294.

@@ -133,7 +133,41 @@ handles contain that remote loopback address: pass them back to `hallvi_wait`,
 not to a browser or an HTTP client on your laptop. Use a different MCP server
 name for a second controller so each connection remains explicit.
 
-## Updating the plugin UI
+## Updating the installed plugin
+
+With dependencies installed (`npm ci` under Node 22), run from the checkout
+whose plugin revision you want to install. The updater uses Node 22, selecting
+an existing Homebrew Node 22 automatically if your default Node is newer:
+
+```sh
+npm run plugin:update
+```
+
+This builds the plugin, updates the existing local marketplace at
+`~/.local/share/hallvi-plugin-marketplace`, updates the adapter over its existing
+SSH connection when applicable, and reinstalls `hallvi` through Codex. It keeps
+`.mcp.json` byte-for-byte, including controller, UI address and SSH options.
+It does not restart Codex, Hallvi or any application. If adapter code changed,
+restart Codex once and reopen Hallvi from the sidebar. Compare the panel's UI
+version with the command's expected version; installation success alone does
+not prove the open panel refreshed.
+
+Use `-- --dry-run` to build and check the existing installation without changing
+installed files. `-- --marketplace-dir /absolute/path` selects another existing,
+registered local marketplace; `-- --bundle /absolute/path/to/hallvi-plugin`
+installs an already built bundle instead of building. The command does not
+fetch source changes, set up a first installation, or upgrade the controller.
+
+The supported connections are the direct Node and SSH commands above. SSH
+uses the existing options and host, requires an absolute adapter path and
+Node 22, and rejects shell expressions or paths with spaces. Unsupported
+connections fail before installed files change. A failed SSH preflight leaves
+all installed files alone. Updates stage both remote files before replacing
+them individually and verify their hashes; a later failure can leave some
+copies updated. Fix the reported failing step and rerun the same command.
+No application state or credentials are copied.
+
+## Updating only the plugin UI
 
 Each HTML revision gets a content-addressed URI:
 `ui://hallvi/applications-<sha256-prefix>.html`. Tool metadata, resource reads
