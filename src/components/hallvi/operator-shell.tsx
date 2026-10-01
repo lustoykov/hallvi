@@ -90,7 +90,7 @@ export function OperatorShell({
   initialPiSetup: PiSetupStatus;
   applications: Pick<
     ApplicationRecord,
-    "id" | "repositoryOwner" | "repositoryName"
+    "id" | "name" | "repositoryOwner" | "repositoryName"
   >[];
   /** The repository is synthetic: GitHub links are shown, never followed. */
   demo?: boolean;
