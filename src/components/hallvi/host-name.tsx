@@ -127,7 +127,7 @@ export function HostLabel() {
   if (!name) return null;
   return (
     <span className="hv-host-label" title={`Hallvi runs on ${name}`}>
-      Running on {name}
+      Running on <b>{name}</b>
     </span>
   );
 }

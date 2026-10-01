@@ -27,6 +27,14 @@
   --line-2: #e6ebf3;
   --panel: #f7f9fc;
   --canvas: #f5f7fb;
+  /* The frame the workspace rests in: a faint tint of the action blue, worn
+     by the navigation column and the strip above it. Every shadow cast onto
+     it is this one blue-navy, so depth reads as one light. */
+  --nav-top: #e9eef9;
+  --nav-bottom: #e1e8f6;
+  --nav-groove: #d2dbee;
+  --nav-text: #344363;
+  --shade: 28 52 110;
   --radius-s: 6px;
   --radius: 8px;
   --radius-l: 12px;
@@ -110,62 +118,78 @@ textarea:focus-visible {
 .hv-app-content .hv-shell {
   height: 100%;
 }
+/* The strip is the top of the frame: the navigation column's own tint with no
+   rule under it, so the two read as one surface and the workspace as the
+   sheet resting in it. Everything on it is cut from one ink. */
 .hv-alpha-notice {
+  --strip-ink: var(--nav-text);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 24px;
-  color: var(--navy);
-  background: var(--amber-soft);
-  border-bottom: 1px solid var(--line);
+  gap: 10px;
+  /* A long machine name is cut; it never widens the page. */
+  min-width: 0;
+  padding: 6px 24px 6px 12px;
+  background: var(--nav-top);
+  color: var(--strip-ink);
+  font-size: 12.5px;
+  line-height: 20px;
 }
-.hv-alpha-label {
+.hv-alpha-label,
+.hv-development-label {
   flex: none;
-  padding: 3px 9px;
-  border-radius: var(--radius-s);
-  background: var(--navy);
-  color: white;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+/* Pressed into the frame rather than lifted off it: a tag, not a control. */
+.hv-alpha-label {
+  background: color-mix(in srgb, var(--strip-ink) 8%, transparent);
+  box-shadow:
+    inset 0 1px 1px color-mix(in srgb, var(--strip-ink) 16%, transparent),
+    0 1px 0 rgb(255 255 255 / 85%);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-/* A checkout says so on every page; the installed Hallvi has no chip. */
+/* A checkout says so on every page, in the green of its tab icon; the
+   installed Hallvi has no chip. */
 .hv-alpha-notice:has(.hv-development-label) {
+  --strip-ink: #0b5e3c;
   background: var(--green-soft);
 }
 .hv-development-label {
-  flex: none;
-  padding: 3px 9px;
-  border-radius: var(--radius-s);
-  background: var(--green);
+  background: var(--green-text);
   color: white;
-  font-size: 13px;
-  font-weight: 650;
 }
+.hv-alpha-notice p,
+.hv-host-label {
+  color: color-mix(in srgb, var(--strip-ink) 84%, transparent);
+}
+/* In a narrow window the sentence folds in two before the machine's name is
+   cut, and never further. */
 .hv-alpha-notice p {
+  flex: 1 1 0;
+  min-width: 28ch;
   margin: 0;
-  max-width: 90ch;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-2);
+  text-wrap: balance;
 }
 .hv-host-label {
   margin-left: auto;
   min-width: 0;
-  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  color: var(--ink-2);
+}
+.hv-host-label b {
+  color: var(--strip-ink);
+  font-weight: 500;
 }
 @media (max-width: 640px) {
   .hv-alpha-notice {
-    align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
+    gap: 4px 8px;
+    padding: 8px 12px;
   }
   .hv-alpha-notice p {
     order: 1;
