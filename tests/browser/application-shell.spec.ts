@@ -234,7 +234,7 @@ test(
 test(
   "the same repository can create two independent named applications",
   journey("isolation"),
-  async ({ page }) => {
+  async ({ page }, testInfo) => {
     const ids: string[] = [];
     for (const name of ["My app", "Staging"]) {
       await page.goto("/applications/new");
@@ -268,5 +268,54 @@ test(
       ).toBeVisible();
     }
     expect(ids[0]).not.toBe(ids[1]);
+    // Independently named deployments of one repository must stay
+    // distinguishable at the point where the owner chooses a target.
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    await composer.fill("Only staging should receive this draft.");
+    await page
+      .getByRole("button", { name: "Switch application: Staging", exact: true })
+      .click();
+    const picker = page.getByRole("navigation", {
+      name: "Applications",
+      exact: true,
+    });
+    await page.screenshot({
+      path: testInfo.outputPath("named-application-picker.png"),
+      fullPage: true,
+    });
+    const first = picker.getByRole("link", {
+      name: "My app qa/same-source",
+      exact: true,
+    });
+    await expect(first).toHaveAttribute("href", ids[0]);
+    await expect(
+      picker.getByRole("link", {
+        name: "Staging qa/same-source Current application",
+        exact: true,
+      }),
+    ).toHaveAttribute("href", ids[1]);
+    await first.click();
+    await expect(page).toHaveURL(new RegExp(`${ids[0]}$`));
+    await expect(
+      page.getByRole("button", {
+        name: "Switch application: My app",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(composer).toHaveValue("");
+    await page
+      .getByRole("button", { name: "Switch application: My app", exact: true })
+      .click();
+    await picker
+      .getByRole("link", { name: "Staging qa/same-source", exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${ids[1]}$`));
+    await expect(composer).toHaveValue(
+      "Only staging should receive this draft.",
+    );
+    await page.reload();
+    await expect(composer).toHaveValue(
+      "Only staging should receive this draft.",
+    );
   },
 );

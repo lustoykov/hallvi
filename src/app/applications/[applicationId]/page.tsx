@@ -39,8 +39,9 @@ export default async function ApplicationPage({
       // synthetic, so GitHub links are shown but never followed.
       demo={Boolean(process.env.HALLVI_QA_ROOT)}
       applications={(await listApplications()).map(
-        ({ id, repositoryOwner, repositoryName }) => ({
+        ({ id, name, repositoryOwner, repositoryName }) => ({
           id,
+          name,
           repositoryOwner,
           repositoryName,
         }),
