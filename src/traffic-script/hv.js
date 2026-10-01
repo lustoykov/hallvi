@@ -8,9 +8,9 @@
 //
 // No cookie, nothing stored in the browser, nothing that tells people apart:
 // a page view has a random id that joins its own events and nothing else.
-// Measurement starts only after the site's analytics consent controls grant
-// it. window.hvConsent carries a choice made before this deferred file loads;
-// window.hv.consent(true/false) applies later changes, including withdrawal.
+// The plain include starts measurement. A site's existing controls can set
+// window.hvConsent = false before loading, or call window.hv.consent(false)
+// later to stop it. window.hv.consent(true) starts a fresh current view.
 //
 // What is served is this file without its whole-line comments
 // (src/server/traffic/script.ts), so keep every comment on a line of its own
@@ -77,7 +77,7 @@
   const observers = [];
   const cleanup = [];
   let tracking = false;
-  let consent = window.hvConsent === true;
+  let consent = window.hvConsent !== false;
   let first = true;
 
   const on = (target, type, handler, options) => {

@@ -253,7 +253,7 @@ export function scriptOffer(
 
 /** What the owner sends Pi when they take the offer. */
 export function scriptDraft(name: string) {
-  return `Add Hallvi's traffic script to ${name}: use the site's existing analytics consent controls and update its privacy notice. If it has none, offer a small consent prompt and notice using the site's existing design. Keep measurement off until the visitor allows analytics, with an equally easy refusal and later withdrawal. Ask me for missing notice details rather than inventing them. Open a pull request for the include, consent integration and notice, and make sure the proxy serves /_hv/. Don't change anything at the proxy that rewrites pages.`;
+  return `Add Hallvi's traffic script to ${name}: open the smallest pull request that loads /_hv/s.js on every page, and make sure the proxy serves /_hv/. Use the plain script include without adding a banner or mandatory grant callback. Preserve the site's existing controls. Don't change anything at the proxy that rewrites pages.`;
 }
 
 /**

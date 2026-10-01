@@ -4,6 +4,16 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.13 — 1 October 2026
+
+Install the traffic script reliably, use it without a mandatory banner, and keep Hallvi's operator and plugin easier to follow.
+
+- **Working traffic-script installation.** The installer now puts the script where the operator reads it. Native clean-install and upgrade checks exercise that installed path, so a running service alone cannot hide a missing asset.
+- **Script-only browser measurement.** The plain include measures immediately, without a banner or mandatory grant callback. It uses no cookies, browser storage or persistent visitor identifier. Existing site controls can still explicitly disable and re-enable measurement. This is no claim of consent exemption or legal compliance.
+- **Correct browser routes and proxy setup.** Applications can explicitly count hash routes, and Traefik setup uses stable names for each application's router and service. Traffic storage, log rotation and repeated live reads handle contention and cleanup more consistently. Goals still require the owner's own instrumentation.
+- **Updated operator and models.** Pi uses its current published runtime; OpenRouter choices use the current catalog. Existing accounts and chosen models remain retained, and completed host setup closes obsolete requests.
+- **Clearer settings and plugin updates.** Settings separates connections and model choices, the compact plugin exposes the operator and current work, and the plugin updater explains how to recover an already-rendered panel. Native ChatGPT rendering remains unverified.
+
 ## 0.1.1-alpha.12 — 30 September 2026
 
 Ask the existing Hallvi operator from Codex, understand Traffic setup, and find Hallvi settings and updates in one menu.

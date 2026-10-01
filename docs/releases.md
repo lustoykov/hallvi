@@ -167,8 +167,10 @@ They then restart the candidate with an active conversation stream, requiring
 the old stream to close and the same records and address to survive.
 This exercises installer-mediated upgrades, not public automatic-update discovery
 or downloading. The jobs refuse an existing same-user installation or service.
-All four jobs must pass before publishing. The
-[beta walkthrough](beta-walkthrough.md) is the fuller acceptance.
+All four jobs must pass before publishing. The jobs also run the canonical traffic-script reader from the installed `app/`
+directory and check its content hash and JavaScript syntax. Archive presence
+alone is insufficient: the installer must put the asset where the worker reads it.
+The [beta walkthrough](beta-walkthrough.md) is the fuller acceptance.
 
 **Publish.** The workflow leaves a **draft**. GitHub does not serve a draft to
 a reader without a token, so nothing discovers it. Publishing it as the

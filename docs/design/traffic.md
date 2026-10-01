@@ -264,10 +264,15 @@ internet, no cookies and nothing stored in the browser.
   being served pages, the page says "script silent since …" rather than
   quietly falling back.
 
-### Analytics consent and privacy notice
+### Analytics controls and privacy
 
-The shipped script defaults to no measurement. A site grants analytics only
-from its valid, current consent state:
+The plain script include starts measurement without a banner or grant callback.
+It uses no cookies, browser storage or persistent visitor identifier. Each view
+gets a temporary random id to join that view's events. Hallvi does not add a
+consent UI unless the owner asks for one, and preserves existing site controls.
+
+An existing site control can start the script disabled by setting
+`window.hvConsent = false` before the deferred file loads. Later changes use:
 
 ```js
 function setAnalyticsConsent(granted) {
@@ -276,79 +281,40 @@ function setAnalyticsConsent(granted) {
 }
 ```
 
-The same callback works before and after the deferred file loads. Set the
-initial choice before loading when it is known, and call it on every change;
-unknown, refused, expired and withdrawn choices are false. A repeated grant
-does not duplicate tracking. The script reads no page/referrer, creates no
-view id or performance observer and starts no tracking timer before a grant.
-Withdrawal sends no final beacon, stops listeners/observers/timers and discards
-the view. A later grant measures the current page with a new id, without
-replaying earlier routes, goals, errors or buffered performance entries.
-Prerendered pages still wait until shown.
+Disabling sends no final beacon, stops listeners, observers and timers, and
+clears the current view. Re-enabling measures the current page with a fresh id
+without replaying earlier activity. Repeated enable calls do not duplicate
+tracking. Prerendered pages wait until shown. The script stores no preference;
+existing site controls own remembering and propagating their choice.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Off: absent or refused analytics consent
-  Off --> Waiting: grant while prerendered
-  Waiting --> Measuring: page shown and consent still valid
-  Waiting --> Off: withdrawal
-  Off --> Measuring: grant on shown page
-  Measuring --> Off: refusal, expiry or withdrawal
-  Measuring --> Measuring: repeated grant keeps the same view
+  [*] --> Measuring: plain include on shown page
+  [*] --> Off: explicit initial false
+  [*] --> Waiting: prerendered page
+  Waiting --> Measuring: page shown and enabled
+  Off --> Measuring: explicit enable on shown page
+  Measuring --> Off: explicit disable
 ```
 
-Pi's `traffic_script` result includes this callback, setup requirements, a
-measurement-notice draft and the facts the owner must supply. Reuse the site's
-existing analytics controls. When none exist, offer a small prompt and notice
-in the site's language and design: **Allow analytics** and **Decline** are
-equally easy, the completed notice is linked, the site works on refusal, and
-**Analytics preferences** remains reachable for withdrawal. Closing, scrolling
-or continued browsing never grants consent. The site's controls own remembering
-the choice, time, notice version and expiry, and propagate shared preferences
-to open tabs. The tracker stores none of these. Disclose any preference cookie
-or browser storage separately from the cookie-free measurement script.
+Pi's `traffic_script` result includes the file, proxy configuration, versioned
+include and optional controls. Propose the smallest correct include change;
+add a prompt, consent integration or privacy notice only when requested.
+Never manufacture missing notice facts or claim that cookieless means
+anonymous, consent-exempt or legally compliant. Raw event requests still enter
+access logs with IP and browser information. Hallvi keeps traffic totals on the
+controller; paths and campaign values can be retained in those totals. Keep
+personal information out of paths, campaign values and goal names. Ordinary
+server logs continue when browser measurement is disabled.
 
-The notice must describe this deployment, including the operator/contact,
-purposes and legal bases, recipients and hosting/controller locations,
-international transfers where applicable, actual raw-log retention (including
-CDN/backup copies), total retention, rights and complaint route. Totals remain
-on the controller until the owner forgets them. Raw logs can include IP and
-browser information; those are also used in memory for daily visitor
-estimates. Paths, configured page-query values and campaign tags can contain
-personal information and be retained in totals. Keep personal data out of
-these and goal names, and exclude sensitive pages through the site's script
-integration. Never invent notice facts, publish placeholders or call all data
-anonymous. Refusal stops the script, while ordinary server request/security
-logs continue with their separately disclosed purpose, basis and retention.
-
-Script figures measure consenting visitors and can understate total use; log
-coverage measures available log time, not the percentage who consented. After
-the first allowed event, the existing switch point still takes views from the
-script alone. There is no fallback that reconstructs refused browser activity.
-Before any script event, existing ordinary log measurement remains its separate
-source. Keep these bases clear in the notice and in Pi's explanation.
-
-The tag includes the script's content version in its URL to avoid reusing an
-older cached script at the unchanged path. One server file still serves every
-application on that host. Coordinate replacement with every application's
-consent integration: the new file stops old unintegrated tags from measuring,
-while a cached older file can still measure immediately until replaced or
-expired. Replace the existing tag rather than loading two versions; already-open
-pages keep their loaded tracker until reloaded. Purge/bypass relevant CDN caches
-as needed and compare the served
-sha256; verify actual browser behavior, not the tag alone. No live site is
-changed by merely returning setup text.
-
-**Source review, 30 September 2026:** cookie-free does not itself establish a
-consent exemption. The [EDPB's final technical-scope guidance](https://www.edpb.europa.eu/documents/guideline/guidelines-22023-on-technical-scope-of-art-53-of-eprivacy-directive_en)
-includes JavaScript-directed transmission of terminal information; it does
-not decide exemptions. [CNIL's audience-measurement guidance](https://www.cnil.fr/en/sheet-ndeg16-use-analytics-your-websites-and-applications)
-describes conditional exemptions and national variation, so Hallvi does not
-claim an EU-wide exemption. Opt-in everywhere is the selected product default.
-[CNIL's refusal guidance](https://www.cnil.fr/en/refusing-cookies-should-be-easy-accepting-them-cnil-continues-its-action-and-issues-new-orders)
-supports equally easy refusal, and its [information guidance](https://cnil.fr/en/informing-data-subjects)
-describes the notice obligations. This technical setup is not a blanket legal
-compliance claim or a notice for all other processing on the site.
+The tag includes the content version in its URL to avoid reusing an older
+cached script. One server file serves all applications on that host, so
+coordinate replacement with them, replace existing tags rather than loading
+two versions, compare the served sha256 through any CDN, and test a fresh
+browser. Already-open pages keep their loaded tracker until reloaded. Returning
+setup text changes no live site. The first script event still sets the switch
+point from ordinary page-log counts to script views; disabled views are not
+reconstructed afterward.
 
 ### Collection is on by default, and a standing choice
 
