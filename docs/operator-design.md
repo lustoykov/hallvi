@@ -120,6 +120,14 @@ Background work and, eventually, requests from other agents must coordinate with
 
 **Pi keeps the conversation.** Its persisted history, its queues and its operation state are the record of what was said, what waits, what is running and what an interruption left behind (published `pi-agent-core` 0.85.1, `AgentHarness`/`AgentLane`). Hallvi stores no messages, no replies, no conversation status and no record of what it has handed over. The page is projected on every read from Pi's lane — its whole branch for the history, its snapshot for the queue, the open operation and the text being streamed — and Hallvi's execution evidence is placed into it by the id Pi gave each tool call. The database keeps the conversation's title, which application it belongs to, and the id of the Pi session that holds it.
 
+When a conversation stream advances while a browser action awaits HTTP,
+the action response refreshes application metadata while preserving the new
+streamed conversation state. A delayed HTTP view must not replace a reply the
+stream has already completed. If the stream did not advance, the HTTP view
+applies normally, including while the stream is disconnected. Ending the
+subscription clears this baseline; the next connection begins with a fresh
+full snapshot.
+
 **What Pi ran is read from the same history.** Pi writes a tool call to its branch before the tool runs and the tool's result when it returns, and keeps both through a compaction and across a restart, so Hallvi keeps no second record of them: the calls, their arguments and their results are read on every read, redacted on the way out, and joined to Hallvi's execution records by Pi's own tool-call id. A call with no result is running while a worker is driving the conversation and interrupted otherwise, which is what a reader needs after a crash and needs no sweep to say. Only what a call in flight has streamed so far is nobody's record; the worker keeps that in memory for as long as the call lasts.
 
 **Useful findings during work.** Before continuing into lengthy work, Pi should briefly share a new, evidenced finding that helps the owner's next decision, distinguishing repository requirements from observed runtime. These are ordinary intermediate replies in Pi's history, not a report after every command or a new saved record for each progress update. Missing private inputs still use the existing request tools; only lasting discoveries belong in saved information.
@@ -134,7 +142,7 @@ Pi decides when a message runs: a follow-up when its current work is done, a ste
 
 Hallvi schedules nothing. Conversations of different applications run at the same time, including two applications on one server, and a read-only side conversation answers while its application's main conversation is busy. Within a conversation Pi sequences its own work. What protects a target is what always did: the application's permission mode and approvals, tool calls one at a time within a turn, side conversations having no tools that change anything, and each application's own host, secrets and records. No operation is known to need more than that; one that does would be fenced where it happens, not by holding conversations back.
 
-**Stop** is Pi's `abort`: it ends the operation and empties Pi's queues. Queued messages are no longer Pi's after that and leave the transcript, which is what the control says it does (“Stop + cancel 2 waiting”). With no operation open, Stop cancels what is queued by its id. There is no taking back a single waiting message.
+**Stop** is Pi's `abort`: it ends the operation and empties Pi's queues. Queued messages are no longer Pi's after that and leave the transcript, which is what the control says it does (“Stop + cancel 2 waiting”). With no operation open, Stop cancels what is queued by its id. Active work is aborted through its running lane. After a restart, the worker opens the stored lane with a credential-free catalog and no executable tools, only to abort its operation or cancel its queue; Stop needs no model login and changes no model setting. There is no taking back a single waiting message.
 
 **A worker going away** — killed or shut down — aborts nothing in Pi, and a worker coming back opens nothing. Nothing runs because a worker restarted. When the conversation is next read, Pi restores what it had, and unfinished work that nobody is running is shown as interrupted: the history and evidence as they were, the reply saying that whether the last command finished is not known, anything queued still waiting, and two controls, always both:
 

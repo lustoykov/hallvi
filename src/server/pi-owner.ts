@@ -22,6 +22,7 @@ import {
   earlierHistoryPath,
   readNativeConversation,
   removeNativeSessions,
+  stopNativeConversation,
 } from "./pi-sessions";
 import {
   holds,
@@ -563,7 +564,12 @@ export function sessionOwner(
     async stop(scope: Scope) {
       if (!(await hasHistory(scope))) return {};
       const stopped = inLine(scope.chatId, async () => {
-        const conversation = await ensure(scope);
+        const conversation = opened.get(scope.chatId);
+        if (!conversation) {
+          await stopNativeConversation(scope.applicationId, scope.chatId);
+          notifyChange({ kind: "chat", ...scope });
+          return {};
+        }
         if ((await conversation.fresh()).operation)
           await conversation.lane.abort(ctx);
         // Without an operation there is nothing to abort, only a queue.

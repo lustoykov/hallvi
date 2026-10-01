@@ -226,6 +226,7 @@ export function OperatorShell({
   const submittingChat = useRef<string | null>(null);
   const submittingKey = useRef<string | null>(null);
   const editedAfterSubmission = useRef(new Set<string>());
+  const streamSnapshots = useRef(new Map<string, ChatSnapshot>());
 
   const application = view.application;
   const activeChat =
@@ -372,6 +373,7 @@ export function OperatorShell({
   useEffect(() => {
     if (!applicationId || !selectedChatId) return;
     let active = true;
+    const observedSnapshots = streamSnapshots.current;
     const observedChats = new Set([selectedChatId]);
     if (observedMainId) observedChats.add(observedMainId);
     const subscriptions = [...observedChats].map((chatId) => {
@@ -391,6 +393,7 @@ export function OperatorShell({
           JSON.parse(event.data) as ChatFrame,
         );
         streamed = snapshot;
+        observedSnapshots.set(`${applicationId}/${chatId}`, snapshot);
         if (chatId === mainChatId)
           setMainSnapshot({ applicationId, chatId, snapshot });
         setView((current) =>
@@ -471,6 +474,7 @@ export function OperatorShell({
     return () => {
       active = false;
       subscriptions.forEach((close) => close());
+      observedSnapshots.clear();
     };
   }, [
     applicationId,
@@ -491,8 +495,19 @@ export function OperatorShell({
     writeConversationDraft(applicationId, activeChat.id, value);
   }
 
-  function applyView(next: OperatorView) {
-    setView(next);
+  function applyView(
+    next: OperatorView,
+    observedBefore: Map<string, ChatSnapshot>,
+  ) {
+    // Keep a stream frame that arrived while this action awaited HTTP. An
+    // unchanged baseline must not hide a newer HTTP view during a disconnect.
+    const key = `${next.application?.id}/${next.selectedChatId}`;
+    const snapshot = streamSnapshots.current.get(key);
+    setView(
+      snapshot && snapshot !== observedBefore.get(key)
+        ? { ...next, ...snapshot }
+        : next,
+    );
     // The transcript is navigable state; keep it when this page is refreshed.
     const url = new URL(window.location.href);
     if (next.selectedChatId) url.searchParams.set("chat", next.selectedChatId);
@@ -509,7 +524,13 @@ export function OperatorShell({
       setRenaming(false);
       setBusy(null);
       router.refresh();
-      if (activeChat) applyView(await api.view(application.id, activeChat.id));
+      if (activeChat) {
+        const observedBefore = new Map(streamSnapshots.current);
+        applyView(
+          await api.view(application.id, activeChat.id),
+          observedBefore,
+        );
+      }
     } catch (caught) {
       setRenameError(
         caught instanceof Error ? caught.message : "Could not rename it.",
@@ -549,8 +570,9 @@ export function OperatorShell({
     if (busy) return;
     setBusy(label);
     setError(null);
+    const observedBefore = new Map(streamSnapshots.current);
     try {
-      applyView(await work());
+      applyView(await work(), observedBefore);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -855,10 +877,11 @@ export function OperatorShell({
               [targetChat.id]: [...images, ...(current[targetChat.id] ?? [])],
             }));
         }
+        const observedBefore = new Map(streamSnapshots.current);
         const refreshed = await api
           .view(application.id, targetChat.id)
           .catch(() => null);
-        if (refreshed) applyView(refreshed);
+        if (refreshed) applyView(refreshed, observedBefore);
       },
     );
   }
