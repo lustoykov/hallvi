@@ -35,8 +35,20 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
 | [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
+| [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-060 — Keep named applications distinct in the switcher
+
+Two deployments of one repository can be renamed independently, but the
+application switcher discarded their saved names and listed both under the
+repository name. The current application's label was correct, making the
+menu inconsistent at the point where the owner chooses an operational target.
+Pass the saved name into the existing switcher and check switching between
+the named deployments with separate drafts and a refresh.
+
+**+1:** 2026-10-01 — normal-process QA, `codex/qa-browser-flows`.
 
 ### AF-054 — Check traffic assets after installation
 
