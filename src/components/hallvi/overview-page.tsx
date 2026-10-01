@@ -30,6 +30,7 @@ import { OverviewLive } from "./overview-live/overview-live";
 import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag, UnresolvedMarks } from "./presentation";
+import { releasesFromRecords } from "./release-records";
 import "./overview-prototype/overview.css";
 import "./overview-plain.css";
 
@@ -207,6 +208,10 @@ export function OverviewPage({
     () => usageFromRecords(records, application.id),
     [records, application.id],
   );
+  const releases = useMemo(
+    () => releasesFromRecords(records, application.id),
+    [records, application.id],
+  );
 
   // Where the application answers, from the record that says so.
   const openUrl =
@@ -223,7 +228,7 @@ export function OverviewPage({
         mapped={Boolean(model)}
         built={built}
         usage={usage}
-        condition={condition}
+        releases={releases}
         now={now}
         chrome={chrome}
         openUrl={openUrl}

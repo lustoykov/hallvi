@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 2 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 3 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -31,6 +31,10 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-048 — Ask the host for a taller panel inside a conversation](#af-048--ask-the-host-for-a-taller-panel-inside-a-conversation) | 1 | New |
 | [AF-050 — Keep Pi's replies from summoning the owner](#af-050--keep-pis-replies-from-summoning-the-owner) | 1 | New |
 | [AF-051 — Retire or rewrite the conversation-first capture](#af-051--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
+| [AF-056 — Check the port before rebuilding the scenario database](#af-056--check-the-port-before-rebuilding-the-scenario-database) | 1 | New |
+| [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
+| [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
+| [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -62,6 +66,49 @@ in…", groups named by state), so it cannot run against the current shell.
 Only its wording was updated.
 
 **+1:** 2026-09-30 — calm labels, `claude/calm-asks`
+
+### AF-056 — Check the port before rebuilding the scenario database
+
+`npm run scenarios -- <port>` deletes and rebuilds `tests/results/scenarios`
+before it starts Next. Run a second time on a port a scenario server already
+holds, it rebuilds the database under the running server and only then fails
+with `EADDRINUSE`. The owner hit this while a preview was open. Checking that
+the port is free before touching the state would let the second run fail
+without side effects.
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+### AF-057 — Say which Node a checkout runs under
+
+This Mac's default `node` is 26. `npm run checks` refuses anything but
+Node 22, but `npm ci`, `npm test` and `npm run scenarios` use whatever is on
+the path. Under Node 26.9.0, `unit/hallvi-plugin-update.test.ts` fails with
+"ssh failed (1)" and reads like a product failure; under Node 22.23.2 the
+suite passes. Native modules installed under one version also fail to load
+under the other. An `.nvmrc` or an `engines` field would say so first.
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+### AF-058 — Give the Overview before a verified deployment the same plain labels
+
+The deployed Overview now says "Recent" and "Checked by Hallvi", and its head
+says how the address reads in plain words. The compositions shown before a
+verified deployment still say "What has been assessed", "What happened" and
+"Is the way in working?". The owner found that family of labels precious on
+the deployed page. Overview's title is also the web part's name, so a static
+site behind Caddy is titled "Caddy".
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+### AF-059 — Remove the red a closed head never shows
+
+`journey-v2.css` colours `.axj3-closed` red, but `.axj3-open small` is more
+specific and always wins, so "The tunnel is closed" and "The address did not
+answer" render in muted grey. `DESIGN.md` says a failed observation is neutral,
+so the grey is the intended one. The rule reads as if those heads were red, and
+this change's first description said so.
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
 
 ### AF-017 — Make record validation easier for Pi to recover from
 
@@ -400,6 +447,17 @@ separate old breakage from a new change's.
 `applications.spec.ts` P1-10 stalls on the synthetic reply ("Writing the
 reply") before it reaches Settings, and `controller-protection.spec.ts` looks
 for Backups, which now sits behind "Show more" in the application sidebar.
+**+1:** 2026-10-01 — Overview visitors first (`claude/overview-visitors-first`):
+telling this change's failures from old ones took a second 28-minute run of the
+whole suite against main. On main at `4c1e2b17`, five journeys fail.
+`applications.spec.ts` P1-07 still finds "QA simulated provider failure." in
+the conversation. `controller-protection.spec.ts` and
+`experience-continuity.spec.ts` both wait for Backups behind "Show more". With
+a scenario server up, `record-journeys.spec.ts` no longer finds "not answering"
+on Processes or "did not survive a replacement" on Storage. Its two private
+access journeys never run at all: their lookup takes `/applications/new` for
+the first application and skips, the fault `interactions.spec.ts` fixed for
+itself.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
@@ -501,6 +559,7 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-055 — Make Overview labels and space serve the summary](#af-055--make-overview-labels-and-space-serve-the-summary) | 2 | Resolved in #317 |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 2 | Resolved in #295 and #313 |
 | [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Resolved in #310 |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Resolved in #303 and #308 |
@@ -910,6 +969,18 @@ be authoritative, including an absent route.
 **+1:** 2026-10-01 — review of #309.
 
 **Status:** Fixed in #309 with a refresh regression check.
+
+### AF-055 — Make Overview labels and space serve the summary
+
+The installed Overview gave an empty five-minute request diagram most of its
+first viewport, and labels such as “The way in” and “As it is written” needed
+interpreting. The owner called out the wording and wanted a useful, calm
+summary that keeps the Visitors presentation.
+
+**+1:** 2026-10-01 — owner's Overview exploration, `codex/overview-five-prototypes` (#316, closed)
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+**Status:** Resolved in #317: the deployed Overview leads with visitors, uses direct labels and drops the request diagram. AF-058 keeps what is left: the labels before a verified deployment, and the title.
 
 ### AF-052 — Keep selected history filters readable on hover
 

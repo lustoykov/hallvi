@@ -75,7 +75,7 @@ describe("offering a way in", () => {
       reachable: "checking",
       onAsk: () => undefined,
     });
-    expect(html).toContain("Checking the way in");
+    expect(html).toContain("Checking access");
     expect(html).not.toContain('href="http://127.0.0.1:18000"');
   });
 

@@ -54,6 +54,18 @@ export function Working({ children }: { children: ReactNode }) {
   );
 }
 
+/** "Unresolved: 1 failed, 2 awaiting approval": what the marks are read as. */
+export function unresolvedWords(tones: readonly ("waiting" | "failed")[]) {
+  const failed = tones.filter((tone) => tone === "failed").length;
+  const waiting = tones.length - failed;
+  return `Unresolved: ${[
+    failed && `${failed} failed`,
+    waiting && `${waiting} awaiting approval`,
+  ]
+    .filter(Boolean)
+    .join(", ")}`;
+}
+
 /**
  * What is unresolved, drawn rather than named: one mark per open thing, an
  * open ring for a decision awaiting approval and a filled dot for something
@@ -63,26 +75,22 @@ export function Working({ children }: { children: ReactNode }) {
 export function UnresolvedMarks({
   tones,
   inverse = false,
+  silent = false,
 }: {
   tones: readonly ("waiting" | "failed")[];
   /** On a dark surface, such as a pressed filter. */
   inverse?: boolean;
+  /** Beside words that already say it: drawn, and not read a second time. */
+  silent?: boolean;
 }) {
   if (!tones.length) return null;
-  const failed = tones.filter((tone) => tone === "failed").length;
-  const waiting = tones.length - failed;
-  const said = [
-    failed && `${failed} failed`,
-    waiting && `${waiting} awaiting approval`,
-  ]
-    .filter(Boolean)
-    .join(", ");
   return (
     <span
       className="hv-marks"
       data-inverse={inverse || undefined}
-      role="img"
-      aria-label={`Unresolved: ${said}`}
+      {...(silent
+        ? { "aria-hidden": true }
+        : { role: "img", "aria-label": unresolvedWords(tones) })}
     >
       {tones
         .toSorted((a, b) => Number(b === "failed") - Number(a === "failed"))

@@ -511,8 +511,10 @@ All of it reads stored totals immediately; none of it waits for Pi.
   the live map and arrivals, the range switch, the charts with deploy markers
   and gaps, the breakdowns, errors with visitors affected, coverage, the
   script offer and the DB-IP credit.
-- **Overview:** a small tile — today's estimated visitors against a usual day,
-  a live pulse, errors visitors hit only when there are some.
+- **Overview:** the lead card — today's estimated visitors against a usual
+  day, thirty days of bars with each release marked on its day, what today's
+  visitors opened and where they came from, and a live pulse. Server errors
+  sit in the facts under it, red only when a visitor saw one.
 - **Deployment:** on each release, what changed in the two hours after it
   against the two before, leaving out the hour the release fell in so a
   failure before it is never counted after it — "errors on /checkout 0 → 14, about 9 visitors" —

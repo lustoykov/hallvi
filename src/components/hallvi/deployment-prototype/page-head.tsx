@@ -77,8 +77,14 @@ export function accessStateText(state: Reachability) {
     ? "Cannot reach Hallvi"
     : state === "unknown"
       ? "Access has not been checked"
-      : "Checking the way in…";
+      : "Checking access…";
 }
+
+/** Only a tunnel ends at this computer's own loopback. */
+export const isTunnel = (url: string | null | undefined) =>
+  Boolean(
+    url && /^https?:\/\/(127\.0\.0\.1|\[?::1\]?|localhost)(:|\/|$)/.test(url),
+  );
 
 export function PageHead({
   bar,
@@ -88,6 +94,7 @@ export function PageHead({
   restricted,
   reachable = "checking",
   onReopen,
+  reading,
 }: {
   bar: ReactNode;
   title: string;
@@ -97,6 +104,8 @@ export function PageHead({
   reachable?: Reachability;
   /** Asks Pi to reopen private access. Absent hides the offer. */
   onReopen?: () => void;
+  /** Overview's head also says how the address reads; see AccessLink. */
+  reading?: boolean;
 }) {
   return (
     <header className="axj3-head">
@@ -109,10 +118,19 @@ export function PageHead({
           restricted={restricted}
           reachable={reachable}
           onReopen={onReopen}
+          reading={reading}
         />
       </div>
     </header>
   );
+}
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
 
 /**
@@ -129,6 +147,13 @@ export function PageHead({
  * The words are the ones `main` arrived at, including the distinction
  * between a tunnel that closed and a published address that did not answer.
  * This only makes them reachable from more than one page.
+ *
+ * `reading` is Overview's: with no tile left to say it, the head says how the
+ * address reads beside the link, in the same words. A published address that
+ * answered is "Answering" and its host. A tunnel is only ever "open": the
+ * check proves the connection, never the application behind it. And a tunnel
+ * this computer dropped gets an empty ring there in place of the warning
+ * mark, because it says nothing about the application.
  */
 export function AccessLink({
   openUrl,
@@ -136,6 +161,7 @@ export function AccessLink({
   restricted,
   reachable = "checking",
   onReopen,
+  reading,
 }: {
   openUrl: string | null;
   name: string;
@@ -143,26 +169,29 @@ export function AccessLink({
   reachable?: Reachability;
   /** Asks Pi to reopen private access. Absent hides the offer. */
   onReopen?: () => void;
+  /** Say how the address reads, in words, beside the link. */
+  reading?: boolean;
 }) {
   const reconnect = useReconnectAction();
   if (!openUrl) return null;
-  // Only a tunnel ends at this computer's own loopback.
-  const tunnelled = Boolean(
-    openUrl &&
-    /^https?:\/\/(127\.0\.0\.1|\[?::1\]?|localhost)(:|\/|$)/.test(openUrl),
-  );
+  const tunnelled = isTunnel(openUrl);
   return (
     <div className="axj3-open" data-reach={reachable}>
       {reachable === "open" ? (
         <>
-          {tunnelled ? (
-            <small>Private connection open</small>
+          {reading ? (
+            <small className="axj3-reading">
+              <i aria-hidden="true" />
+              <b>{tunnelled ? "Private connection open" : "Answering"}</b>
+              {hostOf(openUrl)}
+            </small>
           ) : (
-            restricted && (
-              <small>
-                <ShieldCheck weight="bold" /> Only from your network
-              </small>
-            )
+            tunnelled && <small>Private connection open</small>
+          )}
+          {!tunnelled && restricted && (
+            <small>
+              <ShieldCheck weight="bold" /> Only from your network
+            </small>
           )}
           <a href={openUrl} target="_blank" rel="noreferrer">
             Open {name}
@@ -171,15 +200,24 @@ export function AccessLink({
         </>
       ) : reachable === "closed" ? (
         <>
-          <small className="axj3-closed">
-            <WarningCircle weight="bold" />{" "}
-            {/* A published address has no tunnel to be closed. What failed
-                is the address itself, and saying "tunnel" sends the reader
-                to look at the wrong thing. The address settles which one
-                this is: only a tunnel ends at this computer's own
-                loopback. */}
-            {tunnelled ? "The tunnel is closed" : "The address did not answer"}
-          </small>
+          {reading && tunnelled ? (
+            <small className="axj3-reading" data-closed>
+              <i aria-hidden="true" />
+              <b>The tunnel is closed</b>
+            </small>
+          ) : (
+            <small className="axj3-closed">
+              <WarningCircle weight="bold" />{" "}
+              {/* A published address has no tunnel to be closed. What failed
+                  is the address itself, and saying "tunnel" sends the reader
+                  to look at the wrong thing. The address settles which one
+                  this is: only a tunnel ends at this computer's own
+                  loopback. */}
+              {tunnelled
+                ? "The tunnel is closed"
+                : "The address did not answer"}
+            </small>
+          )}
           {/* No anchor at all. A dead link that looks alive is worse than
               no link: the reader spends the click, the wait and the browser
               error before learning what the page knew. */}
