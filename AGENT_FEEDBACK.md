@@ -19,14 +19,15 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
 | [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 2 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
-| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 4 | New |
+| [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
-| [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 1 | New |
+| [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 2 | New |
 | [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
 | [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Fix in review |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
 | [AF-044 — Keep dashboard UI checks away from real learning progress](#af-044--keep-dashboard-ui-checks-away-from-real-learning-progress) | 1 | New |
+| [AF-048 — Ask the host for a taller panel inside a conversation](#af-048--ask-the-host-for-a-taller-panel-inside-a-conversation) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -415,6 +416,12 @@ application details after recovery with an unchanged transcript. Fixed in #293:
 save the key before sending, settle the original app after switching, and refresh
 context after recovery. The checks also cover storage-denied frames.
 
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`). Checked
+natively in Codex with an instrumented copy: `ui/open-link` for an HTTP address
+answers `{}` and opens nothing, `window.open` returns `null` and a
+`target=_blank` link does nothing in the frame; HTTPS opens Codex's browser and
+clipboard writes work. An acknowledged link request is still not an opened page.
+
 ### AF-035 — Say "awaiting approval" while request_approval waits
 
 While Pi's `request_approval` call waited for the owner (Hallvi decides), the
@@ -434,6 +441,17 @@ controllers. A `codex` (or `plugin`) origin, accepted by new controllers and
 retried as `cli` on a refusal, would say where the owner wrote it.
 
 **+1:** 2026-09-30 — Codex operator panel
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`): a real
+read-only request sent from the panel was recorded with origin `cli`.
+
+### AF-048 — Ask the host for a taller panel inside a conversation
+
+Opened inside a Codex conversation, the panel's frame is about 330px tall, so
+the overview's traffic bars and setup scroll inside it; the side panel shows it
+whole. Asking the host for the overview's height, if MCP Apps and Codex allow an
+app to, might show it without inner scrolling; neither is checked yet.
+
+**+1:** 2026-09-30 — overview-first panel (`claude/plugin-entry-point`)
 
 ### AF-041 — Show OpenRouter credit beside the saved key
 
@@ -851,3 +869,13 @@ together while the surrounding status wraps.
 The [390px capture](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/candidate/finding-narrow.png)
 and [verification report](https://github.com/lustoykov/hallvi/blob/49fac0dbac12ae4f66c6df9eb040098d166112ea/docs/assets/clear-progress/README.md)
 show `2m 0s` and the longer quiet-time phrase together without page overflow.
+
+### AF-049 — Do not revive a removed plugin address
+
+Refreshing the plugin could restore an old application-list address after saved
+records no longer provided a valid current route. A successful records read must
+be authoritative, including an absent route.
+
+**+1:** 2026-10-01 — review of #309.
+
+**Status:** Fixed in #309 with a refresh regression check.

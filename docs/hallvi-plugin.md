@@ -7,9 +7,10 @@ the small adapter on the controller machine.
 
 The adapter lists applications, reads recorded evidence and the main
 conversation, submits a request to the application's existing Pi operator and
-follows its result. Its panel is a compact Hallvi built around that operator:
-ask for work, follow it, read the result and continue, with the application's
-condition, traffic and errors one click away. It neither creates applications
+follows its result. Its panel is a compact Hallvi: it opens on an overview of
+the application (what needs you, its condition, deployment, traffic and
+setup), with the operator's conversation one tab away and each part one link
+from its page in Hallvi. It neither creates applications
 nor replaces Pi. Approvals, missing input, Continue and Stop remain in the
 Hallvi page. Requests use the existing CLI origin label, so the adapter also
 works with controllers that predate this plugin.
@@ -56,9 +57,9 @@ Then, for a fresh check:
 > request and show the evidence.
 
 `hallvi_open` supplies the optional panel to compatible MCP Apps hosts.
-Tools work without the panel. The first read-only panel was checked in the
-installed Codex MCP Apps panel; the operator panel's host verification is
-recorded in its pull request, and native ChatGPT rendering remains unverified.
+Tools work without the panel. Each panel revision's Codex check is recorded in
+its pull request, including what it could not establish; native ChatGPT
+rendering remains unverified.
 
 To install the skill and tools together as a local plugin:
 
@@ -117,12 +118,14 @@ forward open in your laptop terminal:
 ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8474:127.0.0.1:4747 hallvi-host
 ```
 
-Open `http://127.0.0.1:8474`. The installed Codex host silently ignores HTTP
-open-link requests, so the panel shows **Copy address** for HTTP URLs. Paste
-the address into your browser; keep the SSH forward running. If clipboard
-access is denied, the panel selects the address for manual copying. HTTPS
-URLs retain **Open in Hallvi**, with a copy fallback if the host reports a
-failure. For changed panel HTML, follow the UI update procedure below.
+Open `http://127.0.0.1:8474`. The Codex desktop app answers an HTTP open-link
+request as if it had opened it and does nothing, and the panel's frame may not
+open windows, so for HTTP addresses the panel shows the address with **Copy**
+and says where it leads. Paste it into your browser; keep the SSH forward
+running. If clipboard access is denied, the panel selects the address for
+manual copying. HTTPS addresses open in Codex's browser, with the same copy
+fallback if the host reports a failure. For changed panel HTML, follow the UI
+update procedure below.
 
 `--ui-url` controls browser links only; the
 adapter still talks exclusively to the server's local controller. Request
@@ -196,12 +199,15 @@ reconnection and refreshed native rendering must be tested through the host UI.
 
 The same server exposes an MCP Apps HTML resource. `hallvi_open` declares both
 `global` and `thread` entrypoints through the new OpenAI Plugin Extensions.
-In the panel you choose an application and talk to its main operator: a
-message goes through `hallvi_exec` exactly as a model's would, as a follow-up
-while Pi works. The latest turns come from `hallvi_conversation`, whichever
-surface wrote them, and are re-read about every 1.5 seconds while Pi works and
-every 8 seconds otherwise, never while the panel is hidden. The details under
-the application's name come from `hallvi_inspect`. The panel shares the
+The panel opens on the chosen application's overview, read from
+`hallvi_inspect`: anything the operator needs from you, its condition, the
+running release, the last day's traffic and its setup, each linking to its
+page in Hallvi. The Operator view is its main conversation, and its tab says
+what the operator is doing from either view. A message goes
+through `hallvi_exec` exactly as a model's would, as a follow-up while Pi
+works. The latest turns come from `hallvi_conversation`, whichever surface
+wrote them, and are re-read about every 1.5 seconds while Pi works and every 8
+seconds otherwise, never while the panel is hidden. The panel shares the
 selected application and what its operator is doing with the host model, so
 "ask Hallvi to…" in the Codex conversation goes to the same application.
 
@@ -242,7 +248,7 @@ this private proof of concept.
 | Tool | Behavior |
 | --- | --- |
 | `hallvi_apps` | List applications and recorded condition. No live probe. |
-| `hallvi_inspect` | Read identity, permission mode, attention, bounded evidence and the last day's stored traffic totals; optionally one execution in full. |
+| `hallvi_inspect` | Read identity, permission mode, attention, how it deploys, bounded evidence and the last day's stored traffic totals; under `saved`, the running and latest release and the current way in by the Deployment page's rules, read from the records the conversation read carries. Optionally one execution in full. |
 | `hallvi_conversation` | Read the latest turns of the main conversation: requests, each reply's calls, words, records and status. Pass a previous `revision` as `known` to learn only whether it changed. |
 | `hallvi_exec` | Send one bounded request with a caller-supplied UUID key; return its handle after acceptance. Also the panel's composer. |
 | `hallvi_wait` | Read that handle, optionally waiting up to 20 seconds. Never restart or resend work. |
@@ -294,6 +300,18 @@ Add `?storage=1` to its address to give the frame an origin, which browser
 storage and screenshot tools need. It re-reads `panel.html` on each load
 through `hallvi_reload_ui`. Anything it proves is fixture behavior: link,
 clipboard, message and caching behavior must be checked in the host itself.
+
+To check a panel change in the Codex desktop app without touching an installed
+Hallvi plugin, give the build its own names. Copy the bundle's `server.mjs`,
+`panel.html` and `icon.svg` into a scratch marketplace whose plugin and MCP
+server are both `hallvi-dev` (display name "Hallvi dev"), pointed at a
+development controller. Back up `~/.codex/config.toml`, then run
+`codex plugin marketplace add <dir>` and `codex plugin add hallvi-dev@<marketplace>`.
+A running desktop does not grow a sidebar entry for it, but a new chat can:
+ask Codex to call `hallvi_open` from `hallvi-dev`, then expand the in-thread
+panel into the side panel. Remove both with `codex plugin remove` and
+`codex plugin marketplace remove`, and compare the configuration with the
+backup.
 
 For real operational verification, use [the shared workflow](verification.md)
 and send a bounded request through these tools against the exclusively
