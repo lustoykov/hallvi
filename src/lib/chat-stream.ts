@@ -35,6 +35,59 @@ function applyCollection<T extends { id: string }>(
     : [...next.values()];
 }
 
+/** Whether two values read off the wire say the same thing. */
+function same(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every(
+      (key) =>
+        key in b &&
+        same(
+          (a as Record<string, unknown>)[key],
+          (b as Record<string, unknown>)[key],
+        ),
+    )
+  );
+}
+
+/**
+ * Full state repeats what a reader already holds: the stream's first frame
+ * after the page, a reconnect, an action's own response. A record that says
+ * what it said before stays the object it was, so a long conversation is not
+ * drawn a second time to show that nothing in it changed.
+ */
+export function keepUnchanged<
+  T extends { [K in ChatCollection]?: { id: string }[] },
+>(
+  held: { [K in ChatCollection]?: { id: string }[] } | null | undefined,
+  next: T,
+) {
+  if (!held) return next;
+  const kept: T = { ...next };
+  for (const key of chatCollections) {
+    const before = held[key];
+    const after = next[key];
+    if (!before || !after) continue;
+    const known = new Map(before.map((record) => [record.id, record]));
+    const records = after.map((record) => {
+      const old = known.get(record.id);
+      return old && same(old, record) ? old : record;
+    });
+    Object.assign(kept, {
+      [key]:
+        records.length === before.length &&
+        records.every((record, index) => record === before[index])
+          ? before
+          : records,
+    });
+  }
+  return kept;
+}
+
 /** Preserve unchanged objects and arrays, including disclosure identities. */
 export function applyChatFrame(
   previous: ChatSnapshot | null,

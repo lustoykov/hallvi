@@ -13,7 +13,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { currentAccessRecord } from "@/server/access-record";
-import { applyChatFrame, type ChatFrame } from "@/lib/chat-stream";
+import {
+  applyChatFrame,
+  keepUnchanged,
+  type ChatFrame,
+} from "@/lib/chat-stream";
 import { useAccessObservation } from "./use-access-observation";
 
 import type { ApplicationFacts } from "@/server/application-facts";
@@ -86,7 +90,12 @@ export function OperatorShell({
   studioPort,
   identityVariant = "navigation",
 }: {
-  initialView: OperatorView;
+  /**
+   * The view the page opens on, as JSON. A long conversation is megabytes of
+   * records, and as a prop each of them is encoded by the server and rebuilt
+   * here one value at a time. As one string it is copied and parsed once.
+   */
+  initialView: string;
   initialPiSetup: PiSetupStatus;
   applications: Pick<
     ApplicationRecord,
@@ -148,7 +157,9 @@ export function OperatorShell({
       window.removeEventListener("hashchange", restore);
     };
   }, []);
-  const [view, setView] = useState(initialView);
+  const [view, setView] = useState(
+    () => JSON.parse(initialView) as OperatorView,
+  );
   /**
    * Whether a message can be sent at all. This arrives with the page, but
    * the reader may have just connected a model — in this tab or another one
@@ -187,11 +198,12 @@ export function OperatorShell({
   // What this browser kept while the reader was away — connecting a model,
   // for instance. Anything typed since wins over it.
   const chatIds = view.chats.map((chat) => chat.id).join(" ");
+  const openedId = view.application?.id;
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const kept: Record<string, string> = {};
       const restoredContexts: Record<string, ConversationContext | null> = {};
-      const appId = initialView.application?.id;
+      const appId = openedId;
       for (const id of chatIds.split(" ").filter(Boolean)) {
         if (!appId) continue;
         const draft = readConversationDraft(appId, id);
@@ -202,7 +214,7 @@ export function OperatorShell({
       setContexts((current) => ({ ...restoredContexts, ...current }));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [chatIds, initialView.application?.id]);
+  }, [chatIds, openedId]);
   const [pendingMessage, setPendingMessage] = useState<{
     body: string;
     images: ImageAttachment[];
@@ -227,6 +239,11 @@ export function OperatorShell({
   const submittingKey = useRef<string | null>(null);
   const editedAfterSubmission = useRef(new Set<string>());
   const streamSnapshots = useRef(new Map<string, ChatSnapshot>());
+  /** What the page holds now, for full state arriving outside a render. */
+  const held = useRef(view);
+  useEffect(() => {
+    held.current = view;
+  });
 
   const application = view.application;
   const activeChat =
@@ -388,10 +405,19 @@ export function OperatorShell({
       stream.onerror = () => setReconnecting(true);
       stream.onmessage = (event) => {
         if (!active) return;
-        const snapshot = applyChatFrame(
-          streamed,
-          JSON.parse(event.data) as ChatFrame,
-        );
+        const frame = JSON.parse(event.data) as ChatFrame;
+        // A connection opens with everything, most of it already here: the
+        // page was drawn from it, or the last connection left it.
+        const snapshot =
+          "type" in frame
+            ? applyChatFrame(streamed, frame)
+            : keepUnchanged(
+                streamed ??
+                  (held.current.selectedChatId === chatId
+                    ? held.current
+                    : null),
+                frame,
+              );
         streamed = snapshot;
         observedSnapshots.set(`${applicationId}/${chatId}`, snapshot);
         if (chatId === mainChatId)
@@ -506,7 +532,8 @@ export function OperatorShell({
     setView(
       snapshot && snapshot !== observedBefore.get(key)
         ? { ...next, ...snapshot }
-        : next,
+        : // The response repeats the conversation the stream delivered.
+          keepUnchanged(snapshot, next),
     );
     // The transcript is navigable state; keep it when this page is refreshed.
     const url = new URL(window.location.href);

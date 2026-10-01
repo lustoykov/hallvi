@@ -134,6 +134,19 @@ SSR and browser work. Both profiles make no model calls, isolate fixture
 accounts, and keep raw results in ignored `work/` or `tests/results/`. Browser
 response counters are injected only into the disposable QA copy.
 
+The same journey checks where a long conversation opens: on its latest
+message, and on the linked message when the address names one, without being
+carried back to the end. `unit/chat-frames.test.ts` holds the rule that full
+state repeating a held conversation keeps the records it repeats, and
+`unit/chat-recovery.test.tsx` that the latest messages are drawn first. How
+long opening takes is the spec's second opt-in profile:
+`HALLVI_QA_PRODUCTION=1 HALLVI_OPEN_PROFILE=1 HALLVI_E2E_PORT=3960 npm run test:e2e -- long-history-responses.spec.ts --grep 'profile opening' --reporter=list`.
+It opens 240, 900 and 2,000 synthetic calls from the applications list three
+times each while a scripted turn streams, and writes `open-profile.json`:
+when the latest reply was on screen, when every message was drawn, and the
+long tasks after the click. Synthetic, local and one machine's numbers:
+compare a change against the same run on its base, not against a budget.
+
 A browser case asserts what the product says, not what a past layout said. Scope
 by landmark and accessible name rather than by layout class: a routine record is
 one compact line in a transcript and its content is behind a disclosure, and a
@@ -176,6 +189,10 @@ Install Chromium with `npx playwright install chromium`. Browser fixtures run on
 
 For a concurrent worktree, set `HALLVI_E2E_PORT` to a free port from **3100 to
 3999**; the fixture rejects ports outside that range before starting a test.
+Each worker listens one port above the last, and Playwright starts another
+worker after every failed test and for each set of fixture options, so leave
+room above the base. A whole-suite run started at 3980 reached 4000 and failed
+its last journeys on the port alone.
 
 **Learn Hallvi** (`/learn`) is the dashboard's architecture map and learning
 queue. A separate daily Codex task reviews merged `main` and publishes an

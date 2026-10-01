@@ -49,7 +49,7 @@ export default async function ApplicationPage({
       // `npm run dev` starts a Drizzle Studio on this database and names its
       // port here, so the Database link cannot point at another checkout's.
       studioPort={Number(process.env.HALLVI_STUDIO_PORT) || undefined}
-      initialView={view}
+      initialView={JSON.stringify(view)}
       initialPiSetup={await getPiSetupStatus()}
     />
   );
