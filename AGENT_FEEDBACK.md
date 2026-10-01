@@ -537,6 +537,7 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-055 — Make Overview labels and space serve the summary](#af-055--make-overview-labels-and-space-serve-the-summary) | 2 | Resolved in #317 |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 2 | Resolved in #295 and #313 |
 | [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Resolved in #310 |
 | [AF-031 — Account for hash-routed pages before promising SPA coverage](#af-031--account-for-hash-routed-pages-before-promising-spa-coverage) | 1 | Resolved in #303 and #308 |
@@ -946,6 +947,18 @@ be authoritative, including an absent route.
 **+1:** 2026-10-01 — review of #309.
 
 **Status:** Fixed in #309 with a refresh regression check.
+
+### AF-055 — Make Overview labels and space serve the summary
+
+The installed Overview gave an empty five-minute request diagram most of its
+first viewport, and labels such as “The way in” and “As it is written” needed
+interpreting. The owner called out the wording and wanted a useful, calm
+summary that keeps the Visitors presentation.
+
+**+1:** 2026-10-01 — owner's Overview exploration, `codex/overview-five-prototypes` (#316, closed)
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+**Status:** Resolved in #317: the deployed Overview leads with visitors, uses direct labels and drops the request diagram. AF-058 keeps what is left: the labels before a verified deployment, and the title.
 
 ### AF-052 — Keep selected history filters readable on hover
 
