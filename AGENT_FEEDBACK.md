@@ -17,7 +17,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
-| [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
+| [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
 | [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 4 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
@@ -37,8 +37,18 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 | [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 1 | Guidance added |
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
+| [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-066 — Agree the navigation column's width with the design document
+
+The component design's Layout section says the workspace shell has a 240px
+navigation column; `application-shell.css` lays it out at 224px. One of the
+two is stale, and anything aligned to the column from the document lands 16px
+off.
+
+**+1:** 2026-10-01 — alpha strip polish, `claude/alpha-notice-polish`.
 
 ### AF-065 — Show a failed recovery-kit read
 
@@ -457,6 +467,9 @@ checkout. Looking at them took a throwaway Playwright script answering
 pick the update state, would make that one command.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
+**+1:** 2026-10-01 — alpha strip polish, `claude/alpha-notice-polish`: the
+installed strip has no Dev chip and a different tint, and seeing it took the
+same kind of script answering `/api/host` without `development`.
 
 ### AF-028 — Notice browser journeys that stop passing while checks are off
 
