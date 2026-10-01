@@ -232,6 +232,8 @@ export function OverviewPage({
         onReopen={onReopen}
         onAsk={onAsk}
         onOpenDestination={onOpenDestination}
+        // PROTOTYPE · prototype/overview-directions
+        prototype={{ records, executions, onOpenConversation }}
       />
     );
 

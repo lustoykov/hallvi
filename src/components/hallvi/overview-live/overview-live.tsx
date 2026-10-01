@@ -13,6 +13,9 @@
 import { agedAs, usePulse, type Pulse } from "../pulse";
 import type { ReactNode } from "react";
 
+import type { ExecutionRecord } from "@/server/operator-execution";
+import type { SavedInformation } from "@/server/operator-data";
+
 import type { ApplicationSection } from "../application-sections";
 import { ago } from "../architecture-prototype/model";
 import {
@@ -22,6 +25,11 @@ import {
   type Reachability,
 } from "../deployment-prototype/page-head";
 import type { Usage } from "../monitoring-records";
+// PROTOTYPE · prototype/overview-directions · throwaway: the next four.
+import { OverviewDirections } from "../overview-directions-prototype";
+import { overviewFacts } from "../overview-directions-prototype/facts";
+import { OverviewSwitcher } from "../overview-directions-prototype/switcher";
+import { useOverviewVariant } from "../overview-directions-prototype/variant";
 import type { Overview } from "../overview-prototype/overview-model";
 import { Tag, UnresolvedMarks } from "../presentation";
 import { hasTotals, trafficListed } from "../traffic/model";
@@ -56,7 +64,7 @@ const tone = {
  * lane current again, and silence is the one thing here worth amber. A lane
  * holding anything else keeps its own age.
  */
-function liveReading(
+export function liveReading(
   vital: {
     id: string;
     value: string;
@@ -235,10 +243,17 @@ export function OverviewLive({
   onReopen,
   onAsk,
   onOpenDestination,
+  prototype,
 }: {
   applicationId: string;
   name: string;
   title: string;
+  /** PROTOTYPE · what the directions read that today's page does not. */
+  prototype?: {
+    records: SavedInformation[];
+    executions: ExecutionRecord[];
+    onOpenConversation: (chatId: string, messageId: string | null) => void;
+  };
   /** Whether Pi has recorded how the application is put together. */
   mapped: boolean;
   built: Overview;
@@ -255,6 +270,7 @@ export function OverviewLive({
 }) {
   const traffic = useTraffic(applicationId);
   const pulse = usePulse();
+  const variant = useOverviewVariant();
   // Where traffic history is kept, today's visitors and the last day's
   // response times come from stored totals rather than a day Pi read.
   const { collection } = useCollection(applicationId);
@@ -280,8 +296,57 @@ export function OverviewLive({
             state: reachable === "checking" ? "asking" : "unknown",
           };
 
+  // PROTOTYPE · the same hooks and records, drawn another way.
+  if (variant !== "now")
+    return (
+      <OverviewDirections
+        variant={variant}
+        bar={chrome.bar}
+        facts={overviewFacts({
+          applicationId,
+          name,
+          title,
+          now,
+          openUrl,
+          restricted,
+          reachable,
+          pulse,
+          traffic,
+          collection,
+          kept,
+          month,
+          hourly,
+          usage,
+          built,
+          condition: {
+            tone: tone[condition.certainty],
+            text:
+              condition.certainty === "stale" && pulse.app === "answering"
+                ? `${name} answered just now.`
+                : condition.text,
+          },
+          lanes: built.vitals.map((vital) => ({
+            id: vital.id,
+            label: vital.label,
+            ...liveReading(vital, pulse),
+            plain: vital.plain,
+            destination: vital.destination,
+            ask: vital.ask,
+          })),
+          mapped,
+          records: prototype?.records ?? [],
+          executions: prototype?.executions ?? [],
+          onOpenConversation: prototype?.onOpenConversation,
+          onAsk,
+          onOpenDestination,
+          onReopen,
+        })}
+      />
+    );
+
   return (
     <div className="hv-section-page hv-section-overview ovl">
+      <OverviewSwitcher value="now" />
       <PageHead
         bar={chrome.bar}
         title={title}

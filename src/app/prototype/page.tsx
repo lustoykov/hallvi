@@ -36,6 +36,11 @@ export default function PrototypeIndexPage() {
           mascot in every mood, which no record produces.
         </li>
         <li>
+          <Link href="/prototype/overview">Overview directions</Link> —
+          PROTOTYPE: five structures for a deployed application&apos;s Overview,
+          switchable with <code>?variant=</code>, on invented numbers.
+        </li>
+        <li>
           <Link href="/prototype/traffic">Traffic</Link> — the destination and
           its lines on Overview, Deployment and Monitoring, on invented numbers
           until the collector&apos;s routes exist.
