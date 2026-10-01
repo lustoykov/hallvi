@@ -240,9 +240,9 @@ failed observations are neutral and withhold private Open links; controller
 transport loss says “Cannot reach Hallvi,” while a negative tunnel check says
 “The tunnel is closed.” Historical saved checks retain their recorded meaning.
 Reopening still prepares a draft for the main operator. Overview's head adds
-the open reading in words beside the link, and draws a closed tunnel without
-colour; every other head is unchanged. While the first answer is on its way
-a head says “Checking access…”.
+the open reading in words beside the link, and marks a closed tunnel with an
+empty ring where the other heads keep the warning mark. While the first answer
+is on its way a head says “Checking access…”.
 
 **Adding a destination** means rendering `InformationCard` from the sorted records with `currentView` set, and nothing else until that destination earns more. The content contract Pi writes against lives with the `save_information` tool in `src/server/pi.ts`; when a component needs a field the records do not carry, the fix is that contract, not a component that invents one.
 

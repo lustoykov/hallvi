@@ -152,8 +152,8 @@ function hostOf(url: string) {
  * address reads beside the link, in the same words. A published address that
  * answered is "Answering" and its host. A tunnel is only ever "open": the
  * check proves the connection, never the application behind it. And a tunnel
- * this computer dropped is stated without colour there, because it says
- * nothing about the application.
+ * this computer dropped gets an empty ring there in place of the warning
+ * mark, because it says nothing about the application.
  */
 export function AccessLink({
   openUrl,

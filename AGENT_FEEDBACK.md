@@ -34,6 +34,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-056 — Check the port before rebuilding the scenario database](#af-056--check-the-port-before-rebuilding-the-scenario-database) | 1 | New |
 | [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
 | [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
+| [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -96,6 +97,16 @@ verified deployment still say "What has been assessed", "What happened" and
 "Is the way in working?". The owner found that family of labels precious on
 the deployed page. Overview's title is also the web part's name, so a static
 site behind Caddy is titled "Caddy".
+
+**+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+### AF-059 — Remove the red a closed head never shows
+
+`journey-v2.css` colours `.axj3-closed` red, but `.axj3-open small` is more
+specific and always wins, so "The tunnel is closed" and "The address did not
+answer" render in muted grey. `DESIGN.md` says a failed observation is neutral,
+so the grey is the intended one. The rule reads as if those heads were red, and
+this change's first description said so.
 
 **+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
 
