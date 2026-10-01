@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -34,6 +35,9 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
+import type { SavedInformation } from "@/server/operator-data";
+import type { ExecutionRecord } from "@/server/operator-execution";
+import type { ActivityRecord } from "@/server/pi-activity";
 import type { Chat, ChatMessage, OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
@@ -50,7 +54,7 @@ import {
   sentImageSources,
   type ImageAttachment,
 } from "./message-images";
-import { hasActivity, PiActivity } from "./pi-activity";
+import { PiActivity } from "./pi-activity";
 import { hostOf, intentOf, placeOf, whereItRan } from "./execution-text";
 import { WorkingMascot } from "./working-mascot";
 import {
@@ -60,6 +64,7 @@ import {
   type RunActivity,
 } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
+import { useLatestFirst } from "./use-latest-first";
 import { useConnectionRequests } from "./onboarding/connection-requests";
 import { ModelConnect } from "./onboarding/model-connect";
 import { GithubConnect } from "./onboarding/github-connect";
@@ -296,6 +301,383 @@ function Doing({ activity }: { activity: RunActivity }) {
   );
 }
 
+const NONE: never[] = [];
+
+/** Records gathered under the id each belongs to. */
+function gather<T>(
+  records: T[] | undefined,
+  idOf: (record: T) => string | undefined,
+) {
+  const gathered = new Map<string, T[]>();
+  for (const record of records ?? []) {
+    const id = idOf(record);
+    if (id === undefined) continue;
+    const mine = gathered.get(id);
+    if (mine) mine.push(record);
+    else gathered.set(id, [record]);
+  }
+  return gathered;
+}
+
+/** One function for the life of the pane, calling whichever is current. */
+function useSteady<A extends unknown[]>(
+  callback: ((...values: A) => void) | undefined,
+) {
+  const current = useRef(callback);
+  useEffect(() => {
+    current.current = callback;
+  });
+  return useCallback((...values: A) => current.current?.(...values), []);
+}
+
+/** The same members in the same order: a rebuilt list of them is no news. */
+function sameMembers(before: unknown, after: unknown) {
+  return (
+    Array.isArray(before) &&
+    Array.isArray(after) &&
+    before.length === after.length &&
+    before.every((member, index) => member === after[index])
+  );
+}
+
+interface TranscriptMessageProps {
+  message: ChatMessage;
+  /** The owner's words this reply was written under, to send again. */
+  asked: string | undefined;
+  last: boolean;
+  applicationId: string | undefined;
+  chatId: string | null;
+  /** The main conversation, where approvals are given. */
+  main: boolean;
+  readOnly: boolean;
+  /** An action of the reader's is still in hand. */
+  busy: boolean;
+  /** A turn is running, which a message still waiting is read after. */
+  working: boolean;
+  /** The destination this message was asked from. */
+  about: string | null;
+  /** This reply's calls. Absent where the conversation has no transcript. */
+  activity: ActivityRecord[] | undefined;
+  /** The commands this reply ran. */
+  executions: ExecutionRecord[];
+  /** The saved record behind each block, in the blocks' order. */
+  records: (SavedInformation | undefined)[] | undefined;
+  /** Whether each block's record was already shown in full further up. */
+  repeated: boolean[] | undefined;
+  currentAccessId: string | undefined;
+  reachable: Reachability | undefined;
+  /** What the turn is doing, on the reply being written. */
+  doing: RunActivity | null;
+  workerAlive: boolean | undefined;
+  onTell: (message: string) => void;
+  onAsk: (draft: string) => void;
+  onNewChat: () => void;
+  onOpen: (destination: ApplicationSection) => void;
+}
+
+/**
+ * One message of the transcript.
+ *
+ * It is handed its own records and nothing of the rest of the conversation,
+ * and is drawn again only when one of them changes. A token arriving in the
+ * newest reply, a keystroke in the composer and the half-minute clock used
+ * to redraw every message there was: with three hundred replies above it,
+ * each keystroke held the page for about 75 ms.
+ */
+const TranscriptMessage = memo(
+  function TranscriptMessage({
+    message,
+    asked,
+    last,
+    applicationId,
+    chatId,
+    main,
+    readOnly,
+    busy,
+    working,
+    about,
+    activity,
+    executions,
+    records,
+    repeated,
+    currentAccessId,
+    reachable,
+    doing,
+    workerAlive,
+    onTell,
+    onAsk,
+    onNewChat,
+    onOpen,
+  }: TranscriptMessageProps) {
+    // The owner's message is settled once Pi has read it. Until then it
+    // waits, and it can end without ever being read.
+    const unread =
+      message.role === "user" &&
+      !["completed", "delivered"].includes(message.status);
+    const provisional =
+      message.role === "assistant" && message.status !== "completed";
+    const inProgress = message.status === "running";
+    const failure = runFailure({
+      runId: message.id,
+      error: message.error,
+      failure: message.failure,
+      executions,
+    });
+    const historyUnavailable =
+      message.status === "failed" &&
+      message.error?.startsWith("Conversation history unavailable.");
+    // A request Hallvi started itself is never shown as the engineer's
+    // words.
+    const engineer = message.role === "user" && message.source === "user";
+    // Sent from elsewhere on the owner's behalf: said where, not who.
+    const author = engineer
+      ? message.origin
+        ? ORIGIN_LABELS[message.origin]
+        : "You"
+      : "Hallvi";
+    return (
+      <Message
+        className={
+          unread
+            ? message.status === "waiting"
+              ? ""
+              : "hv-message-failed"
+            : provisional
+              ? inProgress
+                ? "hv-message-live"
+                : "hv-message-failed"
+              : message.role === "user" && !engineer
+                ? "hv-message-request"
+                : ""
+        }
+        from={engineer ? "user" : "assistant"}
+        id={`hv-message-${message.id}`}
+      >
+        <div className="hv-message-heading">
+          {engineer ? (
+            <span className="hv-avatar user" aria-hidden="true">
+              {author}
+            </span>
+          ) : (
+            <HallviMark />
+          )}
+          <strong>{author}</strong>
+          {message.source === "hallvi" && (
+            <span className="hv-source-tag">
+              {message.role === "user"
+                ? "Started automatically"
+                : "Recorded event"}
+            </span>
+          )}
+          {(provisional || unread) && message.status !== "running" && (
+            <span
+              className={`hv-source-tag ${message.status === "waiting" ? "live" : "failed"}`}
+            >
+              {unread && message.status === "waiting"
+                ? message.delivery === "steer"
+                  ? "Steering"
+                  : "Waiting"
+                : unread
+                  ? "Not run"
+                  : ATTEMPT_LABELS[message.status]}
+            </span>
+          )}
+          <LocalTime value={message.createdAt} variant="compact" />
+        </div>
+        <MessageContent>
+          {engineer && about !== null && (
+            <span className="hv-message-context">About {about}</span>
+          )}
+          {provisional ? (
+            <div className="hv-run-progress">
+              {message.body && inProgress && !activity && (
+                <MessageResponse>
+                  <Markdown source={message.body} />
+                </MessageResponse>
+              )}
+              {!inProgress && (
+                <p className="hv-run-status" role="status">
+                  {historyUnavailable
+                    ? message.error
+                    : message.status === "cancelled"
+                      ? stopOutcome()
+                      : message.status === "interrupted"
+                        ? // Not the reader's Stop, and never "nothing
+                          // had run": the reply says what is unknown.
+                          (message.error ??
+                          "Interrupted. The last command’s outcome is unknown.")
+                        : failure.says}
+                </p>
+              )}
+              {message.body && !inProgress && (
+                <details className="hv-run-draft">
+                  <summary>Show unfinished draft</summary>
+                  <MessageResponse>
+                    <Markdown source={message.body} />
+                  </MessageResponse>
+                </details>
+              )}
+              {!readOnly &&
+                !inProgress &&
+                last &&
+                message.status !== "interrupted" && (
+                  <button
+                    className="hv-run-action hv-primary-button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (historyUnavailable) onNewChat();
+                      else if (failure.action.kind === "ask")
+                        onAsk(failure.action.draft!);
+                      else if (asked !== undefined) onTell(asked);
+                    }}
+                    type="button"
+                  >
+                    <ArrowClockwise aria-hidden="true" weight="bold" />
+                    {historyUnavailable
+                      ? "Start a new chat"
+                      : // A command that exited non-zero will exit
+                        // non-zero again, so retrying it is a way
+                        // of not reading the error. The control
+                        // follows what actually failed.
+                        failure.action.label}
+                  </button>
+                )}
+            </div>
+          ) : activity?.length ? null : (
+            // With a transcript the body is drawn inside it, in the
+            // place it happened, rather than above the calls.
+            <MessageResponse>
+              <Markdown source={message.body} />
+            </MessageResponse>
+          )}
+          {message.images && applicationId && chatId && (
+            <MessageImages
+              sources={sentImageSources(
+                applicationId,
+                chatId,
+                message.id,
+                message.images,
+              )}
+            />
+          )}
+          {unread && (
+            <div className="hv-run-progress">
+              <p className="hv-run-status" role="status">
+                {message.status === "waiting"
+                  ? message.delivery === "steer" && working
+                    ? "Pi reads this after its current step, before it carries on. It does not interrupt a running command or a pending approval."
+                    : working
+                      ? "Pi reads this when its current work is done."
+                      : "Pi holds this and has not read it. Continue has Pi read it; Stop cancels it."
+                  : message.error}
+              </p>
+              {!readOnly && message.status !== "waiting" && last && (
+                <button
+                  className="hv-run-action hv-primary-button"
+                  disabled={busy}
+                  onClick={() => onTell(message.body)}
+                  type="button"
+                >
+                  <ArrowClockwise aria-hidden="true" weight="bold" />
+                  Send again
+                </button>
+              )}
+            </div>
+          )}
+        </MessageContent>
+        {message.role === "assistant" && activity && (
+          <PiActivity
+            records={activity}
+            executions={executions}
+            runId={message.id}
+            live={
+              message.status === "running" ||
+              (message.status === "completed" && activity.length > 0)
+                ? message.body
+                : null
+            }
+            renderExecution={(executionId) =>
+              applicationId && chatId ? (
+                <OperatorConsole
+                  applicationId={applicationId}
+                  chatId={chatId}
+                  main={main}
+                  executionId={executionId}
+                  records={executions}
+                />
+              ) : null
+            }
+          />
+        )}
+        {message.role === "assistant" &&
+          message.source === "pi" &&
+          message.status === "completed" &&
+          Boolean(message.body.trim()) && <CopyReply body={message.body} />}
+        {message.blocks?.map((block, index) => {
+          // A call already drawn in the activity order is not drawn
+          // again here; the link is by execution id, not by name.
+          if (
+            block.type === "execution" &&
+            activity?.some((record) => record.executionId === block.id)
+          )
+            return null;
+          if (block.type === "text")
+            return <Markdown key={index} source={block.text} />;
+          if (block.type === "execution" && applicationId && chatId)
+            return (
+              <OperatorConsole
+                key={block.id}
+                applicationId={applicationId}
+                chatId={chatId}
+                main={main}
+                executionId={block.id}
+                records={executions}
+              />
+            );
+          if (block.type === "saved-information") {
+            const record = records?.[index];
+            return record ? (
+              <InformationCard
+                key={block.id}
+                record={record}
+                onOpen={onOpen}
+                reachable={
+                  record.presentation?.content?.kind === "application-access" &&
+                  record.presentation.content.mode === "private" &&
+                  record.id !== currentAccessId
+                    ? "unknown"
+                    : reachable
+                }
+                superseded={Boolean(repeated?.[index])}
+              />
+            ) : null;
+          }
+          return null;
+        })}
+        {/* The one live line of a turn, at the end of the reply it belongs
+            to. The words carry the motion; Little Server visits now and
+            then. Stop lives in the composer. */}
+        {doing && (
+          <div className="hv-still-working">
+            {workerAlive !== false && (
+              <SpinnerGap className="spin" aria-hidden="true" />
+            )}
+            <span className="hv-still-what" role="status">
+              <Doing activity={doing} />
+            </span>
+            {workerAlive !== false && <WorkingMascot />}
+          </div>
+        )}
+      </Message>
+    );
+  },
+  (before, after) =>
+    (Object.keys(after) as (keyof TranscriptMessageProps)[]).every(
+      (key) =>
+        before[key] === after[key] || sameMembers(before[key], after[key]),
+    ),
+);
+
 export function ChatPane({
   view,
   activeChat,
@@ -409,6 +791,20 @@ export function ChatPane({
   }
   const openDestination = onOpenDestination ?? (() => {});
   const messageCount = view.messages.length;
+  const { earlier, conversation, show } = useLatestFirst(chatId, messageCount);
+  const drawn = earlier ? view.messages.slice(earlier) : view.messages;
+  /** Show what the reader asked for, lit for a moment. */
+  const reveal = useCallback(
+    (element: Element) => {
+      show(element);
+      element.classList.add("hv-message-highlight");
+      window.setTimeout(
+        () => element.classList.remove("hv-message-highlight"),
+        2600,
+      );
+    },
+    [show],
+  );
   /**
    * Open a record from its own address.
    *
@@ -427,14 +823,8 @@ export function ChatPane({
     const element = document.getElementById(id);
     if (!element) return;
     openedRecord.current = id;
-    element.scrollIntoView({ block: "center" });
-    element.classList.add("hv-message-highlight");
-    const timer = window.setTimeout(
-      () => element.classList.remove("hv-message-highlight"),
-      2600,
-    );
-    return () => window.clearTimeout(timer);
-  }, [view.messages]);
+    reveal(element);
+  }, [view.messages, earlier, reveal]);
 
   // Clicking a second repeat link changes only the hash, which re-renders
   // nothing, so the effect above would not run again.
@@ -446,38 +836,34 @@ export function ChatPane({
       const element = document.getElementById(id);
       if (!element) return;
       openedRecord.current = id;
-      element.scrollIntoView({ block: "center" });
-      element.classList.add("hv-message-highlight");
-      window.setTimeout(
-        () => element.classList.remove("hv-message-highlight"),
-        2600,
-      );
+      reveal(element);
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
-  }, []);
+  }, [reveal]);
 
+  // A message asked for by a view, or named in the address, is shown as soon
+  // as it is drawn, and once. These run again with every message that
+  // arrives, and would keep returning a reader who has since moved on.
+  const revealed = useRef(0);
   useEffect(() => {
-    if (!highlight) return;
+    if (!highlight || revealed.current === highlight.nonce) return;
     const element = document.getElementById(
       `hv-message-${highlight.messageId}`,
     );
     if (!element) return;
-    element.scrollIntoView({ block: "center" });
-    element.classList.add("hv-message-highlight");
-    const timer = window.setTimeout(
-      () => element.classList.remove("hv-message-highlight"),
-      2600,
-    );
-    return () => window.clearTimeout(timer);
-  }, [highlight, messageCount]);
+    revealed.current = highlight.nonce;
+    reveal(element);
+  }, [highlight, messageCount, earlier, reveal]);
+  const linked = useRef<string | null>(null);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("message");
-    if (id)
-      document
-        .getElementById(`hv-message-${id}`)
-        ?.scrollIntoView({ block: "center" });
-  }, [view.messages.length]);
+    if (!id || linked.current === id) return;
+    const element = document.getElementById(`hv-message-${id}`);
+    if (!element) return;
+    linked.current = id;
+    show(element);
+  }, [messageCount, earlier, show]);
   const application = view.application;
   const archived = Boolean(activeChat?.archivedAt);
   const readOnly = archived;
@@ -578,6 +964,30 @@ export function ChatPane({
     [view.messages],
   );
   const applicationId = view.application?.id;
+  // What each message is drawn from, found once rather than by every
+  // message searching the whole conversation for its own.
+  const activityOf = useMemo(
+    () => gather(view.piActivity, (record) => record.runId),
+    [view.piActivity],
+  );
+  const executionsOf = useMemo(
+    () => gather(view.executions, (record) => record.runId),
+    [view.executions],
+  );
+  const informationOf = useMemo(
+    () => new Map(view.information?.map((record) => [record.id, record])),
+    [view.information],
+  );
+  const bodies = useMemo(
+    () => new Map(view.messages.map((sent) => [sent.id, sent.body])),
+    [view.messages],
+  );
+  const lastId = view.messages.at(-1)?.id;
+  const tell = useSteady(onTell);
+  const ask = useSteady(continueAfterSecrets);
+  const startNewChat = useSteady(onNewChat);
+  const open = useSteady(openDestination);
+
   const connections = useConnectionRequests({
     applicationId,
     application: view.application?.name ?? "the application",
@@ -722,7 +1132,11 @@ export function ChatPane({
           )}
         </div>
       )}
-      <Conversation className="hv-conversation">
+      <Conversation
+        className="hv-conversation"
+        contextRef={conversation}
+        initial="instant"
+      >
         <ConversationContent className="hv-messages">
           {reconnecting && (
             <p className="hv-stream-notice" role="status">
@@ -731,295 +1145,61 @@ export function ChatPane({
               catches up on its own.
             </p>
           )}
-          {view.messages.map((message) => {
-            // The owner's message is settled once Pi has read it. Until
-            // then it waits, and it can end without ever being read.
-            const unread =
-              message.role === "user" &&
-              !["completed", "delivered"].includes(message.status);
-            const provisional =
-              message.role === "assistant" && message.status !== "completed";
-            const inProgress = message.status === "running";
-            const asked = view.messages.find(
-              (sent) => sent.id === message.responseTo,
-            );
-            const last = view.messages.at(-1)?.id === message.id;
-            const failure = runFailure({
-              runId: message.id,
-              error: message.error,
-              failure: message.failure,
-              executions: view.executions ?? [],
-            });
-            const historyUnavailable =
-              message.status === "failed" &&
-              message.error?.startsWith("Conversation history unavailable.");
-            // A request Hallvi started itself is never shown as the
-            // engineer's words.
-            const engineer =
-              message.role === "user" && message.source === "user";
-            // Sent from elsewhere on the owner's behalf: said where, not who.
-            const author = engineer
-              ? message.origin
-                ? ORIGIN_LABELS[message.origin]
-                : "You"
-              : "Hallvi";
+          {earlier > 0 && (
+            <p className="hv-stream-notice" role="status">
+              <SpinnerGap className="spin" aria-hidden="true" />
+              Loading earlier messages…
+            </p>
+          )}
+          {drawn.map((message) => {
+            const blocks = message.blocks;
             return (
               <Fragment key={message.id}>
-                <Message
-                  className={
-                    unread
-                      ? message.status === "waiting"
-                        ? ""
-                        : "hv-message-failed"
-                      : provisional
-                        ? inProgress
-                          ? "hv-message-live"
-                          : "hv-message-failed"
-                        : message.role === "user" && !engineer
-                          ? "hv-message-request"
-                          : ""
+                <TranscriptMessage
+                  message={message}
+                  asked={
+                    message.responseTo
+                      ? bodies.get(message.responseTo)
+                      : undefined
                   }
-                  from={engineer ? "user" : "assistant"}
-                  id={`hv-message-${message.id}`}
-                >
-                  <div className="hv-message-heading">
-                    {engineer ? (
-                      <span className="hv-avatar user" aria-hidden="true">
-                        {author}
-                      </span>
-                    ) : (
-                      <HallviMark />
-                    )}
-                    <strong>{author}</strong>
-                    {message.source === "hallvi" && (
-                      <span className="hv-source-tag">
-                        {message.role === "user"
-                          ? "Started automatically"
-                          : "Recorded event"}
-                      </span>
-                    )}
-                    {(provisional || unread) &&
-                      message.status !== "running" && (
-                        <span
-                          className={`hv-source-tag ${message.status === "waiting" ? "live" : "failed"}`}
-                        >
-                          {unread && message.status === "waiting"
-                            ? message.delivery === "steer"
-                              ? "Steering"
-                              : "Waiting"
-                            : unread
-                              ? "Not run"
-                              : ATTEMPT_LABELS[message.status]}
-                        </span>
-                      )}
-                    <LocalTime value={message.createdAt} variant="compact" />
-                  </div>
-                  <MessageContent>
-                    {engineer && message.id === contextualUserMessageId && (
-                      <span className="hv-message-context">
-                        About {context?.label}
-                      </span>
-                    )}
-                    {provisional ? (
-                      <div className="hv-run-progress">
-                        {message.body && inProgress && !view.piActivity && (
-                          <MessageResponse>
-                            <Markdown source={message.body} />
-                          </MessageResponse>
-                        )}
-                        {!inProgress && (
-                          <p className="hv-run-status" role="status">
-                            {historyUnavailable
-                              ? message.error
-                              : message.status === "cancelled"
-                                ? stopOutcome()
-                                : message.status === "interrupted"
-                                  ? // Not the reader's Stop, and never "nothing
-                                    // had run": the reply says what is unknown.
-                                    (message.error ??
-                                    "Interrupted. The last command’s outcome is unknown.")
-                                  : failure.says}
-                          </p>
-                        )}
-                        {message.body && !inProgress && (
-                          <details className="hv-run-draft">
-                            <summary>Show unfinished draft</summary>
-                            <MessageResponse>
-                              <Markdown source={message.body} />
-                            </MessageResponse>
-                          </details>
-                        )}
-                        {!readOnly &&
-                          !inProgress &&
-                          last &&
-                          message.status !== "interrupted" && (
-                            <button
-                              className="hv-run-action hv-primary-button"
-                              disabled={busy !== null}
-                              onClick={() => {
-                                if (historyUnavailable) onNewChat();
-                                else if (failure.action.kind === "ask")
-                                  continueAfterSecrets(failure.action.draft!);
-                                else if (asked) onTell?.(asked.body);
-                              }}
-                              type="button"
-                            >
-                              <ArrowClockwise
-                                aria-hidden="true"
-                                weight="bold"
-                              />
-                              {historyUnavailable
-                                ? "Start a new chat"
-                                : // A command that exited non-zero will exit
-                                  // non-zero again, so retrying it is a way
-                                  // of not reading the error. The control
-                                  // follows what actually failed.
-                                  failure.action.label}
-                            </button>
-                          )}
-                      </div>
-                    ) : view.piActivity &&
-                      hasActivity(view.piActivity, message.id) ? null : (
-                      // With a transcript the body is drawn inside it, in the
-                      // place it happened, rather than above the calls.
-                      <MessageResponse>
-                        <Markdown source={message.body} />
-                      </MessageResponse>
-                    )}
-                    {message.images && view.application && chatId && (
-                      <MessageImages
-                        sources={sentImageSources(
-                          view.application.id,
-                          chatId,
-                          message.id,
-                          message.images,
-                        )}
-                      />
-                    )}
-                    {unread && (
-                      <div className="hv-run-progress">
-                        <p className="hv-run-status" role="status">
-                          {message.status === "waiting"
-                            ? message.delivery === "steer" && inFlight
-                              ? "Pi reads this after its current step, before it carries on. It does not interrupt a running command or a pending approval."
-                              : inFlight
-                                ? "Pi reads this when its current work is done."
-                                : "Pi holds this and has not read it. Continue has Pi read it; Stop cancels it."
-                            : message.error}
-                        </p>
-                        {!readOnly && message.status !== "waiting" && last && (
-                          <button
-                            className="hv-run-action hv-primary-button"
-                            disabled={busy !== null}
-                            onClick={() => onTell?.(message.body)}
-                            type="button"
-                          >
-                            <ArrowClockwise aria-hidden="true" weight="bold" />
-                            Send again
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </MessageContent>
-                  {message.role === "assistant" && view.piActivity && (
-                    <PiActivity
-                      records={view.piActivity}
-                      executions={view.executions}
-                      runId={message.id}
-                      live={
-                        message.status === "running" ||
-                        (message.status === "completed" &&
-                          hasActivity(view.piActivity, message.id))
-                          ? message.body
-                          : null
-                      }
-                      renderExecution={(executionId) =>
-                        view.application && chatId ? (
-                          <OperatorConsole
-                            applicationId={view.application.id}
-                            chatId={chatId}
-                            main={view.chats[0]?.id === chatId}
-                            executionId={executionId}
-                            records={view.executions}
-                          />
-                        ) : null
-                      }
-                    />
+                  last={message.id === lastId}
+                  applicationId={applicationId}
+                  chatId={chatId}
+                  main={view.chats[0]?.id === chatId}
+                  readOnly={readOnly}
+                  // Only the last message carries a control that waits.
+                  busy={busy !== null && message.id === lastId}
+                  working={message.status === "waiting" && Boolean(inFlight)}
+                  about={
+                    message.id === contextualUserMessageId
+                      ? (context?.label ?? "")
+                      : null
+                  }
+                  activity={
+                    view.piActivity
+                      ? (activityOf.get(message.id) ?? NONE)
+                      : undefined
+                  }
+                  executions={executionsOf.get(message.id) ?? NONE}
+                  records={blocks?.map((block) =>
+                    block.type === "saved-information"
+                      ? informationOf.get(block.id)
+                      : undefined,
                   )}
-                  {message.role === "assistant" &&
-                    message.source === "pi" &&
-                    message.status === "completed" &&
-                    Boolean(message.body.trim()) && (
-                      <CopyReply body={message.body} />
-                    )}
-                  {message.blocks?.map((block, index) => {
-                    // A call already drawn in the activity order is not drawn
-                    // again here; the link is by execution id, not by name.
-                    if (
-                      block.type === "execution" &&
-                      view.piActivity?.some(
-                        (record) => record.executionId === block.id,
-                      )
-                    )
-                      return null;
-                    if (block.type === "text")
-                      return <Markdown key={index} source={block.text} />;
-                    if (
-                      block.type === "execution" &&
-                      view.application &&
-                      chatId
-                    )
-                      return (
-                        <OperatorConsole
-                          key={block.id}
-                          applicationId={view.application.id}
-                          chatId={chatId}
-                          main={view.chats[0]?.id === chatId}
-                          executionId={block.id}
-                          records={view.executions}
-                        />
-                      );
-                    if (block.type === "saved-information") {
-                      const record = view.information?.find(
-                        (r) => r.id === block.id,
-                      );
-                      return record ? (
-                        <InformationCard
-                          key={block.id}
-                          record={record}
-                          onOpen={openDestination}
-                          reachable={
-                            record.presentation?.content?.kind ===
-                              "application-access" &&
-                            record.presentation.content.mode === "private" &&
-                            record.id !== currentAccessId
-                              ? "unknown"
-                              : reachable
-                          }
-                          superseded={
-                            firstShown.get(record.id) !==
-                            `${message.id}:${index}`
-                          }
-                        />
-                      ) : null;
-                    }
-                    return null;
-                  })}
-                  {/* The one live line of a turn, at the end of the reply it
-                      belongs to. The words carry the motion; Little Server
-                      visits now and then. Stop lives in the composer. */}
-                  {message.id === inFlight?.id && (
-                    <div className="hv-still-working">
-                      {workerAlive !== false && (
-                        <SpinnerGap className="spin" aria-hidden="true" />
-                      )}
-                      <span className="hv-still-what" role="status">
-                        <Doing activity={inFlightActivity} />
-                      </span>
-                      {workerAlive !== false && <WorkingMascot />}
-                    </div>
+                  repeated={blocks?.map(
+                    (block, index) =>
+                      block.type === "saved-information" &&
+                      firstShown.get(block.id) !== `${message.id}:${index}`,
                   )}
-                </Message>
+                  currentAccessId={currentAccessId}
+                  reachable={reachable}
+                  doing={message.id === inFlight?.id ? inFlightActivity : null}
+                  workerAlive={workerAlive}
+                  onTell={tell}
+                  onAsk={ask}
+                  onNewChat={startNewChat}
+                  onOpen={open}
+                />
                 {/* The request Pi raised on this message, drawn at the point
                     it was asked rather than wherever the reader is now. */}
                 {connections.at(message.id)}

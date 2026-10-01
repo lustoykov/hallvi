@@ -1,6 +1,10 @@
 import { expect, it, vi } from "vitest";
 import { ChatFrames } from "../../../src/server/chat-frames";
-import { applyChatFrame, type ChatFrame } from "../../../src/lib/chat-stream";
+import {
+  applyChatFrame,
+  keepUnchanged,
+  type ChatFrame,
+} from "../../../src/lib/chat-stream";
 import { activityFromTranscript } from "../../../src/server/pi-activity";
 import type { ChatSnapshot } from "../../../src/server/types";
 import { longHistory } from "../../fixtures/long-history";
@@ -111,4 +115,21 @@ it("a reconnect replaces all state and streams retain independent baselines", ()
   expect(() => applyChatFrame(null, { type: "changes" } as ChatFrame)).toThrow(
     "initial state",
   );
+});
+
+it("full state that repeats a held conversation keeps the records it repeats", () => {
+  // The page was drawn from one copy; the stream's first frame is another.
+  const held = wire(history());
+  const next = wire(held);
+  next.messages.at(-1)!.body += " and one more sentence";
+  next.executions.pop();
+  const kept = keepUnchanged(held, next);
+  expect(kept).toEqual(next);
+  expect(kept.messages[0]).toBe(held.messages[0]);
+  expect(kept.messages.at(-1)).toBe(next.messages.at(-1));
+  expect(kept.executions[0]).toBe(held.executions[0]);
+  expect(kept.executions).not.toBe(held.executions);
+  // A list nothing changed in is the list already held.
+  expect(kept.piActivity).toBe(held.piActivity);
+  expect(keepUnchanged(null, next)).toBe(next);
 });

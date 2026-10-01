@@ -315,6 +315,33 @@ it("renders streaming text once after earlier tool calls, including before the f
   }
 });
 
+it("opens a long conversation on its latest messages, with the earlier ones to follow", () => {
+  const exchange = (turn: number): ChatMessage[] => [
+    { ...asked, id: `asked-${turn}`, body: `Question ${turn}` },
+    {
+      id: `reply-${turn}`,
+      chatId: chat.id,
+      role: "assistant",
+      source: "pi",
+      body: `Answer ${turn}`,
+      createdAt: failedAt,
+      responseTo: `asked-${turn}`,
+      status: "completed",
+      revision: 1,
+    },
+  ];
+  const turns = Array.from({ length: 40 }, (_, turn) => turn);
+  const html = render({ messages: turns.flatMap(exchange) });
+  expect(html).toContain("Answer 39");
+  expect(html).toContain('id="hv-message-asked-28"');
+  expect(html).not.toContain("hv-message-reply-27");
+  expect(html).toContain("Loading earlier messages…");
+  // A conversation that fits is simply drawn.
+  const short = render({ messages: turns.slice(0, 12).flatMap(exchange) });
+  expect(short).toContain("Answer 0");
+  expect(short).not.toContain("Loading earlier messages…");
+});
+
 describe("bounded interruption evidence", () => {
   const execution = (
     id: string,

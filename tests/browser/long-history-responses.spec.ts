@@ -9,7 +9,7 @@ import { scriptWorker } from "./scripted-worker";
 // Timing profiles must not record every full history in Playwright's trace.
 test.use({ scriptedWorker: true, notificationMetrics: true, trace: "off" });
 
-async function setup(page: Page, fixture: { state: string }) {
+async function setup(page: Page, fixture: { state: string }, calls?: number) {
   const created = await page.request.post("/api/applications", {
     data: {
       requestKey: randomUUID(),
@@ -19,8 +19,9 @@ async function setup(page: Page, fixture: { state: string }) {
   expect(created.ok()).toBe(true);
   const view = await created.json();
   const app = view.application.id as string,
-    chat = view.selectedChatId as string;
-  const { transcript, executions } = longHistory(chat, app);
+    chat = view.selectedChatId as string,
+    name = view.application.name as string;
+  const { transcript, executions } = longHistory(chat, app, calls);
   const last = executions.at(-1)!;
   last.status = "running";
   delete last.finishedAt;
@@ -44,7 +45,7 @@ async function setup(page: Page, fixture: { state: string }) {
       JSON.stringify(execution),
     );
   const worker = await scriptWorker(fixture, () => transcript);
-  return { app, chat, transcript, executions, last, call, worker, store };
+  return { app, chat, name, transcript, executions, last, call, worker, store };
 }
 
 test("older evidence and open disclosures survive changes, completion, view switching and reconnect", async ({
@@ -55,6 +56,8 @@ test("older evidence and open disclosures survive changes, completion, view swit
   const { app, chat, transcript, last, call, worker, store } = state;
   try {
     await page.goto(`/applications/${app}`);
+    // It opens on its latest message; the earlier ones are drawn after it.
+    await expect(page.locator('[id="hv-message-reply:79"]')).toBeInViewport();
     const old = page.locator('[id="hv-message-reply:1"]');
     await old.getByRole("button", { name: /1 file read/ }).click();
     const row = old.locator(".hv-did-row").first();
@@ -118,6 +121,31 @@ test("older evidence and open disclosures survive changes, completion, view swit
     );
     expect(detail.ok()).toBe(true);
     expect((await detail.json()).output).toContain("COMPLETE-EVIDENCE");
+    // A link to a message in the middle takes the reader there, and the
+    // conversation keeping to its latest message does not carry them back.
+    await page.goto(`/applications/${app}?message=reply:40`);
+    const linked = page.locator('[id="hv-message-reply:40"]');
+    await expect(page.locator('[id="hv-message-asked:0"]')).toBeAttached();
+    await page.waitForTimeout(1000);
+    await expect(linked).toBeInViewport();
+    // Once: a reader who has gone back to the latest message stays there
+    // when the next one arrives.
+    await page
+      .getByRole("button", { name: "Scroll to the latest message" })
+      .click();
+    transcript.messages.push({
+      id: "asked:after",
+      chatId: chat,
+      role: "user",
+      body: "One more question.",
+      source: "user",
+      status: "delivered",
+      createdAt: last.finishedAt!,
+      revision: 0,
+    });
+    worker.changed({ kind: "chat", applicationId: app, chatId: chat });
+    await expect(page.getByText("One more question.")).toBeInViewport();
+    await expect(linked).not.toBeInViewport();
   } finally {
     await worker();
   }
@@ -364,3 +392,95 @@ for (const count of [1, 5, 10]) {
     }
   });
 }
+
+test.describe("opening a long conversation from the list", () => {
+  test.skip(
+    process.env.HALLVI_OPEN_PROFILE !== "1",
+    "Opt-in timing; the journey above checks where a conversation opens.",
+  );
+  for (const calls of [240, 900, 2000])
+    test(`profile opening ${calls} calls while Hallvi works`, async ({
+      page,
+      fixture,
+    }, testInfo) => {
+      test.setTimeout(180_000);
+      const state = await setup(page, fixture, calls);
+      const { app, chat, name, transcript, worker } = state;
+      // A turn in flight: every token is a change notice.
+      const streaming = setInterval(() => {
+        transcript.messages.at(-1)!.body += " token";
+        transcript.messages.at(-1)!.revision++;
+        worker.changed({ kind: "chat", applicationId: app, chatId: chat });
+      }, 60);
+      const runs: object[] = [];
+      try {
+        const latest = `hv-message-reply:${Math.floor((calls - 1) / 3)}`;
+        for (let round = 0; round < 3; round++) {
+          await page.goto("/applications");
+          const open = page
+            .getByRole("listitem")
+            .filter({ hasText: name })
+            .getByRole("link", { name: "Open app" });
+          await expect(open).toBeVisible();
+          await page.waitForTimeout(1000);
+          await page.evaluate((latest) => {
+            const marks: Record<string, number> = { longTasks: 0, longest: 0 };
+            Object.assign(window, { qaOpen: marks });
+            document.addEventListener(
+              "click",
+              () => (marks.click = performance.now()),
+              { capture: true, once: true },
+            );
+            new PerformanceObserver((list) => {
+              for (const task of list.getEntries()) {
+                if (!marks.click || task.startTime < marks.click) continue;
+                marks.longTasks += task.duration;
+                marks.longest = Math.max(marks.longest, task.duration);
+              }
+            }).observe({ type: "longtask" });
+            const watch = () => {
+              const reply = document.getElementById(latest);
+              const port = reply
+                ?.closest(".hv-conversation")
+                ?.getBoundingClientRect();
+              const box = reply?.getBoundingClientRect();
+              if (box && port && box.bottom > port.top && box.top < port.bottom)
+                marks.latestOnScreen ??= performance.now();
+              if (document.getElementById("hv-message-asked:0"))
+                marks.allDrawn ??= performance.now();
+              if (!marks.allDrawn || !marks.latestOnScreen)
+                requestAnimationFrame(watch);
+            };
+            requestAnimationFrame(watch);
+          }, latest);
+          await open.click();
+          await expect(page.locator('[id="hv-message-asked:0"]')).toBeAttached({
+            timeout: 60_000,
+          });
+          await page.waitForTimeout(3000);
+          const marks = await page.evaluate(
+            () =>
+              (window as unknown as { qaOpen: Record<string, number> }).qaOpen,
+          );
+          runs.push({
+            calls,
+            latestOnScreenMs: Math.round(marks.latestOnScreen - marks.click),
+            allDrawnMs: Math.round(marks.allDrawn - marks.click),
+            longTasksMs: Math.round(marks.longTasks),
+            longestTaskMs: Math.round(marks.longest),
+          });
+        }
+      } finally {
+        clearInterval(streaming);
+        writeFileSync(
+          testInfo.outputPath("open-profile.json"),
+          JSON.stringify(runs, null, 2),
+        );
+        await testInfo.attach("open-profile", {
+          body: JSON.stringify(runs, null, 2),
+          contentType: "application/json",
+        });
+        await worker();
+      }
+    });
+});
