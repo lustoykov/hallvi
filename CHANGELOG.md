@@ -4,6 +4,15 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.15 — 1 October 2026
+
+Meet the same Hallvi in the product as on hallvi.com: its mascot is now one flat drawing everywhere.
+
+- **One mascot.** Little Server on the applications home, Add application, a new application's welcome, Overview and Monitoring is the flat drawing from hallvi.com instead of a 3D model. It keeps its moods, greetings and dances, and each application's caretaker keeps its colour.
+- **It arrives with the page.** The mascot no longer needs WebGL or a 3D library, so it is drawn as the page loads instead of appearing a moment later, and a home with many applications no longer runs a 3D scene for each.
+- **What Hallvi says sits beside its head.** On Add application the speech bubble starts next to the mascot's head and clear of its raised hand, as on hallvi.com.
+- **Matching small marks.** The browser tab icon, the small mascot beside a working reply and the plugin panel's mark wear the same colours. The mascot beside the closing notes on Environment Variables and Cache & queue is now visible.
+
 ## 0.1.1-alpha.14 — 1 October 2026
 
 Keep completed replies visible, choose the right application and stop interrupted work even when the model connection needs renewing.

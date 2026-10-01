@@ -15,9 +15,9 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
-import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { listed } from "../backup-prototype/model";
+import { Mascot } from "../mascot";
 import type { SupplyProps } from "./supply-story";
 import { RevealSecret } from "../reveal-secret";
 import { ago, sizeWords, when, type Value } from "./supply-model";
@@ -253,7 +253,7 @@ export function ManifestDirection({
       )}
 
       <footer className="axma-foot">
-        <LittleServer
+        <Mascot
           mood={story.waiting.length ? "attention" : "ready"}
           className="axma-guy"
         />

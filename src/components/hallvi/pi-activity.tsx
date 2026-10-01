@@ -46,11 +46,6 @@ import {
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
-/** True when this run has anything in the transcript at all. */
-export function hasActivity(records: ActivityRecord[], runId: string) {
-  return records.some((record) => record.runId === runId);
-}
-
 type Kind = "read" | "search" | "ran" | "wrote" | "saved" | "called" | "asked";
 
 // Every tool Pi has, named the way a reader would name it. An unmapped tool

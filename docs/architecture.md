@@ -130,6 +130,22 @@ usable state and the same record identities, so older messages, quiet tool
 disclosures, approvals and open output cards keep their data and interaction
 state. POST, SSR, CLI inspection and execution detail remain full responses.
 
+Full state repeats what a page already holds: the stream's first frame after
+the page was drawn from the same conversation, a reconnect, a write's own
+response. The browser keeps the record it had wherever the new one says the
+same, and each message is drawn from its own records only. A repeated record,
+a token in the newest reply, a keystroke in the composer and the clock redraw
+no other message.
+
+A conversation opens on its latest messages, already in place. The earlier
+ones are drawn above them in steps while what is on screen keeps its
+position, so opening costs the same however long the conversation is; a link
+to a message or a record takes the reader there and leaves them there. The
+view a page opens on travels as one JSON string: megabytes of records are
+slow to encode and rebuild as a structured page property, and quick as text.
+The page and the stream's first frame still each carry the whole
+conversation.
+
 Each connection holds only its previous snapshot, drops the initial serialized
 string after sending it, and releases the baseline on close. Reconnect starts
 with authoritative full state rather than replaying missed frames. The original

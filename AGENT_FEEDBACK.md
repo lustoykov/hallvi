@@ -16,9 +16,9 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
-| [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
+| [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 4 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 5 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -38,8 +38,77 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 1 | Guidance added |
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
+| [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 1 | New |
+| [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 1 | New |
+| [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
+| [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-071 — Refresh compact message dates after midnight
+
+PR #325 memoizes transcript rows, so an unchanged message's `LocalTime` no
+longer reads the current date when the pane's clock ticks or the owner types.
+In a disposable Chromium fixture, moving the browser clock from 1 October
+23:59 to 2 October 00:01 left an earlier message labelled `12:00` after typing;
+the same check on the base revision changed it to `1 Oct, 12:00`. Reproduced
+on `db6b9aa4`, passing on `cac3e2f5`. Give the timestamp its own day-change
+update while keeping the rest of the message memoized.
+
+**+1:** 2026-10-01 — review of [PR #325](https://github.com/lustoykov/hallvi/pull/325), `codex/review-325-feedback`.
+
+### AF-070 — Land a message link in a long conversation
+
+A link to a message (`?message=`) scrolled to its target and was then carried
+to the end: the conversation keeps to its latest message as it grows and was
+never told the reader had been taken somewhere. On a 160-message synthetic
+conversation `?message=reply:40` was not on screen at 0.3, 0.7, 1.5 or 3
+seconds after loading. A repeated record's `#record-` anchor after a reload
+and Overview's "open the conversation at this reply" scroll the same way and
+were given the same fix without being measured separately. The fix tells the
+conversation the reader was taken somewhere; the long-history journey checks
+the message link.
+
+**+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
+
+### AF-069 — Carry a long conversation to the page once, and less of it
+
+Opening an application still moves its whole conversation twice: once in the
+page and again as the stream's first frame, which is sent uncompressed
+(`no-transform`). With 2,000 synthetic calls that is 19 MB each time; the
+browser spends about 200 ms taking the frame in although nothing in it is
+drawn again, and the server builds the conversation twice (about 140 ms
+each). Over a tunnel to a remote controller the second copy is the larger
+half of the wait. About 96% of those bytes are command output and call
+results behind disclosures that open closed. Two directions, neither built:
+start the stream from the state the page was drawn from, so the first frame
+is a difference; and send what a closed row shows, fetching a call's output
+when it is opened.
+
+**+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
+
+### AF-068 — Remove the mascot placements nothing draws
+
+`.axbc-guy` in `backup-prototype/calendar.css` and `.axm-guy` in
+`deployment-prototype/transit.css` size a Little Server that no component
+renders. Found while replacing the three.js mascot with the flat drawing, and
+left alone as outside that change.
+
+**+1:** 2026-10-01 — flat mascot, `claude/flat-mascot`.
+
+### AF-067 — Give the scenarios a new application and a one-application home
+
+`npm run scenarios` serves twelve applications that all have records, so three
+layouts never appear on it: Add application on a first run, the applications
+home with a single application, and the welcome in an untouched conversation.
+Checking the flat mascot in them needed the disposable browser fixture and an
+API call, and that fixture copies `src` once, so each edit meant restarting
+it. An application with no records in the scenario file, and a way to see the
+home with one application, would put those states behind the server that
+reloads as you edit.
+
+**+1:** 2026-10-01 — flat mascot, `claude/flat-mascot`.
 
 ### AF-066 — Agree the navigation column's width with the design document
 
@@ -434,6 +503,14 @@ acceptance when describing a usable private link.
 
 **+1:** 2026-09-30 — remaining browser acceptance diagnosis, codex/remaining-acceptance-verification
 
+**+1:** 2026-10-01 — application QA and alpha.14 release acceptance,
+`codex/application-qa-release`: the installed controller opened and reconnected
+its own SSH route with HTTP 200, while the in-app browser refused the forwarded
+address with `ERR_BLOCKED_BY_CLIENT`. No browser protection was bypassed. A
+separate public-address TCP probe connected while HTTP timed out with no bytes;
+keep those observations distinct from an application-level response. The
+isolated deployment and its access resources were removed after verification.
+
 ### AF-022 — Send one review's findings to one branch
 
 The traffic v1 review findings were fixed twice in parallel: on main (c0e4bf05)
@@ -501,6 +578,16 @@ itself.
 `codex/application-qa-release`: the wider browser pass reproduced stale
 Processes and Storage assertions. This task updates those checks and the
 private-application lookup so their results exercise the current product.
+
+**+1:** 2026-10-01 — opening a long conversation,
+`claude/app-open-performance`: two failures in the whole suite had to be run
+again on main to be told from this change's. On main at `cac3e2f5`,
+`change-notifications.spec.ts` (line 61) counts two worker subscriptions
+where it expects one; it passed at `bc4e2c12`. `settings-account-recovery`
+passes alone and fails when `onboarding-first-app` runs before it: both ask
+for a fresh, isolated fixture and get the same one, with a model already
+connected. `interactions.spec.ts` and `secrets.spec.ts` fail at once unless
+a scenario server is already listening on 3410.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 

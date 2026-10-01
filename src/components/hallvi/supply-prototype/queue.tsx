@@ -10,9 +10,9 @@
 
 import { ChatCircleText, Lightning } from "@phosphor-icons/react";
 
-import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { listed } from "../backup-prototype/model";
+import { Mascot } from "../mascot";
 import { countWord } from "../stack-prototype/stack-model";
 import type { SupplyProps } from "./supply-story";
 import { ago, waitWords } from "./supply-model";
@@ -184,7 +184,7 @@ export function QueueDirection({
       </div>
 
       <footer className="axqu-foot">
-        <LittleServer
+        <Mascot
           mood={failed ? "attention" : measured ? "checking" : "resting"}
           className="axqu-guy"
         />

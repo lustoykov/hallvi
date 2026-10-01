@@ -1,7 +1,7 @@
 # Hallvi
 
 <p align="center">
-  <img src="docs/assets/hallvi-mascot.svg" alt="Hallvi, the smiling little server mascot, holding a wrench" width="132" />
+  <img src="docs/assets/hallvi-mascot.svg" alt="Hallvi, a smiling robot holding a mug and waving" width="132" />
 </p>
 
 **The agent for self-hosted software.** Hallvi helps you deploy an application

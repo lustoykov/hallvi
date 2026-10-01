@@ -87,6 +87,7 @@ export function OperatorConsole({
 }) {
   const url = `/api/applications/${applicationId}/operator`;
   const suppliedRecords = records !== undefined;
+  const excluded = new Set(excludeIds);
   const readUrl =
     settingsOnly || suppliedRecords ? `${url}?settingsOnly=1` : url;
   const [settings, setSettings] = useState<OperatorSettings | null>(null);
@@ -259,7 +260,7 @@ export function OperatorConsole({
             (item) =>
               item.chatId === chatId &&
               (!executionId || item.id === executionId) &&
-              !excludeIds.includes(item.id),
+              !excluded.has(item.id),
           )
           .map((item) => {
             const where = whereItRan(item);

@@ -25,16 +25,6 @@
   outline: 2px solid var(--blue, #285ad8);
   outline-offset: -2px;
 }
-.hv-rail-mascot .mascot-scene {
-  width: 100%;
-  height: 100%;
-}
-.hv-rail-mascot .mascot-scene canvas {
-  display: block;
-}
-.hv-rail-mascot .mascot-fallback {
-  display: none;
-}
 .hv-rail-start {
   flex: none;
   display: inline-flex;
