@@ -2,7 +2,6 @@
 
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -14,7 +13,7 @@ import {
   Plus,
 } from "@phosphor-icons/react";
 import type { ApplicationListItem } from "../applications-screen";
-import type { MascotMood } from "./mascot-scene";
+import { Mascot, type MascotMood } from "../mascot";
 import {
   applicationKind,
   applicationColors,
@@ -23,13 +22,6 @@ import {
 import { PREVIEWS } from "./interface-previews";
 import s from "./home.module.css";
 
-const Mascot = dynamic(
-  () => import("./mascot-scene").then((m) => m.MascotScene),
-  {
-    ssr: false,
-    loading: () => <div className={s.mascotPlaceholder} aria-hidden="true" />,
-  },
-);
 type HomeApplication = ApplicationListItem & { href: string };
 
 /**
@@ -181,7 +173,7 @@ export function ApplicationsHome({
         {!applications.length ? (
           <div className={s.empty}>
             <div className={s.emptyMascot} aria-hidden="true">
-              <Mascot color="#7a8bd6" mood="waving" paused={paused} />
+              <Mascot mood="waving" paused={paused} />
             </div>
             <h2>Add your first application</h2>
             <p>

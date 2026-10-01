@@ -26,8 +26,8 @@ import { useState, type ReactNode } from "react";
 
 import { FRESH_MS } from "./architecture-prototype/model";
 import type { Tone } from "./deployment-prototype/deployment-model";
-import { LittleServer } from "./deployment-prototype/little-server";
 import { Tag } from "./deployment-prototype/tag";
+import { Mascot } from "./mascot";
 import type {
   MonitoringStory,
   PartLook,
@@ -279,7 +279,7 @@ export function WatchingMap({
             className="axmw-watcher"
             data-state={on ? "on" : quiet ? "quiet" : "none"}
           >
-            <LittleServer
+            <Mascot
               mood={
                 watching.counts.failed
                   ? "attention"

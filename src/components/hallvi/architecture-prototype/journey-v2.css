@@ -658,20 +658,6 @@
   border-radius: 20px;
   will-change: transform;
 }
-
-.axj2-mascot .mascot-scene {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-.axj2-mascot .mascot-scene canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-}
-.axj2-mascot .mascot-fallback {
-  display: none;
-}
 .axj2-mascot:focus-visible {
   outline: 2px solid var(--ax-blue);
   outline-offset: 2px;

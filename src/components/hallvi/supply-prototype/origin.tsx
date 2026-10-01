@@ -10,9 +10,8 @@
 
 import { ChatCircleText, MapPin } from "@phosphor-icons/react";
 
-import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import type { MascotMood } from "../home/mascot-scene";
+import { Mascot, type MascotMood } from "../mascot";
 import type { SupplyProps } from "./supply-story";
 import "./origin.css";
 
@@ -122,7 +121,7 @@ export function OriginDirection({
           )}
         </div>
         <div className="axog-machine" data-dark={dark || undefined}>
-          <LittleServer mood={mood} className="axog-guy" />
+          <Mascot mood={mood} className="axog-guy" />
           <div>
             <b>{story.machine ?? "One machine"}</b>
             <span className="axog-where">

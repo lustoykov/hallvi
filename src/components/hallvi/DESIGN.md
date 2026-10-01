@@ -271,6 +271,31 @@ Blue remains the action color; caretaker colors identify applications rather
 than health. Greeting the caretaker is a small optional interaction, separate
 from opening the application. It makes no new claims about runtime state.
 
+## Little Server
+
+**One flat drawing (1 October).** Little Server is the drawing hallvi.com and
+the banners use: a periwinkle box with a navy screen, two antennas, `</>` on
+his mug and one mitten raised. `mascot.tsx` draws him wherever he stands: on
+the applications home, on Add application, in a new application's welcome, on
+Overview before a deployment, and beside Monitoring, CDN, Cache and
+Environment Variables. Waving, he is that drawing exactly, in Hallvi's own
+periwinkle; a caretaker on the applications home wears its application's
+color instead, shaded the same way. He replaced a three.js scene on the day
+the owner made hallvi.com's mascot flat and asked for the product to match:
+the page and the product showed two different characters, and every
+caretaker cost a WebGL context.
+
+His face, his antennas and what he holds carry the mood, and nothing else
+does: a mug and a smile when all is fine, a clipboard when nobody has looked
+lately, a wrench while Hallvi works, a magnifier, a worried face and amber
+antenna tips when something is worth a look, drooped antennas and closed eyes
+where nothing is watching. He waves once for each greeting and dances when
+asked. Paused, or under reduced motion, every mood keeps its pose and nothing
+moves. What he says starts beside his head and clear of the raised mitten, as
+on hallvi.com. The small one in a line of text (`working-mascot.tsx`), the
+browser tab's icon and the plugin panel's mark wear the same paint, with what
+would not read at their size left out.
+
 ## Adopted interaction direction (9 September)
 
 Fable A is the selected experience: conversation first, inline operation receipts and quiet navigation marks, with stable full-page application views. There is no permanent right pane, split mode or floating window. Operations are shared across conversations and application views; completed evidence stays historical while application facts reflect later verified work.

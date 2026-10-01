@@ -479,7 +479,6 @@ export function TimelineHero({
   // time the label is fully on screen.
   const point = guy.point;
   useEffect(() => {
-    const mounted = Date.now();
     let touched = false;
     const touch = () => {
       touched = true;
@@ -526,19 +525,11 @@ export function TimelineHero({
         quiet &&
         onScreen(mascot.current) &&
         onScreen(label.current);
-      const drawing = mascot.current
-        ?.querySelector(".mascot-scene")
-        ?.getAttribute("data-expression");
-      if (settled && drawing) {
+      if (settled) {
         point(intro ? INTRO : facts.copy);
         if (!visit.review) remember(appId, { pointed: Date.now() });
         // The label answers as his tap lands; no separate arrival.
         timers.push(window.setTimeout(() => answer(true), 820));
-        return;
-      }
-      // His scene may still be loading: look again, for a few seconds.
-      if (settled && Date.now() - mounted + 300 <= 6000) {
-        timers.push(window.setTimeout(decide, 300));
         return;
       }
       if (news) arrive();

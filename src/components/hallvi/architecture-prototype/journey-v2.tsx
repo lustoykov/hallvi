@@ -404,12 +404,12 @@ function HallviFace() {
       />
       <circle cx="7.6" cy="2.9" r="1.35" fill="#9dbbff" />
       <circle cx="16.4" cy="2.9" r="1.35" fill="#9dbbff" />
-      <rect x="2" y="6" width="20" height="15" rx="4.8" fill="#192338" />
-      <rect x="7" y="10" width="2.6" height="4.8" rx="1.3" fill="#edf3ff" />
-      <rect x="14.4" y="10" width="2.6" height="4.8" rx="1.3" fill="#edf3ff" />
+      <rect x="2" y="6" width="20" height="15" rx="4.8" fill="#101828" />
+      <rect x="7" y="10" width="2.6" height="4.8" rx="1.3" fill="#eef3fb" />
+      <rect x="14.4" y="10" width="2.6" height="4.8" rx="1.3" fill="#eef3fb" />
       <path
         d="M9.2 16.6Q12 18.3 14.8 16.6"
-        stroke="#d6e5ff"
+        stroke="#eef3fb"
         strokeWidth="1.3"
         fill="none"
         strokeLinecap="round"

@@ -17,11 +17,13 @@ Open app link. One application gets a wider card with identity and caretaker
 on the left; narrow screens use the same header-above-details layout as the
 collection. An empty collection goes straight to the first-application welcome.
 
-- **One 3D caretaker per application.** The existing Little Server silhouette
-  and eight fixed application colors (`APPLICATION_COLORS`) form one family.
-  Colors are assigned oldest first so adding an application does not recolor
-  the others. The header and preview carry the same identity tint. Red, amber
-  and green status marks retain their semantic meaning.
+- **One caretaker per application.** Little Server's flat drawing
+  (`../mascot.tsx`, the one hallvi.com uses) and eight fixed application
+  colors (`APPLICATION_COLORS`) form one family: each caretaker is painted in
+  its application's color. Colors are assigned oldest first so adding an
+  application does not recolor the others. The header and preview carry the
+  same identity tint. Red, amber and green status marks retain their semantic
+  meaning. Until 1 October 2026 the caretakers were a three.js scene each.
 - **The face and prop follow recorded state.** Fine: a coffee mug and a smile.
   Working: a wrench. Not checked lately: a clipboard. Worth a look: a
   magnifier and a worried face. New: ready and waving. A caretaker with

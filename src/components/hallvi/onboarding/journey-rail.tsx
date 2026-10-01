@@ -14,15 +14,10 @@
 // recorded, the first-deployment rail is finished and does not return.
 
 import { ArrowRight, Check } from "@phosphor-icons/react";
-import dynamic from "next/dynamic";
 import { useState } from "react";
 
+import { Mascot } from "../mascot";
 import "./journey-rail.css";
-
-const Mascot = dynamic(
-  () => import("../home/mascot-scene").then((m) => m.MascotScene),
-  { ssr: false, loading: () => null },
-);
 
 export const READ_REPOSITORY_MESSAGE =
   "Read this repository and explain what the application does, what it needs to run, and a sensible hosting option. Do not rent a server, deploy, or change anything yet. Ask me where I want it to run after explaining what you found.";
@@ -133,12 +128,7 @@ export function JourneyRail({
         aria-label="Make Hallvi dance"
         onClick={() => setDances((count) => count + 1)}
       >
-        <Mascot
-          color="#7a8bd6"
-          mood={mood}
-          dance="shuffle"
-          danceRequest={dances}
-        />
+        <Mascot mood={mood} dance="shuffle" danceRequest={dances} />
       </button>
     );
     // The request is open in the transcript: the welcome steps back to one

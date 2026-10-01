@@ -1,0 +1,605 @@
+/* Little Server, flat. Prefix: hv-ms-. `mascot.tsx` puts the parts on screen;
+   this poses them for each expression and moves them. Lengths are in the
+   drawing's own units, so every pose scales with the box that holds him. */
+
+:where(.hv-mascot) {
+  display: block;
+  height: 100%;
+}
+.hv-mascot > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* ---------- Poses ----------
+   How far each arm, hand and antenna has turned from the drawing, which
+   holds a mug at the left and raises a mitten at the right. Standing ready,
+   the raised arm hangs at his side. */
+.hv-mascot {
+  --arm-l: 0deg;
+  --hand-l: 0deg;
+  --arm-r: 112deg;
+  --hand-r: 26deg;
+  --antenna-l: 0deg;
+  --antenna-r: 0deg;
+  --lean: 0deg;
+}
+.hv-mascot[data-expression="waving"] {
+  --arm-r: 0deg;
+  --hand-r: 0deg;
+}
+/* The clipboard is held up a little, and he leans in to read it. */
+.hv-mascot[data-expression="checking"] {
+  --arm-l: 6deg;
+  --antenna-r: 14deg;
+  --lean: -2deg;
+}
+/* The wrench stands straight up in the raised mitten. */
+.hv-mascot[data-expression="working"] {
+  --arm-l: -8deg;
+  --arm-r: 0deg;
+  --hand-r: -18deg;
+}
+/* The magnifier is held up, the free hand comes up, the antennas stiffen. */
+.hv-mascot[data-expression="attention"] {
+  --arm-l: 26deg;
+  --hand-l: -26deg;
+  --arm-r: 0deg;
+  --hand-r: -18deg;
+  --antenna-l: 4.5deg;
+  --antenna-r: -4.5deg;
+}
+.hv-mascot[data-expression="resting"] {
+  --antenna-l: -30deg;
+  --antenna-r: 30deg;
+}
+/* Out and down toward what he means, below and to his right. */
+.hv-mascot[data-expression="pointing"] {
+  --arm-l: -8deg;
+  --arm-r: 100deg;
+  --hand-r: 22deg;
+  --antenna-l: 10deg;
+  --antenna-r: 12deg;
+  --lean: 3deg;
+}
+.hv-mascot[data-expression="dancing"] {
+  --arm-l: -8deg;
+}
+
+.hv-ms-figure,
+.hv-ms-arm,
+.hv-ms-hand,
+.hv-ms-antenna,
+.hv-ms-gaze,
+.hv-ms-eye,
+.hv-ms-brow {
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.hv-ms-figure {
+  transform-origin: 200px 316px;
+  transform: rotate(var(--lean));
+}
+.hv-ms-arm[data-side="l"],
+.hv-ms-arm[data-side="l"] .hv-ms-swing {
+  transform-origin: 92px 192px;
+}
+.hv-ms-arm[data-side="l"] {
+  transform: rotate(var(--arm-l));
+}
+.hv-ms-hand[data-side="l"] {
+  transform-origin: 84px 207px;
+  transform: rotate(var(--hand-l));
+}
+.hv-ms-arm[data-side="r"],
+.hv-ms-arm[data-side="r"] .hv-ms-swing {
+  transform-origin: 298px 204px;
+}
+.hv-ms-arm[data-side="r"] {
+  transform: rotate(var(--arm-r));
+}
+.hv-ms-hand[data-side="r"] {
+  transform-origin: 318px 180px;
+  transform: rotate(var(--hand-r));
+}
+.hv-ms-antenna[data-side="l"],
+.hv-ms-antenna[data-side="l"] .hv-ms-sway {
+  transform-origin: 152px 88px;
+}
+.hv-ms-antenna[data-side="l"] {
+  transform: rotate(var(--antenna-l));
+}
+.hv-ms-antenna[data-side="r"],
+.hv-ms-antenna[data-side="r"] .hv-ms-sway {
+  transform-origin: 248px 88px;
+}
+.hv-ms-antenna[data-side="r"] {
+  transform: rotate(var(--antenna-r));
+}
+
+/* The thumb shows on the open, raised mitten only. */
+.hv-ms-thumb {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.hv-mascot[data-expression="waving"] .hv-ms-thumb {
+  opacity: 1;
+}
+
+/* The tips are white, so they carry the mittens' outline to stand on a white
+   page. Amber when something is worth a look, dim when he rests. */
+.hv-ms-tip {
+  fill: #f3f6fc;
+  stroke: #c3cee2;
+  stroke-width: 1.6px;
+  transition:
+    fill 240ms ease,
+    stroke 240ms ease;
+}
+.hv-mascot[data-expression="attention"] .hv-ms-tip {
+  fill: #f6d9a8;
+  stroke: #dfa65e;
+}
+.hv-mascot[data-expression="resting"] .hv-ms-tip {
+  fill: #e3e8f1;
+}
+
+/* ---------- The face ---------- */
+.hv-ms-eye,
+.hv-ms-brow {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.hv-mascot[data-expression="working"] .hv-ms-eye {
+  transform: scaleY(0.65);
+}
+.hv-mascot[data-expression="resting"] .hv-ms-eye {
+  transform: scaleY(0.12);
+}
+.hv-mascot[data-expression="checking"] .hv-ms-gaze {
+  transform: translateX(-4px);
+}
+.hv-mascot[data-expression="checking"] .hv-ms-eye[data-side="l"] {
+  transform: scaleY(0.7);
+}
+.hv-mascot[data-expression="checking"] .hv-ms-brow[data-side="l"] {
+  transform: rotate(-9deg);
+}
+.hv-mascot[data-expression="checking"] .hv-ms-brow[data-side="r"] {
+  transform: rotate(5deg);
+}
+.hv-mascot[data-expression="attention"] .hv-ms-eye[data-side="l"] {
+  transform: rotate(-6deg);
+}
+.hv-mascot[data-expression="attention"] .hv-ms-eye[data-side="r"] {
+  transform: rotate(6deg);
+}
+.hv-mascot[data-expression="attention"] .hv-ms-brow[data-side="l"] {
+  transform: translateY(-4px) rotate(-16deg);
+}
+.hv-mascot[data-expression="attention"] .hv-ms-brow[data-side="r"] {
+  transform: translateY(-4px) rotate(16deg);
+}
+.hv-mascot[data-expression="pointing"] .hv-ms-gaze {
+  transform: translate(8px, 4px);
+}
+.hv-mascot[data-expression="pointing"] .hv-ms-brow {
+  transform: translateY(-3px);
+}
+
+/* ---------- Motion ---------- */
+.hv-ms-blink {
+  transform-origin: 200px 157px;
+  animation: hv-ms-blink 5.7s infinite;
+}
+.hv-mascot[data-expression="resting"] .hv-ms-blink {
+  animation: none;
+}
+@keyframes hv-ms-blink {
+  0%,
+  96%,
+  100% {
+    transform: scaleY(1);
+  }
+  98% {
+    transform: scaleY(0.1);
+  }
+}
+
+.hv-ms-sway {
+  animation: hv-ms-sway 3.2s ease-in-out infinite alternate;
+}
+.hv-ms-antenna[data-side="r"] .hv-ms-sway {
+  animation-delay: -1.1s;
+}
+.hv-mascot[data-expression="checking"] .hv-ms-sway {
+  animation-duration: 1.1s;
+}
+.hv-mascot[data-expression="working"] .hv-ms-sway {
+  animation-duration: 0.9s;
+}
+.hv-mascot[data-expression="attention"] .hv-ms-sway,
+.hv-mascot[data-expression="resting"] .hv-ms-sway {
+  animation: none;
+}
+/* A greeting wiggles them, then they settle. */
+.hv-mascot[data-expression="waving"] .hv-ms-sway {
+  animation:
+    hv-ms-wiggle 0.8s ease-in-out 2,
+    hv-ms-sway 3.2s ease-in-out 1.6s infinite alternate;
+}
+.hv-mascot[data-expression="dancing"] .hv-ms-sway {
+  animation: hv-ms-wiggle 0.65s ease-in-out infinite;
+}
+@keyframes hv-ms-sway {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(2deg);
+  }
+}
+@keyframes hv-ms-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-11deg);
+  }
+  75% {
+    transform: rotate(11deg);
+  }
+}
+
+.hv-mascot:is([data-expression="checking"], [data-expression="working"])
+  .hv-ms-tip {
+  animation: hv-ms-pulse 0.8s ease-in-out infinite alternate;
+}
+.hv-ms-antenna[data-side="r"] .hv-ms-tip {
+  animation-delay: -0.8s;
+}
+@keyframes hv-ms-pulse {
+  to {
+    fill: #a9c4fb;
+    stroke: #86a8f0;
+  }
+}
+
+/* The wave the page greets a visitor with, once for each greeting. */
+.hv-mascot[data-expression="waving"] .hv-ms-arm[data-side="r"] .hv-ms-swing {
+  animation: hv-ms-wave 1.6s ease-in-out 0.3s;
+}
+@keyframes hv-ms-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  17%,
+  50%,
+  83% {
+    transform: rotate(-14deg);
+  }
+  33%,
+  66% {
+    transform: rotate(4deg);
+  }
+}
+/* Tightening something. */
+.hv-mascot[data-expression="working"] .hv-ms-arm[data-side="r"] .hv-ms-swing {
+  animation: hv-ms-turn 0.7s ease-in-out infinite alternate;
+}
+@keyframes hv-ms-turn {
+  from {
+    transform: rotate(-5deg);
+  }
+  to {
+    transform: rotate(7deg);
+  }
+}
+.hv-mascot[data-expression="attention"] .hv-ms-arm[data-side="r"] .hv-ms-swing {
+  animation: hv-ms-peer 2.1s ease-in-out infinite alternate;
+}
+@keyframes hv-ms-peer {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+/* Out first, then one tap down: it lands at 820 ms, with the label. */
+.hv-mascot[data-expression="pointing"] .hv-ms-arm[data-side="r"] .hv-ms-swing {
+  animation: hv-ms-point 820ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+@keyframes hv-ms-point {
+  0% {
+    transform: rotate(12deg);
+  }
+  40%,
+  68% {
+    transform: rotate(-26deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* ---------- Dances ----------
+   Each loop comes back to standing, so a dance can stop on any of them. */
+.hv-mascot[data-dance="shuffle"] .hv-ms-figure {
+  animation: hv-ms-shuffle 1.3s ease-in-out infinite;
+}
+.hv-mascot[data-dance="shuffle"] .hv-ms-arm[data-side="l"] .hv-ms-swing {
+  animation: hv-ms-pop-l 0.65s ease-in-out infinite;
+}
+.hv-mascot[data-dance="shuffle"] .hv-ms-arm[data-side="r"] .hv-ms-swing {
+  animation: hv-ms-pop-r 0.65s ease-in-out infinite;
+}
+@keyframes hv-ms-shuffle {
+  0%,
+  50%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(9px, -4px) rotate(-3deg);
+  }
+  75% {
+    transform: translate(-9px, -4px) rotate(3deg);
+  }
+}
+@keyframes hv-ms-pop-l {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(58deg);
+  }
+}
+@keyframes hv-ms-pop-r {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-56deg);
+  }
+}
+
+/* Sharp moves and holds make the robot mechanical. */
+.hv-mascot[data-dance="robot"] .hv-ms-figure {
+  animation: hv-ms-robot 2.6s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+.hv-mascot[data-dance="robot"] .hv-ms-arm[data-side="l"] .hv-ms-swing {
+  animation: hv-ms-robot-l 2.6s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+.hv-mascot[data-dance="robot"] .hv-ms-arm[data-side="r"] .hv-ms-swing {
+  animation: hv-ms-robot-r 2.6s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+@keyframes hv-ms-robot {
+  0%,
+  27%,
+  47%,
+  77%,
+  100% {
+    transform: rotate(0deg);
+  }
+  5%,
+  22% {
+    transform: rotate(-4deg);
+  }
+  52%,
+  72% {
+    transform: rotate(4deg);
+  }
+}
+@keyframes hv-ms-robot-l {
+  0%,
+  52%,
+  72%,
+  100% {
+    transform: rotate(0deg);
+  }
+  5%,
+  22% {
+    transform: rotate(96deg);
+  }
+  27%,
+  47%,
+  77%,
+  95% {
+    transform: rotate(62deg);
+  }
+}
+@keyframes hv-ms-robot-r {
+  0%,
+  5%,
+  22%,
+  100% {
+    transform: rotate(0deg);
+  }
+  27%,
+  47%,
+  77%,
+  95% {
+    transform: rotate(-56deg);
+  }
+  52%,
+  72% {
+    transform: rotate(-92deg);
+  }
+}
+
+/* Both hands sweep to one side while the hips go to the other. */
+.hv-mascot[data-dance="floss"] .hv-ms-figure {
+  animation: hv-ms-floss 1.3s ease-in-out infinite;
+}
+.hv-mascot[data-dance="floss"] .hv-ms-arm[data-side="l"] .hv-ms-swing {
+  animation: hv-ms-floss-l 1.3s ease-in-out infinite;
+}
+.hv-mascot[data-dance="floss"] .hv-ms-arm[data-side="r"] .hv-ms-swing {
+  animation: hv-ms-floss-r 1.3s ease-in-out infinite;
+}
+@keyframes hv-ms-floss {
+  0%,
+  50%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-10px) rotate(2deg);
+  }
+  75% {
+    transform: translateX(10px) rotate(-2deg);
+  }
+}
+@keyframes hv-ms-floss-l {
+  0%,
+  50%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-44deg);
+  }
+  75% {
+    transform: rotate(46deg);
+  }
+}
+@keyframes hv-ms-floss-r {
+  0%,
+  50%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-42deg);
+  }
+  75% {
+    transform: rotate(48deg);
+  }
+}
+
+/* The two tricks step back first, so he stays inside his box. */
+.hv-mascot[data-dance="cartwheel"] .hv-ms-figure {
+  transform-origin: 200px 180px;
+  animation: hv-ms-cartwheel 2.6s ease-in-out;
+}
+.hv-mascot:is([data-dance="cartwheel"], [data-dance="backflip"])
+  .hv-ms-arm[data-side="l"]
+  .hv-ms-swing {
+  animation: hv-ms-spread-l 2.6s ease-in-out;
+}
+.hv-mascot:is([data-dance="cartwheel"], [data-dance="backflip"])
+  .hv-ms-arm[data-side="r"]
+  .hv-ms-swing {
+  animation: hv-ms-spread-r 2.6s ease-in-out;
+}
+@keyframes hv-ms-cartwheel {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  12% {
+    transform: translate(26px, 27px) rotate(6deg) scale(0.8);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  50% {
+    transform: translate(0, 10px) rotate(-180deg) scale(0.74);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  88% {
+    transform: translate(-26px, 27px) rotate(-366deg) scale(0.8);
+  }
+  100% {
+    transform: translate(0, 0) rotate(-360deg) scale(1);
+  }
+}
+@keyframes hv-ms-spread-l {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  14%,
+  86% {
+    transform: rotate(66deg);
+  }
+}
+@keyframes hv-ms-spread-r {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  14%,
+  86% {
+    transform: rotate(-58deg);
+  }
+}
+/* From the front a backflip is a card turning over in the air. */
+.hv-mascot[data-dance="backflip"] .hv-ms-figure {
+  transform-origin: 200px 190px;
+  animation: hv-ms-backflip 2.6s ease-in-out;
+}
+@keyframes hv-ms-backflip {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+  14% {
+    transform: translateY(13px) scale(1.04, 0.9);
+  }
+  24% {
+    transform: translateY(-34px) scale(0.84, 0.84);
+    animation-timing-function: linear;
+  }
+  37% {
+    transform: translateY(-64px) scale(0.84, 0);
+    animation-timing-function: linear;
+  }
+  50% {
+    transform: translateY(-74px) scale(0.84, -0.84);
+    animation-timing-function: linear;
+  }
+  63% {
+    transform: translateY(-64px) scale(0.84, 0);
+    animation-timing-function: linear;
+  }
+  76% {
+    transform: translateY(-30px) scale(0.84, 0.84);
+  }
+  86% {
+    transform: translateY(10px) scale(1.04, 0.92);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+.hv-mascot:is([data-dance="cartwheel"], [data-dance="backflip"]) .hv-ms-shadow {
+  transform-origin: 206px 318px;
+  animation: hv-ms-air 2.6s ease-in-out;
+}
+@keyframes hv-ms-air {
+  0%,
+  14%,
+  86%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.6);
+  }
+}
+
+/* Paused, or asked for less motion: every mood keeps its pose and nothing
+   moves. */
+.hv-mascot[data-still] * {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hv-mascot * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

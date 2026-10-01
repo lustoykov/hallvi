@@ -6,10 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import dynamic from "next/dynamic";
-
 import { api } from "./api";
 import s from "./applications.module.css";
+import { Mascot } from "./mascot";
 import w from "./welcome.module.css";
 import { WelcomeSteps } from "./welcome-steps";
 
@@ -23,14 +22,6 @@ const CHATTER = [
   "Click me. I dance.",
 ];
 const DANCES = ["shuffle", "robot", "floss", "cartwheel", "backflip"] as const;
-
-const Mascot = dynamic(
-  () => import("./home/mascot-scene").then((m) => m.MascotScene),
-  {
-    ssr: false,
-    loading: () => <div className={w.mascotPlaceholder} aria-hidden="true" />,
-  },
-);
 
 export function NewApplicationScreen({
   githubLogin = null,
@@ -192,7 +183,6 @@ export function NewApplicationScreen({
                 onClick={() => setDances((count) => count + 1)}
               >
                 <Mascot
-                  color="#7a8bd6"
                   mood={mood}
                   ambient={idle}
                   dance={DANCES[dances % DANCES.length]}
