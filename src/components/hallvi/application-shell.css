@@ -6,14 +6,6 @@
   height: 100dvh;
   grid-template-columns: 224px minmax(0, 1fr);
   grid-template-rows: 56px minmax(0, 1fr);
-  /* The column is recessed in a faint tint of the action blue, and the
-     workspace rests on it as a sheet. Every shadow in the shell is this one
-     blue-navy, so depth reads as one light. */
-  --nav-top: #e9eef9;
-  --nav-bottom: #e1e8f6;
-  --nav-groove: #d2dbee;
-  --nav-text: #344363;
-  --shade: 28 52 110;
   /* What is selected in the column is lifted off it. */
   --raise:
     0 0 0 1px rgb(var(--shade) / 7%), 0 1px 1px rgb(var(--shade) / 6%),
@@ -21,6 +13,8 @@
   /* A card resting on the sheet: its hairline border, plus a short shadow. */
   --lift:
     0 1px 1px rgb(var(--shade) / 4%), 0 4px 12px -4px rgb(var(--shade) / 10%);
+  /* The column is recessed in the frame's tint (globals.css), and the
+     workspace rests on it as a sheet. */
   background: linear-gradient(180deg, var(--nav-top), var(--nav-bottom));
 }
 .hv-adaptive-shell [hidden] {

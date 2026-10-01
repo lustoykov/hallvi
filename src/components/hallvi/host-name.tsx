@@ -102,32 +102,33 @@ export function HostTitle() {
   return null;
 }
 
-/** The chip in the top strip of a checkout; nothing in an installation. */
-export function DevelopmentLabel() {
-  const { development } = useThisHallvi();
-  if (!development) return null;
+/**
+ * Which Hallvi this is, at the end of the top strip: the computer serving it,
+ * including when opened through an SSH tunnel, and that it is a checkout when
+ * it is one. Which checkout stays in the tab title and the tooltip; on the
+ * page, "Dev · some-folder" read as a riddle.
+ */
+export function HostLabel() {
+  const { name, development } = useThisHallvi();
+  if (!name) return null;
+  if (!development)
+    return (
+      <span className="hv-host-label" title={`Hallvi runs on ${name}`}>
+        Running on <b>{name}</b>
+      </span>
+    );
   const { checkout, application } = development;
   return (
     <span
-      className="hv-development-label"
+      className="hv-host-label"
       title={
         application
           ? `Development checkout ${checkout}, attached to the retained application ${application}. Not the installed Hallvi.`
           : `Development checkout ${checkout}. Not the installed Hallvi.`
       }
     >
-      Dev · {application ?? checkout}
-    </span>
-  );
-}
-
-/** The computer serving Hallvi, including when opened through an SSH tunnel. */
-export function HostLabel() {
-  const { name } = useThisHallvi();
-  if (!name) return null;
-  return (
-    <span className="hv-host-label" title={`Hallvi runs on ${name}`}>
-      Running on {name}
+      <span className="hv-development-label">Development checkout</span> on{" "}
+      <b>{name}</b>
     </span>
   );
 }
