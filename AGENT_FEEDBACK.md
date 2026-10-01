@@ -16,7 +16,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
-| [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
+| [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
 | [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 4 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
@@ -423,6 +423,14 @@ removed. Keep server-side reachability evidence separate from client browser
 acceptance when describing a usable private link.
 
 **+1:** 2026-09-30 — remaining browser acceptance diagnosis, codex/remaining-acceptance-verification
+
+**+1:** 2026-10-01 — application QA and alpha.14 release acceptance,
+`codex/application-qa-release`: the installed controller opened and reconnected
+its own SSH route with HTTP 200, while the in-app browser refused the forwarded
+address with `ERR_BLOCKED_BY_CLIENT`. No browser protection was bypassed. A
+separate public-address TCP probe connected while HTTP timed out with no bytes;
+keep those observations distinct from an application-level response. The
+isolated deployment and its access resources were removed after verification.
 
 ### AF-022 — Send one review's findings to one branch
 
