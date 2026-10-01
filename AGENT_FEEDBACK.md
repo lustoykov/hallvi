@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 4 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 5 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -39,8 +39,40 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 1 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 1 | New |
+| [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-070 — Land a message link in a long conversation
+
+A link to a message (`?message=`) scrolled to its target and was then carried
+to the end: the conversation keeps to its latest message as it grows and was
+never told the reader had been taken somewhere. On a 160-message synthetic
+conversation `?message=reply:40` was not on screen at 0.3, 0.7, 1.5 or 3
+seconds after loading. A repeated record's `#record-` anchor after a reload
+and Overview's "open the conversation at this reply" scroll the same way and
+were given the same fix without being measured separately. The fix tells the
+conversation the reader was taken somewhere; the long-history journey checks
+the message link.
+
+**+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
+
+### AF-069 — Carry a long conversation to the page once, and less of it
+
+Opening an application still moves its whole conversation twice: once in the
+page and again as the stream's first frame, which is sent uncompressed
+(`no-transform`). With 2,000 synthetic calls that is 19 MB each time; the
+browser spends about 200 ms taking the frame in although nothing in it is
+drawn again, and the server builds the conversation twice (about 140 ms
+each). Over a tunnel to a remote controller the second copy is the larger
+half of the wait. About 96% of those bytes are command output and call
+results behind disclosures that open closed. Two directions, neither built:
+start the stream from the state the page was drawn from, so the first frame
+is a difference; and send what a closed row shows, fetching a call's output
+when it is opened.
+
+**+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
 
 ### AF-068 — Remove the mascot placements nothing draws
 
@@ -520,6 +552,16 @@ itself.
 `codex/application-qa-release`: the wider browser pass reproduced stale
 Processes and Storage assertions. This task updates those checks and the
 private-application lookup so their results exercise the current product.
+
+**+1:** 2026-10-01 — opening a long conversation,
+`claude/app-open-performance`: two failures in the whole suite had to be run
+again on main to be told from this change's. On main at `cac3e2f5`,
+`change-notifications.spec.ts` (line 61) counts two worker subscriptions
+where it expects one; it passed at `bc4e2c12`. `settings-account-recovery`
+passes alone and fails when `onboarding-first-app` runs before it: both ask
+for a fresh, isolated fixture and get the same one, with a model already
+connected. `interactions.spec.ts` and `secrets.spec.ts` fail at once unless
+a scenario server is already listening on 3410.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
