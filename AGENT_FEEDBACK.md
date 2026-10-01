@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 2 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 3 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -436,6 +436,14 @@ separate old breakage from a new change's.
 `applications.spec.ts` P1-10 stalls on the synthetic reply ("Writing the
 reply") before it reaches Settings, and `controller-protection.spec.ts` looks
 for Backups, which now sits behind "Show more" in the application sidebar.
+**+1:** 2026-10-01 — Overview visitors first (`claude/overview-visitors-first`):
+telling this change's failures from old ones took a second 28-minute run of the
+whole suite against main. On main at `4c1e2b17`, five journeys fail.
+`applications.spec.ts` P1-07 still finds "QA simulated provider failure." in
+the conversation. `controller-protection.spec.ts` and
+`experience-continuity.spec.ts` both wait for Backups behind "Show more". With
+a scenario server up, `record-journeys.spec.ts` no longer finds "not answering"
+on Processes or "did not survive a replacement" on Storage.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
