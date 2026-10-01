@@ -189,6 +189,10 @@ Install Chromium with `npx playwright install chromium`. Browser fixtures run on
 
 For a concurrent worktree, set `HALLVI_E2E_PORT` to a free port from **3100 to
 3999**; the fixture rejects ports outside that range before starting a test.
+Each worker listens one port above the last, and Playwright starts another
+worker after every failed test and for each set of fixture options, so leave
+room above the base. A whole-suite run started at 3980 reached 4000 and failed
+its last journeys on the port alone.
 
 **Learn Hallvi** (`/learn`) is the dashboard's architecture map and learning
 queue. A separate daily Codex task reviews merged `main` and publishes an
