@@ -10,6 +10,8 @@ Connect real saved records and execution evidence to the accepted reference desi
 
 Keep the scope on the views and interactions needed by that journey. Medium and more complicated applications and broader ongoing care follow this UI/UX checkpoint. Broad security hardening is deferred until after beta; during beta, communicate current risks and practical precautions without turning this into a new architecture project.
 
+The 1 October normal-use QA merged four reproduced reliability repairs: saved application names in [#319](https://github.com/lustoykov/hallvi/pull/319), Stop after expired model login and delayed-response conversation ordering in [#318](https://github.com/lustoykov/hallvi/pull/318), and forgotten Traffic figures in [#320](https://github.com/lustoykov/hallvi/pull/320). They form the alpha.14 release candidate. Local browser and source checks establish those repairs; publication, native installation and the owner’s installed-controller acceptance are separate release steps.
+
 ## Private Codex and ChatGPT plugin proof of concept
 
 **Implemented in [#283](https://github.com/lustoykov/hallvi/pull/283) and

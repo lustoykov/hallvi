@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 1 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 1 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 3 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 4 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -35,33 +35,33 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
 | [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
-| [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Fix in review |
-| [AF-061 — Cancel interrupted work without a model login](#af-061--cancel-interrupted-work-without-a-model-login) | 1 | Fix in review |
-| [AF-064 — Keep completed streamed replies when an older view arrives](#af-064--keep-completed-streamed-replies-when-an-older-view-arrives) | 1 | Fix in review |
-| [AF-062 — Drop loaded traffic totals after Forget](#af-062--drop-loaded-traffic-totals-after-forget) | 1 | Fix in review |
+| [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 1 | Guidance added |
+| [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
-### AF-062 — Drop loaded traffic totals after Forget
+### AF-065 — Show a failed recovery-kit read
 
-Forget deletes stored totals, but the Traffic page retains its loaded snapshot.
-Keep history again with an interrupted history read and it still displays the
-deleted views and pages, even though the real history route returns zero.
-Drop the loaded snapshot when history is forgotten; stopping collection must
-still preserve stored totals.
+The Backups disclosure silently drops a failed recovery-kit GET and can stay
+on “Reading the kit…” with “I saved it” disabled. Closing and reopening retries;
+Settings already reports the error and leaves Show recovery kit available.
+This is a source-review observation in `controller-protection.tsx`, not a
+reproduced browser blocker in this task. Give the disclosure an explicit error
+and retry when improving this recovery path.
 
-**+1:** 2026-10-01 — data and traffic QA, `codex/qa-traffic-data`.
+**+1:** 2026-10-01 — application QA and release,
+`codex/application-qa-release`.
 
-### AF-060 — Keep named applications distinct in the switcher
+### AF-063 — Stagger browser fixtures on a shared development machine
 
-Two deployments of one repository can be renamed independently, but the
-application switcher discarded their saved names and listed both under the
-repository name. The current application's label was correct, making the
-menu inconsistent at the point where the owner chooses an operational target.
-Pass the saved name into the existing switcher and check switching between
-the named deployments with separate drafts and a refresh.
+Running several agents' Next.js fixtures and scenario servers simultaneously
+on this 24 GB Mac exhausted available memory (14 GB compressed, load average
+35). Fixture route warm-up timed out before assertions, obscuring product
+failures. The verification guide now calls for coordinating browser/build work
+on memory-limited hosts and rerunning affected checks after scoped cleanup.
 
-**+1:** 2026-10-01 — normal-process QA, `codex/qa-browser-flows`.
+**+1:** 2026-10-01 — application QA and release,
+`codex/application-qa-release`.
 
 ### AF-054 — Check traffic assets after installation
 
@@ -217,29 +217,6 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
-
-### AF-064 — Keep completed streamed replies when an older view arrives
-
-An action fetched a running conversation view, the stream completed the reply,
-and the delayed HTTP response replaced it with the old partial reply and
-“Send next”. A deterministic browser test holds the actual running response
-until after SSE completion and reproduces the regression. Action views should
-preserve stream state that advanced during the request for the same application
-and conversation, while still applying newer HTTP state when the stream is quiet.
-
-**Status:** Fix in review (`codex/qa-operator-core`).
-
-### AF-061 — Cancel interrupted work without a model login
-
-After a worker restart, Stop reopened the full Pi runtime and refused to cancel
-an interrupted conversation when its model login had expired. Stopping stored
-work and dropping an unread queue should require only the local Pi session.
-The fix in this QA branch uses Pi's cancellation API with a credential-free
-catalog and no tools; active Stop still aborts the running session.
-
-**Status:** Fix in review (`codex/qa-operator-core`).
-
-**+1:** 2026-10-01 — Normal application QA (`codex/qa-operator-core`)
 
 ### AF-040 — Say whether a Pi upgrade keeps the shared login readable
 
@@ -507,6 +484,11 @@ access journeys never run at all: their lookup takes `/applications/new` for
 the first application and skips, the fault `interactions.spec.ts` fixed for
 itself.
 
+**+1:** 2026-10-01 — application QA and release,
+`codex/application-qa-release`: the wider browser pass reproduced stale
+Processes and Storage assertions. This task updates those checks and the
+private-application lookup so their results exercise the current product.
+
 ### AF-033 — Refuse a second preview before attaching retained state
 
 Attaching a retained application from a checkout that already serves a
@@ -607,6 +589,10 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-062 — Drop loaded traffic totals after Forget](#af-062--drop-loaded-traffic-totals-after-forget) | 1 | Resolved in #320 |
+| [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Resolved in #319 |
+| [AF-061 — Cancel interrupted work without a model login](#af-061--cancel-interrupted-work-without-a-model-login) | 1 | Resolved in #318 |
+| [AF-064 — Keep completed streamed replies when an older view arrives](#af-064--keep-completed-streamed-replies-when-an-older-view-arrives) | 1 | Resolved in #318 |
 | [AF-055 — Make Overview labels and space serve the summary](#af-055--make-overview-labels-and-space-serve-the-summary) | 2 | Resolved in #317 |
 | [AF-037 — Close setup requests handled in conversation](#af-037--close-setup-requests-handled-in-conversation) | 2 | Resolved in #295 and #313 |
 | [AF-029 — Keep Traffic database waits off the event loop](#af-029--keep-traffic-database-waits-off-the-event-loop) | 1 | Resolved in #310 |
@@ -630,6 +616,55 @@ limit from the account balance; the request error now names both possibilities.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-062 — Drop loaded traffic totals after Forget
+
+**Status:** Resolved in [#320](https://github.com/lustoykov/hallvi/pull/320).
+
+Forget deletes stored totals, but the Traffic page retains its loaded snapshot.
+Keep history again with an interrupted history read and it still displays the
+deleted views and pages, even though the real history route returns zero.
+Drop the loaded snapshot when history is forgotten; stopping collection must
+still preserve stored totals.
+
+**+1:** 2026-10-01 — data and traffic QA, `codex/qa-traffic-data`.
+
+
+### AF-060 — Keep named applications distinct in the switcher
+
+**Status:** Resolved in [#319](https://github.com/lustoykov/hallvi/pull/319).
+
+Two deployments of one repository can be renamed independently, but the
+application switcher discarded their saved names and listed both under the
+repository name. The current application's label was correct, making the
+menu inconsistent at the point where the owner chooses an operational target.
+Pass the saved name into the existing switcher and check switching between
+the named deployments with separate drafts and a refresh.
+
+**+1:** 2026-10-01 — normal-process QA, `codex/qa-browser-flows`.
+
+### AF-061 — Cancel interrupted work without a model login
+
+**Status:** Resolved in [#318](https://github.com/lustoykov/hallvi/pull/318).
+
+After a worker restart, Stop reopened the full Pi runtime and refused to cancel
+an interrupted conversation when its model login had expired. Stopping stored
+work and dropping an unread queue should require only the local Pi session.
+The fix in this QA branch uses Pi's cancellation API with a credential-free
+catalog and no tools; active Stop still aborts the running session.
+
+**+1:** 2026-10-01 — Normal application QA (`codex/qa-operator-core`)
+
+### AF-064 — Keep completed streamed replies when an older view arrives
+
+**Status:** Resolved in [#318](https://github.com/lustoykov/hallvi/pull/318).
+
+An action fetched a running conversation view, the stream completed the reply,
+and the delayed HTTP response replaced it with the old partial reply and
+“Send next”. A deterministic browser test holds the actual running response
+until after SSE completion and reproduces the regression. Action views should
+preserve stream state that advanced during the request for the same application
+and conversation, while still applying newer HTTP state when the stream is quiet.
 
 ### AF-037 — Close setup requests handled in conversation
 

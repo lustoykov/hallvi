@@ -4,6 +4,16 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.14 — 1 October 2026
+
+Keep completed replies visible, choose the right application and stop interrupted work even when the model connection needs renewing.
+
+- **Distinct application names.** The application switcher shows each saved name, so two deployments of the same repository stay distinguishable. Switching and reloading keep each conversation's draft with its own application.
+- **Stop without signing in again.** After a worker restart, Stop can cancel interrupted work and unread queued messages even if the model login has expired. It does not start model calls or server commands.
+- **Replies stay complete.** A delayed page response can no longer replace a completed live reply with an older partial reply or leave the conversation looking busy.
+- **Forgotten traffic stays forgotten on screen.** Forget clears the page's saved chart as well as the stored totals, so restarting collection cannot bring deleted figures back when the next read fails.
+- **Overview starts with visitors.** Deployed applications show recorded visitor traffic first, followed by response time, server errors, server load and the running release. Unknown facts remain explicit.
+
 ## 0.1.1-alpha.13 — 1 October 2026
 
 Install the traffic script reliably, use it without a mandatory banner, and keep Hallvi's operator and plugin easier to follow.

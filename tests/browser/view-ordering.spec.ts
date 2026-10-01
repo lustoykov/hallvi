@@ -5,7 +5,7 @@ import type { OperatorView } from "../../src/server/types";
 
 test("a delayed action view cannot replace a reply already completed by the stream", async ({
   page,
-}) => {
+}, testInfo) => {
   const created = await page.request.post("/api/applications", {
     data: {
       requestKey: randomUUID(),
@@ -69,6 +69,10 @@ test("a delayed action view cannot replace a reply already completed by the stre
         exact: true,
       }),
     ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("completed-reply-after-delayed-view.png"),
+      fullPage: true,
+    });
     await page.unroute(`**${endpoint}?chat=${chatId}`);
     await page
       .getByRole("button", { name: "New conversation", exact: true })
