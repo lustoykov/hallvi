@@ -4,6 +4,15 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.16 — 1 October 2026
+
+Open an application with a long conversation without waiting, under a quieter alpha strip.
+
+- **Long conversations open on their latest messages.** The newest messages are in place as the page appears, and earlier ones are drawn above them without moving what you are reading. Hallvi no longer draws the whole conversation first and then travels to its end.
+- **Typing and live replies stay quick.** A message is redrawn only when it changes, so a keystroke, a streamed word or the clock no longer redraws the whole conversation.
+- **Links stay where they take you.** A link to a message or record opens on it, and the conversation no longer carries you back to its end.
+- **A calmer alpha strip.** The notice at the top is now part of the frame: the navigation column's own tint, a small Alpha tag and "Running on" your machine's name, in a thinner strip instead of an amber band. In a narrow window the sentence folds before the machine's name is cut.
+
 ## 0.1.1-alpha.15 — 1 October 2026
 
 Meet the same Hallvi in the product as on hallvi.com: its mascot is now one flat drawing everywhere.
