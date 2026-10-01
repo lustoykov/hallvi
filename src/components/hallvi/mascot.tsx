@@ -90,6 +90,105 @@ function mouthOf(expression: Expression) {
   return MOUTH.smile;
 }
 
+// What he holds. Tools are drawn upright in the raised mitten's own frame;
+// the mug and the clipboard sit in the other hand, where the banners put
+// the mug.
+
+function Wrench() {
+  return (
+    <g stroke={DARK} strokeLinecap="round" fill="none">
+      <path d="M326 168V112" strokeWidth="10" />
+      <path d="M334 86.5A14 14 0 1 1 318 86.5" strokeWidth="10" />
+    </g>
+  );
+}
+
+function Magnifier() {
+  return (
+    <g stroke={DARK} strokeLinecap="round">
+      <path d="M326 168V127" strokeWidth="9" />
+      <circle
+        cx="326"
+        cy="108"
+        r="16"
+        fill="#dfe8fb"
+        fillOpacity=".75"
+        strokeWidth="6.5"
+      />
+      <path
+        d="M317 105a10 10 0 0 1 6.5-6.5"
+        stroke="#fff"
+        strokeWidth="2.6"
+        fill="none"
+      />
+    </g>
+  );
+}
+
+function Mug() {
+  return (
+    <>
+      <path
+        d="M36 222q-13 0-13 11.5t13 11.5"
+        stroke={LINE}
+        strokeWidth="7.5"
+        fill="none"
+      />
+      <path
+        d="M36 222q-13 0-13 11.5t13 11.5"
+        stroke={PAPER}
+        strokeWidth="4"
+        fill="none"
+      />
+      <rect
+        x="36"
+        y="212"
+        width="38"
+        height="42"
+        rx="7"
+        fill={PAPER}
+        stroke={LINE}
+        strokeWidth="1.6"
+      />
+      <path
+        d="M49 226l-5 5 5 5M61 226l5 5-5 5M57.5 223.5l-5 15"
+        stroke={ACCENT}
+        strokeWidth="2.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <ellipse
+        cx="55"
+        cy="213.5"
+        rx="19"
+        ry="5.2"
+        fill={PAPER}
+        stroke={LINE}
+        strokeWidth="1.4"
+      />
+      <ellipse cx="55" cy="214.2" rx="15" ry="3.4" fill="#5a3a22" />
+    </>
+  );
+}
+
+function Clipboard() {
+  return (
+    <g transform="rotate(-7 50 219)">
+      <rect x="23" y="184" width="54" height="70" rx="7" fill={DARK} />
+      <rect x="28" y="192" width="44" height="56" rx="3.5" fill={PAPER} />
+      <rect x="40" y="180" width="20" height="10" rx="3.5" fill="#8c9fb9" />
+      <path d="M34 205h6M34 219h6M34 233h6" stroke={ACCENT} strokeWidth="6" />
+      <path
+        d="M46 205h20M46 219h20M46 233h20"
+        stroke={LINE}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </g>
+  );
+}
+
 export function Mascot({
   color,
   mood = "ready",
@@ -233,7 +332,7 @@ export function Mascot({
           ))}
           <rect x="138" y="82" width="26" height="10" rx="3.5" fill={DARK} />
           <rect x="236" y="82" width="26" height="10" rx="3.5" fill={DARK} />
-          <g className="hv-ms-feet" fill="#2e3950">
+          <g fill="#2e3950">
             <rect x="124" y="300" width="42" height="16" rx="6" />
             <rect x="234" y="300" width="42" height="16" rx="6" />
           </g>
@@ -249,34 +348,8 @@ export function Mascot({
               />
               <g className="hv-ms-hand" data-side="r">
                 <g transform="rotate(18 326 164)">
-                  {expression === "working" && (
-                    <g stroke={DARK} strokeLinecap="round" fill="none">
-                      <path d="M326 168V112" strokeWidth="10" />
-                      <path
-                        d="M334 86.5A14 14 0 1 1 318 86.5"
-                        strokeWidth="10"
-                      />
-                    </g>
-                  )}
-                  {expression === "attention" && (
-                    <g stroke={DARK} strokeLinecap="round">
-                      <path d="M326 168V127" strokeWidth="9" />
-                      <circle
-                        cx="326"
-                        cy="108"
-                        r="16"
-                        fill="#dfe8fb"
-                        fillOpacity=".75"
-                        strokeWidth="6.5"
-                      />
-                      <path
-                        d="M317 105a10 10 0 0 1 6.5-6.5"
-                        stroke="#fff"
-                        strokeWidth="2.6"
-                        fill="none"
-                      />
-                    </g>
-                  )}
+                  {expression === "working" && <Wrench />}
+                  {expression === "attention" && <Magnifier />}
                   {expression === "pointing" && (
                     <rect
                       x="321.5"
@@ -339,7 +412,6 @@ export function Mascot({
           />
           <path d="M118 122h34l-22 86h-12z" fill="#fff" opacity=".04" />
           <g
-            className="hv-ms-face"
             stroke={FACE}
             strokeWidth="5"
             strokeLinecap="round"
@@ -408,95 +480,8 @@ export function Mascot({
                 transform="rotate(28 100 190)"
               />
               <g className="hv-ms-hand" data-side="l">
-                {mug && (
-                  <>
-                    <path
-                      d="M36 222q-13 0-13 11.5t13 11.5"
-                      stroke={LINE}
-                      strokeWidth="7.5"
-                      fill="none"
-                    />
-                    <path
-                      d="M36 222q-13 0-13 11.5t13 11.5"
-                      stroke={PAPER}
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <rect
-                      x="36"
-                      y="212"
-                      width="38"
-                      height="42"
-                      rx="7"
-                      fill={PAPER}
-                      stroke={LINE}
-                      strokeWidth="1.6"
-                    />
-                    <path
-                      d="M49 226l-5 5 5 5M61 226l5 5-5 5M57.5 223.5l-5 15"
-                      stroke={ACCENT}
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                    <ellipse
-                      cx="55"
-                      cy="213.5"
-                      rx="19"
-                      ry="5.2"
-                      fill={PAPER}
-                      stroke={LINE}
-                      strokeWidth="1.4"
-                    />
-                    <ellipse
-                      cx="55"
-                      cy="214.2"
-                      rx="15"
-                      ry="3.4"
-                      fill="#5a3a22"
-                    />
-                  </>
-                )}
-                {expression === "checking" && (
-                  <g transform="rotate(-7 50 219) translate(3 0)">
-                    <rect
-                      x="20"
-                      y="184"
-                      width="54"
-                      height="70"
-                      rx="7"
-                      fill={DARK}
-                    />
-                    <rect
-                      x="25"
-                      y="192"
-                      width="44"
-                      height="56"
-                      rx="3.5"
-                      fill={PAPER}
-                    />
-                    <rect
-                      x="37"
-                      y="180"
-                      width="20"
-                      height="10"
-                      rx="3.5"
-                      fill="#8c9fb9"
-                    />
-                    <path
-                      d="M31 205h6M31 219h6M31 233h6"
-                      stroke={ACCENT}
-                      strokeWidth="6"
-                    />
-                    <path
-                      d="M43 205h20M43 219h20M43 233h20"
-                      stroke={LINE}
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                    />
-                  </g>
-                )}
+                {mug && <Mug />}
+                {expression === "checking" && <Clipboard />}
                 <rect
                   x="66"
                   y="216"
