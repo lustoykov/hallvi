@@ -1,4 +1,5 @@
 import {
+  AgentHarness,
   BACKGROUND_CONTEXT,
   JsonlSessionRepo,
   laneState,
@@ -11,6 +12,11 @@ import {
   type OperationResultRecord,
   type Session,
 } from "@earendil-works/pi-agent-core";
+import {
+  createPiCatalog,
+  defaultPiSelection,
+  loadPiSdk,
+} from "./pi-configuration";
 import { operationResults } from "./pi-transcript";
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import {
@@ -188,6 +194,48 @@ export async function openNativeChatSession(
 /** Remove every history an application has. */
 export function removeNativeSessions(applicationId: string) {
   rmSync(applicationDirectory(applicationId), { recursive: true, force: true });
+}
+
+/** Cancel stored work without credentials, a workspace, or executable tools. */
+export async function stopNativeConversation(
+  applicationId: string,
+  chatId: string,
+) {
+  const native = await openNativeChatSession(applicationId, chatId);
+  const ctx = BACKGROUND_CONTEXT;
+  let harness: AgentHarness | undefined;
+  try {
+    const models = await createPiCatalog(await loadPiSdk());
+    const model = models.getModel(
+      defaultPiSelection.providerId,
+      defaultPiSelection.modelId,
+    );
+    if (!model)
+      throw new Error("Pi's default model is missing from its catalog.");
+    // Pi restores the lane's existing configuration. This catalog model only
+    // seeds absent lanes; abort and cancelQueued never call the provider.
+    harness = (
+      await AgentHarness.create({ session: native.session, models, model }, ctx)
+    ).harness;
+    const lane = await harness.lane(LANE, ctx);
+    if ((await lane.inspectExecution(ctx)).current) {
+      const stopped = await lane.abort(ctx);
+      if (!stopped.ok) throw new Error(stopped.error.message);
+    }
+    const watch = await lane.watch(ctx);
+    const queued = watch.snapshot.queues;
+    watch.unsubscribe();
+    for (const item of queued) {
+      const cancelled = await lane.cancelQueued(item.entryId, ctx);
+      if (!cancelled.ok) throw new Error(cancelled.error.message);
+    }
+  } finally {
+    try {
+      await harness?.close(ctx);
+    } finally {
+      await native.release();
+    }
+  }
 }
 
 /**

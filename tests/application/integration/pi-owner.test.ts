@@ -1,4 +1,7 @@
-import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/pi-agent-core";
+import {
+  BACKGROUND_CONTEXT as ctx,
+  laneConfig,
+} from "@earendil-works/pi-agent-core";
 import {
   createAssistantMessageEventStream,
   InMemoryCredentialStore,
@@ -109,6 +112,7 @@ import {
   saveOperatorSettings,
 } from "../../../src/server/operator-execution";
 import { openPiSession } from "../../../src/server/pi";
+import { openNativeChatSession } from "../../../src/server/pi-sessions";
 import { ownSessions } from "../../../src/server/pi-owner";
 import { MESSAGE_TAG } from "../../../src/server/pi-transcript";
 import {
@@ -903,7 +907,7 @@ it("after a restart nothing runs; history and evidence stay; Continue carries on
   });
 });
 
-it("after a restart Stop is there with nothing queued, and ends what Pi held", async () => {
+it("after a restart Stop ends what Pi held even when the model login has expired", async () => {
   const a = await application("shop");
   await a.send("[approve] restart it");
   await until(async () => expect(await approval(a.id)).toBeTruthy());
@@ -911,15 +915,41 @@ it("after a restart Stop is there with nothing queued, and ends what Pi held", a
   await startWorker();
   expect(await a.status()).toBe("interrupted");
 
+  synthetic.authFails = true;
   await a.stop();
   expect(await a.status()).toBe("idle");
   expect((await a.transcript()).at(-1)).toBe(
     "pi [cancelled] I will ask first.",
   );
   expect(requests).toEqual(["[approve] restart it"]);
+  synthetic.authFails = false;
   await a.send("hello");
   await until(async () => expect(await a.status()).toBe("idle"));
   expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: hello");
+});
+
+it("Stop drops an idle lane's unread queue without a model login", async () => {
+  const a = await application("shop");
+  const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
+  const model = (await direct.lane.inspectExecution(ctx)).configuredModel;
+  const queued = await direct.lane.followUp("unread work", undefined, ctx);
+  expect(queued.ok).toBe(true);
+  await direct.close();
+
+  synthetic.authFails = true;
+  expect(await a.status()).toBe("interrupted");
+  await a.stop();
+  expect(await a.status()).toBe("idle");
+  expect(await a.transcript()).toEqual([]);
+  expect(requests).toEqual([]);
+  const native = await openNativeChatSession(a.id, a.chat);
+  try {
+    expect(
+      (await native.session.getValue(laneConfig("main"), ctx))?.value.model,
+    ).toEqual(model);
+  } finally {
+    await native.release();
+  }
 });
 
 it("a message Pi queued on an idle lane is read from Pi's queue, once, when its owner continues", async () => {

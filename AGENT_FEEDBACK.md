@@ -35,6 +35,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
 | [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
+| [AF-061 — Cancel interrupted work without a model login](#af-061--cancel-interrupted-work-without-a-model-login) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
 
@@ -192,6 +193,18 @@ to revisit one, add your feedback and flag it for the owner rather than
 changing their decision.
 
 ## Requests
+
+### AF-061 — Cancel interrupted work without a model login
+
+After a worker restart, Stop reopened the full Pi runtime and refused to cancel
+an interrupted conversation when its model login had expired. Stopping stored
+work and dropping an unread queue should require only the local Pi session.
+The fix in this QA branch uses Pi's cancellation API with a credential-free
+catalog and no tools; active Stop still aborts the running session.
+
+**Status:** Fix in review (`codex/qa-operator-core`).
+
+**+1:** 2026-10-01 — Normal application QA (`codex/qa-operator-core`)
 
 ### AF-040 — Say whether a Pi upgrade keeps the shared login readable
 
