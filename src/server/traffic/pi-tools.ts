@@ -208,7 +208,7 @@ export function trafficReading(
       history.viewSource === "script"
         ? "Page views and visitors come from Hallvi's script; requests, errors, response times and bots from the log."
         : "Page views and visitors switch from the log to Hallvi's script inside this range, at the script's switch point; they are never added together.",
-      "Consent-gated script measurements cover visitors who allow analytics, so they can understate total use. Access-log coverage does not establish consent or the proportion of visitors measured.",
+      "Script measurements cover browsers where the script runs. Blocking or optional site controls can reduce that coverage; access-log coverage does not establish the proportion of visitors measured.",
     );
   if (history.collection.scriptSilentSince)
     notes.push(

@@ -190,7 +190,7 @@ function ScriptOffer({
 }) {
   return (
     <div className="tf-offer-line">
-      <p>{says} Measurement starts after analytics consent.</p>
+      <p>{says} Measurement starts when the script loads.</p>
       <button
         type="button"
         className="tf-button"
@@ -382,8 +382,8 @@ function Foot({
       {asked}
       {script && (
         <p className="tf-foot-quiet">
-          Consent-gated script measurements cover visitors who allow analytics,
-          so they can understate total use.
+          Script measurements cover browsers where the script runs. Blocking or
+          optional site controls can reduce that coverage.
         </p>
       )}
       <p className="tf-foot-quiet">

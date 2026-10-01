@@ -1,8 +1,9 @@
 # Traffic: who uses the application, and how it is doing
 
-**Status:** Traffic v1 merged on 29 September 2026. The owner requested
-consent and privacy-notice setup, and removal of the automatic goal-tracking
-claim, on 30 September; that change is in review on `codex/traffic-consent`.
+**Status:** Traffic v1 merged on 29 September 2026. Optional analytics controls
+and removal of the automatic goal-tracking claim landed in PR #306. On
+1 October the owner selected plain-include measurement without a banner or
+mandatory grant callback; PR #315 also repairs the installed script path.
 This document owns the design. The shared contract every
 part is written against is [`src/server/traffic/contract.ts`](../../src/server/traffic/contract.ts);
 [Product](../../PRODUCT.md#what-the-modes-cover) owns the collection rule.
@@ -200,10 +201,11 @@ internet, no cookies and nothing stored in the browser.
   file and the helper's Caddyfile remain shared; removing one application's
   routing leaves those files and the other application's routing in place.
 - **Getting it into the application:** a small pull request for the versioned
-  include in the shared layout, analytics consent integration and completed
-  privacy notice, through Hallvi's existing operability pull requests; for
-  software the owner does not change, its own code-injection setting where it
-  supports all three (Ghost has one). **Never** by
+  include in the shared layout, or each entry point in a hand-built site,
+  through Hallvi's existing operability pull requests. Preserve existing site
+  controls; add a prompt, consent integration or notice only when requested.
+  Software the owner does not change can use its own code-injection setting
+  (Ghost has one). **Never** by
   rewriting HTML at the proxy: that changes what the application serves
   without the owner merging anything, which the
   [operating boundary](../../PRODUCT.md#operating-boundary) rules out.
