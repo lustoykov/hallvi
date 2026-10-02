@@ -55,22 +55,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 1 | New |
 | [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | New |
 | [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
-| [AF-084 — Let Deployment wait for the public address check](#af-084--let-deployment-wait-for-the-public-address-check) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
-
-### AF-084 — Let Deployment wait for the public address check
-
-Deployment offered the saved public address while its access check was pending,
-and kept it as a link after the check failed. The shared page header already
-withheld that link. Use the same observation on Deployment, with a failed public
-address distinguished from a closed private tunnel.
-
-**+1:** 2026-10-02 — end-to-end critical bug audit,
-`codex/e2e-critical-audit`.
-
-**Status:** Fix in this branch; public checking, failed and recovered access are
-covered by the existing release-panel and browser checks.
 
 ### AF-083 — Let the checks notice runtime advisories and lockfile drift
 
@@ -890,6 +876,7 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-084 — Let Deployment wait for the public address check](#af-084--let-deployment-wait-for-the-public-address-check) | 1 | Resolved in #332 |
 | [AF-062 — Drop loaded traffic totals after Forget](#af-062--drop-loaded-traffic-totals-after-forget) | 1 | Resolved in #320 |
 | [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Resolved in #319 |
 | [AF-061 — Cancel interrupted work without a model login](#af-061--cancel-interrupted-work-without-a-model-login) | 1 | Resolved in #318 |
@@ -917,6 +904,20 @@ limit from the account balance; the request error now names both possibilities.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-084 — Let Deployment wait for the public address check
+
+Deployment offered the saved public address while its access check was pending,
+and kept it as a link after the check failed. The shared page header already
+withheld that link. Deployment now uses the same observation, with a failed public
+address distinguished from a closed private tunnel.
+
+**+1:** 2026-10-02 — end-to-end critical bug audit,
+`codex/e2e-critical-audit`.
+
+**Status:** Resolved in [#332](https://github.com/lustoykov/hallvi/pull/332).
+Public checking, failed and recovered access are covered by the existing
+release-panel and browser checks.
 
 ### AF-062 — Drop loaded traffic totals after Forget
 
