@@ -4,6 +4,15 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.17 — 2 October 2026
+
+Hallvi's operator now runs on Pi 1.0. Your applications are as they were, and conversations start fresh.
+
+- **Pi 1.0 underneath.** Pi 1.0 replaced the part Hallvi's conversations ran on, so they now run on its new durable runtime, which Pi still marks experimental. Pi keeps each conversation in a store of its own. Sending, steering, Stop, and Continue after a restart work as before.
+- **Conversations start empty after this update.** Each keeps its title and its application. Applications, servers, saved information, recorded work, secrets, traffic and connections are untouched, and Pi picks an application up again from what it saved about it and from the server. The earlier conversation files stay on disk, unchanged.
+- **A message that waited gets its own answer.** A follow-up sent while Pi was working is answered as work of its own, with its own answer and evidence, instead of sharing the answer of the work before it. A message that steers Pi still joins the work it steers.
+- **Recovery copies take open conversations as they stand.** The copy Hallvi takes of its records before an update copies each conversation safely, even one Pi has open.
+
 ## 0.1.1-alpha.16 — 1 October 2026
 
 Open an application with a long conversation without waiting, under a quieter alpha strip.
