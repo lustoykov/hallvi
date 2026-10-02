@@ -5,6 +5,12 @@ test("Settings status can retry and account management returns to its chat", asy
   page,
 }) => {
   test.setTimeout(180_000);
+  // The worker-scoped fresh fixture may have connected ChatGPT in another test.
+  const disconnected = await page.request.delete("/api/pi/setup", {
+    data: { confirm: "disconnect" },
+  });
+  expect(disconnected.ok()).toBe(true);
+  expect((await disconnected.json()).ready).toBe(false);
   await page.goto("/applications/new");
   await page
     .getByLabel("GitHub repository", { exact: true })

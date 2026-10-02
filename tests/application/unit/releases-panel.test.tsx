@@ -94,8 +94,7 @@ describe("offering a way in", () => {
     expect(html).not.toContain("Open the connection again");
   });
 
-  it("does not withhold a public address because this PC's tunnel is down", () => {
-    // A public address is answered by the server, whatever this PC is doing.
+  it("withholds a public address that did not answer", () => {
     const html = draw({
       view: view("public"),
       now: NOW,
@@ -103,7 +102,33 @@ describe("offering a way in", () => {
       onReopen: () => undefined,
       onAsk: () => undefined,
     });
+    expect(html).toContain("The address did not answer");
+    expect(html).not.toContain('href="https://shop.example"');
+    expect(html).not.toContain("Open the connection again");
+  });
+
+  it.each([
+    ["checking", "Checking access"],
+    ["unknown", "Access has not been checked"],
+    ["unavailable", "Cannot reach Hallvi"],
+  ] as const)("withholds public links when %s", (reachable, label) => {
+    const html = draw({
+      view: view("public"),
+      now: NOW,
+      reachable,
+      onAsk: () => undefined,
+    });
+    expect(html).toContain(label);
+    expect(html).not.toContain('href="https://shop.example"');
+  });
+
+  it("links a public address after it answers", () => {
+    const html = draw({
+      view: view("public"),
+      now: NOW,
+      reachable: "open",
+      onAsk: () => undefined,
+    });
     expect(html).toContain('href="https://shop.example"');
-    expect(html).not.toContain("Reopen access");
   });
 });

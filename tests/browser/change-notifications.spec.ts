@@ -95,7 +95,7 @@ test("one worker subscription scopes notices, relays a Next mutation, and recove
       b.selectedChatId,
       contexts,
     );
-    expect(worker.connections()).toBe(1);
+    await expect.poll(() => worker.subscribers()).toBe(1);
     await page.waitForTimeout(600);
     const before = await reads(page.request);
     worker.changed({
@@ -136,7 +136,7 @@ test("one worker subscription scopes notices, relays a Next mutation, and recove
     await expect(main.getByText("No worker is running")).toHaveCount(0);
     await expect(second.getByText("No worker is running")).toHaveCount(0);
     await expect(other.getByText("No worker is running")).toHaveCount(0);
-    expect(worker.connections()).toBe(1);
+    await expect.poll(() => worker.subscribers()).toBe(1);
     for (const context of contexts) await context.close();
     contexts.length = 0;
     await expect.poll(() => worker.subscribers()).toBe(0);

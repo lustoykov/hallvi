@@ -239,9 +239,9 @@ export function ReleasesPanel({
   const impacts = useReleaseImpacts(applicationId, view.all);
   const said = releaseHeadline(view);
   const { running, latest, access } = view;
-  // Only a private address depends on the tunnel. A public one is answered by
-  // the server whatever this PC is doing.
-  const closed = Boolean(access?.localOnly) && reachable === "closed";
+  // The current address is offered only after its observation answers. For a
+  // private route that checks the tunnel; for a public route it checks HTTP.
+  const closed = reachable === "closed";
   const before = running
     ? (view.all.find(
         (one) =>
@@ -454,13 +454,17 @@ export function ReleasesPanel({
             </p>
           ) : null}
         </div>
-        {/* The one action this page owes the reader, as a link: the address
-            itself, or what to do when the tunnel to it is closed. */}
+        {/* The address is a link only after the same access check used by the
+            page header says it answers. */}
         {access && closed ? (
           // Never a link to an address just found not to answer.
           <span className="rp-way">
-            <span className="rp-muted">The tunnel is closed</span>
-            {onReopen && (
+            <span className="rp-muted">
+              {access.localOnly
+                ? "The tunnel is closed"
+                : "The address did not answer"}
+            </span>
+            {access.localOnly && onReopen && (
               <button
                 type="button"
                 className="rp-link"
@@ -471,18 +475,14 @@ export function ReleasesPanel({
               </button>
             )}
           </span>
-        ) : access?.localOnly && reachable !== "open" ? (
+        ) : access && reachable !== "open" ? (
           <span className="rp-way rp-muted">
             {accessStateText(reachable ?? "checking")}
           </span>
         ) : access ? (
           <span className="rp-way">
             {access.localOnly && (
-              <span className="rp-muted">
-                {reachable === "checking"
-                  ? "Checking that the tunnel still answers"
-                  : "From this PC only"}
-              </span>
+              <span className="rp-muted">From this PC only</span>
             )}
             <a
               className="rp-link"

@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 6 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 7 | Partially fixed |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -763,6 +763,19 @@ knows"), which opens the first application on the scenario home and finds no
 "What is running" region on its Deployment; run alone against a scenario
 server on main it fails the same way.
 
+**+1:** 2026-10-02 — end-to-end critical bug audit,
+`codex/e2e-critical-audit`: Fast Refresh reconnected the main EventSource,
+so the cumulative connection count was two even with one live subscription.
+The check now measures active subscribers. Account recovery also explicitly
+disconnects its synthetic account before starting, because onboarding leaves
+the shared fresh-setup worker connected. The connect-and-return selector now
+uses the current first-application region, and the secret checks find a real
+application instead of silently skipping on the New application link. Those
+secret checks still need a pending-request fixture to establish accepted
+browser submission and replacement; refusal and absence checks do not prove
+those behaviors. The wider record sweep independently found AF-084. Other
+external-fixture prerequisites remain as documented.
+
 ### AF-033 — Refuse a second preview before attaching retained state
 
 Attaching a retained application from a checkout that already serves a
@@ -863,6 +876,7 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-084 — Let Deployment wait for the public address check](#af-084--let-deployment-wait-for-the-public-address-check) | 1 | Resolved in #332 |
 | [AF-062 — Drop loaded traffic totals after Forget](#af-062--drop-loaded-traffic-totals-after-forget) | 1 | Resolved in #320 |
 | [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Resolved in #319 |
 | [AF-061 — Cancel interrupted work without a model login](#af-061--cancel-interrupted-work-without-a-model-login) | 1 | Resolved in #318 |
@@ -890,6 +904,20 @@ limit from the account balance; the request error now names both possibilities.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-084 — Let Deployment wait for the public address check
+
+Deployment offered the saved public address while its access check was pending,
+and kept it as a link after the check failed. The shared page header already
+withheld that link. Deployment now uses the same observation, with a failed public
+address distinguished from a closed private tunnel.
+
+**+1:** 2026-10-02 — end-to-end critical bug audit,
+`codex/e2e-critical-audit`.
+
+**Status:** Resolved in [#332](https://github.com/lustoykov/hallvi/pull/332).
+Public checking, failed and recovered access are covered by the existing
+release-panel and browser checks.
 
 ### AF-062 — Drop loaded traffic totals after Forget
 
