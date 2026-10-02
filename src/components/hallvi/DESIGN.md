@@ -668,7 +668,9 @@ table around the visual it already had. It lives in `register.tsx` and
   opened.
 - **A narrow window scrolls the table, not the page.** The table keeps a floor
   of 720px; below that its panel scrolls sideways and an opened row travels
-  with it. A strip that wraps keeps a rule between its figures.
+  with it. A quiet hint appears above tables that do not fit. The panel accepts
+  keyboard focus for horizontal scrolling, and sorted headers announce their
+  direction. A strip that wraps keeps a rule between its figures.
 - **One page owns a story; the others carry a line of it.** Chosen
   23 September 2026, after the backup situation was told three times in three
   wordings that drifted apart. Backups owns copies, plans and restores, and

@@ -188,10 +188,18 @@ export function ApplicationNavigation({
   // has to show where it landed. A conversation does not move the list: its
   // row is at the foot of it, and the destinations would scroll away.
   useEffect(() => {
-    if (!section) return;
-    list.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView?.({ block: "nearest", inline: "center" });
+    const navigation = list.current;
+    if (!section || !navigation) return;
+    const revealCurrent = () =>
+      navigation
+        .querySelector('[aria-current="page"]')
+        ?.scrollIntoView?.({ block: "nearest", inline: "center" });
+    revealCurrent();
+    // Resizing can turn the sidebar into a horizontal strip, or shorten it
+    // around the selected row, without changing the destination itself.
+    const observer = new ResizeObserver(revealCurrent);
+    observer.observe(navigation);
+    return () => observer.disconnect();
   }, [section]);
   return (
     <aside
