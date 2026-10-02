@@ -104,6 +104,8 @@ export const test = base.extend<
           `/api/applications/${missing}/chats`,
           `/api/applications/${missing}/chats/${missing}/messages`,
           `/api/applications/${missing}/chats/${missing}/events`,
+          `/api/applications/${missing}/chats/${missing}/stop`,
+          `/api/applications/${missing}/chats/${missing}/continue`,
         ]) {
           const response = await fetch(`${url}${path}`, {
             headers: { origin: url },

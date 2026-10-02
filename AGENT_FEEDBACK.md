@@ -795,7 +795,10 @@ snapshot for checks whose scenarios have no deployment record.
 The latest-main rerun also spent 26 seconds compiling the traffic collection
 handler during its first chat action while other previews were active. The
 fixture now warms that handler and the application page alongside its existing
-API warm-up, before measuring interactions; the cold compiler is fixture setup.
+API warm-up, before measuring interactions. Its Stop route also needed 13 seconds
+to compile while the synthetic six-second reply finished; Stop and Continue now
+warm through GET (405), without performing either action. The cold compiler is
+fixture setup.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
