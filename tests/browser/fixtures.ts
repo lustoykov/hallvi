@@ -93,7 +93,9 @@ export const test = base.extend<
         for (const path of [
           `/applications/${missing}`,
           `/api/applications/${missing}`,
+          `/api/applications/${missing}/traffic`,
           `/api/applications/${missing}/traffic/collection`,
+          `/api/applications/${missing}/traffic/history`,
           `/api/applications/${missing}/access`,
           `/api/applications/${missing}/operator`,
           `/api/applications/${missing}/connections`,

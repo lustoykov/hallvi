@@ -798,7 +798,11 @@ fixture now warms that handler and the application page alongside its existing
 API warm-up, before measuring interactions. Its Stop route also needed 13 seconds
 to compile while the synthetic six-second reply finished; Stop and Continue now
 warm through GET (405), without performing either action. The cold compiler is
-fixture setup.
+fixture setup. The live traffic and history handlers now warm too, after their
+first compilation blocked the seeded-history journey's page reads.
+The permission-read recovery journey also assumed a clicked write was already
+accepted. It now requires the real POST's HTTP 200 before checking recovery
+from the subsequent failed read; the UI assertions retain their original budget.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 

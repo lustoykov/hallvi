@@ -77,7 +77,17 @@ test("recovered operator reads clear their own error and preserve uncertain or r
   writeFailure = "accepted";
   failReads = true;
   await page.getByRole("button", { name: /^Permissions:/ }).click();
-  await page.getByRole("radio", { name: /Always ask/ }).click();
+  const [saved] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+          `/api/applications/${appId}/operator` &&
+        response.request().method() === "POST",
+      { timeout: 30_000 },
+    ),
+    page.getByRole("radio", { name: /Always ask/ }).click(),
+  ]);
+  expect(saved.status()).toBe(200);
   await expect(alert).toHaveText("Failed to fetch");
   failReads = false;
   await expect(alert).toHaveCount(0, { timeout: 20_000 });
