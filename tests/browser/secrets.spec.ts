@@ -46,13 +46,15 @@ async function application(page: Page) {
     waitUntil: "domcontentloaded",
   });
   await page.waitForLoadState("networkidle").catch(() => {});
-  return page.evaluate(
-    () =>
-      document
-        .querySelector<HTMLAnchorElement>("a[href*='/applications/']")
-        ?.getAttribute("href")
-        ?.match(/[0-9a-f-]{36}/)?.[0] ?? null,
-  );
+  return page.evaluate(() => {
+    for (const link of document.querySelectorAll<HTMLAnchorElement>(
+      "a[href*='/applications/']",
+    )) {
+      const id = link.getAttribute("href")?.match(/[0-9a-f-]{36}/)?.[0];
+      if (id) return id;
+    }
+    return null;
+  });
 }
 
 test.describe("supplying a secret", () => {

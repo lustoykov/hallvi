@@ -81,7 +81,7 @@ test(
     // Connecting happens here, so the draft never has to travel anywhere.
     const draft = "Does this need a bigger server before the weekend?";
     await page
-      .locator(".hv-pi-required")
+      .getByRole("region", { name: "Get to know your application" })
       .getByRole("button", { name: "Connect a model", exact: true })
       .click();
     const card = page.getByRole("region", { name: "Connect a model" });
