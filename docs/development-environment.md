@@ -83,13 +83,17 @@ In order, and each one a refusal on its own:
 4. **This program does not read what is on disk.** The database's schema is
    compared with `src/server/schema-version.json`, and the Pi version the
    histories were last written with (in `retained.json`) with the one this
-   checkout bundles. A schema behind the program is migrated deliberately
+   checkout bundles: its `@earendil-works/pi-durable`, the package that stores
+   conversations. A schema behind the program is migrated deliberately
    first — `node scripts/migrate-state.mjs --plan --data <state>`, then
    `--apply`, which keeps its own verified copy; a schema ahead of it is left
    for a checkout that reads it. A different Pi is tried on a snapshot first,
    then accepted with `--accept-format`, which records the new version.
+   [Upgrading the records](#upgrading-the-records) says what becomes of
+   conversations an earlier Pi wrote.
 5. **A verified copy is taken** into `applications/<name>/backups/`: the
    database through SQLite's own backup and reopened with its counts compared,
+   each conversation store through the same backup without its journal files,
    every other file compared by hash. The five newest attach copies are kept.
 6. **The owner is registered** — worktree, branch, revision, pid, port — and
    the pair starts on the application's own port. The command stays in the
@@ -186,8 +190,9 @@ node scripts/retained-application.mjs snapshot /tmp/hv-look <name> [<name> …]
 ```
 
 A snapshot is a copy for looking at: the chosen applications' databases merged
-into one, their execution, activity and workspace records and Pi's histories —
-and none of their SSH keys, secrets or connection requests. The recorded key
+into one, their execution, activity and workspace records and Pi's histories,
+each conversation store taken through SQLite's own backup — and none of their
+SSH keys, secrets or connection requests. The recorded key
 paths point inside the snapshot, where no key is, and the command prints the
 one line that runs the pair against it with an empty account directory. The
 worker is what reads a conversation's history, so it runs; with no ChatGPT
@@ -248,6 +253,13 @@ disk, so state is never handed to code that cannot open it; the one thing it
 cannot see is a change to the JSON records, which have no version of their
 own, and that is what the copy is for.
 
+Pi's history is one SQLite store per conversation,
+`pi-sessions/<application>/<chat>/conversation.sqlite`. State an earlier Pi
+wrote as session files is not converted. Attaching it needs `--accept-format`,
+and its conversations then start empty: the session files stay where they are,
+unread, and every record stays — the application, its host, saved information,
+execution and activity records and secrets.
+
 When a change alters the schema, the retained applications are the acceptance
 test. Each runs the same migration an installation would — the same list, the
 same code, the same verified copy taken first — while detached:
@@ -281,10 +293,19 @@ checkout to attach it reads the new schema or restores the copy.
 Every attach takes a verified copy of the whole state directory before
 starting, so the copy to go back to after a bad change is the newest one
 under `applications/<name>/backups/`; `manifest.json` in it lists every file
-with its hash and the database's schema and counts. Putting one back is
-copying it over the state directory while nothing is attached. A copy taken
+copied as a file with its hash, and the database's schema and counts. Putting
+one back is copying it over the state directory while nothing is attached,
+after removing any `-wal` or `-shm` journal file left beside the database or a
+conversation store there: it belongs to what is being replaced. A copy taken
 around a migration is made by `migrate-state.mjs --apply` and restored by
 `--restore`, and that is the one to prefer when there is one.
+
+The database and each conversation store are SQLite databases, not plain
+files: while a process has one open, what it wrote last is in the journal
+beside it. The attach copy and a snapshot take them through SQLite's own
+backup and leave the journal files behind. Copy a conversation store by hand
+the same way, or through these commands; never copy the file alone while a
+worker has it open.
 
 What a copy covers, and what it deliberately does not: it holds Hallvi's own
 records — the database, the conversation, the credentials and the connection

@@ -50,7 +50,10 @@ controllers. Keep fixture credentials isolated as the existing runners do.
 Before attaching older state, check its schema and Pi version against this
 checkout. Test compatibility on a snapshot first: open the application and
 its history through the running worker, inspect its records, and refresh the
-browser. A schema change needs the documented migration on a copy first too.
+browser. Conversations an earlier Pi wrote as session files are not converted:
+they open empty with every record intact, which is the expected result and not
+a failed check. A schema change needs the documented migration on a copy first
+too.
 Stop the snapshot preview and its paired tools before attaching from the same
 checkout: Next.js allows only one development server per checkout, even on
 different ports. Only after that proof, use `attach <name> --accept-format` if
@@ -142,9 +145,11 @@ use `exec ... --timeout 120 --json` to send and follow in one command.
 
 Read `accepted`, `status`, `error`, `attention`, `answer`, `failure` and
 `operation.requestKeys`. Match your key to that operation and its `evidence`,
-not simply the newest execution in `inspect`. Several queued requests can
-share an operation and its whole answer. Check each relevant call's target,
-input, status, output and timing; an absent numeric exit code is not zero.
+not simply the newest execution in `inspect`. A request that waited behind
+other work is answered in a run of its own; a steer that joined a run, or a
+message Pi took from its queue in the same moment, shares that operation and
+its whole answer. Check each relevant call's target, input, status, output and
+timing; an absent numeric exit code is not zero.
 
 If `outputTruncated` or `inputTruncated` hides what you need, take the relevant
 non-null `executionId` from that operation:

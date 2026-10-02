@@ -10,9 +10,9 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Side conversation**: A separate read-only discussion of relevant application context and evidence. It does not independently change the application.
 
-**Queued follow-up**: A message Pi processes after its current work finishes, using its native follow-up mechanism. Distinct from the existing operation change queue.
+**Queued follow-up**: A message Pi takes into its queue while it is working and reads when its current run has answered. It is answered in a run of its own. Distinct from the existing operation change queue.
 
-**Steering**: Direction delivered to the active Pi session after the current turn's tool calls finish, before the next model call. It does not itself stop a running command.
+**Steering**: Direction Pi reads from its queue after the tool calls of its current step, before the next model call. It joins the run it was sent into. It does not itself stop a running command.
 
 **Execution**: A tool invocation with its target, input/command, permission context, output, timing and known or uncertain outcome, recorded automatically.
 
@@ -34,19 +34,19 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Application requirement**: A declared need for running or checking an Application, grounded in its software configuration, documentation or the owner's request. Declaring a requirement does not establish that Hallvi can fulfill it.
 
-**Conversation (Chat in existing code)**: An application-owned transcript and native model session. Conversations have separate drafts/history and share the application's operational state. In the redesign, only the main conversation owns changes; side conversations are read-only.
+**Conversation (Chat in existing code)**: An application-owned transcript, kept by Pi in a store of its own (`pi-sessions.ts`); the database keeps its title, kind and application. Conversations have separate drafts/history and share the application's operational state. In the redesign, only the main conversation owns changes; side conversations are read-only.
 
 **Application view**: An inspectable projection of recorded application facts and work, such as deployment, data or health. Record cards in chat and views refer to the same records.
 
-**Reply** (`pi-transcript.ts`): What Pi said and did between two of the owner's messages, as one item in the conversation. It is projected from Pi's history on every read and stored nowhere else; it is named after the message it answers. Evidence is placed under it by the id Pi gave each tool call. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
+**Reply** (`pi-transcript.ts`): What Pi said and did between two of the owner's messages, as one item in the conversation. It is projected on every read from what Pi holds (its history, its record of each message and the run it has open) and stored nowhere else; it is named after the message it answers and belongs to the run Pi wrote it in. Evidence is placed under it by the id Pi gave each tool call. It says how it ended (completed, failed, stopped, interrupted); a completed reply does not prove an external effect.
 
-**Waiting message**: A message Pi has durably taken and not read yet: an entry in Pi's queue, under the id its sender gave it. Pi orders it, reads it, or drops it on Stop. After a worker goes away it keeps waiting until the owner continues or stops the conversation.
+**Waiting message**: A message Pi has durably taken and not read yet: a follow-up or a steer in Pi's queue, recorded under the request key its sender gave it. Pi orders it, reads it, or drops it on Stop; a dropped message is gone, and sent again under its key it is a new message. After a worker goes away, or a reply fails while it waits, it keeps waiting until the owner continues or stops the conversation.
 
-**Request handle** (`controller-client.mjs`): The address a request's outcome is read from, naming its controller, application, conversation and request key and holding no credential. A request's outcome is the Pi operation that took its message: several requests Pi read in one operation share its result.
+**Request handle** (`controller-client.mjs`): The address a request's outcome is read from, naming its controller, application, conversation and request key and holding no credential. A request's outcome is that of the run in which Pi answered it, as Pi recorded it on the message. A run is the message that began it and any steer that joined it: a follow-up has a run of its own, and requests answered in one run share its result.
 
 **Origin**: Where a message was written when it was not Hallvi's page, such as the `hallvi` command, shown as its label instead of "You". Provenance kept with the message in Pi's history; it names no identity and grants no authority.
 
-**Session owner** (`pi-owner.ts`, `worker-link.ts`): The worker, as the only process that opens a Pi session: the one holding the owner's lock, which the operating system releases when it ends. The app asks it over `worker.sock` to read, send, continue, stop or forget; a send is answered once Pi has durably taken the message. **Interrupted** means Pi holds an open operation or a queue that this worker is not running: nothing runs until the owner chooses Continue or Stop.
+**Session owner** (`pi-owner.ts`, `worker-link.ts`): The worker, as the only process that opens Pi's conversation stores: the one holding the owner's lock, which the operating system releases when it ends. It keeps a conversation open only while Pi has work in it. The app asks it over `worker.sock` to read, send, continue, stop or forget; a send is answered once Pi has durably taken the message. **Interrupted** means Pi holds work it began and did not finish, or messages still in its queue, that this worker is not running: nothing runs, and no new message is taken, until the owner chooses Continue or Stop.
 
 ## Execution and evidence
 
