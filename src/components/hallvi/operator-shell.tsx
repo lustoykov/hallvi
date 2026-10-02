@@ -151,8 +151,9 @@ export function OperatorShell({
         // A button inside the previous destination goes away with that page.
         // Sidebar controls stay mounted and keep their ordinary keyboard focus.
         if (initiatingControl?.isConnected) return;
-        const heading =
-          document.querySelector<HTMLHeadingElement>(".hv-workspace h1");
+        const heading = document.querySelector<HTMLHeadingElement>(
+          ".hv-workspace h1, .hv-workspace h2",
+        );
         if (heading) {
           heading.tabIndex = -1;
           heading.focus({ preventScroll: true });
