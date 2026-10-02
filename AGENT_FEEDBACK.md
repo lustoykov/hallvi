@@ -792,6 +792,10 @@ the real masked field, requires HTTP 200, counts exactly one browser POST, and
 checks the receipt and absence of the value after reload. It replaces that
 misleading check. The wide run also needed a free port and a retained deployment
 snapshot for checks whose scenarios have no deployment record.
+The latest-main rerun also spent 26 seconds compiling the traffic collection
+handler during its first chat action while other previews were active. The
+fixture now warms that handler and the application page alongside its existing
+API warm-up, before measuring interactions; the cold compiler is fixture setup.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 

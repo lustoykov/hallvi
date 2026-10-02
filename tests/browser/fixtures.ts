@@ -86,12 +86,14 @@ export const test = base.extend<
             { timeout: 90_000, intervals: [500, 1000] },
           )
           .toBe(true);
-        // Compile conversation handlers before interaction deadlines begin.
+        // Compile application pages and handlers before interaction deadlines.
         // GETs against nonexistent IDs create no application, chat or run.
         // Compilation is fixture setup, not an application response-time check.
         const missing = "00000000-0000-4000-8000-000000000000";
         for (const path of [
+          `/applications/${missing}`,
           `/api/applications/${missing}`,
+          `/api/applications/${missing}/traffic/collection`,
           `/api/applications/${missing}/access`,
           `/api/applications/${missing}/operator`,
           `/api/applications/${missing}/connections`,
