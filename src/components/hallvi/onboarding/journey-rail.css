@@ -2,6 +2,10 @@
  * request, these four quiet stops move beside the composer, immediately above
  * the single live activity row. */
 
+.hv-chat-top {
+  min-height: 0;
+  overflow: auto;
+}
 .hv-chat-top:empty {
   display: none;
 }

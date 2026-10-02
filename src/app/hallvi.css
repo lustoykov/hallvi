@@ -832,6 +832,10 @@
   border-top: 1px solid var(--line);
   background: #fff;
 }
+.hv-composer:has(.hv-pi-required) {
+  max-height: 70%;
+  overflow-y: auto;
+}
 .hv-composer-box {
   border: 1px solid #c9d4e4;
   border-radius: 14px;
@@ -1037,6 +1041,14 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+@media (max-width: 400px) {
+  .hv-composer-bar:has(.hv-steer) {
+    flex-wrap: wrap;
+  }
+  .hv-composer-bar:has(.hv-steer) .hv-composer-left {
+    flex-basis: 100%;
+  }
 }
 .hv-composer-hint {
   color: var(--muted);

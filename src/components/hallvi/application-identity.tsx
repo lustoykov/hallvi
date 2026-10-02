@@ -114,14 +114,17 @@ export function ApplicationIdentity({
           const box = anchor.current?.getBoundingClientRect();
           if (!box) return;
           const menu = event.currentTarget;
-          // Never narrower than the menu's own 320px, or the clamp below
-          // lets it run off the right edge of a phone.
-          const width = Math.max(box.width, 320);
-          menu.style.minWidth = `${width}px`;
+          // Keep the menu inside the viewport, with a 12px gutter.
+          const width = Math.min(
+            Math.max(box.width, 320),
+            window.innerWidth - 24,
+          );
+          menu.style.width = `${width}px`;
           menu.style.left = `${Math.max(12, Math.min(box.left, window.innerWidth - width - 12))}px`;
           // Below the control normally; above it when the control sits low.
           const room = window.innerHeight - box.bottom;
-          menu.style.top = room > 280 ? `${box.bottom + 6}px` : "";
+          menu.style.maxHeight = `${Math.max(0, (room > 280 ? room : box.top) - 18)}px`;
+          menu.style.top = room > 280 ? `${box.bottom + 6}px` : "auto";
           menu.style.bottom =
             room > 280 ? "" : `${window.innerHeight - box.top + 6}px`;
         }}

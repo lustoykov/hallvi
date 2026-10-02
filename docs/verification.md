@@ -200,6 +200,13 @@ representative data and relevant screenshots; CLI output cannot prove visual
 quality. Choose focused checks by [the testing bar](../tests/README.md#the-8020-bar),
 run `npm run format`, and review the final diff.
 
+For destination captures, wait for the selected navigation item and the
+destination content, not just the shell: the initial render can still show
+the conversation. Reset the destination's scroll position before the first
+capture. The workspace and Settings content scroll inside the page, so a
+full-page screenshot does not show their offscreen content; scroll those
+containers and inspect the relevant lower content separately.
+
 In the PR, state the tested revision and environment (real model/provider,
 local container or scripted fixture), request/operation/execution identities,
 observations, independent behavior check and relevant screenshot links.

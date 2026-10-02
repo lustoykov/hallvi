@@ -45,6 +45,14 @@
   font-family: var(--mono);
   font-size: 12.5px;
 }
+.notes pre {
+  overflow-x: auto;
+}
+.notes pre code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
 .notes a {
   color: var(--blue-text);
 }

@@ -55,8 +55,18 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 2 | Fix in review |
 | [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | New |
 | [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
+| [AF-085 — Render reply tables in the plugin panel](#af-085--render-reply-tables-in-the-plugin-panel) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-085 — Render reply tables in the plugin panel
+
+A reply containing a Markdown table renders as literal pipe-separated lines in
+the plugin panel, while the same kind of reply has a table in the application.
+This needs parser support rather than a CSS containment fix; leave that choice
+outside the UI polish pass.
+
+**+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
 
 ### AF-083 — Let the checks notice runtime advisories and lockfile drift
 

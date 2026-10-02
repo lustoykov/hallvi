@@ -201,6 +201,7 @@
   color: #53617a;
   font-size: 13px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .helper a {
   color: var(--blue-text);
@@ -248,6 +249,7 @@
   font-size: 14px;
   line-height: 1.6;
   margin: 0 0 18px;
+  overflow-wrap: anywhere;
 }
 
 /* Condition in words, with the dot as a quiet confirmation. */
