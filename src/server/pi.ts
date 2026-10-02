@@ -71,7 +71,8 @@ import {
 } from "./traffic/pi-tools";
 
 import { configuredPiRuntime } from "./pi-configuration";
-import { openNativeChatSession } from "./pi-sessions";
+import { NativeSessionError, openConversation } from "./pi-sessions";
+import { ORIGIN_TAG, SENT_AT_TAG } from "./pi-transcript";
 import {
   diagnosticFailure,
   toolStepKind,
@@ -225,24 +226,18 @@ export function describePiFailure(error: unknown): string {
   return "Hallvi could not reach the selected model. Check Settings or retry.";
 }
 
-/** One tool call, as the runtime reports it, before anything interprets it. */
-export type PiToolEvent =
-  | {
-      type: "start";
-      id: string;
-      sequence: number;
-      tool: string;
-      args: unknown;
-    }
-  | { type: "update"; id: string; partial: unknown }
-  | { type: "end"; id: string; result: unknown; isError: boolean }
-  /** What Pi said at this point, between its calls. */
-  | { type: "message"; sequence: number; text: string };
-
 export interface PiSessionEvents {
-  /** Every tool call, in order, with what went in and what came back. */
-  onTool?: (event: PiToolEvent) => void;
-  onActivity?: (event: ExecutionSignal) => void;
+  /**
+   * What a call in flight has streamed back so far, by Pi's tool-call id;
+   * nothing once the call has ended. The tool sends a result-so-far, never
+   * an increment.
+   */
+  onPartial?: (id: string, partial: unknown) => void;
+  /**
+   * The worker is going away. A call in flight is left to itself then,
+   * rather than waited for: Pi keeps the conversation as it is.
+   */
+  signal?: AbortSignal;
 }
 
 /** One conversation's tools. Their evidence is kept under Pi's call ids. */
@@ -251,7 +246,11 @@ export interface PiSessionScope {
   chatId: string;
 }
 
-type PiHarness = import("@earendil-works/pi-agent-core").AgentHarness;
+type PiSession = Awaited<ReturnType<typeof openConversation>>;
+type PiTool = import("@earendil-works/pi-durable").ToolRegistration;
+type PiMessages = Parameters<
+  import("@earendil-works/pi-durable").GenerationHooks["beforeRequest"]
+>[0]["messages"];
 
 /** A tool as Hallvi and Pi's coding agent define one. */
 interface DefinedTool {
@@ -270,47 +269,127 @@ interface DefinedTool {
 }
 
 /**
- * The same definition under the harness's call shape. The schema, argument
- * preparation and sampling constraint are Pi's fields and pass through; only
- * the order of `execute`'s arguments differs, and cancellation arrives on the
- * context instead of as a bare signal.
+ * The same definition under Pi's durable call shape. The schema, argument
+ * preparation and sampling constraint are Pi's fields and pass through; the
+ * call's id and its cancellation arrive on Pi's own objects instead of as
+ * arguments.
+ *
+ * Three things are Hallvi's choices rather than Pi's defaults. Every call is
+ * sequential: nothing that changes a server, a file or a record may overlap
+ * another within a turn. A failure is returned to the model as the tool's own
+ * words, as it always was, rather than thrown for Pi to wrap. And Pi does not
+ * cut the result: Hallvi's tools bound their own output, and a result Pi
+ * shortened would lose the note that says where the rest is.
  */
-function forHarness(tool: DefinedTool) {
+function forDurable(tool: DefinedTool, events: PiSessionEvents): PiTool {
   return {
     name: tool.name,
-    label: tool.label,
     description: tool.description,
     parameters: tool.parameters,
     prepareArguments: tool.prepareArguments,
     constrainedSampling: tool.constrainedSampling,
-    execute: (
-      id: string,
-      params: unknown,
-      onUpdate: (partial: never) => void,
-      _toolContext: unknown,
-      _invocation: unknown,
-      context: { abortSignal: AbortSignal | undefined },
-    ) => tool.execute(id, params as never, context.abortSignal, onUpdate),
-  } as import("@earendil-works/pi-agent-core").AgentHarnessTool<undefined>;
+    executionMode: "sequential",
+    outputLimits: { maxBytes: Infinity, maxLines: Infinity },
+    async execute(args, api, context) {
+      // Pi waits for a call to return before it lets go of the conversation,
+      // and a tool waiting on something that never answers would hold the
+      // worker's own shutdown for as long. Only the worker going away ends
+      // the wait, and it says so after Pi has stopped taking results, so what
+      // is returned here then is discarded. A Stop does not end it: that is
+      // the call's own signal, the tool is given it, and Stop says Pi has not
+      // stopped until the call has let go, so nothing new starts beside work
+      // that is still going on.
+      const leaving = events.signal;
+      const left = new Promise<never>((_, reject) => {
+        if (leaving?.aborted) reject(leaving.reason);
+        leaving?.addEventListener("abort", () => reject(leaving.reason), {
+          once: true,
+        });
+      });
+      try {
+        const result = (await Promise.race([
+          tool.execute(
+            api.callId,
+            args as never,
+            context.abortSignal,
+            (partial: never) => events.onPartial?.(api.callId, partial),
+          ),
+          left,
+        ])) as { content?: unknown; details?: unknown; isError?: boolean };
+        // Pi stores a result as strict JSON, and a result it cannot store is
+        // not a failed call but a lost one.
+        return JSON.parse(
+          JSON.stringify({
+            content: Array.isArray(result?.content)
+              ? result.content
+              : [{ type: "text", text: JSON.stringify(result ?? null) }],
+            details: result?.details ?? {},
+            ...(result?.isError && { isError: true }),
+          }),
+        );
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? error.message : String(error),
+            },
+          ],
+          isError: true,
+          details: {},
+        };
+      } finally {
+        events.onPartial?.(api.callId, undefined);
+      }
+    },
+  } as PiTool;
 }
 
 /**
- * Open this conversation's native session with its tools. Pi owns everything
- * that happens in it; `close` waits for Pi to settle and releases the history.
+ * What the model is sent, from what Pi keeps. Pi stores the prompt and the
+ * tool list as entries in the conversation, after its first message; sent as
+ * they stand, a provider takes them for a note in mid-conversation and not
+ * for its instructions. They are gathered into the one prompt that leads the
+ * request, as current as the last change. Hallvi's own marks on a message
+ * come off here: they are for the page, never for the model.
+ */
+function forProvider(
+  messages: PiMessages,
+  collapse: (context: never) => { messages: PiMessages },
+): PiMessages {
+  return collapse({ messages } as never).messages.map((message) =>
+    message.role !== "user" || !Array.isArray(message.content)
+      ? message
+      : {
+          ...message,
+          content: message.content.map((part) => {
+            if (!(SENT_AT_TAG in part) && !(ORIGIN_TAG in part)) return part;
+            const rest = { ...part } as Record<string, unknown>;
+            delete rest[SENT_AT_TAG];
+            delete rest[ORIGIN_TAG];
+            return rest as typeof part;
+          }),
+        },
+  );
+}
+
+/**
+ * Open this conversation for work: Pi's own store, with this conversation's
+ * tools, prompt and model. Pi owns everything that happens in it; `close`
+ * waits for Pi to let go and then releases the workspace.
  */
 export async function openPiSession(
   scope: PiSessionScope,
-  options: { signal?: AbortSignal } = {},
+  options: PiSessionEvents = {},
 ) {
   options.signal?.throwIfAborted();
   const sdk = await import("@earendil-works/pi-coding-agent");
-  const { AgentHarness, BACKGROUND_CONTEXT } =
-    await import("@earendil-works/pi-agent-core");
+  const durable = await import("@earendil-works/pi-durable");
+  const { collapseSystemMessages } =
+    await import("@earendil-works/pi-ai/utils/transcript");
+  const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
   const { defineTool } = sdk;
-  // Open and validate history before provider/auth work. A missing established
-  // history is a recovery error, not permission to silently start a new Chat.
-  const native = await openNativeChatSession(scope.applicationId, scope.chatId);
-  let harness: PiHarness | undefined;
+  let session: PiSession | undefined;
   const builtinWorkspace = new PiWorkspace({
     applicationId: scope.applicationId,
     chatId: scope.chatId,
@@ -320,13 +399,9 @@ export async function openPiSession(
   });
   const close = async () => {
     try {
-      await harness?.close(BACKGROUND_CONTEXT);
+      await session?.close();
     } finally {
-      try {
-        await builtinWorkspace.dispose();
-      } finally {
-        await native.release();
-      }
+      await builtinWorkspace.dispose();
     }
   };
   try {
@@ -1225,60 +1300,69 @@ export async function openPiSession(
       );
     options.signal?.throwIfAborted();
     const tools = [...workspaceTools, ...recordTools, ...operatorTools];
-    const created = await AgentHarness.create(
-      {
-        session: native.session,
-        // Pi's own runtime: credentials, refresh and model access stay its.
-        models: modelRuntime,
-        model,
-        thinkingLevel: configuration.reasoningEffort,
-        systemPrompt: [
-          SYSTEM_PROMPT,
-          builtinWorkspace.prompt(workspaceUnavailable),
-          main
-            ? "You are the main operator. You may execute work for this application."
-            : "You are a read-only side chat. Explain the application and its execution evidence. You cannot run commands or change files, records or the server. Tell the user to send operational work to the main conversation.",
-        ].join("\n\n"),
-        tools: tools.map((tool) => forHarness(tool as DefinedTool)),
-        activeToolNames: tools.map((tool) => tool.name),
-        // One setting for a whole turn's tool calls; the harness has no
-        // per-tool one, so Hallvi's tools declare none. Every call that
-        // changes a server, a file or a record has to be sequential, and one
-        // at a time for all of them keeps that, at the cost of reads no
-        // longer overlapping.
+    // Three parts, sent as one prompt. Pi keeps the prompt in the
+    // conversation and writes again only the part that changed: the long
+    // first one changes with a release, the workspace's with every stretch
+    // of work, which gets a folder of its own.
+    const prompt = {
+      operator: SYSTEM_PROMPT,
+      workspace: builtinWorkspace.prompt(workspaceUnavailable),
+      role: main
+        ? "You are the main operator. You may execute work for this application."
+        : "You are a read-only side chat. Explain the application and its execution evidence. You cannot run commands or change files, records or the server. Tell the user to send operational work to the main conversation.",
+    };
+    const registry = durable.createRegistry();
+    registry.install(
+      durable.defineExtension({
+        name: "hallvi",
+        tools: tools.map((tool) => forDurable(tool as DefinedTool, options)),
+        sections: Object.entries(prompt).map(([key, text]) =>
+          durable.section(key, () => text, { tag: false }),
+        ),
+        hooks: [
+          durable.hook(durable.GenerationTask, {
+            beforeRequest: ({ messages }) => ({
+              messages: forProvider(messages, collapseSystemMessages as never),
+            }),
+          }),
+        ],
+      }),
+    );
+    session = await openConversation(scope, {
+      // Pi's own runtime: credentials, refresh and model access stay its.
+      models: modelRuntime as never,
+      registry,
+      // What Pi reports without failing the work it was doing.
+      onReport: (error) =>
+        console.warn(
+          `Pi reported a problem in ${scope.chatId}: ${error instanceof Error ? error.message : error}`,
+        ),
+      settings: {
+        // Also said on each tool, so no setting can loosen it.
         toolExecution: "sequential",
-        // One message per turn, as the conversation shows them.
-        steeringMode: "one-at-a-time",
-        followUpMode: "one-at-a-time",
+        // Compaction is part of the work it serves, never a task of its own
+        // that outlives the reply and reads as unfinished afterwards.
+        compaction: { backgroundTokens: 0 },
+        // What a provider keeps its prompt cache and its connection under.
+        // Pi takes it as a request option and passes it through.
+        stream: { sessionId: scope.chatId } as never,
+      },
+    });
+    // Hallvi's setup chooses the model, not what an earlier turn recorded.
+    // Pi writes nothing when the choice is the one it already has.
+    await session.conversation.configure(
+      {
+        model: { provider: model.provider, modelId: model.id },
+        thinkingLevel: configuration.reasoningEffort,
       },
       BACKGROUND_CONTEXT,
     );
-    harness = created.harness;
-    const lane = await harness.lane("main", BACKGROUND_CONTEXT);
-    // Hallvi's setup chooses the model, not what an earlier history recorded.
-    // Pi writes each change to the history, so only a change is set: opening
-    // a conversation to read it writes nothing.
-    const current = await lane.getModel(BACKGROUND_CONTEXT);
-    if (current?.provider !== model.provider || current.id !== model.id)
-      await lane.setModel(
-        { provider: model.provider, modelId: model.id },
-        BACKGROUND_CONTEXT,
-      );
-    if (
-      (await lane.getThinkingLevel(BACKGROUND_CONTEXT)) !==
-      configuration.reasoningEffort
-    )
-      await lane.setThinkingLevel(
-        configuration.reasoningEffort,
-        BACKGROUND_CONTEXT,
-      );
-    const names = tools.map((tool) => tool.name);
-    if ((await lane.getActiveTools(BACKGROUND_CONTEXT)).join() !== names.join())
-      await lane.setActiveTools(names, BACKGROUND_CONTEXT);
-    return { harness, lane, close };
+    return { ...session, close };
   } catch (error) {
     await close();
-    if (options.signal?.aborted) throw error;
+    // A store that cannot be opened is said as that, not as a model problem.
+    if (options.signal?.aborted || error instanceof NativeSessionError)
+      throw error;
     throw new PiUnavailableError(
       describePiFailure(error),
       diagnosticFailure(error),
@@ -1286,112 +1370,88 @@ export async function openPiSession(
   }
 }
 
-/** Pi's events as Hallvi records them. `reply()` restarts per-reply keys. */
-export function watchPiSession(harness: PiHarness, options: PiSessionEvents) {
+/**
+ * Pi's work as Hallvi's diagnostics record it: one step for each model
+ * request, tool call, compaction and retry, and nothing of what was said.
+ */
+export async function watchPiSession(
+  session: Pick<PiSession, "harness" | "conversation">,
+  onActivity: (event: ExecutionSignal) => void,
+) {
+  const { watchEvents } = await import("@earendil-works/pi-durable");
+  const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
   let generation = 0;
   let compaction = 0;
   let retry = 0;
   let toolSequence = 0;
+  let model: string | undefined;
   const toolKeys = new Map<string, string>();
-  const off = [
-    harness.events.on("tool_start", (event) => {
-      const key = `tool:${++toolSequence}`;
-      toolKeys.set(event.toolCallId, key);
-      options.onActivity?.({
-        type: "start",
-        key,
-        kind: toolStepKind(event.toolName),
-      });
-      options.onTool?.({
-        type: "start",
-        id: event.toolCallId,
-        sequence: toolSequence,
-        tool: event.toolName,
-        args: event.args,
-      });
-    }),
-    harness.events.on("tool_update", (event) =>
-      options.onTool?.({
-        type: "update",
-        id: event.toolCallId,
-        partial: event.partialResult,
-      }),
-    ),
-    harness.events.on("tool_end", (event) => {
-      const key = toolKeys.get(event.toolCallId);
-      if (key)
-        options.onActivity?.({ type: "end", key, failed: event.isError });
-      toolKeys.delete(event.toolCallId);
-      options.onTool?.({
-        type: "end",
-        id: event.toolCallId,
-        result: event.result,
-        isError: event.isError,
-      });
-    }),
-    harness.events.on("compaction_start", () =>
-      options.onActivity?.({
-        type: "start",
-        key: `compaction:${++compaction}`,
-        kind: "compaction",
-      }),
-    ),
-    harness.events.on("compaction_end", (event) =>
-      options.onActivity?.({
-        type: "end",
-        key: `compaction:${compaction}`,
-        failed: event.status === "failed" || event.status === "aborted",
-      }),
-    ),
-    harness.events.on("retry_start", (event) => {
-      const key = `retry:${++retry}`;
-      options.onActivity?.({ type: "start", key, kind: "retry" });
-      options.onActivity?.({
-        type: "end",
-        key,
-        metadata: { attempt: event.attempt },
-      });
-    }),
-    harness.events.on("message_start", (event) => {
-      if (event.message.role !== "assistant") return;
-      options.onActivity?.({
-        type: "start",
-        key: `model:${++generation}`,
-        kind: "model",
-      });
-    }),
-    harness.events.on("message_end", ({ message }) => {
-      if (message.role !== "assistant") return;
-      options.onActivity?.({
-        type: "end",
-        key: `model:${generation}`,
-        failed:
-          message.stopReason === "error" || message.stopReason === "aborted",
-        metadata: {
-          model: message.model,
-          provider: message.provider,
-          inputTokens: message.usage?.input,
-          outputTokens: message.usage?.output,
-          cacheReadTokens: message.usage?.cacheRead,
-          cacheWriteTokens: message.usage?.cacheWrite,
-        },
-      });
-      const said = message.content
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-        .join("");
-      if (said.trim())
-        options.onTool?.({
-          type: "message",
-          sequence: ++toolSequence,
-          text: said,
+  const stream = await watchEvents(
+    session.harness,
+    session.conversation.id,
+    BACKGROUND_CONTEXT,
+  );
+  stream.start(async (events) => {
+    for (const event of events) {
+      if (event.type === "tool_execution_start") {
+        const key = `tool:${++toolSequence}`;
+        toolKeys.set(event.toolCallId, key);
+        onActivity({ type: "start", key, kind: toolStepKind(event.toolName) });
+      } else if (event.type === "tool_execution_end") {
+        // A call Pi refused before it began ends without having started.
+        const key = toolKeys.get(event.toolCallId);
+        toolKeys.delete(event.toolCallId);
+        const result = event.entry?.model?.[0] as
+          { isError?: boolean } | undefined;
+        if (key)
+          onActivity({ type: "end", key, failed: result?.isError ?? true });
+      } else if (event.type === "compaction_start")
+        onActivity({
+          type: "start",
+          key: `compaction:${++compaction}`,
+          kind: "compaction",
         });
-    }),
-  ];
-  return {
-    unsubscribe: () => off.forEach((stop) => stop()),
-    reply() {
-      generation = compaction = retry = toolSequence = 0;
-    },
-  };
+      else if (event.type === "compaction_end") {
+        // The event says a compaction ended, not how: Pi's record of the
+        // task does.
+        const task = await session.harness
+          .getTask(event.taskId, BACKGROUND_CONTEXT)
+          .catch(() => undefined);
+        onActivity({
+          type: "end",
+          key: `compaction:${compaction}`,
+          failed:
+            task?.state.status === "terminal" &&
+            task.state.outcome.status !== "completed",
+        });
+      } else if (event.type === "auto_retry_start") {
+        const key = `retry:${++retry}`;
+        onActivity({ type: "start", key, kind: "retry" });
+        onActivity({ type: "end", key, metadata: { attempt: event.attempt } });
+      } else if (event.type === "message_start") {
+        if (event.message.role !== "assistant" || model) continue;
+        model = `model:${++generation}`;
+        onActivity({ type: "start", key: model, kind: "model" });
+      } else if (event.type === "message_end") {
+        const message = event.entry.model?.[0];
+        if (!model || message?.role !== "assistant") continue;
+        onActivity({
+          type: "end",
+          key: model,
+          failed:
+            message.stopReason === "error" || message.stopReason === "aborted",
+          metadata: {
+            model: message.model,
+            provider: message.provider,
+            inputTokens: message.usage?.input,
+            outputTokens: message.usage?.output,
+            cacheReadTokens: message.usage?.cacheRead,
+            cacheWriteTokens: message.usage?.cacheWrite,
+          },
+        });
+        model = undefined;
+      }
+    }
+  });
+  return { unsubscribe: () => void stream.stop() };
 }

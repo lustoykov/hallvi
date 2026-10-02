@@ -41,7 +41,12 @@ export const chats = sqliteTable(
       .references(() => applications.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     kind: text("kind").$type<"main" | "side">().notNull().default("side"),
-    /** The Pi session that holds this conversation. Pi keeps the rest. */
+    /**
+     * No longer read or written: Pi keeps each conversation in a store of its
+     * own, found by the conversation's id. The column stays so the table is
+     * the same in every installation, and an earlier release put back over
+     * these records still finds the histories it wrote.
+     */
     nativeSessionId: text("native_session_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),

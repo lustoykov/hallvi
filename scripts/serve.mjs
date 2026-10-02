@@ -228,7 +228,12 @@ web.on("exit", (code) => {
   stop("SIGTERM", code || 1);
 });
 
-const worker = start([join(program, "dist", "worker.mjs")]);
+// Pi keeps conversations with Node's built-in SQLite, which Node 22 still
+// announces as experimental on every start. The log is for what went wrong.
+const worker = start([
+  "--disable-warning=ExperimentalWarning",
+  join(program, "dist", "worker.mjs"),
+]);
 worker.on("exit", (code, signal) => {
   if (stopping) return;
   if (code === WORKER_BUSY_EXIT) {

@@ -1,7 +1,4 @@
-import {
-  BACKGROUND_CONTEXT as ctx,
-  laneConfig,
-} from "@earendil-works/pi-agent-core";
+import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import {
   createAssistantMessageEventStream,
   InMemoryCredentialStore,
@@ -112,9 +109,7 @@ import {
   saveOperatorSettings,
 } from "../../../src/server/operator-execution";
 import { openPiSession } from "../../../src/server/pi";
-import { openNativeChatSession } from "../../../src/server/pi-sessions";
 import { ownSessions } from "../../../src/server/pi-owner";
-import { MESSAGE_TAG } from "../../../src/server/pi-transcript";
 import {
   RequestNotFoundError,
   inspectApplication,
@@ -136,6 +131,8 @@ import { pushTestDatabase } from "../../test-database";
 let root: string;
 /** What each model request ended with, in order: the scripted model's view. */
 let requests: string[];
+/** Each request as the provider was handed it. */
+let sent: { context: Context; options?: SimpleStreamOptions }[];
 let contextUsed = 10;
 let worker: NonNullable<Awaited<ReturnType<typeof ownSessions>>> | null;
 
@@ -192,6 +189,7 @@ beforeAll(async () => {
     baseUrl: "https://invalid.test",
     streamSimple: (model, context: Context, options?: SimpleStreamOptions) => {
       const stream = createAssistantMessageEventStream();
+      sent.push({ context, options });
       const last = context.messages.at(-1)!;
       const text = last.role === "user" ? said(last.content) : "";
       const images = Array.isArray(last.content)
@@ -264,80 +262,89 @@ beforeAll(async () => {
         stream.push({ type: "error", reason: "error", error: failed });
         return stream;
       }
-      const message = text.includes("[fail]")
-        ? assistant(model, [], "error", "invalid_grant: 401 unauthorized")
-        : text.includes("[withdraw-dns]")
-          ? assistant(
-              model,
-              [
-                {
-                  type: "toolCall",
-                  id: `call-${++calls}`,
-                  name: "cancel_connection_request",
-                  arguments: {
-                    kind: "domain",
-                    reason:
-                      "The owner handled DNS outside the card; the recorded check confirms the intended address.",
-                  },
-                },
-              ],
-              "toolUse",
-            )
-          : text.includes("[domain]")
-            ? assistant(
-                model,
-                [
-                  { type: "text", text: "Reading the name." },
-                  {
-                    type: "toolCall",
-                    id: `call-${++calls}`,
-                    name: "check_domain",
-                    // Secret-shaped, because Pi's history keeps what the model
-                    // sent and a reader must never be handed it.
-                    arguments: { name: "ghp_livesecrettoken0123456789abcdef" },
-                  },
-                ],
-                "toolUse",
-              )
-            : text.includes("[dns]")
+      const message =
+        last.role === "toolResult" &&
+        requested &&
+        said(requested.content).includes("[then-fail]")
+          ? assistant(model, [], "error", "invalid_grant: 401 unauthorized")
+          : text.includes("[fail]")
+            ? assistant(model, [], "error", "invalid_grant: 401 unauthorized")
+            : text.includes("[withdraw-dns]")
               ? assistant(
                   model,
                   [
-                    { type: "text", text: "I need the name's DNS." },
                     {
                       type: "toolCall",
                       id: `call-${++calls}`,
-                      name: "request_domain_access",
-                      arguments: { name: "shop.test" },
+                      name: "cancel_connection_request",
+                      arguments: {
+                        kind: "domain",
+                        reason:
+                          "The owner handled DNS outside the card; the recorded check confirms the intended address.",
+                      },
                     },
                   ],
                   "toolUse",
                 )
-              : text.includes("[approve]")
+              : text.includes("[domain]")
                 ? assistant(
                     model,
                     [
-                      { type: "text", text: "I will ask first." },
+                      { type: "text", text: "Reading the name." },
                       {
                         type: "toolCall",
                         id: `call-${++calls}`,
-                        name: "request_approval",
-                        arguments: { action: "Restart the service" },
+                        name: "check_domain",
+                        // Secret-shaped, because Pi's history keeps what the
+                        // model sent and a reader must never be handed it.
+                        arguments: {
+                          name: "ghp_livesecrettoken0123456789abcdef",
+                        },
                       },
                     ],
                     "toolUse",
                   )
-                : assistant(
-                    model,
-                    [
-                      {
-                        type: "text",
-                        text:
-                          last.role === "user" ? `reply: ${text}` : "finished",
-                      },
-                    ],
-                    "stop",
-                  );
+                : text.includes("[dns]")
+                  ? assistant(
+                      model,
+                      [
+                        { type: "text", text: "I need the name's DNS." },
+                        {
+                          type: "toolCall",
+                          id: `call-${++calls}`,
+                          name: "request_domain_access",
+                          arguments: { name: "shop.test" },
+                        },
+                      ],
+                      "toolUse",
+                    )
+                  : text.includes("[approve]")
+                    ? assistant(
+                        model,
+                        [
+                          { type: "text", text: "I will ask first." },
+                          {
+                            type: "toolCall",
+                            id: `call-${++calls}`,
+                            name: "request_approval",
+                            arguments: { action: "Restart the service" },
+                          },
+                        ],
+                        "toolUse",
+                      )
+                    : assistant(
+                        model,
+                        [
+                          {
+                            type: "text",
+                            text:
+                              last.role === "user"
+                                ? `reply: ${text}`
+                                : "finished",
+                          },
+                        ],
+                        "stop",
+                      );
       stream.push({ type: "start", partial: message });
       stream.push(
         message.stopReason === "error"
@@ -381,6 +388,7 @@ beforeEach(async () => {
   for (const application of await store.listApplications())
     await store.deleteApplication(application.id);
   requests = [];
+  sent = [];
   contextUsed = 10;
   synthetic.authFails = false;
   synthetic.hanging = false;
@@ -405,7 +413,7 @@ it("the registered private-access tool accepts provider nullable forms through P
   await loseWorker();
   const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
   try {
-    const tool = (await direct.harness.getTools(ctx)).find(
+    const tool = (await direct.conversation.agent(ctx)).tools.find(
       (item) => item.name === "open_server_port",
     )!;
     expect(tool).toBeDefined();
@@ -517,6 +525,52 @@ const approval = async (applicationId: string) =>
 /** What a caller outside the page reads about one request. */
 const outcome = (app: { id: string; chat: string }, key: string) =>
   requestOutcome(app.id, app.chat, key);
+
+it("sends the model one prompt that leads the request, the conversation so far, and none of Hallvi's marks", async () => {
+  const a = await application("shop");
+  await sendChatMessage(
+    a.id,
+    a.chat,
+    "first",
+    randomUUID(),
+    "next",
+    undefined,
+    "cli",
+  );
+  await until(async () => expect(await a.status()).toBe("idle"));
+  await a.send("second");
+  await until(async () => expect(await a.status()).toBe("idle"));
+
+  const { context, options } = sent.at(-1)!;
+  // Pi keeps the prompt and the tools as entries after the first message. A
+  // provider takes only what leads the request for its instructions.
+  expect(context.messages.map((message) => message.role)).toEqual([
+    "system",
+    "user",
+    "assistant",
+    "user",
+  ]);
+  const prompt = context.messages[0] as unknown as {
+    sections: Record<string, string>;
+    toolsAdded: { name: string }[];
+  };
+  expect(Object.keys(prompt.sections)).toEqual([
+    "operator",
+    "workspace",
+    "role",
+  ]);
+  expect(prompt.sections.role).toContain("main operator");
+  expect(prompt.toolsAdded.map((tool) => tool.name)).toEqual(
+    expect.arrayContaining(["server_bash", "save_information"]),
+  );
+  // When it was sent and where it was written are for the page.
+  expect(JSON.stringify(sent)).not.toMatch(/hallviSentAt|hallviOrigin/);
+  expect(
+    (await a.snapshot()).messages.find((m) => m.body === "first")?.origin,
+  ).toBe("cli");
+  // What a provider keeps its prompt cache under: the conversation.
+  expect((options as { sessionId?: string }).sessionId).toBe(a.chat);
+});
 
 it("accepts nothing while no worker answers, and the same send succeeds once when one does", async () => {
   const a = await application("shop");
@@ -679,10 +733,12 @@ it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", asy
   ]);
 });
 
-it("a request's outcome is the operation Pi read it in: what Pi read together shares one result, and later work stays out", async () => {
+it("a request's outcome is the work Pi answered it in: a steer shares the result of the work it joined, and what waited has its own", async () => {
   const a = await application("shop");
   const b = await application("blog");
-  const [first, second, third, later] = [0, 1, 2, 3].map(() => randomUUID());
+  const [first, steered, second, third, later] = [0, 1, 2, 3, 4].map(() =>
+    randomUUID(),
+  );
   await sendChatMessage(
     a.id,
     a.chat,
@@ -701,6 +757,7 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
   });
   await a.send("then check the logs", "next", second);
   await a.send("and the disk", "next", third);
+  await a.send("use the staging server", "steer", steered);
   expect(await outcome(a, second)).toMatchObject({
     status: "queued",
     operation: null,
@@ -711,10 +768,10 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
   await decideExecution(a.id, (await approval(a.id))!.id, true);
   await until(async () => expect(await a.status()).toBe("idle"));
   await until(async () => expect(await b.status()).toBe("idle"));
-  // Pi read both follow-ups inside the operation it was already running, so
-  // all three requests have that operation's result, whole.
+  // Pi answered the steer inside the work it was already doing, so the two
+  // requests have that one result, whole: its last answer and its evidence.
   const results = await Promise.all(
-    [first, second, third].map((key) => outcome(a, key)),
+    [first, steered].map((key) => outcome(a, key)),
   );
   for (const result of results)
     expect(result).toMatchObject({
@@ -722,9 +779,9 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
       operation: {
         id: first,
         status: "completed",
-        requestKeys: [first, second, third],
+        requestKeys: [first, steered],
       },
-      answer: "reply: and the disk",
+      answer: "reply: use the staging server",
       evidence: [
         {
           tool: "request_approval",
@@ -733,6 +790,17 @@ it("a request's outcome is the operation Pi read it in: what Pi read together sh
         },
       ],
     });
+  // What waited for that work to end was answered after it, each by itself.
+  expect(await outcome(a, second)).toMatchObject({
+    status: "completed",
+    operation: { id: second, status: "completed", requestKeys: [second] },
+    answer: "reply: then check the logs",
+    evidence: [],
+  });
+  expect(await outcome(a, third)).toMatchObject({
+    operation: { id: third, requestKeys: [third] },
+    answer: "reply: and the disk",
+  });
 
   // A later request is its own operation, and does not change the earlier one.
   await a.send("hello", "next", later);
@@ -824,7 +892,7 @@ it("Stop ends an approval wait and a streaming answer, drops what waited, and sa
   expect(await listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
   expect(requests).toEqual(["[approve] restart it"]);
   expect(await outcome(a, stopped)).toMatchObject({ status: "cancelled" });
-  // Pi keeps no record of a waiting message Stop dropped.
+  // A waiting message Stop dropped has left the conversation.
   await expect(outcome(a, dropped)).rejects.toBeInstanceOf(
     RequestNotFoundError,
   );
@@ -900,10 +968,15 @@ it("after a restart nothing runs; history and evidence stay; Continue carries on
     "you [delivered] then check the logs",
     "pi [completed] reply: then check the logs",
   ]);
-  // Continuing resumed the same operation, which then read what waited.
+  // Continuing resumed the work that was cut, and what waited was read after
+  // it, as work of its own.
+  expect(await outcome(a, first)).toMatchObject({
+    status: "completed",
+    operation: { id: first, requestKeys: [first] },
+  });
   expect(await outcome(a, waiting)).toMatchObject({
     status: "completed",
-    operation: { id: first, requestKeys: [first, waiting] },
+    operation: { id: waiting, requestKeys: [waiting] },
   });
 });
 
@@ -928,68 +1001,76 @@ it("after a restart Stop ends what Pi held even when the model login has expired
   expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: hello");
 });
 
-it("Stop drops an idle lane's unread queue without a model login", async () => {
+/**
+ * What a failed reply leaves: Pi has stopped working, and a message it took
+ * while it worked is still in its queue with nothing reading it.
+ */
+async function stranded(
+  a: Awaited<ReturnType<typeof application>>,
+  key: ReturnType<typeof randomUUID>,
+) {
+  await a.send("[approve] [then-fail] restart it");
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
+  await a.send("one more thing", "next", key);
+  await decideExecution(a.id, (await approval(a.id))!.id, true);
+  await until(async () => expect(await a.status()).toBe("interrupted"));
+  expect((await a.transcript()).slice(-2)).toEqual([
+    "pi [failed] I will ask first.",
+    "you [waiting] one more thing",
+  ]);
+}
+
+it("Stop drops what waited behind a failed reply, without a model login", async () => {
   const a = await application("shop");
-  const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
-  const model = (await direct.lane.inspectExecution(ctx)).configuredModel;
-  const queued = await direct.lane.followUp("unread work", undefined, ctx);
-  expect(queued.ok).toBe(true);
-  await direct.close();
+  const waiting = randomUUID();
+  await stranded(a, waiting);
+  const asked = requests.length;
 
   synthetic.authFails = true;
-  expect(await a.status()).toBe("interrupted");
   await a.stop();
   expect(await a.status()).toBe("idle");
-  expect(await a.transcript()).toEqual([]);
-  expect(requests).toEqual([]);
-  const native = await openNativeChatSession(a.id, a.chat);
-  try {
-    expect(
-      (await native.session.getValue(laneConfig("main"), ctx))?.value.model,
-    ).toEqual(model);
-  } finally {
-    await native.release();
-  }
+  expect((await a.transcript()).at(-1)).toBe("pi [failed] I will ask first.");
+  expect(requests).toHaveLength(asked);
+  // What Stop dropped is gone. Sent again under its key, as a page does
+  // with a draft it never saw accepted, it is a new message, taken once.
+  synthetic.authFails = false;
+  await a.send("one more thing", "next", waiting);
+  await a.send("one more thing", "next", waiting);
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect(requests.slice(asked)).toEqual(["one more thing"]);
+  expect((await a.snapshot()).messages.slice(-2)).toMatchObject([
+    { id: waiting, status: "delivered" },
+    { status: "completed", body: "reply: one more thing" },
+  ]);
+  expect(await outcome(a, waiting)).toMatchObject({
+    status: "completed",
+    operation: { id: waiting, requestKeys: [waiting] },
+  });
 });
 
-it("a message Pi queued on an idle lane is read from Pi's queue, once, when its owner continues", async () => {
+it("a message left waiting behind a failed reply is read from Pi's queue, once, when its owner continues", async () => {
   const a = await application("shop");
-  await a.send("hello");
-  await until(async () => expect(await a.status()).toBe("idle"));
-  // What a worker leaves when it dies in the instant after Pi finished and
-  // took one more message: an idle lane with a queue.
-  await loseWorker();
-  const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
-  const queued = await direct.lane.followUp(
-    {
-      role: "user",
-      content: [{ type: "text", text: "one more thing" }],
-      timestamp: Date.now(),
-      [MESSAGE_TAG]: "late-message",
-    } as never,
-    undefined,
-    ctx,
-  );
-  expect(queued.ok).toBe(true);
-  await direct.close();
-  await startWorker();
-
-  expect(await a.status()).toBe("interrupted");
-  expect((await a.transcript()).at(-1)).toBe("you [waiting] one more thing");
+  const waiting = randomUUID();
+  await stranded(a, waiting);
+  const asked = requests.length;
   await delay(200);
-  expect(requests).toEqual(["hello"]);
+  expect(requests).toHaveLength(asked);
+  // A new message would be read after it, so it is refused until then.
+  await expect(a.send("what time is it?")).rejects.toMatchObject({
+    code: "interrupted",
+  });
 
   await a.continue();
   await until(async () => expect(await a.status()).toBe("idle"));
-  expect(requests).toEqual(["hello", "one more thing"]);
+  expect(requests.slice(asked)).toEqual(["one more thing"]);
   expect((await a.snapshot()).messages.at(-2)).toMatchObject({
-    id: "late-message",
+    id: waiting,
     status: "delivered",
   });
-  // Pi read it in an operation of its own, named after its queue entry.
-  expect(await outcome(a, "late-message")).toMatchObject({
+  // Pi read it as work of its own, named after the message.
+  expect(await outcome(a, waiting)).toMatchObject({
     status: "completed",
-    operation: { id: expect.stringMatching(/^queue:/) },
+    operation: { id: waiting, requestKeys: [waiting] },
     answer: "reply: one more thing",
   });
 });
@@ -1002,19 +1083,37 @@ it("leaves retrying, compaction and failure to Pi, and gives the page advice ins
     "pi [completed] reply: [flaky] first",
   );
 
+  // Enough said for Pi to have something to summarise, sent past the page's
+  // own limit on a message, and then a provider that reports its context
+  // nearly full.
+  const say = async (body: string) => {
+    await worker!.owner.handle("send", {
+      scope: { applicationId: a.id, chatId: a.chat },
+      message: { id: randomUUID(), body, delivery: "next" },
+    });
+    await until(async () => expect(await a.status()).toBe("idle"));
+  };
+  const long = (n: number) => `long ${n} ${"x".repeat(60_000)}`;
+  await say(long(1));
+  await say(long(2));
   contextUsed = 260_000;
-  await a.send("second");
-  await until(async () => expect(await a.status()).toBe("idle"));
+  await say(long(3));
   contextUsed = 10;
-  await a.send("third");
+  await a.send("after it");
   await until(async () => expect(await a.status()).toBe("idle"));
-  // Compaction changed what the model is sent, not what the page shows.
+  // Pi summarised the earlier part for the model by itself. Compaction
+  // changed what the model is sent, not what the page shows.
+  expect(requests.some((sent) => sent.startsWith("<conversation>"))).toBe(true);
   expect(
-    (await a.transcript()).filter((line) => line.startsWith("you")),
+    (await a.transcript())
+      .filter((line) => line.startsWith("you"))
+      .map((line) => line.slice(0, 29)),
   ).toEqual([
     "you [delivered] [flaky] first",
-    "you [delivered] second",
-    "you [delivered] third",
+    "you [delivered] long 1 xxxxxx",
+    "you [delivered] long 2 xxxxxx",
+    "you [delivered] long 3 xxxxxx",
+    "you [delivered] after it",
   ]);
 
   await a.send("[fail] fourth");
@@ -1059,39 +1158,29 @@ it("a model failure after a successful status read keeps the same safe reason in
   await check();
 });
 
-it("Stop after continuing an idle lane's queue says stopped, from the result of the operation Pi read the queue in", async () => {
+it("Stop after continuing what waited says stopped, and later work does not rewrite it", async () => {
   const a = await application("shop");
-  await a.send("hello");
-  await until(async () => expect(await a.status()).toBe("idle"));
-  await loseWorker();
-  const direct = await openPiSession({ applicationId: a.id, chatId: a.chat });
-  await direct.lane.followUp(
-    {
-      role: "user",
-      content: [{ type: "text", text: "[approve] restart it" }],
-      timestamp: Date.now(),
-      [MESSAGE_TAG]: "late-approval",
-    } as never,
-    undefined,
-    ctx,
-  );
-  await direct.close();
-  await startWorker();
+  await a.send("[approve] [then-fail] restart it");
+  await until(async () => expect(await approval(a.id)).toBeTruthy());
+  await a.send("[approve] and again");
+  await decideExecution(a.id, (await approval(a.id))!.id, true);
+  await until(async () => expect(await a.status()).toBe("interrupted"));
 
   await a.continue();
   await until(async () => expect(await approval(a.id)).toBeTruthy());
   await a.stop();
   expect(await a.status()).toBe("idle");
   expect((await a.transcript()).slice(-2)).toEqual([
-    "you [delivered] [approve] restart it",
+    "you [delivered] [approve] and again",
     "pi [cancelled] I will ask first.",
   ]);
-  expect(await listExecutions(a.id)).toMatchObject([{ status: "interrupted" }]);
+  expect((await listExecutions(a.id)).at(-1)).toMatchObject({
+    status: "interrupted",
+  });
 
   // A later turn, and a worker that went away in between, do not rewrite how
-  // that stopped one ended: its operation is the one Pi read the queue in,
-  // and a reader that only asked about the newest operation called it
-  // completed.
+  // that stopped one ended: a reader that only asked how the newest work
+  // ended called it completed.
   await a.send("hello again");
   await until(async () => expect(await a.status()).toBe("idle"));
   await loseWorker();
@@ -1101,6 +1190,82 @@ it("Stop after continuing an idle lane's queue says stopped, from the result of 
     "you [delivered] hello again",
     "pi [completed] reply: hello again",
   ]);
+});
+
+it("Stop does not say stopped while a call that ignores it is still going, and nothing starts beside it", async () => {
+  const a = await application("shop");
+  synthetic.hanging = true;
+  await a.send("[domain] check the name");
+  await until(() => expect(synthetic.release).toBeTruthy());
+
+  // The provider read takes no signal. Pi waits for the call, and so does
+  // Stop, for as long as the worker allows before saying so.
+  await expect(a.stop()).rejects.toMatchObject({ code: "stopping" });
+  expect(await a.status()).toBe("working");
+  expect(worker!.owner.live()).toBe(1);
+  await expect(a.send("and another thing")).rejects.toMatchObject({
+    code: "stopping",
+  });
+
+  synthetic.release!();
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect((await a.snapshot()).messages.at(-1)).toMatchObject({
+    status: "cancelled",
+  });
+  expect(requests).toEqual(["[domain] check the name"]);
+  await a.send("hello");
+  await until(async () => expect(await a.status()).toBe("idle"));
+  expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: hello");
+});
+
+it("a worker told to stop mid-call leaves the call unsettled: Pi records no result for it and asks the model nothing more", async () => {
+  await loseWorker();
+  const told = new AbortController();
+  worker = await ownSessions({ signal: told.signal });
+  const a = await application("shop");
+  synthetic.hanging = true;
+  await a.send("[domain] check the name");
+  await until(() => expect(synthetic.release).toBeTruthy());
+
+  // What the service manager's signal does, before anything else in the
+  // worker has had a turn: the call is let go of, and what it then returns
+  // must not be taken for its result.
+  told.abort();
+  await worker!.close();
+  worker = null;
+  await delay(100);
+  expect(requests).toEqual(["[domain] check the name"]);
+
+  await startWorker();
+  expect(await a.status()).toBe("interrupted");
+  expect(requests).toEqual(["[domain] check the name"]);
+  await a.continue();
+  await until(async () => expect(await a.status()).toBe("idle"));
+  // Continued, the model is told the call was interrupted, once.
+  expect(requests).toEqual(["[domain] check the name", "<toolResult>"]);
+});
+
+it("a cleanup that fails when a conversation ends stops neither the worker nor the conversation", async () => {
+  const a = await application("shop");
+  const unhandled: unknown[] = [];
+  const record = (reason: unknown) => unhandled.push(reason);
+  process.on("unhandledRejection", record);
+  try {
+    synthetic.cleanupFailsFor = a.chat;
+    await a.send("hello");
+    await until(async () => expect(await a.status()).toBe("idle"));
+    await delay(50);
+    expect(unhandled).toEqual([]);
+    expect(worker!.owner.live()).toBe(0);
+    await a.send("again");
+    await until(async () =>
+      expect((await a.transcript()).at(-1)).toBe("pi [completed] reply: again"),
+    );
+  } finally {
+    synthetic.cleanupFailsFor = undefined;
+    await delay(50);
+    process.off("unhandledRejection", record);
+  }
 });
 
 it("a second worker steps aside without touching what the first is doing", async () => {

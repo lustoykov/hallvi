@@ -327,8 +327,8 @@ export function controllerClient(controller) {
  * for idle, finished or cancelled. Failures that may pass — a restarting
  * controller or worker — are asked again for `patienceMs`, then reported with
  * the last state known. A request the caller knows Pi took, and that Pi then
- * holds neither waiting nor read, was dropped by Stop: Pi keeps no record of
- * that, so it is said from the two observations, and only then.
+ * holds neither waiting nor read, was dropped by Stop: the conversation no
+ * longer shows it, so it is said from the two observations, and only then.
  */
 export async function observe(
   client,

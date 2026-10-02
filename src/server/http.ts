@@ -4,7 +4,6 @@ import {
   ExistingApplicationConflictError,
   NotFoundError,
 } from "./applications";
-import { PiUnavailableError } from "./pi";
 import {
   WorkerLostError,
   WorkerRefusal,
@@ -14,7 +13,6 @@ import {
 function statusFor(error: unknown) {
   if (error instanceof ExistingApplicationConflictError) return 409;
   if (error instanceof NotFoundError) return 404;
-  if (error instanceof PiUnavailableError) return 503;
   if (error instanceof WorkerUnavailableError) return 503;
   // Asked, and the answer was lost: not a refusal, and not known either way.
   if (error instanceof WorkerLostError) return 502;

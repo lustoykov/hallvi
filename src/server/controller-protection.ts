@@ -163,18 +163,61 @@ function passphrase() {
 
 // Capture
 
-function walk(directory: string, prefix: string, entries: TarFile[]) {
+/**
+ * A conversation's store as it stands now. Pi keeps each conversation in a
+ * SQLite file the worker may have open, with what it last wrote still in the
+ * journal beside it: the file read by itself is an older conversation, or an
+ * empty one. SQLite's own backup reads through the journal.
+ */
+const SQLITE_CORRUPT = 11;
+const SQLITE_NOTADB = 26;
+async function conversationStore(source: string, staging: string) {
+  const { DatabaseSync, backup } = await import("node:sqlite");
+  const target = join(staging, "conversation-store");
+  const store = new DatabaseSync(source, { readOnly: true });
+  try {
+    // In one step. Copied a few pages at a time, SQLite starts over whenever
+    // the worker commits to the store, and Pi commits ten times a second
+    // while it writes a reply.
+    await backup(store, target, { rate: 2 ** 31 - 1 });
+    return readFileSync(target);
+  } finally {
+    store.close();
+    rmSync(target, { force: true });
+  }
+}
+
+async function walk(
+  directory: string,
+  prefix: string,
+  entries: TarFile[],
+  staging?: string,
+) {
   for (const name of readdirSync(directory).sort()) {
     if (name === ".locks") continue;
+    // The journal of a store is part of the store, copied with it above.
+    if (staging && /\.sqlite-(wal|shm)$/.test(name)) continue;
     const source = join(directory, name);
     const stat = lstatSync(source);
     if (stat.isSymbolicLink())
       throw new Error("Refusing a symbolic link in controller state.");
-    if (stat.isDirectory()) walk(source, `${prefix}/${name}`, entries);
+    if (stat.isDirectory())
+      await walk(source, `${prefix}/${name}`, entries, staging);
     else if (stat.isFile())
       entries.push({
         path: `${prefix}/${name}`,
-        content: readFileSync(source),
+        content:
+          staging && name.endsWith(".sqlite")
+            ? await conversationStore(source, staging).catch((error) => {
+                // A file that is not a database is still the owner's, and is
+                // copied as it is. Any other failure fails the copy: the file
+                // by itself would be an older conversation passed off as
+                // this one.
+                if (![SQLITE_NOTADB, SQLITE_CORRUPT].includes(error?.errcode))
+                  throw error;
+                return readFileSync(source);
+              })
+            : readFileSync(source),
         mode: 0o600,
       });
   }
@@ -253,13 +296,13 @@ export async function captureControllerPayload(): Promise<{
         mode: 0o600,
       });
     }
+    const sessions = join(dirname(database), "pi-sessions");
+    if (existsSync(sessions))
+      await walk(sessions, "payload/database/pi-sessions", entries, staging);
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
   const capturedAt = new Date().toISOString();
-  const sessions = join(dirname(database), "pi-sessions");
-  if (existsSync(sessions))
-    walk(sessions, "payload/database/pi-sessions", entries);
   const config = piConfigDir();
   const accountNames = [
     "github-connection.json",
@@ -294,7 +337,7 @@ export async function captureControllerPayload(): Promise<{
     "secrets",
   ])
     if (existsSync(join(config, name)))
-      walk(join(config, name), `payload/config/${name}`, entries);
+      await walk(join(config, name), `payload/config/${name}`, entries);
   // The copy history travels with the copy; the passphrase never does.
   const state = join(protectionDir(), "state.json");
   if (existsSync(state))

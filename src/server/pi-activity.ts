@@ -1,6 +1,6 @@
 // What Pi actually did, in the order it did it — read from Pi's own history.
 //
-// Pi writes a tool call to its branch before the tool runs and the tool's
+// Pi writes a tool call to its history before the tool runs and the tool's
 // result when it returns, and keeps both through a compaction and across a
 // restart. So this is derived on every read rather than kept a second time:
 // there is no store here, nothing to sweep, and no way for two records of the

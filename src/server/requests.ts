@@ -251,7 +251,7 @@ export async function requestOutcome(
   );
   if (!message)
     throw new RequestNotFoundError(
-      "Pi holds no message with this request key in this conversation. It was never accepted, or Stop removed it before Pi read it: Pi keeps no record of a message it dropped.",
+      "Pi holds no message with this request key in this conversation. It was never accepted, or Stop removed it before Pi read it.",
     );
   const page = `/applications/${applicationId}?chat=${chatId}`;
   const identity = { applicationId, chatId, requestKey };

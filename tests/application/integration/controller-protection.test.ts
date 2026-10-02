@@ -1,3 +1,4 @@
+import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import Database from "better-sqlite3";
 import { execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
@@ -29,6 +30,7 @@ import {
   type DestinationAccess,
 } from "../../../src/server/controller-protection";
 import * as secrets from "../../../src/server/application-secrets";
+import { openConversation } from "../../../src/server/pi-sessions";
 import { readTar } from "../../../src/server/tar";
 import { countDay } from "../../../src/server/traffic/count";
 import { setCollection, writeDay } from "../../../src/server/traffic/store";
@@ -150,6 +152,43 @@ it("copies the controller while it runs, including committed WAL data", async ()
     captured.prepare("SELECT count(*) AS c FROM applications").get(),
   ).toEqual({ c: 1 });
   captured.close();
+});
+
+it("carries a conversation the worker has open as it stands now, not as its file was", async () => {
+  const { app, chat } = await application();
+  const open = await openConversation({
+    applicationId: app.id,
+    chatId: chat.id,
+  });
+  try {
+    // Written and not yet folded into the store's main file: what Pi wrote
+    // last is in the journal beside it for as long as the worker has it open.
+    await (
+      await open.conversation.submit(
+        { type: "write", entry: { kind: "test.note", data: "said today" } },
+        ctx,
+      )
+    ).wait(ctx);
+    const { entries: files } = await captureControllerPayload();
+    const stores = files.filter((file) =>
+      file.path.startsWith(`payload/database/pi-sessions/${app.id}/`),
+    );
+    expect(stores.map((file) => file.path)).toEqual([
+      `payload/database/pi-sessions/${app.id}/${chat.id}/conversation.sqlite`,
+    ]);
+    const copy = join(root, "captured-conversation.sqlite");
+    writeFileSync(copy, stores[0].content);
+    const captured = new Database(copy, { readonly: true });
+    expect(
+      captured
+        .prepare("SELECT record FROM entries")
+        .all()
+        .map((row) => JSON.parse((row as { record: string }).record).data),
+    ).toEqual(["said today"]);
+    captured.close();
+  } finally {
+    await open.close();
+  }
 });
 
 it("opens again only with the recovery passphrase", async () => {

@@ -1,9 +1,5 @@
-import {
-  AgentHarness,
-  BACKGROUND_CONTEXT,
-} from "@earendil-works/pi-agent-core";
-import { createModels } from "@earendil-works/pi-ai";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -12,14 +8,16 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
 import {
-  openNativeChatSession,
+  hasConversation,
+  openConversation,
   removeNativeSessions,
 } from "../../../src/server/pi-sessions";
 import { pushTestDatabase } from "../../test-database";
@@ -28,9 +26,11 @@ let root: string;
 let applicationId: string;
 let chatId: string;
 let otherChatId: string;
-const pathFor = (chat = chatId) =>
-  join(root, "pi-sessions", applicationId, `${chat}.jsonl`);
-const association = async () => (await store.getChat(chatId))!.nativeSessionId;
+const scope = (chat = chatId) => ({ applicationId, chatId: chat });
+const directory = (chat = chatId) =>
+  join(root, "pi-sessions", applicationId, chat);
+const storePath = (chat = chatId) =>
+  join(directory(chat), "conversation.sqlite");
 
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "hallvi-native-sessions-"));
@@ -56,170 +56,130 @@ afterAll(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-/** Pi's own history files for one conversation, wherever Pi put them. */
-const historyFiles = (chat = chatId) => {
-  const directory = join(root, "pi-sessions", applicationId, chat);
-  return existsSync(directory)
-    ? (readdirSync(directory, { recursive: true }) as string[])
-        .filter((name) => name.endsWith(".jsonl"))
-        .map((name) => join(directory, name))
-    : [];
-};
-const ctx = BACKGROUND_CONTEXT;
+/** Write something to a conversation without asking a model anything. */
+async function note(text: string, chat = chatId) {
+  const open = await openConversation(scope(chat));
+  try {
+    const written = await open.conversation.submit(
+      { type: "write", entry: { kind: "test.note", data: text } },
+      ctx,
+    );
+    await written.wait(ctx);
+  } finally {
+    await open.close();
+  }
+}
+async function notes(chat = chatId) {
+  const open = await openConversation(scope(chat));
+  try {
+    return (await open.read()).entries
+      .filter((entry) => entry.kind === "test.note")
+      .map((entry) => entry.data);
+  } finally {
+    await open.close();
+  }
+}
+const fingerprint = (path: string) =>
+  createHash("sha256").update(readFileSync(path)).digest("hex");
 
-it("keeps one private history per conversation, tied to its chat, and reopens it across database restarts", async () => {
-  const first = await openNativeChatSession(applicationId, chatId);
-  const id = first.session.metadata.id;
-  await first.release();
-  expect(await association()).toBe(id);
-  const [file] = historyFiles();
-  expect(statSync(file).mode & 0o077).toBe(0);
+it("keeps one private store per conversation and reopens it across database restarts", async () => {
+  expect(hasConversation(scope())).toBe(false);
+  // While it is open, Pi's journal files are private too.
+  const open = await openConversation(scope());
+  await (
+    await open.conversation.submit(
+      { type: "write", entry: { kind: "test.note", data: "kept" } },
+      ctx,
+    )
+  ).wait(ctx);
+  for (const name of readdirSync(directory()))
+    expect(statSync(join(directory(), name)).mode & 0o077).toBe(0);
+  await open.close();
+
+  expect(hasConversation(scope())).toBe(true);
+  expect(readdirSync(directory())).toEqual(["conversation.sqlite"]);
+  for (const path of [
+    join(root, "pi-sessions"),
+    join(root, "pi-sessions", applicationId),
+    directory(),
+  ])
+    expect(statSync(path).mode & 0o777).toBe(0o700);
   await store.closeDatabase();
-  const reopened = await openNativeChatSession(applicationId, chatId);
-  expect(reopened.session.metadata.id).toBe(id);
-  await reopened.release();
-  expect(historyFiles()).toEqual([file]);
+  expect(await notes()).toEqual(["kept"]);
   // A conversation's history never leaks into another's.
-  const other = await openNativeChatSession(applicationId, otherChatId);
-  expect(other.session.metadata.id).not.toBe(id);
-  await other.release();
+  expect(await notes(otherChatId)).toEqual([]);
 });
 
-it("reports a missing established history instead of silently starting a new one", async () => {
-  const first = await openNativeChatSession(applicationId, chatId);
-  await first.release();
-  rmSync(join(root, "pi-sessions", applicationId, chatId), {
-    recursive: true,
-  });
-  await expect(
-    openNativeChatSession(applicationId, chatId),
-  ).rejects.toMatchObject({ code: "history-unavailable" });
-  expect(historyFiles()).toEqual([]);
-  // The failed open let go of the application again.
-  const other = await openNativeChatSession(applicationId, otherChatId);
-  await other.release();
+it("reads what Pi holds without writing anything or setting anything going", async () => {
+  await note("kept");
+  const before = fingerprint(storePath());
+  const open = await openConversation(scope());
+  try {
+    const read = await open.read();
+    expect(read).toMatchObject({ live: {}, inbox: { items: [] }, tasks: 0 });
+    expect((await open.harness.inspect(ctx)).scheduling).toBe("paused");
+  } finally {
+    await open.close();
+  }
+  expect(fingerprint(storePath())).toBe(before);
 });
 
-it("opens a history written before the upgrade through Pi's own repository, and leaves the original for rollback", async () => {
-  // A representative earlier history, written by the session manager the
-  // earlier version used: a tool call and its result, a compaction, more talk.
-  mkdirSync(dirname(pathFor()), { recursive: true });
-  writeFileSync(pathFor(), "", { mode: 0o600 });
-  const earlier = SessionManager.open(pathFor(), dirname(pathFor()), root);
-  const assistant = (content: unknown[], stopReason = "stop") =>
-    ({
-      role: "assistant",
-      api: "openai-codex-responses",
-      provider: "openai-codex",
-      model: "gpt-5.6-sol",
-      content,
-      stopReason,
-      timestamp: 2,
-      usage: {
-        input: 10,
-        output: 1,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 11,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-    }) as never;
-  earlier.appendMessage({ role: "user", content: "Deploy it", timestamp: 1 });
-  earlier.appendMessage(
-    assistant(
-      [{ type: "toolCall", id: "call-1", name: "server_bash", arguments: {} }],
-      "toolUse",
+it("starts an earlier release's conversation empty and leaves its history where that release reads it", async () => {
+  const earlier = [
+    join(root, "pi-sessions", applicationId, `${chatId}.jsonl`),
+    join(directory(), "--tmp--", "2026-09-20_abc.jsonl"),
+  ];
+  mkdirSync(join(directory(), "--tmp--"), { recursive: true });
+  for (const path of earlier)
+    writeFileSync(path, '{"v":4,"kind":"header","id":"abc"}\n', {
+      mode: 0o600,
+    });
+  const before = earlier.map(fingerprint);
+
+  expect(hasConversation(scope())).toBe(false);
+  expect(await notes()).toEqual([]);
+  await note("new");
+  expect(await notes()).toEqual(["new"]);
+  expect(earlier.map(fingerprint)).toEqual(before);
+});
+
+it("says a store it cannot open is unavailable, and leaves it as it is", async () => {
+  mkdirSync(directory(), { recursive: true });
+  writeFileSync(
+    storePath(),
+    "this is not a database, and is long enough to be read as one\n".repeat(
+      200,
     ),
   );
-  earlier.appendMessage({
-    role: "toolResult",
-    toolCallId: "call-1",
-    toolName: "server_bash",
-    content: [{ type: "text", text: "container started" }],
-    isError: false,
-    timestamp: 3,
-  } as never);
-  const kept = earlier.appendMessage({
-    role: "user",
-    content: "Is it up?",
-    timestamp: 4,
+  const damaged = fingerprint(storePath());
+  await expect(openConversation(scope())).rejects.toMatchObject({
+    code: "history-unavailable",
   });
-  earlier.appendCompaction("Deployed the application.", kept, 1_000);
-  earlier.appendMessage(assistant([{ type: "text", text: "It is up." }]));
-  await store.setNativeSessionId(chatId, earlier.getSessionId());
-  const original = readFileSync(pathFor());
+  expect(fingerprint(storePath())).toBe(damaged);
 
-  const opened = await openNativeChatSession(applicationId, chatId);
-  expect(opened.session.metadata.id).toBe(earlier.getSessionId());
-  const { harness } = await AgentHarness.create(
-    {
-      session: opened.session,
-      models: createModels(),
-      model: { provider: "none", id: "none" } as never,
-      systemPrompt: "x",
-      tools: [],
-    },
-    ctx,
-  );
-  const lane = await harness.lane("main", ctx);
-  const entries = await lane.findEntries(undefined, ctx);
-  expect(entries.map((entry) => entry.type).sort()).toEqual([
-    "compaction",
-    "message",
-    "message",
-    "message",
-    "message",
-    "message",
-  ]);
-  expect(JSON.stringify(entries)).toContain("container started");
-  // Writing through Pi turns its copy into Pi's current format.
-  await lane.appendCustomEntry("hallvi-upgrade-check", undefined, ctx);
-  await harness.close(ctx);
-  await opened.release();
-  const [imported] = historyFiles();
-  expect(
-    JSON.parse(readFileSync(imported, "utf8").split("\n")[0]),
-  ).toMatchObject({ v: 4, id: earlier.getSessionId() });
-  // The original is byte for byte what it was: the earlier version still
-  // reads it, and removing the conversation's directory is the rollback.
-  expect(readFileSync(pathFor()).equals(original)).toBe(true);
-  expect(
-    SessionManager.open(pathFor(), dirname(pathFor()), root).getEntries(),
-  ).toHaveLength(6);
-  // A second open uses Pi's copy and does not import again.
-  const again = await openNativeChatSession(applicationId, chatId);
-  expect(await again.session.findEntries(undefined, ctx)).toHaveLength(7);
-  await again.release();
-  expect(historyFiles()).toEqual([imported]);
-});
-
-it("refuses a damaged earlier history rather than half-reading it", async () => {
-  mkdirSync(dirname(pathFor()), { recursive: true });
-  writeFileSync(
-    pathFor(),
-    '{"type":"session","version":3,"id":"s","timestamp":"2026-01-01T00:00:00.000Z","cwd":"/"}\n{"type":"message","id":"a"\n',
-    { mode: 0o600 },
-  );
-  await expect(
-    openNativeChatSession(applicationId, chatId),
-  ).rejects.toMatchObject({ code: "history-unavailable" });
-  expect(historyFiles()).toEqual([]);
+  // A link is never followed out of the conversation's own directory.
+  mkdirSync(directory(otherChatId), { recursive: true });
+  symlinkSync(join(root, "elsewhere.sqlite"), storePath(otherChatId));
+  await expect(openConversation(scope(otherChatId))).rejects.toMatchObject({
+    code: "history-unavailable",
+  });
+  expect(existsSync(join(root, "elsewhere.sqlite"))).toBe(false);
 });
 
 it("removes every history an application has", async () => {
-  const opened = await openNativeChatSession(applicationId, chatId);
-  await opened.release();
+  await note("kept");
   expect(existsSync(join(root, "pi-sessions", applicationId))).toBe(true);
   removeNativeSessions(applicationId);
   expect(existsSync(join(root, "pi-sessions", applicationId))).toBe(false);
+  expect(hasConversation(scope())).toBe(false);
 });
 
-it("rejects cross-application identity and path traversal before creating session storage", async () => {
+it("rejects cross-application identity and path traversal before creating storage", async () => {
   await expect(
-    openNativeChatSession("wrong-app", chatId),
+    openConversation({ applicationId: "wrong-app", chatId }),
   ).rejects.toMatchObject({ code: "not-found" });
   await expect(
-    openNativeChatSession(applicationId, "../escape"),
+    openConversation({ applicationId, chatId: "../escape" }),
   ).rejects.toMatchObject({ code: "not-found" });
-  expect(existsSync(dirname(pathFor()))).toBe(false);
+  expect(existsSync(join(root, "pi-sessions", applicationId))).toBe(false);
 });
