@@ -51,8 +51,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 1 | New |
 | [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | New |
 | [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | New |
-| [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 1 | New |
-| [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 1 | New |
+| [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 2 | Scroll hint in review; stacked layout open |
+| [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 2 | Fix in review |
 | [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | New |
 | [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
 
@@ -93,6 +93,10 @@ make it able to fail.
 
 **+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
 
+**+1:** 2026-10-02 — smooth UI pass, `codex/ui-smooth-polish`: corrected
+the check to inspect the actual focused element or its label; the keyboard
+journey passes with that real outline check.
+
 ### AF-080 — Give the registers a phone layout
 
 Below about 1000px a register table now keeps a 720px floor and scrolls
@@ -102,6 +106,10 @@ an opened release's checks sit off-screen until it does. A stacked row for
 narrow screens is a design question, not a fix.
 
 **+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+**+1:** 2026-10-02 — smooth UI pass, `codex/ui-smooth-polish`: reproduced
+the hidden columns in a narrow window. Added a width-aware scroll hint and
+keyboard scrolling to the shared table. A stacked-row design remains open.
 
 ### AF-079 — Decide the shell's button font reset
 

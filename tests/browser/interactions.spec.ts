@@ -206,8 +206,16 @@ test.describe("operating the destinations", () => {
         const focused = await page.evaluate(() => {
           const element = document.activeElement as HTMLElement | null;
           if (!element || element === document.body) return null;
-          const style = getComputedStyle(element);
-          const focus = getComputedStyle(element, ":focus-visible");
+          // :focus-visible is a selector, not a pseudo-element accepted by
+          // getComputedStyle. Read the actual focused control (or its label).
+          const hasOutline = (target: Element | null) => {
+            if (!target) return false;
+            const style = getComputedStyle(target);
+            return (
+              style.outlineStyle !== "none" &&
+              parseFloat(style.outlineWidth) > 0
+            );
+          };
           const rect = element.getBoundingClientRect();
           return {
             tag: element.tagName,
@@ -216,11 +224,7 @@ test.describe("operating the destinations", () => {
               element.getAttribute("title") ??
               (element.textContent ?? "").trim().slice(0, 40),
             onScreen: rect.width > 0 && rect.height > 0,
-            ring:
-              focus.outlineStyle !== "none" ||
-              focus.boxShadow !== style.boxShadow ||
-              focus.borderColor !== style.borderColor ||
-              focus.backgroundColor !== style.backgroundColor,
+            ring: hasOutline(element) || hasOutline(element.closest("label")),
           };
         });
         if (!focused) continue;

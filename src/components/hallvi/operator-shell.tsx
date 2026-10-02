@@ -26,6 +26,7 @@ import type { PiSetupStatus } from "@/server/pi-setup";
 import type {
   ApplicationRecord,
   ChatSnapshot,
+  OperatorMetadata,
   OperatorView,
 } from "@/server/types";
 
@@ -82,6 +83,21 @@ function focusComposer() {
   );
 }
 
+/** A periodic read that says the same thing should leave the page alone. */
+export function mergeOperatorMetadata(
+  current: OperatorView,
+  next: OperatorMetadata,
+): OperatorView {
+  const changed = Object.entries(next).filter(
+    ([key, value]) =>
+      JSON.stringify(value) !==
+      JSON.stringify(current[key as keyof OperatorMetadata]),
+  );
+  return changed.length
+    ? { ...current, ...Object.fromEntries(changed) }
+    : current;
+}
+
 export function OperatorShell({
   initialView,
   initialPiSetup,
@@ -122,6 +138,7 @@ export function OperatorShell({
     return () => window.clearInterval(timer);
   }, []);
   function selectSection(section: ApplicationSection | null) {
+    const initiatingControl = document.activeElement;
     setActiveSection(section);
     const url = new URL(window.location.href);
     const hash = section ? `#${section}` : "";
@@ -129,6 +146,19 @@ export function OperatorShell({
       url.hash = hash;
       window.history.pushState(null, "", url);
     }
+    if (section)
+      requestAnimationFrame(() => {
+        // A button inside the previous destination goes away with that page.
+        // Sidebar controls stay mounted and keep their ordinary keyboard focus.
+        if (initiatingControl?.isConnected) return;
+        const heading = document.querySelector<HTMLHeadingElement>(
+          ".hv-workspace h1, .hv-workspace h2",
+        );
+        if (heading) {
+          heading.tabIndex = -1;
+          heading.focus({ preventScroll: true });
+        }
+      });
   }
   // Closing a destination returns to the conversation.
   function closeSection() {
@@ -259,7 +289,7 @@ export function OperatorShell({
       setView((current) =>
         current.application?.id === applicationId &&
         current.selectedChatId === next.selectedChatId
-          ? { ...current, ...next }
+          ? mergeOperatorMetadata(current, next)
           : current,
       );
     }
@@ -276,17 +306,18 @@ export function OperatorShell({
         execution.status === "awaiting-approval",
     );
   useEffect(() => {
-    const initial = window.setTimeout(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
       void refreshDeployment().catch(() => undefined);
-    }, 0);
+    };
+    const initial = window.setTimeout(refreshIfVisible, 0);
     // Preserve the cadence of background deployment/protection facts.
-    const timer = setInterval(
-      () => void refreshDeployment().catch(() => undefined),
-      working ? 2500 : 15_000,
-    );
+    const timer = setInterval(refreshIfVisible, working ? 2500 : 15_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
     return () => {
       window.clearTimeout(initial);
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
     };
   }, [refreshDeployment, working]);
   const accessRecord = currentAccessRecord(
@@ -483,7 +514,7 @@ export function OperatorShell({
               if (active)
                 setView((current) =>
                   current.selectedChatId === chatId
-                    ? { ...current, ...next }
+                    ? mergeOperatorMetadata(current, next)
                     : current,
                 );
             })

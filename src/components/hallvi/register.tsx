@@ -464,142 +464,162 @@ export function Register<R extends { id: string }>({
   const span = columns.length + (detail ? 1 : 0);
 
   return (
-    <div className="hv-rg-panel">
-      <table className="hv-rg-table">
-        <colgroup>
-          {columns.map((column) => (
-            <col
-              key={column.key}
-              style={column.width ? { width: column.width } : undefined}
-            />
-          ))}
-          {detail ? <col style={{ width: 30 }} /> : null}
-        </colgroup>
-        <thead>
-          <tr>
+    <div className="hv-rg-register">
+      <p className="hv-rg-scroll-hint">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m4 5-3 3 3 3m8-6 3 3-3 3M1 8h14" />
+        </svg>
+        Scroll to see all columns
+      </p>
+      <div
+        className="hv-rg-panel"
+        tabIndex={0}
+        role="region"
+        aria-label="Table"
+      >
+        <table className="hv-rg-table">
+          <colgroup>
             {columns.map((column) => (
-              <th
+              <col
                 key={column.key}
-                className={column.align === "end" ? "hv-rg-end" : undefined}
-              >
-                {column.sort ? (
-                  <button
-                    type="button"
-                    className="hv-rg-sort"
-                    data-on={sortKey === column.key}
-                    onClick={() => {
-                      if (sortKey === column.key)
-                        setDir(dir === "desc" ? "asc" : "desc");
-                      else {
-                        setSortKey(column.key);
-                        setDir("desc");
-                      }
-                    }}
-                  >
-                    {column.head}
-                    <svg viewBox="0 0 10 10" aria-hidden="true">
-                      <path
-                        d={
-                          sortKey === column.key && dir === "asc"
-                            ? "M2 6.5 5 3.5l3 3"
-                            : "M2 3.5 5 6.5l3-3"
-                        }
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                ) : (
-                  column.head
-                )}
-              </th>
+                style={column.width ? { width: column.width } : undefined}
+              />
             ))}
-            {detail ? <th className="hv-rg-open" /> : null}
-          </tr>
-        </thead>
-
-        {rows.length === 0 ? (
-          <tbody>
-            <tr className="hv-rg-blank">
-              <td colSpan={span}>{empty ?? "Nothing here yet."}</td>
-            </tr>
-          </tbody>
-        ) : (
-          blocks.map((block, blockIndex) => (
-            <tbody key={block.label ?? `block-${blockIndex}`}>
-              {block.label ? (
-                <tr className="hv-rg-group">
-                  <td colSpan={span}>
-                    {block.label}
-                    <em>{block.rows.length}</em>
-                  </td>
-                </tr>
-              ) : null}
-              {block.rows.map((row) => {
-                const isOpen = open === row.id;
-                return (
-                  <Fragment key={row.id}>
-                    <tr
-                      className="hv-rg-row"
-                      data-tone={tone?.(row) ?? "plain"}
-                      data-open={isOpen}
-                      data-click={Boolean(detail)}
-                      onClick={
-                        detail
-                          ? () => setOpen(isOpen ? null : row.id)
-                          : undefined
-                      }
+            {detail ? <col style={{ width: 30 }} /> : null}
+          </colgroup>
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  className={column.align === "end" ? "hv-rg-end" : undefined}
+                  aria-sort={
+                    column.sort && sortKey === column.key
+                      ? dir === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : undefined
+                  }
+                >
+                  {column.sort ? (
+                    <button
+                      type="button"
+                      className="hv-rg-sort"
+                      data-on={sortKey === column.key}
+                      onClick={() => {
+                        if (sortKey === column.key)
+                          setDir(dir === "desc" ? "asc" : "desc");
+                        else {
+                          setSortKey(column.key);
+                          setDir("desc");
+                        }
+                      }}
                     >
-                      {columns.map((column) => (
-                        <td
-                          key={column.key}
-                          className={
-                            column.align === "end" ? "hv-rg-end" : undefined
+                      {column.head}
+                      <svg viewBox="0 0 10 10" aria-hidden="true">
+                        <path
+                          d={
+                            sortKey === column.key && dir === "asc"
+                              ? "M2 6.5 5 3.5l3 3"
+                              : "M2 3.5 5 6.5l3-3"
                           }
-                        >
-                          {column.cell(row)}
-                        </td>
-                      ))}
-                      {detail ? (
-                        <td className="hv-rg-open">
-                          <button
-                            type="button"
-                            aria-expanded={isOpen}
-                            aria-label={`${isOpen ? "Close" : "Open"}${label ? ` ${label(row)}` : ""}`}
-                          >
-                            <svg viewBox="0 0 10 10" aria-hidden="true">
-                              <path
-                                d={
-                                  isOpen
-                                    ? "M2 6.5 5 3.5l3 3"
-                                    : "M3.5 2 6.5 5l-3 3"
-                                }
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.4"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </button>
-                        </td>
-                      ) : null}
-                    </tr>
-                    {isOpen && detail ? (
-                      <tr className="hv-rg-detail">
-                        <td colSpan={span}>{detail(row)}</td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  ) : (
+                    column.head
+                  )}
+                </th>
+              ))}
+              {detail ? <th className="hv-rg-open" /> : null}
+            </tr>
+          </thead>
+
+          {rows.length === 0 ? (
+            <tbody>
+              <tr className="hv-rg-blank">
+                <td colSpan={span}>{empty ?? "Nothing here yet."}</td>
+              </tr>
             </tbody>
-          ))
-        )}
-      </table>
+          ) : (
+            blocks.map((block, blockIndex) => (
+              <tbody key={block.label ?? `block-${blockIndex}`}>
+                {block.label ? (
+                  <tr className="hv-rg-group">
+                    <td colSpan={span}>
+                      {block.label}
+                      <em>{block.rows.length}</em>
+                    </td>
+                  </tr>
+                ) : null}
+                {block.rows.map((row) => {
+                  const isOpen = open === row.id;
+                  return (
+                    <Fragment key={row.id}>
+                      <tr
+                        className="hv-rg-row"
+                        data-tone={tone?.(row) ?? "plain"}
+                        data-open={isOpen}
+                        data-click={Boolean(detail)}
+                        onClick={
+                          detail
+                            ? () => setOpen(isOpen ? null : row.id)
+                            : undefined
+                        }
+                      >
+                        {columns.map((column) => (
+                          <td
+                            key={column.key}
+                            className={
+                              column.align === "end" ? "hv-rg-end" : undefined
+                            }
+                          >
+                            {column.cell(row)}
+                          </td>
+                        ))}
+                        {detail ? (
+                          <td className="hv-rg-open">
+                            <button
+                              type="button"
+                              aria-expanded={isOpen}
+                              aria-label={`${isOpen ? "Close" : "Open"}${label ? ` ${label(row)}` : ""}`}
+                            >
+                              <svg viewBox="0 0 10 10" aria-hidden="true">
+                                <path
+                                  d={
+                                    isOpen
+                                      ? "M2 6.5 5 3.5l3 3"
+                                      : "M3.5 2 6.5 5l-3 3"
+                                  }
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.4"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                      {isOpen && detail ? (
+                        <tr className="hv-rg-detail">
+                          <td colSpan={span}>{detail(row)}</td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            ))
+          )}
+        </table>
+      </div>
     </div>
   );
 }
