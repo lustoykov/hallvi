@@ -164,7 +164,16 @@ test(
     });
 
     // The draft belongs to this conversation, and goes when it is sent.
-    await composer.press("Enter");
+    const [accepted] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/messages") &&
+          response.request().method() === "POST",
+        { timeout: 30_000 },
+      ),
+      composer.press("Enter"),
+    ]);
+    expect(accepted.status()).toBe(202);
     await openConversation(page);
     await expect(composer).toHaveValue("");
     await page.reload();
