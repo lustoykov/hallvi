@@ -79,7 +79,7 @@ schema and [migrations.mjs](../scripts/migrations.mjs) owns supported upgrades.
 
 To read the rows, use the **Database** link in the application top bar in development. It addresses the Drizzle Studio that `npm run dev` started on this database (`https://local.drizzle.studio/?port=<port>`), which is the point: SQLite is a file rather than a service, and a Studio started by hand serves whichever database its own working directory resolves, so one left running in another checkout will show that checkout's rows. Studio takes `host`, `port`, `vendor` and `themeId` from its URL and has no address for a table or a row, so the link opens the whole controller database — find the application by its ID once inside. The link is absent when no Studio was started beside the application.
 
-Native conversation histories live beside the database in `pi-sessions/<application-id>/<chat-id>/`, in Pi's own session format; a `<chat-id>.jsonl` beside that directory is the untouched history from before the upgrade. For a consistent offline controller backup, stop both processes and preserve SQLite, native sessions, configuration and execution/credential material privately. Restoring SQLite alone cannot restore missing native history. This developer procedure is not the planned automated application-backup feature.
+Pi keeps each conversation in a SQLite store of its own beside the database, `pi-sessions/<application-id>/<chat-id>/conversation.sqlite`, readable only by its user. Session files an earlier Pi wrote in or beside a conversation's directory (`*.jsonl`) are neither read nor changed. For a consistent offline controller backup, stop both processes and preserve the controller database, `pi-sessions`, configuration and execution/credential material privately. A conversation store is a SQLite database, not a plain file: while a worker has it open, what Pi wrote last is in the journal beside it (`conversation.sqlite-wal`). Copy a store with SQLite's own backup, as the [retained-application commands](development-environment.md#backups-and-getting-back) do, or together with any journal file left beside it once the worker has stopped; never copy the file alone under a running worker. Restoring the controller database alone cannot restore missing conversation history. This developer procedure is not the planned automated application-backup feature.
 
 ### Diagnostics
 
@@ -94,12 +94,13 @@ redacted, bounded previews; command output is limited to the most recent
 100,000 recorded characters. Opening the page cannot recover output discarded
 by the execution recorder.
 
-Raw recorded reasoning and Pi's session tree currently have no supported
+Raw recorded reasoning and Pi's stored history currently have no supported
 developer export. The old standalone inspector was removed because it read
-retired database fields and the pre-upgrade session format. Do not open current
-Pi files with the legacy HTML exporter or treat missing evidence as a clean
-run. If the page and execution record still omit what a check needs, report
-the verification gap.
+retired database fields and an earlier session format. The page and the
+request commands read a conversation store through the running worker; Pi's
+HTML exporter reads session files, not a store. Do not open a store by hand or
+treat missing evidence as a clean run. If the page and execution record still
+omit what a check needs, report the verification gap.
 
 Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `HALLVI_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Implementation: [local diagnostics](../src/server/diagnostics.ts) and [trace configuration](../src/server/tracing-config.ts).
 

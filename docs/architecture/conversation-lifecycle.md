@@ -32,25 +32,39 @@ Pi owned the queue and the run, but Hallvi still held every message until Pi
 acknowledged it, kept its own reply rows and status beside Pi's history, and
 reconciled the two when a conversation was opened.
 
-## Now: Pi keeps the conversation, and the worker owns Pi's sessions
+## Now: Pi keeps the conversation, and the worker owns Pi's stores
 
 ```mermaid
 flowchart LR
   Page[Page] --> App[App]
-  App -->|worker.sock: send, continue, stop, read, forget| Worker[Worker: sole owner]
-  Worker -->|accept, followUp, steer, resume, abort| Lane[Pi AgentLane per conversation]
-  Lane --> Pi[Pi owns: messages, history, queue order, steer boundary, abort, retry, compaction, restoration]
+  App -->|worker.sock: send, continue, stop, read, forget| Worker[Worker: sole owner of Pi's stores]
+  Worker -->|submit, with the request key as Pi's request id| Store[(Pi: one store per conversation)]
+  Worker -->|Stop: abort| Store
+  Worker -->|Continue: resume| Store
+  Store --> Pi[Pi owns: messages, history, its queue and when it is read, steer boundary, abort, retry, compaction, resume]
   Pi -->|tool call, with Pi's id| Tools[Hallvi: permission, approval, workspace, deployment tools]
   Tools --> Evidence[(Evidence under Pi's tool-call id)]
-  Lane -->|branch + snapshot| Read[Transcript projected on read]
+  Store -->|one reading: history, message records, open run, queue| Read[Transcript projected on read]
   Evidence --> Read --> App
-  Runtime[Pi ModelRuntime: credentials, refresh, models] --> Lane
+  Runtime[Pi ModelRuntime: credentials, refresh, models] --> Pi
 ```
 
 A send is answered once Pi has durably taken the message, and fails visibly
-otherwise. There is no intake queue, no reply row, no stored status, no
-reconciliation, no per-application lock and no start gate: one process owns
-the sessions, by a lock the operating system holds for it, and only it is
-asked; what the page shows is read from Pi each time. Hallvi keeps what
-is the product's own: permissions, approvals and execution evidence, each
+otherwise. The sender's request key is the request id of Pi's own record of
+the message, so a send repeated after a lost answer is accepted again without
+being taken twice. Pi reads its own queue: a follow-up when its current run
+has answered, a steer after the tool calls of its current step. The worker
+only waits for Pi to have nothing left, and then lets go of the conversation.
+Stop is Pi's abort, which ends the run and withdraws what waited. A worker
+going away aborts nothing, and nothing runs until the owner chooses: Continue
+has Pi resume what it had not finished, without making an interrupted call
+again, or read its queue when messages waiting are all that is left; Stop
+aborts it.
+
+Each conversation has a store of its own, open only while Pi has work in it or
+for the length of a read or a Stop. There is no intake queue, no reply row, no
+stored status, no reconciliation, no per-application lock and no start gate:
+one process owns the stores, by a lock the operating system holds for it, and
+only it is asked; what the page shows is read from Pi each time. Hallvi keeps
+what is the product's own: permissions, approvals and execution evidence, each
 record under the id Pi gave the tool call.

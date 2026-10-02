@@ -202,18 +202,19 @@ test("apps, exec, wait and inspect agree on one request, and stopping the CLI le
   expect(said).toContain("stopping this command did not stop it");
   const second = /hallvi wait (\S+)/.exec(said)![1];
 
-  // Both are read from fresh processes: Pi read the second inside the
-  // operation it was already running, so both have that result.
-  for (const handle of [handed.handle, second]) {
+  // Both are read from fresh processes. Pi answered the second after the
+  // work it waited behind, as work of its own: each has its own result.
+  for (const [handle, said] of [
+    [handed.handle, "Take your time [slow-cancel]"],
+    [second, "And then this"],
+  ]) {
     const result = hallvi("wait", handle, "--json");
     expect(result.code, result.stdout).toBe(0);
-    expect(result.json()).toMatchObject({
+    const read = result.json();
+    expect(read).toMatchObject({
       status: "completed",
-      operation: {
-        id: handed.requestKey,
-        requestKeys: [handed.requestKey, expect.any(String)],
-      },
-      answer: "[QA fixture reply] And then this",
+      operation: { id: read.requestKey, requestKeys: [read.requestKey] },
+      answer: `[QA fixture reply] ${said}`,
     });
   }
 

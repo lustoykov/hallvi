@@ -12,8 +12,8 @@ approval cards were removed, and nothing replaced them.
 
 The first chat of an application is its permanent main conversation. Pi keeps
 what is said in it: messages, replies, what waits and what is running are read
-from Pi's session on every view, and the database holds only the
-conversation's title, its application and the id of that session. Evidence
+from Pi's store for that conversation on every view, and the database holds
+only the conversation's title and its application. Evidence
 records still call the place they are shown a "run"; it is the reply Pi's
 transcript puts the tool call under. Permissions and the host reference live
 on the application; execution evidence lives in files. See the storage [verification](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-12-operator-execution.md).
@@ -26,7 +26,7 @@ flowchart TD
     API -->|await named operation| WebDB[Database thread in web process]
     WebDB --> DB[(SQLite: applications, conversations,<br/>saved information)]
     API -->|worker.sock: send, continue, stop, read| Worker
-    Worker[Node worker: sole owner of Pi's sessions,<br/>one lane per conversation] -->|await named operation| PiDB[Database thread in Pi process]
+    Worker[Node worker: sole owner of Pi's conversation stores,<br/>one store per conversation] -->|await named operation| PiDB[Database thread in Pi process]
     PiDB --> DB
     API -->|await Traffic operation| WebTraffic[Traffic database thread in web process]
     Worker --> Collector[Traffic collector]
@@ -37,50 +37,56 @@ flowchart TD
     Tools --> Host[Application server over SSH]
     Tools --> Providers[Hetzner, Cloudflare, GitHub, object storage]
     Tools -->|save_information| PiDB
-    Tools --> Files[Execution evidence and native Pi history,<br/>files beside the database]
+    Worker -->|submit, abort, resume, read| Stores[(Pi's conversation stores:<br/>one SQLite file per conversation,<br/>beside the database)]
+    Tools --> Files[Execution evidence,<br/>files beside the database]
     DB --> Projection[record-projection.ts]
     Projection --> Records[*-records.ts, one per destination]
     Records --> Pages[*-page.tsx]
     Pages --> UI
 ```
 
-The web process never opens a Pi session and never runs a turn. It asks the
-worker, a separate process that alone owns Pi's sessions, over a Unix socket
-beside the database: a message is accepted only once Pi has durably taken it,
-and the conversation shown is what Pi holds. That separation is why a crash
-takes one process rather than the server, and why the product says so, and
-accepts nothing, when no worker is running.
+The web process never opens one of Pi's conversation stores and never runs a
+turn. It asks the worker, a separate process that alone owns those stores,
+over a Unix socket beside the database: a message is accepted only once Pi has
+durably taken it, and the conversation shown is what Pi holds. Pi keeps each
+conversation in a store of its own, which the worker has open only while Pi
+has work in it or for the length of a read or a Stop. That separation is why a
+crash takes one process rather than the server, and why the product says so,
+and accepts nothing, when no worker is running.
 
 The `hallvi` command's request commands use the same loopback API from outside
-the page: they send an ordinary follow-up under the caller's request key and
-read back what became of it. What became of it is the Pi operation that took
-the key — each message and reply in the projected transcript names its
-operation, from Pi's records of where each began and ended — with its answer
-and bounded, redacted evidence ([requests.ts](../src/server/requests.ts)).
-Nothing is stored for a request. [Working from a terminal](cli.md) owns the
-contract.
+the page: they send an ordinary follow-up under the caller's request key, which
+is the request id of Pi's own record of the message, and read back what became
+of it. What became of it is the run in which Pi answered it — each message and
+reply in the projected transcript names its run by the request key of the
+message that began it, and how the run ended is Pi's record of that message —
+with its answer and bounded, redacted evidence
+([requests.ts](../src/server/requests.ts)). Nothing is stored for a request.
+[Working from a terminal](cli.md) owns the contract.
 
-Native model failures and Pi's terminal operation errors are read from that
-same history. The transcript supplies a typed diagnostic with its source,
-category and at most 400 characters of redacted reason; chat and CLI show the
-same explanation. Only a first prose line is eligible: appended payloads,
-headers, stacks, URLs and local paths are omitted, and held application values
-and credential-shaped text are redacted before bounding it. A missing reason
-says so, and an open operation without a driving worker remains interrupted.
+Native model failures and Pi's own reason for a run it could not finish are
+read from what Pi holds: a failed answer in its history, and its record of the
+message that began the run. The transcript supplies a typed diagnostic with
+its source, category and at most 400 characters of redacted reason; chat and
+CLI show the same explanation. Only a first prose line is eligible: appended
+payloads, headers, stacks, URLs and local paths are omitted, and held
+application values and credential-shaped text are redacted before bounding it.
+A missing reason says so, and an open run that no worker is running remains
+interrupted.
 Neither a failed model call nor a successful status read establishes a provider
 outage or the outcome of a command with no reported exit code.
 
 ### Conversation change delivery
 
-The worker's existing Unix socket also carries ephemeral invalidations. Pi
-lane and tool-preview changes target one conversation; execution writes,
+The worker's existing Unix socket also carries ephemeral invalidations. Pi's
+commits and tool-preview changes target one conversation; execution writes,
 saved-information commits and application changes target all conversations
 of that application. Readers always reconstruct the current snapshot from
 Pi and durable records; notifications contain no transcript or retained log.
 
 ```mermaid
 flowchart LR
-    Pi[Pi lane and tool changes] --> Hub[Worker change hub]
+    Pi[Pi commits and tool previews] --> Hub[Worker change hub]
     Writes[Committed database or execution writes] --> Hub
     WebWrite[Web mutation commits] --> Local[Web process hub]
     Local -->|POST /changed on worker.sock| Hub
@@ -203,8 +209,8 @@ without the owner's Continue or Stop. The thread holds retained ownership
 until close or process exit, and checks authority before opening the file.
 
 Graceful Pi shutdown drains accepted database requests and closes the
-connection after its sessions have closed. The existing five-second forced
-exit limit still applies. Idle database threads do not keep
+connection after its conversation stores have closed. The existing
+five-second forced exit limit still applies. Idle database threads do not keep
 a process alive; Node ends them with their owning process. Development loads
 the source thread through `scripts/database-worker.mjs`; the build and package
 include `dist/database-worker.mjs` and `dist/traffic-worker.mjs`, which need no
@@ -226,7 +232,7 @@ Three tables, in [db-schema.ts](../src/server/db-schema.ts), at schema 18:
 | Table | What it holds |
 | --- | --- |
 | `applications` | The application, its repository, its permission mode and its host reference. |
-| `conversations` | One permanent main conversation per application, plus read-only side chats. |
+| `conversations` | One permanent main conversation per application, plus read-only side chats. Its `native_session_id` column is unused: Pi's store is found by the conversation's id. |
 | `saved_information` | Everything Pi established, with its presentation: what it is about, what it states, its facts and its checks. |
 
 Everything a destination page says about an application comes from
@@ -234,12 +240,14 @@ Everything a destination page says about an application comes from
 runtime table: a release, a backup copy, a restore test and a certificate are
 all records with a subject and a claim.
 
-Three things live in files beside the database rather than in it. Native Pi
-conversation history, under `pi-sessions/<application>/<chat>/`, because Pi's
-session repository owns it and its format. Execution evidence — every command, its output and its
-outcome — under `operator/<application>/executions/`, with each update
-atomically replacing that execution's JSON file. And local diagnostics, under
-`diagnostics/`.
+Three things live in files beside the database rather than in it. Pi's
+conversation history, one SQLite store per conversation at
+`pi-sessions/<application>/<chat>/conversation.sqlite`, because Pi owns it and
+its format; one store holds one conversation because Pi decides whether to run
+unfinished work once for a whole store. Execution evidence — every command,
+its output and its outcome — under `operator/<application>/executions/`, with
+each update atomically replacing that execution's JSON file. And local
+diagnostics, under `diagnostics/`.
 
 ### Reading execution evidence
 
@@ -290,9 +298,10 @@ flowchart LR
 ```
 
 Execution writes remain synchronous. The worker awaits the async reader for
-recovery before accepting socket requests and for settlement before a live
-stretch stops driving. Settlement starts a fresh scan after the scope stops
-executing, so it cannot join an older read and overwrite a completed command.
+recovery before accepting socket requests and for settlement before it lets go
+of a conversation Pi has finished working in. Settlement starts a fresh scan
+after the scope stops executing, so it cannot join an older read and overwrite
+a completed command.
 Transcript projection, worker-link transcript serialization and changed-record
 response serialization still run on the main thread. Incremental browser frames
 avoid repeatedly encoding unchanged history; initial connections and a change
@@ -465,7 +474,7 @@ credential paths are left out and credential-shaped text is redacted.
 ```mermaid
 flowchart LR
   subgraph Controller["Hallvi worker (holds credentials)"]
-    Pi[Pi session] --> Gate[Permission mode and read-only side chats]
+    Pi[Pi conversation] --> Gate[Permission mode and read-only side chats]
     Gate --> Choice{Settings → Workspace}
   end
   Choice -->|On this computer, default| Direct
@@ -608,8 +617,9 @@ controller stays manual; see
   [run on a rented server](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-19-overview-live.md) with a record
   Pi wrote. A private application has no proxy until the owner asks for this,
   and a dead connection takes about fifteen seconds to notice.
-- One conversation per application runs at a time, and applications run
-  beside each other. Parallel read-only side work is deferred.
+- An application has one conversation that may change anything, its main
+  one. Its read-only side conversations, and other applications, run beside
+  it.
 
 ## Source and proof
 

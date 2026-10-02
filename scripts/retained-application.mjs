@@ -131,8 +131,9 @@ function programFormat() {
   return {
     schema: readJson(join(checkout, "src", "server", "schema-version.json"))
       .version,
+    // The package that owns how conversations are stored.
     pi: readJson(join(checkout, "package.json")).dependencies[
-      "@earendil-works/pi-agent-core"
+      "@earendil-works/pi-durable"
     ],
   };
 }
@@ -203,12 +204,40 @@ const VOLATILE = new Set([
   "hallvi.db.worker-lock-journal",
 ]);
 
+/**
+ * Pi keeps each conversation in a SQLite store, and what it wrote last is in
+ * the journal beside it while a worker has it open. A store is copied with
+ * SQLite's own backup, never as a file.
+ */
+const STORE = /(^|\/)conversation\.sqlite$/;
+const STORE_JOURNAL = /^conversation\.sqlite-(wal|shm)$/;
+async function copyDatabase(source, target) {
+  const database = new Database(source, { readonly: true });
+  try {
+    await database.backup(target);
+  } finally {
+    database.close();
+  }
+}
+/**
+ * A file that is not a database is still the owner's, and is copied as it
+ * is. Any other failure fails the copy: the file by itself would be an older
+ * conversation passed off as this one.
+ */
+const copyStore = (source, target) =>
+  copyDatabase(source, target).catch((error) => {
+    if (!["SQLITE_NOTADB", "SQLITE_CORRUPT"].includes(error?.code)) throw error;
+    copyFileSync(source, target);
+  });
+
 function walk(root, directory = root, found = []) {
   for (const name of readdirSync(directory).sort()) {
     const path = join(directory, name);
     const relativePath = path.slice(root.length + 1);
     if (directory === root && VOLATILE.has(name)) continue;
     if (relativePath === "pi-sessions/.locks") continue;
+    // A conversation store's journal is part of the store, copied with it.
+    if (STORE_JOURNAL.test(name)) continue;
     const stat = lstatSync(path);
     if (stat.isSymbolicLink())
       throw new Refused(`Refusing a symbolic link in retained state: ${path}`);
@@ -234,12 +263,11 @@ export async function copyState(state, into) {
     const target = join(into, relativePath);
     mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
     if (relativePath === "hallvi.db") {
-      const database = new Database(source, { readonly: true });
-      try {
-        await database.backup(target);
-      } finally {
-        database.close();
-      }
+      await copyDatabase(source, target);
+      continue;
+    }
+    if (STORE.test(relativePath)) {
+      await copyStore(source, target);
       continue;
     }
     copyFileSync(source, target);
@@ -607,14 +635,8 @@ export async function snapshot(into, names) {
   const target = join(state, "hallvi.db");
   for (const [index, application] of chosen.entries()) {
     const source = join(application.state, "hallvi.db");
-    if (index === 0) {
-      const database = new Database(source, { readonly: true });
-      try {
-        await database.backup(target);
-      } finally {
-        database.close();
-      }
-    } else {
+    if (index === 0) await copyDatabase(source, target);
+    else {
       const database = new Database(target);
       try {
         database.exec(
@@ -638,18 +660,18 @@ export async function snapshot(into, names) {
     for (const part of ["executions", "activity"]) {
       const from = join(application.state, "config", "operator", id, part);
       if (existsSync(from))
-        cpRecursive(from, join(state, "config", "operator", id, part));
+        await cpRecursive(from, join(state, "config", "operator", id, part));
     }
     const sessions = join(application.state, "pi-sessions", id);
     if (existsSync(sessions))
-      cpRecursive(
+      await cpRecursive(
         sessions,
         join(state, "pi-sessions", id),
-        (name) => name !== ".locks",
+        (name) => name !== ".locks" && !STORE_JOURNAL.test(name),
       );
     const workspaces = join(application.state, "pi-workspaces");
     if (existsSync(workspaces))
-      cpRecursive(
+      await cpRecursive(
         workspaces,
         join(state, "pi-workspaces"),
         (name) => name !== "workspace.tar",
@@ -679,16 +701,17 @@ export async function snapshot(into, names) {
   ].join("\n");
 }
 
-function cpRecursive(from, to, keep = () => true) {
+async function cpRecursive(from, to, keep = () => true) {
   for (const name of readdirSync(from)) {
     if (!keep(name)) continue;
     const source = join(from, name);
     const stat = lstatSync(source);
     if (stat.isSymbolicLink()) continue;
-    if (stat.isDirectory()) cpRecursive(source, join(to, name), keep);
+    if (stat.isDirectory()) await cpRecursive(source, join(to, name), keep);
     else if (stat.isFile()) {
       mkdirSync(to, { recursive: true, mode: 0o700 });
-      copyFileSync(source, join(to, name));
+      if (STORE.test(name)) await copyStore(source, join(to, name));
+      else copyFileSync(source, join(to, name));
     }
   }
 }

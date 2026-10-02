@@ -38,7 +38,7 @@ export const MIGRATIONS = [
     to: 18,
     changes: [STORES.database],
     summary:
-      "Conversations moved onto Pi's AgentHarness. Nothing in the database is rewritten: the earlier `messages` table is simply no longer read, and the two conversation columns that tracked a reply stay where they are. The histories beside it are left untouched — the worker copies one into Pi's session repository the first time it opens it, and the original stays where the earlier version reads it.",
+      "Conversations moved onto Pi's AgentHarness. Nothing in the database is rewritten: the earlier `messages` table is simply no longer read, and the two conversation columns that tracked a reply stay where they are. The histories beside it are left untouched, where the earlier version reads them.",
     apply() {
       // Deliberately nothing. The stamp is the migration; see the summary.
     },

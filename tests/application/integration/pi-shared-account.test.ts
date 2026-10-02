@@ -1,9 +1,9 @@
+import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import {
-  AgentHarness,
-  BACKGROUND_CONTEXT as ctx,
-  JsonlSessionRepo,
-} from "@earendil-works/pi-agent-core";
-import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+  createRegistry,
+  Harness,
+  MemoryStorage,
+} from "@earendil-works/pi-durable";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -128,7 +128,7 @@ it("two conversations on one expired account refresh it once and both get the ne
   ).toMatchObject({ access: "access-2", refresh: "refresh-2" });
 });
 
-it("the harness authenticates through Pi's own ModelRuntime, refresh included", async () => {
+it("Pi authenticates through its own ModelRuntime, refresh included", async () => {
   const authPath = join(root, "auth.json");
   writeFileSync(
     authPath,
@@ -144,26 +144,23 @@ it("the harness authenticates through Pi's own ModelRuntime, refresh included", 
   );
   const refreshes: string[] = [];
   keysTheProviderSaw.length = 0;
-  // Exactly what Hallvi composes: coding-agent's runtime handed to agent-core.
+  // Exactly what Hallvi composes: coding-agent's runtime handed to Pi.
   const models = await runtime(authPath, refreshes);
-  const repo = new JsonlSessionRepo({
-    fileSystem: new NodeExecutionEnv({ cwd: root }),
-    sessionsRoot: join(root, "sessions"),
-  });
-  const { harness } = await AgentHarness.create(
-    {
-      session: await repo.create({ cwd: root }, ctx),
-      models,
-      model: models.getModel("shared-account-test", "synthetic")!,
-      systemPrompt: "x",
-      tools: [],
-    },
+  const harness = await Harness.open(
+    new MemoryStorage(),
+    { models: models as never, registry: createRegistry() },
     ctx,
   );
-  const lane = await harness.lane("main", ctx);
-  const run = await lane.prompt("hello", undefined, ctx);
+  const conversation = await harness.root(ctx, {
+    agent: {
+      model: { provider: "shared-account-test", modelId: "synthetic" },
+    },
+  });
+  const answered = await (
+    await conversation.submit({ type: "input", content: "hello" }, ctx)
+  ).wait(ctx);
   await harness.close(ctx);
-  expect(run.ok && run.value.status).toBe("completed");
+  expect(answered.status).toBe("done");
   expect(refreshes).toEqual(["refresh-1"]);
   expect(keysTheProviderSaw).toEqual(["access-2"]);
 });

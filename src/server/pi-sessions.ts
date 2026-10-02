@@ -1,42 +1,38 @@
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { createModels } from "@earendil-works/pi-ai/models";
 import {
-  AgentHarness,
-  BACKGROUND_CONTEXT,
-  JsonlSessionRepo,
-  laneState,
-  operationMeta,
-  operationResult,
-  pendingEntry,
-  type Entry,
-  type JsonlSessionMetadata,
-  type LaneQueuedItem,
-  type OperationResultRecord,
-  type Session,
-} from "@earendil-works/pi-agent-core";
-import {
-  createPiCatalog,
-  defaultPiSelection,
-  loadPiSdk,
-} from "./pi-configuration";
-import { operationResults } from "./pi-transcript";
-import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+  createRegistry,
+  Harness,
+  InboxDoc,
+  LiveDoc,
+  ROOT_CONVERSATION_ID,
+  type Conversation,
+  type EntryRecord,
+  type HarnessOptions,
+  type InboxState,
+  type LiveState,
+  type Storage,
+  type SubmissionRecord,
+} from "@earendil-works/pi-durable";
+import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import {
   chmodSync,
-  constants,
-  copyFileSync,
+  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
+  openSync,
   realpathSync,
   rmSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { databasePath, getChat, setNativeSessionId } from "./db";
+import { databasePath, getChat } from "./db";
 
-// Only the worker calls into this file. It is the one owner of session
+// Only the worker calls into this file. It is the one owner of conversation
 // storage: the app asks it over the worker link and never opens a history.
 const RECOVERY_MESSAGE =
   "Conversation history unavailable. Start a new chat to continue.";
+const ctx = BACKGROUND_CONTEXT;
 
 export class NativeSessionError extends Error {
   constructor(
@@ -79,241 +75,158 @@ function privateDirectory(path: string) {
 }
 
 function storageRoot() {
-  // Canonicalize the configured database's parent so aliases use the same lock.
-  return privateDirectory(
-    join(realpathSync(dirname(databasePath())), "pi-sessions"),
+  return join(realpathSync(dirname(databasePath())), "pi-sessions");
+}
+
+/** The file Pi keeps one conversation in: `<application>/<chat>/`. */
+const STORE = "conversation.sqlite";
+function storePath(scope: ConversationScope) {
+  return join(
+    storageRoot(),
+    validatedId(scope.applicationId),
+    validatedId(scope.chatId),
+    STORE,
   );
 }
 
-function applicationDirectory(applicationId: string) {
-  return privateDirectory(join(storageRoot(), validatedId(applicationId)));
-}
-
-/** Where a history from before Pi's session repository would be. */
-export function earlierHistoryPath(scope: {
+export interface ConversationScope {
   applicationId: string;
   chatId: string;
-}) {
-  return join(
-    applicationDirectory(scope.applicationId),
-    `${validatedId(scope.chatId)}.jsonl`,
-  );
 }
 
-/**
- * A history written before Pi's session repository: `<chat>.jsonl` beside the
- * chat's directory. Checked once, before it is copied in, so a damaged file is
- * reported rather than half-read.
- */
-function inspectEarlierHistory(path: string, expectedId: string | null) {
-  const stat = lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink() || !(stat.mode & 0o400))
-    throw unavailable();
-  const entries = readFileSync(path, "utf8")
-    .split("\n")
-    .filter((line) => line.trim())
-    .map((line) => JSON.parse(line) as Record<string, unknown>);
-  const header = entries[0];
-  if (!header) return false;
-  if (
-    header.type !== "session" ||
-    typeof header.id !== "string" ||
-    (expectedId !== null && header.id !== expectedId) ||
-    entries.slice(1).some((entry) => typeof entry.id !== "string")
-  )
-    throw unavailable();
-  return true;
+/** Whether Pi has ever been handed anything in this conversation. */
+export function hasConversation(scope: ConversationScope) {
+  return existsSync(storePath(scope));
 }
 
-/** The lane every Hallvi conversation runs in; Pi keeps its state under it. */
-const LANE = "main";
+/** Pi's records of one conversation, opened by the worker and nobody else. */
+export interface OpenConversation {
+  harness: Harness;
+  conversation: Conversation;
+  /** Read what Pi holds. Starts nothing: a read never resumes work. */
+  read(): Promise<StoredConversation>;
+  close(): Promise<void>;
+}
 
-export type NativeSession = Session<JsonlSessionMetadata>;
+/** What Pi durably holds of a conversation, as one consistent reading. */
+export interface StoredConversation {
+  /**
+   * The whole history, oldest first: a compaction shortens only what the
+   * model is sent.
+   */
+  entries: EntryRecord[];
+  /** Every message Pi was handed, with how its run ended. */
+  submissions: SubmissionRecord[];
+  live: LiveState;
+  inbox: InboxState;
+  /** Tasks Pi has not finished, whether or not anything is running them. */
+  tasks: number;
+}
 
-/**
- * One repository per conversation, in `<application>/<chat>/`. Pi owns the
- * files in it and their format. A history from before that layout is copied
- * in, never moved: the original stays where the earlier version reads it.
- */
-export async function openNativeChatSession(
-  applicationId: string,
-  chatId: string,
+async function all<T>(
+  page: (cursor: Parameters<Storage["scanEntries"]>[2]) => Promise<{
+    items: readonly T[];
+    next?: Parameters<Storage["scanEntries"]>[2];
+  }>,
 ) {
-  const chat = await ownedChat(applicationId, chatId);
-  const root = privateDirectory(
-    join(applicationDirectory(applicationId), validatedId(chatId)),
-  );
-  const repo = new JsonlSessionRepo({
-    fileSystem: new NodeExecutionEnv({ cwd: root }),
-    sessionsRoot: root,
-  });
+  const items: T[] = [];
+  let cursor: Parameters<Storage["scanEntries"]>[2];
+  do {
+    const read = await page(cursor);
+    items.push(...read.items);
+    cursor = read.next;
+  } while (cursor);
+  return items;
+}
+
+/**
+ * Open one conversation's store. `runtime` is what Pi works with: left out,
+ * the conversation can be read and stopped and nothing else — no model, no
+ * credentials, no tools, which is all a reader or a Stop needs.
+ *
+ * One store holds one conversation on purpose. Pi's scheduler is one switch
+ * for a whole store, so a second conversation beside it would be resumed by
+ * anything asked of the first.
+ */
+export async function openConversation(
+  scope: ConversationScope,
+  runtime?: Omit<HarnessOptions, "env">,
+): Promise<OpenConversation> {
+  await ownedChat(scope.applicationId, scope.chatId);
+  const path = storePath(scope);
   try {
-    let found = await repo.list(undefined, BACKGROUND_CONTEXT);
-    const earlier = earlierHistoryPath({ applicationId, chatId });
-    if (
-      !found.length &&
-      existsSync(earlier) &&
-      inspectEarlierHistory(earlier, chat.nativeSessionId)
-    ) {
-      const imported = join(
-        privateDirectory(join(root, "imported")),
-        "0.jsonl",
+    privateDirectory(storageRoot());
+    privateDirectory(dirname(dirname(path)));
+    privateDirectory(dirname(path));
+    // Looked at before anything is opened: a link is never followed out of
+    // the conversation's own directory.
+    const found = lstatSync(path, { throwIfNoEntry: false });
+    if (found && (!found.isFile() || found.isSymbolicLink()))
+      throw unavailable();
+    // Created private before SQLite sees it: its journal files take the
+    // mode of the file they belong to.
+    if (!found) closeSync(openSync(path, "ax", 0o600));
+    chmodSync(path, 0o600);
+    const storage = await openNodeSqliteStorage(path);
+    let harness: Harness;
+    try {
+      harness = await Harness.open(
+        storage,
+        runtime ?? { models: createModels(), registry: createRegistry() },
+        ctx,
       );
-      copyFileSync(earlier, imported, constants.COPYFILE_EXCL);
-      chmodSync(imported, 0o600);
-      found = await repo.list(undefined, BACKGROUND_CONTEXT);
+    } catch (cause) {
+      await storage.close(ctx).catch(() => undefined);
+      throw cause;
     }
-    if (found.length > 1 || (!found.length && chat.nativeSessionId))
-      throw unavailable();
-    const session = found.length
-      ? await repo.open(found[0], BACKGROUND_CONTEXT)
-      : await repo.create({ cwd: root }, BACKGROUND_CONTEXT);
-    if (chat.nativeSessionId && session.metadata.id !== chat.nativeSessionId)
-      throw unavailable();
-    if (!chat.nativeSessionId) {
-      const changed = await setNativeSessionId(chatId, session.metadata.id);
-      if (changed !== 1) throw unavailable();
+    try {
+      const conversation = await harness.root(ctx);
+      const id = ROOT_CONVERSATION_ID;
+      return {
+        harness,
+        conversation,
+        async read() {
+          const { tasks } = await harness.inspect(ctx);
+          // One reading, on Pi's own line of commits: a reply and the record
+          // that says it is finished are never read from either side of the
+          // commit that wrote them. The transaction writes nothing.
+          return harness.commit(async (tx) => {
+            const entries = await all((cursor) =>
+              storage.scanEntries({ conversationId: id }, 512, cursor, ctx),
+            );
+            const submissions = await all((cursor) =>
+              storage.scanSubmissions({ conversationId: id }, 512, cursor, ctx),
+            );
+            // A document read inside a transaction is a live view of it, and
+            // is dead once the transaction ends: copied here.
+            const copy = <T>(value: T) =>
+              JSON.parse(JSON.stringify(value)) as T;
+            return {
+              // Pi scans newest first.
+              entries: entries.reverse(),
+              submissions,
+              live: copy<LiveState>(await tx.doc(LiveDoc, id)),
+              inbox: copy<InboxState>(await tx.doc(InboxDoc, id)),
+              tasks: tasks.length,
+            };
+          }, ctx);
+        },
+        // Closing aborts nothing durable: Pi keeps unfinished work as it is.
+        close: () => harness.close(ctx),
+      };
+    } catch (cause) {
+      await harness.close(ctx).catch(() => undefined);
+      throw cause;
     }
-    // Pi writes its files readable by everyone. The directory is private; the
-    // file is made so too, again after Pi has rewritten it.
-    const keepPrivate = () => chmodSync(session.metadata.path, 0o600);
-    keepPrivate();
-    return {
-      session,
-      async release() {
-        await repo.close(BACKGROUND_CONTEXT);
-        keepPrivate();
-      },
-    };
   } catch (cause) {
-    await repo.close(BACKGROUND_CONTEXT).catch(() => undefined);
     throw cause instanceof NativeSessionError ? cause : unavailable(cause);
   }
 }
 
 /** Remove every history an application has. */
 export function removeNativeSessions(applicationId: string) {
-  rmSync(applicationDirectory(applicationId), { recursive: true, force: true });
-}
-
-/** Cancel stored work without credentials, a workspace, or executable tools. */
-export async function stopNativeConversation(
-  applicationId: string,
-  chatId: string,
-) {
-  const native = await openNativeChatSession(applicationId, chatId);
-  const ctx = BACKGROUND_CONTEXT;
-  let harness: AgentHarness | undefined;
-  try {
-    const models = await createPiCatalog(await loadPiSdk());
-    const model = models.getModel(
-      defaultPiSelection.providerId,
-      defaultPiSelection.modelId,
-    );
-    if (!model)
-      throw new Error("Pi's default model is missing from its catalog.");
-    // Pi restores the lane's existing configuration. This catalog model only
-    // seeds absent lanes; abort and cancelQueued never call the provider.
-    harness = (
-      await AgentHarness.create({ session: native.session, models, model }, ctx)
-    ).harness;
-    const lane = await harness.lane(LANE, ctx);
-    if ((await lane.inspectExecution(ctx)).current) {
-      const stopped = await lane.abort(ctx);
-      if (!stopped.ok) throw new Error(stopped.error.message);
-    }
-    const watch = await lane.watch(ctx);
-    const queued = watch.snapshot.queues;
-    watch.unsubscribe();
-    for (const item of queued) {
-      const cancelled = await lane.cancelQueued(item.entryId, ctx);
-      if (!cancelled.ok) throw new Error(cancelled.error.message);
-    }
-  } finally {
-    try {
-      await harness?.close(ctx);
-    } finally {
-      await native.release();
-    }
-  }
-}
-
-/**
- * A conversation nobody is running, read from Pi's stored session alone.
- *
- * Opening a conversation to answer it needs Pi's model runtime: credentials,
- * a workspace, the tool list. Reading one needs none of that, and asking for
- * it meant an expired ChatGPT login hid the history it had nothing to do with.
- * This reads what Pi durably wrote — the branch, the lane's own state, and how
- * its operations ended — through Pi's own API and no runtime at all. It starts
- * nothing, changes no setting, and writes nothing except the session id the
- * first open records.
- */
-export async function readNativeConversation(
-  applicationId: string,
-  chatId: string,
-): Promise<{
-  entries: Entry[];
-  results: OperationResultRecord[];
-  lane: {
-    operation: {
-      id: string;
-      startedAt: number;
-      fromTipId: string | null;
-    } | null;
-    queues: LaneQueuedItem[];
-  };
-}> {
-  const native = await openNativeChatSession(applicationId, chatId);
-  const ctx = BACKGROUND_CONTEXT;
-  try {
-    const { session } = native;
-    const branch = await session.branch(LANE, ctx);
-    const entries = branch
-      ? await branch.findEntries({ order: "oldestFirst" }, ctx)
-      : [];
-    const state = (await session.getValue(laneState(LANE), ctx))?.value;
-    // What Pi is holding for this conversation, in the order it will read it.
-    const queues: LaneQueuedItem[] = [];
-    for (const item of state?.inbox ?? []) {
-      const held = (await session.getValue(pendingEntry(item.entryId), ctx))
-        ?.value;
-      if (held?.type === "message")
-        queues.push({
-          entryId: item.entryId,
-          kind: item.kind,
-          type: "message",
-          message: held.payload,
-        });
-    }
-    // An operation still open when the worker went away: Pi's record of it is
-    // what says the conversation was interrupted rather than finished.
-    const open = state?.currentOperationId ?? null;
-    const meta = open
-      ? (await session.getValue(operationMeta(open), ctx))?.value
-      : undefined;
-    // Every operation in the branch, not only the newest: a reply stopped
-    // three turns ago is still stopped, and reading only the current and last
-    // operation turned it into a completed one as soon as another turn ran.
-    const results = await operationResults(
-      entries,
-      async (id) => (await session.getValue(operationResult(id), ctx))?.value,
-    );
-    return {
-      entries,
-      results,
-      lane: {
-        operation: open
-          ? {
-              id: open,
-              startedAt: meta?.startedAt ?? Date.now(),
-              fromTipId: meta?.sourceTipId ?? null,
-            }
-          : null,
-        queues,
-      },
-    };
-  } finally {
-    await native.release();
-  }
+  rmSync(join(storageRoot(), validatedId(applicationId)), {
+    recursive: true,
+    force: true,
+  });
 }

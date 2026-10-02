@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { failureText, nativeFailure } from "@/server/pi-failure";
-import { projectTranscript, MESSAGE_TAG } from "@/server/pi-transcript";
+import { projectTranscript } from "@/server/pi-transcript";
 
 it("keeps a useful reason while omitting secrets, payloads, URLs, paths and stacks before bounding it", () => {
   const failure = nativeFailure(
@@ -43,41 +43,53 @@ it("keeps a useful reason while omitting secrets, payloads, URLs, paths and stac
   ).toBeNull();
 });
 
-it("reads a native terminal runtime error when Pi wrote no assistant message, while open work stays interrupted", () => {
-  const history = [
-    {
-      type: "message",
-      id: "entry-user",
-      timestamp: 1,
-      message: {
-        role: "user",
-        content: [{ type: "text", text: "Check status" }],
-        timestamp: 1,
-        [MESSAGE_TAG]: "request",
-      },
-    },
-  ];
-  const result = {
-    operationId: "request",
-    kind: "run",
-    status: "failed",
-    fromTipId: null,
-    tipId: "entry-user",
-    startedAt: 1,
-    endedAt: 2,
-    error: {
-      code: "runtime_error",
-      message: "Worker dispatcher rejected the model response",
-      details: { token: "never-copy-details" },
-    },
-  };
-  const transcript = projectTranscript(
-    "chat",
-    history as never,
-    [result] as never,
-    { operation: null, queues: [] },
-    false,
-  );
+/** What Pi holds of a conversation, as the worker reads it. */
+const held = (over: object) =>
+  ({
+    entries: [],
+    submissions: [],
+    live: {},
+    inbox: { items: [] },
+    tasks: 0,
+    ...over,
+  }) as never;
+const asked = (id: number, text: string) => ({
+  id,
+  conversationId: 1,
+  kind: "pi.user",
+  model: [{ role: "user", content: [{ type: "text", text }], timestamp: id }],
+});
+const record = (
+  id: number,
+  requestId: string,
+  entry: number,
+  rest: object,
+) => ({
+  id,
+  conversationId: 1,
+  type: "input",
+  requestId,
+  entry,
+  ...rest,
+});
+
+it("reads Pi's own reason when it wrote no reply, while open work stays interrupted", () => {
+  const entries = [asked(6, "Check status")];
+  const failed = (rest: object) =>
+    projectTranscript(
+      "chat",
+      held({
+        entries,
+        submissions: [
+          record(7, "request", 6, { status: "unanswered", ...rest }),
+        ],
+      }),
+      false,
+    );
+  const transcript = failed({
+    reason: "faulted",
+    detail: "Worker dispatcher rejected the model response",
+  });
   expect(transcript.messages.at(-1)).toMatchObject({
     status: "failed",
     operationId: "request",
@@ -86,98 +98,69 @@ it("reads a native terminal runtime error when Pi wrote no assistant message, wh
       reason: "Worker dispatcher rejected the model response",
     },
   });
-  expect(JSON.stringify(transcript)).not.toContain("never-copy-details");
-  const unknown = projectTranscript(
-    "chat",
-    history as never,
-    [{ ...result, error: undefined }] as never,
-    { operation: null, queues: [] },
-    false,
-  );
-  expect(unknown.messages.at(-1)?.failure).toEqual({
-    source: "runtime",
-    category: "unknown",
-    reason: null,
+  expect(transcript.operations).toMatchObject({
+    request: { status: "failed" },
   });
-  expect(unknown.messages.at(-1)?.error).toContain(
-    "Pi stopped without recording a reason",
+  // Only words Pi wrote as the reason are shown, never a structure beside it.
+  expect(
+    JSON.stringify(
+      failed({ reason: "faulted", detail: { token: "never-copy-details" } }),
+    ),
+  ).not.toContain("never-copy-details");
+  // A model that is no longer offered is said in words, not in Pi's code.
+  expect(failed({ reason: "no_model" }).messages.at(-1)?.error).toContain(
+    "The selected model is not available",
   );
   const interrupted = projectTranscript(
     "chat",
-    history as never,
-    [],
-    { operation: { id: "request", startedAt: 1, fromTipId: null }, queues: [] },
+    held({
+      entries,
+      submissions: [record(7, "request", 6, { status: "placed" })],
+      live: { run: { taskId: 8, inputs: [7] } },
+      tasks: 1,
+    }),
     false,
   );
+  expect(interrupted.status).toBe("interrupted");
   expect(interrupted.messages.at(-1)).toMatchObject({
     status: "interrupted",
+    operationId: "request",
     error: expect.stringContaining("not known"),
   });
   expect(interrupted.messages.at(-1)?.failure).toBeUndefined();
 });
 
-it("an early runtime failure stays under its request when a later request succeeds", () => {
-  const history = [
-    {
-      type: "message",
-      id: "first",
-      timestamp: 1,
-      message: {
-        role: "user",
-        content: "First",
-        timestamp: 1,
-        [MESSAGE_TAG]: "early",
-      },
-    },
-    {
-      type: "message",
-      id: "second",
-      timestamp: 3,
-      message: {
-        role: "user",
-        content: "Second",
-        timestamp: 3,
-        [MESSAGE_TAG]: "later",
-      },
-    },
-    {
-      type: "message",
-      id: "answer",
-      timestamp: 4,
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: "Done" }],
-        timestamp: 4,
-        stopReason: "stop",
-      },
-    },
-  ];
-  const results = [
-    {
-      operationId: "early",
-      kind: "run",
-      status: "failed",
-      fromTipId: null,
-      tipId: "first",
-      startedAt: 1,
-      endedAt: 2,
-      error: { code: "dispatcher_error", message: "Response rejected" },
-    },
-    {
-      operationId: "later",
-      kind: "run",
-      status: "completed",
-      fromTipId: "first",
-      tipId: "answer",
-      startedAt: 3,
-      endedAt: 4,
-    },
-  ];
+it("an early failure stays under its request when a later request succeeds", () => {
   const read = projectTranscript(
     "chat",
-    history as never,
-    results as never,
-    { operation: null, queues: [] },
+    held({
+      entries: [
+        asked(6, "First"),
+        asked(9, "Second"),
+        {
+          id: 11,
+          conversationId: 1,
+          kind: "pi.assistant",
+          byTaskId: 10,
+          model: [
+            {
+              role: "assistant",
+              content: [{ type: "text", text: "Done" }],
+              timestamp: 11,
+              stopReason: "stop",
+            },
+          ],
+        },
+      ],
+      submissions: [
+        record(7, "early", 6, {
+          status: "unanswered",
+          reason: "faulted",
+          detail: "Response rejected",
+        }),
+        record(10, "later", 9, { status: "done", answer: 11 }),
+      ],
+    }),
     false,
   );
   expect(read.messages.map((message) => [message.id, message.status])).toEqual([
@@ -186,6 +169,10 @@ it("an early runtime failure stays under its request when a later request succee
     ["later", "delivered"],
     ["reply:later", "completed"],
   ]);
+  expect(read.operations).toMatchObject({
+    early: { status: "failed" },
+    later: { status: "completed" },
+  });
 });
 
 it("omits Unix account paths with Unicode, spaces, home shorthand or one component", () => {

@@ -168,23 +168,24 @@ known. Time that runs out while reads are failing is reported the same way
 
 ## What a request becomes
 
-The result is that of the Pi operation that took the request, identified by
-Pi's own records of where each operation began and ended in the conversation.
-When Pi reads several waiting messages inside one operation, each of those
-requests gets that operation's result, whole: its final answer and all its
-evidence, and `operation.requestKeys` lists them. A later request, or another
-application's, is never read into it.
+The result is that of the run in which Pi answered the request, as Pi itself
+recorded it on the message. A request that waited behind other work is
+answered in a run of its own, with its own answer and evidence. A steer joins
+the run it was sent into, and so does a message Pi took from its queue in the
+same moment: each of those requests gets that run's result, whole — its final
+answer and all its evidence — and `operation.requestKeys` lists them. A later
+request, or another application's, is never read into it.
 
 | Status | Means | Exit |
 | --- | --- | --- |
 | `queued` | Pi holds it and has not read it yet. | 3 if the wait ended |
-| `working` | The operation that took it is running. | 3 if the wait ended |
+| `working` | The run that took it is going on. | 3 if the wait ended |
 | `waiting-for-approval` | A call is waiting for the owner's decision and has not run. | 2 |
-| `waiting-for-input` | The operation ended asking the owner for something through one of Hallvi's cards, and that card is still open. A card opened after the asking call returned belongs to later work. | 2 |
+| `waiting-for-input` | The run ended asking the owner for something through one of Hallvi's cards, and that card is still open. A card opened after the asking call returned belongs to later work. | 2 |
 | `completed` | Pi finished answering. | 0 |
 | `failed` | Pi could not finish. | 1 |
 | `cancelled` | Stopped in Hallvi, or dropped by Stop before Pi read it. | 4 |
-| `interrupted` | The worker went away mid-operation, or with the request unread. Nothing runs until someone chooses Continue or Stop in Hallvi. | 4 |
+| `interrupted` | The worker went away mid-run, or a reply failed, with the request unread or unanswered. Nothing runs until someone chooses Continue or Stop in Hallvi. | 4 |
 
 Other exit codes: 0 for `--background` once accepted and for `apps` and
 `inspect`; 1 for a validation, transport or refusal failure, or acceptance not
@@ -220,11 +221,11 @@ object and nothing is written to stderr.
   "stoppedByUser": false,  // Ctrl-C
   "background": false,
   "operation": {
-    "id": "…",             // Pi's own; the request key when this request began it
+    "id": "…",             // the request key of the message that began the run
     "status": "completed", // open, completed, failed, aborted
-    "startedAt": "…",
-    "endedAt": "…",
-    "requestKeys": ["…"]   // every request this operation took
+    "startedAt": "…",      // when that message was taken
+    "endedAt": "…",        // when Pi began its last answer, or last heard from a tool
+    "requestKeys": ["…"]   // every request this run answered
   },
   "answer": "…",           // Pi's final words, once the operation ended
   "answerTruncated": false,
@@ -270,11 +271,11 @@ its own label in the same way. It is provenance, not an identity.
 ```mermaid
 flowchart LR
     CLI["hallvi exec / wait / inspect<br/>controller named explicitly"] -->|loopback HTTP, no redirects| API[Controller API]
-    API -->|"send (next), under the caller's key"| Worker[Worker: sole owner of Pi's sessions]
-    Worker -->|durably taken| Lane[Pi lane: queue, operations, history]
-    Lane -->|tool calls| Tools[Hallvi tools: permission mode, approvals]
+    API -->|"send (next), under the caller's key"| Worker[Worker: sole owner of Pi's stores]
+    Worker -->|durably taken| Pi[Pi: queue, runs, history]
+    Pi -->|tool calls| Tools[Hallvi tools: permission mode, approvals]
     Tools --> Evidence[(Execution records,<br/>by Pi's tool-call id)]
-    Lane -->|"operation results: where each began and ended"| Projection[Request outcome:<br/>the operation that took the key]
+    Pi -->|"its record of each message: answered, stopped or failed"| Projection[Request outcome:<br/>the run that answered the key]
     Evidence --> Projection
     Projection -->|"status, answer, bounded evidence"| API
     API -->|read by the handle| CLI
@@ -297,11 +298,12 @@ and the attach/snapshot commands. This document owns the CLI contract.
 - **Input waits are recognised only from Hallvi's own cards**: where to run,
   DNS access for a domain, how to deploy, and a secret value. A question Pi
   asks in prose reads as `completed`; its answer carries the question. Once the
-  owner answers a card, the work goes on in a new operation that Hallvi's
-  message starts, and the original handle keeps reporting its own.
-- **A waiting request that Stop drops leaves no record in Pi.** A command that
+  owner answers a card, the work goes on in a new run that Hallvi's message
+  starts, and the original handle keeps reporting its own.
+- **A waiting request that Stop drops leaves the conversation.** A command that
   saw it waiting reports it `cancelled`; a fresh `wait` finds nothing and says
-  it was never accepted or was dropped.
+  it was never accepted or was dropped. Sent again under the same key, it is a
+  new request.
 - Repository workspace commands record no numeric exit code; a failure there is
   `failed` with its output.
 - Following is a poll about once a second. Streaming JSON events, name lookup,

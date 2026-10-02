@@ -228,14 +228,6 @@ function createApplicationRecords(
   );
 }
 
-function setNativeSessionId(chatId: string, nativeSessionId: string) {
-  return db()
-    .update(chats)
-    .set({ nativeSessionId })
-    .where(and(eq(chats.id, chatId), isNull(chats.nativeSessionId)))
-    .run().changes;
-}
-
 function updateOperatorSettings(
   applicationId: string,
   settings: Pick<ApplicationRecord, "permissionMode" | "host">,
@@ -370,7 +362,6 @@ export const operations = {
   archiveChat,
   latestObservation,
   insertObservation,
-  setNativeSessionId,
   updateOperatorSettings,
   listInformation,
   saveInformationRow,

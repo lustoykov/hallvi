@@ -10,8 +10,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 2 | Basis fixed in #275; absence-record friction remains |
 | [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | New |
-| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 2 | New |
-| [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 1 | New |
+| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 3 | New |
+| [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 2 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
 | [AF-022 — Send one review's findings to one branch](#af-022--send-one-reviews-findings-to-one-branch) | 1 | New |
@@ -23,7 +23,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
 | [AF-036 — Let the plugin label the messages it sends](#af-036--let-the-plugin-label-the-messages-it-sends) | 2 | New |
-| [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 1 | New |
+| [AF-040 — Say whether a Pi upgrade keeps the shared login readable](#af-040--say-whether-a-pi-upgrade-keeps-the-shared-login-readable) | 2 | New |
 | [AF-041 — Show OpenRouter credit beside the saved key](#af-041--show-openrouter-credit-beside-the-saved-key) | 1 | New |
 | [AF-042 — Include consent and notices in traffic setup](#af-042--include-consent-and-notices-in-traffic-setup) | 1 | Controls retained; mandatory opt-in removed by owner |
 | [AF-043 — Do not imply automatic sign-up tracking](#af-043--do-not-imply-automatic-sign-up-tracking) | 1 | Fix in review |
@@ -43,8 +43,71 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 1 | New |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | New |
+| [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
+| [AF-073 — Say exactly when a request ended](#af-073--say-exactly-when-a-request-ended) | 1 | New |
+| [AF-074 — Let the model look before Continue finishes an interrupted step](#af-074--let-the-model-look-before-continue-finishes-an-interrupted-step) | 1 | New |
+| [AF-075 — Keep a worktree from borrowing the main checkout's packages](#af-075--keep-a-worktree-from-borrowing-the-main-checkouts-packages) | 1 | New |
+| [AF-076 — Raise the proof of fit's findings with Pi upstream](#af-076--raise-the-proof-of-fits-findings-with-pi-upstream) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-076 — Raise the proof of fit's findings with Pi upstream
+
+The proof of fit for Pi 1.0 found six things that are Pi's to change and
+worth raising there. One conversation of a store cannot be resumed alone: the
+scheduler is one switch for the whole store, which is why Hallvi keeps one
+store per conversation. A run records no time at which it settles. A request
+id sent again with different content is taken for a duplicate of the first,
+so Hallvi compares the text itself. An input has no place for the host's own
+data, so when and where a message was sent ride on its content. The system
+prompt is stored after the first message and reaches ChatGPT models as a
+developer message unless the host gathers it to the front. Pi passes no
+session id to the provider, so Hallvi sets one.
+
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`
+
+### AF-075 — Keep a worktree from borrowing the main checkout's packages
+
+A worktree under `.claude/worktrees/` sits inside the main checkout, so a
+package missing from its own `node_modules` is found in the main checkout's.
+After `@earendil-works/pi-agent-core` was removed from this branch, tests that
+still imported it resolved the main checkout's copy (0.87.1) instead of
+failing to find it. A removed dependency reads as present, at whatever version
+the main checkout happens to hold.
+
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`
+
+### AF-074 — Let the model look before Continue finishes an interrupted step
+
+After a restart, Continue has Pi give the interrupted call an error result and
+then make the calls that were still to come in that same step, under the same
+permission mode and approvals, before the model is asked again. The model
+hears that a call was cut only after the calls it had planned beside it have
+run. I would like the model to see the interrupted result first and decide
+whether the rest still holds. The order is Pi's, not Hallvi's.
+
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`
+
+### AF-073 — Say exactly when a request ended
+
+Pi records no time at which a run settles, so `operation.endedAt` is when Pi
+began its last answer or last heard from a tool. A run whose last answer
+streams for a minute ends a minute early in the CLI's JSON. An exact time
+needs Pi to record when a run settles.
+
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`
+
+### AF-072 — Give the release's upgrade journey a real conversation
+
+`scripts/verify-installed-upgrade.mjs` seeds an application, its chats and the
+permission setting, and the only message it expects is Hallvi's greeting,
+which needs no model. The release's four jobs therefore pass whether or not
+the candidate can open or replace a history Pi wrote under the baseline. The
+move to Pi 1.0 changed where a conversation lives and was proven by hand on a
+retained application instead. I would like the upgrade jobs to carry one
+conversation Pi really wrote.
+
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`
 
 ### AF-071 — Refresh compact message dates after midnight
 
@@ -309,6 +372,12 @@ credential file as a boundary, or a check beside the history-format one,
 would make an upgrade's live run a decision instead of an investigation.
 
 **+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`: a live run on Pi 1.0.0
+used the shared ChatGPT login in `~/.config/hallvi/pi` without a new login.
+That it would was again established by hand, by comparing the installed
+`dist/` with a 0.99.1 checkout's: `pi-ai`'s `auth/` differs only in its
+Anthropic sign-in, and `pi-coding-agent`'s `auth-storage` and
+`runtime-credentials` are identical.
 
 ### AF-042 — Include consent and notices in traffic setup
 
@@ -359,6 +428,9 @@ follow-up; this release patches Hallvi's direct `ws` runtime to 8.22.0.
 **+1:** 2026-09-30 — Pi 0.99.1 upgrade, `claude/pi-0.99`: 0.99.1's shrinkwrap
 still installs `brace-expansion` 5.0.9 under `pi-coding-agent`, so the upgrade
 does not close this.
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`: 1.0.0's shrinkwrap still
+installs `brace-expansion` 5.0.9 under `pi-coding-agent`, so the move does not
+close this either.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
@@ -379,6 +451,11 @@ fresh `wait` finds nothing and has to say "never accepted, or dropped". A small
 durable note of the keys Stop removed would let every caller say `cancelled`.
 
 **+1:** 2026-09-28 — hallvi CLI task, [PR #241](https://github.com/lustoykov/hallvi/pull/241)
+**+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`: Pi now keeps a record of a
+message Stop withdrew, settled as aborted with no history entry, so a fresh
+`wait` could say `cancelled`. Hallvi reads that record only to count how
+often a key was handed over, so that a dropped message sent again is taken as
+a new one; what became of a request does not read it yet.
 
 ### AF-002 — Record a workspace command's exit code
 

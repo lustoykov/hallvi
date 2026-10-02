@@ -1,38 +1,28 @@
-// The worker's side of every conversation: it alone opens Pi's sessions.
+// The worker's side of every conversation: it alone opens Pi's stores.
 //
 // Pi owns what was said, what waits, what runs and what an interruption left
-// behind. This answers the app's requests by asking Pi, drives a lane while it
-// has work, and writes down the evidence of what Pi's tools did. It keeps no
-// record of its own about a message or a reply.
-import {
-  BACKGROUND_CONTEXT as ctx,
-  reduceLaneSnapshot,
-  type AgentMessage,
-  type Entry,
-  type LaneSnapshot,
-  type OperationResultRecord,
-} from "@earendil-works/pi-agent-core";
-import { existsSync } from "node:fs";
+// behind. This answers the app's requests by asking Pi, keeps a conversation
+// open while Pi has work in it, and writes down the evidence of what Pi's
+// tools did. It keeps no record of its own about a message or a reply.
+import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { assertChatWritable, loadChat } from "./applications";
 import { openPiSession, watchPiSession } from "./pi";
 import { listApplications } from "./db";
 import {
-  earlierHistoryPath,
-  readNativeConversation,
+  hasConversation,
+  openConversation,
   removeNativeSessions,
-  stopNativeConversation,
+  type StoredConversation,
 } from "./pi-sessions";
 import {
   holds,
   imageOf,
-  laneView,
-  MESSAGE_TAG,
-  operationResults,
   ORIGIN_TAG,
   projectTranscript,
-  queueOperation,
+  requestIdFor,
+  SENT_AT_TAG,
   unfinished,
   type MessageOrigin,
   type Transcript,
@@ -60,28 +50,22 @@ export interface SentMessage {
   origin?: MessageOrigin;
 }
 
-interface Opened extends Scope {
-  lane: Awaited<ReturnType<typeof openPiSession>>["lane"];
-  /** Pi's lane as it stands, kept current by Pi's own reducer. */
-  snapshot: () => LaneSnapshot;
-  fresh: () => Promise<LaneSnapshot>;
-  /**
-   * Pi's whole branch, and how Pi says each operation in it ended: both read
-   * again only when the tip has moved or another operation has ended.
-   */
-  history: () => Promise<{
-    entries: Entry[];
-    results: OperationResultRecord[];
-  }>;
-  /** One trace per stretch of work, ended with how Pi says it ended. */
-  trace(id: string | null, outcome?: PiReply["status"]): void;
-  close: () => Promise<void>;
-  /** Set while this worker runs the lane. */
-  driving: boolean;
-  /** Settles when this worker has let go of the lane. */
-  done?: Promise<void>;
+/**
+ * A conversation this worker is running. It is open exactly as long as Pi has
+ * work in it: a conversation nobody is running is closed, and reading one
+ * opens it for the length of the read.
+ */
+interface Working extends Scope {
+  session: Awaited<ReturnType<typeof openPiSession>>;
+  /** Settles when this worker has let go of the conversation. */
+  done: Promise<void>;
+  /** Stop was asked for, and Pi's work has not let go yet. */
+  stopping: boolean;
   /** What each call in flight has streamed back, by Pi's tool-call id. */
   previews: Map<string, string>;
+  /** One trace per stretch of work, ended with how Pi says it ended. */
+  trace(id: string | null, outcome?: PiReply["status"]): void;
+  close(): Promise<void>;
 }
 
 /** A result-so-far as text, for the line under a call that is still running. */
@@ -103,20 +87,27 @@ function partialText(partial: unknown): string {
   return partial === undefined || partial === null ? "" : String(partial);
 }
 
-const toPi = (message: SentMessage): AgentMessage =>
-  ({
-    role: "user",
-    content: [
-      ...(message.body ? [{ type: "text", text: message.body }] : []),
-      ...(message.images ?? []).map((image) => ({
-        type: "image",
-        ...image,
-      })),
-    ],
-    timestamp: Date.now(),
-    [MESSAGE_TAG]: message.id,
-    ...(message.origin && { [ORIGIN_TAG]: message.origin }),
-  }) as AgentMessage;
+/**
+ * The message as Pi is handed it. Pi keeps the content as given, in its queue
+ * and in its history, so when it was sent and where it was written ride on
+ * its first part; they are taken off again before a model sees anything.
+ */
+const toPi = (message: SentMessage) =>
+  [
+    ...(message.body ? [{ type: "text", text: message.body }] : []),
+    ...(message.images ?? []).map((image) => ({ type: "image", ...image })),
+  ].map((part, index) =>
+    index
+      ? part
+      : {
+          ...part,
+          [SENT_AT_TAG]: Date.now(),
+          ...(message.origin && { [ORIGIN_TAG]: message.origin }),
+        },
+  ) as never;
+
+/** A passive note in Pi's history: the owner chose to continue. */
+const CONTINUED = "hallvi.continued";
 
 const NOTHING: Transcript = {
   status: "idle",
@@ -126,19 +117,45 @@ const NOTHING: Transcript = {
   operations: {},
 };
 
+/** How Pi says the stretch of work that just ended went. */
+function outcomeOf(state: StoredConversation | undefined): PiReply["status"] {
+  const last = state?.submissions.findLast(
+    (record) => record.type === "input" && record.entry !== undefined,
+  );
+  return last?.status === "done"
+    ? "completed"
+    : last?.status === "unanswered" && last.reason === "aborted"
+      ? "cancelled"
+      : "failed";
+}
+
 export function sessionOwner(
   options: { signal?: AbortSignal; stopTimeoutMs?: number } = {},
 ) {
   /** The worker is going away: Pi keeps what it has, and nothing goes on. */
   let closing = false;
   /**
+   * Said to everything this worker started once it has begun to go away: a
+   * command is stopped, and a call that is waiting on something is let go of
+   * rather than waited for. Only ever after Pi has been told to keep each
+   * conversation as it is, so that what a call returns then is discarded and
+   * not taken for its result.
+   */
+  const leaving = new AbortController();
+  const signal = leaving.signal;
+  let letGo: Promise<void> | undefined;
+  /**
    * An update is about to stop this worker, and has asked it to stop taking
    * work first. The deadline is not a policy: it is what keeps a held worker
    * from staying held for ever if whoever asked never comes back.
    */
   let heldUntil = 0;
-  const opened = new Map<string, Opened>();
-  /** One thing at a time per conversation; reads of an open one skip this. */
+  const working = new Map<string, Working>();
+  /**
+   * One thing at a time per conversation. Every opening of a conversation's
+   * store happens in its line, which is what keeps two from being open at
+   * once; reads of one that is being run skip the line and ask the open one.
+   */
   const lines = new Map<string, Promise<unknown>>();
   const inLine = <T>(chatId: string, work: () => Promise<T>): Promise<T> => {
     const next = (lines.get(chatId) ?? Promise.resolve()).then(work, work);
@@ -149,79 +166,66 @@ export function sessionOwner(
     return next;
   };
 
-  async function open(scope: Scope) {
-    const session = await openPiSession(scope, options);
-    const watch = await session.lane.watch(ctx);
-    let snapshot = watch.snapshot;
-    const fresh = async () => (snapshot = await watch.resnapshot(ctx));
-    watch.start(async (event) => {
-      if (reduceLaneSnapshot(snapshot, event)) await fresh();
-      // The reducer returns undefined for ordinary changes, including tokens.
-      // Publish after applying them, not just when it requests a resnapshot.
-      if (
-        ![
-          "usage",
-          "handler_error",
-          "config_update",
-          "value_update",
-          "lane_created",
-        ].includes(event.type)
-      )
-        notifyChange({ kind: "chat", ...scope });
+  /** Nothing is opened once the worker has begun to let go of what it has. */
+  function assertOpen() {
+    if (closing) throw new Error("The worker is stopping.");
+  }
+
+  const changed = (scope: Scope) =>
+    notifyChange({
+      kind: "chat",
+      applicationId: scope.applicationId,
+      chatId: scope.chatId,
     });
-    let read:
-      | {
-          at: string;
-          entries: Entry[];
-          results: OperationResultRecord[];
-        }
-      | undefined;
-    const history = async () => {
-      // An operation can end without moving the tip, so its result is part of
-      // what says the history has changed.
-      const { tipId, lastResult } = snapshot;
-      const at = `${tipId}:${lastResult?.operationId}:${lastResult?.endedAt}`;
-      if (read?.at !== at) {
-        const entries = await session.lane.findEntries(
-          { order: "oldestFirst" },
-          ctx,
-        );
-        // Pi keeps how each operation ended, and where it began and ended.
-        const results = await operationResults(entries, (id) =>
-          session.lane.getResult(id, ctx),
-        );
-        read = { at, entries, results };
-      }
-      return read;
-    };
-    // What a call has streamed back so far. Pi writes the call and its
-    // result to its own history; only the in-between is nobody's record, and
-    // a short-lived read has no business on disk. It lives here while the
-    // call does, and a lost worker takes it with it — which is honest, since
-    // a call whose worker is gone is not producing anything either.
+
+  /**
+   * What Pi holds of a conversation nobody is running. Reading needs nothing
+   * of Pi's runtime: not the model, not credentials, not a workspace. Pi
+   * wrote everything a reader needs, and this reads it and starts nothing.
+   */
+  async function stored(scope: Scope) {
+    assertOpen();
+    const open = await openConversation(scope);
+    try {
+      return await open.read();
+    } finally {
+      await open.close();
+    }
+  }
+
+  /** Open for a stretch of work: current settings, a new workspace. */
+  async function begin(scope: Scope) {
+    assertOpen();
     const previews = new Map<string, string>();
-    const recording = watchPiSession(session.harness, {
-      onActivity: (event) => diagnostics?.signal(event),
-      onTool(event) {
-        if (event.type === "start") previews.delete(event.id);
-        // The runtime sends a result-so-far, never an increment.
-        else if (event.type === "update")
-          previews.set(event.id, partialText(event.partial));
-        else if (event.type === "end") previews.delete(event.id);
-        notifyChange({ kind: "chat", ...scope });
+    const session = await openPiSession(scope, {
+      signal,
+      // What a call has streamed back so far. Pi writes the call and its
+      // result to its own history; only the in-between is nobody's record,
+      // and a short-lived read has no business on disk. It lives here while
+      // the call does, and a lost worker takes it with it.
+      onPartial(id, partial) {
+        if (partial === undefined) previews.delete(id);
+        else previews.set(id, partialText(partial));
+        changed(scope);
       },
     });
     let diagnostics: ReturnType<typeof beginRunDiagnostics> | undefined;
-    const conversation = {
+    // Whatever Pi commits may be something a reader shows.
+    const unsubscribe = session.harness.subscribeCommits(() => changed(scope));
+    const recording = await watchPiSession(session, (event) =>
+      diagnostics?.signal(event),
+    ).catch(async (error) => {
+      unsubscribe();
+      await session.close();
+      throw error;
+    });
+    const conversation: Working = {
       ...scope,
-      lane: session.lane,
+      session,
       previews,
-      snapshot: () => snapshot,
-      fresh,
-      history,
-      driving: false,
-      done: undefined as Promise<void> | undefined,
-      trace(id: string | null, outcome: PiReply["status"] = "completed") {
+      done: Promise.resolve(),
+      stopping: false,
+      trace(id, outcome = "completed") {
         diagnostics?.finish(outcome);
         const now = new Date().toISOString();
         diagnostics = id
@@ -235,150 +239,94 @@ export function sessionOwner(
           : undefined;
       },
       async close() {
+        unsubscribe();
         recording.unsubscribe();
-        watch.unsubscribe();
         conversation.trace(null);
         await session.close();
       },
     };
-    opened.set(scope.chatId, conversation);
+    working.set(scope.chatId, conversation);
     return conversation;
   }
 
-  async function shut(conversation: Opened) {
-    opened.delete(conversation.chatId);
-    await conversation.close();
-    notifyChange({
-      kind: "chat",
-      applicationId: conversation.applicationId,
-      chatId: conversation.chatId,
-    });
-  }
-
-  /** The conversation as it stands, opened for reading if it was not open. */
-  const ensure = async (scope: Scope) =>
-    opened.get(scope.chatId) ?? (await open(scope));
-
-  /** Open for a stretch of work: current settings, a new workspace. */
-  async function begin(scope: Scope) {
-    const viewing = opened.get(scope.chatId);
-    if (viewing) await shut(viewing);
-    return open(scope);
+  /**
+   * Let go of a conversation. Whatever closing it runs into, it is no longer
+   * this worker's: the next request opens Pi's store again.
+   */
+  async function shut(conversation: Working) {
+    if (working.get(conversation.chatId) === conversation)
+      working.delete(conversation.chatId);
+    try {
+      await conversation.close();
+    } finally {
+      changed(conversation);
+    }
   }
 
   /**
-   * Run the lane until Pi has nothing left for it. A message queued as Pi
-   * finished stays in Pi's queue under its own id, and an empty prompt has Pi
-   * read it from there.
+   * Stay with the conversation until Pi has nothing left to run in it. Pi
+   * reads what waits in its queue by itself, in its own order; this only
+   * notices when it has finished, and lets go.
    */
-  function drive(
-    conversation: Opened,
-    operationId: string,
-    first: () => Promise<unknown>,
-  ) {
-    conversation.driving = true;
-    notifyChange({
-      kind: "chat",
-      applicationId: conversation.applicationId,
-      chatId: conversation.chatId,
-    });
-    conversation.trace(operationId);
+  function drive(conversation: Working, traceId: string) {
+    changed(conversation);
+    conversation.trace(traceId);
     conversation.done = (async () => {
-      let step = first;
       while (!closing) {
-        const settled = await step().then(
-          () => true,
-          (error) => {
-            console.warn(
-              `Pi could not go on in ${conversation.chatId}: ${error instanceof Error ? error.message : error}`,
-            );
-            return false;
-          },
-        );
+        await conversation.session.conversation
+          .waitForIdle(ctx)
+          .catch((error) => {
+            if (!closing)
+              console.warn(
+                `Pi could not go on in ${conversation.chatId}: ${error instanceof Error ? error.message : error}`,
+              );
+          });
         if (closing) return;
-        const next = await inLine(conversation.chatId, async () => {
-          const { queues, operation } = await conversation.fresh();
-          if (settled && queues.length && !operation)
-            return queueOperation(queues[0].entryId);
-          // Whatever a command never reported ending did not survive the
-          // stretch. Pi's own calls need no sweep: one with no result in Pi's
-          // history, with nobody driving, reads as interrupted.
-          await settleRunningExecutions(
-            conversation.applicationId,
-            conversation.chatId,
-          );
-          conversation.driving = false;
-          const ended = conversation.snapshot().lastResult?.status;
-          conversation.trace(
-            null,
-            ended === "aborted"
-              ? "cancelled"
-              : ended === "completed"
-                ? "completed"
-                : "failed",
-          );
-          await shut(conversation);
-          return null;
+        const ended = await inLine(conversation.chatId, async () => {
+          const state = await conversation.session
+            .read()
+            .catch(() => undefined);
+          // A message taken in the moment Pi finished began another run.
+          if (state?.live.run) return false;
+          try {
+            // Whatever a command never reported ending did not survive the
+            // stretch. Pi's own calls need no sweep: one with no result in
+            // Pi's history, with nobody running it, reads as interrupted.
+            await settleRunningExecutions(
+              conversation.applicationId,
+              conversation.chatId,
+            );
+            conversation.trace(null, outcomeOf(state));
+          } finally {
+            await shut(conversation);
+          }
+          return true;
         });
-        if (!next) return;
-        step = async () => {
-          await accept(conversation, next, []);
-          await run(conversation, next);
-        };
+        if (ended) return;
       }
-    })();
-  }
-
-  async function run(conversation: Opened, operationId: string) {
-    const driven = await conversation.lane.drive(
-      { operationId, waitForRetry: true },
-      ctx,
-    );
-    if (!driven.ok) throw new Error(driven.error.message);
-  }
-
-  async function accept(
-    conversation: Opened,
-    operationId: string,
-    prompt: AgentMessage | AgentMessage[],
-  ) {
-    const admitted = await conversation.lane.accept(
-      { kind: "prompt", operationId, prompt },
-      ctx,
-    );
-    if (!admitted.ok) throw new Error(admitted.error.message);
-  }
-
-  async function hasHistory(scope: Scope) {
-    const { chat } = await loadChat(scope.applicationId, scope.chatId);
-    return (
-      Boolean(chat.nativeSessionId) || existsSync(earlierHistoryPath(scope))
-    );
-  }
-
-  const project = async (open: Opened) => {
-    const { entries, results } = await open.history();
-    return withPreviews(
-      projectTranscript(
-        open.chatId,
-        entries,
-        results,
-        laneView(open.snapshot()),
-        open.driving,
-        (text) => redactHeldSecrets(open.applicationId, text),
+    })().catch((error) =>
+      // Nobody may be waiting for this, and a cleanup that failed is not a
+      // reason for the worker, and every other conversation, to stop.
+      console.warn(
+        `Hallvi could not let go of ${conversation.chatId} cleanly: ${error instanceof Error ? error.message : error}`,
       ),
-      open.previews,
     );
-  };
+  }
 
-  /** What the calls still in flight have streamed back, from this worker. */
-  function withPreviews(transcript: Transcript, previews: Map<string, string>) {
-    for (const [id, preview] of previews) {
+  const project = async (conversation: Working) => {
+    const transcript = projectTranscript(
+      conversation.chatId,
+      await conversation.session.read(),
+      true,
+      (text) => redactHeldSecrets(conversation.applicationId, text),
+    );
+    // What the calls still in flight have streamed back, from this worker.
+    for (const [id, preview] of conversation.previews) {
       const call = transcript.calls[id];
       if (call) call.preview = preview;
     }
     return transcript;
-  }
+  };
 
   /**
    * Refuses, synchronously, before anything is awaited. That is the point:
@@ -396,28 +344,23 @@ export function sessionOwner(
 
   const actions = {
     async transcript(scope: Scope): Promise<Transcript> {
-      const open = opened.get(scope.chatId);
+      const running = working.get(scope.chatId);
       // Read without waiting in line. One that is being closed as it is read
-      // is read again below, from Pi's stored session.
-      const read = open && (await project(open).catch(() => undefined));
+      // is read again below, from what Pi stored.
+      const read = running && (await project(running).catch(() => undefined));
       if (read) return read;
-      if (!(await hasHistory(scope))) return NOTHING;
-      // Nobody is running this conversation, so reading it needs nothing of
-      // Pi's runtime: not the model, not credentials, not a workspace. Pi
-      // wrote everything a reader needs, and this reads it and nothing else.
+      if (!hasConversation(scope)) return NOTHING;
       return inLine(scope.chatId, async () => {
-        const stored = await readNativeConversation(
-          scope.applicationId,
-          scope.chatId,
-        );
-        return projectTranscript(
-          scope.chatId,
-          stored.entries,
-          stored.results,
-          stored.lane,
-          false,
-          (text) => redactHeldSecrets(scope.applicationId, text),
-        );
+        // It may have begun work while this waited its turn.
+        const now = working.get(scope.chatId);
+        return now
+          ? project(now)
+          : projectTranscript(
+              scope.chatId,
+              await stored(scope),
+              false,
+              (text) => redactHeldSecrets(scope.applicationId, text),
+            );
       }).catch(async (error) => ({
         // A history that cannot be opened is said where it would have been.
         ...NOTHING,
@@ -441,18 +384,16 @@ export function sessionOwner(
     /** One image the owner attached to a message, as Pi keeps it. */
     async image(scope: Scope, message: unknown) {
       const { id, index } = message as { id: string; index: number };
-      const open = opened.get(scope.chatId);
-      const image = open
-        ? imageOf((await open.history()).entries, open.snapshot(), id, index)
-        : (await hasHistory(scope))
-          ? await inLine(scope.chatId, async () => {
-              const stored = await readNativeConversation(
-                scope.applicationId,
-                scope.chatId,
-              );
-              return imageOf(stored.entries, stored.lane, id, index);
+      const running = working.get(scope.chatId);
+      const state =
+        (running && (await running.session.read().catch(() => undefined))) ??
+        (hasConversation(scope)
+          ? await inLine(scope.chatId, () => {
+              const now = working.get(scope.chatId);
+              return now ? now.session.read() : stored(scope);
             })
-          : undefined;
+          : undefined);
+      const image = state && imageOf(state, id, index);
       if (!image)
         throw new WorkerRefusal(
           "This image is not in the conversation.",
@@ -468,73 +409,115 @@ export function sessionOwner(
         assertChatWritable(
           (await loadChat(scope.applicationId, scope.chatId)).chat,
         );
-        const conversation = (await hasHistory(scope))
-          ? await ensure(scope)
-          : undefined;
-        const snapshot = await conversation?.fresh();
+        const running = working.get(scope.chatId);
+        const state = running
+          ? await running.session.read()
+          : hasConversation(scope)
+            ? await stored(scope)
+            : undefined;
         // An answer that was lost on its way back is sent again. Pi has it.
-        const held =
-          conversation &&
-          snapshot &&
-          holds((await conversation.history()).entries, snapshot, message.id);
+        // Pi itself takes a known id for the message it already has, whatever
+        // the words, so the comparison is made here.
+        const held = state && holds(state, message.id);
         if (held !== undefined && held !== message.body)
           throw new WorkerRefusal(
             "This request key was already used for a different message.",
             "conflict",
           );
         if (held !== undefined) return { accepted: true };
-        if (conversation?.driving) {
+        if (running) {
+          // Pi finished, a reply failed with messages still waiting, and
+          // this worker has yet to let go: what waits is the owner's to
+          // continue or stop, and anything Pi took now would set it going.
+          if (
+            state &&
+            !state.live.run &&
+            state.inbox.items.some((item) => item.mode !== "write")
+          )
+            throw new WorkerRefusal(
+              "This conversation was interrupted. Continue or stop it before sending something new.",
+              "interrupted",
+            );
           if (onlyIfIdle)
             throw new WorkerRefusal(
               "Hallvi is working in the conversation. The deployment can start when that finishes.",
               "busy",
             );
-          const queued = await (message.delivery === "steer"
-            ? conversation.lane.steer(toPi(message), undefined, ctx)
-            : conversation.lane.followUp(toPi(message), undefined, ctx));
-          if (!queued.ok) throw new Error(queued.error.message);
+          // A message Pi took while it was stopping would be left in its
+          // queue with nothing to read it.
+          if (running.stopping)
+            throw new WorkerRefusal(
+              "Pi has not stopped yet. A command may still be finishing; try again in a moment.",
+              "stopping",
+            );
+          await running.session.conversation.submit(
+            {
+              type: "input",
+              content: toPi(message),
+              requestId: requestIdFor(state, message.id),
+              whenBusy: message.delivery === "steer" ? "steer" : "followUp",
+            },
+            ctx,
+          );
           return { accepted: true };
         }
-        if (snapshot && unfinished(snapshot))
+        // Decided here, before Pi is asked anything: whatever Pi is asked to
+        // take would also set its unfinished work going again.
+        if (state && unfinished(state))
           throw new WorkerRefusal(
             "This conversation was interrupted. Continue or stop it before sending something new.",
             "interrupted",
           );
         const live = await begin(scope);
         try {
-          await accept(live, message.id, toPi(message));
+          await live.session.conversation.submit(
+            {
+              type: "input",
+              content: toPi(message),
+              requestId: requestIdFor(state, message.id),
+            },
+            ctx,
+          );
         } catch (error) {
           await shut(live);
           throw error;
         }
-        drive(live, message.id, () => run(live, message.id));
+        drive(live, message.id);
         return { accepted: true };
       })
     ),
 
-    /** Pi goes on with what an interruption left: its operation, its queue. */
+    /** Pi goes on with what an interruption left: its work, its queue. */
     continue: (scope: Scope) => (
       assertTaking(),
       inLine(scope.chatId, async () => {
-        const viewing = await ensure(scope);
-        const snapshot = await viewing.fresh();
-        if (viewing.driving || !unfinished(snapshot)) return {};
+        if (working.has(scope.chatId) || !hasConversation(scope)) return {};
+        const state = await stored(scope);
+        if (!unfinished(state)) return {};
         const live = await begin(scope);
-        if (snapshot.operation)
-          drive(live, snapshot.operation.id, async () => {
-            const resumed = await live.lane.resume(ctx);
-            if (!resumed.ok) throw new Error(resumed.error.message);
-          });
-        else {
-          const operationId = queueOperation(snapshot.queues[0].entryId);
-          try {
-            await accept(live, operationId, []);
-          } catch (error) {
-            await shut(live);
-            throw error;
-          }
-          drive(live, operationId, () => run(live, operationId));
+        try {
+          // Pi resumes what it had begun; a call the interruption cut is not
+          // made again. With only messages waiting there is nothing to resume,
+          // and Pi reads its queue when something is written to the
+          // conversation: a note that carries nothing for the model.
+          if (state.tasks > 0 || state.live.run) live.session.harness.resume();
+          else
+            await live.session.conversation.submit(
+              { type: "write", entry: { kind: CONTINUED } },
+              ctx,
+            );
+        } catch (error) {
+          await shut(live);
+          throw error;
         }
+        const first =
+          state.live.run?.inputs[0] ??
+          state.inbox.items.find((item) => item.mode !== "write")?.id;
+        drive(
+          live,
+          state.submissions.find((record) => record.id === first)?.requestId ??
+            `continue:${scope.chatId}`,
+        );
         return {};
       })
     ),
@@ -560,24 +543,46 @@ export function sessionOwner(
       return { held: false };
     },
 
-    /** Pi's abort ends its operation and empties its queues. */
+    /**
+     * Pi's abort ends its work and withdraws what waited. It runs no tool and
+     * asks no model, so a conversation nobody is running is stopped as it
+     * was read: without a login, a workspace or a tool.
+     */
     async stop(scope: Scope) {
-      if (!(await hasHistory(scope))) return {};
       const stopped = inLine(scope.chatId, async () => {
-        const conversation = opened.get(scope.chatId);
-        if (!conversation) {
-          await stopNativeConversation(scope.applicationId, scope.chatId);
-          notifyChange({ kind: "chat", ...scope });
-          return {};
+        const running = working.get(scope.chatId);
+        if (!running) {
+          // Decided here, in its turn: a message still opening the
+          // conversation has taken it by now, or has not been sent.
+          if (!hasConversation(scope)) return { done: undefined };
+          assertOpen();
+          const open = await openConversation(scope);
+          try {
+            await open.conversation.abort(ctx, { background: true });
+          } finally {
+            await open.close();
+          }
+          changed(scope);
+          return { done: undefined };
         }
-        if ((await conversation.fresh()).operation)
-          await conversation.lane.abort(ctx);
-        // Without an operation there is nothing to abort, only a queue.
-        for (const item of (await conversation.fresh()).queues)
-          await conversation.lane.cancelQueued(item.entryId, ctx);
-        // Wrapped, so the line is not held while the driver lets go: letting
-        // go is itself something the driver does in this line.
-        return { done: conversation.done };
+        running.stopping = true;
+        // Wrapped, so the line is not held while Pi's work lets go: letting
+        // go of the conversation is itself something done in this line.
+        return {
+          done: Promise.all([
+            running.session.conversation
+              .abort(ctx, { background: true })
+              .catch(async (error) => {
+                // A store Pi can no longer write cannot be stopped through
+                // it. Closed, it is read again as Pi left it, and stopped
+                // from there. In its line, so that nothing opens the store
+                // again before it has closed.
+                await inLine(scope.chatId, () => shut(running));
+                throw error;
+              }),
+            running.done,
+          ]),
+        };
       }).then(({ done }) => done);
       const late = Symbol();
       if (
@@ -595,17 +600,23 @@ export function sessionOwner(
 
     /** Remove every history an application has. */
     async forget(scope: { applicationId: string }) {
-      const mine = [...opened.values()].filter(
-        (open) => open.applicationId === scope.applicationId,
-      );
-      if (mine.some((open) => open.driving))
+      const running = () =>
+        [...working.values()].some(
+          (conversation) => conversation.applicationId === scope.applicationId,
+        );
+      // A request in hand may have a store open, or be opening the
+      // conversation for work: every line runs out first, and the look at
+      // what is running comes after, with nothing between it and the removal.
+      for (;;) {
+        const pending = [...lines.values()];
+        await Promise.allSettled(pending);
+        if ([...lines.values()].every((line) => pending.includes(line))) break;
+      }
+      if (running())
         throw new WorkerRefusal(
           "This application's conversation is still running. Stop it and wait for it to stop before removing its history.",
           "busy",
         );
-      await Promise.all(
-        mine.map((open) => inLine(open.chatId, () => shut(open))),
-      );
       removeNativeSessions(scope.applicationId);
       return {};
     },
@@ -616,7 +627,7 @@ export function sessionOwner(
      * A crash never reaches a worker's own cleanup, so evidence still marked
      * running belongs to work that no longer exists. Only the owner may say
      * so: a process that has yet to find out whether another worker is serving
-     * would be settling that worker's live approvals. Pi's sessions are left
+     * would be settling that worker's live approvals. Pi's stores are left
      * as they are: nothing is opened, and nothing runs, until somebody asks.
      */
     async recover() {
@@ -631,12 +642,12 @@ export function sessionOwner(
       const { scope, message } = body as { scope: Scope; message?: unknown };
       return Promise.resolve(act(scope, message));
     },
-    live: () => [...opened.values()].filter((open) => open.driving).length,
+    live: () => working.size,
     /** What the branch watch needs of a conversation, and nothing more. */
     conversations: {
-      driving: (chatId: string) => Boolean(opened.get(chatId)?.driving),
+      driving: (chatId: string) => working.has(chatId),
       // The check belongs inside the conversation queue: an owner message
-      // may have begun opening the session before the watch checked driving.
+      // may have begun opening the conversation before the watch checked.
       send: (scope: Scope, message: SentMessage) =>
         actions.send(scope, message, true),
       transcript: actions.transcript,
@@ -647,27 +658,45 @@ export function sessionOwner(
       (scope: never, message: unknown) => Promise<unknown>
     >,
     /**
-     * The worker is going away. Nothing is aborted: Pi keeps each operation
-     * and queue as it is, and nothing runs again until its owner continues.
+     * The worker is going away. Nothing is aborted: Pi keeps its work and its
+     * queue as they are, and nothing runs again until its owner continues.
      */
-    async close() {
-      closing = true;
-      // One failed cleanup must not release ownership while another session
-      // is still closing. Report failures only after every attempt settles.
-      const results = await Promise.allSettled(
-        [...opened.values()].map((open) => open.close()),
-      );
-      const errors = results.flatMap((result) =>
-        result.status === "rejected" ? [result.reason] : [],
-      );
-      if (errors.length)
-        throw new AggregateError(errors, "Pi session cleanup failed.");
+    close() {
+      return (letGo ??= (async () => {
+        closing = true;
+        // One failed cleanup must not release ownership while another
+        // conversation is still closing. Report failures only after every
+        // attempt settles.
+        const errors: unknown[] = [];
+        // A request already in hand may still have a store open, or be
+        // about to register the conversation it opened: ownership is kept
+        // until every line has run out and nothing is left open.
+        do {
+          const open = [...working.values()];
+          for (const conversation of open) working.delete(conversation.chatId);
+          // Each close tells Pi, before anything is awaited, to take no more
+          // of that conversation's work. Only then is the work let go of.
+          const closed = open.map((conversation) => conversation.close());
+          leaving.abort(new Error("The worker is stopping."));
+          for (const result of await Promise.allSettled(closed))
+            if (result.status === "rejected") errors.push(result.reason);
+          await Promise.allSettled([...lines.values()]);
+        } while (working.size);
+        if (errors.length)
+          throw new AggregateError(errors, "Pi session cleanup failed.");
+      })());
     },
   };
+  // Asked to stop, the worker lets go here and now, whatever else it is in
+  // the middle of: Pi is sealed in the same turn the signal arrives, ahead
+  // of every command the signal goes on to stop.
+  const leave = () => void owner.close().catch(() => undefined);
+  if (options.signal?.aborted) leave();
+  else options.signal?.addEventListener("abort", leave, { once: true });
   return owner;
 }
 
-/** Become the owner of Pi's sessions for this database, unless there is one. */
+/** Become the owner of Pi's stores for this database, unless there is one. */
 export async function ownSessions(
   options: Parameters<typeof sessionOwner>[0] = {},
 ) {
@@ -677,9 +706,9 @@ export async function ownSessions(
   return {
     owner,
     /**
-     * Stop answering, let go of every session, and only then stop being the
-     * owner. Pi's close waits for what it is still writing, and no other
-     * process may open those sessions until it has finished.
+     * Stop answering, let go of every conversation, and only then stop being
+     * the owner. Pi's close waits for what it is still writing, and no other
+     * process may open those stores until it has finished.
      */
     async close() {
       serving.server.close();

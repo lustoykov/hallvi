@@ -371,6 +371,12 @@ keys, the ChatGPT connection, your `hallvi.env` settings and your ports. The
 update returns the service to the state it found: running if it was running,
 stopped if you had stopped it. Unsent text in a conversation is kept too.
 
+The exception is what was said under a release that ran Pi before 1.0. After
+updating, such a conversation keeps its title and its application and starts
+empty; everything else listed above is kept. Its earlier files are not changed:
+they stay under `pi-sessions` in `~/.local/share/hallvi`, where the release
+that wrote them still reads them.
+
 **Where it is installed.** The machine running Hallvi. Reached through an SSH
 connection from a laptop, it updates the machine at the other end, keeps its
 ports, and the page comes back on the same address when it restarts.

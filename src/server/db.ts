@@ -80,7 +80,6 @@ export const insertObservation = operation(
   "insertObservation",
   ({ applicationId }) => applicationChanged(applicationId),
 );
-export const setNativeSessionId = operation("setNativeSessionId");
 export const updateOperatorSettings = operation(
   "updateOperatorSettings",
   applicationChanged,

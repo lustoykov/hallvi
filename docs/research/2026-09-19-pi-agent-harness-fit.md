@@ -5,6 +5,9 @@ integration that followed is described in
 [operator design](../operator-design.md#interaction-while-pi-is-busy).
 Companion to the ecosystem audit in research PR #155.
 
+Pi 1.0.0 removed this harness; the runtime that replaced it is examined in
+[Pi 1.0 durable runtime proof of fit](2026-10-02-pi-durable-fit.md).
+
 ## What was run
 
 Published `@earendil-works/pi-agent-core` 0.85.1, `pi-ai` 0.85.1 and

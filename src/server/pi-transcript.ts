@@ -1,49 +1,42 @@
-// The conversation as the page shows it, read from Pi's own lane snapshot.
+// The conversation as the page shows it, read from what Pi durably holds.
 //
-// Pi's history, queues and operation state are the record of what was said,
-// what waits and what is running. Nothing here is stored: it is projected on
-// every read, and Hallvi's execution evidence is placed into it by the id Pi
-// gave each tool call.
-import type {
-  Entry,
-  LaneQueuedItem,
-  LaneSnapshot,
-  OperationResultRecord,
-  TerminalStatus,
-} from "@earendil-works/pi-agent-core";
+// Pi's history, its queue and its record of each message are the record of
+// what was said, what waits and how each stretch of work ended. Nothing here
+// is stored: it is projected on every read, and Hallvi's execution evidence is
+// placed into it by the id Pi gave each tool call.
+import type { EntryRecord, SubmissionRecord } from "@earendil-works/pi-durable";
 
 import type { ConversationStatus } from "./operator-data";
+import type { StoredConversation } from "./pi-sessions";
 import type { ChatMessage } from "./types";
 import { failureText, nativeFailure } from "./pi-failure";
 import { redactSecrets } from "./secrets";
 
-/** Every message handed to Pi carries the id its sender gave it. */
-export const MESSAGE_TAG = "hallviMessageId";
 /**
  * A message Hallvi sent itself, such as the branch watch waking Pi to deploy.
  * The id says so, because Pi's history is the only record of a message and
  * such a message must never read as the owner's own words.
  */
 export const WAKEUP_PREFIX = "wakeup:";
-export const tagOf = (message: unknown) =>
-  (message as Record<string, unknown> | undefined)?.[MESSAGE_TAG] as
-    string | undefined;
-const sourceOf = (message: unknown): "hallvi" | "user" =>
-  tagOf(message)?.startsWith(WAKEUP_PREFIX) ? "hallvi" : "user";
+const sourceOf = (id: string | undefined): "hallvi" | "user" =>
+  id?.startsWith(WAKEUP_PREFIX) ? "hallvi" : "user";
 
 /**
+ * What Hallvi writes on a message besides its words. Pi keeps a message's
+ * content as it was handed over, in its queue and in its history, so these
+ * travel on the first part of it and are taken off again before a model is
+ * sent anything. The message's id needs no tag: it is the request id of Pi's
+ * own record of the message.
+ */
+export const SENT_AT_TAG = "hallviSentAt";
+/**
  * Where a message was written when it was not Hallvi's own composer: the
- * `hallvi` command today, an agent's adapter later. It travels on the message
- * into Pi's history, so the label survives a reload. It is provenance only: it
+ * `hallvi` command today, an agent's adapter later. It is provenance only: it
  * names no identity and grants no authority.
  */
 export const ORIGIN_TAG = "hallviOrigin";
 export const MESSAGE_ORIGINS = ["cli"] as const;
 export type MessageOrigin = (typeof MESSAGE_ORIGINS)[number];
-const originOf = (message: unknown) => {
-  const said = (message as Record<string, unknown> | undefined)?.[ORIGIN_TAG];
-  return MESSAGE_ORIGINS.find((origin) => origin === said);
-};
 
 /**
  * One of Pi's tool calls, as Pi recorded it: where it sits, what it was, and
@@ -67,9 +60,9 @@ export interface TranscriptCall {
   preview?: string;
 }
 
-/** One of Pi's operations: how Pi says it ended, or that it is still open. */
+/** One stretch of Pi's work: how Pi says it ended, or that it is still open. */
 export interface TranscriptOperation {
-  status: "open" | TerminalStatus;
+  status: "open" | "completed" | "aborted" | "failed";
   startedAt: string;
   endedAt: string | null;
 }
@@ -82,9 +75,10 @@ export interface Transcript {
   /** What Pi said between its calls, in the same sequence. */
   said: { replyId: string; sequence: number; text: string; at: string }[];
   /**
-   * Pi's operations, by the id each message and reply names as the one it
-   * was taken in. Several messages share one when Pi read them in one go.
-   * Always there from the worker; a page's stand-in may leave it out.
+   * Pi's stretches of work, by the id each message and reply names as the
+   * one it was taken in: the request key of the message that began it.
+   * Several messages share one when Pi read them in one go. Always there
+   * from the worker; a page's stand-in may leave it out.
    */
   operations?: Record<string, TranscriptOperation>;
 }
@@ -97,17 +91,15 @@ type Part = {
   arguments?: Record<string, unknown>;
 };
 
-/**
- * A tool result as Pi stores it: the tool's own words, and whether it
- * failed.
- */
-type ToolResult = {
+/** A message as Pi stores it, of whichever role. */
+type Stored = {
   role: string;
-  toolCallId?: string;
-  toolName?: string;
   content: unknown;
-  isError?: boolean;
   timestamp?: number;
+  toolCallId?: string;
+  isError?: boolean;
+  stopReason?: string;
+  errorMessage?: string;
 };
 
 function textOf(content: unknown) {
@@ -117,6 +109,17 @@ function textOf(content: unknown) {
     .map((part) => (part.type === "text" ? String(part.text) : ""))
     .join("");
 }
+
+/**
+ * A tool's result as its words. What Pi itself has to say about a call — it
+ * was stopped, it was interrupted, its arguments were refused — comes wrapped
+ * in a tag meant for the model; the page shows the sentence.
+ */
+const toolText = (content: unknown) =>
+  textOf(content).replace(
+    /<harness>\n\[(?:error|warn|info)\] ([\s\S]*?)\n<\/harness>/g,
+    "$1",
+  );
 
 /** The images in a message, in the order the owner attached them. */
 function imagesOf(content: unknown) {
@@ -129,159 +132,132 @@ function imagesOf(content: unknown) {
 }
 const imageCount = (content: unknown) => imagesOf(content).length || undefined;
 
+/** What Hallvi wrote on a message's first part. */
+function tagsOf(content: unknown) {
+  const first = Array.isArray(content)
+    ? (content[0] as Record<string, unknown> | undefined)
+    : undefined;
+  const sentAt = first?.[SENT_AT_TAG];
+  return {
+    sentAt: typeof sentAt === "number" ? sentAt : undefined,
+    origin: MESSAGE_ORIGINS.find((origin) => origin === first?.[ORIGIN_TAG]),
+  };
+}
+
 const at = (timestamp: number | undefined) =>
   new Date(timestamp ?? 0).toISOString();
 
+const messageOf = (entry: EntryRecord) =>
+  entry.model?.[0] as Stored | undefined;
+
 /**
- * The part of Pi's lane a transcript reads: whether an operation is open, what
- * it is streaming, and what is waiting in the queue.
- *
- * A narrow shape on purpose. A worker driving the conversation has the whole
- * lane; a reader that only opens Pi's stored session has these three facts and
- * no runtime at all, and both must produce the same transcript.
+ * The sender's id of a message, from Pi's record of it. See `requestIdFor`.
  */
-export interface LaneView {
-  operation: {
-    id: string;
-    startedAt: number;
-    /** Where the branch stood when it began: what it takes comes after. */
-    fromTipId: string | null;
-    streamingMessage?: { content: unknown; timestamp?: number };
-  } | null;
-  queues: LaneQueuedItem[];
+const keyOf = (record: SubmissionRecord | undefined) =>
+  record?.requestId?.replace(/#\d+$/, "");
+
+/** A message Pi was handed and has not placed in its history yet. */
+const waiting = (state: StoredConversation) =>
+  state.inbox.items.filter((item) => item.mode !== "write");
+
+/**
+ * True while anything of Pi's is unfinished: work it began, or messages it
+ * holds and has not read. With nobody running it, that is interrupted work.
+ */
+export function unfinished(state: StoredConversation) {
+  return (
+    state.tasks > 0 || Boolean(state.live.run) || waiting(state).length > 0
+  );
 }
 
-export const laneView = (snapshot: LaneSnapshot): LaneView => ({
-  operation: snapshot.operation,
-  queues: snapshot.queues,
-});
-
-/** The operation in which Pi reads its queue, named after its first entry. */
-export const queueOperation = (entryId: string) => `queue:${entryId}`;
-
-/**
- * How Pi says each operation in the branch ended.
- *
- * An operation begins at one of the owner's messages and is named after it:
- * a prompt's after the message's own id, a queue read's after the entry id of
- * the first message Pi read from the queue. Both are asked for, over every
- * message in the branch, because a reply stopped three turns ago is still
- * stopped — a reader that only asks about the newest operation quietly
- * promotes old cancelled work to completed.
- *
- * The caller says how a result is fetched: a driving worker asks its lane, a
- * reader asks Pi's stored session. The derivation is the same either way.
- */
-export async function operationResults(
-  history: Entry[],
-  resultOf: (operationId: string) => Promise<OperationResultRecord | undefined>,
+/** Whether Pi answered two messages, or left them unanswered, as one. */
+function endedAlike(
+  one: SubmissionRecord | undefined,
+  other: SubmissionRecord | undefined,
 ) {
-  const results: OperationResultRecord[] = [];
-  for (const entry of history) {
-    if (entry.type !== "message" || entry.message.role !== "user") continue;
-    for (const id of [tagOf(entry.message), queueOperation(entry.id)]) {
-      const result = id ? await resultOf(id) : undefined;
-      if (result) results.push(result);
-    }
-  }
-  return results;
+  if (!one || !other) return true;
+  return (
+    one.status === other.status &&
+    one.answer === other.answer &&
+    one.reason === other.reason
+  );
 }
 
 /**
- * Which of Pi's operations took each entry of the branch.
- *
- * Pi records where on the branch every operation began and where it ended, so
- * an entry belongs to the operation whose stretch it falls in, and one still
- * open runs to the tip. A message Pi read while already working — a follow-up
- * or a steer — is therefore in the operation that read it, not one of its own.
- */
-function operationsOfEntries(
-  history: Entry[],
-  results: OperationResultRecord[],
-  open: LaneView["operation"],
-) {
-  const index = new Map(history.map((entry, at) => [entry.id, at]));
-  // A tip that is not on this branch places nothing: NaN matches no index.
-  const at = (id: string | null) => (id === null ? -1 : (index.get(id) ?? NaN));
-  const stretches = results.map((result) => ({
-    id: result.operationId,
-    from: at(result.fromTipId),
-    to: at(result.tipId),
-  }));
-  if (open)
-    stretches.push({
-      id: open.id,
-      from: at(open.fromTipId),
-      to: history.length - 1,
-    });
-  const taken = new Map<string, string>();
-  for (const { id, from, to } of stretches)
-    for (let position = from + 1; position <= to; position++)
-      taken.set(history[position].id, id);
-  return taken;
-}
-
-/** True while anything of Pi's is unfinished: an operation, or a queue. */
-export function unfinished(lane: LaneView) {
-  return Boolean(lane.operation) || lane.queues.length > 0;
-}
-
-/**
- * `history` is Pi's whole branch: its lane snapshot holds only what the model
- * is still sent, which a compaction shortens. `driving` is the one fact Pi's
- * records cannot hold: whether this worker is running the lane right now.
- * Unfinished work that nobody is driving was interrupted, and stays so until
- * its owner continues or stops it.
+ * `state` is one reading of what Pi holds. `working` is the one fact Pi's
+ * records cannot hold: whether this worker is running the conversation right
+ * now. Unfinished work that nobody is running was interrupted, and stays so
+ * until its owner continues or stops it.
  */
 export function projectTranscript(
   chatId: string,
-  history: Entry[],
-  /** How Pi says each operation in the branch ended. */
-  results: OperationResultRecord[],
-  lane: LaneView,
-  driving: boolean,
+  state: StoredConversation,
+  working: boolean,
   clean: (text: string) => string = (text) => redactSecrets(text).text,
 ): Transcript {
   const messages: ChatMessage[] = [];
   const calls: Transcript["calls"] = {};
   const said: Transcript["said"] = [];
+  const operations: NonNullable<Transcript["operations"]> = {};
   let reply: ChatMessage | undefined;
   let sequence = 0;
   /** save_information calls that asked to be shown, until their result. */
   const shown = new Set<string>();
-  /** Entries at which Pi says an operation was aborted. */
-  const abortedAt = new Set(
-    results.flatMap((result) =>
-      result.status === "aborted" && result.tipId ? [result.tipId] : [],
+  const taken = new Map(
+    state.submissions.flatMap((record) =>
+      record.type === "input" && record.entry !== undefined
+        ? [[record.entry as number, record] as const]
+        : [],
     ),
   );
-  const operationOf = operationsOfEntries(history, results, lane.operation);
-  const operations: Transcript["operations"] = {};
-  for (const result of results)
-    operations[result.operationId] = {
-      status: result.status,
-      startedAt: at(result.startedAt),
-      endedAt: at(result.endedAt),
-    };
-  if (lane.operation)
-    operations[lane.operation.id] = {
-      status: "open",
-      startedAt: at(lane.operation.startedAt),
-      endedAt: null,
-    };
+  const running = (state.live.run?.inputs ?? []) as readonly number[];
 
-  const replyFor = (
-    entryId: string,
-    timestamp: number,
-    operationId = operationOf.get(entryId) ?? null,
-  ) => {
+  /**
+   * The stretch of work the entries being read belong to. A message begins
+   * one, named after itself, unless Pi placed it into the one before it. Pi
+   * does that in two ways, and its history shows both. Messages it takes
+   * from its queue together are written in one commit and carry one time. A
+   * steer is written by the task that ran a step's tool calls, after them
+   * and before the model is asked again.
+   */
+  let run: { id: string } | undefined;
+  let before: (Stored & { kind: string }) | undefined;
+  /** Pi's record of the message read last. */
+  let previous: SubmissionRecord | undefined;
+  /** Whether the last answer Pi wrote was one it gave up on. */
+  let abandoned = false;
+  const begin = (entry: EntryRecord, record: SubmissionRecord | undefined) => {
+    const stamp = at(messageOf(entry)?.timestamp);
+    run = { id: keyOf(record) ?? `entry:${entry.id}` };
+    const open =
+      record?.status === "placed" ||
+      (record !== undefined && running.includes(record.id));
+    operations[run.id] = {
+      status: open
+        ? "open"
+        : record?.status === "unanswered"
+          ? record.reason === "aborted"
+            ? "aborted"
+            : "failed"
+          : "completed",
+      startedAt: stamp,
+      endedAt: open ? null : stamp,
+    };
+  };
+  const reached = (timestamp: number | undefined) => {
+    const operation = run && operations[run.id];
+    if (operation && operation.endedAt !== null && timestamp)
+      operation.endedAt = at(timestamp);
+  };
+
+  const replyFor = (key: string, timestamp: number | undefined) => {
     if (reply) return reply;
     sequence = 0;
     const asked = messages.findLast((m) => m.role === "user")?.id;
     reply = {
       // Named after the message it answers, so it is the same reply while it
       // streams, once Pi has written it, and after an interruption.
-      id: `reply:${asked ?? entryId}`,
+      id: `reply:${asked ?? key}`,
       chatId,
       role: "assistant",
       body: "",
@@ -290,121 +266,136 @@ export function projectTranscript(
       createdAt: at(timestamp),
       startedAt: at(timestamp),
       responseTo: asked ?? null,
-      operationId,
+      operationId: run?.id ?? null,
       revision: 0,
     };
     messages.push(reply);
     return reply;
   };
 
-  const assistant = (
-    entryId: string,
-    message: {
-      content: unknown;
-      timestamp?: number;
-      stopReason?: string;
-      errorMessage?: string;
-    },
-  ) => {
-    const to = replyFor(entryId, message.timestamp ?? 0);
-    for (const part of (message.content as Part[]) ?? []) {
-      if (part.type === "text" && part.text?.trim()) {
-        to.body = part.text;
-        said.push({
-          replyId: to.id,
-          sequence: ++sequence,
-          text: part.text,
-          at: at(message.timestamp),
-        });
-      } else if (part.type === "toolCall" && part.id) {
-        calls[part.id] = {
-          replyId: to.id,
-          sequence: ++sequence,
-          tool: part.name ?? "",
-          args: part.arguments,
-          at: at(message.timestamp),
-        };
-        if (part.name === "save_information" && part.arguments?.showInChat)
-          shown.add(part.id);
-      }
-    }
-    to.finishedAt = at(message.timestamp);
-    to.status =
-      message.stopReason === "error"
-        ? "failed"
-        : message.stopReason === "aborted"
-          ? "cancelled"
-          : "completed";
-    to.failure =
-      message.stopReason === "error"
-        ? nativeFailure("model", message.errorMessage, clean)
-        : undefined;
-    to.error = to.failure ? failureText(to.failure) : null;
-  };
-
-  for (const entry of history) {
-    if (entry.type !== "message") continue;
-    // Stopped mid-call, Pi's last words are a finished message and a tool
-    // result; that the reply was cut is in Pi's record of the operation.
-    const cut = () => {
-      if (reply && abortedAt.has(entry.id)) reply.status = "cancelled";
-    };
-    const message = entry.message as ToolResult;
-    if (message.role === "user") {
+  for (const entry of state.entries) {
+    const message = messageOf(entry);
+    if (!message) continue;
+    if (entry.kind === "pi.user") {
+      const record = taken.get(entry.id);
+      const placed =
+        before?.kind === "pi.user"
+          ? // One time is one commit, unless a clock stood still; Pi also
+            // ends the messages of one run alike.
+            before.timestamp === message.timestamp &&
+            endedAlike(previous, record)
+          : entry.byTaskId !== undefined &&
+            (before?.kind === "pi.tool-result" ||
+              // A call whose tool failed inside Pi leaves no result.
+              before?.stopReason === "toolUse");
+      if (!run || !placed) begin(entry, record);
       reply = undefined;
+      const tags = tagsOf(message.content);
       messages.push({
-        id: tagOf(message) ?? entry.id,
-        requestKey: tagOf(message),
+        id: keyOf(record) ?? String(entry.id),
+        requestKey: keyOf(record),
         chatId,
         role: "user",
         body: textOf(message.content),
         images: imageCount(message.content),
-        source: sourceOf(message),
-        origin: originOf(message),
+        source: sourceOf(keyOf(record)),
+        origin: tags.origin,
         status: "delivered",
-        createdAt: at(message.timestamp ?? entry.timestamp),
-        operationId: operationOf.get(entry.id) ?? null,
+        createdAt: at(tags.sentAt ?? message.timestamp),
+        operationId: run!.id,
         revision: 0,
       });
-    } else if (message.role === "assistant") {
-      assistant(entry.id, message);
-      cut();
-    } else if (message.role === "toolResult") {
-      cut();
-      const call = message.toolCallId && calls[message.toolCallId];
-      if (call)
-        call.result = {
-          text: textOf(message.content),
-          failed: Boolean(message.isError),
-          at: at(message.timestamp ?? entry.timestamp),
-        };
-    }
-    if (
-      message.role === "toolResult" &&
-      message.toolCallId &&
-      shown.has(message.toolCallId)
-    ) {
-      try {
-        const saved = JSON.parse(textOf(message.content));
-        if (typeof saved.id === "string" && saved.presentation)
-          calls[message.toolCallId].informationId = saved.id;
-      } catch {
-        // A refused save returns prose, and shows nothing.
+    } else if (entry.kind === "pi.assistant") {
+      const to = replyFor(String(entry.id), message.timestamp);
+      // An attempt that failed, or an answer that was cut, is an entry in
+      // Pi's history too. Its words are the reply's while nothing follows
+      // them, and are never listed among what Pi said: what Pi wrote next
+      // says it whole. Pi runs the calls of one kind of answer only, the one
+      // that ended asking for them.
+      abandoned =
+        message.stopReason === "error" || message.stopReason === "aborted";
+      const ran = message.stopReason === "toolUse";
+      for (const part of (message.content as Part[]) ?? []) {
+        if (part.type === "text" && part.text?.trim()) {
+          to.body = part.text;
+          if (!abandoned)
+            said.push({
+              replyId: to.id,
+              sequence: ++sequence,
+              text: part.text,
+              at: at(message.timestamp),
+            });
+        } else if (part.type === "toolCall" && part.id && ran) {
+          calls[part.id] = {
+            replyId: to.id,
+            sequence: ++sequence,
+            tool: part.name ?? "",
+            args: part.arguments,
+            at: at(message.timestamp),
+          };
+          if (part.name === "save_information" && part.arguments?.showInChat)
+            shown.add(part.id);
+        }
       }
-    }
+      // The last thing Pi wrote decides: an attempt it retried, or an answer
+      // it sent again after an interruption, is superseded by what followed.
+      to.finishedAt = at(message.timestamp);
+      to.status =
+        message.stopReason === "error"
+          ? "failed"
+          : message.stopReason === "aborted"
+            ? "cancelled"
+            : "completed";
+      to.failure =
+        message.stopReason === "error"
+          ? nativeFailure("model", message.errorMessage, clean)
+          : undefined;
+      to.error = to.failure ? failureText(to.failure) : null;
+      reached(message.timestamp);
+    } else if (entry.kind === "pi.tool-result") {
+      const call = message.toolCallId ? calls[message.toolCallId] : undefined;
+      if (call) {
+        call.result = {
+          text: toolText(message.content),
+          failed: Boolean(message.isError),
+          at: at(message.timestamp),
+        };
+        if (shown.has(message.toolCallId!)) {
+          try {
+            const saved = JSON.parse(textOf(message.content));
+            if (typeof saved.id === "string" && saved.presentation)
+              call.informationId = saved.id;
+          } catch {
+            // A refused save returns prose, and shows nothing.
+          }
+        }
+      }
+      reached(message.timestamp);
+    } else continue;
+    if (entry.kind === "pi.user") previous = taken.get(entry.id);
+    before = { ...message, kind: entry.kind };
   }
 
-  for (const result of results) {
-    if (result.status !== "failed") continue;
-    const asked = messages.findLast(
-      (message) =>
-        message.role === "user" && message.operationId === result.operationId,
-    );
+  // How Pi says each stretch ended is its record of the message that began
+  // it, whatever the last thing it wrote looks like: a reply stopped mid-call
+  // ends in a finished message and a tool result.
+  const records = new Map(
+    state.submissions.flatMap((record) =>
+      record.requestId ? [[keyOf(record)!, record] as const] : [],
+    ),
+  );
+  for (const [id, operation] of Object.entries(operations)) {
+    if (operation.status !== "aborted" && operation.status !== "failed")
+      continue;
+    const of = (message: ChatMessage) => message.operationId === id;
     let ended = messages.findLast(
-      (message) =>
-        message.role === "assistant" &&
-        message.operationId === result.operationId,
+      (message) => message.role === "assistant" && of(message),
     );
+    const asked = messages.findLast(
+      (message) => message.role === "user" && of(message),
+    );
+    // Pi wrote nothing before it stopped or failed: the reply is still said,
+    // under the id it had while it ran.
     if (!ended && asked) {
       ended = {
         id: `reply:${asked.id}`,
@@ -413,114 +404,139 @@ export function projectTranscript(
         body: "",
         source: "pi",
         status: "failed",
-        createdAt: at(result.startedAt),
-        startedAt: at(result.startedAt),
+        createdAt: operation.startedAt,
+        startedAt: operation.startedAt,
         responseTo: asked.id,
-        operationId: result.operationId,
+        operationId: id,
         revision: 0,
       };
-      const after = messages.findLastIndex(
-        (message) => message.operationId === result.operationId,
-      );
-      messages.splice(after + 1, 0, ended);
+      messages.splice(messages.findLastIndex(of) + 1, 0, ended);
     }
     if (!ended) continue;
+    ended.finishedAt ??= operation.endedAt;
+    if (operation.status === "aborted") {
+      ended.status = "cancelled";
+      continue;
+    }
     ended.status = "failed";
-    ended.finishedAt = at(result.endedAt);
+    ended.finishedAt = operation.endedAt;
     if (!ended.failure?.reason) {
+      const record = records.get(id);
+      const model = record?.reason === "model_error";
       ended.failure = nativeFailure(
-        result.error ? "runtime" : (ended.failure?.source ?? "runtime"),
-        result.error?.message || result.error?.code,
+        model ? "model" : "runtime",
+        typeof record?.detail === "string"
+          ? record.detail
+          : record?.reason === "no_model"
+            ? "The selected model is not available"
+            : record?.reason,
         clean,
       );
       ended.error = failureText(ended.failure);
     }
   }
 
-  const streaming = lane.operation?.streamingMessage;
-  if (streaming)
-    replyFor(
-      `${lane.operation!.id}:streaming`,
-      streaming.timestamp ?? lane.operation!.startedAt,
-      lane.operation!.id,
-    ).body = textOf(streaming.content);
-
-  const status: ConversationStatus = driving
+  const status: ConversationStatus = working
     ? "working"
-    : unfinished(lane)
+    : unfinished(state)
       ? "interrupted"
       : "idle";
-  if (lane.operation) {
-    // The operation is Pi's; whether anyone is driving it is the worker's.
+  if (state.live.run) {
+    // The run is Pi's; whether anyone is running it is the worker's.
+    const opened = run && operations[run.id]?.status === "open" ? run.id : null;
+    const partial = state.live.generation?.message as Stored | undefined;
     const open =
-      reply ??
-      replyFor(
-        `${lane.operation.id}:open`,
-        lane.operation.startedAt,
-        lane.operation.id,
-      );
-    open.status = driving ? "running" : "interrupted";
+      reply?.operationId === opened && reply
+        ? reply
+        : ((reply = undefined),
+          // Before its first words, the reply began when Pi placed what it
+          // answers.
+          replyFor(
+            `${opened ?? "run"}:open`,
+            partial?.timestamp ?? before?.timestamp,
+          ));
+    // What is being written now, or nothing yet: an attempt Pi gave up on
+    // is not the reply it is working on.
+    if (partial) open.body = textOf(partial.content) || open.body;
+    else if (working && abandoned) open.body = "";
+    open.status = working ? "running" : "interrupted";
     open.finishedAt = null;
-    open.error = driving
+    open.failure = undefined;
+    open.error = working
       ? null
       : "The worker stopped while Pi was working. Whether the last command finished is not known: read execution evidence before continuing. Nothing runs again until you continue.";
   }
 
-  for (const item of lane.queues) {
-    if (item.type !== "message") continue;
+  const byId = new Map(state.submissions.map((record) => [record.id, record]));
+  for (const item of waiting(state)) {
+    const record = byId.get(item.id);
+    const tags = tagsOf(item.content);
     messages.push({
-      id: tagOf(item.message) ?? item.entryId,
-      requestKey: tagOf(item.message),
+      id: keyOf(record) ?? `queued:${item.id}`,
+      requestKey: keyOf(record),
       chatId,
       role: "user",
-      body: textOf((item.message as { content: unknown }).content),
-      images: imageCount((item.message as { content: unknown }).content),
-      source: sourceOf(item.message),
-      origin: originOf(item.message),
+      body: textOf(item.content),
+      images: imageCount(item.content),
+      source: sourceOf(keyOf(record)),
+      origin: tags.origin,
       status: "waiting",
-      delivery: item.kind === "steer" ? "steer" : "next",
-      createdAt: at((item.message as { timestamp?: number }).timestamp),
+      delivery: item.mode === "steer" ? "steer" : "next",
+      createdAt: at(tags.sentAt),
       revision: 0,
     });
   }
   return { status, messages, calls, said, operations };
 }
 
-/** The owner's message Pi holds under this id, read or still queued. */
-function held(history: Entry[], lane: LaneView, id: string) {
-  const found =
-    lane.queues.find(
-      (item) =>
-        item.type === "message" && (tagOf(item.message) ?? item.entryId) === id,
-    ) ??
-    history.find(
-      (entry) =>
-        entry.type === "message" &&
-        entry.message.role === "user" &&
-        (tagOf(entry.message) ?? entry.id) === id,
-    );
-  return found?.type === "message"
-    ? (found.message as { content: unknown })
-    : undefined;
+/** Every time Pi was handed a message under this sender's id, in order. */
+const handed = (state: StoredConversation, id: string) =>
+  state.submissions.filter(
+    (record) => record.type === "input" && keyOf(record) === id,
+  );
+
+/**
+ * The message Pi holds under a sender's id, in its queue or its history. One
+ * that a Stop took from the queue unread is not held: Pi keeps a record that
+ * it was dropped, and nothing of the message.
+ */
+function held(state: StoredConversation, id: string) {
+  const record = handed(state, id).at(-1);
+  if (!record) return undefined;
+  const entry =
+    record.entry !== undefined &&
+    state.entries.find((each) => each.id === record.entry);
+  if (entry) return { content: messageOf(entry)?.content };
+  const queued = waiting(state).find((item) => item.id === record.id);
+  return queued && { content: queued.content };
 }
 
 /**
  * The text of the message Pi holds under this id, read or still queued. An
  * image-only message holds an empty text, which is still a message.
  */
-export function holds(history: Entry[], lane: LaneView, id: string) {
-  const message = held(history, lane, id);
+export function holds(state: StoredConversation, id: string) {
+  const message = held(state, id);
   return message && textOf(message.content);
 }
 
-/** One image of a message Pi holds, by the order it was attached in. */
-export function imageOf(
-  history: Entry[],
-  lane: LaneView,
+/**
+ * The id to hand Pi a message under. It is the sender's own, which is what
+ * makes a send repeated after a lost answer one message. Pi never takes an id
+ * twice, though, and a message Stop dropped is gone: sent again, it is a new
+ * message to Pi, under the sender's id and a count.
+ */
+export function requestIdFor(
+  state: StoredConversation | undefined,
   id: string,
-  index: number,
 ) {
-  const message = held(history, lane, id);
+  const before = state ? handed(state, id).length : 0;
+  return before ? `${id}#${before + 1}` : id;
+}
+
+/** One image of a message Pi holds, by the order it was attached in. */
+export function imageOf(state: StoredConversation, id: string, index: number) {
+  const message = held(state, id);
   const image = message && imagesOf(message.content)[index];
   return image ? { mimeType: image.mimeType, data: image.data } : undefined;
 }
