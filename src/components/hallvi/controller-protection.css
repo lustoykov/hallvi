@@ -21,6 +21,10 @@
   display: none;
 }
 
+.cpb > summary:hover b {
+  color: var(--ax-blue);
+}
+
 .cpb-icon {
   display: grid;
   place-items: center;

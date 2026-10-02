@@ -226,90 +226,92 @@ export function JobsPage({
   ];
 
   return (
-    <section className="jb" aria-label="Jobs">
+    <>
       {head}
-      {jobs.length ? (
-        <>
-          <p className="jb-headline">
-            <span className="jb-dot" data-bad={said.bad || undefined} />
-            {said.text}
-          </p>
-          <Register
-            rows={jobs}
-            columns={columns}
-            label={(job) => job.name}
-            tone={(job) => (job.failed ? "bad" : undefined)}
-            // The job a reader came for: the one whose last run failed.
-            defaultOpen={jobs.find((job) => job.failed)?.id ?? null}
-            detail={(job) => (
-              <Opened
-                asks={
-                  <Ask
-                    onAsk={onAsk}
-                    tone={job.failed ? "bad" : "plain"}
-                    prompt={
-                      job.failed
-                        ? `The last run of ${job.name} failed. What did it print, and what would make it pass?`
-                        : `Show me the last few runs of ${job.name} and what each printed.`
-                    }
-                  >
-                    {job.failed ? "Why did it fail?" : "What did it print?"}
-                  </Ask>
-                }
-              >
-                <code className="jb-command">{job.command}</code>
-                <div className="jb-split">
-                  <Facts
-                    items={[
-                      {
-                        label: "Schedule",
-                        value: (
-                          <span className="hv-rg-mono">{job.schedule}</span>
-                        ),
-                      },
-                      { label: "Timezone", value: job.timezone },
-                    ]}
-                  />
-                  <RunList runs={job.runs} />
-                </div>
-              </Opened>
-            )}
-          />
-        </>
-      ) : (
-        <div className="jb-empty">
-          <p>Nothing of {story.name}’s runs on a schedule yet.</p>
-          <button
-            type="button"
-            className="jb-button"
-            onClick={() =>
-              onAsk(
-                `What does ${story.name} run on a schedule — cron jobs, timers, anything recurring — and did each one last succeed?`,
-              )
-            }
-          >
-            Ask Hallvi to look
-          </button>
-        </div>
-      )}
-      {story.recurring.length > 0 && (
-        <div className="jb-theirs">
-          <span className="jb-muted">Hallvi also runs</span>
-          {story.recurring.map((item) => (
+      <section className="hv-rg-sheet jb" aria-label="Jobs">
+        {jobs.length ? (
+          <>
+            <p className="jb-headline">
+              <span className="jb-dot" data-bad={said.bad || undefined} />
+              {said.text}
+            </p>
+            <Register
+              rows={jobs}
+              columns={columns}
+              label={(job) => job.name}
+              tone={(job) => (job.failed ? "bad" : undefined)}
+              // The job a reader came for: the one whose last run failed.
+              defaultOpen={jobs.find((job) => job.failed)?.id ?? null}
+              detail={(job) => (
+                <Opened
+                  asks={
+                    <Ask
+                      onAsk={onAsk}
+                      tone={job.failed ? "bad" : "plain"}
+                      prompt={
+                        job.failed
+                          ? `The last run of ${job.name} failed. What did it print, and what would make it pass?`
+                          : `Show me the last few runs of ${job.name} and what each printed.`
+                      }
+                    >
+                      {job.failed ? "Why did it fail?" : "What did it print?"}
+                    </Ask>
+                  }
+                >
+                  <pre className="hv-rg-out">{job.command}</pre>
+                  <div className="jb-split">
+                    <Facts
+                      items={[
+                        {
+                          label: "Schedule",
+                          value: (
+                            <span className="hv-rg-mono">{job.schedule}</span>
+                          ),
+                        },
+                        { label: "Timezone", value: job.timezone },
+                      ]}
+                    />
+                    <RunList runs={job.runs} />
+                  </div>
+                </Opened>
+              )}
+            />
+          </>
+        ) : (
+          <div className="jb-empty">
+            <p>Nothing of {story.name}’s runs on a schedule yet.</p>
             <button
-              key={item.id}
               type="button"
-              className="jb-theirs-item"
-              onClick={() => onOpenDestination(item.where)}
-              title={item.detail}
+              className="jb-button"
+              onClick={() =>
+                onAsk(
+                  `What does ${story.name} run on a schedule — cron jobs, timers, anything recurring — and did each one last succeed?`,
+                )
+              }
             >
-              <b>{item.title}</b>
-              <span className="jb-muted">{item.words.toLowerCase()}</span>
-              <ArrowRight weight="bold" />
+              Ask Hallvi to look
             </button>
-          ))}
-        </div>
-      )}
-    </section>
+          </div>
+        )}
+        {story.recurring.length > 0 && (
+          <div className="jb-theirs">
+            <span className="jb-muted">Hallvi also runs</span>
+            {story.recurring.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="jb-theirs-item"
+                onClick={() => onOpenDestination(item.where)}
+                title={item.detail}
+              >
+                <b>{item.title}</b>
+                <span className="jb-muted">{item.words.toLowerCase()}</span>
+                <ArrowRight weight="bold" />
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
   );
 }

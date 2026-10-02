@@ -65,6 +65,7 @@
   line-height: 1.1;
   font-weight: 700;
   letter-spacing: -0.03em;
+  text-wrap: balance;
 }
 .hello > p {
   margin: 0;
@@ -213,6 +214,7 @@
   }
   .says {
     align-self: center;
+    justify-self: start;
     max-width: none;
     margin: 0;
     translate: none;

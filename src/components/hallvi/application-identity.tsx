@@ -114,7 +114,9 @@ export function ApplicationIdentity({
           const box = anchor.current?.getBoundingClientRect();
           if (!box) return;
           const menu = event.currentTarget;
-          const width = Math.max(box.width, 260);
+          // Never narrower than the menu's own 320px, or the clamp below
+          // lets it run off the right edge of a phone.
+          const width = Math.max(box.width, 320);
           menu.style.minWidth = `${width}px`;
           menu.style.left = `${Math.max(12, Math.min(box.left, window.innerWidth - width - 12))}px`;
           // Below the control normally; above it when the control sits low.

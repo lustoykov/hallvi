@@ -9,7 +9,7 @@ import {
   Plus,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   applicationSections,
   type ApplicationSection,
@@ -183,6 +183,16 @@ export function ApplicationNavigation({
 }) {
   const primary = sections.filter((item) => item.group !== "activity");
   const activity = sections.filter((item) => item.group === "activity");
+  const list = useRef<HTMLElement>(null);
+  // A link into a page far down the list, or far along the phone strip,
+  // has to show where it landed. A conversation does not move the list: its
+  // row is at the foot of it, and the destinations would scroll away.
+  useEffect(() => {
+    if (!section) return;
+    list.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView?.({ block: "nearest", inline: "center" });
+  }, [section]);
   return (
     <aside
       className="hv-application-navigation"
@@ -202,7 +212,7 @@ export function ApplicationNavigation({
           <span>sg</span>Hallvi
         </Link>
       )}
-      <nav aria-label="Application workspace">
+      <nav ref={list} aria-label="Application workspace">
         <div className="hv-destinations">
           {primary.map((item, index) => {
             const groupStart =

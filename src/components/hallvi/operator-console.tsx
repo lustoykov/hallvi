@@ -6,6 +6,7 @@ import type {
   ExecutionRecord,
   OperatorSettings,
 } from "@/server/operator-execution";
+import { LocalTime } from "./local-time";
 import "./operator-console.css";
 import { Tag, Working, type Tone } from "./presentation";
 import { StreamingOutput } from "./streaming-output";
@@ -292,10 +293,7 @@ export function OperatorConsole({
                     {where ? where.said : item.target}
                     {where?.detail && ` · ${where.detail}`}
                     {" · "}
-                    {new Date(item.createdAt).toLocaleTimeString(undefined, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    <LocalTime value={item.createdAt} variant="compact" />
                   </span>
                   <span role="status" className="hv-execution-state">
                     {states[item.status] ? (

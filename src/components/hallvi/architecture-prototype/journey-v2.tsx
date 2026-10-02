@@ -602,6 +602,12 @@ function Popover({
   onAsk: DirectionProps["onAsk"];
 }) {
   const right = rect.x + rect.w / 2 < W * 0.56;
+  // Beside a wide part, such as the server's header, an opening to the right
+  // stops at the stage's edge: 340px below is the popover's own width.
+  const at = placer(height).point(
+    right ? rect.x + rect.w + 14 : rect.x - 14,
+    rect.y,
+  );
   const element = useRef<HTMLDivElement>(null);
   // Keep it inside the stage: nudge up if it would run past the bottom.
   useLayoutEffect(() => {
@@ -616,14 +622,30 @@ function Popover({
     );
     pop.style.top = `${top}px`;
   }, [rect, height]);
+  // In a map narrower than its stage, slide the map sideways so all of it
+  // shows. Once, when it opens, and from its layout position, which the
+  // opening animation does not move.
+  useLayoutEffect(() => {
+    const pop = element.current;
+    const view = pop?.parentElement?.parentElement;
+    if (!pop || !view) return;
+    const left =
+      pop.offsetLeft -
+      (pop.classList.contains("is-right") ? 0 : pop.offsetWidth);
+    view.scrollTo?.({
+      left: Math.max(
+        left + pop.offsetWidth - view.clientWidth,
+        Math.min(view.scrollLeft, left),
+      ),
+    });
+  }, []);
   return (
     <div
       ref={element}
       className={`axj2-pop${right ? " is-right" : " is-left"}`}
-      style={placer(height).point(
-        right ? rect.x + rect.w + 14 : rect.x - 14,
-        rect.y,
-      )}
+      style={
+        right ? { ...at, left: `min(${at.left}, calc(100% - 340px))` } : at
+      }
       role="dialog"
       aria-label={part.name}
       onClick={(event) => event.stopPropagation()}
@@ -1076,6 +1098,7 @@ export function JourneyDirection({
           {volumes.length > 0 && (
             <div
               className="axj2-region axj2-shelf"
+              data-single={volumes.length === 1 || undefined}
               style={place(layout.rects.shelf ?? BOX.shelf)}
             >
               <span>Disk · kept when containers are replaced</span>

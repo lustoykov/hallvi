@@ -3,7 +3,6 @@
    derived checks stay visible. */
 .page {
   min-height: 100vh;
-  min-width: 1060px;
   background: var(--canvas);
   color: var(--ink);
 }
@@ -33,6 +32,7 @@
   line-height: 1.15;
   font-weight: 700;
   letter-spacing: -0.03em;
+  text-wrap: balance;
 }
 .heading p {
   margin: 0;
@@ -176,10 +176,6 @@
   border-bottom: 1px solid #d8e0ec;
   font-size: 14px;
 }
-.githubConnection > a {
-  color: #2852a6;
-  white-space: nowrap;
-}
 .field,
 .permissions legend {
   display: block;
@@ -193,6 +189,7 @@
   border: 1px solid #bcc9dd;
   border-radius: 8px;
   padding: 10px 12px;
+  color: var(--ink);
   font-size: 15px;
   caret-color: #285ad8;
 }
@@ -204,6 +201,9 @@
   color: #53617a;
   font-size: 13px;
   line-height: 1.6;
+}
+.helper a {
+  color: var(--blue-text);
 }
 .permissions {
   padding: 0;

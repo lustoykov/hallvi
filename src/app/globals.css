@@ -104,6 +104,24 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+/* A control's colours ease between states. One that names its own transition
+   keeps it; the focus ring is not eased and appears at once. */
+button,
+a,
+summary {
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  button,
+  a,
+  summary {
+    transition: none;
+  }
+}
+
 /* The alpha notice is part of the layout, never an overlay on the workspace. */
 .hv-app-frame {
   height: 100dvh;

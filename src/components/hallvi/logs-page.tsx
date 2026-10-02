@@ -119,7 +119,10 @@ export function LogsPage({
               onClick={() => setPlace(null)}
             >
               <strong>Everywhere</strong>
-              <small>{captured.length} captured runs</small>
+              <small>
+                {captured.length} captured{" "}
+                {captured.length === 1 ? "run" : "runs"}
+              </small>
             </button>
             {streams.map((stream) => (
               <button
@@ -130,7 +133,8 @@ export function LogsPage({
               >
                 <strong>{stream.label}</strong>
                 <small>
-                  {stream.lines.toLocaleString()} lines · last{" "}
+                  {stream.lines.toLocaleString()}{" "}
+                  {stream.lines === 1 ? "line" : "lines"} · last{" "}
                   <LocalTime value={stream.lastAt} variant="compact" />
                 </small>
                 <span className="hv-stream-bar" aria-hidden="true">

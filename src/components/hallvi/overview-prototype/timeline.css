@@ -41,6 +41,11 @@
 .axt-say .hv-marks {
   margin-right: 10px;
 }
+/* Little Server stands on the rails' top right corner; the verdict stops
+   short of him. */
+.axt-words {
+  padding-right: 120px;
+}
 .axt-needs {
   display: grid;
   gap: 10px;
@@ -534,4 +539,10 @@
 :root[data-ax-motion="reduced"] .axt-ev,
 :root[data-ax-motion="reduced"] .axt-ev::after {
   animation: none !important;
+}
+
+@media (max-width: 640px) {
+  .axt {
+    padding: 18px 14px 14px;
+  }
 }

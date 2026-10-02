@@ -2,7 +2,8 @@ import { Fragment, type ReactNode } from "react";
 
 /**
  * Renders the Markdown subset Pi writes in chat: paragraphs, headings, bullet
- * and numbered lists, fenced code, quotes, emphasis, inline code, and links.
+ * and numbered lists, fenced code, quotes, tables, emphasis, inline code, and
+ * links.
  * Everything becomes React elements, so the text can never carry HTML through.
  */
 export function Markdown({ source }: { source: string }) {
@@ -14,13 +15,31 @@ type Block =
   | { type: "heading"; text: string }
   | { type: "list"; ordered: boolean; items: string[] }
   | { type: "code"; text: string }
-  | { type: "quote"; lines: string[] };
+  | { type: "quote"; lines: string[] }
+  | { type: "table"; head: string[]; rows: string[][] };
 
 const FENCE = /^\s*```/;
 const HEADING = /^#{1,6}\s+(.*)$/;
 const LIST_ITEM = /^\s{0,3}(?:[-*+]|\d{1,3}[.)])\s+(.*)$/;
 const ORDERED_ITEM = /^\s{0,3}\d{1,3}[.)]\s/;
 const QUOTE = /^\s{0,3}>\s?(.*)$/;
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_RULE = /^\s*\|(?:\s*:?-+:?\s*\|)+\s*$/;
+
+/** A header row with its rule under it; pipes alone are just text. */
+const startsTable = (lines: string[], index: number) =>
+  TABLE_ROW.test(lines[index]) && TABLE_RULE.test(lines[index + 1] ?? "");
+/**
+ * A row's cells. The closing pipe may still be on its way while a reply
+ * streams, and `\|` is a pipe inside a cell rather than the end of one.
+ */
+const cells = (line: string) =>
+  line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/(?<!\\)\|$/, "")
+    .split(/(?<!\\)\|/)
+    .map((cell) => cell.trim().replaceAll("\\|", "|"));
 
 function parseBlocks(source: string): Block[] {
   const lines = source.replace(/\r\n?/g, "\n").split("\n");
@@ -97,6 +116,22 @@ function parseBlocks(source: string): Block[] {
       continue;
     }
 
+    if (startsTable(lines, index)) {
+      const head = cells(line);
+      const rows: string[][] = [];
+      index += 2;
+      // Once the table has begun, a line that opens with a pipe is a row,
+      // drawn as wide as the header, so a row does not flip between text and
+      // table while it is being written.
+      while (index < lines.length && /^\s*\|/.test(lines[index])) {
+        const row = cells(lines[index]);
+        rows.push(head.map((_, column) => row[column] ?? ""));
+        index++;
+      }
+      blocks.push({ type: "table", head, rows });
+      continue;
+    }
+
     const paragraph: string[] = [];
     while (
       index < lines.length &&
@@ -104,7 +139,8 @@ function parseBlocks(source: string): Block[] {
       !FENCE.test(lines[index]) &&
       !HEADING.test(lines[index]) &&
       !LIST_ITEM.test(lines[index]) &&
-      !QUOTE.test(lines[index])
+      !QUOTE.test(lines[index]) &&
+      !startsTable(lines, index)
     ) {
       paragraph.push(lines[index]);
       index++;
@@ -141,6 +177,29 @@ function renderBlock(block: Block, key: number): ReactNode {
     }
     case "quote":
       return <blockquote key={key}>{renderLines(block.lines)}</blockquote>;
+    case "table":
+      return (
+        <div className="hv-md-table" key={key}>
+          <table>
+            <thead>
+              <tr>
+                {block.head.map((cell, index) => (
+                  <th key={index}>{renderInline(cell)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, index) => (
+                    <td key={index}>{renderInline(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
     default:
       return <p key={key}>{renderLines(block.lines)}</p>;
   }

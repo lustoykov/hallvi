@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 5 | New |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 6 | New |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -38,7 +38,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 1 | Guidance added |
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
-| [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 1 | New |
+| [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 1 | New |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
@@ -48,8 +48,78 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-074 — Let the model look before Continue finishes an interrupted step](#af-074--let-the-model-look-before-continue-finishes-an-interrupted-step) | 1 | New |
 | [AF-075 — Keep a worktree from borrowing the main checkout's packages](#af-075--keep-a-worktree-from-borrowing-the-main-checkouts-packages) | 1 | New |
 | [AF-076 — Raise the proof of fit's findings with Pi upstream](#af-076--raise-the-proof-of-fits-findings-with-pi-upstream) | 1 | New |
+| [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 1 | New |
+| [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | New |
+| [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | New |
+| [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 1 | New |
+| [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 1 | New |
+| [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-082 — Show a stopped reply's text once
+
+A failed or interrupted reply that has a transcript prints what Hallvi last
+said twice: inside "Show unfinished draft" and again under Try again. Leaving
+the disclosure out when the transcript already shows the text is one line,
+but `tests/browser/applications.spec.ts:121` opens that disclosure on exactly
+such a reply, so it wants a decision rather than a polish fix.
+
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+### AF-081 — Let the keyboard-ring check fail
+
+`tests/browser/interactions.spec.ts:209` reads
+`getComputedStyle(element, ":focus-visible").outlineStyle`. In this Chromium
+that returns an empty declaration, so `!== "none"` is always true and the walk
+passes whatever a control draws. Reading the focused element's own computed
+outline (or its label's, for the two fields whose label draws the ring) would
+make it able to fail.
+
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+### AF-080 — Give the registers a phone layout
+
+Below about 1000px a register table now keeps a 720px floor and scrolls
+sideways inside its card, with the opened row travelling with it. That stops
+the page running off the screen, but nothing hints that the table scrolls and
+an opened release's checks sit off-screen until it does. A stacked row for
+narrow screens is a design question, not a fix.
+
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+### AF-079 — Decide the shell's button font reset
+
+`.hv-adaptive-shell button { font: inherit }` in `application-shell.css`
+outranks every one-class button rule, so inside an application a button's own
+size and weight never apply. This pass restored 13px at 560 for the primary,
+the secondary, Send and Backups' primary, as the component design states. About
+twenty other classes still render at what they inherit: Steer and
+"Review private access" declare 600 and draw 400, the ask pills and the call
+lines declare 12 to 12.5px and draw 13px. Removing the reset would move all of
+them at once, so it needs a look at every destination first.
+
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+### AF-078 — Say what Deployment's Took column means when nothing was timed
+
+A release with no timed steps prints a dash in Took. The component design says
+a dash appears nowhere and a missing reading is "not recorded", but those
+words do not fit the 84px column, and widening it squeezes "What shipped" at
+the table's floor. It needs a wording or a column decision.
+
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+### AF-077 — Give the scenarios a conversation
+
+`npm run scenarios` has no worker, so every conversation shows the repository
+card and the connect banner and nothing else. Looking at replies, call groups,
+a running command, an approval, an interrupted turn and a secret request
+needed a hand-written stand-in on the worker's socket, kept in ignored `work/`.
+A scripted transcript for a few scenario applications, behind the same command,
+would put the conversation in front of a reviewer the way the destinations are.
+
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
 
 ### AF-076 — Raise the proof of fit's findings with Pi upstream
 
@@ -172,6 +242,8 @@ home with one application, would put those states behind the server that
 reloads as you edit.
 
 **+1:** 2026-10-01 — flat mascot, `claude/flat-mascot`.
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`: the
+first-run Add application and the one-application home could not be looked at.
 
 ### AF-066 — Agree the navigation column's width with the design document
 
@@ -665,6 +737,13 @@ passes alone and fails when `onboarding-first-app` runs before it: both ask
 for a fresh, isolated fixture and get the same one, with a model already
 connected. `interactions.spec.ts` and `secrets.spec.ts` fail at once unless
 a scenario server is already listening on 3410.
+
+**+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`: three
+failures in the whole suite, all the same on main at `4d7f0979`. The two
+above, and `record-journeys.spec.ts:201` ("never claims a way in before it
+knows"), which opens the first application on the scenario home and finds no
+"What is running" region on its Deployment; run alone against a scenario
+server on main it fails the same way.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 

@@ -4,14 +4,14 @@
 
 /* The shared head brings no padding of its own; its page does. */
 .ovl > .axj3-head {
-  max-width: 1180px;
-  padding: 22px 36px 0;
+  max-width: 1200px;
+  padding: 4px 36px 0;
 }
 .ovl-body {
   display: grid;
   gap: 22px;
   align-content: start;
-  max-width: 1180px;
+  max-width: 1200px;
   padding: 18px 36px 48px;
 }
 .ovl h2 {
@@ -238,6 +238,7 @@
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--muted);
+  text-wrap: pretty;
 }
 .ovl-facts button:hover b {
   color: var(--link);
@@ -309,7 +310,9 @@
   align-items: baseline;
   gap: 10px;
   width: 100%;
-  padding: 7px 0;
+  /* As tall as a Recent row, so the two lists' hairlines stay level. */
+  min-height: 34px;
+  padding: 5px 0;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: none;
@@ -358,7 +361,7 @@
 }
 @media (max-width: 640px) {
   .ovl > .axj3-head {
-    padding: 16px 16px 0;
+    padding: 4px 16px 0;
   }
   .ovl-body {
     padding: 14px 16px 40px;

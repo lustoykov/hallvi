@@ -227,6 +227,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
             <button type="button" onClick={() => void copy()}>
               {output ? "Copy" : "Copy command"}
             </button>
+            <span role="status">{copyStatus}</span>
             {/* From the deployment work merged into this branch: a command
                 that has gone quiet says how long it has been running and how
                 long since it last spoke, so silence is legible as silence
@@ -236,7 +237,6 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
                 {pulse(item, now)}
               </span>
             )}
-            <span role="status">{copyStatus}</span>
           </div>
         </div>
       </details>

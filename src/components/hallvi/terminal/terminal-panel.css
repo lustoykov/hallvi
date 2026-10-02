@@ -39,21 +39,24 @@
   resize: vertical;
   overflow: hidden;
 }
-.hv-terminal[data-expanded] {
-  position: fixed;
-  inset: 56px 0 0 224px;
+/* Expanded, it takes the workspace's rows under the top bar, so it follows
+   the column and the strip above whatever their size. Minimized wins: the
+   panel goes back to its bar in the bottom row. */
+.hv-terminal[data-expanded]:not([data-minimized]) {
   height: auto;
-  z-index: 40;
   resize: none;
 }
-@media (max-width: 1100px) {
-  .hv-terminal[data-expanded] {
-    left: 196px;
+@media (min-width: 641px) {
+  .hv-terminal[data-expanded]:not([data-minimized]) {
+    grid-row: 2 / -1;
+    z-index: 2;
   }
 }
 @media (max-width: 640px) {
-  .hv-terminal[data-expanded] {
+  .hv-terminal[data-expanded]:not([data-minimized]) {
+    position: fixed;
     inset: 0;
+    z-index: 40;
   }
 }
 .hv-terminal[data-minimized] {
@@ -108,7 +111,8 @@
   font-size: 12px;
   cursor: pointer;
 }
-.hv-terminal-controls button:hover {
+.hv-terminal-controls button:hover,
+.hv-terminal-empty button:hover {
   background: #39465d;
 }
 
@@ -180,7 +184,6 @@
   outline-offset: -2px;
 }
 
-/* On a narrow screen the panel is the workspace, with the bar to leave it. */
 /* On a narrow screen the panel is the workspace, with its bar to leave it. */
 @media (max-width: 760px) {
   .hv-terminal {

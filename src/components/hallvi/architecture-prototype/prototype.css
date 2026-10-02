@@ -59,6 +59,12 @@
   padding: 4px 36px 132px;
   max-width: 1200px;
 }
+/* One page gutter on a phone, the same as Overview's. */
+@media (max-width: 640px) {
+  .ax-root {
+    padding: 4px 16px 96px;
+  }
+}
 .ax-root ::selection {
   color: #fff;
   background: var(--ax-blue);
@@ -166,6 +172,11 @@
   margin: 0;
   font-size: 13.5px;
   overflow-wrap: anywhere;
+}
+@media (max-width: 960px) {
+  .ax-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ---------- Buttons shared by the directions ---------- */
@@ -317,7 +328,7 @@
 .ax-slider-track:active button:not(.is-on) {
   transform: scale(0.97);
 }
-.ax-slider button:focus-visible {
+.ax-slider .ax-slider-track button:focus-visible {
   outline: 2px solid var(--ax-blue);
   outline-offset: -2px;
 }

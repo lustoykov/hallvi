@@ -29,14 +29,14 @@
 .axma-lede p {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 8px 10px;
   margin: 0;
   color: var(--ax-muted);
   font-size: 13.5px;
   line-height: 1.55;
 }
-.axma-lede p > span {
+.axma-lede p > span:not(.ax-tag) {
   flex: 1 1 340px;
   min-width: 0;
 }
@@ -203,10 +203,7 @@
   color: var(--ax-faint);
 }
 .axma-to {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  display: block;
   color: var(--ax-muted);
   font-size: 11.5px;
 }
@@ -215,6 +212,8 @@
   font-size: 11.5px;
 }
 .axma-to b {
+  display: inline-block;
+  margin-left: 6px;
   padding: 0 7px;
   border-radius: 999px;
   background: var(--ax-waiting-bg);
@@ -234,11 +233,16 @@
   border-radius: 0 12px 12px 0;
   background: var(--ax-context);
 }
+/* The name as it is on its card, not as a section label. */
 .axma-open h3 {
   margin: 0 0 6px;
   font-family: var(--ax-mono);
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--ax-ink);
+  overflow-wrap: anywhere;
 }
 .axma-open p {
   margin: 0 0 14px;

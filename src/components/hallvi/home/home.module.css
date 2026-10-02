@@ -225,6 +225,15 @@
   padding: 8px 2px;
   font-size: 14px;
 }
+/* The field and its magnifier take focus as one. */
+.search:focus-within {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.page .search input:focus-visible {
+  outline: none;
+}
 
 /* ---------- The collection ---------- */
 .collection {
@@ -242,6 +251,8 @@
 }
 .card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -327,9 +338,12 @@
     height: 144px;
   }
 }
+/* Cards in a row share a height; the footer sits at the bottom of each. */
 .body {
+  flex: 1;
   padding: 18px;
   display: grid;
+  grid-template-rows: auto auto 1fr;
   gap: 12px;
 }
 .identity {
@@ -415,7 +429,11 @@
 .foot {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-self: end;
+  /* The address and Open app share a baseline; a browser that does not know
+     last baseline keeps them on the bottom edge. */
   align-items: end;
+  align-items: last baseline;
   gap: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line-2);
@@ -452,6 +470,11 @@
   color: var(--blue-text);
   font-weight: 550;
   overflow-wrap: anywhere;
+}
+/* The page's links inherit their colour; the address is the one that is
+   meant to read as a link. */
+.page a.address {
+  color: var(--blue-text);
 }
 .address:hover {
   text-decoration: underline;
@@ -671,6 +694,7 @@
 }
 .noResults button {
   border: 0;
+  padding: 0;
   background: none;
   color: var(--blue-text);
   text-decoration: underline;
@@ -690,9 +714,14 @@
   align-items: center;
   gap: 6px;
   border: 0;
+  padding: 0;
   background: transparent;
   color: var(--blue-text);
   font-size: 13px;
+}
+.controls button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .controls svg {
   width: 15px;

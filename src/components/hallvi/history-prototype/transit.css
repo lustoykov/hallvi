@@ -50,9 +50,6 @@
   font: inherit;
   font-size: 13.5px;
   cursor: pointer;
-  transition:
-    background-color var(--ax-base),
-    color var(--ax-base);
 }
 .axhm-filters button b {
   font-weight: 600;
@@ -93,7 +90,6 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--ax-base);
 }
 .axhm-index button:hover {
   background: #f4f6fa;
@@ -155,6 +151,8 @@
 .axhm .axh-actions {
   grid-row: 1;
   grid-column: 5;
+  /* A row without a button keeps the column, so the times stay in line. */
+  min-width: 28px;
 }
 .axhm .axh-list::before {
   left: calc(var(--axh-time) + var(--axh-gap) + var(--axh-dot) / 2 - 1.5px);
@@ -281,6 +279,12 @@
   }
   .axhm-almanac {
     position: static;
+  }
+}
+/* On a phone the gutter only has to hold the threads, not a time. */
+@media (max-width: 640px) {
+  .axhm {
+    --axh-time: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
