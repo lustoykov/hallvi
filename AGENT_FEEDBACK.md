@@ -800,6 +800,8 @@ to compile while the synthetic six-second reply finished; Stop and Continue now
 warm through GET (405), without performing either action. The cold compiler is
 fixture setup. The live traffic and history handlers now warm too, after their
 first compilation blocked the seeded-history journey's page reads.
+Terminal's first compilation also consumed its no-server assertion budget;
+its handler now warms without opening a terminal.
 The permission-read recovery journey also assumed a clicked write was already
 accepted. It now requires the real POST's HTTP 200 before checking recovery
 from the subsequent failed read; the UI assertions retain their original budget.

@@ -100,6 +100,7 @@ export const test = base.extend<
           `/api/applications/${missing}/operator`,
           `/api/applications/${missing}/connections`,
           `/api/applications/${missing}/secrets`,
+          `/api/applications/${missing}/terminal`,
           "/api/host",
           "/api/hallvi/update",
           `/api/applications/${missing}/executions/${missing}/decision`,
