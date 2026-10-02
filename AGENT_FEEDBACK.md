@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 7 | Partially fixed |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 8 | Partially fixed |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -783,6 +783,15 @@ secret checks still need a pending-request fixture to establish accepted
 browser submission and replacement; refusal and absence checks do not prove
 those behaviors. The wider record sweep independently found AF-084. Other
 external-fixture prerequisites remain as documented.
+
+**+1:** 2026-10-02 — independent fresh end-to-end retest,
+`codex/e2e-retest`: the old secret-submission journey posted outside the watched
+page, allowed HTTP 500, and often had no pending request. It did not establish
+the behavior its title claimed. An isolated pending-request journey now fills
+the real masked field, requires HTTP 200, counts exactly one browser POST, and
+checks the receipt and absence of the value after reload. It replaces that
+misleading check. The wide run also needed a free port and a retained deployment
+snapshot for checks whose scenarios have no deployment record.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 
