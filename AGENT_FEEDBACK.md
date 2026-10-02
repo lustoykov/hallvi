@@ -10,7 +10,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 2 | Basis fixed in #275; absence-record friction remains |
 | [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | New |
-| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 3 | New |
+| [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 4 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 2 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
 | [AF-010 — Read Pi's recorded reasoning through a supported export](#af-010--read-pis-recorded-reasoning-through-a-supported-export) | 1 | New |
@@ -54,8 +54,23 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 1 | New |
 | [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 1 | New |
 | [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | New |
+| [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-083 — Let the checks notice runtime advisories and lockfile drift
+
+A critical advisory against the pinned `next` (GHSA-vcvr-r3jv-pc5j) sat on
+`main` until someone ran `npm audit --omit=dev` by hand; `npm run checks`
+has no step that would have said so. The same bump showed `main`'s lockfile
+was not what npm writes: since the Pi 1.0 move, any `npm install` re-marks
+eight root packages (`cross-spawn`, `which`, `yaml` and their kin) as
+development-only, so an unrelated diff rides along with the next dependency
+change. A step that lists runtime advisories other than the known AF-038 one,
+and says when `npm install --package-lock-only` would change the lockfile,
+would catch both.
+
+**+1:** 2026-10-02 — Next.js 16.3.8 bump, `claude/next-16.3.8-og-advisory`.
 
 ### AF-082 — Show a stopped reply's text once
 
@@ -503,6 +518,9 @@ does not close this.
 **+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`: 1.0.0's shrinkwrap still
 installs `brace-expansion` 5.0.9 under `pi-coding-agent`, so the move does not
 close this either.
+**+1:** 2026-10-02 — Next.js 16.3.8 bump, `claude/next-16.3.8-og-advisory`:
+with `next` patched, that installed 5.0.9 is the one finding
+`npm audit --omit=dev` still reports.
 
 Use this small template; add detail only when useful. Link the overview row to
 the request heading.
