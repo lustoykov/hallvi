@@ -79,11 +79,20 @@ export const test = base.extend<
                 .find((line) => line.startsWith('{"root":'));
               if (!manifest) return false;
               ({ root, state } = JSON.parse(manifest));
+              // The manifest is printed before Next binds its port. A server
+              // from another checkout may already answer there; only this
+              // child's readiness line establishes that it started.
+              if (!output.includes("✓ Ready in ")) return false;
               return fetch(`${url}/applications`)
                 .then((r) => r.ok)
                 .catch(() => false);
             },
-            { timeout: 90_000, intervals: [500, 1000] },
+            {
+              // Production builds finish before the manifest is printed.
+              timeout:
+                process.env.HALLVI_QA_PRODUCTION === "1" ? 240_000 : 120_000,
+              intervals: [500, 1000],
+            },
           )
           .toBe(true);
         // Compile application pages and handlers before interaction deadlines.
@@ -96,6 +105,7 @@ export const test = base.extend<
           `/api/applications/${missing}/traffic`,
           `/api/applications/${missing}/traffic/collection`,
           `/api/applications/${missing}/traffic/history`,
+          `/api/applications/${missing}/traffic/simulate`,
           `/api/applications/${missing}/access`,
           `/api/applications/${missing}/operator`,
           `/api/applications/${missing}/connections`,
@@ -109,10 +119,17 @@ export const test = base.extend<
           `/api/applications/${missing}/chats/${missing}/events`,
           `/api/applications/${missing}/chats/${missing}/stop`,
           `/api/applications/${missing}/chats/${missing}/continue`,
+          ...(freshSetup
+            ? [
+                "/api/pi/setup",
+                "/api/pi/setup/login",
+                `/api/pi/setup/login/${missing}`,
+              ]
+            : []),
         ]) {
           const response = await fetch(`${url}${path}`, {
             headers: { origin: url },
-            signal: AbortSignal.timeout(60_000),
+            signal: AbortSignal.timeout(90_000),
           });
           await response.body?.cancel();
           expect([200, 400, 404, 405], `Fixture warm-up: ${path}`).toContain(
@@ -151,7 +168,8 @@ export const test = base.extend<
         );
       }
     },
-    { scope: "worker", timeout: 180_000 },
+    // Route compilation belongs to worker setup, before UI assertion budgets.
+    { scope: "worker", timeout: 300_000 },
   ],
   baseURL: async ({ fixture }, provide) => {
     await provide(fixture.url);
