@@ -9,7 +9,12 @@
 // part is hatched lightly. The bucket still in progress — this hour, today —
 // is drawn lighter, because it is, and only its future is exempt from gaps.
 
-import { useMemo, useState, type PointerEvent } from "react";
+import {
+  useMemo,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from "react";
 
 import type { SeriesPoint, TrafficHistory } from "@/server/traffic/contract";
 
@@ -301,9 +306,12 @@ export function TrafficChart({
             <div
               className="tf-chart-tip"
               data-side={place(starts[hover]) > 58 ? "left" : "right"}
-              style={{
-                left: `${(place(starts[hover]) + place(ends[hover])) / 2}%`,
-              }}
+              style={
+                {
+                  "--tf-chart-hover": `${(place(starts[hover]) + place(ends[hover])) / 2}%`,
+                  left: "var(--tf-chart-hover)",
+                } as CSSProperties
+              }
             >
               <time>{label(hover)}</time>
               {hovered.covered ? (

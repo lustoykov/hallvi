@@ -462,6 +462,7 @@
   white-space: nowrap;
 }
 .address {
+  vertical-align: bottom;
   position: relative;
   z-index: 2;
   display: inline-flex;

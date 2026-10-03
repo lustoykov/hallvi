@@ -452,8 +452,12 @@ screens and Add application wear the shell's own 56px bar: white, a `line`
 hairline under it, ink on it, the mark and name at the left and one back link
 at the right in muted. Setting something up is not a different product, so it
 is not a different colour of room; the bar says where you are and nothing
-else. Add application asks its question once, in its heading, rather than
-greeting on the left and asking again over the field. Chosen from a switchable
+else. Settings navigation becomes a wrapping row on narrow screens, keeping
+every link and its keyboard focus outline visible. A keyboard-focused Settings
+control that fits the content scrollport stays inside it with room for its
+outline; a taller control keeps its nearer edge visible. Dialogs and popovers
+retain their own scrolling. Add application asks its question once, in its
+heading, rather than greeting on the left and asking again over the field. Chosen from a switchable
 prototype of four framings; the options and the verdict are on the
 `prototype/ux-audit-directions` branch.
 
@@ -483,6 +487,10 @@ The dark bar at the very bottom of the exploration (variant tabs, scenario stepp
 ## Elevation & Depth
 
 Two levels, one light (19 September). The navigation column is recessed; the workspace is a sheet resting on it. Within the column, what is selected is lifted off it (`--raise`: a hairline ring and a short shadow on white): the application identity, the selected destination or conversation, and the new-conversation button. Group separators are grooves — one dark hairline with a light one under it — rather than rules. On the sheet, top-level cards keep their one-pixel border and gain `--lift`, a short soft shadow: the composer, command cards, and each destination's lead cards. Both shadows are mixed from `shade`. Focus stays a two-pixel blue outline; the composer's focus ring sits over its lift.
+
+In an overflowing Architecture canvas, keyboard focus scrolls a card or server
+header into view. A control that fits keeps room for its outline; the canvas
+keeps its manual scrolling.
 
 State is still carried by tint and one-pixel borders. A receipt, approval card or activity card is a bordered rectangle on white; its state tints the border (`working-line`, `waiting-line`, `failed-line`) and sometimes the surface (`waiting-surface`, `failed-surface`, `card-surface`).
 
@@ -673,7 +681,9 @@ table around the visual it already had. It lives in `register.tsx` and
   of 720px; below that its panel scrolls sideways and an opened row travels
   with it. A quiet hint appears above tables that do not fit. The panel accepts
   keyboard focus for horizontal scrolling, and sorted headers announce their
-  direction. A strip that wraps keeps a rule between its figures.
+  direction. Keyboard focus reveals a sort heading or row action with room
+  for its outline; pointer focus keeps the target in place. A strip that wraps
+  keeps a rule between its figures.
 - **One page owns a story; the others carry a line of it.** Chosen
   23 September 2026, after the backup situation was told three times in three
   wordings that drifted apart. Backups owns copies, plans and restores, and
@@ -814,8 +824,10 @@ attempt. Claude Opus 5 at maximum effort reviewed source and six screenshots.
 - Completed receipts show identical result text once. The first three
   destination links remain visible; additional destinations expand in place.
 - History keeps failure reasons visible, names the verified resolver, and
-  expands detailed evidence/steps. “Outside chat” describes origin accurately
-  without assuming that every log collection is automatic or user-triggered.
+  expands detailed evidence/steps. In narrow workspaces, each record's time
+  and actions sit beneath its prose so the evidence stays readable.
+  “Outside chat” describes origin accurately without assuming that every log
+  collection is automatic or user-triggered.
 - Overview summarizes the primary destination; History holds the full list.
 - Verified Deployment shows its revision, runtime type, server and HTTP access.
   Event logs retain all original evidence.

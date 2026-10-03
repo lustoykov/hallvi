@@ -56,8 +56,43 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | New |
 | [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
 | [AF-085 — Render reply tables in the plugin panel](#af-085--render-reply-tables-in-the-plugin-panel) | 1 | New |
+| [AF-086 — Keep expanded Terminal focus visible](#af-086--keep-expanded-terminal-focus-visible) | 1 | New |
+| [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | New |
+| [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-088 — Keep Traffic steady while its first totals arrive
+
+When the first stored totals arrive, Traffic replaces its short loading line
+with a chart and inserts the breakdown cards above the footer. In a held-read
+fixture at 768px, the chart moved down 50px and the visible footer moved from
+615px to 2435px. The page still fits its scrollport, but someone reading the
+footer loses their place. Decide how much space the initial loading state
+should reserve; this needs a loading-layout choice rather than a small CSS fix.
+
+**+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
+
+### AF-087 — Keep plugin overlay focus visible
+
+In the plugin browser fixture, a narrow open menu or address sheet can cover
+the control that receives keyboard focus underneath it. Escape closes the menu
+and restores its trigger; the address sheet remains recoverable through Close
+or Escape. Deciding whether these overlays should constrain focus needs an
+interaction decision beyond a CSS containment fix.
+
+**+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
+
+### AF-086 — Keep expanded Terminal focus visible
+
+On a phone, Shift+Tab from expanded Terminal's Restore control can focus
+navigation behind the full-screen terminal. In Chromium and Firefox, forward
+Tab returns to Restore and Enter collapses it; that recovery was not established
+in WebKit. Once the terminal input
+has focus, Tab and Escape belong to the terminal session. Decide how focus
+should stay visible while expanded without taking those keys from the shell.
+
+**+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
 
 ### AF-085 — Render reply tables in the plugin panel
 

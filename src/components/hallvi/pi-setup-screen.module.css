@@ -235,6 +235,7 @@
    go away while they fetch a token. */
 .connectForm {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   padding: 18px;
   border: 1px solid #d8e0ec;
@@ -256,6 +257,7 @@
 }
 .connectForm p[role="alert"] {
   color: #9c312a;
+  overflow-wrap: anywhere;
 }
 .connectForm label {
   display: grid;
@@ -274,6 +276,9 @@
   background: white;
   font: inherit;
   font-weight: 400;
+}
+.connectForm select {
+  height: 44px;
 }
 .connectActions {
   display: flex;

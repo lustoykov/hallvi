@@ -117,6 +117,13 @@
   gap: 8px;
   margin-top: 12px;
 }
+.hv-execution-actions button {
+  scroll-margin-block: 12px;
+}
+.hv-conversation
+  :is(.hv-reply-copy button, .hv-stream > summary, .hv-did-head) {
+  scroll-margin-block: 12px;
+}
 
 .hv-execution .hv-stream {
   padding: 0;

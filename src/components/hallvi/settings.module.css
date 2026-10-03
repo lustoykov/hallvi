@@ -369,6 +369,9 @@ li[data-state="expired"] .rowIcon {
 .muted {
   color: var(--muted);
 }
+.hero > div > p.muted {
+  white-space: normal;
+}
 .dot {
   width: 7px;
   height: 7px;
@@ -566,7 +569,7 @@ li[data-state="expired"] .rowIcon {
   }
   .nav {
     flex-direction: row;
-    overflow-x: auto;
+    flex-wrap: wrap;
   }
   .nav a {
     white-space: nowrap;

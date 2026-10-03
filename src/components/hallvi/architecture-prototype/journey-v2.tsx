@@ -1041,6 +1041,17 @@ export function JourneyDirection({
         tabIndex={0}
         role="region"
         aria-label="Architecture diagram; scroll horizontally to explore"
+        onFocus={(event) => {
+          const target = event.target;
+          if (
+            !(target instanceof HTMLElement) ||
+            !target.matches(".axj2-card, .axj2-server-head") ||
+            !target.matches(":focus-visible")
+          )
+            return;
+          if (event.currentTarget.scrollWidth > event.currentTarget.clientWidth)
+            target.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }}
       >
         <div
           style={{ aspectRatio: `${W} / ${layout.height}` }}

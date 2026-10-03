@@ -207,6 +207,21 @@ capture. The workspace and Settings content scroll inside the page, so a
 full-page screenshot does not show their offscreen content; scroll those
 containers and inspect the relevant lower content separately.
 
+When claiming a complete keyboard walk, use native forward and reverse Tab
+and inspect the focused control inside its actual clipping ancestors. A fixed
+key count or a repeated focused element does not establish a complete walk:
+reconcile the eligible controls, allowing for radio groups and terminal input
+that deliberately consumes Tab.
+
+When focus reveals a clipped control, also click its visible edge with native
+pointer down/up at fixed coordinates. Verify that scrolling during focus does
+not move the control away before the click is delivered.
+
+Keep captured, visually inspected and pixel-identical inherited evidence
+distinct. State when inspection used reduced contact-sheet tiles or sampled
+scroll positions; opening a sheet at its original size does not restore the
+source pixels it reduced.
+
 In the PR, state the tested revision and environment (real model/provider,
 local container or scripted fixture), request/operation/execution identities,
 observations, independent behavior check and relevant screenshot links.
