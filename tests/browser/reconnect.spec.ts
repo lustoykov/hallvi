@@ -16,6 +16,9 @@ test("Reconnect uses Main operator, keeps drafts, and exposes queue, decision an
   page,
   fixture,
 }) => {
+  // Several reconnect/approval states each survive a separate navigation.
+  // Keep individual assertion budgets; allow the whole sequence to finish.
+  test.slow();
   const created = await (
     await page.request.post("/api/applications", {
       data: {

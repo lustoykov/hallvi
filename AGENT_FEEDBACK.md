@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 7 | Partially fixed |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 8 | Partially fixed |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -828,6 +828,50 @@ secret checks still need a pending-request fixture to establish accepted
 browser submission and replacement; refusal and absence checks do not prove
 those behaviors. The wider record sweep independently found AF-084. Other
 external-fixture prerequisites remain as documented.
+
+**+1:** 2026-10-02 — independent fresh end-to-end retest,
+`codex/e2e-retest`: the old secret-submission journey posted outside the watched
+page, allowed HTTP 500, and often had no pending request. It did not establish
+the behavior its title claimed. An isolated pending-request journey now fills
+the real masked field, requires HTTP 200, counts exactly one browser POST, and
+checks the receipt and absence of the value after reload. It replaces that
+misleading check. The wide run also needed a free port and a retained deployment
+snapshot for checks whose scenarios have no deployment record.
+The latest-main rerun also spent 26 seconds compiling the traffic collection
+handler during its first chat action while other previews were active. The
+fixture now warms that handler and the application page alongside its existing
+API warm-up, before measuring interactions. Its Stop route also needed 13 seconds
+to compile while the synthetic six-second reply finished; Stop and Continue now
+warm through GET (405), without performing either action. The cold compiler is
+fixture setup. The live traffic and history handlers now warm too, after their
+first compilation blocked the seeded-history journey's page reads.
+The Traffic page's simulation-status GET also needs warm-up: its cold compile
+held the history-switch POST in flight after the seeded totals were visible.
+Terminal's first compilation also consumed its no-server assertion budget;
+its handler now warms without opening a terminal.
+The permission-read recovery journey also assumed a clicked write was already
+accepted. It now requires the real POST's HTTP 200 before checking recovery
+from the subsequent failed read; the UI assertions retain their original budget.
+Reconnect's multi-state journey exhausted its default whole-test minute after
+nine navigations, without an individual assertion failing. It now uses the
+existing slow-test budget, with its interaction assertions unchanged.
+The durable acceptance/cancellation/retry sequence likewise completed its
+recovery assertions but exhausted the whole minute at its final history read;
+its whole-journey budget now accounts for the separate states too.
+The fresh-setup journey also now acknowledges its final send before reload:
+the draft is provisionally cleared while the POST is in flight, and reload
+correctly restores that uncertain send. The fixture's readiness check must
+wait for its own Next child to bind, since its earlier manifest plus HTTP
+probe accepted a different checkout already listening on a later worker port.
+Fresh-setup fixtures also warm the login status handlers without starting a
+login, after compilation delayed the cancelled-attempt response past its UI check.
+One fixture also exhausted its setup-only three-minute budget compiling the
+warmed routes under concurrent previews; setup gets five minutes, while startup,
+HTTP warm-up and UI assertion deadlines remain bounded separately. Production
+QA builds before printing its manifest; its readiness budget now includes the
+build after the old 90-second wait killed compilation before startup. Development
+readiness and per-route compilation also get bounded allowances for the observed
+startup and warm-up timeouts. No interaction deadline was relaxed.
 
 ### AF-033 — Refuse a second preview before attaching retained state
 

@@ -466,6 +466,10 @@ signed manifest, the workflow and the one secret it needs. This section is the
 single archive underneath it, for a contributor who wants one by hand. From an
 authorized source checkout using Node.js 22 and locked dependencies:
 
+On a fresh Ubuntu 24.04 builder, install the native-module build prerequisites
+before `npm ci`: `sudo apt-get install build-essential python3`. This is needed
+on the machine building the archive; recipients use the bundled native modules.
+
 ```bash
 npm ci
 npm run package

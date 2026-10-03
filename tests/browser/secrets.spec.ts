@@ -3,8 +3,8 @@
 // The unit tests prove the controller does not write the value anywhere. This
 // proves the browser does not either: not in a GET response, not in a URL, not
 // in React's serialised props, not in the console, and not left sitting in the
-// field after it has been sent. Every request is watched, and exactly one is
-// allowed to carry it.
+// field after it has been sent. The isolated secret-submission journey covers
+// the masked field and accepted POST; these inspect acceptance-server pages.
 
 import { expect, test, type Page } from "@playwright/test";
 
@@ -58,50 +58,6 @@ async function application(page: Page) {
 }
 
 test.describe("supplying a secret", () => {
-  test(
-    "the value leaves the browser exactly once, and never comes back",
-    journey("record-destinations"),
-    async ({ page }) => {
-      const app = await application(page);
-      test.skip(!app, "no acceptance server");
-      const base = `${ACCEPTANCE}/api/applications/${app}/secrets`;
-
-      // No route asks for a secret — request_secret is Pi's tool — so this
-      // application may have none pending. What is asserted below holds
-      // either way: nothing carries a value.
-      //
-      // An earlier draft posted operator settings here, including host: null,
-      // which quietly disconnected the server from whichever application came
-      // first in the list. A test should not be able to do that by accident,
-      // and this one no longer touches settings at all.
-
-      const seen = watchEverything(page);
-      await page.goto(`${ACCEPTANCE}/applications/${app}#variables`);
-      await page.waitForLoadState("networkidle").catch(() => {});
-
-      // Whatever is on this page, none of it may be a value.
-      const shown = await page.locator("main").innerText();
-      expect(shown).not.toContain(VALUE);
-
-      // Post the value the way the masked field does, and watch it go.
-      const response = await page.request.post(base, {
-        data: { name: NAME, value: VALUE },
-      });
-      // Refused unless something asked for it, which is the correct answer.
-      expect([200, 400, 500]).toContain(response.status());
-
-      await page.reload();
-      await page.waitForLoadState("networkidle").catch(() => {});
-
-      const leaked = seen.bodies.filter((body) => body.includes(VALUE));
-      expect(leaked, "the value in a watched request or response").toEqual([]);
-      expect(
-        seen.urls.filter((url) => url.includes(encodeURIComponent(VALUE))),
-      ).toEqual([]);
-      expect(seen.console.filter((line) => line.includes(VALUE))).toEqual([]);
-    },
-  );
-
   test(
     "nothing the page hands the browser carries a value",
     journey("record-destinations"),

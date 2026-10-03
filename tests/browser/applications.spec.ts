@@ -51,6 +51,9 @@ test(
   "P1-20 durable acceptance, reconnect, Stop and sending again",
   journey("durable-requests"),
   async ({ page }, testInfo) => {
+    // Acceptance, reconnect, cancellation and retry share one journey;
+    // individual assertions still enforce their original response budgets.
+    test.slow();
     await addApplication(page, "durable-app");
     const before = await view(page);
     const route = `${new URL(page.url()).pathname}?chat=${before.selectedChatId}`;
