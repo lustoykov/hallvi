@@ -108,7 +108,8 @@ test("older evidence and open disclosures survive changes, completion, view swit
     expect(reading.top).toBeLessThan(reading.end);
     const accessibility = await page.context().newCDPSession(page);
     ax = accessibility;
-    // Role queries do not account for inert; read Chromium's accessibility tree.
+    // Role queries do not account for inert. Read Chromium's
+    // accessibility tree instead.
     const exposedComposers = async () => {
       const { nodes } = await accessibility.send("Accessibility.getFullAXTree");
       expect(nodes.length).toBeGreaterThan(0);
