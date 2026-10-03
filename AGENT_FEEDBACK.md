@@ -6,7 +6,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
 | [AF-054 — Check traffic assets after installation](#af-054--check-traffic-assets-after-installation) | 1 | Fix in review |
-| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 4 | Partially improved; pause remains |
+| [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 5 | Partially improved; pause remains |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 2 | Basis fixed in #275; absence-record friction remains |
 | [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | New |
@@ -35,12 +35,12 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
 | [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
-| [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 1 | Guidance added |
+| [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 2 | Guidance added |
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
-| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 1 | New |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 2 | New |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | New |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
@@ -48,7 +48,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-074 — Let the model look before Continue finishes an interrupted step](#af-074--let-the-model-look-before-continue-finishes-an-interrupted-step) | 1 | New |
 | [AF-075 — Keep a worktree from borrowing the main checkout's packages](#af-075--keep-a-worktree-from-borrowing-the-main-checkouts-packages) | 1 | New |
 | [AF-076 — Raise the proof of fit's findings with Pi upstream](#af-076--raise-the-proof-of-fits-findings-with-pi-upstream) | 1 | New |
-| [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 1 | New |
+| [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 2 | New |
 | [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | New |
 | [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | New |
 | [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 2 | Scroll hint in review; stacked layout open |
@@ -200,6 +200,10 @@ A scripted transcript for a few scenario applications, behind the same command,
 would put the conversation in front of a reviewer the way the destinations are.
 
 **+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+**+1:** 2026-10-02 — speed/snappiness audit, `codex/speed-snappiness`:
+repeatable idle/streaming histories and conversation switching required another
+scratch socket worker with 6-, 240- and 2,000-call fixtures. Reusing the existing
+long-history generator still left setup and worker wiring outside scenarios.
 
 ### AF-076 — Raise the proof of fit's findings with Pi upstream
 
@@ -299,7 +303,39 @@ start the stream from the state the page was drawn from, so the first frame
 is a difference; and send what a closed row shows, fetching a call's output
 when it is opened.
 
+On the Mac mini at `4131708d`, five normal-production browser-cold runs with
+2,000 synthetic idle calls and a 5 Mbit/s down / 1 Mbit/s up / 80 ms link
+met content readiness at 1,779 ms (1,762–1,791) and received the complete initial
+stream frame at 33,352 ms (33,327–33,382), medians and ranges. Native-network medians were
+19,282,070 UTF-16 code units for the first frame and 19,941,675 decoded bytes
+for the document. Native document and SSE request-to-first-header medians were
+311 ms (302–378) and 174 ms (170–259), n=5 each. Those server intervals are neither
+CPU time nor full response duration; browser intake and transfer are separate.
+
+All ten 4×-browser-CPU typing samples received another full frame overlapping
+a long task. Maximum input-delay medians were 3,220 ms (3,170–3,226) cold and
+3,205 ms (3,200–3,231) warm, n=5 each. Repeated full-frame delivery is measured;
+the exact reconnect cause and CPU split are not established. The synthetic
+payload compresses unusually well in the document. These observations support
+the existing larger proposals; neither was implemented in this audit.
+
+Investigate the page-baseline handoff first. It has a smaller surface than
+lazy output retrieval: the existing [server comparison](src/server/chat-frames.ts)
+and [client application](src/lib/chat-stream.ts) already handle complete-snapshot
+differences, while fetching closed output changes record shapes, disclosure
+loading states and live command cards. This is a scope recommendation, not
+proven feasibility or a projected gain. The handoff must bind the exact baseline
+to its application, conversation and compatible schema, subscribe before a
+fresh read, preserve notices during that read, and acknowledge unchanged state.
+Missing or incompatible baselines need a fresh full frame; keep current full
+reconnects in the first scope. That leaves reconnect payloads and page bytes
+unresolved. The page currently omits conversation status and has no baseline
+identity, and the server retains no page snapshot. A bounded handoff without a
+new caching layer therefore remains a design question for the owner.
+
 **+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
+**+1:** 2026-10-02 — native production speed/snappiness audit,
+`codex/speed-snappiness`.
 
 ### AF-068 — Remove the mascot placements nothing draws
 
@@ -354,8 +390,19 @@ on this 24 GB Mac exhausted available memory (14 GB compressed, load average
 failures. The verification guide now calls for coordinating browser/build work
 on memory-limited hosts and rerunning affected checks after scoped cleanup.
 
+The speed and UI audits also needed bounded windows on the same persistent
+Mac mini. Separate ports did not isolate timing from other browsers or builds.
+The complete native baseline recorded 497 process observations with no detected
+measurement overlap; periodic checks cannot exclude every brief or unrelated
+workload. The speed task released its owned live workloads at the core boundary
+for a UI window and continued offline analysis. The guidance now records safe
+release points and fresh handback rather than reserving a host during analysis
+or waiting; all required verification remains.
+
 **+1:** 2026-10-01 — application QA and release,
 `codex/application-qa-release`.
+**+1:** 2026-10-02 — native production speed/snappiness audit,
+`codex/speed-snappiness`.
 
 ### AF-054 — Check traffic assets after installation
 
@@ -714,6 +761,22 @@ A supported narrow SDK runtime export or a bundler-compatible OAuth loader could
 remove this boundary; neither was implemented. Profiles and the disposable
 comparison harness remain under ignored `work/cold-pause/` in the owning worktree.
 
+The Mac mini baseline at `4131708d` used five fresh unprofiled Next production
+processes with a six-call synthetic conversation. Native process-to-content
+readiness was 1,096 ms (1,094–1,104), and process-to-usable, including the initial stream
+frame, was 1,228 ms (1,221–1,235), medians and ranges. Same-process warm usable
+opening was 119 ms (115–131), measured from navigation instead of process
+spawn. Document TTFB was 836 ms (807–840); server request-to-first-headers was
+813 ms (692–818), not full handler duration or CPU time. Maximum Node loop
+delay before usable was 341 ms (340–352), versus browser 50 ms timer delay
+of 18 ms (17–19), n=5 each. Browser throttling and server delay remain distinct.
+
+The separate profiled run is excluded from those medians. Its whole-process
+CPU capture includes startup, first reads, Traffic and a warm repeat; it cannot
+assign this pause to a particular SDK module. This confirms a local cold
+server pause, not a supported bundling remedy. The prior authentication
+boundary remains; no SDK or provider-loader change was implemented.
+
 **+1:** 2026-09-29 — alpha.8 release verification, [PR #254](https://github.com/lustoykov/hallvi/pull/254)
 
 **+1:** 2026-09-29 — signed alpha.8 first-open investigation, codex/first-open-latency
@@ -721,6 +784,9 @@ comparison harness remain under ignored `work/cold-pause/` in the owning worktre
 **+1:** 2026-09-29 — supported Pi AI bundling comparison, codex/first-open-runtime
 
 **+1:** 2026-09-30 — current-source cold-opening attribution, codex/remaining-acceptance-verification
+
+**+1:** 2026-10-02 — native production speed/snappiness audit,
+`codex/speed-snappiness`.
 
 ### AF-025 — Distinguish a saved-route HTTP check from browser usability
 

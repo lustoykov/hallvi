@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BrowserContext, Page } from "@playwright/test";
+import type { BrowserContext, CDPSession, Page } from "@playwright/test";
 import { longHistory } from "../fixtures/long-history";
 import { test, expect } from "./fixtures";
 import { scriptWorker } from "./scripted-worker";
@@ -54,6 +54,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
 }) => {
   const state = await setup(page, fixture);
   const { app, chat, transcript, last, call, worker, store } = state;
+  let ax: CDPSession | undefined;
   try {
     await page.goto(`/applications/${app}`);
     // It opens on its latest message; the earlier ones are drawn after it.
@@ -91,11 +92,84 @@ test("older evidence and open disclosures survive changes, completion, view swit
     await expect(card.getByText("Completed", { exact: true })).toBeVisible();
     await expect(output).toContainText("COMPLETE-EVIDENCE");
     await expect(row).toHaveAttribute("aria-expanded", "true");
+    // With the turn idle, a destination round trip must not move the reader
+    // or replace their draft. Keep an older, expanded reply on screen.
+    const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    const draft = "Explain this earlier command when I return.";
+    await composer.fill(draft);
+    await old.scrollIntoViewIfNeeded();
+    await expect(old).toBeInViewport();
+    const transcriptScroll = page.locator(".hv-conversation > div").first();
+    const reading = await transcriptScroll.evaluate((element) => ({
+      top: element.scrollTop,
+      end: element.scrollHeight - element.clientHeight,
+    }));
+    expect(reading.top).toBeGreaterThan(0);
+    expect(reading.top).toBeLessThan(reading.end);
+    const accessibility = await page.context().newCDPSession(page);
+    ax = accessibility;
+    // Role queries do not account for inert; read Chromium's accessibility tree.
+    const exposedComposers = async () => {
+      const { nodes } = await accessibility.send("Accessibility.getFullAXTree");
+      expect(nodes.length).toBeGreaterThan(0);
+      return nodes.filter(
+        (node) =>
+          !node.ignored &&
+          node.role?.value === "textbox" &&
+          node.name?.value === "Message Hallvi",
+      ).length;
+    };
+    await expect.poll(exposedComposers).toBe(1);
     await page.getByRole("button", { name: "Overview", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Overview", exact: true }),
+    ).toBeVisible();
+    await expect.poll(exposedComposers).toBe(0);
+    // The mounted conversation must not steal focus from the destination.
+    await page.locator("#pi-composer").evaluate((element) => element.focus());
+    expect(
+      await page.evaluate(() => document.activeElement?.id === "pi-composer"),
+    ).toBe(false);
     await page
       .getByRole("button", { name: "Main operator", exact: true })
       .click();
+    // Returning intentionally focuses the composer; it must leave the
+    // independently scrolling transcript where the reader put it.
+    await expect(composer).toBeFocused();
+    await expect(composer).toBeInViewport();
+    await expect(composer).toHaveValue(draft);
+    await expect.poll(exposedComposers).toBe(1);
+    await expect
+      .poll(() => transcriptScroll.evaluate((element) => element.scrollTop))
+      .toBe(reading.top);
+    await expect(old).toBeInViewport();
     await expect(row).toHaveAttribute("aria-expanded", "true");
+    await expect(old.locator(".hv-did-detail")).toContainText("END-3");
+    await composer.press("End");
+    await page.keyboard.type(" Keep the evidence.");
+    await expect(composer).toHaveValue(`${draft} Keep the evidence.`);
+    // Keyboard navigation does not light-dismiss the native Permissions
+    // popover. Its top-layer content must be hidden with the conversation.
+    await page.getByRole("button", { name: /^Permissions:/ }).click();
+    const permissions = page.getByRole("radiogroup", {
+      name: "Permissions",
+      exact: true,
+    });
+    await expect(permissions).toBeVisible();
+    const overview = page.getByRole("button", {
+      name: "Overview",
+      exact: true,
+    });
+    await overview.focus();
+    await overview.press("Enter");
+    await expect(page.locator("#hv-mode-menu")).toBeHidden();
+    await expect(permissions).toHaveCount(0);
+    await page.goBack();
+    await expect(permissions).toBeVisible();
+    await expect(composer).toHaveValue(`${draft} Keep the evidence.`);
+    await page.keyboard.press("Escape");
+    await expect(permissions).toHaveCount(0);
+    await composer.fill("");
     await page.context().setOffline(true);
     await page.waitForTimeout(300);
     transcript.messages[3].body += " Updated while disconnected.";
@@ -147,7 +221,11 @@ test("older evidence and open disclosures survive changes, completion, view swit
     await expect(page.getByText("One more question.")).toBeInViewport();
     await expect(linked).not.toBeInViewport();
   } finally {
-    await worker();
+    try {
+      await ax?.detach();
+    } finally {
+      await worker();
+    }
   }
 });
 

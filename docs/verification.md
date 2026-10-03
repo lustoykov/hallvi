@@ -21,11 +21,24 @@ Keep temporary source archives for before/after comparisons under `work/`.
 TypeScript, ESLint and Prettier exclude that ignored scratch directory; source
 and tests remain in the normal checks. Remove task-owned archives after retaining the evidence.
 
-Coordinate browser runs and builds when several agents share a memory-limited
-machine. Separate ports prevent address conflicts, not memory pressure: run one
-Next.js browser fixture or production build at a time when concurrent runs cause
-cold compilation or fixture-startup timeouts. Stop only task-owned previews and
-rerun the affected check before attributing a setup timeout to the product.
+Coordinate browser runs and builds when several agents share a machine.
+Separate ports prevent address conflicts, not CPU or memory contention. Keep
+one stopwatch workload at a time, with other browser, build and heavy test work
+outside its measurement window. Through an authorized coordination path, agree
+a bounded live-work window, estimated duration and next safe stopping point.
+Checkpoint and release at that boundary, confirm a fresh handback before the
+next task starts, and revise overruns explicitly. Offline review, analysis and
+waiting do not reserve the machine.
+
+Record competing workloads during timing and disclose observed overlap.
+Preserve affected evidence and repeat contaminated comparisons in a quiet
+window before claiming a speedup. When concurrent fixtures cause cold
+compilation or startup timeouts, run one fixture or production build at a time,
+stop only task-owned previews, and rerun the affected check before attributing
+the timeout to the product. Coordination changes scheduling, not the required
+checks or acceptance criteria. Follow
+[development resources](development-resources.md#local-processes-and-containers)
+for process ownership and handback.
 
 | What the change needs to prove | Start here |
 | --- | --- |
