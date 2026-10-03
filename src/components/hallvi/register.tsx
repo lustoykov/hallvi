@@ -476,6 +476,17 @@ export function Register<R extends { id: string }>({
         tabIndex={0}
         role="region"
         aria-label="Table"
+        onFocus={(event) => {
+          const target = event.target;
+          if (
+            !(target instanceof HTMLElement) ||
+            !target.matches(".hv-rg-sort, .hv-rg-ask, .hv-rg-open > button") ||
+            !target.matches(":focus-visible")
+          )
+            return;
+          if (event.currentTarget.scrollWidth > event.currentTarget.clientWidth)
+            target.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }}
       >
         <table className="hv-rg-table">
           <colgroup>

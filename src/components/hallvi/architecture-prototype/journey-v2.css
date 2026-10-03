@@ -174,6 +174,7 @@
   box-shadow: none;
 }
 .axj2-server-head {
+  scroll-margin: 8px;
   position: absolute;
   left: 0;
   right: 0;
@@ -342,6 +343,8 @@
 
 .axj2-card {
   position: absolute;
+  scroll-margin-inline: 8px;
+  scroll-margin-block: 24px;
   z-index: 2;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);

@@ -221,7 +221,18 @@ export function ApplicationNavigation({
         </Link>
       )}
       <nav ref={list} aria-label="Application workspace">
-        <div className="hv-destinations">
+        <div
+          className="hv-destinations"
+          onFocus={(event) => {
+            if (
+              event.currentTarget.scrollWidth > event.currentTarget.clientWidth
+            )
+              event.target.scrollIntoView?.({
+                block: "nearest",
+                inline: "nearest",
+              });
+          }}
+        >
           {primary.map((item, index) => {
             const groupStart =
               index > 0 && item.group !== primary[index - 1].group;

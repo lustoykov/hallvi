@@ -6,7 +6,7 @@ const second = "3ee7c9a7-5da8-434a-8222-cccac5089142";
 const origin = "http://127.0.0.1:3978";
 
 // Actual panel, synthetic MCP host. No controller, model or account access.
-async function panel(page: Page, empty = false) {
+async function panel(page: Page, empty = false, firstName = "First app") {
   const html = (await readFile("plugins/hallvi/panel.html", "utf8")).replaceAll(
     "__HALLVI_UI_VERSION__",
     "1111111111111111",
@@ -46,7 +46,7 @@ async function panel(page: Page, empty = false) {
           ui: { version: state.availableVersion },
           applications: (empty ? [] : [first, second]).map((id, i) => ({
             id,
-            name: i ? "Second app" : "First app",
+            name: i ? "Second app" : firstName,
             mainChatId: id,
             permissionMode: "always-ask",
             address: "https://old.example.test",
@@ -125,6 +125,34 @@ async function panel(page: Page, empty = false) {
 /** The panel opens on the overview; the composer is in the conversation. */
 const operator = (frame: FrameLocator) =>
   frame.getByRole("tab", { name: /^Operator/ }).click();
+
+test("a long application name stays readable without expanding an empty draft", async ({
+  page,
+}) => {
+  const firstName = "a".repeat(100);
+  const p = await panel(page, false, firstName);
+  await operator(p.frame);
+  const heading = p.frame.getByRole("heading", {
+    name: `Hallvi looks after ${firstName}`,
+  });
+  await expect(heading).toBeVisible();
+  expect(await heading.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(
+    0,
+  );
+  const draft = p.frame.getByRole("textbox", { name: "Message to Hallvi" });
+  const emptyHeight = await draft.evaluate((el) => el.clientHeight);
+  const lineHeight = await draft.evaluate((el) =>
+    Number.parseFloat(getComputedStyle(el).lineHeight),
+  );
+  expect(emptyHeight).toBeLessThanOrEqual(Math.ceil(lineHeight));
+  await draft.fill("An unsent draft with several lines of text. ".repeat(20));
+  expect(await draft.evaluate((el) => el.clientHeight)).toBeGreaterThan(
+    emptyHeight,
+  );
+  await draft.fill("");
+  expect(await draft.evaluate((el) => el.clientHeight)).toBe(emptyHeight);
+  expect(p.sends).toHaveLength(0);
+});
 
 test("a removed route does not fall back to the application's old address", async ({
   page,

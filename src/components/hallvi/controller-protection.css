@@ -7,6 +7,7 @@
 }
 
 .cpb > summary {
+  scroll-margin-block: 24px;
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 11px;

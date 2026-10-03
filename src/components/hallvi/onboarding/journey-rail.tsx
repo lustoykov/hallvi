@@ -127,6 +127,21 @@ export function JourneyRail({
         className="hv-first-app-mascot hv-rail-mascot"
         aria-label="Make Hallvi dance"
         onClick={() => setDances((count) => count + 1)}
+        onFocus={(event) => {
+          const target = event.currentTarget;
+          if (!target.matches(":focus-visible")) return;
+          const scroller = target.closest(".hv-chat-top");
+          if (!scroller) return;
+          const rect = target.getBoundingClientRect();
+          const bounds = scroller.getBoundingClientRect();
+          if (rect.height > scroller.clientHeight - 16) return;
+          if (rect.top < bounds.top + 8 || rect.bottom > bounds.bottom - 8)
+            target.scrollIntoView({
+              block: "nearest",
+              inline: "nearest",
+              behavior: "instant",
+            });
+        }}
       >
         <Mascot mood={mood} dance="shuffle" danceRequest={dances} />
       </button>

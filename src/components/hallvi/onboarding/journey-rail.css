@@ -2,6 +2,10 @@
  * request, these four quiet stops move beside the composer, immediately above
  * the single live activity row. */
 
+.hv-chat-top {
+  min-height: 0;
+  overflow: auto;
+}
 .hv-chat-top:empty {
   display: none;
 }
@@ -133,6 +137,7 @@
   background: var(--panel);
 }
 .hv-first-app .hv-first-app-mascot {
+  scroll-margin-block: 8px;
   width: 160px;
   height: 174px;
 }
@@ -207,7 +212,7 @@
   opacity: 0.5;
   cursor: default;
 }
-/* Two different things are missing: one line each, the first one blue. */
+/* Two different things are missing: one row each, the first action blue. */
 .hv-first-app-needs {
   margin: 0 0 4px;
   padding: 0;
@@ -218,6 +223,7 @@
 }
 .hv-first-app-needs li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   padding: 10px 12px;
@@ -226,11 +232,15 @@
   border-top: 1px solid var(--line);
 }
 .hv-first-app-needs li > span {
-  flex: 1;
+  flex: 1 1 12rem;
+  overflow-wrap: anywhere;
   display: grid;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--ink-2);
+}
+.hv-first-app-needs button {
+  scroll-margin-block: 24px;
 }
 .hv-first-app-needs strong {
   font-size: 13px;

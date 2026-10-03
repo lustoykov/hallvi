@@ -157,6 +157,12 @@
   scrollbar-width: thin;
   scrollbar-color: #d3d9e4 transparent;
 }
+@media (min-width: 641px) {
+  /* Keep the whole destination visible when native focus scrolls the sidebar. */
+  .hv-application-navigation > nav .hv-destinations > button {
+    scroll-margin-block: 24px;
+  }
+}
 .hv-application-navigation > nav::-webkit-scrollbar {
   width: 8px;
 }
@@ -624,6 +630,8 @@
   .hv-application-navigation {
     grid-column: 1;
     grid-row: 1;
+    /* Long conversation lists scroll without taking the whole workspace. */
+    max-height: 40dvh;
     padding: 12px;
     border-right: 0;
     border-bottom: 1px solid var(--line);

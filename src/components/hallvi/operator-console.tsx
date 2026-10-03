@@ -228,7 +228,8 @@ export function OperatorConsole({
                   const opener = menu.previousElementSibling;
                   const box = opener?.getBoundingClientRect();
                   if (!box) return;
-                  menu.style.left = `${box.left}px`;
+                  const width = parseFloat(window.getComputedStyle(menu).width);
+                  menu.style.left = `${Math.max(12, Math.min(box.left, window.innerWidth - width - 12))}px`;
                   menu.style.bottom = `${window.innerHeight - box.top + 6}px`;
                 }}
               >

@@ -369,6 +369,9 @@ li[data-state="expired"] .rowIcon {
 .muted {
   color: var(--muted);
 }
+.hero > div > p.muted {
+  white-space: normal;
+}
 .dot {
   width: 7px;
   height: 7px;
@@ -471,6 +474,7 @@ li[data-state="expired"] .rowIcon {
 }
 .flow {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   margin-bottom: 12px;
   padding: 16px 18px;
@@ -480,6 +484,10 @@ li[data-state="expired"] .rowIcon {
 }
 .flow p {
   margin: 0;
+}
+.flow > .muted {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .flowRow {
   display: flex;
@@ -538,6 +546,7 @@ li[data-state="expired"] .rowIcon {
   margin: 0 4px 20px;
   color: #a6312b;
   font-size: 13.5px;
+  overflow-wrap: anywhere;
 }
 .root :focus-visible {
   outline: 2px solid var(--blue);
@@ -560,7 +569,7 @@ li[data-state="expired"] .rowIcon {
   }
   .nav {
     flex-direction: row;
-    overflow-x: auto;
+    flex-wrap: wrap;
   }
   .nav a {
     white-space: nowrap;
@@ -577,6 +586,9 @@ li[data-state="expired"] .rowIcon {
     justify-items: start;
   }
   /* The effort choices share the track, each on one line. */
+  .seg {
+    flex-wrap: wrap;
+  }
   .seg button {
     flex: 1 1 auto;
     padding-inline: 4px;

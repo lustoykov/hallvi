@@ -357,6 +357,9 @@ a switchable prototype on the real shell.
 Before the first request, the welcome explains the next action. During first
 setup, a compact row beside the composer shows the four recorded milestones:
 Read it, A place to run, Deploy, Open it. Completed setup removes it.
+The welcome scrolls within the available height on a short window, keeping the
+composer reachable. An interruption panel and its draft share a scrollable
+composer bounded to 70% of the chat pane, leaving room to read the transcript.
 
 **Hallvi working (19 September).** A running turn has one live line, at the end
 of the reply it belongs to: a small spinner, what Hallvi is doing now, and the
@@ -449,10 +452,14 @@ screens and Add application wear the shell's own 56px bar: white, a `line`
 hairline under it, ink on it, the mark and name at the left and one back link
 at the right in muted. Setting something up is not a different product, so it
 is not a different colour of room; the bar says where you are and nothing
-else. Add application asks its question once, in its heading, rather than
-greeting on the left and asking again over the field. Chosen from a switchable
-prototype of four framings; the options and the verdict are on the
-`prototype/ux-audit-directions` branch.
+else. Settings navigation becomes a wrapping row on narrow screens, keeping
+every link and its keyboard focus outline visible. A keyboard-focused Settings
+control that fits the content scrollport stays inside it with room for its
+outline; a taller control keeps its nearer edge visible. Dialogs and popovers
+retain their own scrolling. Add application asks its question once, in its
+heading, rather than greeting on the left and asking again over the field.
+Chosen from a switchable prototype of four framings; the options and the
+verdict are on the `prototype/ux-audit-directions` branch.
 
 **The alpha strip is the top of the frame (1 October).** It wears the
 column's tint with no rule under it, so strip and column are one surface and
@@ -469,17 +476,21 @@ band with a navy chip: amber is a state's colour, and alpha is not a state.
 
 The workspace shell: a 240px navigation column, a 56px top row, and a workspace that fills the rest. The sheet is set 8px down in that row, so the bar itself is 48px, with a `line` hairline under it and its title on the page gutter, above the page's own title. Beside the column the top bar and workspace form one sheet, its top-left corner rounded 14px and set 8px down, casting a soft shadow onto the column; on a phone the navigation is a strip above it and there is no sheet edge. Conversation-first uses the workspace as one column. The transcript keeps the 780px measure of the production chat pane, centred; the composer stays attached at the bottom.
 
-A destination opened from a receipt, a mark or navigation takes the full workspace width. One text button sits above its header, “Back to [conversation name]”, on the page gutter and with no band of its own. Every destination shares that head: the link, then the title on a row as tall as a button, so nothing moves between pages or when the application link arrives beside the title. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit control is the Stop icon until something is typed, then “Send next” with a quiet “Steer” beside it. A waiting message says when Pi will read it — after its current work, or for a steer after its current step, never interrupting a running command or a pending approval — and is cancelled the way Pi cancels: Stop, which also settles every waiting message as not started, with its text kept. A message that was never run offers Send again. The existing interruption panel uses concise prose for the latest returned tool result, latest unknown action/target and waiting-message count, with a link to the matching reply's evidence. It adds no separate feed or result card. A returned tool result does not certify operational success; interrupted or failed status alone does not prove execution. Missing evidence stays unavailable. Continue retains Pi's native resume and queue behavior; Stop does not undo changes or confirm remote processes stopped. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.
+A destination opened from a receipt, a mark or navigation takes the full workspace width. One text button sits above its header, “Back to [conversation name]”, on the page gutter and with no band of its own. Every destination shares that head: the link, then the title on a row as tall as a button, so nothing moves between pages or when the application link arrives beside the title. The conversation stays mounted but parked (visibility hidden, inert), so scroll position and draft survive the trip. A question opened from a destination carries a removable “About [destination]” chip, preserves any existing draft, and offers “Return to [destination]” after submission. Ordinary drafts survive tab closure in controller-origin, application and conversation scoped browser storage. While a reply is running, the submit control is the Stop icon until something is typed, then “Send next” with a quiet “Steer” beside it. On narrow phones, the permission controls take their own row so Steer and Send next stay together. A waiting message says when Pi will read it — after its current work, or for a steer after its current step, never interrupting a running command or a pending approval — and is cancelled the way Pi cancels: Stop, which also settles every waiting message as not started, with its text kept. A message that was never run offers Send again. The existing interruption panel uses concise prose for the latest returned tool result, latest unknown action/target and waiting-message count, with a link to the matching reply's evidence. It adds no separate feed or result card. A returned tool result does not certify operational success; interrupted or failed status alone does not prove execution. Missing evidence stays unavailable. Continue retains Pi's native resume and queue behavior; Stop does not undo changes or confirm remote processes stopped. Completed Pi replies offer a quiet, always available Copy reply action with success or failure feedback. Sending returns focus to the composer; returning to a destination focuses its navigation control. Settings and GitHub connection links carry the application and conversation, so setup returns to the same draft. The first application explains ownership and the deployment steps; subsequent additions keep just the short introduction and repository form.
 
 Receipts sit under the message that started the work, inside the message column, and stretch to the message width. Activity cards and origin lines sit at the top of a destination’s content, above the first heading, so the first thing a view says is what is happening to it right now.
 
-Overview is a two-column grid at desktop (Unresolved beside Running, 28px by 36px gaps), then Recent changes and Evidence freshness at full width. Everything collapses to one column at 640px and below, where navigation becomes the workspace’s horizontal row as in the workspace system.
+Overview is a two-column grid at desktop (Unresolved beside Running, 28px by 36px gaps), then Recent changes and Evidence freshness at full width. Everything collapses to one column at 640px and below, where navigation becomes the workspace’s horizontal row as in the workspace system. Long conversation lists retain native scrolling within a strip bounded to 40dvh, so the composer stays reachable.
 
 The dark bar at the very bottom of the exploration (variant tabs, scenario stepper, clock) is exploration tooling, not part of the product language. It reserves 44px so it never overlaps the composer.
 
 ## Elevation & Depth
 
 Two levels, one light (19 September). The navigation column is recessed; the workspace is a sheet resting on it. Within the column, what is selected is lifted off it (`--raise`: a hairline ring and a short shadow on white): the application identity, the selected destination or conversation, and the new-conversation button. Group separators are grooves — one dark hairline with a light one under it — rather than rules. On the sheet, top-level cards keep their one-pixel border and gain `--lift`, a short soft shadow: the composer, command cards, and each destination's lead cards. Both shadows are mixed from `shade`. Focus stays a two-pixel blue outline; the composer's focus ring sits over its lift.
+
+In an overflowing Architecture canvas, keyboard focus scrolls a card or server
+header into view. A control that fits keeps room for its outline; the canvas
+keeps its manual scrolling.
 
 State is still carried by tint and one-pixel borders. A receipt, approval card or activity card is a bordered rectangle on white; its state tints the border (`working-line`, `waiting-line`, `failed-line`) and sometimes the surface (`waiting-surface`, `failed-surface`, `card-surface`).
 
@@ -670,7 +681,9 @@ table around the visual it already had. It lives in `register.tsx` and
   of 720px; below that its panel scrolls sideways and an opened row travels
   with it. A quiet hint appears above tables that do not fit. The panel accepts
   keyboard focus for horizontal scrolling, and sorted headers announce their
-  direction. A strip that wraps keeps a rule between its figures.
+  direction. Keyboard focus reveals a sort heading or row action with room
+  for its outline; pointer focus keeps the target in place. A strip that wraps
+  keeps a rule between its figures.
 - **One page owns a story; the others carry a line of it.** Chosen
   23 September 2026, after the backup situation was told three times in three
   wordings that drifted apart. Backups owns copies, plans and restores, and
@@ -811,8 +824,12 @@ attempt. Claude Opus 5 at maximum effort reviewed source and six screenshots.
 - Completed receipts show identical result text once. The first three
   destination links remain visible; additional destinations expand in place.
 - History keeps failure reasons visible, names the verified resolver, and
-  expands detailed evidence/steps. “Outside chat” describes origin accurately
-  without assuming that every log collection is automatic or user-triggered.
+  expands detailed evidence/steps. Where the feed itself is narrower than
+  480px (a phone, or a small window beside the sidebar), each record's time
+  and actions sit beneath its prose so the evidence stays readable; a laptop
+  keeps the time on the title's line.
+  “Outside chat” describes origin accurately without assuming that every log
+  collection is automatic or user-triggered.
 - Overview summarizes the primary destination; History holds the full list.
 - Verified Deployment shows its revision, runtime type, server and HTTP access.
   Event logs retain all original evidence.

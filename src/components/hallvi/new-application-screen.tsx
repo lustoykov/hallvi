@@ -196,7 +196,7 @@ export function NewApplicationScreen({
                 key={said}
                 role={idle ? undefined : "status"}
               >
-                {said}
+                <span>{said}</span>
               </p>
             </div>
             {/* The page asks once. It used to greet on the left and ask

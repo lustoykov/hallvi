@@ -259,6 +259,10 @@
   outline: 2px solid var(--blue);
   outline-offset: 3px;
 }
+.hv-rg-panel .hv-rg-ask,
+.hv-rg-panel .hv-rg-open > button {
+  scroll-margin-inline: 8px;
+}
 .hv-rg-table {
   width: 100%;
   /* Narrower than this the fixed columns leave the name column nothing, so
@@ -286,6 +290,7 @@
 }
 .hv-rg-sort {
   display: inline-flex;
+  scroll-margin-inline: 8px;
   align-items: center;
   gap: 4px;
   padding: 0;

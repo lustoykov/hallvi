@@ -20,6 +20,7 @@ import { listed } from "../backup-prototype/model";
 import { Mascot } from "../mascot";
 import type { SupplyProps } from "./supply-story";
 import { RevealSecret } from "../reveal-secret";
+import { revealKeyboardControl } from "../reveal-keyboard-control";
 import { ago, sizeWords, when, type Value } from "./supply-model";
 import "./manifest.css";
 
@@ -183,6 +184,7 @@ export function ManifestDirection({
                 data-held={value.held || undefined}
                 data-pending={value.pending || undefined}
                 data-open={open === value.id || undefined}
+                onFocus={(event) => revealKeyboardControl(event.currentTarget)}
                 onClick={() => setOpen(open === value.id ? null : value.id)}
               >
                 <span className="axma-name">{value.name}</span>

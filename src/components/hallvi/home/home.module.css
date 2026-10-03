@@ -343,8 +343,10 @@
   flex: 1;
   padding: 18px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
   gap: 12px;
+  overflow-wrap: anywhere;
 }
 .identity {
   min-width: 0;
@@ -460,6 +462,7 @@
   white-space: nowrap;
 }
 .address {
+  vertical-align: bottom;
   position: relative;
   z-index: 2;
   display: inline-flex;
@@ -467,6 +470,7 @@
   gap: 6px;
   font-size: 13px;
   min-width: 0;
+  max-width: 100%;
   color: var(--blue-text);
   font-weight: 550;
   overflow-wrap: anywhere;

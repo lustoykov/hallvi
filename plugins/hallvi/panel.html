@@ -228,7 +228,7 @@
 
   .empty { margin: 24px auto; max-width: 34ch; text-align: center; color: var(--muted); }
   .empty svg { width: 44px; height: 40px; }
-  .empty h2 { margin: 8px 0 4px; font-size: 15px; color: var(--ink); font-weight: 620; }
+  .empty h2 { margin: 8px 0 4px; font-size: 15px; color: var(--ink); font-weight: 620; overflow-wrap: anywhere; }
   .empty p { margin: 0 0 12px; }
   .suggestions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   .suggestions button { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; background: var(--surface); font-size: 12px; }
@@ -1402,7 +1402,7 @@ function autosize() {
   const draft = $("draft");
   draft.style.height = "auto";
   // Hidden, it measures nothing; leave it to its natural height.
-  if (draft.scrollHeight) draft.style.height = `${Math.min(draft.scrollHeight, 160)}px`;
+  if (draft.value && draft.scrollHeight) draft.style.height = `${Math.min(draft.scrollHeight, 160)}px`;
 }
 
 /** Elapsed times move on their own; nothing else re-renders for the clock. */

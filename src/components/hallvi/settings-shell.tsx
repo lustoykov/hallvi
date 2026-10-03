@@ -8,7 +8,13 @@ import {
   Plugs,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type ReactNode,
+} from "react";
 
 import type { SetupReturn } from "@/server/setup-return";
 
@@ -50,6 +56,36 @@ const PAGES: {
     icon: <Cube aria-hidden="true" />,
   },
 ];
+
+function keepSettingsFocusVisible(event: FocusEvent<HTMLElement>) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || !target.matches(":focus-visible"))
+    return;
+  if (
+    !event.currentTarget.contains(target) ||
+    target.closest("dialog, [popover]")
+  )
+    return;
+  const scroller = event.currentTarget.closest<HTMLElement>(".hv-app-content");
+  if (!scroller) return;
+  const rect = target.getBoundingClientRect();
+  const bounds = scroller.getBoundingClientRect();
+  const top = Math.max(0, bounds.top) + 8;
+  const bottom = Math.min(window.innerHeight, bounds.bottom) - 8;
+  if (bottom <= top) return;
+  if (rect.height > bottom - top) {
+    // Keep a larger control's nearer edge without alternating visible edges.
+    if (rect.top > top)
+      scroller.scrollBy({ top: rect.top - top, behavior: "instant" });
+    else if (rect.bottom < bottom)
+      scroller.scrollBy({ top: rect.bottom - bottom, behavior: "instant" });
+    return;
+  }
+  if (rect.top < top)
+    scroller.scrollBy({ top: rect.top - top, behavior: "instant" });
+  else if (rect.bottom > bottom)
+    scroller.scrollBy({ top: rect.bottom - bottom, behavior: "instant" });
+}
 
 /**
  * Settings: the top bar, a sidebar of four pages, and the page's own title.
@@ -126,7 +162,10 @@ export function SettingsShell({
               </div>
             )}
         </aside>
-        <section aria-labelledby="settings-page-title">
+        <section
+          aria-labelledby="settings-page-title"
+          onFocus={keepSettingsFocusVisible}
+        >
           <header className={s.head}>
             <h2 id="settings-page-title">{title}</h2>
             <p>{lead}</p>

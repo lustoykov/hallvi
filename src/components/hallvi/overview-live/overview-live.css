@@ -202,6 +202,7 @@
   border-left: 1px solid var(--line);
 }
 .ovl-facts button {
+  scroll-margin-block: 8px;
   display: grid;
   gap: 5px;
   align-content: start;
@@ -261,6 +262,7 @@
 }
 .ovl-lower section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 .ovl-recent,

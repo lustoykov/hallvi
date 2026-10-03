@@ -1738,9 +1738,29 @@
 .hv-section-content {
   font-size: var(--view-body);
 }
+.hv-workspace .axj2 .axj2-pop {
+  max-width: calc(100vw - 32px);
+}
 .hv-history-open {
   color: var(--ink);
   border-radius: 6px;
+}
+.hv-workspace .axhm .axh-title {
+  overflow-wrap: anywhere;
+}
+/* Only a feed too narrow for prose beside its time gives the time a row of
+   its own; a laptop keeps the time on the title's line. */
+.hv-workspace .axhm-feed {
+  container-type: inline-size;
+}
+@container (max-width: 480px) {
+  .hv-workspace .axhm .axh-body {
+    grid-column: 3 / -1;
+  }
+  .hv-workspace .axhm .axh-time,
+  .hv-workspace .axhm .axh-actions {
+    grid-row: 2;
+  }
 }
 .hv-history-open strong {
   font-size: var(--view-body);
@@ -1896,6 +1916,7 @@
   font-variant-numeric: tabular-nums;
 }
 .hv-captured header button {
+  scroll-margin-block: 24px;
   display: inline-flex;
   align-items: center;
   gap: 4px;

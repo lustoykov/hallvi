@@ -29,6 +29,7 @@ import type { Usage } from "../monitoring-records";
 import type { NeedItem, Overview } from "../overview-prototype/overview-model";
 import { Tag, UnresolvedMarks, unresolvedWords } from "../presentation";
 import { agedAs, usePulse, type Pulse } from "../pulse";
+import { revealKeyboardControl } from "../reveal-keyboard-control";
 import type { ReleaseView } from "../release-records";
 import { NowWords, Pulse as Arriving } from "../traffic/live";
 import { hasTotals, milliseconds, trafficListed } from "../traffic/model";
@@ -310,7 +311,11 @@ function Fact({
 }) {
   return (
     <li data-reads={reads}>
-      <button type="button" onClick={onOpen}>
+      <button
+        type="button"
+        onClick={onOpen}
+        onFocus={(event) => revealKeyboardControl(event.currentTarget)}
+      >
         <span>{label}</span>
         <b>{value}</b>
         <small>{note}</small>
