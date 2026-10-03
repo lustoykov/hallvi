@@ -872,6 +872,14 @@ build after the old 90-second wait killed compilation before startup. Developmen
 readiness and per-route compilation also get bounded allowances for the observed
 startup and warm-up timeouts. No interaction deadline was relaxed.
 
+**+1:** 2026-10-03 — cross-browser UI audit, `codex/ui-evidence-audit`:
+on the Mac mini, unchanged main reproduced three bootstrap fixture failures
+and browser startup timing out after Next had reported ready. The bootstrap
+fixture now includes the real release verifier and a Node shim for the stock
+macOS fallback. The browser fixture strips terminal color codes before matching
+its own child's readiness line; it still requires that line and a healthy HTTP
+response. These fixes preserve signature rejection and startup ownership checks.
+
 ### AF-033 — Refuse a second preview before attaching retained state
 
 Attaching a retained application from a checkout that already serves a

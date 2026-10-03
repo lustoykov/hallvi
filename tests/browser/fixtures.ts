@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { removeTemporaryRoot } from "../temporary-root.mjs";
 
 // One disposable app per worker; distinct repositories per test. Never port
@@ -82,7 +83,8 @@ export const test = base.extend<
               // The manifest is printed before Next binds its port. A server
               // from another checkout may already answer there; only this
               // child's readiness line establishes that it started.
-              if (!output.includes("✓ Ready in ")) return false;
+              if (!stripVTControlCharacters(output).includes("✓ Ready in "))
+                return false;
               return fetch(`${url}/applications`)
                 .then((r) => r.ok)
                 .catch(() => false);

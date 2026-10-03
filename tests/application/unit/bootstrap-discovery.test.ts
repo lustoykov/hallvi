@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -14,7 +15,8 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 
 // Exercise the actual shell bootstrap with fixture HTTP responses, a tiny
 // archive and an installer that writes only a test marker. It never contacts
-// GitHub or touches an installation. Its signature check uses real OpenSSL.
+// GitHub or touches an installation. Signature checks use real OpenSSL or
+// the current Node runtime through the archive's fixture shim.
 let root: string;
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "hallvi-bootstrap-"));
@@ -36,6 +38,19 @@ it.each(["default", "custom", "bad-signature"])(
     writeFileSync(
       join(root, folder, "install.sh"),
       '#!/bin/sh\nprintf "fixture installer reached\\n" > "$HALLVI_BOOTSTRAP_MARKER"\n',
+    );
+    // Stock macOS uses the archive's Node fallback for Ed25519 verification.
+    // Keep that path real without putting a full Node binary in every archive.
+    mkdirSync(join(root, folder, "node/bin"), { recursive: true });
+    writeFileSync(
+      join(root, folder, "node/bin/node"),
+      '#!/bin/sh\nexec "$HALLVI_BOOTSTRAP_NODE" "$@"\n',
+      { mode: 0o755 },
+    );
+    mkdirSync(join(root, folder, "scripts"));
+    copyFileSync(
+      "scripts/release-trust.mjs",
+      join(root, folder, "scripts/release-trust.mjs"),
     );
     execFileSync("tar", ["-czf", join(root, name), "-C", root, folder]);
     const archive = readFileSync(join(root, name));
@@ -149,6 +164,7 @@ cp "$HALLVI_BOOTSTRAP_FIXTURE/$file" "$4"
         HALLVI_BOOTSTRAP_FIXTURE: root,
         HALLVI_BOOTSTRAP_REQUESTS: requests,
         HALLVI_BOOTSTRAP_MARKER: marker,
+        HALLVI_BOOTSTRAP_NODE: process.execPath,
       },
     });
     const fetched = readFileSync(requests, "utf8").trim().split("\n");
@@ -163,7 +179,12 @@ cp "$HALLVI_BOOTSTRAP_FIXTURE/$file" "$4"
       expect(result.status).not.toBe(0);
       expect(result.stderr).toContain("not signed by the Hallvi release key");
       expect(existsSync(marker)).toBe(false);
-      expect(fetched).not.toContain(`${base}/${name}`);
+      // OpenSSL rejects before download; the Node fallback must unpack first.
+      if (result.stdout.includes("check runs after unpacking")) {
+        expect(fetched[3]).toBe(`${base}/${name}`);
+      } else {
+        expect(fetched).not.toContain(`${base}/${name}`);
+      }
     } else {
       expect(result.status, result.stderr).toBe(0);
       expect(readFileSync(marker, "utf8")).toBe("fixture installer reached\n");

@@ -1,4 +1,4 @@
-/** Keep a fitting keyboard target visible within its actual scroll ancestors. */
+/** Keep a fitting keyboard target visible within its scroll ancestors. */
 export function revealKeyboardControl(target: HTMLElement) {
   if (!target.matches(":focus-visible")) return;
   const rect = target.getBoundingClientRect();
