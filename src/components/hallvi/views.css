@@ -1748,7 +1748,12 @@
 .hv-workspace .axhm .axh-title {
   overflow-wrap: anywhere;
 }
-@media (max-width: 1200px) {
+/* Only a feed too narrow for prose beside its time gives the time a row of
+   its own; a laptop keeps the time on the title's line. */
+.hv-workspace .axhm-feed {
+  container-type: inline-size;
+}
+@container (max-width: 480px) {
   .hv-workspace .axhm .axh-body {
     grid-column: 3 / -1;
   }

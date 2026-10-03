@@ -59,8 +59,21 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-086 — Keep expanded Terminal focus visible](#af-086--keep-expanded-terminal-focus-visible) | 1 | New |
 | [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | New |
 | [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | New |
+| [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-089 — Size a narrow-layout fix by the space it has
+
+The UI audit stacked each History record's time and action under its prose
+for every window up to 1200px. At 1150px the feed still had 340px for prose,
+so every record grew a row for nothing. The audit's overflow and focus
+evidence could not notice: nothing overflowed. Review moved the rule to a
+container query on the feed (480px), which keeps it for phones and small
+windows. A fix that adds a breakpoint should also be looked at in the widest
+window the rule reaches.
+
+**+1:** 2026-10-03 — review of #335, `codex/ui-evidence-audit`.
 
 ### AF-088 — Keep Traffic steady while its first totals arrive
 

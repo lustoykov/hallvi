@@ -457,9 +457,9 @@ every link and its keyboard focus outline visible. A keyboard-focused Settings
 control that fits the content scrollport stays inside it with room for its
 outline; a taller control keeps its nearer edge visible. Dialogs and popovers
 retain their own scrolling. Add application asks its question once, in its
-heading, rather than greeting on the left and asking again over the field. Chosen from a switchable
-prototype of four framings; the options and the verdict are on the
-`prototype/ux-audit-directions` branch.
+heading, rather than greeting on the left and asking again over the field.
+Chosen from a switchable prototype of four framings; the options and the
+verdict are on the `prototype/ux-audit-directions` branch.
 
 **The alpha strip is the top of the frame (1 October).** It wears the
 column's tint with no rule under it, so strip and column are one surface and
@@ -824,8 +824,10 @@ attempt. Claude Opus 5 at maximum effort reviewed source and six screenshots.
 - Completed receipts show identical result text once. The first three
   destination links remain visible; additional destinations expand in place.
 - History keeps failure reasons visible, names the verified resolver, and
-  expands detailed evidence/steps. In narrow workspaces, each record's time
-  and actions sit beneath its prose so the evidence stays readable.
+  expands detailed evidence/steps. Where the feed itself is narrower than
+  480px (a phone, or a small window beside the sidebar), each record's time
+  and actions sit beneath its prose so the evidence stays readable; a laptop
+  keeps the time on the title's line.
   “Outside chat” describes origin accurately without assuming that every log
   collection is automatic or user-triggered.
 - Overview summarizes the primary destination; History holds the full list.
