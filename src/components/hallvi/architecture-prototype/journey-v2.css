@@ -344,6 +344,7 @@
 .axj2-card {
   position: absolute;
   scroll-margin-inline: 8px;
+  scroll-margin-block: 24px;
   z-index: 2;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);

@@ -480,7 +480,7 @@ export function Register<R extends { id: string }>({
           const target = event.target;
           if (
             !(target instanceof HTMLElement) ||
-            !target.matches(".hv-rg-sort, .hv-rg-ask") ||
+            !target.matches(".hv-rg-sort, .hv-rg-ask, .hv-rg-open > button") ||
             !target.matches(":focus-visible")
           )
             return;

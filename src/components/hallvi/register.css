@@ -259,7 +259,8 @@
   outline: 2px solid var(--blue);
   outline-offset: 3px;
 }
-.hv-rg-panel .hv-rg-ask {
+.hv-rg-panel .hv-rg-ask,
+.hv-rg-panel .hv-rg-open > button {
   scroll-margin-inline: 8px;
 }
 .hv-rg-table {
