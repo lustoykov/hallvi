@@ -70,10 +70,19 @@ reason, in the handoff. Anything kept gets `sg-cleanup=retain`.
 
 ## Local processes and containers
 
-Record the PID and port of every preview a task starts. Stop previews used only
-for your own checks before the handoff. Leave a preview someone is reviewing
-running and give its link; stop it when that review ends. Stop the exact
-processes with `SIGTERM`, then run `node scripts/check-preview-processes.mjs`
+Record the host, checkout, command, start time, PID and port of each preview or
+long-running verification process your task starts. Before signalling a PID,
+match its current host, command, checkout and start time to that record;
+copied PID files and reused PIDs do not establish ownership. On a shared
+machine, checkpoint at the agreed safe boundary, stop only owned workloads
+that conflict with the next task, and record the release before that task
+starts. Include kept previews and services in the handback so the next task
+can assess timing contention.
+
+Stop previews used only for your own checks before the handoff. Leave a preview
+someone is reviewing running and give its link; stop it when that review ends.
+Stop the exact processes with `SIGTERM`, then run
+`node scripts/check-preview-processes.mjs`
 in that checkout to find any remaining Next.js or local preview processes, and
 confirm their ports closed. The check only reports PIDs; match each to its
 command and port before stopping it. Leave intentional tunnels and installed
