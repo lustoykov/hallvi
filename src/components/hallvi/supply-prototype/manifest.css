@@ -127,6 +127,7 @@
   gap: 12px;
 }
 .axma-card {
+  scroll-margin-block: 24px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

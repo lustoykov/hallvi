@@ -22,6 +22,7 @@ import {
   type ProtectionVerdict,
 } from "./backups-records";
 import { LocalTime } from "./local-time";
+import { revealKeyboardControl } from "./reveal-keyboard-control";
 
 import "./backup-stages.css";
 
@@ -189,6 +190,7 @@ function Inventory({
                 data-selected={open || undefined}
                 aria-expanded={open}
                 onClick={() => setSelected(open ? null : piece.key)}
+                onFocus={(event) => revealKeyboardControl(event.currentTarget)}
               >
                 <span className="bs-data-icon" aria-hidden="true">
                   <HardDrive weight="duotone" />

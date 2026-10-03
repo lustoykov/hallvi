@@ -1911,6 +1911,7 @@
   font-variant-numeric: tabular-nums;
 }
 .hv-captured header button {
+  scroll-margin-block: 24px;
   display: inline-flex;
   align-items: center;
   gap: 4px;

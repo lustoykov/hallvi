@@ -480,7 +480,7 @@ button.axmw-host:hover,
 }
 .axmw-rail {
   display: grid;
-  scroll-margin-block: 24px;
+  scroll-margin-block: 8px;
   grid-template-columns: 210px minmax(0, 1fr) 240px;
   align-items: center;
   gap: 16px;

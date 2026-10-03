@@ -86,10 +86,9 @@ interaction decision beyond a CSS containment fix.
 ### AF-086 — Keep expanded Terminal focus visible
 
 On a phone, Shift+Tab from expanded Terminal's Restore control can focus
-navigation behind the full-screen terminal. In Chromium and Firefox, forward
-Tab returns to Restore and Enter collapses it; that recovery was not established
-in WebKit. Once the terminal input
-has focus, Tab and Escape belong to the terminal session. Decide how focus
+navigation behind the full-screen terminal. In Chromium, Firefox and WebKit,
+forward traversal returns to Restore and Enter collapses it. Once the terminal
+input has focus, Tab and Escape belong to the terminal session. Decide how focus
 should stay visible while expanded without taking those keys from the shell.
 
 **+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.

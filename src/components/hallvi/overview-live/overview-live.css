@@ -202,6 +202,7 @@
   border-left: 1px solid var(--line);
 }
 .ovl-facts button {
+  scroll-margin-block: 8px;
   display: grid;
   gap: 5px;
   align-content: start;

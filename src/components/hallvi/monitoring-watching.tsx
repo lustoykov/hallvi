@@ -10,6 +10,7 @@
 // worked, and how much longer that result counts.
 
 import { usePulse } from "./pulse";
+import { revealKeyboardControl } from "./reveal-keyboard-control";
 import {
   ChatCircleText,
   Check,
@@ -324,6 +325,9 @@ export function WatchingMap({
                   aria-pressed={item.id === picked}
                   title={item.id}
                   onClick={() => setPicked(item.id)}
+                  onFocus={(event) =>
+                    revealKeyboardControl(event.currentTarget)
+                  }
                 >
                   <span className="axmw-rail-name">
                     <KindIcon kind={item.kind} />
