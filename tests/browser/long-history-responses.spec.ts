@@ -55,7 +55,47 @@ test("older evidence and open disclosures survive changes, completion, view swit
   const state = await setup(page, fixture);
   const { app, chat, transcript, last, call, worker, store } = state;
   try {
+    await page.addInitScript(() => {
+      const frames: { type: string; collections: string[] }[] = [];
+      (
+        window as unknown as { qaInitialFrames: typeof frames }
+      ).qaInitialFrames = frames;
+      const Native = window.EventSource;
+      window.EventSource = class extends Native {
+        constructor(url: string | URL, options?: EventSourceInit) {
+          super(url, options);
+          if (!String(url).includes("/events")) return;
+          this.addEventListener("message", (event) => {
+            const frame = JSON.parse(event.data);
+            frames.push({
+              type: frame.type ?? "snapshot",
+              collections: [
+                "messages",
+                "executions",
+                "piActivity",
+                "information",
+              ].filter((key) => key in frame),
+            });
+          });
+        }
+      };
+    });
+    const received = () =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              qaInitialFrames: { type: string; collections: string[] }[];
+            }
+          ).qaInitialFrames,
+      );
     await page.goto(`/applications/${app}`);
+    await expect
+      .poll(async () => (await received())[0])
+      .toEqual({
+        type: "initial",
+        collections: [],
+      });
     // It opens on its latest message; the earlier ones are drawn after it.
     await expect(page.locator('[id="hv-message-reply:79"]')).toBeInViewport();
     const old = page.locator('[id="hv-message-reply:1"]');
@@ -103,10 +143,21 @@ test("older evidence and open disclosures survive changes, completion, view swit
     worker.changed({ kind: "chat", applicationId: app, chatId: chat });
     await page.context().setOffline(false);
     await expect(old).toContainText("Updated while disconnected.");
+    await expect
+      .poll(async () =>
+        (await received()).some((frame) => frame.type === "snapshot"),
+      )
+      .toBe(true);
     await expect(row).toHaveAttribute("aria-expanded", "true");
     await page.screenshot({ path: "tests/results/long-history-evidence.png" });
-    // A new subscription replaces its baseline with full current state.
+    // A reload receives new page records and acknowledges them again.
     await page.reload();
+    await expect
+      .poll(async () => (await received())[0])
+      .toEqual({
+        type: "initial",
+        collections: [],
+      });
     const latest = page.locator('[id="hv-message-reply:79"]');
     await latest.getByRole("button", { name: /2 commands/ }).click();
     await latest.locator(".hv-did-row").last().click();

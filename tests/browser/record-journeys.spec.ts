@@ -202,24 +202,10 @@ test.describe("what the pages must never stop saying", () => {
     "never claims a way in before it knows",
     journey("record-destinations"),
     async ({ page }) => {
-      test.skip(!(await up(page, ACCEPTANCE)), "no acceptance server");
-      await page.goto(`${ACCEPTANCE}/applications`, {
-        waitUntil: "domcontentloaded",
-      });
-      await page.waitForLoadState("networkidle").catch(() => {});
-      const id = await page.evaluate(
-        () =>
-          [
-            ...document.querySelectorAll<HTMLAnchorElement>(
-              "a[href*='/applications/']",
-            ),
-          ]
-            .map(
-              (link) => link.getAttribute("href")?.match(/[0-9a-f-]{36}/)?.[0],
-            )
-            .find(Boolean) ?? null,
-      );
-      test.skip(!id, "no application");
+      test.skip(!(await up(page, SCENARIOS)), "no scenario server");
+      // This check needs a recorded deployment. The first home entry can be
+      // an undeployed application, whose Deployment has no access header.
+      const id = SCENARIO.everything;
 
       // Hold the answer back, so the frame before it arrives is the one under
       // test. Starting at "open" made that frame claim a working way in on
@@ -233,7 +219,7 @@ test.describe("what the pages must never stop saying", () => {
         await route.continue();
       });
 
-      await page.goto(`${ACCEPTANCE}/applications/${id}#deployment`, {
+      await page.goto(`${SCENARIOS}/applications/${id}#deployment`, {
         waitUntil: "domcontentloaded",
       });
       const header = page.getByRole("region", { name: "What is running" });

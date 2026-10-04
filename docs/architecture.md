@@ -96,7 +96,10 @@ flowchart LR
     Stream -->|refresh| Pending[Share pending read for this chat]
     Local -->|notice invalidates older pending read| Pending
     Pending --> Snapshot
-    Snapshot -->|connect or reconnect: full state| Browser[Open conversations]
+    Page[Page or selected-chat HTTP view] -->|exact collection fingerprints| Stream
+    Snapshot --> Initial[Compare fresh collections with page fingerprints]
+    Initial -->|first connection: changed collections and current status| Browser[Open conversations]
+    Snapshot -->|missing baseline or reconnect: full state| Browser
     Snapshot --> Compare[Compare records with this stream's previous state]
     Compare -->|changed records, removals and order| Browser
 ```
@@ -126,8 +129,18 @@ SSR, CLI and write responses do not join this pending read. There is no settled
 transcript cache, freshness window or new worker protocol. Each stream compares
 the shared value against its own baseline without modifying it.
 
-The page opts into incremental frames with `events?changes=1`. Its first frame
-is a full `ChatSnapshot`; later frames replace only changed records in messages,
+The page opts into incremental frames with `events?changes=1`. A full HTTP view
+carries four SHA-256 fingerprints of its messages, executions, Pi activity and
+presented information, scoped to the application, conversation and wire version.
+The first connection supplies those fingerprints once. After subscribing and
+reading fresh state, the server acknowledges matching collections without
+resending them and completely replaces any changed collection. Current status
+and worker availability always come from that fresh read. Missing or incompatible
+fingerprints receive a full `ChatSnapshot`; no page snapshot is retained on the
+server. The browser keeps the token paired with the exact immutable HTTP records
+until the acknowledgement, including when a newer stream races an HTTP response.
+
+Later frames replace only changed records in messages,
 executions, Pi activity and presented information. A record replacement clears
 missing optional fields. Membership or ordering changes carry the resulting id
 order, and removals are explicit. Unchanged records are compared structurally,
@@ -136,8 +149,7 @@ usable state and the same record identities, so older messages, quiet tool
 disclosures, approvals and open output cards keep their data and interaction
 state. POST, SSR, CLI inspection and execution detail remain full responses.
 
-Full state repeats what a page already holds: the stream's first frame after
-the page was drawn from the same conversation, a reconnect, a write's own
+Full state can repeat what a page already holds on a reconnect or a write's own
 response. The browser keeps the record it had wherever the new one says the
 same, and each message is drawn from its own records only. A repeated record,
 a token in the newest reply, a keystroke in the composer and the clock redraw
@@ -145,16 +157,18 @@ no other message.
 
 A conversation opens on its latest messages, already in place. The earlier
 ones are drawn above them in steps while what is on screen keeps its
-position, so opening costs the same however long the conversation is; a link
-to a message or a record takes the reader there and leaves them there. The
+position, so the latest messages are usable before the whole history is drawn;
+a link to a message or a record takes the reader there and leaves them there. The
 view a page opens on travels as one JSON string: megabytes of records are
 slow to encode and rebuild as a structured page property, and quick as text.
-The page and the stream's first frame still each carry the whole
-conversation.
+The page still carries the whole conversation; its initial stream avoids
+transferring matching collections again.
 
 Each connection holds only its previous snapshot, drops the initial serialized
-string after sending it, and releases the baseline on close. Reconnect starts
-with authoritative full state rather than replaying missed frames. The original
+string after sending it, and releases the baseline on close. The handoff's first
+event includes `id: ready` as an EventSource reconnect marker, not a cursor. An automatic
+reconnect's `Last-Event-ID` makes the server ignore the original page fingerprints
+and return authoritative full state rather than replaying missed frames. The original
 `events` URL continues sending full snapshots for already-open clients whose
 JavaScript predates the upgrade. There is no durable cursor or frame store.
 

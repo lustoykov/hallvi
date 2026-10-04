@@ -26,17 +26,30 @@ vi.mock("../../../src/server/change-notifications", () => ({
   },
 }));
 import { GET } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/events/route";
+import { chatStreamBaseline } from "../../../src/server/chat-stream-baseline";
+import type { ChatSnapshot } from "../../../src/server/types";
 
 const context = {
   params: Promise.resolve({ applicationId: "app", chatId: "chat" }),
 };
-const snapshot = (revision: number) => ({
+const snapshot = (revision: number): ChatSnapshot => ({
   status: "idle",
   worker: { alive: true },
   executions: [],
   piActivity: [],
   information: [],
-  messages: [{ id: "answer", revision }],
+  messages: [
+    {
+      id: "answer",
+      chatId: "chat",
+      role: "assistant",
+      body: "Current answer",
+      source: "pi",
+      status: "completed",
+      createdAt: "2026-09-01T00:00:00.000Z",
+      revision,
+    },
+  ],
 });
 const frame = async (reader: ReadableStreamDefaultReader<Uint8Array>) =>
   new TextDecoder().decode((await reader.read()).value);
@@ -58,14 +71,16 @@ beforeEach(() => {
 
 it("keeps full updates for already-open clients without incremental opt-in", async () => {
   const reader = (await open(false)).body!.getReader();
-  expect(await frame(reader)).toContain(
-    '"messages":[{"id":"answer","revision":1}]',
+  const initial = await frame(reader);
+  expect(initial.startsWith("data: ")).toBe(true);
+  expect(initial).toContain(
+    `"messages":${JSON.stringify(snapshot(1).messages)}`,
   );
   mocks.snapshot.mockResolvedValue(snapshot(2));
   mocks.notify({ kind: "chat" });
   await vi.advanceTimersByTimeAsync(500);
   const next = await frame(reader);
-  expect(next).toContain('"messages":[{"id":"answer","revision":2}]');
+  expect(next).toContain(`"messages":${JSON.stringify(snapshot(2).messages)}`);
   expect(next).not.toContain('"type":"changes"');
 });
 afterEach(() => {
@@ -78,7 +93,9 @@ it("does no idle reads, coalesces active bursts at 500ms, and cleans up on disco
   const response = await open();
   expect(response.headers.get("content-type")).toBe("text/event-stream");
   const reader = response.body!.getReader();
-  expect(await frame(reader)).toContain('"revision":1');
+  const initial = await frame(reader);
+  expect(initial.startsWith("data: ")).toBe(true);
+  expect(initial).toContain('"revision":1');
   await vi.advanceTimersByTimeAsync(16_000);
   expect(await frame(reader)).toBe(": keep-alive\n\n");
   expect(mocks.snapshot).toHaveBeenCalledTimes(1);
@@ -116,6 +133,48 @@ it("keeps a notification arriving during the initial snapshot", async () => {
   await vi.advanceTimersByTimeAsync(500);
   expect(await frame(reader)).toContain('"revision":2');
   expect(mocks.invalidate).toHaveBeenCalledWith("app");
+});
+
+it("acknowledges page records after a fresh read and keeps notices received during that read", async () => {
+  const page = snapshot(1);
+  const baseline = chatStreamBaseline("app", "chat", page);
+  let release!: (value: unknown) => void;
+  mocks.snapshot.mockImplementationOnce(
+    () => new Promise((resolve) => (release = resolve)),
+  );
+  const opening = GET(
+    new Request(`http://localhost/events?changes=1&baseline=${baseline}`, {
+      signal: controller.signal,
+    }),
+    context,
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.snapshot).toHaveBeenCalledOnce();
+  mocks.notify({ kind: "chat" });
+  mocks.snapshot.mockResolvedValue(snapshot(2));
+  release(page);
+  const reader = (await opening).body!.getReader();
+  const initial = await frame(reader);
+  expect(initial).toContain("id: ready\n");
+  expect(initial).toContain('"type":"initial"');
+  expect(initial).not.toContain('"messages"');
+  await vi.advanceTimersByTimeAsync(500);
+  expect(await frame(reader)).toContain('"revision":2');
+});
+
+it("an automatic reconnect ignores the page fingerprint and returns fresh full state", async () => {
+  const baseline = chatStreamBaseline("app", "chat", snapshot(1));
+  const response = await GET(
+    new Request(`http://localhost/events?changes=1&baseline=${baseline}`, {
+      headers: { "Last-Event-ID": "ready" },
+      signal: controller.signal,
+    }),
+    context,
+  );
+  const initial = await frame(response.body!.getReader());
+  expect(initial).toContain('"revision":1');
+  expect(initial).not.toContain('"type":"initial"');
+  expect(mocks.snapshot).toHaveBeenCalledOnce();
 });
 
 it("keeps changes arriving during an async refresh and never overlaps reads", async () => {

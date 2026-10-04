@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 8 | Partially fixed |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 9 | Partially fixed |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -40,7 +40,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
-| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 1 | New |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 2 | Initial handoff in review; page and reconnect bytes remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | New |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
@@ -287,19 +287,28 @@ the message link.
 
 ### AF-069 — Carry a long conversation to the page once, and less of it
 
-Opening an application still moves its whole conversation twice: once in the
+Opening an application on the base moved its whole conversation twice: once in the
 page and again as the stream's first frame, which is sent uncompressed
 (`no-transform`). With 2,000 synthetic calls that is 19 MB each time; the
 browser spends about 200 ms taking the frame in although nothing in it is
 drawn again, and the server builds the conversation twice (about 140 ms
 each). Over a tunnel to a remote controller the second copy is the larger
 half of the wait. About 96% of those bytes are command output and call
-results behind disclosures that open closed. Two directions, neither built:
-start the stream from the state the page was drawn from, so the first frame
-is a difference; and send what a closed row shows, fetching a call's output
-when it is opened.
+results behind disclosures that open closed.
+
+The owner-requested performance follow-up implements the initial handoff:
+the full HTTP view fingerprints each of its four conversation collections,
+scoped to the application, conversation and wire version. The first stream
+still subscribes before a fresh read, acknowledges matching collections and
+replaces changed ones completely. The handoff adds no server cache or retained
+page snapshot.
+Automatic reconnects still read and send full state. The page's full records
+and reconnect transfer remain expensive; fetching closed output only when a
+disclosure opens is a separate larger change.
 
 **+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
+**+1:** 2026-10-04 — owner-requested practical performance fixes,
+`codex/speed-stream-handoff`.
 
 ### AF-068 — Remove the mascot placements nothing draws
 
@@ -788,6 +797,13 @@ failed since #179 reworded the Storage & privacy popover on 20 September
 workflow was switched off, and it surfaced only because a later step of the same
 test changed. A cheap way to see which journeys currently fail on main would
 separate old breakage from a new change's.
+
+**+1:** 2026-10-04 — practical performance fixes,
+`codex/speed-stream-handoff`: the access-loading journey's failure was already
+reproduced on unchanged main at `fc9d428c`. The check picked the first home
+entry, which can have no deployment or access header. It now uses the named
+deployed scenario, preserving the assertions that no Open link appears before
+the held access request resolves.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
 **+1:** 2026-09-30 — settings redesign (`claude/settings-redesign`): on main,
