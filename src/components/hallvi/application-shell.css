@@ -578,7 +578,6 @@
   display: block;
   grid-column: 2;
   grid-row: 2;
-  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   position: relative;
 }
@@ -613,7 +612,6 @@
   padding: 28px 36px;
 }
 .hv-adaptive-shell .hv-workspace.hv-dashboard-open {
-  grid-template-columns: minmax(0, 1fr);
   overflow: auto;
 }
 
@@ -622,7 +620,6 @@
     grid-template-columns: 196px minmax(0, 1fr);
   }
   .hv-adaptive-shell .hv-workspace {
-    grid-template-columns: minmax(0, 1fr);
     overflow: auto;
   }
 }
