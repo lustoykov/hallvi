@@ -59,6 +59,11 @@ test("older evidence and open disclosures survive changes, completion, view swit
     await page.goto(`/applications/${app}`);
     // It opens on its latest message; the earlier ones are drawn after it.
     await expect(page.locator('[id="hv-message-reply:79"]')).toBeInViewport();
+    // Leave the latest message as a reader does, with the wheel. Playwright's
+    // own jump to an element can go unnoticed while messages are still being
+    // drawn, and the conversation would carry the reader back down.
+    await page.locator(".hv-conversation").hover({ position: { x: 8, y: 8 } });
+    await page.mouse.wheel(0, -200);
     const old = page.locator('[id="hv-message-reply:1"]');
     await old.getByRole("button", { name: /1 file read/ }).click();
     const row = old.locator(".hv-did-row").first();

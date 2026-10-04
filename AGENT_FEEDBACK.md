@@ -60,8 +60,28 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | New |
 | [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | New |
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
+| [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; product gap open |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-090 — Notice a reader who jumps up as the last earlier messages are drawn
+
+The long-history journey's new position checks in #336 failed three runs of
+three on review, on development and production fixtures:
+`scrollIntoViewIfNeeded` put an old reply on screen and the conversation then
+carried it out of view. The conversation still believed it was on its latest
+message. Playwright's first jump to the old reply arrives as a single scroll
+event, and one run's scroll log showed stick-to-bottom animating to the end
+after it. The likely gap, not confirmed in a failing run because instrumenting
+one changed its timing: `useLatestFirst` listens for the reader going up only
+while earlier messages remain to be drawn, and the library ignores scroll
+events for a frame after a resize, so a single jump in the frame the last
+stretch is drawn is noticed by neither. The journey now leaves the latest
+message with the wheel first, as a reader does, and passed four runs of four.
+A reader's own single jump in that frame (Home, a scrollbar click) would be
+carried back down by the next growth; that was not reproduced by hand.
+
+**+1:** 2026-10-04 — review of #336, `codex/speed-snappiness`.
 
 ### AF-089 — Size a narrow-layout fix by the space it has
 
