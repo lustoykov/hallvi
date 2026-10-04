@@ -804,6 +804,10 @@ reproduced on unchanged main at `fc9d428c`. The check picked the first home
 entry, which can have no deployment or access header. It now uses the named
 deployed scenario, preserving the assertions that no Open link appears before
 the held access request resolves.
+The new reconnect assertion also exposed that a 300 ms offline toggle can
+leave an existing SSE stream alive. The journey now ends the real response
+through a disposable proxy and checks the browser's reconnect marker and
+fresh full frame; missed updates and open disclosures survive that drop.
 
 **+1:** 2026-09-30 — sidebar footer Hallvi menu (`claude/sidebar-footer-menu`)
 **+1:** 2026-09-30 — settings redesign (`claude/settings-redesign`): on main,

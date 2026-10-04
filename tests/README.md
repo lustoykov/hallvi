@@ -115,7 +115,9 @@ removals and optional-field clearing. `unit/pi-stream.test.ts` checks fresh
 reads, notices during the initial read and full automatic reconnects.
 `long-history-responses.spec.ts` verifies that unchanged page collections are
 acknowledged, then keeps old evidence disclosures and live output usable through updates and
-reconnect. Its opt-in profile compares full and incremental responses on the
+reconnect. A disposable proxy ends the actual SSE response; the journey checks
+the browser's `Last-Event-ID` and fresh full reconnect frame, since a short
+offline toggle can leave the existing connection alive. Its opt-in profile compares full and incremental responses on the
 same warmed, production-built Next fixture with 1/5/10 real browser readers:
 `HALLVI_QA_PRODUCTION=1 HALLVI_RESPONSE_PROFILE=1 HALLVI_E2E_PORT=3960 npm run test:e2e -- long-history-responses.spec.ts --grep 'profile warm' --reporter=list`.
 Choose a free QA port. Fixture build and first-connect work are outside the
