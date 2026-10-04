@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { currentAccessRecord } from "@/server/access-record";
 import {
   applyChatFrame,
+  initialChatBaseline,
   keepUnchanged,
   type ChatFrame,
 } from "@/lib/chat-stream";
@@ -190,6 +191,9 @@ export function OperatorShell({
   const [view, setView] = useState(
     () => JSON.parse(initialView) as OperatorView,
   );
+  // Consume an exact HTTP/page baseline once. Its records stay paired with
+  // the fingerprint even if another action or stream changes the held view.
+  const bootstrap = useRef(initialChatBaseline(view));
   /**
    * Whether a message can be sent at all. This arrives with the page, but
    * the reader may have just connected a model — in this tab or another one
@@ -426,22 +430,29 @@ export function OperatorShell({
     if (observedMainId) observedChats.add(observedMainId);
     const subscriptions = [...observedChats].map((chatId) => {
       let outcomeVersion = "";
-      // Each observed chat owns a stream baseline. POST/SSR views arrive
-      // independently; reconnect replaces it with authoritative full state.
+      // Each observed chat owns a stream baseline. The first connection can
+      // reuse its page records; reconnect replaces them with fresh full state.
       let streamed: ChatSnapshot | null = null;
+      let initialBaseline =
+        bootstrap.current?.applicationId === applicationId &&
+        bootstrap.current.chatId === chatId
+          ? bootstrap.current
+          : null;
       const stream = new EventSource(
-        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1`,
+        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1${
+          initialBaseline ? `&baseline=${initialBaseline.token}` : ""
+        }`,
       );
       stream.onopen = () => setReconnecting(false);
       stream.onerror = () => setReconnecting(true);
       stream.onmessage = (event) => {
         if (!active) return;
         const frame = JSON.parse(event.data) as ChatFrame;
-        // A connection opens with everything, most of it already here: the
-        // page was drawn from it, or the last connection left it.
+        // An acknowledgement reuses its exact page records. A full frame can
+        // repeat held records after a reconnect, so retain their identities.
         const snapshot =
           "type" in frame
-            ? applyChatFrame(streamed, frame)
+            ? applyChatFrame(streamed, frame, initialBaseline?.collections)
             : keepUnchanged(
                 streamed ??
                   (held.current.selectedChatId === chatId
@@ -449,6 +460,10 @@ export function OperatorShell({
                     : null),
                 frame,
               );
+        // Consume only after receiving state, so a cancelled opening (including
+        // Strict Mode's effect restart) can still use its exact page records.
+        if (bootstrap.current === initialBaseline) bootstrap.current = null;
+        initialBaseline = null;
         streamed = snapshot;
         observedSnapshots.set(`${applicationId}/${chatId}`, snapshot);
         if (chatId === mainChatId)
@@ -524,6 +539,7 @@ export function OperatorShell({
         }
       };
       return () => {
+        initialBaseline = null;
         streamed = null;
         stream.close();
       };
@@ -560,12 +576,16 @@ export function OperatorShell({
     // unchanged baseline must not hide a newer HTTP view during a disconnect.
     const key = `${next.application?.id}/${next.selectedChatId}`;
     const snapshot = streamSnapshots.current.get(key);
-    setView(
+    const applied =
       snapshot && snapshot !== observedBefore.get(key)
-        ? { ...next, ...snapshot }
+        ? { ...next, ...snapshot, chatStreamBaseline: undefined }
         : // The response repeats the conversation the stream delivered.
-          keepUnchanged(snapshot, next),
-    );
+          keepUnchanged(snapshot, next);
+    bootstrap.current =
+      applied.selectedChatId !== held.current.selectedChatId
+        ? initialChatBaseline(applied)
+        : null;
+    setView(applied);
     // The transcript is navigable state; keep it when this page is refreshed.
     const url = new URL(window.location.href);
     if (next.selectedChatId) url.searchParams.set("chat", next.selectedChatId);

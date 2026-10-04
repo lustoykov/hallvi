@@ -9,6 +9,7 @@ import { loadChat } from "@/server/applications";
 import { subscribeChanges } from "@/server/change-notifications";
 import { invalidateExecutionReads } from "@/server/operator-execution";
 import { ChatFrames } from "@/server/chat-frames";
+import { initialChatFrame } from "@/server/chat-stream-baseline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,13 +25,25 @@ export async function GET(
     const frames = new ChatFrames();
     // Installed clients may reconnect with JavaScript from before an upgrade.
     // Only clients that can apply changes opt in; the old URL stays full-state.
-    const incremental =
-      new URL(request.url).searchParams.get("changes") === "1";
+    const parameters = new URL(request.url).searchParams;
+    const incremental = parameters.get("changes") === "1";
+    // EventSource carries the first frame's id on automatic reconnect. It is
+    // only a reconnect marker, never a cursor or retained server-side state.
+    const baseline = request.headers.has("last-event-id")
+      ? null
+      : parameters.get("baseline");
     let latestFull = "";
     let initial = "";
-    const encode = (snapshot: Awaited<ReturnType<typeof chatSnapshot>>) => {
+    const encode = (
+      snapshot: Awaited<ReturnType<typeof chatSnapshot>>,
+      first = false,
+    ) => {
       if (incremental) {
         const frame = frames.next(snapshot);
+        if (first)
+          return JSON.stringify(
+            initialChatFrame(applicationId, chatId, snapshot, baseline),
+          );
         return frame ? JSON.stringify(frame) : undefined;
       }
       const text = JSON.stringify(snapshot);
@@ -129,7 +142,7 @@ export async function GET(
       lastReadAt = Date.now();
       const snapshot = await chatSnapshot(applicationId, chatId);
       request.signal.throwIfAborted();
-      initial = encode(snapshot)!;
+      initial = encode(snapshot, true)!;
     } catch (error) {
       clean();
       throw error;
@@ -144,7 +157,9 @@ export async function GET(
         }
         // Reconnect always starts with authoritative latest state; no token
         // history, cursor retention, or missed frame can lose an accepted run.
-        send(`data: ${initial}\n\n`);
+        send(
+          `${incremental && baseline ? "id: ready\n" : ""}data: ${initial}\n\n`,
+        );
         initial = "";
         if (generation !== initialGeneration) schedule();
         heartbeat = setInterval(() => send(": keep-alive\n\n"), 15_000);

@@ -1,5 +1,6 @@
 import { controllerProtectionFacts } from "./controller-protection";
 import { chatSnapshot } from "./pi-conversation";
+import { chatStreamBaseline } from "./chat-stream-baseline";
 import { deploymentStatus } from "./deployment-automation";
 import { listExecutions } from "./operator-execution";
 import { listSecrets } from "./application-secrets";
@@ -24,6 +25,15 @@ export async function getOperatorView(
     : null;
   return {
     ...view,
+    ...(conversation && view.selectedChatId
+      ? {
+          chatStreamBaseline: chatStreamBaseline(
+            applicationId,
+            view.selectedChatId,
+            conversation,
+          ),
+        }
+      : {}),
     executions:
       conversation?.executions ?? (await listExecutions(applicationId)),
     piActivity: conversation?.piActivity ?? [],

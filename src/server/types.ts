@@ -106,8 +106,8 @@ export interface Observation {
 }
 
 /**
- * The authoritative Chat state returned on demand and at SSE connect. Clients
- * opting into changes reconstruct this same shape for subsequent updates.
+ * The authoritative Chat state returned on demand. Incremental SSE clients
+ * reconstruct this same shape from their initial and subsequent frames.
  */
 export interface ChatSnapshot {
   status: import("./operator-data").ConversationStatus;
@@ -122,6 +122,8 @@ export interface ChatSnapshot {
 
 /** The application page: conversations and the shared application records. */
 export interface OperatorView {
+  /** Versioned fingerprints for the exact conversation collections below. */
+  chatStreamBaseline?: string;
   executions?: import("./operator-execution").ExecutionRecord[];
   /** Whether the worker that owns Pi's sessions answered. */
   worker?: { alive: boolean };
@@ -162,7 +164,12 @@ export interface OperatorView {
 /** Periodic application facts; conversation state arrives through SSE. */
 export type OperatorMetadata = Omit<
   OperatorView,
-  "messages" | "executions" | "piActivity" | "worker" | "information"
+  | "messages"
+  | "executions"
+  | "piActivity"
+  | "worker"
+  | "information"
+  | "chatStreamBaseline"
 >;
 
 export interface CreateApplicationInput {

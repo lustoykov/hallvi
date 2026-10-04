@@ -1,6 +1,10 @@
 import { expect, it, vi } from "vitest";
 import { ChatFrames } from "../../../src/server/chat-frames";
 import {
+  chatStreamBaseline,
+  initialChatFrame,
+} from "../../../src/server/chat-stream-baseline";
+import {
   applyChatFrame,
   keepUnchanged,
   type ChatFrame,
@@ -26,6 +30,52 @@ function history(): ChatSnapshot {
     }),
   };
 }
+
+it("hands off unchanged page collections and preserves changes, removals and current status", () => {
+  const page = wire(history());
+  const baseline = chatStreamBaseline("app", "chat", page);
+  const acknowledgement = initialChatFrame("app", "chat", wire(page), baseline);
+  expect(acknowledgement).toEqual({
+    type: "initial",
+    status: "idle",
+    worker: { alive: true },
+  });
+  const held = applyChatFrame(null, wire(acknowledgement), page);
+  expect(held).toEqual(page);
+  expect(held.messages).toBe(page.messages);
+  expect(held.executions).toBe(page.executions);
+
+  const latest = wire(page);
+  latest.messages = latest.messages.slice(1).reverse();
+  latest.messages.at(-1)!.body += " updated before subscribing";
+  latest.information = [];
+  latest.worker.alive = false;
+  latest.status = "working";
+  const first = initialChatFrame("app", "chat", latest, baseline);
+  expect(first).toHaveProperty("messages", latest.messages);
+  expect(first).not.toHaveProperty("executions");
+  expect(first).not.toHaveProperty("piActivity");
+  const client = applyChatFrame(null, wire(first), page);
+  expect(client).toEqual(latest);
+  expect(client.messages[0]).toBe(page.messages.at(-1));
+  expect(client.executions).toBe(page.executions);
+  expect(() => applyChatFrame(null, first)).toThrow("no page baseline");
+});
+
+it("binds page fingerprints to their conversation and falls back for older wire versions", () => {
+  const page = wire(history());
+  const baseline = chatStreamBaseline("app", "chat", page);
+  for (const [app, chat] of [
+    ["other-app", "chat"],
+    ["app", "other-chat"],
+  ]) {
+    const first = initialChatFrame(app, chat, page, baseline);
+    for (const key of ["messages", "executions", "piActivity", "information"])
+      expect(first).toHaveProperty(key);
+  }
+  for (const token of [null, "", "1.bad", baseline.replace(/^1/, "2")])
+    expect(initialChatFrame("app", "chat", page, token)).toBe(page);
+});
 
 it("never serializes freshly reconstructed unchanged history while finding changes", () => {
   const encoder = new ChatFrames();
