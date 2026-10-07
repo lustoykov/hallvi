@@ -12,6 +12,7 @@ import type { BrowserContext, CDPSession, Page } from "@playwright/test";
 import { longHistory } from "../fixtures/long-history";
 import { test, expect } from "./fixtures";
 import { scriptWorker } from "./scripted-worker";
+import { openConversation } from "./workspace-helpers";
 
 // Timing profiles must not record every full history in Playwright's trace.
 test.use({ scriptedWorker: true, notificationMetrics: true, trace: "off" });
@@ -135,7 +136,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
             }
           ).qaInitialFrames,
       );
-    await page.goto(`/applications/${app}`);
+    await page.goto(`/applications/${app}?chat=${chat}`);
     await expect
       .poll(async () => (await received())[0])
       .toEqual({
@@ -372,7 +373,7 @@ for (const count of [1, 5, 10]) {
       ).json();
     try {
       // Warm SSR and handlers; each mode uses the same code and data.
-      await page.goto(`/applications/${app}`);
+      await page.goto(`/applications/${app}?chat=${chat}`);
       await expect(page.locator(`#execution-${last.id}`)).toBeVisible();
       await page.goto("about:blank");
       recordEvent({ stage: "warm" });
@@ -461,7 +462,7 @@ for (const count of [1, 5, 10]) {
           const connected = reader.waitForResponse((response) =>
             new URL(response.url()).pathname.endsWith(`/chats/${chat}/events`),
           );
-          await reader.goto(`/applications/${app}`);
+          await reader.goto(`/applications/${app}?chat=${chat}`);
           recordEvent({ stage: "loaded", incremental, reader: index });
           await connected;
           recordEvent({ stage: "sse-response", incremental, reader: index });
@@ -577,7 +578,7 @@ for (const count of [1, 5, 10]) {
   });
 }
 
-test.describe("opening a long conversation from the list", () => {
+test.describe("opening an application from the list and choosing its conversation", () => {
   test.skip(
     process.env.HALLVI_OPEN_PROFILE !== "1",
     "Opt-in timing; the journey above checks where a conversation opens.",
@@ -628,7 +629,13 @@ test.describe("opening a long conversation from the list", () => {
                 ?.closest(".hv-conversation")
                 ?.getBoundingClientRect();
               const box = reply?.getBoundingClientRect();
-              if (box && port && box.bottom > port.top && box.top < port.bottom)
+              if (
+                !reply?.closest(".hv-chat-parked") &&
+                box &&
+                port &&
+                box.bottom > port.top &&
+                box.top < port.bottom
+              )
                 marks.latestOnScreen ??= performance.now();
               if (document.getElementById("hv-message-asked:0"))
                 marks.allDrawn ??= performance.now();
@@ -638,6 +645,7 @@ test.describe("opening a long conversation from the list", () => {
             requestAnimationFrame(watch);
           }, latest);
           await open.click();
+          await openConversation(page);
           await expect(page.locator('[id="hv-message-asked:0"]')).toBeAttached({
             timeout: 60_000,
           });

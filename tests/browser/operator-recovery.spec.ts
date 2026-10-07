@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures";
 
@@ -32,6 +33,7 @@ test("recovered operator reads clear their own error and preserve uncertain or r
     healthyReads += 1;
   });
   await page.goto(`/applications/${appId}`);
+  await openConversation(page);
   const console = page.locator(".hv-operator-console");
   const alert = console.getByRole("alert");
   const composer = page.getByRole("textbox", { name: "Message Hallvi" });

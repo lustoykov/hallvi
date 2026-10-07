@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures";
 import { exchange, scriptWorker } from "./scripted-worker";
@@ -49,6 +50,7 @@ test("Pi text stays once in order through completion and reload @journey-streami
   const runId = "reply:asked";
   try {
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const message = page.locator(`[id="hv-message-${runId}"]`);
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
     // What the group line actually says. It counts and pluralises — "1 file
@@ -150,6 +152,7 @@ test("a native failure reason after a successful status read remains visible aft
   });
   try {
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const message = page.locator('[id="hv-message-reply:asked"]');
     await expect(
       message.getByText(/The model stopped: HTTP 400 context window exceeded/),

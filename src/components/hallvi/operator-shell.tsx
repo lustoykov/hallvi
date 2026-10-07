@@ -126,10 +126,13 @@ export function OperatorShell({
   identityVariant?: IdentityVariant;
 }) {
   const router = useRouter();
-  // Until the first response arrives a view cannot honestly say a resource
-  // is absent, so it shows the shape of the answer instead.
+  const [view, setView] = useState(
+    () => JSON.parse(initialView) as OperatorView,
+  );
+  // A plain application link opens Overview; conversation and destination
+  // links restore their explicit selection below.
   const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
-    null,
+    "overview",
   );
   const recordVisible = activeSection !== null;
   const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
@@ -142,9 +145,9 @@ export function OperatorShell({
     const initiatingControl = document.activeElement;
     setActiveSection(section);
     const url = new URL(window.location.href);
-    const hash = section ? `#${section}` : "";
-    if (url.hash !== hash) {
-      url.hash = hash;
+    url.hash = section ? `#${section}` : "";
+    if (!section) url.searchParams.set("chat", view.selectedChatId ?? "");
+    if (url.href !== window.location.href) {
       window.history.pushState(null, "", url);
     }
     if (section)
@@ -168,16 +171,20 @@ export function OperatorShell({
   }
   useEffect(() => {
     const restore = () => {
-      const hash = window.location.hash;
+      const url = new URL(window.location.href);
+      const hash = url.hash;
       const section = sectionFromHash(hash);
+      const conversation =
+        hash.startsWith("#record-") ||
+        (!hash &&
+          (url.searchParams.has("chat") || url.searchParams.has("message")));
       // A hash that names no page would leave the URL saying one thing and
       // the screen another. Record links (`#record-…`) belong to the chat.
       if (!section && hash && !hash.startsWith("#record-")) {
-        const url = new URL(window.location.href);
-        url.hash = "";
+        url.hash = "#overview";
         window.history.replaceState(null, "", url);
       }
-      setActiveSection(section);
+      setActiveSection(section ?? (conversation ? null : "overview"));
     };
     const timer = window.setTimeout(restore, 0);
     window.addEventListener("popstate", restore);
@@ -188,9 +195,6 @@ export function OperatorShell({
       window.removeEventListener("hashchange", restore);
     };
   }, []);
-  const [view, setView] = useState(
-    () => JSON.parse(initialView) as OperatorView,
-  );
   // Consume an exact HTTP/page baseline once. Its records stay paired with
   // the fingerprint even if another action or stream changes the held view.
   const bootstrap = useRef(initialChatBaseline(view));
@@ -588,8 +592,12 @@ export function OperatorShell({
     setView(applied);
     // The transcript is navigable state; keep it when this page is refreshed.
     const url = new URL(window.location.href);
-    if (next.selectedChatId) url.searchParams.set("chat", next.selectedChatId);
-    else url.searchParams.delete("chat");
+    // Keep a plain application URL on Overview when an action finishes there.
+    if (url.hash || url.searchParams.has("chat")) {
+      if (next.selectedChatId)
+        url.searchParams.set("chat", next.selectedChatId);
+      else url.searchParams.delete("chat");
+    }
     window.history.replaceState(null, "", url);
   }
 
@@ -1145,7 +1153,7 @@ export function OperatorShell({
                         onClick={closeSection}
                       >
                         <ArrowLeft aria-hidden="true" />
-                        Back to {activeChat?.title ?? "the conversation"}
+                        Open {activeChat?.title ?? "the conversation"}
                       </button>
                     </div>
                   }

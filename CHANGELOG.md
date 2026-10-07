@@ -4,6 +4,15 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.18 — 7 October 2026
+
+Open an application on Overview, with steadier navigation and long conversations.
+
+- **Overview is the starting view.** Opening an application from the list or application switcher starts on Overview. Choose Main operator or a side conversation in the sidebar to talk to Hallvi; conversation links, refresh and browser Back/Forward keep the selected view.
+- **Long conversations stay in place.** Moving between a destination and a conversation keeps the messages and drafts already loaded, and opening a conversation avoids downloading the same history twice.
+- **Clearer navigation and narrow layouts.** Sidebar groups, tables, keyboard focus and background refresh are more consistent, and conversation controls and dialogs remain usable in narrow windows.
+- **Updated Next.js.** This release includes the Next.js 16.3.8 update.
+
 ## 0.1.1-alpha.17 — 2 October 2026
 
 Hallvi's operator now runs on Pi 1.0. Your applications are as they were, and conversations start fresh.

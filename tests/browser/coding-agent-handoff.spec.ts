@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -84,6 +85,7 @@ test("a saved Markdown problem packet is copied whole and survives refresh @jour
       .context()
       .grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/applications/" + appId);
+    await openConversation(page);
     const record = page.locator('[data-information-id="' + id + '"]');
     await expect(record).toContainText("Running revision:");
     await expect(record).toContainText(
