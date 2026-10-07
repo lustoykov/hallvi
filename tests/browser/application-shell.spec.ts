@@ -1,10 +1,11 @@
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
+import { openConversation } from "./workspace-helpers";
 
 test(
   "application conversations preserve drafts and messages across navigation and reload",
   journey("application-shell"),
-  async ({ page }) => {
+  async ({ page }, testInfo) => {
     // This journey first compiles creation, chat selection and message routes.
     // Bound each HTTP acceptance separately; the first route transition also
     // waits for a cold Next dev compilation on shared CI runners.
@@ -21,9 +22,31 @@ test(
     });
     const nav = page.getByRole("navigation", { name: "Application workspace" });
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    const overview = page.getByRole("heading", {
+      name: "Overview",
+      exact: true,
+    });
+    await expect(overview).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Overview", exact: true }),
-    ).toHaveCount(1);
+      nav.getByRole("button", { name: "Overview", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    const conversation = page.locator(".hv-chat-column:not(.hv-chat-parked)");
+    await expect(conversation).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("default-overview.png"),
+    });
+    await page.reload();
+    await expect(overview).toBeVisible();
+    await openConversation(page);
+    expect(new URL(page.url()).searchParams.get("chat")).toMatch(
+      /^[\da-f-]{36}$/,
+    );
+    await page.goBack();
+    await expect(overview).toBeVisible();
+    await page.goForward();
+    await expect(conversation).toBeVisible();
+    await page.reload();
+    await expect(conversation).toBeVisible();
     await composer.fill("First conversation draft");
     const chatsUrl = new URL(
       `/api${new URL(page.url()).pathname}/chats`,
@@ -271,6 +294,7 @@ test(
     // Independently named deployments of one repository must stay
     // distinguishable at the point where the owner chooses a target.
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    await openConversation(page);
     await composer.fill("Only staging should receive this draft.");
     await page
       .getByRole("button", { name: "Switch application: Staging", exact: true })
@@ -302,6 +326,10 @@ test(
         exact: true,
       }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Overview", exact: true }),
+    ).toBeVisible();
+    await openConversation(page);
     await expect(composer).toHaveValue("");
     await page
       .getByRole("button", { name: "Switch application: My app", exact: true })
@@ -310,6 +338,7 @@ test(
       .getByRole("link", { name: "Staging qa/same-source", exact: true })
       .click();
     await expect(page).toHaveURL(new RegExp(`${ids[1]}$`));
+    await openConversation(page);
     await expect(composer).toHaveValue(
       "Only staging should receive this draft.",
     );

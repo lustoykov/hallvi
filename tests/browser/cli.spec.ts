@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -290,7 +291,9 @@ test("in Always ask a CLI request stops at the approval with nothing run, and ap
   // Approval and completion must arrive through SSE, without a reload.
   const observer = await page.context().newPage();
   await page.goto(`/applications/${app.id}`);
+  await openConversation(page);
   await observer.goto(`/applications/${app.id}`);
+  await openConversation(observer);
   const request = "Ask me first [mark]";
   const asked = hallvi(
     "exec",

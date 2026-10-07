@@ -79,6 +79,11 @@ Start with one concrete application per tier. Complete and obtain owner acceptan
 
 ## Draft deployment happy path
 
+Opening an application without a destination or conversation link starts on
+Overview. Main operator and side conversations remain one click away in the
+sidebar; an explicit conversation link opens that conversation. Refresh and
+browser Back/Forward preserve the chosen view.
+
 ### Proposed implementation checkpoints
 
 The architectural direction is sufficiently clear to begin bounded implementation after agreeing the first stage. Resolve remaining details inside the smallest relevant stage rather than planning every vertical up front. Each stage should produce a coherent diff, something the user can try, a short account of verification and limitations, and a list of obsolete machinery removed. Offer review between stages rather than accumulating one large redesign.

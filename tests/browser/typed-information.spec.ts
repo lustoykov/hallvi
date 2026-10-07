@@ -139,7 +139,7 @@ test("records render in chat and their views, survive refresh, and update by rec
         said: [],
       };
     });
-    await page.goto(`/applications/${appId}`);
+    await page.goto(`/applications/${appId}?chat=${chatId}`);
     const chat = page.locator(".hv-chat-pane");
     const cards = (scope: typeof chat) =>
       scope.locator("[data-information-id]");

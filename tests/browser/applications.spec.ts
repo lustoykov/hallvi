@@ -16,6 +16,7 @@ async function addApplication(page: Page, name: string) {
   await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {
     timeout: 30_000,
   });
+  await openConversation(page);
   return new URL(page.url()).pathname;
 }
 async function view(page: Page) {
@@ -371,6 +372,7 @@ test(
     ).toBeVisible();
     await expect(page.getByText("Pick what Hallvi thinks with")).toBeVisible();
     await page.goto(path);
+    await openConversation(page);
     // A draft can still be written; it cannot be sent until ChatGPT is back.
     await page
       .getByRole("textbox", { name: "Message Hallvi" })

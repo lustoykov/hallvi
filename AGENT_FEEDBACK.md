@@ -18,7 +18,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 9 | Partially fixed |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 10 | Partially fixed |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -61,8 +61,24 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | New |
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 | [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; product gap open |
+| [AF-091 — Share the initial clock when Overview hydrates](#af-091--share-the-initial-clock-when-overview-hydrates) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-091 — Share the initial clock when Overview hydrates
+
+Opening Overview first brought its relative dates into the server-rendered
+page. Browser journeys with a fixed clock then reported hydration mismatches:
+the server said “8 d ago” while the browser said “2 min ago”. Different clocks
+or crossing a relative-date threshold can produce the same mismatch outside
+fixtures. The initial page now supplies one timestamp to both renders; ordinary
+client clock updates continue afterwards. Explicit conversation links also
+select their initial view on the server.
+
+**+1:** 2026-10-07 — Overview default and alpha.18,
+`codex/overview-default-release`.
+
+**Status:** Fix in review in [#338](https://github.com/lustoykov/hallvi/pull/338).
 
 ### AF-090 — Notice a reader who jumps up as the last earlier messages are drawn
 
@@ -869,6 +885,15 @@ failed since #179 reworded the Storage & privacy popover on 20 September
 workflow was switched off, and it surfaced only because a later step of the same
 test changed. A cheap way to see which journeys currently fail on main would
 separate old breakage from a new change's.
+
+**+1:** 2026-10-07 — Overview as the default view,
+`codex/overview-default-release`: the application-workspace smoke journey only
+counted the Overview button while assuming the conversation was open. It now
+checks the initial Overview, refresh, explicit conversation selection and
+Back/Forward. The shared conversation-opening helper also mistook a parked,
+transparent, inert transcript for an open one; it now checks the active pane.
+Application-switching checks open the conversation explicitly before inspecting
+its draft. The GitHub checks workflow remains disabled.
 
 **+1:** 2026-10-04 — practical performance fixes,
 `codex/speed-stream-handoff`: the access-loading journey's failure was already

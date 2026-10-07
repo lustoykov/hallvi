@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
+import { openConversation } from "./workspace-helpers";
 
 test("contextual questions preserve a draft across tab closure and return to their destination", async ({
   page,
@@ -18,6 +19,7 @@ test("contextual questions preserve a draft across tab closure and return to the
   const created = await response.json();
   const path = `/applications/${created.application.id}`;
   await page.goto(path);
+  await openConversation(page);
   const draft = "Keep this question exactly as I wrote it.";
   await page.getByRole("textbox", { name: "Message Hallvi" }).fill(draft);
   await page
@@ -39,6 +41,7 @@ test("contextual questions preserve a draft across tab closure and return to the
   const returned = await context.newPage();
   try {
     await returned.goto(`${fixture.url}${path}`);
+    await openConversation(returned);
     const composer = returned.getByRole("textbox", { name: "Message Hallvi" });
     await expect(composer).toHaveValue(draft);
     await expect(
@@ -151,6 +154,7 @@ test("Send next and Steer wait on active work, and Stop settles them as not star
     ).messages.slice(1);
   try {
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     // The fixture model holds this answer open, as a long command would.
     await composer.fill("Inspect the application [hold]");
@@ -225,6 +229,7 @@ test("a late POST response preserves identical text typed after SSE acceptance",
   expect(response.ok()).toBe(true);
   const view = await response.json();
   await page.goto(`/applications/${view.application.id}`);
+  await openConversation(page);
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;

@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
@@ -77,6 +78,7 @@ test("a requested secret is supplied once through its masked field and stays out
     });
     page.on("console", (message) => console.push(message.text()));
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const field = page.getByLabel(name, { exact: false });
     await expect(field).toHaveAttribute("type", "password");
     await field.fill(value);

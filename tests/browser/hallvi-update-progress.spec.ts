@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { expect, test } from "./fixtures";
 
 test("Hallvi update stays visible and reload preserves drafts and uncertain message keys", async ({
@@ -83,6 +84,7 @@ test("Hallvi update stays visible and reload preserves drafts and uncertain mess
     },
   );
   await page.goto(`/applications/${application.id}`);
+  await openConversation(page);
   // This version comes from a client effect, so the composer is hydrated too.
   await expect(
     page.getByRole("button", { name: /Hallvi 0\.1\.1-alpha\.1/ }),

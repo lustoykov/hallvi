@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -39,6 +40,7 @@ test("without a worker nothing is accepted; after a restart nothing runs until t
   let next: ChildProcess | undefined;
   try {
     await page.goto(`/applications/${view.application.id}`);
+    await openConversation(page);
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
     await composer.fill("Inspect the application [hold]");
     await page.getByRole("button", { name: "Send", exact: true }).click();

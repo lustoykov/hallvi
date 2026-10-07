@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -276,6 +277,7 @@ test("private route observations stay with their route, survive refresh and lose
     await expect(header.getByText("Private connection open")).toBeVisible();
     await expect(page.getByText("Answering", { exact: true })).toHaveCount(0);
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const chat = page.locator(".hv-chat-pane");
     await expect(
       chat.locator(`a[href="${selected.presentation!.url}"]`),

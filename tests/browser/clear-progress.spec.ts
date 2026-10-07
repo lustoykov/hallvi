@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -123,6 +124,7 @@ test("current work keeps findings in order and waits for the owner", async ({
       ).ok(),
     ).toBe(true);
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const line = page.locator(".hv-still-working");
     await expect(line).toContainText("Waiting for approval to run a command");
     await expect(
@@ -387,6 +389,7 @@ test.describe("interruption evidence in the existing recovery panel", () => {
     }));
     try {
       await page.goto(`/applications/${applicationId}`);
+      await openConversation(page);
       const panel = page
         .locator(".hv-pi-required")
         .filter({ hasText: "This conversation was interrupted" });

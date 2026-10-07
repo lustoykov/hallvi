@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -76,6 +77,7 @@ test("server output streams inline, preserves reading position and stays readabl
     // A command earns a card once there is output to watch.
     update({ output: "Pulling images" });
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const card = page.locator(`#execution-${executionId}`);
     const output = card.getByRole("region", { name: "Command output" });
     await expect(output).toContainText("Pulling images");

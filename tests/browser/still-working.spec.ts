@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 // "Pi is still working in this conversation."
 //
 // The owner read a finished-looking answer, typed the next thing, and met
@@ -104,6 +105,7 @@ test(
     update({});
 
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
 
     // The reply itself says which machine, and that the command has gone
     // quiet, rather than "Working for 2m 30s" over a command that may be
@@ -202,6 +204,7 @@ test(
     );
 
     await page.goto(`/applications/${appId}`);
+    await openConversation(page);
     const chip = page.locator(".hv-secrets-chip");
     const request = page.getByText("GF_SECURITY_ADMIN_PASSWORD").first();
     await expect(request).toBeVisible();
