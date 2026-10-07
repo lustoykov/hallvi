@@ -143,8 +143,13 @@ export function OperatorShell({
   const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
   const [now, setNow] = useState(initialNow);
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
+    const tick = () => setNow(Date.now());
+    const initial = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 30_000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, []);
   function selectSection(section: ApplicationSection | null) {
     const initiatingControl = document.activeElement;
