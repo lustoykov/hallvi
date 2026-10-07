@@ -18,7 +18,7 @@ export default async function ApplicationPage({
     message?: string | string[];
   }>;
 }) {
-  const [{ applicationId }, { chat }] = await Promise.all([
+  const [{ applicationId }, { chat, message }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -32,9 +32,19 @@ export default async function ApplicationPage({
     if (error instanceof NotFoundError) notFound();
     throw error;
   }
+  // This dynamic server page takes the clock snapshot; the client receives
+  // the same value for hydration instead of reading its own clock on mount.
+  // eslint-disable-next-line react-hooks/purity
+  const initialNow = Date.now();
   return (
     <OperatorShell
       key={applicationId}
+      initialNow={initialNow}
+      initialSection={
+        typeof chat === "string" || typeof message === "string"
+          ? null
+          : "overview"
+      }
       // Only the QA fixture runs under a fixture root: its repositories are
       // synthetic, so GitHub links are shown but never followed.
       demo={Boolean(process.env.HALLVI_QA_ROOT)}

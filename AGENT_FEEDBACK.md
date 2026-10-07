@@ -61,8 +61,24 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | New |
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 | [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; product gap open |
+| [AF-091 — Share the initial clock when Overview hydrates](#af-091--share-the-initial-clock-when-overview-hydrates) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-091 — Share the initial clock when Overview hydrates
+
+Opening Overview first brought its relative dates into the server-rendered
+page. Browser journeys with a fixed clock then reported hydration mismatches:
+the server said “8 d ago” while the browser said “2 min ago”. Different clocks
+or crossing a relative-date threshold can produce the same mismatch outside
+fixtures. The initial page now supplies one timestamp to both renders; ordinary
+client clock updates continue afterwards. Explicit conversation links also
+select their initial view on the server.
+
+**+1:** 2026-10-07 — Overview default and alpha.18,
+`codex/overview-default-release`.
+
+**Status:** Fix in review in [#338](https://github.com/lustoykov/hallvi/pull/338).
 
 ### AF-090 — Notice a reader who jumps up as the last earlier messages are drawn
 

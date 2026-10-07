@@ -101,6 +101,8 @@ export function mergeOperatorMetadata(
 
 export function OperatorShell({
   initialView,
+  initialNow,
+  initialSection,
   initialPiSetup,
   applications,
   demo = false,
@@ -113,6 +115,9 @@ export function OperatorShell({
    * here one value at a time. As one string it is copied and parsed once.
    */
   initialView: string;
+  /** The server's clock, shared with the first client render. */
+  initialNow: number;
+  initialSection: ApplicationSection | null;
   initialPiSetup: PiSetupStatus;
   applications: Pick<
     ApplicationRecord,
@@ -132,11 +137,11 @@ export function OperatorShell({
   // A plain application link opens Overview; conversation and destination
   // links restore their explicit selection below.
   const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
-    "overview",
+    initialSection,
   );
   const recordVisible = activeSection !== null;
   const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(initialNow);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
