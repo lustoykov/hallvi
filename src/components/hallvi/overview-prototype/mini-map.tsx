@@ -13,7 +13,6 @@ import { useMemo } from "react";
 import {
   BOX,
   layoutFor,
-  MAP_H,
   MAP_TOP,
   MAP_W,
 } from "../architecture-prototype/journey-v2";
@@ -166,7 +165,7 @@ export function MiniMap({
             x={server.x + 50}
             y={BOX.header.y + 36}
           >
-            {host?.name ?? "Your server"}
+            {fit(host?.name ?? "Your server", server.w, 25, 70)}
           </text>
         </g>
         {services.length > 0 && (

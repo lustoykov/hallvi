@@ -447,6 +447,13 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 ## Layout
 
+**Architecture keeps room for its labels.** The diagram has a 1120px minimum
+canvas width; narrow views scroll inside the diagram and show a scroll hint.
+Cards keep their reading size, and the source repository and Hallvi controller
+have separate places with a 32px gap. Endpoint labels stay in their routing
+lanes; the Connections list carries the full text. Long server names truncate
+in the header and miniature, with the full name in the node's details.
+
 **One top bar, and it is white (24 September).** Settings, the four setup
 screens and Add application wear the shell's own 56px bar: white, a `line`
 hairline under it, ink on it, the mark and name at the left and one back link

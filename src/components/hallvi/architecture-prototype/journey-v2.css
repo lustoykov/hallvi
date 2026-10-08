@@ -10,6 +10,7 @@
 
 .axj2 {
   position: relative;
+  container-type: inline-size;
   display: grid;
   gap: 10px;
 }
@@ -82,6 +83,26 @@
 
 /* ---------- The stage: a quiet canvas ---------- */
 
+.axj2-scroll-hint {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.axj2-scroll-hint svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+@container (max-width: 1119px) {
+  .axj2-scroll-hint {
+    display: flex;
+  }
+}
+
 .axj2-viewport {
   min-width: 0;
   overflow: auto;
@@ -93,7 +114,7 @@
   outline-offset: -2px;
 }
 .axj2-stage {
-  min-width: 900px;
+  min-width: 1120px;
   position: relative;
   width: 100%;
   aspect-ratio: 1120 / 500;
@@ -199,6 +220,9 @@
   background: rgb(255 255 255 / 70%);
 }
 .axj2-server-head b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
@@ -213,12 +237,14 @@
   color: var(--ax-muted);
 }
 .axj2-server-head .axj2-icon {
+  flex: none;
   width: 30px;
   height: 30px;
   border-radius: 9px;
 }
 .axj2-server-head .axj2-status {
-  margin-left: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .axj2-region {
   position: absolute;
@@ -737,10 +763,12 @@
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.012em;
+  overflow-wrap: anywhere;
 }
 .axj2-pop header small {
   font-size: 12px;
   color: var(--ax-muted);
+  overflow-wrap: anywhere;
 }
 .axj2-pop header button {
   display: grid;
@@ -761,6 +789,7 @@
   margin: 12px 0 0;
   font-size: 13.5px;
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 .axj2-pop-evidence {
   display: grid;
@@ -777,6 +806,7 @@
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
 }
 .axj2-pop-evidence .ax-invented {
   margin-left: 6px;
@@ -1014,6 +1044,7 @@
 .axj3-title h1 {
   margin: 0;
   font-size: 24px;
+  line-height: var(--button-height);
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--ax-ink);
@@ -1434,6 +1465,10 @@
   padding: 2px 5px;
   border-radius: 4px;
   pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateY(-50%);
 }
 .axj2-connections {
   margin: 20px 0 36px;
@@ -1464,6 +1499,11 @@
   padding: 12px 0;
   font-size: 12px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.axj2-connection > *,
+.axj2-connection-check summary > * {
+  min-width: 0;
 }
 .axj2-connection > span:first-child {
   display: flex;

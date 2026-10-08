@@ -6,6 +6,7 @@
 import {
   ArrowRight,
   ArrowSquareOut,
+  ArrowsLeftRight,
   ArrowsClockwise,
   ChartLineUp,
   ChatCircleText,
@@ -73,11 +74,8 @@ const pct = (value: number, total: number) => `${(value / total) * 100}%`;
 /**
  * The canvas is a fixed width and a height that depends on what is on it.
  *
- * Everything is placed as a percentage, so the drawing scales with the
- * container — which is right for the shapes and wrong for the words, because
- * the words do not scale. The answer is not to shrink boxes until the text
- * leaves them; it is to make the canvas taller when there is more to draw,
- * so a box keeps the size its label needs however many neighbours it has.
+ * The canvas keeps its reference width so its cards never shrink beneath
+ * their text. Extra parts add height; a narrow window scrolls the drawing.
  */
 const placer = (height: number) => ({
   place: (r: Rect): CSSProperties => ({
@@ -119,7 +117,7 @@ interface Layout {
   height: number;
   legs: Record<JourneyId, string[][]>;
   wires: { d: string; journey: JourneyId }[];
-  labels: { x: number; y: number; text: string }[];
+  labels: { x: number; y: number; w: number; text: string }[];
   stops: Record<JourneyId, string[]>;
 }
 
@@ -215,6 +213,15 @@ function layoutFor(model: ArchitectureModel): Layout {
       y: target.y + target.h / 2 - rects.source.h / 2,
     };
   }
+  // Both external cards otherwise align with the app and cover each other.
+  // Keep the source above the controller, with the same gap as service rows.
+  if (
+    model.byId.source &&
+    model.byId.controller &&
+    rects.source.y < rects.controller.y + rects.controller.h &&
+    rects.source.y + rects.source.h + 32 > rects.controller.y
+  )
+    rects.source.y = rects.controller.y - rects.source.h - 32;
   const ordered = [...volumes].sort(
     (a, b) => Number(b.owner === "app") - Number(a.owner === "app"),
   );
@@ -287,7 +294,14 @@ function layoutFor(model: ArchitectureModel): Layout {
     stops.add(edge.to);
     // Detailed labels on short service links belong in the connection list.
     if (edge.label && (edge.from === "source" || from.x === to.x))
-      labels.push({ ...label, text: edge.label });
+      labels.push({
+        ...label,
+        w:
+          edge.from === "source" && to.x > from.x + from.w
+            ? to.x - label.x - 8
+            : rects.private.x - label.x - 12,
+        text: edge.label,
+      });
   }
   const disk = ordered.flatMap((volume) => {
     const owner = volume.owner && rects[volume.owner];
@@ -334,8 +348,9 @@ function layoutFor(model: ArchitectureModel): Layout {
     model.byId.app
       ? [
           roundedRoute(
-            [centre(rects.source), rects.source.y + rects.source.h],
-            [centre(rects.source), appY + 126],
+            [rects.source.x + rects.source.w, middle(rects.source)],
+            [238, middle(rects.source)],
+            [238, appY + 126],
             [286, appY + 126],
             [286, middle(rects.app)],
             [rects.app.x, middle(rects.app)],
@@ -1036,6 +1051,10 @@ export function JourneyDirection({
         </p>
       </div>
 
+      <p className="axj2-scroll-hint">
+        <ArrowsLeftRight aria-hidden="true" />
+        Scroll to explore the diagram
+      </p>
       <div
         className="axj2-viewport"
         tabIndex={0}
@@ -1084,7 +1103,7 @@ export function JourneyDirection({
                   reading — a server card that looked like it had failed to
                   load. Nothing has been established about the machine, and
                   saying so is both true and the thing a reader can act on. */}
-              <b>
+              <b title={host?.name ?? "This server"}>
                 {planned
                   ? `${host?.name ?? "Your server"}, once approved`
                   : (host?.name ?? "This server")}
@@ -1224,7 +1243,8 @@ export function JourneyDirection({
             <span
               key={index}
               className="axj2-edge-label"
-              style={point(label.x, label.y)}
+              style={{ ...point(label.x, label.y), width: pct(label.w, W) }}
+              title={label.text}
             >
               {label.text}
             </span>
