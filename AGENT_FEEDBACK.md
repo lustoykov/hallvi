@@ -62,37 +62,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 | [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; product gap open |
 | [AF-091 — Share the initial clock when Overview hydrates](#af-091--share-the-initial-clock-when-overview-hydrates) | 1 | Fix in review |
-| [AF-092 — Keep diagram cards and labels from covering one another](#af-092--keep-diagram-cards-and-labels-from-covering-one-another) | 1 | Fix in review |
-| [AF-093 — Read Overview visit memory after hydration](#af-093--read-overview-visit-memory-after-hydration) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
-
-### AF-093 — Read Overview visit memory after hydration
-
-Opening a mapped application without a verified deployment returned HTTP 500:
-the Timeline read `window.location` in its state initializer. A saved folded
-log could also make the server and browser start with different layouts.
-The initial render now uses a neutral visit; after hydration the browser
-restores the saved log and last-seen state. A focused server-render check
-covers this branch of the default Overview.
-
-**+1:** 2026-10-08 — UI polish pass, `codex/hallvi-ui-polish`.
-
-**Status:** Fix in review.
-
-### AF-092 — Keep diagram cards and labels from covering one another
-
-The Architecture layout put the source and Hallvi controller at the same
-position when both connected to the application. Long endpoint labels ran
-under cards, and scaling a 1120-unit canvas down to 900px made fixed-size
-text spill outside nodes. The diagram now preserves its reading width,
-separates the external cards, confines labels to routing lanes and shows
-a scroll hint when it does not fit. The Paperless scenario now includes
-both external cards, a long server name and long endpoint labels.
-
-**+1:** 2026-10-08 — UI polish pass, `codex/hallvi-ui-polish`.
-
-**Status:** Fix in review.
 
 ### AF-091 — Share the initial clock when Overview hydrates
 
@@ -1143,6 +1114,8 @@ limit from the account balance; the request error now names both possibilities.
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-093 — Read Overview visit memory after hydration](#af-093--read-overview-visit-memory-after-hydration) | 1 | Resolved in #339 |
+| [AF-092 — Keep diagram cards and labels from covering one another](#af-092--keep-diagram-cards-and-labels-from-covering-one-another) | 1 | Resolved in #339 |
 | [AF-084 — Let Deployment wait for the public address check](#af-084--let-deployment-wait-for-the-public-address-check) | 1 | Resolved in #332 |
 | [AF-062 — Drop loaded traffic totals after Forget](#af-062--drop-loaded-traffic-totals-after-forget) | 1 | Resolved in #320 |
 | [AF-060 — Keep named applications distinct in the switcher](#af-060--keep-named-applications-distinct-in-the-switcher) | 1 | Resolved in #319 |
@@ -1171,6 +1144,33 @@ limit from the account balance; the request error now names both possibilities.
 | [AF-004 — Shared-information smoke can miss its 10 s window on a cold dev server](#af-004--shared-information-smoke-can-miss-its-10-s-window-on-a-cold-dev-server) | 1 | Fixed in #245 |
 | [AF-011 — Keep elapsed time together on narrow work lines](#af-011--keep-elapsed-time-together-on-narrow-work-lines) | 1 | Resolved in #255 |
 | [AF-012 — Keep private access observations truthful and on one route](#af-012--keep-private-access-observations-truthful-and-on-one-route) | 1 | Resolved in #256 |
+
+### AF-093 — Read Overview visit memory after hydration
+
+Opening a mapped application without a verified deployment returned HTTP 500:
+the Timeline read `window.location` in its state initializer. A saved folded
+log could also make the server and browser start with different layouts.
+The initial render now uses a neutral visit; after hydration the browser
+restores the saved log and last-seen state. A focused server-render check
+covers this branch of the default Overview.
+
+**+1:** 2026-10-08 — UI polish pass, `codex/hallvi-ui-polish`.
+
+**Status:** Resolved in [#339](https://github.com/lustoykov/hallvi/pull/339).
+
+### AF-092 — Keep diagram cards and labels from covering one another
+
+The Architecture layout put the source and Hallvi controller at the same
+position when both connected to the application. Long endpoint labels ran
+under cards, and scaling a 1120-unit canvas down to 900px made fixed-size
+text spill outside nodes. The diagram now preserves its reading width,
+separates the external cards, confines labels to routing lanes and shows
+a scroll hint when it does not fit. The Paperless scenario now includes
+both external cards, a long server name and long endpoint labels.
+
+**+1:** 2026-10-08 — UI polish pass, `codex/hallvi-ui-polish`.
+
+**Status:** Resolved in [#339](https://github.com/lustoykov/hallvi/pull/339).
 
 ### AF-084 — Let Deployment wait for the public address check
 

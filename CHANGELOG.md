@@ -4,6 +4,14 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.19 — 8 October 2026
+
+Read Architecture diagrams more comfortably and open Overview reliably while setup is unfinished.
+
+- **Diagram parts stay separate.** The source repository and Hallvi controller have their own space, connection labels stay clear of neighboring cards, and long server names remain readable with their full text in the details.
+- **More consistent narrow layouts.** Diagrams keep their labels legible and show when you can scroll to see more. Details wrap long names, and Architecture's heading aligns with the other application views.
+- **Overview opens before deployment.** Applications with a saved architecture and no verified deployment open on Overview without a server-rendering error. Return visits restore the saved expanded or folded log after the page loads.
+
 ## 0.1.1-alpha.18 — 7 October 2026
 
 Open an application on Overview, with steadier navigation and long conversations.
