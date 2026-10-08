@@ -32,7 +32,7 @@ import { UnresolvedMarks } from "../presentation";
 import { ago, type LogLine } from "../architecture-prototype/model";
 import { reducedMotion } from "../architecture-prototype/motion";
 import type { HeroProps } from "./hero";
-import type { Overview, Vital } from "./overview-model";
+import type { Vital } from "./overview-model";
 import {
   NeedCard,
   span,
@@ -112,13 +112,12 @@ function dayName(at: number, now: number) {
  * state now; the attention cards say what to do about it, which is a
  * different question.
  */
-function subline(model: HeroProps["model"], overview: Overview) {
+function subline(model: HeroProps["model"]) {
   if (model.status !== "live")
     return model.status === "none"
       ? "Ask Hallvi in the conversation to deploy it; this fills in as it runs."
       : "Nothing runs yet. Once you approve, Hallvi builds it, checks it and starts copying its data off the server.";
   const app = model.byId.app;
-  const host = model.byId.host;
   // The Server lane directly below says "Checked 7 h ago" in its own caption,
   // so repeating it in the verdict spent a third of the sentence on something
   // already on screen — and pushed the part that matters onto another line.
@@ -301,26 +300,33 @@ export function TimelineHero({
   const appId = record.application.id;
   // This visit, read once from what the browser remembers of the last: how
   // the log was left, and when you last looked, so what landed since stays
-  // new all visit. The hero only renders on the client, once the model
-  // exists. ?looked=20h and ?looked=never stand in for a visit, for review.
-  const [visit] = useState(() => {
+  // new all visit. The server and first browser render share a neutral
+  // reading; restore the browser's memory only after hydration.
+  // ?looked=20h and ?looked=never stand in for a visit, for review.
+  const arrival = useRef(model.now);
+  const [visit, setVisit] = useState<{
+    review: boolean;
+    intro: boolean;
+    seenAt: number | null;
+  } | null>(null);
+  const [logOpen, setLogOpen] = useState(true);
+  useEffect(() => {
     const memory = recall(appId);
     const looked = new URLSearchParams(window.location.search).get("looked");
     const hours = looked?.match(/^(\d+)h$/)?.[1];
-    return {
-      memory,
+    setVisit({
       review: looked !== null,
       intro: looked === "never",
       seenAt: hours
-        ? model.now - Number(hours) * HOUR
+        ? arrival.current - Number(hours) * HOUR
         : looked === "never" || !memory?.seen
           ? null
           : Date.parse(memory.seen),
-    };
-  });
+    });
+    setLogOpen(memory?.open ?? true);
+  }, [appId]);
   // Open from the start unless you folded it, so the log reads as the
   // timeline's terminal.
-  const [logOpen, setLogOpen] = useState(visit.memory?.open ?? true);
   // The moment being pointed at, on the lanes or in the log.
   const [lit, setLit] = useState<string | null>(null);
   const log = useRef<HTMLDivElement>(null);
@@ -348,7 +354,7 @@ export function TimelineHero({
   // on the same page did not — which reads as reassurance the page has not
   // earned. When something is unresolved, its marks come before anything
   // reassuring, and the cards below say what it is.
-  const verdict = subline(model, overview);
+  const verdict = subline(model);
   const waiting = overview.needs.length;
   const showLog = !planned && logOpen;
   const lines = guy.lines.slice(-6);
@@ -357,7 +363,7 @@ export function TimelineHero({
   // has none.
   const recorded = model.log.filter((line) => !line.invented);
   const newestRecorded = recorded.at(-1)?.at;
-  const seenAt = visit.seenAt;
+  const seenAt = visit?.seenAt ?? null;
   const fresh =
     seenAt === null
       ? []
@@ -455,9 +461,9 @@ export function TimelineHero({
   // The next visit starts from the newest recorded line; this one keeps
   // its snapshot.
   useEffect(() => {
-    if (!visit.review && newestRecorded)
+    if (visit && !visit.review && newestRecorded)
       remember(appId, { seen: newestRecorded });
-  }, [appId, newestRecorded, visit.review]);
+  }, [appId, newestRecorded, visit]);
 
   // What the arrival reads when it decides, kept current.
   const facts = {
@@ -479,6 +485,7 @@ export function TimelineHero({
   // time the label is fully on screen.
   const point = guy.point;
   useEffect(() => {
+    if (!visit) return;
     let touched = false;
     const touch = () => {
       touched = true;

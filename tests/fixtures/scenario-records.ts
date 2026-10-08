@@ -1262,6 +1262,28 @@ function paperlessRecords(id: string): SavedInformation[] {
           from: "observed",
           parts: [
             {
+              id: "paperless-source",
+              kind: "source",
+              name: "paperless-ngx/paperless-ngx",
+              role: "the source repository",
+              plain: "Where the application's code comes from.",
+            },
+            {
+              id: "paperless-controller",
+              kind: "controller",
+              name: "Hallvi on this computer",
+              role: "the private way in",
+              plain:
+                "This computer holds the private connection to the application.",
+            },
+            {
+              id: "paperless-host",
+              kind: "host",
+              name: "paperless-production-archive-and-ingestion-server-hel1",
+              role: "the server",
+              plain: "The machine running Paperless and its backing services.",
+            },
+            {
               id: "paperless-webserver",
               kind: "web",
               name: "paperless-webserver",
@@ -1302,6 +1324,18 @@ function paperlessRecords(id: string): SavedInformation[] {
             },
           ],
           edges: [
+            {
+              from: "paperless-source",
+              to: "paperless-webserver",
+              network: "public",
+              label: "image from ghcr.io/paperless-ngx/paperless-ngx:2.13.5",
+            },
+            {
+              from: "paperless-controller",
+              to: "paperless-http",
+              network: "loopback",
+              label: "SSH tunnel from this computer to the server loopback",
+            },
             // What each port leads to. Nothing else on record says which
             // service a port is for, and without these the map can only put
             // a port on the boundary and leave the reader to guess.

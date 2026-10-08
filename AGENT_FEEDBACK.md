@@ -48,7 +48,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-074 — Let the model look before Continue finishes an interrupted step](#af-074--let-the-model-look-before-continue-finishes-an-interrupted-step) | 1 | New |
 | [AF-075 — Keep a worktree from borrowing the main checkout's packages](#af-075--keep-a-worktree-from-borrowing-the-main-checkouts-packages) | 1 | New |
 | [AF-076 — Raise the proof of fit's findings with Pi upstream](#af-076--raise-the-proof-of-fits-findings-with-pi-upstream) | 1 | New |
-| [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 2 | New |
+| [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 3 | New |
 | [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | New |
 | [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | New |
 | [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 2 | Scroll hint in review; stacked layout open |
@@ -62,8 +62,37 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 | [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; product gap open |
 | [AF-091 — Share the initial clock when Overview hydrates](#af-091--share-the-initial-clock-when-overview-hydrates) | 1 | Fix in review |
+| [AF-092 — Keep diagram cards and labels from covering one another](#af-092--keep-diagram-cards-and-labels-from-covering-one-another) | 1 | Fix in review |
+| [AF-093 — Read Overview visit memory after hydration](#af-093--read-overview-visit-memory-after-hydration) | 1 | Fix in review |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-093 — Read Overview visit memory after hydration
+
+Opening a mapped application without a verified deployment returned HTTP 500:
+the Timeline read `window.location` in its state initializer. A saved folded
+log could also make the server and browser start with different layouts.
+The initial render now uses a neutral visit; after hydration the browser
+restores the saved log and last-seen state. A focused server-render check
+covers this branch of the default Overview.
+
+**+1:** 2026-10-08 — UI polish pass, `codex/hallvi-ui-polish`.
+
+**Status:** Fix in review.
+
+### AF-092 — Keep diagram cards and labels from covering one another
+
+The Architecture layout put the source and Hallvi controller at the same
+position when both connected to the application. Long endpoint labels ran
+under cards, and scaling a 1120-unit canvas down to 900px made fixed-size
+text spill outside nodes. The diagram now preserves its reading width,
+separates the external cards, confines labels to routing lanes and shows
+a scroll hint when it does not fit. The Paperless scenario now includes
+both external cards, a long server name and long endpoint labels.
+
+**+1:** 2026-10-08 — UI polish pass, `codex/hallvi-ui-polish`.
+
+**Status:** Fix in review.
 
 ### AF-091 — Share the initial clock when Overview hydrates
 
@@ -240,6 +269,10 @@ would put the conversation in front of a reviewer the way the destinations are.
 repeatable idle/streaming histories and conversation switching required another
 scratch socket worker with 6-, 240- and 2,000-call fixtures. Reusing the existing
 long-history generator still left setup and worker wiring outside scenarios.
+
+**+1:** 2026-10-08 — UI polish pass, `codex/hallvi-ui-polish`: the
+populated destinations are reviewable, but the scenario conversation still
+opens on repository/model setup notices rather than a representative transcript.
 
 ### AF-076 — Raise the proof of fit's findings with Pi upstream
 
