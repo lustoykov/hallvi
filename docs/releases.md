@@ -199,6 +199,15 @@ discovery check still sees the previous release, allow that cache to expire and
 repeat the same read before concluding publication failed. Do not republish or
 change the release to force a cached listing to refresh.
 
+Anonymous API verification can also exhaust GitHub's quota for the originating
+IP, which other applications or computers on the same network may share. A
+`403` or `429` with `x-ratelimit-remaining: 0` means to wait until the UTC epoch
+seconds in `x-ratelimit-reset` before retrying. Record discovery as pending,
+continue independent public signature and archive checks, and retry discovery
+after that reset. An authenticated `gh` read does not establish anonymous updater
+discovery, and a quota response does not justify republishing. See
+[GitHub's rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit).
+
 Merging a pull request never reaches any of this.
 
 ## The manifest

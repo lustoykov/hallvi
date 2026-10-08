@@ -62,8 +62,22 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 | [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; product gap open |
 | [AF-091 — Share the initial clock when Overview hydrates](#af-091--share-the-initial-clock-when-overview-hydrates) | 1 | Fix in review |
+| [AF-094 — Distinguish exhausted API quota from release publication](#af-094--distinguish-exhausted-api-quota-from-release-publication) | 1 | Guidance corrected |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-094 — Distinguish exhausted API quota from release publication
+
+Alpha.19 was published as latest and its four native checks passed, but the
+anonymous latest-release check returned HTTP 403 locally and on the Mac mini.
+The local response reported zero remaining requests and a later quota reset.
+Authenticated `gh` reads still worked, so they could have hidden the boundary.
+The release guide now says to retain a pending discovery result, check public
+assets independently and retry after the response's reset time.
+
+**+1:** 2026-10-08 — alpha.19 release, `codex/release-verification-quota`.
+
+**Status:** Guidance corrected.
 
 ### AF-091 — Share the initial clock when Overview hydrates
 
