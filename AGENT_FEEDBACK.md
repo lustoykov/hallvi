@@ -5,7 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-099 — Link captured output to a History event that exists](#af-099--link-captured-output-to-a-history-event-that-exists) | 1 | New |
+| [AF-099 — Link captured output to a History event that exists](#af-099--link-captured-output-to-a-history-event-that-exists) | 1 | Fixed locally |
 | [AF-098 — Recognize continued work in older conversations](#af-098--recognize-continued-work-in-older-conversations) | 1 | Fixed locally |
 | [AF-097 — Keep snapshot previews free of contributor credentials](#af-097--keep-snapshot-previews-free-of-contributor-credentials) | 1 | Fixed locally |
 | [AF-096 — Discover existing provider access before asking for tokens](#af-096--discover-existing-provider-access-before-asking-for-tokens) | 1 | New |
@@ -79,6 +79,15 @@ are intentionally absent from History's operation list; clicking the link opens
 generic History with no matching event. The output itself remains readable.
 Offer a specific event only where one exists, and avoid claiming the rest has
 one. No History event or relationship was invented during this sweep.
+
+**Fixed locally:** Logs now shares History's rule for a command's own event:
+failed, interrupted, declined and awaiting-approval commands can offer the link;
+successful standalone commands keep their output without it. The introductory
+copy no longer claims every capture belongs to an event. A mixed-success/failure
+render regression failed before the fix and passes after it. In the retained
+snapshot, all 101 captures remained readable, nine kept their History action,
+and the latest successful Docker-health and `uname` commands had none. An
+existing event's action still opened History. Output loading was unchanged.
 
 **+1:** 2026-10-19 — normal-usage snapshot sweep, `bugs`.
 

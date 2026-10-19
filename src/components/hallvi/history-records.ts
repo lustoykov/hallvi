@@ -64,6 +64,16 @@ const executionState: Record<
   interrupted: "stopped",
 };
 
+/** Commands that have their own event, rather than only captured output. */
+export function executionHasHistoryEvent(execution: ExecutionRecord) {
+  return (
+    execution.status === "awaiting-approval" ||
+    execution.status === "failed" ||
+    execution.status === "interrupted" ||
+    execution.status === "declined"
+  );
+}
+
 /**
  * Whether Hallvi went on working after this failed command in the same
  * conversation. A probe that failed and was followed by more work is Hallvi
@@ -192,13 +202,7 @@ export function historyFromRecords({
   // nothing was established. Declined is the owner's own decision, and a
   // history that drops those is a history of what Hallvi chose.
   const fromExecutions: ApplicationOperation[] = executions
-    .filter(
-      (execution) =>
-        execution.status === "awaiting-approval" ||
-        execution.status === "failed" ||
-        execution.status === "interrupted" ||
-        execution.status === "declined",
-    )
+    .filter(executionHasHistoryEvent)
     .map((execution) => ({
       id: `execution:${execution.id}`,
       source: { type: "check" as const, id: execution.id },

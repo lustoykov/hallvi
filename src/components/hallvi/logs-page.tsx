@@ -30,6 +30,7 @@ import type { ExecutionSummary as ExecutionRecord } from "@/lib/call-detail";
 
 import { LocalTime } from "./local-time";
 import type { ApplicationSection } from "./application-sections";
+import { executionHasHistoryEvent } from "./history-records";
 
 function placeOf(tool: string) {
   return sharedPlaceOf(tool) ?? "Hallvi";
@@ -163,8 +164,8 @@ function CapturedLogs({
           <p>
             What Hallvi&rsquo;s own commands printed, with when it was captured.
             Not the application&rsquo;s logs: nothing here collects those, and
-            nothing here runs anything. Each of these also sits on the event it
-            belongs to in History.
+            nothing here runs anything. Commands with a History event link to it
+            below.
           </p>
         </div>
       </header>
@@ -277,13 +278,15 @@ function CapturedLogs({
                 {/* In-app navigation, so a button — an href claiming one
                     destination while the click goes to another is a link
                     that lies about where it leads. */}
-                <button
-                  type="button"
-                  onClick={() => onOpenDestination("history")}
-                >
-                  See it in History
-                  <ArrowUpRight weight="bold" aria-hidden="true" />
-                </button>
+                {executionHasHistoryEvent(execution) && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenDestination("history")}
+                  >
+                    See it in History
+                    <ArrowUpRight weight="bold" aria-hidden="true" />
+                  </button>
+                )}
               </header>
               <pre className="hv-logs-output">{lines.join("\n")}</pre>
             </section>
