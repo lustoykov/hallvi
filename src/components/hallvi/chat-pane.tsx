@@ -327,6 +327,25 @@ function gather<T>(
   return gathered;
 }
 
+/**
+ * Calls drawn after the latest message because no message holds them. A
+ * finished one from before the history Pi reads (Pi 1.0 does not read older
+ * histories) has no place here: a long-used conversation drew over a hundred
+ * of them under the reply being written and opened on those instead.
+ */
+export function unplacedExecutions(
+  view: Pick<OperatorView, "messages" | "executions">,
+) {
+  const first = view.messages.find((m) => m.source !== "hallvi")?.createdAt;
+  if (!first) return view.executions;
+  return view.executions?.filter(
+    (record) =>
+      record.status === "running" ||
+      record.status === "awaiting-approval" ||
+      Date.parse(record.createdAt) >= Date.parse(first),
+  );
+}
+
 /** One function for the life of the pane, calling whichever is current. */
 function useSteady<A extends unknown[]>(
   callback: ((...values: A) => void) | undefined,
@@ -1235,7 +1254,7 @@ export function ChatPane({
           {view.application && chatId && (
             <OperatorConsole
               key={`executions:${view.application.id}:${chatId}`}
-              records={view.executions}
+              records={unplacedExecutions(view)}
               excludeIds={view.messages.flatMap(
                 (m) =>
                   m.blocks?.flatMap((b) =>
