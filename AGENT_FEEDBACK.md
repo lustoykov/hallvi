@@ -54,12 +54,12 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-076 — Raise the proof of fit's findings with Pi upstream](#af-076--raise-the-proof-of-fits-findings-with-pi-upstream) | 1 | New |
 | [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 3 | New |
 | [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | Fixed locally |
-| [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | New |
+| [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | Fixed locally |
 | [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 2 | Fixed locally |
 | [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 2 | Fix in review |
 | [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | Fixed locally |
 | [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
-| [AF-085 — Render reply tables in the plugin panel](#af-085--render-reply-tables-in-the-plugin-panel) | 1 | New |
+| [AF-085 — Render reply tables in the plugin panel](#af-085--render-reply-tables-in-the-plugin-panel) | 1 | Fixed locally |
 | [AF-086 — Keep expanded Terminal focus visible](#af-086--keep-expanded-terminal-focus-visible) | 1 | Fixed locally |
 | [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | Fixed locally |
 | [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | Fixed locally |
@@ -263,6 +263,12 @@ outside the UI polish pass.
 
 **+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
 
+**Resolved 2026-10-19:** the application's block parser is one function in
+`src/lib/markdown-blocks.mjs`, drawn by both renderers. The plugin build
+writes it into the built panel, the checkout's server writes it into the
+checked-out one, and a panel served by an older adapter reads as plain
+paragraphs.
+
 ### AF-083 — Let the checks notice runtime advisories and lockfile drift
 
 A critical advisory against the pinned `next` (GHSA-vcvr-r3jv-pc5j) sat on
@@ -338,6 +344,11 @@ lines declare 12 to 12.5px and draw 13px. Removing the reset would move all of
 them at once, so it needs a look at every destination first.
 
 **+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+**Resolved 2026-10-19:** the reset is gone, and Backups' own copy of it.
+Every visible button on every destination of two retained applications was
+measured at desktop and phone width with and without it: 25 classes now draw
+the size and weight they declare, and each changed region was looked at.
 
 ### AF-078 — Say what Deployment's Took column means when nothing was timed
 
