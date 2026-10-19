@@ -438,6 +438,22 @@
     max-width: 340px;
   }
 }
+/* On a phone four stops leave each label a few dozen pixels, and they ran
+   into each other. Only the newest stop keeps its words; the earlier ones are
+   their marks, and their words stay for a screen reader and in the card a
+   tap opens. */
+@media (max-width: 480px) {
+  .axlr-stop:not(.axlr-end):has(~ .axlr-stop:not(.axlr-end))
+    .axlr-station
+    > :is(b, small) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   [data-c="verified"] .axlr-since i {
     animation: none;
