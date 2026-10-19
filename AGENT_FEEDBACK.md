@@ -10,7 +10,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 5 | Partially improved; pause remains |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
 | [AF-017 — Make record validation easier for Pi to recover from](#af-017--make-record-validation-easier-for-pi-to-recover-from) | 2 | Basis fixed in #275; absence-record friction remains |
-| [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | New |
+| [AF-047 — Investigate stdout listener warnings during real Pi turns](#af-047--investigate-stdout-listener-warnings-during-real-pi-turns) | 1 | Not reproduced on Pi 1.0 |
 | [AF-038 — Check installed versions behind upstream shrinkwraps](#af-038--check-installed-versions-behind-upstream-shrinkwraps) | 4 | New |
 | [AF-001 — Record the waiting messages Stop drops](#af-001--record-the-waiting-messages-stop-drops) | 2 | New |
 | [AF-005 — Let the browser suite use a preinstalled Chromium](#af-005--let-the-browser-suite-use-a-preinstalled-chromium) | 1 | New |
@@ -630,6 +630,18 @@ The retained Paperless development controller at `8bbc1ad3` logged
 The requests completed normally and browser error logs were empty. Determine
 which listener owner accumulates before proposing a fix; this observation does
 not establish a product failure or justify raising the listener limit.
+
+**Check, 2026-10-19:** On Node 22 and Pi 1.0, three real turns on retained
+uptime-kuma completed five tool calls, including two successful server commands.
+The Pi worker's stdout and stderr were `SyncWriteStream`s. Each stream kept
+three listeners per pipe event (`unpipe`, `error`, `close`, `finish`) from startup
+through all three turns; no `MaxListenersExceededWarning` appeared in the traced
+runtime. Attachment stacks identified esbuild's transform worker, Hallvi's
+controller database worker and its traffic database worker as the stable startup
+owners. No accumulating owner was found, so no product code or listener limit
+changed. This bounded check does not establish that the older Paperless warning
+is fixed. The runtime detached cleanly, preserving the retained records and its
+verified backup; Pi session jsonl files were not read.
 
 ## How to contribute
 
