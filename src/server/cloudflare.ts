@@ -67,12 +67,6 @@ function accountId() {
   return value || null;
 }
 
-/** Whether a token was typed here rather than set in the environment. */
-export function cloudflareTokenSource(): "settings" | "environment" | null {
-  if (saved()) return "settings";
-  return process.env.CLOUDFLARE_API_TOKEN?.trim() ? "environment" : null;
-}
-
 /**
  * Saves a Cloudflare API token after Cloudflare itself says it is active.
  * The account id is what R2 is addressed per; when the token may read the

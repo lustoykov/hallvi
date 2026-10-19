@@ -29,7 +29,7 @@ import {
   Eye,
   Key,
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 /** The floor the controller enforces; see MINIMUM_LENGTH on the server. */
 const MINIMUM_LENGTH = 8;

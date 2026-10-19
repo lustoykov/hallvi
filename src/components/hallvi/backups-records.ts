@@ -662,20 +662,6 @@ export const CLASS_MEANING: Record<
   },
 };
 
-/** What each class does and does not protect against, in the page's words. */
-export const destinationMeaning: Record<DestinationKind, string> = {
-  "same-server":
-    "On the application's own server. This recovers from a mistake inside the application and from nothing else: if the server is lost, the copies are lost with it.",
-  controller:
-    "On the machine running Hallvi. That survives losing the application's server, and depends on this machine still existing and being reachable.",
-  "off-site":
-    "In object storage independent of both machines, subject to the access and retention configured there.",
-  provider:
-    "The provider's snapshot of the whole disk. It can rebuild the machine; it is not an application-aware copy and says nothing about the data being consistent.",
-  unclassified:
-    "A destination is recorded, but nothing says whether it survives losing the server. Until it does, treat this as unproven.",
-};
-
 /**
  * The one verdict the page leads with.
  *

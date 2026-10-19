@@ -393,21 +393,6 @@
   line-height: 1.45;
   color: var(--ax-ink-2);
 }
-.axlr-card button {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  gap: 4px;
-  margin-top: 8px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 560;
-  color: var(--ax-link);
-  cursor: pointer;
-}
 
 /* Beside the sidebar the rail runs out of room for its labels well before
    the page is narrow, so the lanes stack early. The rail never scrolls: a

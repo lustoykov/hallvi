@@ -16,7 +16,6 @@ import {
   type ReleaseImpact,
   type SeriesPoint,
   type TrafficHistory,
-  type TrafficRange,
 } from "@/server/traffic/contract";
 
 export { DIRECT, UNKNOWN };
@@ -80,12 +79,6 @@ export function keyWords(key: string) {
   if (key === UNKNOWN) return "Unknown";
   return key;
 }
-
-export const RANGE_WORDS: Record<TrafficRange, string> = {
-  "24h": "Last 24 hours",
-  "7d": "Last 7 days",
-  "30d": "Last 30 days",
-};
 
 const GAP_WORDS: Record<Gap["why"], string> = {
   "hallvi-off": "Hallvi was off",

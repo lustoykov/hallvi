@@ -9,7 +9,6 @@ import {
   reconnectRequest,
 } from "./reconnect-request";
 import { ArrowLeft, TerminalWindow } from "@phosphor-icons/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,

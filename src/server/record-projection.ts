@@ -229,19 +229,6 @@ export function seriesFor(records: SavedInformation[], ref: Ref) {
     .map((record) => ({ record, withdrawn: Boolean(record.retiredAt) }));
 }
 
-/** Everything that touched a subject: `about` as well as `states`. */
-export function everythingAbout(records: SavedInformation[], ref: Ref) {
-  const key = refKey(ref);
-  return records
-    .filter(
-      (record) =>
-        (record.presentation?.states &&
-          refKey(record.presentation.states.ref) === key) ||
-        (record.presentation?.about ?? []).some((item) => refKey(item) === key),
-    )
-    .sort(newestFirst);
-}
-
 export type Freshness =
   /** Nothing was established, so it never ages. */
   | { kind: "never-established" }
@@ -456,11 +443,6 @@ export function lane(
   record: SavedInformation,
 ): Lane | null {
   return laneOf(check.about ?? record.presentation?.states?.ref);
-}
-
-/** A check reaches a timeline only if it has a lane and a time. */
-export function timelineWorthy(check: RecordCheck, record: SavedInformation) {
-  return lane(check, record) !== null && record.establishedAt !== null;
 }
 
 /**

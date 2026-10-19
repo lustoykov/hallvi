@@ -244,10 +244,6 @@ export function Tag({
   );
 }
 
-export function Dot({ tone }: { tone: Tone }) {
-  return <span className="hv-rg-dot" data-tone={tone} aria-hidden="true" />;
-}
-
 /** Two lines in one cell: the name, and what qualifies it. */
 export function Name({
   title,

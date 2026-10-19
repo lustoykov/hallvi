@@ -383,7 +383,6 @@ export async function requestOutcome(
     evidenceOmitted: Math.max(0, found.length - LIMITS.calls),
   };
 }
-export type RequestOutcome = Awaited<ReturnType<typeof requestOutcome>>;
 
 /**
  * An application's recorded state, bounded: what the home page says about it,

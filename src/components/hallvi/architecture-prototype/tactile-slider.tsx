@@ -27,7 +27,6 @@ import {
 export interface SliderOption<T extends string> {
   id: T;
   label: string;
-  hint?: string;
 }
 
 export function TactileSlider<T extends string>({
@@ -261,7 +260,6 @@ export function TactileSlider<T extends string>({
             aria-checked={option.id === value}
             tabIndex={option.id === value ? 0 : -1}
             className={option.id === value ? "is-on" : undefined}
-            title={option.hint}
           >
             {option.label}
           </button>

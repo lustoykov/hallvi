@@ -32,7 +32,6 @@ export const backupPolicySchema = z.object({
   configuredAt: timestamp,
   operationId: z.uuid().nullable().default(null),
 });
-export type BackupPolicy = z.infer<typeof backupPolicySchema>;
 
 /** Why an owner's declared procedure failed; the host masks its values. */
 export const procedureDetailSchema = z.object({
@@ -41,7 +40,6 @@ export const procedureDetailSchema = z.object({
   exitCode: z.number().int().nullable(),
   output: z.string().max(2000),
 });
-export type ProcedureDetail = z.infer<typeof procedureDetailSchema>;
 
 export const scheduledRunSchema = z.object({
   version: z.literal(1),
@@ -123,28 +121,3 @@ export const scheduledRunSchema = z.object({
     .nullable()
     .default(null),
 });
-export type ScheduledRun = z.infer<typeof scheduledRunSchema>;
-
-export const backupSnapshotSchema = z.object({
-  version: z.literal(1),
-  applicationId: z.uuid(),
-  deploymentId: z.uuid(),
-  observedAt: timestamp,
-  checkedAt: timestamp,
-  reachable: z.boolean(),
-  timerActive: z.boolean(),
-  nextAt: timestamp.nullable(),
-  running: z.boolean(),
-  cleanupPending: z.boolean(),
-  runs: z.array(scheduledRunSchema).max(30),
-});
-export type BackupSnapshot = z.infer<typeof backupSnapshotSchema>;
-
-export function scheduleCalendar(policy: Pick<BackupPolicy, "schedule">) {
-  return policy.schedule === "daily"
-    ? "*-*-* 03:00:00 Europe/Sofia"
-    : "*-*-* 00,06,12,18:00:00 Europe/Sofia";
-}
-export function scheduleLabel(policy: Pick<BackupPolicy, "schedule">) {
-  return policy.schedule === "daily" ? "Daily at 03:00" : "Every 6 hours";
-}

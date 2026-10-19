@@ -12,14 +12,7 @@
 // lane opens with its name, the answer, and one plain sentence about what it
 // covers. "Earlier" walks back through its history.
 
-import {
-  ArrowRight,
-  CaretLeft,
-  CaretRight,
-  Check,
-  Minus,
-  X,
-} from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, Check, Minus, X } from "@phosphor-icons/react";
 import { useCallback, useState, type ReactNode } from "react";
 
 import { clockTime } from "./format";
@@ -48,8 +41,6 @@ export interface RailLane {
   /** Live words for the planned stop, such as a countdown. */
   nextIn?: string | null;
   pointed?: boolean;
-  /** Where a stop's default popover leads. */
-  action?: { label: string; run: () => void };
 }
 
 const PAGE = 4;
@@ -224,12 +215,6 @@ function Rail({
                         {stamp(event.at, now)} · {lasted(now - event.at)} ago
                       </small>
                       {event.detail && <p>{event.detail}</p>}
-                      {lane.action && (
-                        <button type="button" onClick={lane.action.run}>
-                          {lane.action.label}
-                          <ArrowRight weight="bold" />
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>

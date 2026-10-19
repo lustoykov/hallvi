@@ -6,13 +6,8 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import type { ChatMessage, Observation } from "./types";
-import type {
-  ConversationStatus,
-  MessageBlock,
-  OperatorSettings,
-  SavedInformation,
-} from "./operator-data";
+import type { Observation } from "./types";
+import type { OperatorSettings, SavedInformation } from "./operator-data";
 
 export const applications = sqliteTable("applications", {
   id: text("id").primaryKey(),

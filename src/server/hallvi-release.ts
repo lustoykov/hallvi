@@ -14,7 +14,6 @@ import {
 } from "../../scripts/release-source.mjs";
 import type { UpdateAttempt } from "../../scripts/update-attempt.mjs";
 import {
-  currentAttempt,
   dismissUpdate as dismiss,
   releaseView,
   startUpdate,
@@ -103,15 +102,4 @@ export function beginUpdate() {
 /** The owner has read the outcome and does not want to see it again. */
 export function dismissUpdate() {
   dismiss(data());
-}
-
-/** The attempt as it stands; a dead helper reads as the failure it is. */
-export function updateAttempt() {
-  return currentAttempt(data());
-}
-
-/** Where the helper's own output went, when there is any. */
-export function updateLogPath() {
-  const log = join(data(), "logs", "update.log");
-  return existsSync(log) ? log : null;
 }

@@ -194,14 +194,6 @@ function workspaceText(value: unknown): string {
     .join("");
 }
 
-export function normalizePiAssistantMessage(input: string): string {
-  const message = input.trim();
-  if (!message) throw new Error("Hallvi returned no user-facing message.");
-  if (message.length > 10_000)
-    throw new Error("Hallvi returned a message longer than 10,000 characters.");
-  return message;
-}
-
 export function describePiFailure(error: unknown): string {
   const normalized = (
     error instanceof Error ? error.message : ""

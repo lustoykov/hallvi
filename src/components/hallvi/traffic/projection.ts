@@ -55,11 +55,3 @@ export function cellCentre(row: number, column: number) {
     y: (row + 0.5) * ROW_HEIGHT,
   };
 }
-
-/** The projected point under a map position, for the generator's sampling. */
-export function fromMap(x: number, y: number): [number, number] {
-  return [x * STEP - HALF_WIDTH, TOP - y * STEP];
-}
-
-/** A longitude and latitude, projected, for the generator's polygons. */
-export const projected = raw;

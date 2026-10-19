@@ -92,14 +92,6 @@ const PLAN: Check[] = [
   { id: "docker", label: "Docker", state: "pending" },
 ];
 
-const ORDER: MachineFailure[] = [
-  "timeout",
-  "refused",
-  "wrong-machine",
-  "key-refused",
-  "sudo-password",
-  "unsupported",
-];
 /** Which line of the plan each failure stops at. */
 const STOPS: Record<MachineFailure, number> = {
   timeout: 0,
@@ -520,5 +512,3 @@ function MachineProblem({
     </Problem>
   );
 }
-
-export { ORDER as MACHINE_FAILURES };

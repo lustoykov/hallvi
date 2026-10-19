@@ -156,25 +156,11 @@
 .attention {
   color: #8b4b15;
 }
-.newContent {
-  max-width: 780px;
-  padding-top: 42px;
-}
 .form {
   padding: 28px;
   border: 1px solid #d8e0ec;
   border-radius: 12px;
   background: white;
-}
-.githubConnection {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding-bottom: 24px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid #d8e0ec;
-  font-size: 14px;
 }
 .field,
 .permissions legend {
@@ -261,19 +247,4 @@
   background: #8b95a5;
   margin-right: 8px;
   vertical-align: middle;
-}
-.tone_live .dot {
-  background: #267c58;
-}
-.tone_warn .dot {
-  background: #b25a16;
-}
-.tone_bad .dot {
-  background: #a6312b;
-}
-.tone_warn {
-  color: #8b4b15;
-}
-.tone_bad {
-  color: #a6292f;
 }

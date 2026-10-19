@@ -792,26 +792,6 @@
   font-family: var(--mono);
   font-size: 12px;
 }
-.hv-rg-dot {
-  display: inline-block;
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #b3bdd0;
-}
-.hv-rg-dot[data-tone="good"] {
-  background: var(--green);
-}
-.hv-rg-dot[data-tone="warn"] {
-  background: var(--amber);
-}
-.hv-rg-dot[data-tone="bad"] {
-  background: var(--red);
-}
-.hv-rg-dot[data-tone="working"] {
-  background: var(--blue);
-}
 
 .hv-rg-ask {
   display: inline-flex;

@@ -5,7 +5,6 @@ import type {
   TrafficRange,
 } from "@/server/traffic/contract";
 import type {
-  ChatMessage,
   ChatSnapshot,
   OperatorMetadata,
   OperatorView,

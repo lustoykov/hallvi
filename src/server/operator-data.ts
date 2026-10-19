@@ -94,7 +94,6 @@ export type Claim = (typeof claimKinds)[number];
 
 /** How we know: watched it, were told it, or only intend it (§4). */
 export const basisKinds = ["observed", "planned", "reported"] as const;
-export type Basis = (typeof basisKinds)[number];
 
 /** The pieces a map may draw (§5.1). */
 export const partKinds = [
@@ -109,7 +108,6 @@ export const partKinds = [
   "offsite",
   "monitor",
 ] as const;
-export type PartKind = (typeof partKinds)[number];
 
 /**
  * Where a proxy's access log is: a container's output, or a file whose

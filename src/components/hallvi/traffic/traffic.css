@@ -118,19 +118,6 @@
   font-variant-numeric: tabular-nums;
   color: var(--ax-ink);
 }
-.tf-now-last {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 13px;
-  color: var(--ax-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tf-now-last code {
-  font-family: var(--ax-mono);
-  font-size: 12px;
-  color: var(--ax-ink-2);
-}
 
 /* The live pulse: a dot that breathes once for every visit. */
 .tf-pulse {
@@ -423,9 +410,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-.tf-card-map {
-  padding: 2px 0 6px;
 }
 .tf-tabs {
   display: inline-flex;

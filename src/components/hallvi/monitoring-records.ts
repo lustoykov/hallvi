@@ -24,7 +24,6 @@ import {
   currentChecks,
   currentFacts,
   presenceOf,
-  seriesFor,
   subjectsOfKind,
   topologyOf,
   type SubjectKindOf,
@@ -257,25 +256,6 @@ export function monitoringFromRecords({
     watcher,
     unwatched,
   };
-}
-
-/** Whether the page has anything at all to draw. */
-export function monitoringAssessed(
-  records: SavedInformation[],
-  applicationId: string,
-) {
-  const story = monitoringFromRecords({
-    records,
-    applicationId,
-    applicationName: "",
-    now: Date.now(),
-  });
-  return story.looks.length > 0 || story.watcher !== null;
-}
-
-/** The series of readings for one subject, when a station is opened. */
-export function readingsFor(records: SavedInformation[], ref: Ref) {
-  return seriesFor(records, ref);
 }
 
 export type Usage = Extract<InformationContent, { kind: "usage" }> & {

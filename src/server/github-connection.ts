@@ -51,7 +51,6 @@ const connectionSchema = z.discriminatedUnion("mode", [
   }),
 ]);
 export type GithubConnection = z.infer<typeof connectionSchema>;
-export type GithubAccount = z.infer<typeof githubAccountSchema>;
 type AppConnection = Extract<GithubConnection, { mode: "app" }>;
 
 const tokenResponseSchema = z

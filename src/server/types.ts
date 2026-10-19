@@ -179,7 +179,3 @@ export interface CreateApplicationInput {
   name?: string;
   repositoryUrl: string;
 }
-
-export interface PiTurnResult {
-  message: string;
-}
