@@ -4,6 +4,12 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.21 — 20 October 2026
+
+A fix for conversations that began before Hallvi moved to Pi 1.0.
+
+- **The latest reply is where you look.** A conversation from before Pi 1.0 drew every finished call from that older history under the newest message, so it opened on weeks-old command cards and the reply being written sat out of sight. Those calls are no longer drawn there; they stay in Logs.
+
 ## 0.1.1-alpha.20 — 19 October 2026
 
 Long conversations open much faster, Hallvi works properly on a phone, and a round of fixes makes pages say one thing at a time.
