@@ -1956,3 +1956,91 @@
 .hv-deploy-none button {
   margin-top: 4px;
 }
+
+/* A phone's workspace starts within a thumb's reach of the top: the way
+   back, the application and Hallvi's own menu on one line, then every
+   destination and conversation on the next, scrolled sideways. */
+@media (max-width: 640px) {
+  .hv-adaptive-shell .hv-application-navigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 8px;
+    max-height: none;
+    padding: 8px 12px;
+  }
+  .hv-adaptive-shell .hv-navigation-head {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    padding: 0;
+  }
+  /* The arrow says it; the words stay for a screen reader. */
+  .hv-navigation-home-words {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .hv-adaptive-shell .hv-navigation-home {
+    padding: 12px 4px;
+  }
+  .hv-adaptive-shell .hv-navigation-foot {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .hv-adaptive-shell .hv-navigation-foot .hv-this-hallvi-name,
+  .hv-adaptive-shell .hv-navigation-foot .hv-this-hallvi-caret {
+    display: none;
+  }
+  .hv-adaptive-shell .hv-navigation-foot .hv-this-hallvi-row {
+    padding: 8px;
+  }
+  /* At the top of the screen the menu opens downward, to the right edge. */
+  .hv-adaptive-shell .hv-this-hallvi-menu {
+    top: calc(100% + 6px);
+    bottom: auto;
+    left: auto;
+    right: 0;
+    width: min(300px, calc(100vw - 24px));
+  }
+  /* The column's own list, not the application switcher's popover nav. */
+  .hv-adaptive-shell .hv-application-navigation > nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 -12px;
+    padding: 0 12px 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .hv-adaptive-shell .hv-application-navigation > nav::-webkit-scrollbar {
+    display: none;
+  }
+  /* Conversations lead the row, then a groove, then the destinations. */
+  .hv-adaptive-shell .hv-chat-nav-row {
+    flex: none;
+    order: -2;
+  }
+  .hv-adaptive-shell .hv-conversations-heading {
+    flex: none;
+    order: -1;
+    margin: 0;
+  }
+  .hv-adaptive-shell .hv-destinations {
+    flex: none;
+    overflow: visible;
+    margin-left: 4px;
+    padding: 0 0 0 8px;
+    border-left: 1px solid var(--nav-groove);
+  }
+}

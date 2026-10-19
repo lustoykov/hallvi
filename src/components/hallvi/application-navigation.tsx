@@ -215,7 +215,8 @@ export function ApplicationNavigation({
           {/* The alpha notice above already names the product and the
               machine. This is the way back to the list, so it says that. */}
           <Link href="/applications" className="hv-navigation-home">
-            <ArrowLeft aria-hidden="true" /> All applications
+            <ArrowLeft aria-hidden="true" />{" "}
+            <span className="hv-navigation-home-words">All applications</span>
           </Link>
           {head}
         </div>

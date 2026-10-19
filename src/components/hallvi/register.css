@@ -473,6 +473,14 @@
   .hv-rg-panel > .hv-rg-table > tbody:last-child > .hv-rg-row:last-child {
     border-bottom: 0;
   }
+  /* A release's steps keep their name, outcome and time; the picked step's
+     command is in the pane under them, whole. */
+  .hv-rg-split > .hv-rg-sub tr > :nth-child(4) {
+    display: none;
+  }
+  .hv-rg-split > .hv-rg-sub td:nth-child(3) {
+    white-space: nowrap;
+  }
 }
 
 /* ---------------------------------------------------------- opened row */

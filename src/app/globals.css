@@ -195,14 +195,13 @@ summary {
   color: var(--nav-text);
   font-weight: 500;
 }
+/* On a phone the chip says alpha on its own, and the strip is one line. */
 @media (max-width: 640px) {
   .hv-alpha-notice {
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    padding: 8px 12px;
+    gap: 8px;
+    padding: 6px 12px;
   }
   .hv-alpha-notice p {
-    order: 1;
-    flex-basis: 100%;
+    display: none;
   }
 }
