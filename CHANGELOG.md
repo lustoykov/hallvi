@@ -4,6 +4,12 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.22 — 20 October 2026
+
+One name for each process.
+
+- **Each process listed once.** Hallvi's operator no longer reads conversations from before Pi 1.0, so it could name a running process afresh and Processes listed the same web server twice. When it names a process the application has never mentioned, Hallvi now shows it the names already in use so it reuses the right one.
+
 ## 0.1.1-alpha.21 — 20 October 2026
 
 A fix for conversations that began before Hallvi moved to Pi 1.0.
