@@ -188,8 +188,12 @@ test("server output streams inline, preserves reading position and stays readabl
     await expect(card.getByText("Failed", { exact: true })).toBeVisible();
     await expect(card.getByText("exit 3", { exact: true })).toBeVisible();
     await expect(output).toHaveText("missing service");
-    // After a reload the finished call is folded into the reply's transcript,
-    // at the place Pi made it.
+    // Output the reader left open is still open after a reload.
+    await page.reload();
+    await expect(output).toHaveText("missing service");
+    // Closed, the finished call folds into the reply's transcript, at the
+    // place Pi made it.
+    await card.locator("summary").click();
     await page.reload();
     await expect(page.getByRole("button", { name: /1 command/ })).toBeVisible();
   } finally {
