@@ -21,8 +21,8 @@ import {
 } from "@/server/traffic/contract";
 
 import { ConfirmActionDialog } from "../confirm-action-dialog";
-import type { PageChrome } from "../deployment-prototype/page-head";
-import { PageHead, type Reachability } from "../deployment-prototype/page-head";
+import type { PageChrome } from "../page/page-head";
+import { PageHead, type Reachability } from "../page/page-head";
 import { EmptySketch } from "../empty-sketch";
 import { useTraffic, type Traffic } from "../overview-live/use-traffic";
 import { ago } from "../format";

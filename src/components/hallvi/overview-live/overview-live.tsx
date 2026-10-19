@@ -24,9 +24,9 @@ import {
   isTunnel,
   type PageChrome,
   type Reachability,
-} from "../deployment-prototype/page-head";
+} from "../page/page-head";
 import type { Usage } from "../monitoring-records";
-import type { NeedItem, Overview } from "../overview-prototype/overview-model";
+import type { NeedItem, Overview } from "../overview/overview-model";
 import { Tag, UnresolvedMarks, unresolvedWords } from "../presentation";
 import { agedAs, usePulse, type Pulse } from "../pulse";
 import { revealKeyboardControl } from "../reveal-keyboard-control";

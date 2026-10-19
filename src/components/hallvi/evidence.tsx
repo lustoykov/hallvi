@@ -31,7 +31,7 @@ import type { ReactNode } from "react";
 import type { DatabaseRow } from "./database-records";
 import { ago } from "./format";
 import { Ask, Pips } from "./register";
-import type { ProcessCard } from "./stack-prototype/line-story";
+import type { ProcessCard } from "./processes/line-story";
 
 export type FactState = "known" | "unchecked" | "na" | "absent";
 

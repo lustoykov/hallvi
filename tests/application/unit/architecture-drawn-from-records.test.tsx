@@ -19,7 +19,7 @@ import { architectureFromRecords } from "@/components/hallvi/architecture-record
 import {
   JourneyDirection,
   layoutFor,
-} from "@/components/hallvi/architecture-prototype/journey-v2";
+} from "@/components/hallvi/architecture/journey-v2";
 import type { SavedInformation } from "@/server/operator-data";
 
 const APPLICATION = "8f4a1c02-5d3e-4f8a-9b27-6c1e0a44d9f3";

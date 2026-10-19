@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { architectureFromRecords } from "@/components/hallvi/architecture-records";
-import { MiniMap } from "@/components/hallvi/overview-prototype/mini-map";
+import { MiniMap } from "@/components/hallvi/overview/mini-map";
 import { OverviewPage } from "@/components/hallvi/overview-page";
 import { scenarios } from "../../fixtures/scenario-records";
 

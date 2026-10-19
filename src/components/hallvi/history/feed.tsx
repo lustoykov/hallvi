@@ -13,8 +13,8 @@ import type { OperationStep } from "@/server/operation-record";
 import type { ApplicationSection } from "../application-sections";
 import { clockTime } from "../format";
 import { labelOf } from "../operation-model";
-import { reducedMotion } from "../architecture-prototype/motion";
-import { OpChip } from "../overview-prototype/shared";
+import { reducedMotion } from "../architecture/motion";
+import { OpChip } from "../overview/shared";
 import {
   later,
   settledAt,

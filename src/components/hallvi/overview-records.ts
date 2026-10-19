@@ -44,7 +44,7 @@ import {
   protectionVerdict,
   type ProtectionVerdict,
 } from "./backups-records";
-import type { Certainty, Fact } from "./architecture-prototype/model";
+import type { Certainty, Fact } from "./architecture/model";
 import { ago } from "./format";
 import type {
   Idea,
@@ -52,7 +52,7 @@ import type {
   Overview,
   RecentItem,
   Vital,
-} from "./overview-prototype/overview-model";
+} from "./overview/overview-model";
 
 /** The lane's own page, and the words the design puts on it. */
 const chrome: Record<

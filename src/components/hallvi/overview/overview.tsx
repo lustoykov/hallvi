@@ -9,13 +9,10 @@ import { ArrowRight, CaretDown, Lightbulb } from "@phosphor-icons/react";
 import { useCallback, useState } from "react";
 
 import type { ApplicationSection } from "../application-sections";
-import type { PageContext } from "../deployment-prototype/page-head";
-import { ARCHITECTURE_FOCUS } from "../architecture-prototype/journey-v2";
-import type {
-  ArchitectureModel,
-  LiveRecord,
-} from "../architecture-prototype/model";
-import { PageHead } from "../deployment-prototype/page-head";
+import type { PageContext } from "../page/page-head";
+import { ARCHITECTURE_FOCUS } from "../architecture/journey-v2";
+import type { ArchitectureModel, LiveRecord } from "../architecture/model";
+import { PageHead } from "../page/page-head";
 import { MiniMap } from "./mini-map";
 import type { Overview } from "./overview-model";
 import { IdeaCard, OpChip } from "./shared";

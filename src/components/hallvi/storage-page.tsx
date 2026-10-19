@@ -17,10 +17,10 @@ import { useMemo } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
-import type { Vol } from "./backup-prototype/protect-story";
+import type { Vol } from "./backups/protect-story";
 import { protectionFromRecords, protectionVerdict } from "./backups-records";
-import type { PageChrome } from "./deployment-prototype/page-head";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import { EmptySketch } from "./empty-sketch";
 import { ProtectionLine } from "./protection-line";
 import { ago } from "./format";

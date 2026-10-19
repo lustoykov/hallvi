@@ -26,7 +26,7 @@ import {
   topologyOf,
 } from "@/server/record-projection";
 
-import type { PageChrome } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
 import {
   inNewestCopy,
   protectionFromRecords,
@@ -34,7 +34,7 @@ import {
 } from "./backups-records";
 import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import { ago } from "./format";
 import { Figure, Lede, Strip } from "./register";
 import { storageFromRecords } from "./storage-records";

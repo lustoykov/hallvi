@@ -17,13 +17,13 @@ import {
   type Lane as LaneId,
 } from "@/server/record-projection";
 
-import type { LogLine } from "./architecture-prototype/model";
+import type { LogLine } from "./architecture/model";
 import type {
   EventTone,
   Lane,
   TimeEvent,
   Timeline,
-} from "./overview-prototype/timeline-model";
+} from "./overview/timeline-model";
 
 const HOUR = 3_600_000;
 /** Observations closer together than this read as one moment. */

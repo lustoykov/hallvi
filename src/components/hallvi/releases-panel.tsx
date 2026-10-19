@@ -33,10 +33,7 @@ import type { DeploymentAttempt } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
-import {
-  accessStateText,
-  type Reachability,
-} from "./deployment-prototype/page-head";
+import { accessStateText, type Reachability } from "./page/page-head";
 import { LocalTime } from "./local-time";
 import { ago } from "./format";
 import {

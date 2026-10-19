@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AccessPage } from "@/components/hallvi/access-page";
-import { PageHead } from "@/components/hallvi/deployment-prototype/page-head";
+import { PageHead } from "@/components/hallvi/page/page-head";
 import {
   publishOffer,
   type DomainState,

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { JobsPage, cronWords } from "@/components/hallvi/jobs-page";
-import type { SupplyView } from "@/components/hallvi/supply-prototype/supply-story";
+import type { SupplyView } from "@/components/hallvi/supply/supply-story";
 
 const NOW = Date.parse("2026-09-24T12:00:00.000Z");
 const hoursAgo = (hours: number) =>

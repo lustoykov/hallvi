@@ -28,7 +28,7 @@ import type {
   Piece,
   ProtectView,
   Vol,
-} from "./backup-prototype/protect-story";
+} from "./backups/protect-story";
 import { protectionFromRecords } from "./backups-records";
 
 /**

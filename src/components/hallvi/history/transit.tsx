@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { ApplicationSection } from "../application-sections";
 
-import { reducedMotion } from "../architecture-prototype/motion";
+import { reducedMotion } from "../architecture/motion";
 import { UnresolvedMarks } from "../presentation";
 import { FeedRow, sentenceOf, useJump } from "./feed";
 import {

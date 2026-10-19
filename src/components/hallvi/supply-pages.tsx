@@ -12,18 +12,18 @@ import { useMemo, type ReactNode } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
 import type { ApplicationSection } from "./application-sections";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import type { SecretRequest } from "./secret-request";
 import { supplyFromRecords } from "./supply-records";
-import { ManifestDirection } from "./supply-prototype/manifest";
-import { OriginDirection } from "./supply-prototype/origin";
-import { QueueDirection } from "./supply-prototype/queue";
+import { ManifestDirection } from "./supply/manifest";
+import { OriginDirection } from "./supply/origin";
+import { QueueDirection } from "./supply/queue";
 import { JobsPage } from "./jobs-page";
-import "./supply-prototype/manifest.css";
-import "./supply-prototype/origin.css";
-import "./supply-prototype/queue.css";
+import "./supply/manifest.css";
+import "./supply/origin.css";
+import "./supply/queue.css";
 import { EmptySketch } from "./empty-sketch";
 
 const titles: Record<SupplyPage, string> = {

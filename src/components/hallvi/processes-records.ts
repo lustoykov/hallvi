@@ -32,7 +32,7 @@ import type {
   LineStory,
   ProcessCard,
   Probe,
-} from "./stack-prototype/line-story";
+} from "./processes/line-story";
 
 /** A digest is the honest identity and unreadable as a headline. */
 export function shortImage(image: string) {

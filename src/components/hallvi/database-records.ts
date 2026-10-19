@@ -24,7 +24,7 @@ import {
 } from "@/server/record-projection";
 
 import { protectionFromRecords } from "./backups-records";
-import type { DataStore, DataView, Mark } from "./data-prototype/data-story";
+import type { DataStore, DataView, Mark } from "./database/data-story";
 
 /** A fact naming a process the records know, or nothing. */
 function namedProcess(records: SavedInformation[], value: string | null) {

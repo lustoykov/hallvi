@@ -12,13 +12,13 @@ import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ChatSummary } from "@/server/types";
 
-import type { PageChrome } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
 import type { ApplicationSection } from "./application-sections";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead } from "./page/page-head";
 import { historyFromRecords } from "./history-records";
-import { buildHistory, type Filter } from "./history-prototype/history-model";
-import { TransitHistory } from "./history-prototype/transit";
-import "./history-prototype/transit.css";
+import { buildHistory, type Filter } from "./history/history-model";
+import { TransitHistory } from "./history/transit";
+import "./history/transit.css";
 
 export function HistoryPage({
   records,

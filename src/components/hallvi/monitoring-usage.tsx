@@ -14,7 +14,7 @@ import { useState, type PointerEvent, type ReactNode } from "react";
 
 import { OTHER, type TrafficHistory } from "@/server/traffic/contract";
 
-import { Tag } from "./deployment-prototype/tag";
+import { Tag } from "./page/tag";
 import { EmptySketch } from "./empty-sketch";
 import type { Usage } from "./monitoring-records";
 import { AskButton, toneOf } from "./monitoring-watching";

@@ -16,8 +16,8 @@ import { CheckCircle, Circle, LockSimple } from "@phosphor-icons/react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./deployment-prototype/page-head";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import { EmptySketch } from "./empty-sketch";
 import {
   basisOf,

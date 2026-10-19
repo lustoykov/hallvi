@@ -30,14 +30,14 @@ import {
 import { labelOf } from "../operation-model";
 import { UnresolvedMarks } from "../presentation";
 import type { ApplicationSection } from "../application-sections";
-import type { PageContext } from "../deployment-prototype/page-head";
+import type { PageContext } from "../page/page-head";
 import { ago, clockTime } from "../format";
 import {
   type ArchitectureModel,
   type LiveRecord,
   type LogLine,
-} from "../architecture-prototype/model";
-import { reducedMotion } from "../architecture-prototype/motion";
+} from "../architecture/model";
+import { reducedMotion } from "../architecture/motion";
 import type { Overview, Vital } from "./overview-model";
 import {
   NeedCard,

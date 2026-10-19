@@ -5,7 +5,7 @@ import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { OverviewLive } from "@/components/hallvi/overview-live/overview-live";
-import type { Vital } from "@/components/hallvi/overview-prototype/overview-model";
+import type { Vital } from "@/components/hallvi/overview/overview-model";
 
 vi.mock("@/components/hallvi/overview-live/use-traffic", () => ({
   WINDOW_MINUTES: 5,

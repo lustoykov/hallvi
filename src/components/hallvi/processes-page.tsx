@@ -23,8 +23,8 @@ import { useMemo } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
-import type { PageChrome } from "./deployment-prototype/page-head";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import { EmptySketch } from "./empty-sketch";
 import {
   FactCell,
@@ -57,7 +57,7 @@ import {
   Tag,
   type Column,
 } from "./register";
-import type { ProcessCard, Probe } from "./stack-prototype/line-story";
+import type { ProcessCard, Probe } from "./processes/line-story";
 
 const ROLE_WORD: Record<ProcessCard["role"], string> = {
   web: "web app",

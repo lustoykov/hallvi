@@ -46,7 +46,7 @@ import type {
   Evidence,
   Journey,
   Part,
-} from "./architecture-prototype/model";
+} from "./architecture/model";
 
 /**
  * What kind of thing a drawn piece is, so its own records can be found. The

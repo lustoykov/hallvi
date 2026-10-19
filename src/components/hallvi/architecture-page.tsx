@@ -16,10 +16,10 @@ import { useMemo } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 
 import { architectureFromRecords } from "./architecture-records";
-import { JourneyDirection } from "./architecture-prototype/journey-v2";
-import type { PageChrome } from "./deployment-prototype/page-head";
+import { JourneyDirection } from "./architecture/journey-v2";
+import type { PageChrome } from "./page/page-head";
 import type { ApplicationSection } from "./application-sections";
-import "./architecture-prototype/prototype.css";
+import "./architecture/prototype.css";
 
 export function ArchitecturePage({
   records,

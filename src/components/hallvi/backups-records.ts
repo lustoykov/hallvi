@@ -23,7 +23,7 @@ import {
   topologyOf,
 } from "@/server/record-projection";
 
-import type { Check, Dated } from "./backup-prototype/protect-story";
+import type { Check, Dated } from "./backups/protect-story";
 import { ago } from "./format";
 
 /**

@@ -10,16 +10,8 @@
 import { ArrowRight } from "@phosphor-icons/react";
 import { useMemo } from "react";
 
-import {
-  BOX,
-  layoutFor,
-  MAP_TOP,
-  MAP_W,
-} from "../architecture-prototype/journey-v2";
-import type {
-  ArchitectureModel,
-  Certainty,
-} from "../architecture-prototype/model";
+import { BOX, layoutFor, MAP_TOP, MAP_W } from "../architecture/journey-v2";
+import type { ArchitectureModel, Certainty } from "../architecture/model";
 
 const tint: Record<Certainty, string> = {
   verified: "#14945f",

@@ -13,7 +13,7 @@
 
 import { useEffect, useId, useState } from "react";
 
-import { useReducedMotion } from "./architecture-prototype/motion";
+import { useReducedMotion } from "./architecture/motion";
 import "./mascot.css";
 
 export type MascotMood =

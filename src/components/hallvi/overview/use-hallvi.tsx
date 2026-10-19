@@ -13,11 +13,8 @@ import {
 } from "react";
 
 import { Mascot as LittleServer, type MascotMood } from "../mascot";
-import type {
-  ArchitectureModel,
-  LogLine,
-} from "../architecture-prototype/model";
-import { reducedMotion } from "../architecture-prototype/motion";
+import type { ArchitectureModel, LogLine } from "../architecture/model";
+import { reducedMotion } from "../architecture/motion";
 
 export interface Hallvi {
   mood: MascotMood;

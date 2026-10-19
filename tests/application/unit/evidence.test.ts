@@ -14,7 +14,7 @@ import {
   processFacts,
   recorded,
 } from "@/components/hallvi/evidence";
-import type { ProcessCard } from "@/components/hallvi/stack-prototype/line-story";
+import type { ProcessCard } from "@/components/hallvi/processes/line-story";
 
 const NOW = Date.parse("2026-09-13T12:00:00.000Z");
 

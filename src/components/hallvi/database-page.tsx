@@ -28,8 +28,8 @@ import {
   type DatabaseProbe,
   type DatabaseRow,
 } from "./database-records";
-import type { PageChrome } from "./deployment-prototype/page-head";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import { EmptySketch } from "./empty-sketch";
 import {
   FactCell,

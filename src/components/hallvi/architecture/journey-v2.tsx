@@ -38,7 +38,7 @@ import {
   applicationSections,
   type ApplicationSection,
 } from "../application-sections";
-import type { PageContext } from "../deployment-prototype/page-head";
+import type { PageContext } from "../page/page-head";
 import { CertaintyTag } from "./bits";
 /** What the architecture page hands this journey. */
 export interface DirectionProps {

@@ -3,7 +3,7 @@
 // firewall, and what is scheduled next. `timelineFromRecords` builds it from
 // recorded events only.
 
-import type { LogLine } from "../architecture-prototype/model";
+import type { LogLine } from "../architecture/model";
 import type { Vital } from "./overview-model";
 
 export type LaneId = Vital["id"];

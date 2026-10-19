@@ -42,7 +42,7 @@ import type { Chat, ChatMessage, OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
 import type { ConversationContext } from "./conversation-continuity";
-import type { Reachability } from "./deployment-prototype/page-head";
+import type { Reachability } from "./page/page-head";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";

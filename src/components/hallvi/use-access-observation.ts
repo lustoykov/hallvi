@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 import { accessRouteIdentity } from "@/server/access-record";
-import type { Reachability } from "./deployment-prototype/page-head";
+import type { Reachability } from "./page/page-head";
 import { QUIET_PULSE, type Pulse } from "./pulse";
 
 interface Answer {

@@ -15,13 +15,13 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
-import { Tag } from "../deployment-prototype/tag";
+import { Tag } from "../page/tag";
 import { Mascot } from "../mascot";
 import type { SupplyProps, Value } from "./supply-story";
 import { RevealSecret } from "../reveal-secret";
 import { revealKeyboardControl } from "../reveal-keyboard-control";
 import { ago } from "../format";
-import { when } from "../stack-prototype/stack-model";
+import { when } from "../processes/stack-model";
 import { listed, sizeWords } from "./supply-model";
 import "./manifest.css";
 

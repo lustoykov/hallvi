@@ -13,7 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 
-import type { Piece, Vol } from "./backup-prototype/protect-story";
+import type { Piece, Vol } from "./backups/protect-story";
 import {
   CLASS_MEANING,
   inNewestCopy,

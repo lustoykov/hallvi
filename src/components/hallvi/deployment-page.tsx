@@ -21,8 +21,8 @@ import type { DeploymentStatus } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
-import type { PageChrome } from "./deployment-prototype/page-head";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import { DeploymentSource } from "./deployment-source";
 import { releasesFromRecords } from "./release-records";
 import { ReleasesPanel } from "./releases-panel";

@@ -16,12 +16,8 @@ import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationRecord, ChatSummary } from "@/server/types";
 
 import { architectureFromRecords } from "./architecture-records";
-import {
-  PageHead,
-  type PageChrome,
-  type Reachability,
-} from "./deployment-prototype/page-head";
-import type { LiveRecord } from "./architecture-prototype/model";
+import { PageHead, type PageChrome, type Reachability } from "./page/page-head";
+import type { LiveRecord } from "./architecture/model";
 import type { ApplicationSection } from "./application-sections";
 import {
   applicationCondition,
@@ -30,11 +26,11 @@ import {
 } from "./overview-records";
 import { usageFromRecords } from "./monitoring-records";
 import { OverviewLive } from "./overview-live/overview-live";
-import { OverviewDirection } from "./overview-prototype/overview";
+import { OverviewDirection } from "./overview/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag, UnresolvedMarks } from "./presentation";
 import { releasesFromRecords } from "./release-records";
-import "./overview-prototype/overview.css";
+import "./overview/overview.css";
 import "./overview-plain.css";
 
 const tone = {

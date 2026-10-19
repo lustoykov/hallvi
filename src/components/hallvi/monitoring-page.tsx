@@ -11,8 +11,8 @@ import { useMemo } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./deployment-prototype/page-head";
-import { PageHead, type Reachability } from "./deployment-prototype/page-head";
+import type { PageChrome } from "./page/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import {
   monitoringFromRecords,
   usageFromRecords,

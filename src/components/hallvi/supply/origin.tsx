@@ -10,7 +10,7 @@
 
 import { ChatCircleText, MapPin } from "@phosphor-icons/react";
 
-import { Tag } from "../deployment-prototype/tag";
+import { Tag } from "../page/tag";
 import { Mascot, type MascotMood } from "../mascot";
 import type { SupplyProps } from "./supply-story";
 import "./origin.css";

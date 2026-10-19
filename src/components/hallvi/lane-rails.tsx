@@ -16,7 +16,7 @@ import { CaretLeft, CaretRight, Check, Minus, X } from "@phosphor-icons/react";
 import { useCallback, useState, type ReactNode } from "react";
 
 import { clockTime } from "./format";
-import { useDismiss } from "./overview-prototype/shared";
+import { useDismiss } from "./overview/shared";
 import "./lane-rails.css";
 
 export interface RailEvent {

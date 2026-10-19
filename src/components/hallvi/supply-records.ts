@@ -38,7 +38,7 @@ import type {
   SupplyView,
   Value,
   Waiting,
-} from "./supply-prototype/supply-story";
+} from "./supply/supply-story";
 
 /**
  * A count Pi wrote, which may carry thousands separators or a word after it.

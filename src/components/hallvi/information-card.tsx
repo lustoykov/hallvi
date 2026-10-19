@@ -18,7 +18,7 @@ import {
 import { Tag, toneOf } from "./presentation";
 import "./information-card.css";
 import { InformationContent } from "./information-content";
-import type { Reachability } from "./deployment-prototype/page-head";
+import type { Reachability } from "./page/page-head";
 
 export function InformationCard(props: {
   record: SavedInformation;

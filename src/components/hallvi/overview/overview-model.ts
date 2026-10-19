@@ -6,7 +6,7 @@
 import type { OperationState } from "@/server/operation-record";
 
 import type { ApplicationSection } from "../application-sections";
-import type { Certainty, Fact } from "../architecture-prototype/model";
+import type { Certainty, Fact } from "../architecture/model";
 
 export interface NeedItem {
   id: string;

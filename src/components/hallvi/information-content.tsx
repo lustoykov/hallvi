@@ -10,10 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationSection } from "./application-sections";
-import {
-  accessStateText,
-  type Reachability,
-} from "./deployment-prototype/page-head";
+import { accessStateText, type Reachability } from "./page/page-head";
 import { Tag, toneOf } from "./presentation";
 import { recordDestination } from "./application-sections";
 import { LocalTime } from "./local-time";

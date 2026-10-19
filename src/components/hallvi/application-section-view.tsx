@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import type { ApplicationFacts } from "@/server/application-facts";
 import type { OperatorView } from "@/server/types";
 
-import type { Reachability } from "./deployment-prototype/page-head";
+import type { Reachability } from "./page/page-head";
 import { InformationCard } from "./information-card";
 import { LocalTime } from "./local-time";
 import { rank } from "./presentation";

@@ -15,7 +15,7 @@ import {
   layoutFor,
   MAP_W,
   MAP_TOP,
-} from "@/components/hallvi/architecture-prototype/journey-v2";
+} from "@/components/hallvi/architecture/journey-v2";
 import type { SavedInformation } from "@/server/operator-data";
 
 const APPLICATION = "26820a4b-a4c2-49f8-8002-678503aeb385";

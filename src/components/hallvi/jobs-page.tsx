@@ -28,7 +28,7 @@ import {
   duration,
   type Column,
 } from "./register";
-import type { JobLine, SupplyView } from "./supply-prototype/supply-story";
+import type { JobLine, SupplyView } from "./supply/supply-story";
 
 import "./jobs-page.css";
 
