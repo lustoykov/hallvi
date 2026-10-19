@@ -188,6 +188,10 @@
   font-size: 12.5px;
   color: var(--ax-ink-2);
 }
+/* Held one line tall when there is nothing to list, so the chart stays. */
+.tf-live-countries[data-empty] {
+  min-height: 1lh;
+}
 .tf-live-countries li {
   cursor: default;
 }
@@ -457,6 +461,13 @@
 }
 .tf-trend-body[data-reading] {
   opacity: 0.55;
+}
+/* The strip and the chart's height while the first totals are read: an empty
+   frame, not a sketch of one. A quiet range has no strip and shrinks by it,
+   which moves only what has not been drawn yet. */
+.tf-trend-body[data-loading] {
+  min-height: 306px;
+  align-content: start;
 }
 .tf-strip {
   display: flex;
@@ -1590,6 +1601,9 @@
   }
   .tf-chart-plot {
     height: 150px;
+  }
+  .tf-trend-body[data-loading] {
+    min-height: 261px;
   }
   .tf-error-list li {
     grid-template-columns: minmax(0, 1fr) auto;

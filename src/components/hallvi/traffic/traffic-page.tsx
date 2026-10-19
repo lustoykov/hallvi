@@ -699,7 +699,10 @@ export function TrafficPage({
             nobody came: the log has not been read for it.
           </p>
         ) : (
-          <p className="tf-reading">Reading the totals…</p>
+          // The frame the chart will fill, so nothing moves when it does.
+          <div className="tf-trend-body" data-loading>
+            <p className="tf-reading">Reading the totals…</p>
+          </div>
         )}
       </section>
 
@@ -730,17 +733,21 @@ export function TrafficPage({
         </>
       )}
 
-      <Foot
-        collection={collection}
-        history={history}
-        script={script}
-        busy={busy}
-        error={problem}
-        asked={asked ? lockedOffer(asked) : null}
-        onToggle={() => perform(collection.enabledAt ? "stop" : "keep")}
-        onForget={() => setForgetting(true)}
-        onAsked={() => setAsked("speed")}
-      />
+      {/* Drawn once the totals have settled, below everything they bring:
+          a footer the reader was on is never pushed down the page. */}
+      {(history || picked.error) && (
+        <Foot
+          collection={collection}
+          history={history}
+          script={script}
+          busy={busy}
+          error={problem}
+          asked={asked ? lockedOffer(asked) : null}
+          onToggle={() => perform(collection.enabledAt ? "stop" : "keep")}
+          onForget={() => setForgetting(true)}
+          onAsked={() => setAsked("speed")}
+        />
+      )}
       {forgetting && (
         <ConfirmActionDialog
           title="Forget the stored traffic totals?"

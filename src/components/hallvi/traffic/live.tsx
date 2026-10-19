@@ -194,7 +194,9 @@ export function LiveArea({
         {map}
         <Arrivals traffic={traffic} shown={4} />
       </div>
-      {countries.length > 0 && (
+      {/* Always one row, empty while the day is read and on a day with no
+          country, so the chart under this card never moves. */}
+      {countries.length > 0 ? (
         <ul className="tf-live-countries" aria-label="Countries today">
           {countries.slice(0, 6).map((country) => (
             <li key={country.key} onPointerEnter={() => setFocus(country.key)}>
@@ -203,6 +205,8 @@ export function LiveArea({
             </li>
           ))}
         </ul>
+      ) : (
+        <ul className="tf-live-countries" aria-hidden="true" data-empty />
       )}
     </section>
   );
