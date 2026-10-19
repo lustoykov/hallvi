@@ -37,7 +37,7 @@ import {
 } from "@/components/ai-elements/message";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ExecutionRecord } from "@/server/operator-execution";
-import type { ActivityRecord } from "@/server/pi-activity";
+import type { ActivitySummary as ActivityRecord } from "@/lib/call-detail";
 import type { Chat, ChatMessage, OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
@@ -220,11 +220,11 @@ function InterruptionEvidence({
       const returned =
         exit !== null ||
         (!call.executionId &&
-          Boolean(call.finishedAt && call.result.trim()) &&
+          Boolean(call.finishedAt && (call.hasResult || call.result.trim())) &&
           ["succeeded", "failed"].includes(call.status)) ||
         (ended &&
           execution.status === "succeeded" &&
-          Boolean(call.finishedAt && call.result.trim()));
+          Boolean(call.finishedAt && (call.hasResult || call.result.trim())));
       const place = execution
         ? whereItRan(execution)?.said
         : placeOf(call.tool);
@@ -602,6 +602,7 @@ const TranscriptMessage = memo(
         </MessageContent>
         {message.role === "assistant" && activity && (
           <PiActivity
+            chatId={chatId ?? undefined}
             records={activity}
             executions={executions}
             runId={message.id}

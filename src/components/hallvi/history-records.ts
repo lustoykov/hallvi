@@ -29,7 +29,7 @@
 
 import type { ApplicationOperation } from "@/server/operation-record";
 import { executionTitle, plainText } from "./execution-text";
-import type { ExecutionRecord } from "@/server/operator-execution";
+import type { ExecutionSummary as ExecutionRecord } from "@/lib/call-detail";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
@@ -123,7 +123,9 @@ function ranAround(at: string, executions: ExecutionRecord[]) {
   const when = Date.parse(at);
   if (!Number.isFinite(when)) return [];
   return executions
-    .filter((execution) => (execution.output ?? "").trim())
+    .filter(
+      (execution) => execution.hasOutput || (execution.output ?? "").trim(),
+    )
     .filter((execution) => {
       const ran = Date.parse(execution.finishedAt ?? execution.createdAt);
       return Number.isFinite(ran) && ran <= when && when - ran < NEAR_MS;

@@ -33,10 +33,19 @@ import {
   Question,
   Terminal,
 } from "@phosphor-icons/react";
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 
-import type { ExecutionRecord } from "@/server/operator-execution";
-import type { ActivityRecord } from "@/server/pi-activity";
+import type {
+  ExecutionSummary as ExecutionRecord,
+  ActivitySummary as ActivityRecord,
+} from "@/lib/call-detail";
+import {
+  disclosureKey,
+  disclosureOpen,
+  noDisclosureSubscription,
+  useCallDetail,
+  useDisclosure,
+} from "./call-disclosure";
 import {
   hostOf,
   intentOf,
@@ -241,12 +250,14 @@ function arrange(records: ActivityRecord[], card: (id: string) => boolean) {
 }
 
 export function PiActivity({
+  chatId,
   records,
   executions,
   runId,
   live,
   renderExecution,
 }: {
+  chatId?: string;
   records: ActivityRecord[];
   executions?: ExecutionRecord[];
   /** The assistant message these calls belong to. */
@@ -266,6 +277,28 @@ export function PiActivity({
   const mine = records
     .filter((record) => record.runId === runId)
     .sort((a, b) => a.sequence - b.sequence);
+  const restored = useSyncExternalStore(
+    noDisclosureSubscription,
+    () =>
+      records
+        .flatMap((record) =>
+          record.executionId &&
+          chatId &&
+          disclosureOpen(
+            disclosureKey(
+              "execution",
+              record.applicationId,
+              chatId,
+              record.executionId,
+            ),
+          )
+            ? [record.executionId]
+            : [],
+        )
+        .join("\n"),
+    () => "",
+  );
+  const restoredCards = new Set(restored.split("\n"));
   // Between a message ending and the next starting, the draft still holds the
   // text that has just become the last item; showing both would say it twice.
   const said = mine.filter((record) => record.kind === "message").at(-1)?.text;
@@ -284,8 +317,17 @@ export function PiActivity({
       !execution ||
       execution.status === "awaiting-approval" ||
       (execution.status === "running" &&
-        Boolean(record.preview.trim() || execution.output.trim()));
-    if (watchable || kept.has(record.executionId))
+        Boolean(
+          record.hasOutput ||
+          execution.hasOutput ||
+          record.preview.trim() ||
+          execution.output.trim(),
+        ));
+    if (
+      watchable ||
+      kept.has(record.executionId) ||
+      restoredCards.has(record.executionId)
+    )
       cards.add(record.executionId);
   }
   // Remembered where it is used, rather than after the paint: this is the
@@ -314,6 +356,7 @@ export function PiActivity({
             key={`quiet-${item.records[0].id}`}
             place={item.place}
             records={item.records}
+            chatId={chatId}
             executions={executions}
           />
         ),
@@ -329,15 +372,20 @@ export function PiActivity({
 
 /** A run of calls in one place, behind one line. */
 function Quiet({
+  chatId,
   place,
   records,
   executions,
 }: {
+  chatId?: string;
   place: Place | null;
   records: ActivityRecord[];
   executions?: ExecutionRecord[];
 }) {
-  const [open, setOpen] = useState(false);
+  const first = records[0];
+  const [open, setOpen] = useDisclosure(
+    disclosureKey("group", first.applicationId, chatId ?? "", first.id),
+  );
   const working = records.some((record) => record.status === "running");
   // A refusal is not a failure, and a stop is not either; say which it was.
   const count = (status: string) =>
@@ -424,7 +472,7 @@ function Quiet({
       {open && (
         <ol className="hv-did-rows">
           {records.map((record) => (
-            <Row key={record.id} record={record} />
+            <Row key={record.id} record={record} chatId={chatId} />
           ))}
         </ol>
       )}
@@ -432,13 +480,29 @@ function Quiet({
   );
 }
 
-function Row({ record }: { record: ActivityRecord }) {
-  const [open, setOpen] = useState(false);
+function Row({ record, chatId }: { record: ActivityRecord; chatId?: string }) {
+  const [open, setOpen] = useDisclosure(
+    disclosureKey("call", record.applicationId, chatId ?? "", record.id),
+  );
+  const {
+    detail: loaded,
+    error,
+    loading,
+    retry,
+  } = useCallDetail(
+    record.applicationId,
+    chatId,
+    record.id,
+    record.detailVersion,
+    open,
+  );
+  const detailRecord = loaded?.activity ?? record;
   const { kind, verb } = describe(record);
   const Icon = icons[kind];
   const detail = subject(record);
   const took = duration(record);
-  const shown = record.status === "running" ? record.preview : record.result;
+  const shown =
+    record.status === "running" ? detailRecord.preview : detailRecord.result;
   const wrong = ["failed", "declined", "interrupted"].includes(record.status);
   return (
     <li className="hv-did-item" data-status={record.status}>
@@ -469,15 +533,28 @@ function Row({ record }: { record: ActivityRecord }) {
       </button>
       {open && (
         <div className="hv-did-detail">
-          <pre>{plainText(record.args) || "Nothing recorded."}</pre>
-          <pre data-wrong={wrong || undefined}>
-            {plainText(shown) ||
-              (record.status === "running"
-                ? "Nothing yet."
-                : "Nothing was recorded for this call.")}
-          </pre>
-          {record.truncated && (
-            <p>Longer than Hallvi keeps; what is shown was cut.</p>
+          {loading ? (
+            <p role="status">Loading call details…</p>
+          ) : error ? (
+            <p role="alert">
+              {error}{" "}
+              <button type="button" onClick={retry}>
+                Try again
+              </button>
+            </p>
+          ) : (
+            <>
+              <pre>{plainText(detailRecord.args) || "Nothing recorded."}</pre>
+              <pre data-wrong={wrong || undefined}>
+                {plainText(shown) ||
+                  (record.status === "running"
+                    ? "Nothing yet."
+                    : "Nothing was recorded for this call.")}
+              </pre>
+              {detailRecord.truncated && (
+                <p>Longer than Hallvi keeps; what is shown was cut.</p>
+              )}
+            </>
           )}
         </div>
       )}

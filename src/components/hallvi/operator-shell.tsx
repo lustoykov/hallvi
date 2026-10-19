@@ -1,6 +1,7 @@
 "use client";
 
 import { PulseContext } from "./pulse";
+import { CallDetailsVisible } from "./call-disclosure";
 import { ReconnectActionContext } from "./reconnect-action";
 import {
   reconnectProgress,
@@ -453,7 +454,7 @@ export function OperatorShell({
           ? bootstrap.current
           : null;
       const stream = new EventSource(
-        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1&resume=1${
+        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1&resume=1&details=lazy${
           initialBaseline ? `&baseline=${initialBaseline.token}` : ""
         }`,
       );
@@ -1183,64 +1184,72 @@ export function OperatorShell({
                 </ApplicationSectionView>
               </ReconnectActionContext.Provider>
             )}
-            <div
-              className={`hv-chat-column${recordVisible ? " hv-chat-parked" : ""}`}
-              inert={recordVisible || undefined}
-            >
-              <ChatPane
-                onModelConnected={() => setConnectedSince(true)}
-                checkingRepository={busy === "repository"}
-                onCheckRepository={checkRepository}
-                activeChat={activeChat}
-                reachable={reachable}
-                busy={busy}
-                composer={composer}
-                context={activeChat ? (contexts[activeChat.id] ?? null) : null}
-                error={error}
-                pendingMessage={pendingMessage}
-                piReady={piReady}
-                onArchive={archiveActiveChat}
-                onComposerChange={setComposer}
-                attachments={attached}
-                onAttachmentsChange={(update) => {
-                  if (activeChat)
-                    setAttachments((current) => ({
+            <CallDetailsVisible.Provider value={!recordVisible}>
+              <div
+                className={`hv-chat-column${recordVisible ? " hv-chat-parked" : ""}`}
+                inert={recordVisible || undefined}
+              >
+                <ChatPane
+                  onModelConnected={() => setConnectedSince(true)}
+                  checkingRepository={busy === "repository"}
+                  onCheckRepository={checkRepository}
+                  activeChat={activeChat}
+                  reachable={reachable}
+                  busy={busy}
+                  composer={composer}
+                  context={
+                    activeChat ? (contexts[activeChat.id] ?? null) : null
+                  }
+                  error={error}
+                  pendingMessage={pendingMessage}
+                  piReady={piReady}
+                  onArchive={archiveActiveChat}
+                  onComposerChange={setComposer}
+                  attachments={attached}
+                  onAttachmentsChange={(update) => {
+                    if (activeChat)
+                      setAttachments((current) => ({
+                        ...current,
+                        [activeChat.id]: update(current[activeChat.id] ?? []),
+                      }));
+                  }}
+                  onDismissContext={() => {
+                    if (!activeChat || !application) return;
+                    setContexts((current) => ({
                       ...current,
-                      [activeChat.id]: update(current[activeChat.id] ?? []),
+                      [activeChat.id]: null,
                     }));
-                }}
-                onDismissContext={() => {
-                  if (!activeChat || !application) return;
-                  setContexts((current) => ({
-                    ...current,
-                    [activeChat.id]: null,
-                  }));
-                  writeConversationContext(application.id, activeChat.id, null);
-                  focusComposer();
-                }}
-                onReturnToContext={(section) => {
-                  selectSection(section);
-                  requestAnimationFrame(() =>
-                    document
-                      .querySelector<HTMLButtonElement>(
-                        '.hv-application-navigation button[aria-current="page"]',
-                      )
-                      ?.focus({ preventScroll: true }),
-                  );
-                }}
-                onSend={(delivery) => sendMessage(undefined, delivery)}
-                onTell={(told) => sendMessage(told)}
-                reconnecting={reconnecting}
-                workerAlive={view.worker?.alive}
-                onStop={stopConversation}
-                onContinue={continueConversation}
-                onNewChat={createChat}
-                view={view}
-                now={now}
-                onOpenDestination={selectSection}
-                highlight={highlight}
-              />
-            </div>
+                    writeConversationContext(
+                      application.id,
+                      activeChat.id,
+                      null,
+                    );
+                    focusComposer();
+                  }}
+                  onReturnToContext={(section) => {
+                    selectSection(section);
+                    requestAnimationFrame(() =>
+                      document
+                        .querySelector<HTMLButtonElement>(
+                          '.hv-application-navigation button[aria-current="page"]',
+                        )
+                        ?.focus({ preventScroll: true }),
+                    );
+                  }}
+                  onSend={(delivery) => sendMessage(undefined, delivery)}
+                  onTell={(told) => sendMessage(told)}
+                  reconnecting={reconnecting}
+                  workerAlive={view.worker?.alive}
+                  onStop={stopConversation}
+                  onContinue={continueConversation}
+                  onNewChat={createChat}
+                  view={view}
+                  now={now}
+                  onOpenDestination={selectSection}
+                  highlight={highlight}
+                />
+              </div>
+            </CallDetailsVisible.Provider>
           </section>
 
           {renaming && application && (

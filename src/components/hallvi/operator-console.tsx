@@ -2,10 +2,9 @@
 import { CaretUpDown, ShieldCheck, Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
 import { intentOf, plainText, whereItRan } from "./execution-text";
-import type {
-  ExecutionRecord,
-  OperatorSettings,
-} from "@/server/operator-execution";
+import type { OperatorSettings } from "@/server/operator-execution";
+import type { ExecutionSummary as ExecutionRecord } from "@/lib/call-detail";
+import { disclosureKey, useCallDetail, useDisclosure } from "./call-disclosure";
 import { LocalTime } from "./local-time";
 import "./operator-console.css";
 import { Tag, Working, type Tone } from "./presentation";
@@ -314,20 +313,7 @@ export function OperatorConsole({
                 {item.tool === "server_bash" ? (
                   <StreamingOutput item={item} />
                 ) : (
-                  <details
-                    open={
-                      item.status === "awaiting-approval" ||
-                      item.status === "running"
-                    }
-                  >
-                    <summary>
-                      {item.status === "awaiting-approval"
-                        ? "Review this action"
-                        : "Command and output"}
-                    </summary>
-                    <pre>{plainText(item.input)}</pre>
-                    {item.output && <pre>{item.output}</pre>}
-                  </details>
+                  <ExecutionDetails item={item} />
                 )}
                 {item.status === "awaiting-approval" && main && (
                   <div className="hv-execution-actions">
@@ -354,5 +340,47 @@ export function OperatorConsole({
           })}
       {(error || readError) && <p role="alert">{error || readError}</p>}
     </div>
+  );
+}
+
+function ExecutionDetails({ item }: { item: ExecutionRecord }) {
+  const [open, setOpen] = useDisclosure(
+    disclosureKey("execution", item.applicationId, item.chatId, item.id),
+    item.status === "awaiting-approval" || item.status === "running",
+  );
+  const { detail, error, loading, retry } = useCallDetail(
+    item.applicationId,
+    item.chatId,
+    item.toolCallId ?? item.id,
+    item.detailVersion,
+    open,
+  );
+  const shown = detail?.execution ?? item;
+  return (
+    <details
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        {item.status === "awaiting-approval"
+          ? "Review this action"
+          : "Command and output"}
+      </summary>
+      {loading ? (
+        <p role="status">Loading call details…</p>
+      ) : error ? (
+        <p role="alert">
+          {error}{" "}
+          <button type="button" onClick={retry}>
+            Try again
+          </button>
+        </p>
+      ) : (
+        <>
+          <pre>{plainText(shown.input)}</pre>
+          {shown.output && <pre>{shown.output}</pre>}
+        </>
+      )}
+    </details>
   );
 }

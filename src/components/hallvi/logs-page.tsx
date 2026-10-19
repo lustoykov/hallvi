@@ -17,7 +17,7 @@
 // activity transcript read, rather than from a fourth copy of it kept here.
 
 import { ArrowUpRight, MagnifyingGlass } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   clip,
@@ -26,7 +26,7 @@ import {
   intentOf,
   placeOf as sharedPlaceOf,
 } from "./execution-text";
-import type { ExecutionRecord } from "@/server/operator-execution";
+import type { ExecutionSummary as ExecutionRecord } from "@/lib/call-detail";
 
 import { LocalTime } from "./local-time";
 import type { ApplicationSection } from "./application-sections";
@@ -35,9 +35,67 @@ function placeOf(tool: string) {
   return sharedPlaceOf(tool) ?? "Hallvi";
 }
 
-export function LogsPage({
+/** This destination displays all output, so read it only while it is open. */
+export function LogsPage(props: Parameters<typeof CapturedLogs>[0]) {
+  const compact = props.executions.some((record) => record.detailVersion);
+  const applicationId = props.executions[0]?.applicationId;
+  const revision = props.executions
+    .map((record) => record.detailVersion ?? "")
+    .join(".");
+  const [loaded, setLoaded] = useState<ExecutionRecord[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!compact || !applicationId) return;
+    const controller = new AbortController();
+    void fetch(`/api/applications/${applicationId}/operator`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok)
+          throw new Error(body.error ?? "Could not read captured output.");
+        if (!controller.signal.aborted) {
+          setLoaded(body.executions);
+          setError(null);
+        }
+      })
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) setError(error.message);
+      });
+    return () => controller.abort();
+  }, [compact, applicationId, revision, attempt]);
+  return (
+    <>
+      {error && (
+        <p role="alert">
+          {error}{" "}
+          <button
+            type="button"
+            onClick={() => setAttempt((value) => value + 1)}
+          >
+            Try again
+          </button>
+        </p>
+      )}
+      {compact && !loaded ? (
+        <div className="hv-section-page hv-section-logs">
+          {props.bar}
+          <header className="hv-section-header">
+            <h1>Command output</h1>
+          </header>
+          {!error && <p role="status">Reading captured output…</p>}
+        </div>
+      ) : (
+        <CapturedLogs {...props} executions={loaded ?? props.executions} />
+      )}
+    </>
+  );
+}
+
+function CapturedLogs({
   executions,
-  now,
   bar,
   onAsk,
   onOpenDestination,

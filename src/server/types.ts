@@ -106,17 +106,18 @@ export interface Observation {
 }
 
 /**
- * The authoritative Chat state returned on demand. Incremental SSE clients
- * reconstruct this same shape from their initial and subsequent frames.
+ * Authoritative conversation rows. A detailVersion marks compact call text
+ * whose full contents are read separately when its disclosure opens.
+ * Incremental SSE clients reconstruct this shape from their frames.
  */
 export interface ChatSnapshot {
   status: import("./operator-data").ConversationStatus;
-  executions: import("./operator-execution").ExecutionRecord[];
+  executions: import("@/lib/call-detail").ExecutionSummary[];
   /** Whether the worker that owns Pi's sessions answered. */
   worker: { alive: boolean };
   information: import("./operator-data").SavedInformation[];
   /** What Pi ran, in order. */
-  piActivity: import("./pi-activity").ActivityRecord[];
+  piActivity: import("@/lib/call-detail").ActivitySummary[];
   messages: ChatMessage[];
 }
 
@@ -124,7 +125,7 @@ export interface ChatSnapshot {
 export interface OperatorView {
   /** Versioned fingerprints for the exact conversation collections below. */
   chatStreamBaseline?: string;
-  executions?: import("./operator-execution").ExecutionRecord[];
+  executions?: import("@/lib/call-detail").ExecutionSummary[];
   /** Whether the worker that owns Pi's sessions answered. */
   worker?: { alive: boolean };
   information?: import("./operator-data").SavedInformation[];
@@ -138,7 +139,7 @@ export interface OperatorView {
   deployment?: import("./deployment-automation").DeploymentStatus;
 
   /** What Pi ran in this application's conversations, in order. */
-  piActivity?: import("./pi-activity").ActivityRecord[];
+  piActivity?: import("@/lib/call-detail").ActivitySummary[];
   application: ApplicationRecord | null;
   /** The latest repository access check with the current GitHub login. */
   repository?: {

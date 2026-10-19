@@ -3,6 +3,8 @@
 // continue, to stop. Hallvi's execution evidence is placed into what comes
 // back by the id Pi gave each tool call.
 import { activityFromTranscript } from "./pi-activity";
+import { activitySummary, executionSummary } from "./chat-evidence";
+import type { CallDetail } from "@/lib/call-detail";
 import { listExecutions, type ExecutionRecord } from "./operator-execution";
 import { assertChatWritable, loadChat, NotFoundError } from "./applications";
 import { touchChat } from "./db";
@@ -104,9 +106,35 @@ export async function readConversation(applicationId: string, chatId: string) {
   };
 }
 
+/** One call's redacted detail, read only when a reader opens its disclosure. */
+export async function readCallDetail(
+  applicationId: string,
+  chatId: string,
+  callId: string,
+): Promise<CallDetail> {
+  const { piActivity, executions } = await readConversation(
+    applicationId,
+    chatId,
+  );
+  const activity = piActivity.find(
+    (record) => record.kind === "tool" && record.id === callId,
+  );
+  const execution = executions.find(
+    (record) =>
+      record.chatId === chatId &&
+      (record.id === activity?.executionId ||
+        record.id === callId ||
+        record.toolCallId === callId),
+  );
+  if (!activity && !execution)
+    throw new NotFoundError("This call is not in the conversation.");
+  return { activity, execution };
+}
+
 export async function chatSnapshot(
   applicationId: string,
   chatId: string,
+  compact = true,
 ): Promise<ChatSnapshot> {
   const { application, chat } = await loadChat(applicationId, chatId);
   let worker = true;
@@ -132,8 +160,12 @@ export async function chatSnapshot(
         blocks: placed.blocks.get(message.id),
       })),
     ],
-    executions: placed.executions,
-    piActivity: placed.piActivity,
+    executions: compact
+      ? placed.executions.map(executionSummary)
+      : placed.executions,
+    piActivity: compact
+      ? placed.piActivity.map(activitySummary)
+      : placed.piActivity,
     information: (await listInformation(applicationId, "", true)).filter(
       (r) => r.presentation,
     ),

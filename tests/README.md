@@ -114,6 +114,8 @@ acknowledgements and incremental frames, scope/version fallbacks, ordering,
 removals and optional-field clearing. `unit/pi-stream.test.ts` checks fresh
 reads, notices during the initial read, latest-state reconnect acknowledgements,
 missed changes and full reconnects for older clients.
+`unit/chat-evidence.test.ts` checks compact rows, fingerprints changing when
+only omitted text changes, and the single-call read's conversation boundary.
 `long-history-responses.spec.ts` verifies that unchanged page collections are
 acknowledged, then keeps old evidence disclosures and live output usable through updates and
 reconnect. A disposable proxy ends the actual SSE response; the journey checks
@@ -140,6 +142,24 @@ encoding for 240 and 2,000 synthetic calls; it excludes database, worker socket,
 SSR and browser work. Both profiles make no model calls, isolate fixture
 accounts, and keep raw results in ignored `work/` or `tests/results/`. Browser
 response counters are injected only into the disposable QA copy.
+
+The same journey checks that closed rows and parked conversations make no
+detail read, a failed read can be retried, open detail refreshes with output changes, and open
+disclosures recover their contents after reload and reconnect. A companion
+check opens Command output and a release's steps to verify succeeded
+output and the full command remain available from compact rows. The opt-in
+disclosure profile uses 2,000 calls and three fresh browser contexts against
+the same warmed server:
+`HALLVI_QA_PRODUCTION=1 HALLVI_DISCLOSURE_PROFILE=1 HALLVI_E2E_PORT=3100 npm run test:e2e -- long-history-responses.spec.ts --grep 'profile disclosure' --reporter=list --output tests/results/disclosure-profile`.
+It writes `disclosure-profile.json`: decoded document bytes from Navigation
+Timing (large bodies can be evicted from Chromium's inspector buffer), the
+first SSE frame's UTF-8 bytes including its ID, navigation-to-latest-reply
+visibility and disclosure-click-to-detail visibility. Compare the base and
+change on the same machine in coordinated quiet windows; this synthetic
+production fixture makes no model calls and establishes no deployment.
+Keep that task-owned output directory when working concurrently: a new
+Playwright run empties its output directory, including another run's evidence
+if both use the default.
 
 The same journey checks where a long conversation opens: on its latest
 message, and on the linked message when the address names one, without being

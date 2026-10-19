@@ -30,6 +30,8 @@ export async function GET(
     // Only clients that can apply changes opt in; the old URL stays full-state.
     const parameters = new URL(request.url).searchParams;
     const incremental = parameters.get("changes") === "1";
+    // Already-open older tabs cannot fetch omitted call details.
+    const compact = parameters.get("details") === "lazy";
     // Only clients that can reuse their streamed records opt into reconnect
     // acknowledgements. Older JavaScript still receives full reconnect state.
     const baselines =
@@ -119,7 +121,7 @@ export async function GET(
       lastReadAt = Date.now();
       const at = generation;
       try {
-        const snapshot = await refreshSnapshot(applicationId, chatId);
+        const snapshot = await refreshSnapshot(applicationId, chatId, compact);
         if (closed) return;
         const next = encode(snapshot);
         if (next)
@@ -159,7 +161,7 @@ export async function GET(
       invalidateSnapshotRead(applicationId, chatId);
       initialGeneration = generation;
       lastReadAt = Date.now();
-      const snapshot = await chatSnapshot(applicationId, chatId);
+      const snapshot = await chatSnapshot(applicationId, chatId, compact);
       request.signal.throwIfAborted();
       initial = encode(snapshot, true)!;
     } catch (error) {

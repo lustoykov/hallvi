@@ -1,5 +1,7 @@
 "use client";
 import { useReconnectAction } from "./reconnect-action";
+import { useCallDetail } from "./call-disclosure";
+import { commandOf } from "./execution-text";
 
 // What is running, and every release since.
 //
@@ -131,6 +133,13 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
     steps.at(-1);
   const [picked, setPicked] = useState<string | null>(lead?.id ?? null);
   const step = steps.find((one) => one.id === picked) ?? null;
+  const { detail, error, loading, retry } = useCallDetail(
+    step?.detail?.applicationId ?? "",
+    step?.detail?.chatId,
+    step?.detail?.callId ?? "",
+    step?.detail?.version,
+    Boolean(step),
+  );
 
   if (!steps.length)
     return (
@@ -176,10 +185,28 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
           )}
         </header>
         {step ? (
-          <>
-            <code>{step.command}</code>
-            <pre>{step.output || "It printed nothing."}</pre>
-          </>
+          loading ? (
+            <p role="status">Loading command output…</p>
+          ) : error ? (
+            <p role="alert">
+              {error}{" "}
+              <button type="button" onClick={retry}>
+                Try again
+              </button>
+            </p>
+          ) : (
+            <>
+              <code>
+                {detail?.execution
+                  ? commandOf(detail.execution.input)
+                  : step.command}
+              </code>
+              <pre>
+                {(detail?.execution?.output ?? step.output) ||
+                  "It printed nothing."}
+              </pre>
+            </>
+          )
         ) : (
           <p>Pick a step to see what it printed.</p>
         )}

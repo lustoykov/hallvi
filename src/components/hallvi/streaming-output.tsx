@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { clip, commandOf, essence, plainText } from "./execution-text";
-import type { ExecutionRecord } from "@/server/operator-execution";
+import type { ExecutionSummary as ExecutionRecord } from "@/lib/call-detail";
 import { TerminalBar } from "./terminal-lights";
+import { disclosureKey, useCallDetail, useDisclosure } from "./call-disclosure";
 
 function outputText(item: ExecutionRecord) {
   // Earlier execution records stored the whole command result as JSON.
@@ -64,12 +65,27 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   // moment in the product where a person is being asked to decide something —
   // and the decision itself was never stated in words at all. What it wants
   // to do goes above; the full payload stays one click away.
-  const [open, setOpen] = useState(
+  const [open, setOpen] = useDisclosure(
+    disclosureKey("execution", item.applicationId, item.chatId, item.id),
     item.status === "running" ||
       (item.status !== "succeeded" &&
         item.status !== "declined" &&
         item.status !== "awaiting-approval"),
   );
+  const { detail, error, loading, retry } = useCallDetail(
+    item.applicationId,
+    item.chatId,
+    item.toolCallId ?? item.id,
+    item.detailVersion,
+    open,
+  );
+  const shown = detail?.execution
+    ? {
+        ...item,
+        input: detail.execution.input,
+        output: detail.execution.output,
+      }
+    : item;
   const [follow, setFollow] = useState(true);
   const [copyStatus, setCopyStatus] = useState("");
   // The command is the content only while it is a proposal. Once it has run,
@@ -78,17 +94,17 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
     item.status === "awaiting-approval",
   );
   const viewport = useRef<HTMLPreElement>(null);
-  const output = outputText(item);
+  const output = outputText(shown);
   /** The whole payload: the script, and the settings that travelled with it. */
-  const command = plainText(item.input);
+  const command = plainText(shown.input);
   /**
    * The one line that says what this does. Read from the command itself and
    * never from the payload, so a setting printed beside it can never become
    * the caption, and with the shell preamble skipped, because the first line
    * of a script is `set -euo pipefail` and that is not what it is for.
    */
-  const line = clip(essence(commandOf(item.input)), 140);
-  const script = lineCount(commandOf(item.input));
+  const line = clip(essence(commandOf(shown.input)), 140);
+  const script = lineCount(commandOf(shown.input));
   /** Whether anything at all is hidden: more script, or settings, or both. */
   const more = command.trim() !== line;
   const running = item.status === "running";
@@ -152,6 +168,14 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
               : "Command and output"}
         </summary>
         <div className="hv-stream-terminal">
+          {error && (
+            <p role="alert">
+              {error}{" "}
+              <button type="button" onClick={retry}>
+                Try again
+              </button>
+            </p>
+          )}
           <TerminalBar title={running ? "Running" : "Command"} />
           {/* One line, in a strip, deliberately not a <pre>.
               This used to be a second scrolling dark pane above the output
@@ -169,6 +193,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
                 type="button"
                 className="hv-stream-more"
                 aria-expanded={showCommand}
+                disabled={loading || Boolean(error)}
                 onClick={() => setShowCommand(!showCommand)}
               >
                 {showCommand
@@ -202,13 +227,15 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
           >
             {output || (
               <span className="hv-stream-empty">
-                {awaiting
-                  ? "Waiting for approval. The command has not started."
-                  : running
-                    ? "Waiting for command output…"
-                    : item.status === "declined"
-                      ? "You declined this command, so it did not run."
-                      : "No output recorded."}
+                {loading
+                  ? "Loading command output…"
+                  : awaiting
+                    ? "Waiting for approval. The command has not started."
+                    : running
+                      ? "Waiting for command output…"
+                      : item.status === "declined"
+                        ? "You declined this command, so it did not run."
+                        : "No output recorded."}
               </span>
             )}
           </pre>
@@ -224,7 +251,11 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
                 {follow ? "Following output" : "Follow latest"}
               </button>
             )}
-            <button type="button" onClick={() => void copy()}>
+            <button
+              type="button"
+              disabled={loading || Boolean(error)}
+              onClick={() => void copy()}
+            >
               {output ? "Copy" : "Copy command"}
             </button>
             <span role="status">{copyStatus}</span>

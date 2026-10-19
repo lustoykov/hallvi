@@ -22,7 +22,7 @@ import { currentAccessRecord } from "@/server/access-record";
 // container that was replaced by something that did not start is not still
 // running the old image.
 
-import type { ExecutionRecord } from "@/server/operator-execution";
+import type { ExecutionSummary as ExecutionRecord } from "@/lib/call-detail";
 import type { SavedInformation } from "@/server/operator-data";
 import { releaseOutcome } from "@/server/release-outcome";
 
@@ -82,6 +82,12 @@ export interface ReleaseStep {
   seconds: number | null;
   outcome: ExecutionRecord["status"];
   output: string;
+  detail?: {
+    applicationId: string;
+    chatId: string;
+    callId: string;
+    version: string;
+  };
 }
 
 export interface ReleaseView {
@@ -236,6 +242,16 @@ function stepOf(execution: ExecutionRecord): ReleaseStep {
         : Math.max(0, Math.round(finished / 1000)),
     outcome: execution.status,
     output: execution.output ?? "",
+    ...(execution.detailVersion
+      ? {
+          detail: {
+            applicationId: execution.applicationId,
+            chatId: execution.chatId,
+            callId: execution.toolCallId ?? execution.id,
+            version: execution.detailVersion,
+          },
+        }
+      : {}),
   };
 }
 

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import Database from "better-sqlite3";
 import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -61,12 +62,13 @@ test("older evidence and open disclosures survive changes, completion, view swit
   fixture,
 }) => {
   const state = await setup(page, fixture);
-  const { app, chat, transcript, last, call, worker, store } = state;
+  const { app, chat, name, transcript, last, call, worker, store } = state;
   let ax: CDPSession | undefined;
   // A short offline toggle can leave an existing SSE connection alive. Forward
   // its real bytes through a disposable proxy and explicitly end it.
   const streams = new Map<ServerResponse, ClientRequest>();
   const reconnectIds: (string | undefined)[] = [];
+  let fileReads = 0;
   const proxy = createServer((incoming, outgoing) => {
     reconnectIds.push(incoming.headers["last-event-id"] as string | undefined);
     const upstream = request(
@@ -136,6 +138,15 @@ test("older evidence and open disclosures survive changes, completion, view swit
             }
           ).qaInitialFrames,
       );
+    await page.route(/\/calls\/call(?::|%3A)3$/i, (route) => {
+      fileReads++;
+      return fileReads === 1
+        ? route.fulfill({
+            status: 503,
+            json: { error: "Call details are temporarily unavailable." },
+          })
+        : route.continue();
+    });
     await page.goto(`/applications/${app}?chat=${chat}`);
     await expect
       .poll(async () => (await received())[0])
@@ -143,6 +154,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
         type: "initial",
         collections: [],
       });
+    expect(fileReads).toBe(0);
     // It opens on its latest message; the earlier ones are drawn after it.
     await expect(page.locator('[id="hv-message-reply:79"]')).toBeInViewport();
     // Leave the latest message as a reader does, with the wheel. Playwright's
@@ -154,6 +166,10 @@ test("older evidence and open disclosures survive changes, completion, view swit
     await old.getByRole("button", { name: /1 file read/ }).click();
     const row = old.locator(".hv-did-row").first();
     await row.click();
+    await expect(old.getByRole("alert")).toContainText(
+      "Call details are temporarily unavailable.",
+    );
+    await old.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(old.locator(".hv-did-detail")).toContainText("END-3");
     const card = page.locator(`#execution-${last.id}`);
     const output = card.getByRole("region", { name: "Command output" });
@@ -166,6 +182,11 @@ test("older evidence and open disclosures survive changes, completion, view swit
     worker.changed({ kind: "execution", applicationId: app });
     worker.changed({ kind: "chat", applicationId: app, chatId: chat });
     await expect(output).toContainText("LIVE-UPDATE");
+    transcript.calls["call:3"].result!.text += "\nUPDATED-OPEN-CALL";
+    worker.changed({ kind: "chat", applicationId: app, chatId: chat });
+    await expect(old.locator(".hv-did-detail")).toContainText(
+      "UPDATED-OPEN-CALL",
+    );
     await expect(row).toHaveAttribute("aria-expanded", "true");
     await expect(old.locator(".hv-did-detail")).toContainText("END-3");
     last.status = "succeeded";
@@ -214,7 +235,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
     await expect.poll(exposedComposers).toBe(1);
     await page.getByRole("button", { name: "Overview", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Overview", exact: true }),
+      page.getByRole("heading", { name, exact: true }),
     ).toBeVisible();
     await expect.poll(exposedComposers).toBe(0);
     // The mounted conversation must not steal focus from the destination.
@@ -284,14 +305,18 @@ test("older evidence and open disclosures survive changes, completion, view swit
     disconnect();
     transcript.messages[3].body += " Updated while disconnected.";
     transcript.messages[3].revision++;
+    transcript.calls["call:3"].result!.text += "\nUPDATED-WHILE-DISCONNECTED";
     worker.changed({ kind: "chat", applicationId: app, chatId: chat });
     await expect(old).toContainText("Updated while disconnected.");
     expect(reconnectIds.at(-1)).toMatch(/^2(?:\.[a-f0-9]{64}){4}$/);
     expect((await received()).at(-1)).toEqual({
       type: "initial",
-      collections: ["messages"],
+      collections: ["messages", "piActivity"],
     });
     await expect(row).toHaveAttribute("aria-expanded", "true");
+    await expect(old.locator(".hv-did-detail")).toContainText(
+      "UPDATED-WHILE-DISCONNECTED",
+    );
     await page.screenshot({ path: "tests/results/long-history-evidence.png" });
     // A reload receives new page records and acknowledges them again.
     await page.reload();
@@ -302,13 +327,13 @@ test("older evidence and open disclosures survive changes, completion, view swit
         collections: [],
       });
     const latest = page.locator('[id="hv-message-reply:79"]');
-    await latest.getByRole("button", { name: /2 commands/ }).click();
-    await latest.locator(".hv-did-row").last().click();
-    await expect(latest.locator(".hv-did-detail")).toContainText(
+    await expect(latest.locator(`#execution-${last.id}`)).toContainText(
       "COMPLETE-EVIDENCE",
     );
-    await old.getByRole("button", { name: /1 file read/ }).click();
-    await old.locator(".hv-did-row").first().click();
+    await expect(old.locator(".hv-did-row").first()).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     await expect(old.locator(".hv-did-detail")).toContainText("END-3");
     const detail = await page.request.get(
       `/api/applications/${app}/executions/${last.id}`,
@@ -348,6 +373,99 @@ test("older evidence and open disclosures survive changes, completion, view swit
     } finally {
       await worker();
     }
+  }
+});
+
+test("compact evidence keeps succeeded command output and release steps complete", async ({
+  page,
+  fixture,
+}) => {
+  const { app, executions, worker } = await setup(page, fixture, 6);
+  const command = `printf '${"command-".repeat(40)}END-COMMAND-1'`;
+  executions[0].input = command;
+  writeFileSync(
+    join(
+      fixture.state,
+      "operator",
+      app,
+      "executions",
+      `${executions[0].id}.json`,
+    ),
+    JSON.stringify(executions[0]),
+  );
+  const database = new Database(join(fixture.state, "qa.db"));
+  try {
+    const at = executions[1].finishedAt!;
+    database
+      .prepare(
+        "INSERT INTO saved_information (id,application_id,title,body,evidence,established_at,presentation,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      )
+      .run(
+        randomUUID(),
+        app,
+        "Synthetic release",
+        "",
+        JSON.stringify(
+          executions.slice(0, 2).map(({ id }) => ({ type: "execution", id })),
+        ),
+        at,
+        JSON.stringify({
+          views: ["deployment"],
+          role: "outcome",
+          status: "verified",
+          checks: [{ label: "Container started", status: "passed" }],
+          content: {
+            kind: "deployment",
+            repositoryUrl: "https://github.com/qa/history",
+            revision: "abcdef0123456789",
+            server: "fixture",
+            changes: ["Synthetic release"],
+          },
+        }),
+        at,
+        at,
+      );
+    let callReads = 0;
+    await page.route("**/calls/*", (route) => {
+      callReads++;
+      return route.continue();
+    });
+    await page.goto(`/applications/${app}`);
+    // The parked conversation keeps its UI mounted behind Overview. Even
+    // default-open live cards must wait until that conversation is visible.
+    await expect(page.locator(".hv-chat-parked #pi-composer")).toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "Overview", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await page.waitForTimeout(300);
+    expect(callReads).toBe(0);
+    await page
+      .getByRole("button", { name: "Main operator", exact: true })
+      .click();
+    await expect.poll(() => callReads).toBeGreaterThan(0);
+    await page.getByRole("button", { name: "Activity", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Command output", exact: true })
+      .click();
+    const logs = page.locator(".hv-section-logs");
+    await expect(logs).toContainText("END-1");
+    await expect(logs).toContainText("END-2");
+    await page.getByRole("button", { name: "Deployment", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: "Open abcdef0 · Synthetic release",
+        exact: true,
+      })
+      .click();
+    const terminal = page.locator(".hv-rg-term");
+    await expect(terminal).toContainText("END-2");
+    await page.locator(".hv-rg-split tbody tr").first().click();
+    await expect(terminal.locator("code")).toHaveText(command);
+    await expect(terminal).toContainText("END-1");
+    await expect(terminal).not.toContainText("END-2");
+  } finally {
+    database.close();
+    await worker();
   }
 });
 
@@ -690,4 +808,141 @@ test.describe("opening an application from the list and choosing its conversatio
         await worker();
       }
     });
+});
+
+test("profile disclosure loading with 2000 calls", async ({
+  page,
+  browser,
+  fixture,
+}, testInfo) => {
+  test.skip(
+    process.env.HALLVI_DISCLOSURE_PROFILE !== "1",
+    "Opt-in before/after profile.",
+  );
+  test.setTimeout(240_000);
+  const { app, chat, worker } = await setup(page, fixture, 2000);
+  const runs: object[] = [];
+  try {
+    // Warm server modules and file reads; each measured browser is fresh.
+    await page.goto(`/applications/${app}?chat=${chat}`);
+    await expect(page.locator('[id="hv-message-reply:666"]')).toBeInViewport();
+    await page.goto("/applications");
+    for (let round = 0; round < 3; round++) {
+      const context = await browser.newContext({
+        viewport: { width: 1440, height: 1000 },
+      });
+      const reader = await context.newPage();
+      try {
+        await reader.addInitScript(() => {
+          const marks: Record<string, number> = {};
+          Object.assign(window, { qaDisclosure: marks });
+          const Native = window.EventSource;
+          window.EventSource = class extends Native {
+            constructor(url: string | URL, options?: EventSourceInit) {
+              super(url, options);
+              if (!String(url).includes("/events")) return;
+              this.addEventListener("message", (event) => {
+                marks.firstFrameBytes ??= new TextEncoder().encode(
+                  `id: ${event.lastEventId}\ndata: ${event.data}\n\n`,
+                ).byteLength;
+              });
+            }
+          };
+          const watch = () => {
+            const latest = document.getElementById("hv-message-reply:666");
+            const box = latest?.getBoundingClientRect();
+            const port = latest
+              ?.closest(".hv-conversation")
+              ?.getBoundingClientRect();
+            if (box && port && box.bottom > port.top && box.top < port.bottom)
+              marks.contentReadyMs ??= performance.now();
+            const detail = document.querySelector(
+              '[id="hv-message-reply:1"] .hv-did-detail',
+            );
+            if (marks.openAt && detail?.textContent?.includes("END-3"))
+              marks.disclosureReadyMs ??= performance.now() - marks.openAt;
+            if (!marks.disclosureReadyMs) requestAnimationFrame(watch);
+          };
+          requestAnimationFrame(watch);
+        });
+        const response = await reader.goto(
+          `/applications/${app}?chat=${chat}`,
+          { waitUntil: "commit" },
+        );
+        await expect
+          .poll(() =>
+            reader.evaluate(
+              () =>
+                (window as unknown as { qaDisclosure: Record<string, number> })
+                  .qaDisclosure.contentReadyMs,
+            ),
+          )
+          .toBeGreaterThan(0);
+        await response!.finished();
+        const documentBytes = await reader.evaluate(
+          () =>
+            (
+              performance.getEntriesByType(
+                "navigation",
+              )[0] as PerformanceNavigationTiming
+            ).decodedBodySize,
+        );
+        await expect
+          .poll(() =>
+            reader.evaluate(
+              () =>
+                (window as unknown as { qaDisclosure: Record<string, number> })
+                  .qaDisclosure.firstFrameBytes,
+            ),
+          )
+          .toBeGreaterThan(0);
+        const old = reader.locator('[id="hv-message-reply:1"]');
+        await old.getByRole("button", { name: /1 file read/ }).click();
+        const row = old.locator(".hv-did-row").first();
+        await row.evaluate((element) =>
+          element.addEventListener(
+            "click",
+            () => {
+              (
+                window as unknown as { qaDisclosure: Record<string, number> }
+              ).qaDisclosure.openAt = performance.now();
+            },
+            { once: true },
+          ),
+        );
+        await row.click();
+        await expect(old.locator(".hv-did-detail")).toContainText("END-3");
+        await expect
+          .poll(() =>
+            reader.evaluate(
+              () =>
+                (window as unknown as { qaDisclosure: Record<string, number> })
+                  .qaDisclosure.disclosureReadyMs,
+            ),
+          )
+          .toBeGreaterThan(0);
+        runs.push({
+          round,
+          documentBytes,
+          ...(await reader.evaluate(
+            () =>
+              (window as unknown as { qaDisclosure: Record<string, number> })
+                .qaDisclosure,
+          )),
+        });
+      } finally {
+        await context.close();
+      }
+    }
+  } finally {
+    writeFileSync(
+      testInfo.outputPath("disclosure-profile.json"),
+      JSON.stringify(runs, null, 2),
+    );
+    await testInfo.attach("disclosure-profile", {
+      body: JSON.stringify(runs, null, 2),
+      contentType: "application/json",
+    });
+    await worker();
+  }
 });

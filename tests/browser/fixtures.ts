@@ -119,6 +119,7 @@ export const test = base.extend<
           `/api/applications/${missing}/chats`,
           `/api/applications/${missing}/chats/${missing}/messages`,
           `/api/applications/${missing}/chats/${missing}/events`,
+          `/api/applications/${missing}/chats/${missing}/calls/missing`,
           `/api/applications/${missing}/chats/${missing}/stop`,
           `/api/applications/${missing}/chats/${missing}/continue`,
           ...(freshSetup

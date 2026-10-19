@@ -5,6 +5,7 @@ import {
 } from "@/components/hallvi/reconnect-request";
 import type { ChatMessage } from "@/server/types";
 import type { ExecutionRecord } from "@/server/operator-execution";
+import { executionSummary } from "@/server/chat-evidence";
 import { record } from "../fixtures/records";
 
 it("recognizes only reconnect requests and keeps an in-flight request visible when the saved route changes", () => {
@@ -73,10 +74,14 @@ it("an HTTP observation must belong to the requested saved route", () => {
     tool: "open_server_port",
     status: "succeeded",
     output: JSON.stringify(result),
+    input: "{}",
   } as ExecutionRecord;
   expect(reconnectProgress([request, reply], [call], route)?.text).toContain(
     "Controller HTTP 503",
   );
+  expect(
+    reconnectProgress([request, reply], [executionSummary(call)], route)?.text,
+  ).toContain("Controller HTTP 503");
   call.output = JSON.stringify({ ...result, accessRecordId: "another-route" });
   expect(
     reconnectProgress([request, reply], [call], route)?.text,
