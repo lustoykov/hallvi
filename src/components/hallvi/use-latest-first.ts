@@ -40,9 +40,13 @@ export function useLatestFirst(conversationId: string | null, count: number) {
   const seen = useRef(0);
 
   // On its latest message before it is first shown, not after a journey.
+  // Replayed mount effects must not undo a message link that already landed.
+  const positioned = useRef<string | null | undefined>(undefined);
   useLayoutEffect(() => {
+    if (positioned.current === conversationId) return;
     const scroller = conversation.current?.scrollRef.current;
     if (!scroller) return;
+    positioned.current = conversationId;
     scroller.scrollTo({ top: scroller.scrollHeight });
     seen.current = scroller.scrollTop;
   }, [conversationId]);

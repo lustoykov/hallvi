@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-099 — Link captured output to a History event that exists](#af-099--link-captured-output-to-a-history-event-that-exists) | 1 | New |
 | [AF-098 — Recognize continued work in older conversations](#af-098--recognize-continued-work-in-older-conversations) | 1 | Fixed locally |
 | [AF-097 — Keep snapshot previews free of contributor credentials](#af-097--keep-snapshot-previews-free-of-contributor-credentials) | 1 | Fixed locally |
 | [AF-096 — Discover existing provider access before asking for tokens](#af-096--discover-existing-provider-access-before-asking-for-tokens) | 1 | New |
@@ -44,7 +45,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | Fixed locally |
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 5 | Handoff and lazy output implemented; full worker reads remain |
-| [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
+| [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 2 | Development replay fixed locally |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
 | [AF-073 — Say exactly when a request ended](#af-073--say-exactly-when-a-request-ended) | 1 | New |
@@ -69,6 +70,17 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-095 — Keep an early Home jump while a conversation opens](#af-095--keep-an-early-home-jump-while-a-conversation-opens) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-099 — Link captured output to a History event that exists
+
+Command output offers “See it in History” on every capture. On retained
+uptime-kuma, the latest successful standalone Docker-health and `uname` commands
+are intentionally absent from History's operation list; clicking the link opens
+generic History with no matching event. The output itself remains readable.
+Offer a specific event only where one exists, and avoid claiming the rest has
+one. No History event or relationship was invented during this sweep.
+
+**+1:** 2026-10-19 — normal-usage snapshot sweep, `bugs`.
 
 ### AF-098 — Recognize continued work in older conversations
 
@@ -440,7 +452,19 @@ were given the same fix without being measured separately. The fix tells the
 conversation the reader was taken somewhere; the long-history journey checks
 the message link.
 
+The normal-usage sweep also reproduced this on a short conversation whose target
+was already drawn on mount under `next dev`: StrictMode effect replay ran the
+initial latest position after the successful link jump. Initial positioning now
+runs once per conversation, so replay does not undo the link. A separate Chromium
+regression checks initial navigation, reload and the Latest action at 1440px and
+390px. It failed before the guard and passes afterward; no frame timing was
+injected. This short-history case did not reproduce in a production build with
+the new guard removed: navigation and reload kept the target visible at both
+widths. The new guard fixes the development replay, not a demonstrated production
+failure; the earlier long-history fix is retained.
+
 **+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
+**+1:** 2026-10-19 — normal-usage snapshot sweep, `bugs`.
 
 ### AF-069 — Carry a long conversation to the page once, and less of it
 
