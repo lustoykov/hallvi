@@ -2,7 +2,12 @@
 // sessions, and this asks the worker: for the transcript, to send, to
 // continue, to stop. Hallvi's execution evidence is placed into what comes
 // back by the id Pi gave each tool call.
-import { activityFromTranscript, callDetail } from "./pi-activity";
+import {
+  activityFromTranscript,
+  callDetail,
+  placeExecutions,
+  type TranscriptSummary,
+} from "./pi-activity";
 import { activitySummary, executionSummary } from "./chat-evidence";
 import type { CallDetail, CallReference } from "@/lib/call-detail";
 import {
@@ -57,36 +62,32 @@ function greeting(
  */
 function placeEvidence(
   applicationId: string,
-  transcript: Transcript,
+  transcript: Transcript | TranscriptSummary,
   executions: ExecutionRecord[],
 ) {
-  const { calls } = transcript;
-  const piActivity = activityFromTranscript({
-    applicationId,
-    transcript,
-    executions,
-  });
-  const executionOf = new Map(
-    piActivity.flatMap((record) =>
-      record.executionId ? [[record.id, record.executionId] as const] : [],
-    ),
+  const piActivity =
+    "piActivity" in transcript
+      ? placeExecutions(transcript.piActivity, executions)
+      : activityFromTranscript({ applicationId, transcript, executions });
+  const calls = new Map(
+    piActivity
+      .filter((record) => record.kind === "tool")
+      .map((record) => [record.id, record]),
   );
   const blocks = new Map<string, MessageBlock[]>();
-  for (const [toolCallId, call] of Object.entries(calls).sort(
-    ([, a], [, b]) => a.sequence - b.sequence,
-  )) {
-    const mine = blocks.get(call.replyId) ?? [];
-    const executionId = executionOf.get(toolCallId);
-    if (executionId) mine.push({ type: "execution", id: executionId });
+  for (const call of calls.values()) {
+    const mine = blocks.get(call.runId) ?? [];
+    if (call.executionId)
+      mine.push({ type: "execution", id: call.executionId });
     if (call.informationId)
       mine.push({ type: "saved-information", id: call.informationId });
-    blocks.set(call.replyId, mine);
+    blocks.set(call.runId, mine);
   }
   return {
     piActivity,
     executions: executions.map((record) => {
-      const call = record.toolCallId ? calls[record.toolCallId] : undefined;
-      return call ? { ...record, runId: call.replyId } : record;
+      const call = record.toolCallId ? calls.get(record.toolCallId) : undefined;
+      return call ? { ...record, runId: call.runId } : record;
     }),
     blocks,
   };
@@ -178,9 +179,13 @@ export async function chatSnapshot(
 ): Promise<ChatSnapshot> {
   const { application, chat } = await loadChat(applicationId, chatId);
   let worker = true;
-  const transcript = await askWorker<Transcript>("transcript", {
-    scope: { applicationId, chatId },
-  }).catch((error) => {
+  const transcript = await askWorker<Transcript | TranscriptSummary>(
+    "transcript",
+    {
+      scope: { applicationId, chatId },
+      message: compact ? { compact: true } : undefined,
+    },
+  ).catch((error) => {
     if (!(error instanceof WorkerUnavailableError)) throw error;
     worker = false;
     return NO_WORKER;
@@ -203,9 +208,11 @@ export async function chatSnapshot(
     executions: compact
       ? placed.executions.map(executionSummary)
       : placed.executions,
-    piActivity: compact
-      ? placed.piActivity.map(activitySummary)
-      : placed.piActivity,
+    // A worker kept alive across a dev refresh may ignore the compact flag.
+    piActivity:
+      compact && !("piActivity" in transcript)
+        ? placed.piActivity.map(activitySummary)
+        : placed.piActivity,
     information: (await listInformation(applicationId, "", true)).filter(
       (r) => r.presentation,
     ),

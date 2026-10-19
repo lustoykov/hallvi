@@ -35,6 +35,7 @@ import type { PiReply } from "./types";
 import { serveWorker, WorkerRefusal } from "./worker-link";
 import { notifyChange } from "./change-notifications";
 import { redactHeldSecrets } from "./application-secrets";
+import { summarizeTranscript } from "./pi-activity";
 
 export interface Scope {
   applicationId: string;
@@ -344,7 +345,48 @@ export function sessionOwner(
       );
   }
 
+  async function transcript(scope: Scope): Promise<Transcript> {
+    const running = working.get(scope.chatId);
+    // Read without waiting in line. One that is being closed as it is read
+    // is read again below, from what Pi stored.
+    const read = running && (await project(running).catch(() => undefined));
+    if (read) return read;
+    if (!hasConversation(scope)) return NOTHING;
+    return inLine(scope.chatId, async () => {
+      // It may have begun work while this waited its turn.
+      const now = working.get(scope.chatId);
+      return now
+        ? project(now)
+        : projectTranscript(scope.chatId, await stored(scope), false, (text) =>
+            redactHeldSecrets(scope.applicationId, text),
+          );
+    }).catch(async (error) => ({
+      // A history that cannot be opened is said where it would have been.
+      ...NOTHING,
+      messages: [
+        {
+          id: `unavailable:${scope.chatId}`,
+          chatId: scope.chatId,
+          role: "assistant" as const,
+          body: "",
+          source: "pi" as const,
+          status: "failed" as const,
+          error: error instanceof Error ? error.message : String(error),
+          createdAt: (await loadChat(scope.applicationId, scope.chatId)).chat
+            .createdAt,
+          revision: 0,
+        },
+      ],
+    }));
+  }
+
   const actions = {
+    async transcript(scope: Scope, message?: { compact?: boolean }) {
+      const full = await transcript(scope);
+      return message?.compact === true
+        ? summarizeTranscript(scope.applicationId, full)
+        : full;
+    },
     /** Read the delivered call's two immutable entries, without a scan. */
     async call(scope: Scope, message: unknown) {
       const { id, entryId, resultEntryId } = message as {
@@ -394,44 +436,6 @@ export function sessionOwner(
         }
       });
     },
-    async transcript(scope: Scope): Promise<Transcript> {
-      const running = working.get(scope.chatId);
-      // Read without waiting in line. One that is being closed as it is read
-      // is read again below, from what Pi stored.
-      const read = running && (await project(running).catch(() => undefined));
-      if (read) return read;
-      if (!hasConversation(scope)) return NOTHING;
-      return inLine(scope.chatId, async () => {
-        // It may have begun work while this waited its turn.
-        const now = working.get(scope.chatId);
-        return now
-          ? project(now)
-          : projectTranscript(
-              scope.chatId,
-              await stored(scope),
-              false,
-              (text) => redactHeldSecrets(scope.applicationId, text),
-            );
-      }).catch(async (error) => ({
-        // A history that cannot be opened is said where it would have been.
-        ...NOTHING,
-        messages: [
-          {
-            id: `unavailable:${scope.chatId}`,
-            chatId: scope.chatId,
-            role: "assistant" as const,
-            body: "",
-            source: "pi" as const,
-            status: "failed" as const,
-            error: error instanceof Error ? error.message : String(error),
-            createdAt: (await loadChat(scope.applicationId, scope.chatId)).chat
-              .createdAt,
-            revision: 0,
-          },
-        ],
-      }));
-    },
-
     /** One image the owner attached to a message, as Pi keeps it. */
     async image(scope: Scope, message: unknown) {
       const { id, index } = message as { id: string; index: number };
@@ -701,7 +705,7 @@ export function sessionOwner(
       // may have begun opening the conversation before the watch checked.
       send: (scope: Scope, message: SentMessage) =>
         actions.send(scope, message, true),
-      transcript: actions.transcript,
+      transcript,
     },
     /** Requests that are not about a conversation, for whoever owns them. */
     also: {} as Record<

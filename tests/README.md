@@ -120,6 +120,14 @@ Current call rows carry immutable Pi entry addresses: the same check covers
 exact call reads and direct execution UUID reads without a full transcript or
 execution scan. The native Pi owner/session checks exercise those addresses,
 redaction, restart and read-only storage through the real worker/socket.
+Page snapshots ask the existing worker transcript request for compact rows;
+older workers can ignore the flag and their full reply is compacted locally.
+The same checks compare compact/full execution outcomes, saved-information
+blocks and omitted-content versions. Full transcript readers and older pages
+keep the full path. Navigation deliberately reads twice: once for the document,
+then after subscribing to SSE, covering changes made in the gap. Fingerprints
+acknowledge matching content, not its freshness; the stream test checks a change
+before subscription even when no notice was observed.
 `long-history-responses.spec.ts` verifies that unchanged page collections are
 acknowledged, then keeps old evidence disclosures and live output usable through updates and
 reconnect. A disposable proxy ends the actual SSE response; the journey checks

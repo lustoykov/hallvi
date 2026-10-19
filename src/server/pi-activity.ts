@@ -19,6 +19,8 @@
 
 import type { ExecutionRecord } from "./operator-execution";
 import type { Transcript, TranscriptCall } from "./pi-transcript";
+import type { ActivitySummary } from "@/lib/call-detail";
+import { activitySummary } from "./chat-evidence";
 import { redactSecrets } from "./secrets";
 
 /** How much of a tool's argument or result is worth keeping for a reader. */
@@ -64,6 +66,7 @@ export interface ActivityRecord {
    * instead of a second row for the same work.
    */
   executionId?: string;
+  informationId?: string;
   entryId?: number;
   resultEntryId?: number;
   /** True when the stored text was cut to its limit. */
@@ -85,6 +88,49 @@ const fromExecution: Record<ExecutionRecord["status"], ActivityStatus> = {
   declined: "declined",
   interrupted: "interrupted",
 };
+
+/** Join the executor's outcomes after either a full or a compact Pi read. */
+export function placeExecutions(
+  activity: ActivityRecord[],
+  executions: ExecutionRecord[],
+): ActivityRecord[] {
+  if (!executions.length) return activity;
+  const byCall = new Map(
+    executions.flatMap((record) =>
+      record.toolCallId ? [[record.toolCallId, record] as const] : [],
+    ),
+  );
+  return activity.map((record) => {
+    const execution = record.kind === "tool" && byCall.get(record.id);
+    return execution
+      ? {
+          ...record,
+          status: fromExecution[execution.status],
+          executionId: execution.id,
+        }
+      : record;
+  });
+}
+
+/** The page needs rows and immutable addresses, never closed call output. */
+export type TranscriptSummary = Pick<Transcript, "status" | "messages"> & {
+  piActivity: ActivitySummary[];
+};
+
+export function summarizeTranscript(
+  applicationId: string,
+  transcript: Transcript,
+): TranscriptSummary {
+  return {
+    status: transcript.status,
+    messages: transcript.messages,
+    piActivity: activityFromTranscript({
+      applicationId,
+      transcript,
+      executions: [],
+    }).map(activitySummary),
+  };
+}
 
 /**
  * A tool result is usually `{content:[{type:"text",text}]}`. Reading the text
@@ -159,11 +205,6 @@ export function activityFromTranscript(input: {
   executions: ExecutionRecord[];
 }): ActivityRecord[] {
   const { applicationId, transcript } = input;
-  const executionOf = new Map(
-    input.executions.flatMap((record) =>
-      record.toolCallId ? [[record.toolCallId, record] as const] : [],
-    ),
-  );
   /**
    * Whether the reply a call belongs to is the one being written now.
    *
@@ -180,7 +221,6 @@ export function activityFromTranscript(input: {
   );
   const tools: ActivityRecord[] = Object.entries(transcript.calls).map(
     ([id, call]) => {
-      const execution = executionOf.get(id);
       return {
         ...callDetail(id, call),
         kind: "tool" as const,
@@ -188,16 +228,14 @@ export function activityFromTranscript(input: {
         runId: call.replyId,
         sequence: call.sequence,
         tool: call.tool,
-        status: execution
-          ? fromExecution[execution.status]
-          : call.result
-            ? call.result.failed
-              ? "failed"
-              : "succeeded"
-            : live.get(call.replyId)
-              ? "running"
-              : "interrupted",
-        executionId: execution?.id,
+        status: call.result
+          ? call.result.failed
+            ? "failed"
+            : "succeeded"
+          : live.get(call.replyId)
+            ? "running"
+            : "interrupted",
+        informationId: call.informationId,
         entryId: call.entryId,
         resultEntryId: call.resultEntryId,
         startedAt: call.at,
@@ -233,7 +271,10 @@ export function activityFromTranscript(input: {
   });
   const place = (runId: string) =>
     order.get(runId) ?? transcript.messages.length;
-  return [...tools, ...said].sort(
-    (a, b) => place(a.runId) - place(b.runId) || a.sequence - b.sequence,
+  return placeExecutions(
+    [...tools, ...said].sort(
+      (a, b) => place(a.runId) - place(b.runId) || a.sequence - b.sequence,
+    ),
+    input.executions,
   );
 }

@@ -29,6 +29,8 @@ vi.mock("../../../src/server/saved-information", () => ({
 }));
 
 import { chatSnapshot } from "../../../src/server/pi-conversation";
+import { summarizeTranscript } from "../../../src/server/pi-activity";
+import { activitySummary } from "../../../src/server/chat-evidence";
 import { GET } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/calls/[callId]/route";
 import {
   chatStreamBaseline,
@@ -41,13 +43,54 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.worker.mockImplementation(async (_action, body) =>
     body.scope.chatId === "chat"
-      ? history.transcript
+      ? body.message?.compact
+        ? summarizeTranscript("app", history.transcript)
+        : history.transcript
       : { status: "idle", messages: [], calls: {}, said: [] },
   );
   mocks.executions.mockImplementation(async () => history.executions);
   mocks.execution.mockImplementation(async (_app, id) =>
     history.executions.find((record) => record.id === id),
   );
+});
+
+it("joins lean worker rows exactly like the full transcript, retaining saved information and execution outcomes", async () => {
+  history.transcript.calls["call:3"].informationId = "saved-finding";
+  history.executions[0].status = "declined";
+  const full = await chatSnapshot("app", "chat", false);
+  expect(
+    full.piActivity.find((record) => record.id === "call:3")?.result,
+  ).toContain("END-3");
+  expect(full.executions[0].output).toContain("END-1");
+  expect(mocks.worker).toHaveBeenLastCalledWith(
+    "transcript",
+    expect.anything(),
+  );
+  const lean = await chatSnapshot("app", "chat");
+  expect(mocks.worker).toHaveBeenLastCalledWith("transcript", {
+    scope: { applicationId: "app", chatId: "chat" },
+    message: { compact: true },
+  });
+  expect(lean.piActivity).toEqual(full.piActivity.map(activitySummary));
+  expect(lean.messages).toEqual(full.messages);
+  expect(lean.executions[0]).toMatchObject({
+    runId: "reply:0",
+    status: "declined",
+  });
+  expect(
+    lean.messages.some((message) =>
+      message.blocks?.some(
+        (block) =>
+          block.type === "saved-information" && block.id === "saved-finding",
+      ),
+    ),
+  ).toBe(true);
+  const wire = JSON.stringify(summarizeTranscript("app", history.transcript));
+  expect(wire).not.toContain("END-3");
+  expect(wire).toContain('"entryId":7');
+  // An older worker ignores the flag and returns its original full shape.
+  mocks.worker.mockResolvedValue(history.transcript);
+  expect(await chatSnapshot("app", "chat")).toEqual(lean);
 });
 
 it("reads an addressed Pi call or execution without requesting or projecting the whole conversation", async () => {

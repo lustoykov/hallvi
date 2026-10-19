@@ -712,6 +712,24 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
   const call = snapshot.piActivity!.find((record) => record.kind === "tool")!;
   expect(call.entryId).toBeGreaterThan(0);
   expect(call.resultEntryId).toBeGreaterThan(call.entryId!);
+  const lean = await askWorker<{ piActivity: typeof snapshot.piActivity }>(
+    "transcript",
+    {
+      scope: { applicationId: a.id, chatId: a.chat },
+      message: { compact: true },
+    },
+  );
+  expect(lean).not.toHaveProperty("calls");
+  expect(lean).not.toHaveProperty("operations");
+  expect(
+    lean.piActivity!.find((record) => record.id === call.id),
+  ).toMatchObject({
+    entryId: call.entryId,
+    resultEntryId: call.resultEntryId,
+    detailVersion: call.detailVersion,
+    preview: "",
+    result: "",
+  });
   const exact = await readCallDetail(a.id, a.chat, call.id, call);
   expect(exact.activity?.id).toBe(call.id);
   expect(exact.activity?.args).toContain("Restart the service");

@@ -91,8 +91,8 @@ export function serialize(frame: object, incremental: boolean, diffMs = 0) {
   let conversation = readFileSync(conversationPath, "utf8");
   conversation = replace(
     conversation,
-    "const { calls } = transcript;",
-    "const atProjection = performance.now();\n  const { calls } = transcript;",
+    "  const piActivity =\n",
+    "  const atProjection = performance.now();\n  const piActivity =\n",
   );
   conversation = replace(
     conversation,

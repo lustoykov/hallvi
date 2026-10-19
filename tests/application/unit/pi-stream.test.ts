@@ -162,6 +162,20 @@ it("acknowledges page records after a fresh read and keeps notices received duri
   expect(await frame(reader)).toContain('"revision":2');
 });
 
+it("reads a change between page render and subscription even without a notice", async () => {
+  const baseline = chatStreamBaseline("app", "chat", snapshot(1));
+  mocks.snapshot.mockResolvedValue(snapshot(2));
+  const response = await GET(
+    new Request(`http://localhost/events?changes=1&baseline=${baseline}`, {
+      signal: controller.signal,
+    }),
+    context,
+  );
+  const initial = await frame(response.body!.getReader());
+  expect(initial).toContain('"revision":2');
+  expect(mocks.snapshot).toHaveBeenCalledOnce();
+});
+
 it("older clients still receive full reconnect state", async () => {
   const baseline = chatStreamBaseline("app", "chat", snapshot(1));
   const response = await GET(

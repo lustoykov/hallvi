@@ -44,7 +44,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | Fixed locally |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | Fixed locally |
-| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 6 | Exact call reads implemented; full snapshots remain |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 7 | Lean worker responses implemented; durable scans remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 2 | Development replay fixed locally |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
@@ -535,10 +535,21 @@ the historical disclosure fell from 121.5 to 35.7 ms median (three fresh context
 its HTTP request took 4.7 ms and made zero transcript reads. The roughly 15 ms
 browser target remains unmet. A separate real Pi SQLite benchmark (2,000 calls,
 15 samples after five warmups) measured exact entry reads at 0.095 ms versus
-17.48 ms for full history, before projection. Full snapshots still scan/project:
-the fixture's worker transport/parse took 51.44 ms and app activity projection
-12.05 ms median per read; its full worker response was 11,590,360 bytes. Removing
-that snapshot work needs a separate change; no cache was added.
+17.48 ms for full history, before projection.
+Page snapshots now request compact rows directly from the worker, keeping the
+same redaction, omitted-content versions and entry addresses. Older workers can
+ignore the flag and their full response is compacted locally; full transcript
+consumers and older pages retain full reads. Against the prior quiet fixture,
+worker response bytes fell from 11,590,360 to 1,798,320; app placement fell from
+12.05 to 0.64 ms median, and content readiness from 324.8 to 277.5 ms (three fresh
+contexts). Worker round-trip rose from 51.44 to 59.23 ms as redaction/hashing moved
+into it; JSON parse fell from 10.31 to 2.54 ms. Two reads per navigation remain
+deliberately: document render, then a fresh read after SSE subscription, covering
+changes in that gap. Fingerprints alone cannot establish freshness. Pi still
+scans its durable history; no cache was added. A separate real Pi SQLite/owner/
+socket comparison (15 samples after five warmups, same-process endpoints) cut
+11,236,136 to 1,369,521 bytes but increased raw worker round-trip from 70.83 to
+77.45 ms; that comparison excludes the full reader's additional app projection.
 
 **+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
 **+1:** 2026-10-02 — native production speed/snappiness audit,
@@ -550,6 +561,8 @@ that snapshot work needs a separate change; no cache was added.
 **+1:** 2026-10-19 — disclosure output on demand and production-fixture comparison,
 `perf`.
 **+1:** 2026-10-19 — exact call reads and remaining snapshot/render measurements,
+`perf`.
+**+1:** 2026-10-19 — lean worker snapshots and fresh-read gap verification,
 `perf`.
 
 ### AF-068 — Remove the mascot placements nothing draws

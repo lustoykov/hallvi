@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 
 import { workerSocketPath } from "../../scripts/worker-socket.mjs";
 import type { Transcript } from "../../src/server/pi-transcript";
+import { summarizeTranscript } from "../../src/server/pi-activity";
 import { ownChangeNotifications } from "../../src/server/change-notifications";
 
 /**
@@ -59,7 +60,12 @@ export async function scriptWorker(
       if (incoming.url === "/send") onSend?.(JSON.parse(body));
       if (incoming.url === "/transcript") transcriptReads++;
       let result: unknown = {};
-      if (incoming.url === "/transcript") result = transcript();
+      if (incoming.url === "/transcript") {
+        const { scope, message } = JSON.parse(body);
+        result = message?.compact
+          ? summarizeTranscript(scope.applicationId, transcript())
+          : transcript();
+      }
       if (incoming.url === "/call") {
         const { id, entryId, resultEntryId } = JSON.parse(body).message;
         const call = transcript().calls[id];
