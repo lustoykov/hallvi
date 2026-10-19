@@ -40,7 +40,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 | [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 2 | Guidance added |
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 2 | Fixed locally |
-| [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
+| [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | Fixed locally |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | Fixed locally |
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 5 | Handoff and lazy output implemented; full worker reads remain |
@@ -54,13 +54,13 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 3 | New |
 | [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | Fixed locally |
 | [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | New |
-| [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 2 | Scroll hint in review; stacked layout open |
+| [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 2 | Fixed locally |
 | [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 2 | Fix in review |
 | [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | Fixed locally |
 | [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
 | [AF-085 — Render reply tables in the plugin panel](#af-085--render-reply-tables-in-the-plugin-panel) | 1 | New |
-| [AF-086 — Keep expanded Terminal focus visible](#af-086--keep-expanded-terminal-focus-visible) | 1 | New |
-| [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | New |
+| [AF-086 — Keep expanded Terminal focus visible](#af-086--keep-expanded-terminal-focus-visible) | 1 | Fixed locally |
+| [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | Fixed locally |
 | [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | Fixed locally |
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 | [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; final-frame gap unconfirmed |
@@ -215,6 +215,10 @@ interaction decision beyond a CSS containment fix.
 
 **+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
 
+**Resolved 2026-10-19:** the address popover makes what it covers inert and
+returns focus to its opener; the menu closes when focus leaves it and its
+button.
+
 ### AF-086 — Keep expanded Terminal focus visible
 
 On a phone, Shift+Tab from expanded Terminal's Restore control can focus
@@ -224,6 +228,10 @@ input has focus, Tab and Escape belong to the terminal session. Decide how focus
 should stay visible while expanded without taking those keys from the shell.
 
 **+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
+
+**Resolved 2026-10-19:** the expanded terminal makes the workspace inert,
+and at phone width, where it covers the screen, the top bar and navigation
+too. Keys inside the terminal are unchanged.
 
 ### AF-085 — Render reply tables in the plugin panel
 
@@ -291,6 +299,11 @@ narrow screens is a design question, not a fix.
 **+1:** 2026-10-02 — smooth UI pass, `codex/ui-smooth-polish`: reproduced
 the hidden columns in a narrow window. Added a width-aware scroll hint and
 keyboard scrolling to the shared table. A stacked-row design remains open.
+
+**Resolved 2026-10-19:** a register narrower than 600px stacks each row: its
+name and open control, then each column as a named value. Rows open in place
+and nothing scrolls sideways; the scroll hint remains only between 600px and
+719px.
 
 ### AF-079 — Decide the shell's button font reset
 
@@ -530,6 +543,11 @@ two is stale, and anything aligned to the column from the document lands 16px
 off.
 
 **+1:** 2026-10-01 — alpha strip polish, `claude/alpha-notice-polish`.
+
+**Resolved 2026-10-19:** the code was right. The 224px rule at the top of
+`application-shell.css` was dead, overridden by 240px further down; 224px
+applies only at 1100px and below. The rule is gone and the Layout section
+says both.
 
 ### AF-065 — Show a failed recovery-kit read
 
