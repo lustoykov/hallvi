@@ -61,8 +61,9 @@ test(
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {
       timeout: 30_000,
     });
-    const conversation = page.url();
     await openConversation(page);
+    // Where the reader is once in the conversation: connecting never leaves it.
+    const conversation = page.url();
 
     const composer = page.getByRole("textbox", {
       name: "Message Hallvi",
