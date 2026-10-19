@@ -53,7 +53,7 @@ import {
   type ScriptAsk,
 } from "./model";
 import { useMoment } from "./moment";
-import { useCollection, useHistory } from "./source";
+import { type useCollection, useHistory } from "./source";
 import { SimulateTraffic } from "./simulate";
 import { TrafficChart } from "./traffic-chart";
 import { ScriptOffers } from "./script-offer";
@@ -448,8 +448,9 @@ export function TrafficPage({
   reachable = "checking",
   onReopen,
   onAsk,
-}: Destination) {
-  const { collection, act } = useCollection(applicationId);
+  trafficCollection,
+}: Destination & { trafficCollection: ReturnType<typeof useCollection> }) {
+  const { collection, act } = trafficCollection;
   const listed = trafficListed(collection);
   const [range, setRange] = useState<TrafficRange>("7d");
   const today = useHistory(applicationId, "24h", listed);

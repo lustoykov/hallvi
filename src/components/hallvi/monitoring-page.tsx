@@ -19,8 +19,8 @@ import {
 import { MonitoringUsage } from "./monitoring-usage";
 import { AskButton, MonitoringLede, WatchingMap } from "./monitoring-watching";
 import { EmptySketch } from "./empty-sketch";
-import { hasTotals, trafficListed } from "./traffic/model";
-import { useCollection, useHistory } from "./traffic/source";
+import { hasTotals } from "./traffic/model";
+import { useHistory } from "./traffic/source";
 
 export function MonitoringPage({
   records,
@@ -31,7 +31,8 @@ export function MonitoringPage({
   onReopen,
   bar,
   onAsk,
-}: Destination) {
+  trafficKept: kept = false,
+}: Destination & { trafficKept?: boolean }) {
   const story = useMemo(
     () =>
       monitoringFromRecords({ records, applicationId, applicationName, now }),
@@ -47,7 +48,6 @@ export function MonitoringPage({
   );
   // Where the owner keeps traffic history, its totals answer the traffic
   // questions here, kept current, instead of a day Pi read.
-  const kept = trafficListed(useCollection(applicationId).collection);
   const counted = useHistory(applicationId, "24h", kept).history;
   const history = kept && hasTotals(counted) ? counted : null;
 

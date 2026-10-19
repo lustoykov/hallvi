@@ -217,6 +217,7 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
 
 export function ReleasesPanel({
   view,
+  trafficKept = false,
   applicationId = null,
   records = [],
   executions = [],
@@ -229,6 +230,7 @@ export function ReleasesPanel({
   onFollow,
 }: {
   view: ReleaseView;
+  trafficKept?: boolean;
   /**
    * Whose traffic to read beside each release. Absent, or an application
    * that keeps no traffic history, and the rows say nothing about it.
@@ -260,7 +262,7 @@ export function ReleasesPanel({
   const reconnect = useReconnectAction();
   const [filter, setFilter] = useState("all");
   // What followed each release, where the application keeps history.
-  const impacts = useReleaseImpacts(applicationId, view.all);
+  const impacts = useReleaseImpacts(applicationId, view.all, trafficKept);
   const said = releaseHeadline(view);
   const { running, latest, access } = view;
   // The current address is offered only after its observation answers. For a

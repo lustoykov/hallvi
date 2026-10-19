@@ -7,7 +7,7 @@
 import type { ReleaseImpact } from "@/server/traffic/contract";
 
 import { comparedWords, impactLine } from "./model";
-import { useImpacts, useTrafficListed } from "./source";
+import { useImpacts } from "./source";
 import "./traffic.css";
 
 /** Only the newest releases are asked about; older ones have settled. */
@@ -16,8 +16,8 @@ const ASKED = 20;
 export function useReleaseImpacts(
   applicationId: string | null,
   releases: { at: string }[],
+  listed: boolean,
 ) {
-  const listed = useTrafficListed(applicationId);
   return useImpacts(
     listed ? applicationId : null,
     releases.slice(0, ASKED).map((release) => release.at),

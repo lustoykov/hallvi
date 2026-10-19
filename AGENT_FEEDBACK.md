@@ -5,7 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
-| [AF-100 — Stop observations while their page is hidden](#af-100--stop-observations-while-their-page-is-hidden) | 1 | Fixed locally |
+| [AF-100 — Stop observations while their page is hidden](#af-100--stop-observations-while-their-page-is-hidden) | 2 | Hidden and repeated reads fixed; hash mount remains |
 | [AF-099 — Link captured output to a History event that exists](#af-099--link-captured-output-to-a-history-event-that-exists) | 1 | Fixed locally |
 | [AF-098 — Recognize continued work in older conversations](#af-098--recognize-continued-work-in-older-conversations) | 1 | Fixed locally |
 | [AF-097 — Keep snapshot previews free of contributor credentials](#af-097--keep-snapshot-previews-free-of-contributor-credentials) | 1 | Fixed locally |
@@ -85,7 +85,28 @@ stream keeps its recovery behavior. No cache was added. A browser regression
 dispatches visibility changes and advances polling timers; the snapshot count
 uses 65 real seconds with visibility overridden, not native tab throttling.
 
+The first opening stream frame also treated completed replies already on the
+page as new outcomes, repeating access and metadata reads. Its comparison now
+starts with the held baseline; changed completed outcomes still refresh both.
+The shell owns the existing collection hook and passes its answer/actions to
+destinations, replacing the second Overview/Monitoring/Deployment/Traffic
+collection readers without another cache or store.
+On the same retained snapshot with Chromium's 80 ms network latency enabled
+(three fresh contexts per route), first-open requests fell from 15 to 12 on
+Overview, 15 to 11 on Deployment, 18 to 14 on Traffic, 13 to 10 on History and
+Backups, 14 to 11 on Logs, and 20 to 18 in the conversation. Each now makes one
+access, metadata and collection read. Traffic's median content readiness fell
+from 1,072.8 to 950.0 ms; the other routes changed little. A small fetch probe
+took 87–92 ms. This is local emulation, not a live remote-controller result.
+
+**Remaining:** a direct Traffic hash link first server-renders Overview, then
+restores Traffic in the browser. It still opens and closes Overview's traffic
+stream before opening Traffic's. The URL fragment is unavailable to the server;
+avoiding that mount needs a hydration/observation gate or a routing change,
+beyond this simple ownership handoff. No extra gate was added.
+
 **+1:** 2026-10-19 — ordinary retained-snapshot performance profile, `perf`.
+**+1:** 2026-10-19 — first-open observation ownership, `perf`.
 
 ### AF-099 — Link captured output to a History event that exists
 

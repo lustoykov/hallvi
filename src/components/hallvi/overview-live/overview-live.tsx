@@ -29,7 +29,7 @@ import type { ReleaseView } from "../release-records";
 import { NowWords, Pulse as Arriving } from "../traffic/live";
 import { hasTotals, milliseconds, trafficListed } from "../traffic/model";
 import { VisitorsToday } from "../traffic/overview-visitors";
-import { useCollection, useHistory } from "../traffic/source";
+import { useHistory } from "../traffic/source";
 import { useTraffic } from "./use-traffic";
 import "./overview-live.css";
 
@@ -326,6 +326,7 @@ export function OverviewLive({
   built,
   usage,
   releases,
+  collection = null,
   now,
   bar,
   openUrl,
@@ -343,6 +344,7 @@ export function OverviewLive({
   usage: Usage | null;
   /** Which release is running, and the ones before it. */
   releases: Pick<ReleaseView, "running" | "latest" | "all">;
+  collection?: Collection | null;
   now: number;
   /** The way back to the conversation. */
   bar: ReactNode;
@@ -357,7 +359,6 @@ export function OverviewLive({
   const pulse = usePulse();
   // Where traffic history is kept, the card and the facts under it come from
   // stored totals rather than a day Pi read.
-  const { collection } = useCollection(applicationId);
   const kept = trafficListed(collection);
   const month = useHistory(applicationId, "30d", kept).history;
   const counted = useHistory(applicationId, "24h", kept).history;

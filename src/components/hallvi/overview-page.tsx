@@ -11,6 +11,7 @@ import { currentAccessRecord } from "@/server/access-record";
 
 import { useMemo, type ReactNode } from "react";
 
+import type { Collection } from "@/server/traffic/contract";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationRecord, ChatSummary } from "@/server/types";
@@ -136,6 +137,7 @@ export function OverviewPage({
   now,
   bar,
   reduced,
+  collection = null,
   reachable = "checking",
   onReopen,
   onOpenConversation,
@@ -150,6 +152,7 @@ export function OverviewPage({
   /** The way back to the conversation. */
   bar: ReactNode;
   reduced: boolean;
+  collection?: Collection | null;
   reachable?: Reachability;
   /** Asks Pi to reopen private access. Absent hides the offer. */
   onReopen?: () => void;
@@ -228,6 +231,7 @@ export function OverviewPage({
         built={built}
         usage={usage}
         releases={releases}
+        collection={collection}
         now={now}
         bar={bar}
         openUrl={openUrl}

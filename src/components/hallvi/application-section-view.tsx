@@ -28,6 +28,8 @@ import { AccessPage } from "./access-page";
 import { SupplyPageView, type SupplyPage } from "./supply-pages";
 import { StoragePage } from "./storage-page";
 import { TrafficPage } from "./traffic/traffic-page";
+import type { useCollection } from "./traffic/source";
+import { trafficListed } from "./traffic/model";
 
 // The line under each destination's heading, and the first sentence a reader
 // gets about a page. So it may not describe a page that no longer exists.
@@ -73,6 +75,7 @@ export function ApplicationSectionView({
   section,
   view,
   facts = {},
+  trafficCollection,
   now,
   reachable = "checking",
   onReopen,
@@ -86,6 +89,7 @@ export function ApplicationSectionView({
   section: ApplicationSection;
   view: OperatorView;
   facts?: ApplicationFacts;
+  trafficCollection: ReturnType<typeof useCollection>;
   now: number;
   /** Whether a private way in still answers; see PageHead. */
   reachable?: Reachability;
@@ -137,6 +141,7 @@ export function ApplicationSectionView({
         </div>
       </div>
     );
+  const trafficKept = trafficListed(trafficCollection.collection);
   const destination = {
     records: information,
     applicationId: app.id,
@@ -156,6 +161,7 @@ export function ApplicationSectionView({
         chats={view.chats}
         now={now}
         reduced={false}
+        collection={trafficCollection.collection}
         reachable={reachable}
         onReopen={onReopen}
         bar={bar}
@@ -187,12 +193,16 @@ export function ApplicationSectionView({
         onOpenDestination={onOpenDestination}
       />
     );
-  if (section === "traffic") return <TrafficPage {...destination} />;
+  if (section === "traffic")
+    return (
+      <TrafficPage {...destination} trafficCollection={trafficCollection} />
+    );
   if (section === "deployment")
     return (
       <DeploymentPage
         {...destination}
         executions={view.executions ?? []}
+        trafficKept={trafficKept}
         source={
           view.deployment && {
             applicationId: app.id,
@@ -230,7 +240,8 @@ export function ApplicationSectionView({
         onRefresh={onRefresh}
       />
     );
-  if (section === "monitoring") return <MonitoringPage {...destination} />;
+  if (section === "monitoring")
+    return <MonitoringPage {...destination} trafficKept={trafficKept} />;
   if (section === "database")
     return (
       <DatabasePage {...destination} onOpenDestination={onOpenDestination} />

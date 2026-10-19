@@ -33,6 +33,7 @@ export function DeploymentPage({
   applicationId = null,
   applicationName,
   source,
+  trafficKept = false,
   now,
   reachable = "checking",
   onReopen,
@@ -46,6 +47,7 @@ export function DeploymentPage({
   /** Whose traffic to set beside each release; absent draws none. */
   applicationId?: string | null;
   applicationName: string;
+  trafficKept?: boolean;
   /**
    * How it deploys and what the branch watch has seen. Absent where the page
    * is drawn from invented records, which have no worker behind them.
@@ -138,6 +140,7 @@ export function DeploymentPage({
         {hasReleases ? (
           <ReleasesPanel
             view={releases}
+            trafficKept={trafficKept}
             applicationId={applicationId}
             records={records}
             executions={executions}

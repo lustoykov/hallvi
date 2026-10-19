@@ -14,7 +14,6 @@ import type {
 } from "@/server/traffic/contract";
 
 import { api } from "../api";
-import { trafficListed } from "./model";
 import { usePageVisible } from "../use-page-visible";
 
 export type CollectionAction = "keep" | "stop" | "forget";
@@ -89,11 +88,6 @@ export function useCollection(applicationId: string | null | undefined) {
     );
   };
   return { collection, act };
-}
-
-/** Whether this application lists Traffic, for the sidebar. */
-export function useTrafficListed(applicationId: string | null | undefined) {
-  return trafficListed(useCollection(applicationId).collection);
 }
 
 /**

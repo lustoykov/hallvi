@@ -52,7 +52,8 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ApplicationNavigation } from "./application-navigation";
-import { useTrafficListed } from "./traffic/source";
+import { useCollection } from "./traffic/source";
+import { trafficListed } from "./traffic/model";
 import "./application-shell.css";
 import "./views.css";
 import { OperatorConsole } from "./operator-console";
@@ -446,7 +447,8 @@ export function OperatorShell({
   }
 
   // Traffic is listed on the owner's standing choice, which is not a record.
-  const trafficKept = useTrafficListed(applicationId);
+  const trafficCollection = useCollection(applicationId);
+  const trafficKept = trafficListed(trafficCollection.collection);
   const listedHere = useMemo(
     () =>
       standings(
@@ -468,7 +470,6 @@ export function OperatorShell({
     const observedChats = new Set([selectedChatId]);
     if (observedMainId) observedChats.add(observedMainId);
     const subscriptions = [...observedChats].map((chatId) => {
-      let outcomeVersion = "";
       // Each chat owns its baseline: page records on first connect, then the
       // latest delivered snapshot when native EventSource reconnects.
       let streamed: ChatSnapshot | null = null;
@@ -477,6 +478,17 @@ export function OperatorShell({
         bootstrap.current.chatId === chatId
           ? bootstrap.current
           : null;
+      // The opening frame acknowledges these outcomes; it is not new work.
+      const outcomes = (messages: ChatSnapshot["messages"]) =>
+        messages
+          .filter((settled) => settled.finishedAt)
+          .map((settled) => `${settled.id}:${settled.revision}`)
+          .join(";");
+      let outcomeVersion = outcomes(
+        initialBaseline?.collections.messages ??
+          observedSnapshots.get(`${applicationId}/${chatId}`)?.messages ??
+          (held.current.selectedChatId === chatId ? held.current.messages : []),
+      );
       const stream = new EventSource(
         `/api/applications/${applicationId}/chats/${chatId}/events?changes=1&resume=1&details=lazy${
           initialBaseline ? `&baseline=${initialBaseline.token}` : ""
@@ -559,10 +571,7 @@ export function OperatorShell({
             });
           }
         }
-        const nextVersion = snapshot.messages
-          .filter((settled) => settled.finishedAt)
-          .map((settled) => `${settled.id}:${settled.revision}`)
-          .join(";");
+        const nextVersion = outcomes(snapshot.messages);
         if (nextVersion !== outcomeVersion) {
           outcomeVersion = nextVersion;
           refreshAccess();
@@ -1178,6 +1187,7 @@ export function OperatorShell({
                   key={`${applicationId}:${activeSection}`}
                   section={activeSection}
                   view={view}
+                  trafficCollection={trafficCollection}
                   reachable={reachable}
                   onReopen={askToReopen}
                   now={now}

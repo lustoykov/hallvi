@@ -210,6 +210,11 @@ polling when the conversation is parked behind another destination. It dispatche
 visibility changes without freezing browser execution, then advances the browser
 clock past the polling intervals; it does not measure native tab throttling.
 
+`first-open-observations.spec.ts` checks that the shell owns collection reads,
+an unchanged opening frame does not repeat access/metadata reads, and changed
+completed outcomes still refresh both. Run it with `HALLVI_QA_PRODUCTION=1`
+to check one production read; development Strict Mode replays mount effects.
+
 The same journey checks where a long conversation opens: on its latest
 message, and on the linked message when the address names one, without being
 carried back to the end. `unit/chat-frames.test.ts` holds the rule that full
