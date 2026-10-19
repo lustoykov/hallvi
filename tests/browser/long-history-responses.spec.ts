@@ -262,20 +262,35 @@ test("older evidence and open disclosures survive changes, completion, view swit
     await page.keyboard.press("Escape");
     await expect(permissions).toHaveCount(0);
     await composer.fill("");
-    for (const [response, upstream] of streams) {
-      upstream.destroy();
-      response.end();
-    }
+    const disconnect = () => {
+      for (const [response, upstream] of streams) {
+        upstream.destroy();
+        response.end();
+      }
+    };
+    // Earlier updates changed the page baseline. Reconnecting an unchanged
+    // conversation must acknowledge the latest delivered collections instead.
+    const delivered = (await received()).length;
+    disconnect();
+    await expect
+      .poll(async () => (await received()).length)
+      .toBeGreaterThan(delivered);
+    expect(reconnectIds.at(-1)).toMatch(/^2(?:\.[a-f0-9]{64}){4}$/);
+    expect((await received()).at(-1)).toEqual({
+      type: "initial",
+      collections: [],
+    });
+    await expect(row).toHaveAttribute("aria-expanded", "true");
+    disconnect();
     transcript.messages[3].body += " Updated while disconnected.";
     transcript.messages[3].revision++;
     worker.changed({ kind: "chat", applicationId: app, chatId: chat });
     await expect(old).toContainText("Updated while disconnected.");
-    expect(reconnectIds).toContain("ready");
-    await expect
-      .poll(async () =>
-        (await received()).some((frame) => frame.type === "snapshot"),
-      )
-      .toBe(true);
+    expect(reconnectIds.at(-1)).toMatch(/^2(?:\.[a-f0-9]{64}){4}$/);
+    expect((await received()).at(-1)).toEqual({
+      type: "initial",
+      collections: ["messages"],
+    });
     await expect(row).toHaveAttribute("aria-expanded", "true");
     await page.screenshot({ path: "tests/results/long-history-evidence.png" });
     // A reload receives new page records and acknowledges them again.

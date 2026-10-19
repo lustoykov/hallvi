@@ -112,11 +112,13 @@ See [29 September measurements](https://github.com/lustoykov/hallvi/blob/74b54ef
 `unit/chat-frames.test.ts` checks reconstruction from page-fingerprint
 acknowledgements and incremental frames, scope/version fallbacks, ordering,
 removals and optional-field clearing. `unit/pi-stream.test.ts` checks fresh
-reads, notices during the initial read and full automatic reconnects.
+reads, notices during the initial read, latest-state reconnect acknowledgements,
+missed changes and full reconnects for older clients.
 `long-history-responses.spec.ts` verifies that unchanged page collections are
 acknowledged, then keeps old evidence disclosures and live output usable through updates and
 reconnect. A disposable proxy ends the actual SSE response; the journey checks
-the browser's `Last-Event-ID` and fresh full reconnect frame, since a short
+the browser's latest fingerprint in `Last-Event-ID`, unchanged acknowledgements
+after prior updates and replacement of collections changed while disconnected, since a short
 offline toggle can leave the existing connection alive. Its opt-in profile compares full and incremental responses on the
 same warmed, production-built Next fixture with 1/5/10 real browser readers:
 `HALLVI_QA_PRODUCTION=1 HALLVI_RESPONSE_PROFILE=1 HALLVI_E2E_PORT=3960 npm run test:e2e -- long-history-responses.spec.ts --grep 'profile warm' --reporter=list`.

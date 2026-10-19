@@ -9,7 +9,10 @@ import { loadChat } from "@/server/applications";
 import { subscribeChanges } from "@/server/change-notifications";
 import { invalidateExecutionReads } from "@/server/operator-execution";
 import { ChatFrames } from "@/server/chat-frames";
-import { initialChatFrame } from "@/server/chat-stream-baseline";
+import {
+  ChatStreamBaselines,
+  initialChatFrame,
+} from "@/server/chat-stream-baseline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,11 +30,18 @@ export async function GET(
     // Only clients that can apply changes opt in; the old URL stays full-state.
     const parameters = new URL(request.url).searchParams;
     const incremental = parameters.get("changes") === "1";
-    // EventSource carries the first frame's id on automatic reconnect. It is
-    // only a reconnect marker, never a cursor or retained server-side state.
+    // Only clients that can reuse their streamed records opt into reconnect
+    // acknowledgements. Older JavaScript still receives full reconnect state.
+    const baselines =
+      incremental && parameters.get("resume") === "1"
+        ? new ChatStreamBaselines(applicationId, chatId)
+        : null;
     const baseline = request.headers.has("last-event-id")
-      ? null
+      ? baselines
+        ? request.headers.get("last-event-id")
+        : null
       : parameters.get("baseline");
+    let eventId = "";
     let latestFull = "";
     let initial = "";
     const encode = (
@@ -40,9 +50,16 @@ export async function GET(
     ) => {
       if (incremental) {
         const frame = frames.next(snapshot);
+        if (frame && baselines) eventId = baselines.next(snapshot, frame);
         if (first)
           return JSON.stringify(
-            initialChatFrame(applicationId, chatId, snapshot, baseline),
+            initialChatFrame(
+              applicationId,
+              chatId,
+              snapshot,
+              baseline,
+              eventId || undefined,
+            ),
           );
         return frame ? JSON.stringify(frame) : undefined;
       }
@@ -62,6 +79,7 @@ export async function GET(
     const clean = () => {
       closed = true;
       frames.clear();
+      baselines?.clear();
       latestFull = "";
       initial = "";
       clearTimeout(timer);
@@ -76,8 +94,8 @@ export async function GET(
     };
     const send = (text: string) => {
       if (closed || !controller) return;
-      // Keep at most the current frame. A stalled reader reconnects for full
-      // state instead of retaining every snapshot in an unbounded queue.
+      // Keep at most the current frame. A stalled reader reconnects against
+      // its last delivered fingerprints instead of retaining a frame queue.
       if ((controller.desiredSize ?? 0) <= 0) {
         close();
         return;
@@ -104,7 +122,8 @@ export async function GET(
         const snapshot = await refreshSnapshot(applicationId, chatId);
         if (closed) return;
         const next = encode(snapshot);
-        if (next) send(`data: ${next}\n\n`);
+        if (next)
+          send(`${baselines ? `id: ${eventId}\n` : ""}data: ${next}\n\n`);
       } catch {
         close();
       } finally {
@@ -155,10 +174,10 @@ export async function GET(
           opened.close();
           return;
         }
-        // Reconnect always starts with authoritative latest state; no token
-        // history, cursor retention, or missed frame can lose an accepted run.
+        // Read current state even on reconnect. The last delivered event's
+        // fingerprints acknowledge only collections the browser already has.
         send(
-          `${incremental && baseline ? "id: ready\n" : ""}data: ${initial}\n\n`,
+          `${eventId ? `id: ${eventId}\n` : incremental && baseline ? "id: ready\n" : ""}data: ${initial}\n\n`,
         );
         initial = "";
         if (generation !== initialGeneration) schedule();

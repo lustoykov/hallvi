@@ -444,8 +444,8 @@ export function OperatorShell({
     if (observedMainId) observedChats.add(observedMainId);
     const subscriptions = [...observedChats].map((chatId) => {
       let outcomeVersion = "";
-      // Each observed chat owns a stream baseline. The first connection can
-      // reuse its page records; reconnect replaces them with fresh full state.
+      // Each chat owns its baseline: page records on first connect, then the
+      // latest delivered snapshot when native EventSource reconnects.
       let streamed: ChatSnapshot | null = null;
       let initialBaseline =
         bootstrap.current?.applicationId === applicationId &&
@@ -453,7 +453,7 @@ export function OperatorShell({
           ? bootstrap.current
           : null;
       const stream = new EventSource(
-        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1${
+        `/api/applications/${applicationId}/chats/${chatId}/events?changes=1&resume=1${
           initialBaseline ? `&baseline=${initialBaseline.token}` : ""
         }`,
       );
@@ -462,11 +462,15 @@ export function OperatorShell({
       stream.onmessage = (event) => {
         if (!active) return;
         const frame = JSON.parse(event.data) as ChatFrame;
-        // An acknowledgement reuses its exact page records. A full frame can
-        // repeat held records after a reconnect, so retain their identities.
+        // An acknowledgement reuses the exact records whose fingerprints
+        // EventSource sent. Full fallbacks also retain unchanged identities.
         const snapshot =
           "type" in frame
-            ? applyChatFrame(streamed, frame, initialBaseline?.collections)
+            ? applyChatFrame(
+                streamed,
+                frame,
+                streamed ?? initialBaseline?.collections,
+              )
             : keepUnchanged(
                 streamed ??
                   (held.current.selectedChatId === chatId

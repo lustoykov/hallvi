@@ -162,7 +162,7 @@ it("acknowledges page records after a fresh read and keeps notices received duri
   expect(await frame(reader)).toContain('"revision":2');
 });
 
-it("an automatic reconnect ignores the page fingerprint and returns fresh full state", async () => {
+it("older clients still receive full reconnect state", async () => {
   const baseline = chatStreamBaseline("app", "chat", snapshot(1));
   const response = await GET(
     new Request(`http://localhost/events?changes=1&baseline=${baseline}`, {
@@ -175,6 +175,55 @@ it("an automatic reconnect ignores the page fingerprint and returns fresh full s
   expect(initial).toContain('"revision":1');
   expect(initial).not.toContain('"type":"initial"');
   expect(mocks.snapshot).toHaveBeenCalledOnce();
+});
+
+it("reconnects against the last delivered state, acknowledging unchanged collections and recovering missed changes", async () => {
+  const baseline = chatStreamBaseline("app", "chat", snapshot(1));
+  const url = `http://localhost/events?changes=1&resume=1&baseline=${baseline}`;
+  const reader = (
+    await GET(new Request(url, { signal: controller.signal }), context)
+  ).body!.getReader();
+  expect(await frame(reader)).toContain(`id: ${baseline}\n`);
+  mocks.snapshot.mockResolvedValue(snapshot(2));
+  mocks.notify({ kind: "chat" });
+  await vi.advanceTimersByTimeAsync(500);
+  const update = await frame(reader);
+  const delivered = update.match(/^id: (.+)\n/)![1];
+  expect(delivered).toBe(chatStreamBaseline("app", "chat", snapshot(2)));
+  expect(update).toContain('"revision":2');
+  controller.abort();
+  controller = new AbortController();
+  const reconnect = (
+    await GET(
+      new Request(url, {
+        headers: { "Last-Event-ID": delivered },
+        signal: controller.signal,
+      }),
+      context,
+    )
+  ).body!.getReader();
+  const unchanged = await frame(reconnect);
+  expect(unchanged).toContain('"type":"initial"');
+  expect(unchanged).not.toContain('"messages"');
+  // This update is queued but never read. Only the previous event ID reaches
+  // the next request, so a dropped frame cannot hide a new accepted message.
+  mocks.snapshot.mockResolvedValue(snapshot(3));
+  mocks.notify({ kind: "chat" });
+  await vi.advanceTimersByTimeAsync(500);
+  controller.abort();
+  controller = new AbortController();
+  const recovered = await GET(
+    new Request(url, {
+      headers: { "Last-Event-ID": delivered },
+      signal: controller.signal,
+    }),
+    context,
+  );
+  const changed = await frame(recovered.body!.getReader());
+  expect(changed).toContain('"type":"initial"');
+  expect(changed).toContain('"revision":3');
+  expect(changed).not.toContain('"executions"');
+  expect(mocks.snapshot).toHaveBeenCalledTimes(5);
 });
 
 it("keeps changes arriving during an async refresh and never overlaps reads", async () => {

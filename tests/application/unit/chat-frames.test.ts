@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import { ChatFrames } from "../../../src/server/chat-frames";
 import {
   chatStreamBaseline,
+  ChatStreamBaselines,
   initialChatFrame,
 } from "../../../src/server/chat-stream-baseline";
 import {
@@ -59,7 +60,7 @@ it("hands off unchanged page collections and preserves changes, removals and cur
   expect(client).toEqual(latest);
   expect(client.messages[0]).toBe(page.messages.at(-1));
   expect(client.executions).toBe(page.executions);
-  expect(() => applyChatFrame(null, first)).toThrow("no page baseline");
+  expect(() => applyChatFrame(null, first)).toThrow("no held baseline");
 });
 
 it("binds page fingerprints to their conversation and falls back for older wire versions", () => {
@@ -73,8 +74,50 @@ it("binds page fingerprints to their conversation and falls back for older wire 
     for (const key of ["messages", "executions", "piActivity", "information"])
       expect(first).toHaveProperty(key);
   }
-  for (const token of [null, "", "1.bad", baseline.replace(/^1/, "2")])
+  for (const token of [null, "", "2.bad", baseline.replace(/^2/, "1")])
     expect(initialChatFrame("app", "chat", page, token)).toBe(page);
+});
+
+it("fingerprints the latest streamed state without serializing unchanged evidence", () => {
+  const first = wire(history());
+  const frames = new ChatFrames();
+  const baselines = new ChatStreamBaselines("app", "chat");
+  const token = baselines.next(first, frames.next(first)!);
+  expect(token).toBe(chatStreamBaseline("app", "chat", first));
+  let held = first;
+  const next = wire(first);
+  next.messages = next.messages.slice(1).reverse();
+  next.messages[0].body += " updated";
+  next.executions.pop();
+  next.piActivity[0].preview = "changed result";
+  next.worker.alive = false;
+  const changes = frames.next(next)!;
+  const stringify = vi.spyOn(JSON, "stringify");
+  let latest: string;
+  try {
+    latest = baselines.next(next, changes);
+    // No whole collection or unchanged record is serialized on an update.
+    expect(
+      stringify.mock.calls.some(([value]) => value === next.executions),
+    ).toBe(false);
+    expect(
+      stringify.mock.calls.some(([value]) => value === next.executions[0]),
+    ).toBe(false);
+  } finally {
+    stringify.mockRestore();
+  }
+  expect(latest).not.toBe(token);
+  expect(latest).toBe(chatStreamBaseline("app", "chat", next));
+  held = applyChatFrame(held, wire(changes));
+  const reconnect = initialChatFrame("app", "chat", wire(next), latest);
+  expect(reconnect).toEqual({
+    type: "initial",
+    status: "idle",
+    worker: { alive: false },
+  });
+  expect(applyChatFrame(held, reconnect, held)).toEqual(next);
+  baselines.clear();
+  expect(baselines.next(first, first)).toBe(token);
 });
 
 it("never serializes freshly reconstructed unchanged history while finding changes", () => {

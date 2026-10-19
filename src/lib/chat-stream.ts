@@ -21,13 +21,13 @@ export type ChatChanges = {
 } & { [K in ChatCollection]?: CollectionChanges<ChatSnapshot[K][number]> };
 
 export type ChatBaseline = Pick<ChatSnapshot, ChatCollection>;
-/** Fresh state omits collections only when their page fingerprints match. */
+/** Fresh state omits collections only when their held fingerprints match. */
 export type ChatInitial = {
   type: "initial";
 } & Pick<ChatSnapshot, "status" | "worker"> &
   Partial<ChatBaseline>;
 
-/** Reuse the exact page baseline once; automatic reconnects are full. */
+/** Reuse exact page or streamed records when acknowledging fresh state. */
 export type ChatFrame = ChatSnapshot | ChatChanges | ChatInitial;
 
 /** Keep the token paired with its immutable records, not a later view. */
@@ -128,7 +128,7 @@ export function applyChatFrame(
   if (!("type" in frame)) return frame;
   if (frame.type === "initial") {
     if (!baseline)
-      throw new Error("Conversation acknowledgement has no page baseline.");
+      throw new Error("Conversation acknowledgement has no held baseline.");
     return keepUnchanged(baseline, {
       status: frame.status,
       worker: frame.worker,

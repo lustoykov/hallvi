@@ -40,7 +40,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
-| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 3 | Initial handoff in #337; page and reconnect bytes remain |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 4 | Initial/reconnect handoff implemented; full page/output remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
@@ -384,15 +384,23 @@ scoped to the application, conversation and wire version. The first stream
 still subscribes before a fresh read, acknowledges matching collections and
 replaces changed ones completely. The handoff adds no server cache or retained
 page snapshot.
-Automatic reconnects still read and send full state. The page's full records
-and reconnect transfer remain expensive; fetching closed output only when a
-disclosure opens is a separate larger change.
+Reconnect-capable clients now carry the latest delivered collection fingerprints
+in SSE event IDs. A fresh read acknowledges unchanged collections and replaces
+changed ones; older clients and invalid/version-mismatched tokens get full state.
+Per-stream record hashes follow the existing deltas and are discarded on close.
+For 2,000 synthetic calls, unchanged reconnects fell from 18,973,647 to 332 SSE
+bytes; warm projection/encoding rose from 30.08 to 65.41 ms (15 samples, excluding
+database, worker socket and browser). This reduces transfer, not fresh-read CPU.
+The page's full records and worker reads remain expensive; fetching closed output
+only when a disclosure opens is a separate larger change.
 
 **+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
 **+1:** 2026-10-02 — native production speed/snappiness audit,
 `codex/speed-snappiness`.
 **+1:** 2026-10-04 — owner-requested practical performance fixes,
 `codex/speed-stream-handoff`.
+**+1:** 2026-10-19 — latest-state reconnect handoff and synthetic measurements,
+`perf`.
 
 ### AF-068 — Remove the mascot placements nothing draws
 
