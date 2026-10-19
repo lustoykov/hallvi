@@ -653,13 +653,15 @@ export function BackupStages({
         </span>
         <div className="bs-summary-copy">
           <b>{verdict.says}</b>
-          <small>
-            {newest
-              ? `${ago(newest.at, now)} · ${destination}`
-              : protection.planned
-                ? `Planned for ${destination}; no completed copy yet`
-                : "No completed copy"}
-          </small>
+          {/* With no copy and no plan the line had nothing to add: the
+              headline says so, and Latest copy under it says it again. */}
+          {(newest || protection.planned) && (
+            <small>
+              {newest
+                ? `${ago(newest.at, now)} · ${destination}`
+                : `Planned for ${destination}; no completed copy yet`}
+            </small>
+          )}
           {copyFailed && <p>{copyFailed.detail}</p>}
         </div>
         {verdict.next && (

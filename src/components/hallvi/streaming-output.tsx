@@ -240,9 +240,11 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
             )}
           </pre>
           {/* Nothing to follow and nothing worth copying until something has
-            run; offering both beside an empty pane is two dead controls. */}
+            run; offering both beside an empty pane is two dead controls. A
+            command that has finished prints nothing more, so "Following
+            output" under it would be a claim about a stream that ended. */}
           <div className="hv-stream-controls">
-            {Boolean(output) && (
+            {running && Boolean(output) && (
               <button
                 type="button"
                 aria-pressed={follow}

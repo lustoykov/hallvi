@@ -212,6 +212,11 @@ describe("application-first backup truth", () => {
     expect(html).toContain("No completed copy");
   });
 
+  it("says once that there is no copy when nothing was ever planned", () => {
+    const html = draw([volume("shop-db", "PostgreSQL's data")]);
+    expect(html.split("No completed copy")).toHaveLength(2);
+  });
+
   it("does not invent a missing plan when nobody has checked", () => {
     const html = draw([volume("shop-db", "PostgreSQL's data")]);
     expect(html).toContain("Backup status not established");

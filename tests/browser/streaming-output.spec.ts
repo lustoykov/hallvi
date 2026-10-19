@@ -156,6 +156,8 @@ test("server output streams inline, preserves reading position and stays readabl
     await expect(card.getByText("exit 0", { exact: true })).toBeVisible();
     await expect(output).toBeVisible();
     await expect(output).toContainText("Container web started.");
+    // A finished command prints nothing more, so there is nothing to follow.
+    await expect(card.getByRole("button", { name: /^Follow/ })).toHaveCount(0);
     await page
       .context()
       .grantPermissions(["clipboard-read", "clipboard-write"]);
