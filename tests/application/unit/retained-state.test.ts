@@ -280,4 +280,39 @@ it("copies the histories into a snapshot and says to run the pair on it, with no
   expect(made.out).toMatch(
     new RegExp(`PI_CODING_AGENT_DIR=${join(into, "account")}`),
   );
+  // Run the printed assignments with a probe instead of a dev server. Both
+  // inherited credentials and a checkout env file must stay unavailable.
+  const envFile = join(root, "checkout.env");
+  writeFileSync(envFile, "CLOUDFLARE_API_TOKEN=from-env-file\n");
+  const probe = join(root, "probe.mjs");
+  writeFileSync(
+    probe,
+    `console.log(JSON.stringify({ cloudflare: !!process.env.CLOUDFLARE_API_TOKEN, github: !!(process.env.GH_TOKEN || process.env.GITHUB_TOKEN), ghConfig: process.env.GH_CONFIG_DIR }));`,
+  );
+  const launch = made.out.trim().split("\n").at(-1)!;
+  const observed = execFileSync(
+    "sh",
+    [
+      "-c",
+      launch.replace(
+        /npm run dev.*$/,
+        `${process.execPath} --env-file=${envFile} ${probe}`,
+      ),
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CLOUDFLARE_API_TOKEN: "inherited-token",
+        GH_TOKEN: "inherited-gh-token",
+        GITHUB_TOKEN: "inherited-github-token",
+        GH_CONFIG_DIR: "/owner/gh",
+      },
+    },
+  );
+  expect(JSON.parse(observed)).toEqual({
+    cloudflare: false,
+    github: false,
+    ghConfig: join(into, "account"),
+  });
 });

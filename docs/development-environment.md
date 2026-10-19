@@ -194,8 +194,12 @@ into one, their execution, activity and workspace records and Pi's histories,
 each conversation store taken through SQLite's own backup — and none of their
 SSH keys, secrets or connection requests. The recorded key
 paths point inside the snapshot, where no key is, and the command prints the
-one line that runs the pair against it with an empty account directory. The
-worker is what reads a conversation's history, so it runs; with no ChatGPT
+one line that runs the pair against it with an empty account directory. Its
+explicit empty Cloudflare and GitHub token variables override inherited values
+and the checkout's `.env.local`; its GitHub CLI configuration also points at
+the empty account directory, so setup cannot reuse the owner's CLI login. Keep
+these assignments when changing the port. The worker reads a conversation's
+history, so it runs; with no ChatGPT
 login it cannot start a turn (a send is refused before any tool exists), and
 with no connections it cannot reach a provider or the host. That is what
 makes a snapshot safe to point any branch at. It is also **the way to see one

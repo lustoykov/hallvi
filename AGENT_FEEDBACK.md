@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-097 — Keep snapshot previews free of contributor credentials](#af-097--keep-snapshot-previews-free-of-contributor-credentials) | 1 | Fixed locally |
 | [AF-096 — Discover existing provider access before asking for tokens](#af-096--discover-existing-provider-access-before-asking-for-tokens) | 1 | New |
 | [AF-054 — Check traffic assets after installation](#af-054--check-traffic-assets-after-installation) | 1 | Fix in review |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 5 | Partially improved; pause remains |
@@ -67,6 +68,19 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-095 — Keep an early Home jump while a conversation opens](#af-095--keep-an-early-home-jump-while-a-conversation-opens) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-097 — Keep snapshot previews free of contributor credentials
+
+A credential-free retained snapshot's printed launch command still loaded the
+checkout's `.env.local`. Settings therefore reported the owner's live Cloudflare
+connection despite the snapshot's empty account directory. No provider mutation
+was attempted. The command now explicitly empties Cloudflare and GitHub token
+variables and points GitHub CLI configuration at the empty account directory.
+Settings then reports Cloudflare disconnected. The snapshot regression executes
+the printed assignments with inherited dummy tokens and an env file to hold
+this boundary.
+
+**+1:** 2026-10-19 — normal-usage snapshot sweep, `bugs`.
 
 ### AF-096 — Discover existing provider access before asking for tokens
 
