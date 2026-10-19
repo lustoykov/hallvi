@@ -40,7 +40,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 2 | Fixed locally |
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
-| [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
+| [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | Fixed locally |
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 4 | Initial/reconnect handoff implemented; full page/output remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
@@ -453,6 +453,11 @@ only when a disclosure opens is a separate larger change.
 `deployment-prototype/transit.css` size a Little Server that no component
 renders. Found while replacing the three.js mascot with the flat drawing, and
 left alone as outside that change.
+
+**Resolved 2026-10-19:** nothing imported either stylesheet, so both were
+deleted whole in `b97b4764`, with the rest of the CSS no component names: the
+earlier `ax-ct` caretaker rig, the prototype bar and its reduced-motion preview.
+Screenshots of every scenario destination matched before and after.
 
 **+1:** 2026-10-01 — flat mascot, `claude/flat-mascot`.
 
