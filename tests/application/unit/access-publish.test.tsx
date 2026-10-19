@@ -74,13 +74,14 @@ const named = (serving: boolean): SavedInformation[] => [
   ),
 ];
 
-const render = (records: SavedInformation[]) =>
+const render = (records: SavedInformation[], reachable?: "open" | "closed") =>
   renderToStaticMarkup(
     <AccessPage
       records={records}
       applicationId={APP}
       applicationName="Paper"
       now={NOW}
+      reachable={reachable}
       chrome={{ bar: null, header: null, activity: null }}
       onAsk={() => {}}
     />,
@@ -223,5 +224,37 @@ describe("what the header says when the way in has stopped working", () => {
   it("offers nothing to click either way", () => {
     expect(head("https://paper.example.com", false)).not.toContain("<a ");
     expect(head("http://127.0.0.1:38123", true)).not.toContain("<a ");
+  });
+});
+
+// The head asks the controller whether the way in answers now; the window
+// below it reads the record. A tunnel drops with every restart, and the page
+// went on ticking "It answers through the tunnel" under "The tunnel is
+// closed".
+describe("a way in the head found closed", () => {
+  it("is titled like every other destination", () => {
+    expect(render([tunnelled()])).toContain("<h1>Access</h1>");
+  });
+
+  it("ticks the tunnel only while it is open", () => {
+    expect(render([tunnelled()], "open")).toContain(
+      "It answers through the tunnel",
+    );
+    const closed = render([tunnelled()], "closed");
+    expect(closed).toContain("The tunnel is closed");
+    expect(closed).toContain("It answered when tested");
+    expect(closed).not.toContain("It answers through the tunnel");
+    // Nor does the path light the way it says is shut.
+    expect(closed).not.toContain('class="hv-ac-node" data-live');
+    expect(render([tunnelled()], "open")).toContain(
+      'class="hv-ac-node" data-live',
+    );
+  });
+
+  it("says the same of a published address that did not answer", () => {
+    const closed = render(named(true), "closed");
+    expect(closed).toContain("The address did not answer");
+    expect(closed).toContain("It answered when tested");
+    expect(closed).not.toContain("It answers on the internet");
   });
 });

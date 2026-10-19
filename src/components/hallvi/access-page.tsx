@@ -7,19 +7,17 @@
 // every port, most public first, with the firewall as its footer. Then the
 // path a visitor takes, lit only where a check saw it work.
 //
-// There is no title and no verdict line on top: the first board is the answer,
-// and a page that grades itself above it says the same thing twice.
+// The head is every destination's: the title, and the way in beside it as the
+// controller finds it now. There is no verdict line under it: the first board
+// is the answer, and a page that grades itself above it says it twice.
 
 import { useMemo } from "react";
-import { CheckCircle, LockSimple } from "@phosphor-icons/react";
+import { CheckCircle, Circle, LockSimple } from "@phosphor-icons/react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { PageChrome } from "./deployment-prototype/page-head";
-import {
-  AccessLink,
-  type Reachability,
-} from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
 import {
   basisOf,
@@ -232,11 +230,27 @@ function Node({
 
 /**
  * One address as a browser shows it: the bar, then what came back, in the
- * words of the checks that looked. The page sketch on the right is only a
- * picture of "a page"; everything written is from a record.
+ * words of the checks that looked.
+ *
+ * `dropped` is the head's own finding that this way in does not answer now.
+ * The record still says what answered when it was tested, and the foot dates
+ * that; what it cannot do is go on saying, ticked, that it answers.
  */
-function Visit({ caller, now }: { caller: Caller; now: number }) {
-  const saw = caller.saw.length ? caller.saw : [caller.headline];
+function Visit({
+  caller,
+  dropped,
+  now,
+}: {
+  caller: Caller;
+  dropped: boolean;
+  now: number;
+}) {
+  const saw = dropped
+    ? ["It answered when tested"]
+    : caller.saw.length
+      ? caller.saw
+      : [caller.headline];
+  const Mark = dropped ? Circle : CheckCircle;
   return (
     <div className="hv-ac-visit">
       <div className="hv-ac-visit-bar">
@@ -251,20 +265,14 @@ function Visit({ caller, now }: { caller: Caller; now: number }) {
         </span>
       </div>
       <div className="hv-ac-visit-body">
-        <ul className="hv-ac-visit-saw">
+        <ul className="hv-ac-visit-saw" data-dropped={dropped || undefined}>
           {saw.map((line) => (
             <li key={line}>
-              <CheckCircle weight="fill" aria-hidden="true" />
+              <Mark weight={dropped ? "bold" : "fill"} aria-hidden="true" />
               {line.replace(/\.$/, "")}
             </li>
           ))}
         </ul>
-        <span className="hv-ac-visit-page" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-          <i />
-        </span>
       </div>
       <div className="hv-ac-visit-foot">
         {caller.secure
@@ -304,16 +312,12 @@ export function AccessPage({
     [records, applicationId, applicationName, now],
   );
 
-  // No title. The way back, and nothing else, above the first board.
   const head = (
-    <header className="axj3-head">
-      {chrome.bar && <div className="axj3-bar">{chrome.bar}</div>}
-    </header>
-  );
-  const open = (
-    <AccessLink
-      openUrl={story.address}
+    <PageHead
+      bar={chrome.bar}
+      title="Access"
       name={applicationName}
+      openUrl={story.address}
       restricted={story.audience === "private"}
       reachable={reachable}
       onReopen={onReopen}
@@ -326,6 +330,12 @@ export function AccessPage({
   const answering = story.callers.filter(
     (caller) => caller.outcome === "loads",
   );
+  // The head probes the access record's address and nothing else, so only
+  // that host's window and path can be contradicted by it.
+  const dropped = (caller: Caller) =>
+    reachable === "closed" &&
+    hostOf(caller.typed) === hostOf(story.address ?? "");
+  const reaching = answering.filter((caller) => !dropped(caller)).length > 0;
   const published = story.audience === "public";
 
   if (
@@ -385,20 +395,22 @@ export function AccessPage({
         <Board
           title="What a visitor sees"
           tools={
-            <>
-              {!unpublished && (
-                <Ask onAsk={onAsk} prompt={offer.draft}>
-                  {offer.label}
-                </Ask>
-              )}
-              {open}
-            </>
+            !unpublished && (
+              <Ask onAsk={onAsk} prompt={offer.draft}>
+                {offer.label}
+              </Ask>
+            )
           }
         >
           {visitors.length ? (
             <div className="hv-ac-visits">
               {visitors.map((caller) => (
-                <Visit key={caller.id} caller={caller} now={now} />
+                <Visit
+                  key={caller.id}
+                  caller={caller}
+                  dropped={dropped(caller)}
+                  now={now}
+                />
               ))}
             </div>
           ) : (
@@ -469,7 +481,10 @@ export function AccessPage({
               }
               live={published}
             />
-            <i className="hv-ac-link" data-live={published || undefined} />
+            <i
+              className="hv-ac-link"
+              data-live={(published && reaching) || undefined}
+            />
             <Node
               title={address ?? "No name"}
               caption={
@@ -485,7 +500,7 @@ export function AccessPage({
                     ? "the address"
                     : "no name on record"
               }
-              live={answering.length > 0}
+              live={reaching}
             />
             <i className="hv-ac-link" data-live={Boolean(front) || undefined} />
             <Node
@@ -501,14 +516,11 @@ export function AccessPage({
               }
               live={front?.established === "answered"}
             />
-            <i
-              className="hv-ac-link"
-              data-live={answering.length > 0 || undefined}
-            />
+            <i className="hv-ac-link" data-live={reaching || undefined} />
             <Node
               title={story.name}
               caption="your application"
-              live={answering.length > 0}
+              live={reaching}
             />
           </div>
         </Board>

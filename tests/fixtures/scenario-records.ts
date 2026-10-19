@@ -1084,19 +1084,19 @@ function richRecords(id: string): SavedInformation[] {
         ],
       },
     }),
+    // Published, as Pi records it once the name serves: the access record is
+    // updated in place to the public address, and no tunnel is left behind.
     record(id, {
       at: ago(9 * MINUTE),
-      title: "It is reachable from this PC",
+      title: "It is published",
       views: ["overview", "deployment"],
       role: "status",
       about: [{ kind: "application", id }],
-      url: "http://127.0.0.1:19999",
+      url: "https://a-really-quite-long-subdomain.example.test",
       content: {
         kind: "application-access",
-        mode: "private",
+        mode: "public",
         server: "hetzner-999999",
-        localPort: 19999,
-        remotePort: 8443,
       },
     }),
     usageRecord(id),

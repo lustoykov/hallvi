@@ -96,14 +96,10 @@
   vertical-align: -2px;
 }
 .hv-ac-visit-body {
-  display: flex;
-  align-items: center;
-  gap: 28px;
   padding: 18px 20px;
 }
 .hv-ac-visit-saw {
   display: grid;
-  flex: 1;
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -121,36 +117,13 @@
   color: var(--green);
   font-size: 15px;
 }
-/* A picture of "a page", faint, so the window reads as a browser. */
-.hv-ac-visit-page {
-  display: grid;
-  flex: 0 0 170px;
-  gap: 7px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, #fbfcff, #f6f8fd);
+/* The head found this way in closed: what answered is history, so neither
+   the line nor its mark is a reading any more. */
+.hv-ac-visit-saw[data-dropped] {
+  color: var(--muted);
 }
-.hv-ac-visit-page i {
-  height: 7px;
-  border-radius: 4px;
-  background: var(--blue-soft);
-}
-.hv-ac-visit-page i:nth-child(1) {
-  width: 45%;
-  height: 9px;
-}
-.hv-ac-visit-page i:nth-child(2) {
-  width: 90%;
-}
-.hv-ac-visit-page i:nth-child(3) {
-  width: 75%;
-}
-.hv-ac-visit-page i:nth-child(4) {
-  width: 40%;
-  height: 14px;
-  margin-top: 4px;
-  border-radius: 6px;
+.hv-ac-visit-saw[data-dropped] svg {
+  color: var(--muted);
 }
 .hv-ac-visit-foot {
   padding: 8px 20px;
@@ -269,11 +242,5 @@
     min-width: 0;
     height: 14px;
     margin: 4px 0 4px 3px;
-  }
-}
-/* The sketch carries no fact, so it goes before the checklist is squeezed. */
-@media (max-width: 760px) {
-  .hv-ac-visit-page {
-    display: none;
   }
 }
