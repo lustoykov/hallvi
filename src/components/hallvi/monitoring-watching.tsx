@@ -25,7 +25,8 @@ import {
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 
-import { FRESH_MS, ago } from "./architecture-prototype/model";
+import { ago } from "./format";
+import { FRESH_MS } from "./architecture-prototype/model";
 import { Tag, type Tone } from "./deployment-prototype/tag";
 import { Mascot } from "./mascot";
 import type {

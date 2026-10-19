@@ -17,6 +17,7 @@ import { ArrowRight } from "@phosphor-icons/react";
 
 import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
+import { ago } from "./format";
 import {
   Ask,
   Facts,
@@ -24,7 +25,6 @@ import {
   Num,
   Opened,
   Register,
-  ago,
   duration,
   type Column,
 } from "./register";

@@ -25,7 +25,7 @@ import type { PageChrome } from "../deployment-prototype/page-head";
 import { PageHead, type Reachability } from "../deployment-prototype/page-head";
 import { EmptySketch } from "../empty-sketch";
 import { useTraffic, type Traffic } from "../overview-live/use-traffic";
-import { ago } from "../register";
+import { ago } from "../format";
 import { releasesFromRecords } from "../release-records";
 import { Breakdowns } from "./breakdowns";
 import { Errors, Responses } from "./health";

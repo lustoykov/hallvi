@@ -29,7 +29,8 @@
 import type { ReactNode } from "react";
 
 import type { DatabaseRow } from "./database-records";
-import { Ask, Pips, ago } from "./register";
+import { ago } from "./format";
+import { Ask, Pips } from "./register";
 import type { ProcessCard } from "./stack-prototype/line-story";
 
 export type FactState = "known" | "unchecked" | "na" | "absent";

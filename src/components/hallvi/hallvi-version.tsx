@@ -32,7 +32,7 @@ import { createPortal } from "react-dom";
 
 import { ExternalLink } from "./external-link";
 import { HallviMark } from "./hallvi-mark";
-import { ago } from "./register";
+import { ago } from "./format";
 
 type Phase =
   | "checking"

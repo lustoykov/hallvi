@@ -18,8 +18,7 @@ import { Tag } from "./deployment-prototype/tag";
 import { EmptySketch } from "./empty-sketch";
 import type { Usage } from "./monitoring-records";
 import { AskButton, toneOf } from "./monitoring-watching";
-import { ago } from "./architecture-prototype/model";
-import { clock } from "./stack-prototype/stack-model";
+import { ago, clockTime } from "./format";
 import { hasTotals } from "./traffic/model";
 import "./monitoring-usage.css";
 
@@ -267,9 +266,9 @@ function Traffic({
     traffic.visitors !== undefined
       ? ` from about ${count(traffic.visitors)} visitors`
       : "",
-    `, busiest around ${clock(at(busiest))}.`,
+    `, busiest around ${clockTime(at(busiest))}.`,
     failed
-      ? ` ${count(failed)} failed on the server, most of them around ${clock(at(worst))}.`
+      ? ` ${count(failed)} failed on the server, most of them around ${clockTime(at(worst))}.`
       : " None failed on the server.",
   ].join("");
 
@@ -283,7 +282,7 @@ function Traffic({
         failed
           ? {
               label: `Ask why ${count(failed)} failed`,
-              draft: `${count(failed)} requests to ${name} failed with a server error in the last 24 hours, most around ${clock(at(worst))}. Read the application's output from then and tell me what went wrong.`,
+              draft: `${count(failed)} requests to ${name} failed with a server error in the last 24 hours, most around ${clockTime(at(worst))}. Read the application's output from then and tell me what went wrong.`,
             }
           : null
       }
@@ -344,7 +343,7 @@ function Traffic({
           {hover !== null && (
             <Tip left={((hover + 0.5) / length) * 100}>
               <time>
-                {clock(at(hover))}–{clock(at(hover + 1))}
+                {clockTime(at(hover))}–{clockTime(at(hover + 1))}
               </time>
               {gap(hover) ? (
                 <span className="axmu-tip-quiet">
@@ -374,7 +373,7 @@ function Traffic({
         <Axis
           ticks={ticks(length)}
           place={(index) => (index / length) * 100}
-          label={(index) => clock(at(index))}
+          label={(index) => clockTime(at(index))}
         />
         <figcaption className="axmu-legend">
           <span>
@@ -459,7 +458,7 @@ function Host({
   const points = (values: number[]) =>
     values.map((value, index) => `${index},${100 - value}`).join(" ");
 
-  const say = `CPU averaged ${Math.round(cpuAverage)}% and peaked at ${Math.round(cpu[cpuPeak])}% around ${clock(at(cpuPeak))}. Memory ${
+  const say = `CPU averaged ${Math.round(cpuAverage)}% and peaked at ${Math.round(cpu[cpuPeak])}% around ${clockTime(at(cpuPeak))}. Memory ${
     memoryPeak - Math.min(...memory) < 10 ? "held steady near" : "is now at"
   } ${Math.round(memoryNow)}%${host.memoryTotal ? ` of ${host.memoryTotal}` : ""}.`;
   const busy = cpu[cpuPeak] >= 80 || memoryPeak >= 90;
@@ -531,7 +530,7 @@ function Host({
                 style={{ left: `${x(hover)}%`, top: `${100 - cpu[hover]}%` }}
               />
               <Tip left={x(hover)}>
-                <time>{clock(at(hover))}</time>
+                <time>{clockTime(at(hover))}</time>
                 <span>
                   <i data-series="cpu" />
                   CPU {Math.round(cpu[hover])}%
@@ -547,7 +546,7 @@ function Host({
         <Axis
           ticks={ticks(length)}
           place={x}
-          label={(index) => clock(at(index))}
+          label={(index) => clockTime(at(index))}
         />
         <figcaption className="axmu-legend">
           <span>

@@ -58,13 +58,13 @@ describe("what the Answering column says", () => {
     // A query that ran minutes ago and answered.
     expect(answering("passed")).toMatchObject({
       tone: "good",
-      words: "yes, 5 min ago",
+      words: "yes, 5\u00a0min ago",
     });
 
     // The same pass, twelve days old. Still a yes, with its date, drawn
     // neutral because it does not vouch for right now.
     const stale = answering("passed", LONG_AGO);
-    expect(stale.words).toBe("yes, 12 d ago");
+    expect(stale.words).toBe("yes, 12\u00a0days ago");
     expect(stale.tone).toBe("plain");
 
     // A note is neither outcome. It must not become the red "no".

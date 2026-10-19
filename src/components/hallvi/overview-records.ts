@@ -45,6 +45,7 @@ import {
   type ProtectionVerdict,
 } from "./backups-records";
 import type { Certainty, Fact } from "./architecture-prototype/model";
+import { ago } from "./format";
 import type {
   Idea,
   NeedItem,
@@ -96,17 +97,6 @@ const word: Record<Certainty, string> = {
   unknown: "Not assessed",
   absent: "Not set up",
 };
-
-function when(at: string, now: number) {
-  const ms = now - Date.parse(at);
-  if (!Number.isFinite(ms)) return "at an unrecorded time";
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
-}
 
 /** The verdict's tones in the lane's own vocabulary. */
 const verdictCertainty: Record<ProtectionVerdict["tone"], Certainty> = {
@@ -243,9 +233,9 @@ function laneText(held: Held[], certainty: Certainty, now: number) {
     // observed twenty-one hours earlier: the number invited the reader to
     // dismiss the colour.
     const lapsed = staleAt(held, now);
-    return lapsed ? `Last checked ${when(lapsed, now)}` : "Checked once";
+    return lapsed ? `Last checked ${ago(lapsed, now)}` : "Checked once";
   }
-  return newest ? `Checked ${when(newest, now)}` : "Checked";
+  return newest ? `Checked ${ago(newest, now)}` : "Checked";
 }
 
 /**
@@ -574,7 +564,7 @@ export function overviewFromRecords({
   ]
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .slice(0, 8)
-    .map(({ at, ...rest }) => ({ ...rest, when: when(at, now) }));
+    .map(({ at, ...rest }) => ({ ...rest, when: ago(at, now) }));
 
   return {
     headline: headline || applicationName,
@@ -645,7 +635,7 @@ export function applicationCondition(
     return {
       certainty: "stale",
       text: lapsed
-        ? `It held when it was last checked, ${when(lapsed, now)}.`
+        ? `It held when it was last checked, ${ago(lapsed, now)}.`
         : "It held when it was last checked.",
     };
   }
@@ -658,7 +648,7 @@ export function applicationCondition(
     return {
       certainty: "verified",
       text: newest
-        ? `The checks on record held, ${when(newest, now)}.`
+        ? `The checks on record held, ${ago(newest, now)}.`
         : "The checks on record held when they were last read.",
     };
   }

@@ -20,7 +20,7 @@ import { Mascot } from "../mascot";
 import type { SupplyProps, Value } from "./supply-story";
 import { RevealSecret } from "../reveal-secret";
 import { revealKeyboardControl } from "../reveal-keyboard-control";
-import { ago } from "../architecture-prototype/model";
+import { ago } from "../format";
 import { when } from "../stack-prototype/stack-model";
 import { listed, sizeWords } from "./supply-model";
 import "./manifest.css";

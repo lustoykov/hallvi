@@ -38,7 +38,7 @@ import {
 
 import { protectionFromRecords } from "./backups-records";
 
-import { ago } from "./architecture-prototype/model";
+import { ago } from "./format";
 import type { ApplicationSection } from "./application-sections";
 import type {
   ArchitectureModel,

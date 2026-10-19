@@ -641,8 +641,8 @@ describe("which time a stale reading cites", () => {
     const condition = applicationCondition([lapsed, fresh], APP, A_DAY_ON);
     expect(condition.certainty).toBe("stale");
     // A_DAY_ON is five minutes after `fresh` and a day after `lapsed`.
-    expect(condition.text).toContain("1 d ago");
-    expect(condition.text).not.toContain("5 min ago");
+    expect(condition.text).toContain("1\u00a0day ago");
+    expect(condition.text).not.toContain("5\u00a0min ago");
   });
 
   it("does the same for a lane caption", () => {
@@ -650,6 +650,6 @@ describe("which time a stale reading cites", () => {
       (vital) => vital.id === "checks",
     );
     expect(lane?.status.certainty).toBe("stale");
-    expect(lane?.status.text).toBe("Last checked 1 d ago");
+    expect(lane?.status.text).toBe("Last checked 1\u00a0day ago");
   });
 });

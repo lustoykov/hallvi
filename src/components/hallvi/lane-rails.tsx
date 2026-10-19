@@ -22,6 +22,7 @@ import {
 } from "@phosphor-icons/react";
 import { useCallback, useState, type ReactNode } from "react";
 
+import { clockTime } from "./format";
 import { useDismiss } from "./overview-prototype/shared";
 import "./lane-rails.css";
 
@@ -76,12 +77,7 @@ function stamp(at: number, now: number) {
               month: "short",
               day: "numeric",
             });
-  const clock = new Date(at).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return `${day} ${clock}`;
+  return `${day} ${clockTime(at)}`;
 }
 
 /** Record keys, as something a person would say happened. */

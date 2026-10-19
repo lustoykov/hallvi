@@ -140,6 +140,6 @@ describe("the applications list", () => {
       A_DAY_ON,
     );
     expect(said.tone).toBe("live");
-    expect(said.text).toBe("Checks held 1 d ago");
+    expect(said.text).toBe("Checks held 1\u00a0day ago");
   });
 });

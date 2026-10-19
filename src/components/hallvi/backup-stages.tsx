@@ -21,25 +21,13 @@ import {
   type Protection,
   type ProtectionVerdict,
 } from "./backups-records";
+import { ago } from "./format";
 import { LocalTime } from "./local-time";
 import { revealKeyboardControl } from "./reveal-keyboard-control";
 
 import "./backup-stages.css";
 
 type ItemTone = "included" | "planned" | "gap" | "unknown";
-
-function ago(at: string | null | undefined, now: number) {
-  if (!at) return "never";
-  const ms = now - Date.parse(at);
-  if (!Number.isFinite(ms)) return "at an unknown time";
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  const days = Math.round(hours / 24);
-  return days === 1 ? "yesterday" : `${days} d ago`;
-}
 
 function list(items: string[]) {
   if (items.length <= 1) return items[0] ?? "";

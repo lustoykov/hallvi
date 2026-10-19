@@ -35,7 +35,8 @@ import {
 import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
-import { Figure, Lede, Strip, ago } from "./register";
+import { ago } from "./format";
+import { Figure, Lede, Strip } from "./register";
 import { storageFromRecords } from "./storage-records";
 
 export function BackupsPage({

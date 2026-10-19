@@ -1,4 +1,5 @@
 import type { ApplicationListItem } from "@/components/hallvi/applications-screen";
+import { ago } from "@/components/hallvi/format";
 import { listApplications } from "./db";
 import {
   applicationReading,
@@ -41,14 +42,6 @@ export async function listApplicationItems(): Promise<ApplicationListItem[]> {
       };
     }),
   );
-}
-
-/** "19 h ago", for a card. */
-function since(at: string, now: number) {
-  const minutes = Math.max(0, Math.round((now - Date.parse(at)) / 60_000));
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
 }
 
 /**
@@ -106,7 +99,7 @@ export function applicationListCondition(
       .at(-1);
     return {
       tone: "live",
-      text: lapsed ? `Checks held ${since(lapsed, now)}` : "Checks held",
+      text: lapsed ? `Checks held ${ago(lapsed, now)}` : "Checks held",
     };
   }
   if (reading === "verified") return { tone: "live", text: "Checks held" };

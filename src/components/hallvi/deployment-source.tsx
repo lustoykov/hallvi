@@ -19,7 +19,8 @@ import type {
 } from "@/server/deployment-automation";
 
 import { LocalTime } from "./local-time";
-import { Board, Figure, None, Strip, Tag, ago, type Tone } from "./register";
+import { ago } from "./format";
+import { Board, Figure, None, Strip, Tag, type Tone } from "./register";
 
 import "./releases-panel.css";
 import "./deployment-source.css";

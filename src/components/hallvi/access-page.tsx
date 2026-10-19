@@ -33,6 +33,7 @@ import {
   type Caller,
   type Door,
 } from "./reach-records";
+import { ago } from "./format";
 import {
   Ask,
   Board,
@@ -44,7 +45,6 @@ import {
   Opened,
   Register,
   Tag,
-  ago,
   type Tone,
 } from "./register";
 import "./access-page.css";

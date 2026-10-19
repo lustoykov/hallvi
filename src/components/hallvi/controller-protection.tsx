@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import type { ControllerProtectionFacts } from "@/server/application-facts";
 
-import { ago } from "./architecture-prototype/model";
+import { ago } from "./format";
 import { BackupStorageForm } from "./backup-storage-form";
 import { readRecoveryKit, type RecoveryKit } from "./recovery-kit";
 import "./controller-protection.css";

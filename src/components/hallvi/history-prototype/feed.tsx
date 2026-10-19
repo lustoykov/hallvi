@@ -11,11 +11,11 @@ import { useCallback, useState } from "react";
 import type { OperationStep } from "@/server/operation-record";
 
 import type { ApplicationSection } from "../application-sections";
+import { clockTime } from "../format";
 import { labelOf } from "../operation-model";
 import { reducedMotion } from "../architecture-prototype/motion";
 import { OpChip } from "../overview-prototype/shared";
 import {
-  clockOf,
   later,
   settledAt,
   type Entry,
@@ -127,7 +127,7 @@ export function FeedRow({
       onPointerLeave={onPointerLeave}
     >
       <time className="axh-time" dateTime={entry.at}>
-        {clockOf(entry.at)}
+        {clockTime(entry.at)}
       </time>
       <span className="axh-dot" aria-hidden="true" />
       <div className="axh-body">
@@ -164,7 +164,7 @@ export function FeedRow({
             className="axh-thread is-back"
             onClick={() => onJump(entry.resolves!.id)}
           >
-            Resolves the failure at {clockOf(settledAt(entry.resolves))}
+            Resolves the failure at {clockTime(settledAt(entry.resolves))}
             <ArrowRight weight="bold" />
           </button>
         )}

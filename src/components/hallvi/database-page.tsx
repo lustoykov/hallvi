@@ -41,6 +41,7 @@ import {
 } from "./evidence";
 import { ProtectionLine } from "./protection-line";
 import { probeReading } from "./pulse";
+import { ago } from "./format";
 import {
   Ask,
   Board,
@@ -56,7 +57,6 @@ import {
   Strip,
   Sub,
   Tag,
-  ago,
   type Column,
 } from "./register";
 

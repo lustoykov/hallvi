@@ -15,7 +15,8 @@ import type {
   Protection,
   ProtectionVerdict,
 } from "./backups-records";
-import { Go, Tag, ago, type Tone } from "./register";
+import { ago } from "./format";
+import { Go, Tag, type Tone } from "./register";
 
 /** A protection state, in the fewest words that stay true. */
 export interface Reading {

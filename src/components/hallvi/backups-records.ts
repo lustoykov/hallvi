@@ -24,6 +24,7 @@ import {
 } from "@/server/record-projection";
 
 import type { Check, Dated } from "./backup-prototype/protect-story";
+import { ago } from "./format";
 
 /**
  * One copy, with the two things that are true of it and of nothing else:
@@ -218,14 +219,9 @@ function list(items: string[]) {
 
 /** A relative time for prose. The facts row uses LocalTime instead. */
 function when(at: string, now: number) {
-  const ms = now - Date.parse(at);
-  if (!Number.isFinite(ms)) return "at an unrecorded time";
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "taken just now";
-  if (minutes < 60) return `taken ${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `taken ${hours} h ago`;
-  return `taken ${Math.round(hours / 24)} d ago`;
+  return Number.isFinite(Date.parse(at))
+    ? `taken ${ago(at, now)}`
+    : "at an unrecorded time";
 }
 
 export function protectionFromRecords(

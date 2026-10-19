@@ -47,8 +47,8 @@ export interface DirectionProps {
   onAsk: (draft: string) => void;
   page?: PageContext;
 }
+import { ago } from "../format";
 import {
-  ago,
   type ArchitectureModel,
   type Certainty,
   type Gap,

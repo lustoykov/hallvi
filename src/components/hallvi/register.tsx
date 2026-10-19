@@ -17,18 +17,6 @@ import "./register.css";
 
 export type Tone = "plain" | "good" | "warn" | "bad" | "working" | "idle";
 
-/** "3 h ago", from the page's own clock so server and browser agree. */
-export function ago(at: string | null | undefined, now: number) {
-  const ms = at ? now - Date.parse(at) : NaN;
-  if (!Number.isFinite(ms)) return "not recorded";
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
-}
-
 export function duration(seconds: number) {
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;

@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 import type { Collection } from "@/server/traffic/contract";
 
 import type { ApplicationSection } from "../application-sections";
-import { ago } from "../architecture-prototype/model";
+import { ago } from "../format";
 import {
   PageHead,
   isTunnel,

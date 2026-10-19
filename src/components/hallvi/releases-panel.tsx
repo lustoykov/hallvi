@@ -38,6 +38,7 @@ import {
   type Reachability,
 } from "./deployment-prototype/page-head";
 import { LocalTime } from "./local-time";
+import { ago } from "./format";
 import {
   Ask,
   Board,
@@ -54,7 +55,6 @@ import {
   Register,
   Sub,
   Tag,
-  ago,
   duration,
   type Column,
   type Tone,

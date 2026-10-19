@@ -36,6 +36,7 @@ import {
 } from "./evidence";
 import { processesFromRecords } from "./processes-records";
 import { probeReading } from "./pulse";
+import { ago } from "./format";
 import {
   Ask,
   Board,
@@ -54,7 +55,6 @@ import {
   Strip,
   Sub,
   Tag,
-  ago,
   type Column,
 } from "./register";
 import type { ProcessCard, Probe } from "./stack-prototype/line-story";

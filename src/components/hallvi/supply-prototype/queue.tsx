@@ -14,7 +14,7 @@ import { Tag } from "../deployment-prototype/tag";
 import { Mascot } from "../mascot";
 import { countWord } from "../stack-prototype/stack-model";
 import type { SupplyProps } from "./supply-story";
-import { ago } from "../architecture-prototype/model";
+import { ago } from "../format";
 import { listed, waitWords } from "./supply-model";
 import "./queue.css";
 

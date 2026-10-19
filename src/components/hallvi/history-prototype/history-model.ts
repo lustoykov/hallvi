@@ -167,13 +167,6 @@ export function dayName(at: string, now: number) {
   });
 }
 
-export const clockOf = (at: string) =>
-  new Date(at).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
 /** "2 min later", "3 h later", "2 days later". */
 export function later(ms: number) {
   const minutes = Math.round(ms / 60_000);

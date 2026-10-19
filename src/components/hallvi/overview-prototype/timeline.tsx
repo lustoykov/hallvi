@@ -31,8 +31,8 @@ import { labelOf } from "../operation-model";
 import { UnresolvedMarks } from "../presentation";
 import type { ApplicationSection } from "../application-sections";
 import type { PageContext } from "../deployment-prototype/page-head";
+import { ago, clockTime } from "../format";
 import {
-  ago,
   type ArchitectureModel,
   type LiveRecord,
   type LogLine,
@@ -89,13 +89,6 @@ interface HeroProps {
   onAsk: (draft: string) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
 }
-
-const clock = (at: number | string) =>
-  new Date(at).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
 
 function dayName(at: number, now: number) {
   const day = (value: number) => {
@@ -261,7 +254,7 @@ function EventPop({
         <TerminalBar title="What it did" />
         {event.lines.map((line) => (
           <div key={line.id} className="axt-console-line" data-tone={line.tone}>
-            <time>{clock(line.at)}</time>
+            <time>{clockTime(line.at)}</time>
             <b aria-hidden="true">{glyph[line.tone]}</b>
             <span>{line.text}</span>
           </div>
@@ -744,7 +737,7 @@ export function TimelineHero({
                       onPointerEnter={() => setLit(moment ?? null)}
                       onPointerLeave={() => setLit(null)}
                     >
-                      <time>{clock(line.at)}</time>
+                      <time>{clockTime(line.at)}</time>
                       <b aria-hidden="true">{glyph[line.tone]}</b>
                       <span>{line.text}</span>
                     </div>

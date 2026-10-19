@@ -23,6 +23,7 @@ import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { EmptySketch } from "./empty-sketch";
 import { ProtectionLine } from "./protection-line";
+import { ago } from "./format";
 import {
   Ask,
   Board,
@@ -37,7 +38,6 @@ import {
   Register,
   Strip,
   Tag,
-  ago,
   type Column,
 } from "./register";
 import { storageFromRecords, volumeName } from "./storage-records";
@@ -295,7 +295,7 @@ export function StoragePage({
                       value: row.measuredAt ? (
                         ago(row.measuredAt, now)
                       ) : (
-                        <None>never</None>
+                        <None />
                       ),
                     },
                     {

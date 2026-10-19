@@ -156,24 +156,7 @@ export interface ArchitectureModel {
   log: LogLine[];
 }
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
 /**
  * Overview's rule: verified green only while the evidence is under a day old.
  */
-export const FRESH_MS = DAY;
-
-export function ago(at: string | null | undefined, now: number) {
-  if (!at) return "never";
-  const ms = Math.max(0, now - Date.parse(at));
-  if (ms < MINUTE) return "just now";
-  // A no-break space holds the number to its unit. "7 h ago" is one fact, and
-  // a line that breaks between the 7 and the h makes the reader reassemble it
-  // — which happened in Overview's verdict the moment it became a sentence.
-  const minutes = Math.round(ms / MINUTE);
-  if (minutes < 60) return `${minutes}\u00a0min ago`;
-  const hours = Math.round(ms / HOUR);
-  if (hours < 48) return `${hours}\u00a0h ago`;
-  return `${Math.round(ms / DAY)}\u00a0days ago`;
-}
+export const FRESH_MS = 24 * 60 * 60_000;
