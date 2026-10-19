@@ -34,54 +34,10 @@ import { ExternalLink } from "./external-link";
 import { HallviMark } from "./hallvi-mark";
 import { ago } from "./format";
 
-type Phase =
-  | "checking"
-  | "downloading"
-  | "verifying"
-  | "installing"
-  | "reconnecting"
-  | "completed"
-  | "failed"
-  | "blocked";
+import type { ReleaseState } from "@/server/hallvi-release";
 
-interface UpdateAttemptView {
-  id: string;
-  phase: Phase;
-  message: string;
-  progress?: number;
-  from: { version: string } | null;
-  to: { version: string } | null;
-}
-
-export interface HallviVersionState {
-  installed:
-    | {
-        kind: "installed";
-        version: string;
-        revision: string;
-        platform: string | null;
-      }
-    | {
-        kind: "development";
-        version: string | null;
-        revision: string | null;
-        reason: string;
-      };
-  machine: string;
-  channel: string;
-  ownKey: boolean;
-  available: {
-    version: string;
-    revision: string;
-    notes: string;
-    releasedAt: string;
-    size: number | null;
-    blocked: string | null;
-  } | null;
-  checkedAt: string | null;
-  checkError: string | null;
-  attempt: UpdateAttemptView | null;
-}
+// The update route returns the release state as it is.
+type Phase = NonNullable<ReleaseState["attempt"]>["phase"];
 
 const RUNNING: Phase[] = [
   "checking",
@@ -114,7 +70,7 @@ const megabytes = (size: number | null) =>
   size ? `${Math.round(size / (1024 * 1024))} MB` : null;
 
 /** One answer per page, however many places ask for it. */
-let asked: Promise<HallviVersionState | null> | undefined;
+let asked: Promise<ReleaseState | null> | undefined;
 function readState() {
   asked ??= fetch("/api/hallvi/update", { cache: "no-store" })
     .then((response) => (response.ok ? response.json() : null))
@@ -131,7 +87,7 @@ export function ThisHallvi({
   /** What's new, carrying the way back to where the reader was. */
   whatsNewHref?: string;
 }) {
-  const [state, setState] = useState<HallviVersionState | null>(null);
+  const [state, setState] = useState<ReleaseState | null>(null);
   const [open, setOpen] = useState(false);
   // Whether the reader pressed the check since opening the menu, so the item
   // can answer "Up to date" where they pressed it.
@@ -198,7 +154,7 @@ export function ThisHallvi({
           if (alive) setDisconnected(true);
           return;
         }
-        const value = (await response.json()) as HallviVersionState;
+        const value = (await response.json()) as ReleaseState;
         asked = Promise.resolve(value);
         if (alive) {
           setDisconnected(false);
@@ -228,7 +184,7 @@ export function ThisHallvi({
       if (!response.ok)
         throw new Error(value?.error ?? "Hallvi could not do that.");
       asked = Promise.resolve(value);
-      setState(value as HallviVersionState);
+      setState(value as ReleaseState);
       if (action === "install") setOpen(false);
     } catch (caught) {
       setError(

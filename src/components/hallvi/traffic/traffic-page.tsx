@@ -12,7 +12,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import type { SavedInformation } from "@/server/operator-data";
 import {
   TRAFFIC_RANGES,
   type Collection,
@@ -21,8 +20,8 @@ import {
 } from "@/server/traffic/contract";
 
 import { ConfirmActionDialog } from "../confirm-action-dialog";
-import type { PageChrome } from "../page/page-head";
-import { PageHead, type Reachability } from "../page/page-head";
+import type { Destination } from "../page/page-head";
+import { PageHead } from "../page/page-head";
 import { EmptySketch } from "../empty-sketch";
 import { useTraffic, type Traffic } from "../overview-live/use-traffic";
 import { ago } from "../format";
@@ -445,20 +444,11 @@ export function TrafficPage({
   applicationName,
   records,
   now,
-  chrome,
+  bar,
   reachable = "checking",
   onReopen,
   onAsk,
-}: {
-  applicationId: string;
-  applicationName: string;
-  records: SavedInformation[];
-  now: number;
-  chrome: PageChrome;
-  reachable?: Reachability;
-  onReopen?: () => void;
-  onAsk: (draft: string) => void;
-}) {
+}: Destination) {
   const { collection, act } = useCollection(applicationId);
   const listed = trafficListed(collection);
   const [range, setRange] = useState<TrafficRange>("7d");
@@ -565,7 +555,7 @@ export function TrafficPage({
 
   const head = (
     <PageHead
-      bar={chrome.bar}
+      bar={bar}
       title="Traffic"
       name={applicationName}
       openUrl={null}

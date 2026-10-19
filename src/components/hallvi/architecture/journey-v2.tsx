@@ -994,7 +994,7 @@ export function JourneyDirection({
     >
       {/* Where you are, and what you can open. */}
       <header className="axj3-head">
-        {page?.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
+        {page?.bar && <div className="axj3-bar">{page.bar}</div>}
         <div className="axj3-title">
           <h1>Architecture</h1>
           {page?.openUrl && !planned && (
@@ -1012,8 +1012,6 @@ export function JourneyDirection({
           )}
         </div>
       </header>
-
-      {page?.busy && page.chrome.activity}
 
       <div className="axj2-controls">
         <span className="axj2-label">Follow</span>

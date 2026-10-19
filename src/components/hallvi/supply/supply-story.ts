@@ -134,8 +134,6 @@ export interface SupplyProps {
    */
   applicationId?: string;
   head: import("react").ReactNode;
-  /** Work in progress on this destination, as the shell shows it. */
-  activity: import("react").ReactNode;
   onAsk: (draft: string) => void;
   onOpenDestination: (
     destination: import("../application-sections").ApplicationSection,

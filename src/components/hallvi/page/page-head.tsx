@@ -13,6 +13,9 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
+
+import type { SavedInformation } from "@/server/operator-data";
+
 import { useReconnectAction } from "../reconnect-action";
 
 /**
@@ -27,26 +30,28 @@ import { useReconnectAction } from "../reconnect-action";
  * `checking` is the honest state before anything is known, and it claims
  * nothing.
  */
-/**
- * The page around a destination, as the shell draws it.
- *
- * It lives beside PageHead because PageHead is what draws it: every
- * destination page takes this and hands the pieces to the head. It used to
- * live in a chooser that let a reviewer flip between candidate layouts, which
- * is a thing the product no longer has.
- */
-export interface PageChrome {
+export type Reachability =
+  "checking" | "open" | "closed" | "unknown" | "unavailable";
+
+/** What the section view hands every destination page. */
+export interface Destination {
+  records: SavedInformation[];
+  applicationId: string;
+  applicationName: string;
+  now: number;
   /** The way back to the conversation. */
   bar: ReactNode;
-  /** The destination's title, description and "Open application". */
-  header: ReactNode;
-  /** Unsettled work, then the last settled operation and earlier work. */
-  activity: ReactNode;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
+  onAsk: (draft: string) => void;
 }
 
 /** What a page that draws its own header needs from the record. */
 export interface PageContext {
-  chrome: PageChrome;
+  /** The way back to the conversation. */
+  bar: ReactNode;
   /** Where the application answers, while it is serving. */
   openUrl: string | null;
   /**
@@ -56,21 +61,7 @@ export interface PageContext {
   reachable?: Reachability;
   /** Asks Pi to reopen private access. Absent hides the offer. */
   onReopen?: () => void;
-  /** Work is unsettled: the shipped activity is shown as it is. */
-  busy: boolean;
-  /** The last settled operation that touched this destination. */
-  last: {
-    title: string;
-    at: string;
-    conversation: string | null;
-    open: (() => void) | null;
-  } | null;
-  /** Settled operations before the last one. */
-  earlier: number;
 }
-
-export type Reachability =
-  "checking" | "open" | "closed" | "unknown" | "unavailable";
 
 export function accessStateText(state: Reachability) {
   return state === "unavailable"

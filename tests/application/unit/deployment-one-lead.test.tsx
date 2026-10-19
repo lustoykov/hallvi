@@ -180,16 +180,11 @@ describe("deployment evidence and active work", () => {
         executions={[execution]}
         applicationName="Shop"
         now={NOW}
-        chrome={
-          { bar: null, activity: <p>Creating the server</p> } as Parameters<
-            typeof DeploymentPage
-          >[0]["chrome"]
-        }
+        bar={null}
         onAsk={() => undefined}
       />,
     );
     expect(html).toContain("Work is in progress");
-    expect(html).toContain("Creating the server");
     expect(html).not.toContain("Ask Hallvi to deploy");
   });
 });

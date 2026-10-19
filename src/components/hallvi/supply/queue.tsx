@@ -14,8 +14,8 @@ import { Tag } from "../page/tag";
 import { Mascot } from "../mascot";
 import { countWord } from "../processes/stack-model";
 import type { SupplyProps } from "./supply-story";
-import { ago } from "../format";
-import { listed, waitWords } from "./supply-model";
+import { ago, listed } from "../format";
+import { waitWords } from "./supply-model";
 import "./queue.css";
 
 const SLOTS = 14;
@@ -24,7 +24,6 @@ export function QueueDirection({
   story,
   now,
   head,
-  activity,
   onAsk,
   onOpenDestination,
 }: SupplyProps) {
@@ -38,7 +37,6 @@ export function QueueDirection({
   return (
     <section className="axqu" aria-label="Cache and queue">
       {head}
-      {activity}
       <div className="axqu-lede">
         <div>
           <h2>

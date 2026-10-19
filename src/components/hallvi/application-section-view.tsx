@@ -137,6 +137,16 @@ export function ApplicationSectionView({
         </div>
       </div>
     );
+  const destination = {
+    records: information,
+    applicationId: app.id,
+    applicationName: app.name,
+    now,
+    bar,
+    reachable,
+    onReopen,
+    onAsk: (draft: string) => onAsk(null, draft),
+  };
   if (section === "overview")
     return (
       <OverviewPage
@@ -148,7 +158,7 @@ export function ApplicationSectionView({
         reduced={false}
         reachable={reachable}
         onReopen={onReopen}
-        chrome={{ bar, header: null, activity: null }}
+        bar={bar}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
         onAsk={(draft) => onAsk(null, draft)}
@@ -172,33 +182,17 @@ export function ApplicationSectionView({
         chats={view.chats}
         applicationName={app.name}
         now={now}
-        chrome={{ bar, header: null, activity: null }}
+        bar={bar}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
       />
     );
-  if (section === "traffic")
-    return (
-      <TrafficPage
-        applicationId={app.id}
-        applicationName={app.name}
-        records={information}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
-        reachable={reachable}
-        onReopen={onReopen}
-        onAsk={(draft) => onAsk(null, draft)}
-      />
-    );
+  if (section === "traffic") return <TrafficPage {...destination} />;
   if (section === "deployment")
     return (
       <DeploymentPage
-        reachable={reachable}
-        onReopen={onReopen}
-        records={information}
+        {...destination}
         executions={view.executions ?? []}
-        applicationId={app.id}
-        applicationName={app.name}
         source={
           view.deployment && {
             applicationId: app.id,
@@ -211,100 +205,35 @@ export function ApplicationSectionView({
             },
           }
         }
-        now={now}
-        chrome={{
-          bar,
-          header: null,
-          activity: null,
-        }}
         panel={children}
-        onAsk={(draft) => onAsk(null, draft)}
         onOpenDestination={onOpenDestination}
       />
     );
   if (section === "processes")
     return (
       <ProcessesPage
-        reachable={reachable}
-        onReopen={onReopen}
-        records={information}
-        applicationId={app.id}
-        applicationName={app.name}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
+        {...destination}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
-        onAsk={(draft) => onAsk(null, draft)}
       />
     );
   if (section === "storage")
     return (
-      <StoragePage
-        reachable={reachable}
-        onReopen={onReopen}
-        records={information}
-        applicationId={app.id}
-        applicationName={app.name}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
-        onOpenDestination={onOpenDestination}
-        onAsk={(draft) => onAsk(null, draft)}
-      />
+      <StoragePage {...destination} onOpenDestination={onOpenDestination} />
     );
-  if (section === "access")
-    return (
-      <AccessPage
-        reachable={reachable}
-        onReopen={onReopen}
-        records={information}
-        applicationId={app.id}
-        applicationName={app.name}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
-        onAsk={(draft) => onAsk(null, draft)}
-      />
-    );
+  if (section === "access") return <AccessPage {...destination} />;
   if (section === "backups")
     return (
       <BackupsPage
-        reachable={reachable}
-        onReopen={onReopen}
-        records={information}
-        applicationId={app.id}
-        applicationName={app.name}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
+        {...destination}
         controller={facts.controllerProtection}
         onRefresh={onRefresh}
-        onAsk={(draft) => onAsk(null, draft)}
       />
     );
-  if (section === "monitoring")
-    return (
-      <MonitoringPage
-        reachable={reachable}
-        onReopen={onReopen}
-        records={information}
-        applicationId={app.id}
-        applicationName={app.name}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
-        onAsk={(draft) => onAsk(null, draft)}
-      />
-    );
+  if (section === "monitoring") return <MonitoringPage {...destination} />;
   if (section === "database")
     return (
-      <DatabasePage
-        reachable={reachable}
-        onReopen={onReopen}
-        records={information}
-        applicationId={app.id}
-        applicationName={app.name}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
-        onOpenDestination={onOpenDestination}
-        onAsk={(draft) => onAsk(null, draft)}
-      />
+      <DatabasePage {...destination} onOpenDestination={onOpenDestination} />
     );
   if (
     section === "cache" ||
@@ -314,17 +243,10 @@ export function ApplicationSectionView({
   )
     return (
       <SupplyPageView
-        reachable={reachable}
-        onReopen={onReopen}
+        {...destination}
         page={section as SupplyPage}
-        records={information}
-        applicationId={app.id}
-        applicationName={app.name}
         secrets={view.secrets ?? []}
-        now={now}
-        chrome={{ bar, header: null, activity: null }}
         onOpenDestination={onOpenDestination}
-        onAsk={(draft) => onAsk(null, draft)}
       />
     );
   if (section === "architecture")
@@ -334,18 +256,8 @@ export function ApplicationSectionView({
         applicationId={app.id}
         applicationName={app.name}
         now={now}
-        chrome={{
-          bar,
-          header: (
-            <header className="hv-section-header">
-              <div>
-                <h1>Architecture</h1>
-                <p>{descriptions.architecture}</p>
-              </div>
-            </header>
-          ),
-          activity: null,
-        }}
+        bar={bar}
+        description={descriptions.architecture}
         onOpenDestination={onOpenDestination}
         onAsk={(draft) => onAsk(null, draft)}
       />

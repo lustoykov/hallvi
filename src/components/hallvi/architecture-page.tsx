@@ -11,13 +11,12 @@
 // cards when records are thin would mean the page a reader learns is the one
 // they see least.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
 import { architectureFromRecords } from "./architecture-records";
 import { JourneyDirection } from "./architecture/journey-v2";
-import type { PageChrome } from "./page/page-head";
 import type { ApplicationSection } from "./application-sections";
 import "./architecture/prototype.css";
 
@@ -26,7 +25,8 @@ export function ArchitecturePage({
   applicationId,
   applicationName,
   now,
-  chrome,
+  bar,
+  description,
   onOpenDestination,
   onAsk,
 }: {
@@ -34,7 +34,10 @@ export function ArchitecturePage({
   applicationId: string;
   applicationName: string;
   now: number;
-  chrome: PageChrome;
+  /** The way back to the conversation. */
+  bar: ReactNode;
+  /** The line under the heading, drawn while nothing is mapped. */
+  description: string;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
 }) {
@@ -47,8 +50,13 @@ export function ArchitecturePage({
   if (!model)
     return (
       <div className="ax-root hv-section-page hv-section-architecture">
-        {chrome.bar}
-        {chrome.header}
+        {bar}
+        <header className="hv-section-header">
+          <div>
+            <h1>Architecture</h1>
+            <p>{description}</p>
+          </div>
+        </header>
         <div className="hv-section-content">
           <div className="hv-arch-unmapped">
             <h2>How this fits together has not been worked out yet.</h2>
@@ -84,13 +92,7 @@ export function ArchitecturePage({
         model={model}
         onOpenDestination={onOpenDestination}
         onAsk={onAsk}
-        page={{
-          chrome,
-          openUrl: null,
-          busy: false,
-          last: null,
-          earlier: 0,
-        }}
+        page={{ bar, openUrl: null }}
       />
     </div>
   );

@@ -9,14 +9,14 @@ import { currentAccessRecord } from "@/server/access-record";
 // happened — so this renders that rather than a diagram of nothing or a wall
 // of cards.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationRecord, ChatSummary } from "@/server/types";
 
 import { architectureFromRecords } from "./architecture-records";
-import { PageHead, type PageChrome, type Reachability } from "./page/page-head";
+import { PageHead, type Reachability } from "./page/page-head";
 import type { LiveRecord } from "./architecture/model";
 import type { ApplicationSection } from "./application-sections";
 import {
@@ -134,7 +134,7 @@ export function OverviewPage({
   application,
   chats,
   now,
-  chrome,
+  bar,
   reduced,
   reachable = "checking",
   onReopen,
@@ -147,7 +147,8 @@ export function OverviewPage({
   application: ApplicationRecord;
   chats: ChatSummary[];
   now: number;
-  chrome: PageChrome;
+  /** The way back to the conversation. */
+  bar: ReactNode;
   reduced: boolean;
   reachable?: Reachability;
   /** Asks Pi to reopen private access. Absent hides the offer. */
@@ -228,7 +229,7 @@ export function OverviewPage({
         usage={usage}
         releases={releases}
         now={now}
-        chrome={chrome}
+        bar={bar}
         openUrl={openUrl}
         restricted={model?.restricted ?? false}
         reachable={reachable}
@@ -250,15 +251,7 @@ export function OverviewPage({
           reduced={reduced}
           onOpenDestination={onOpenDestination}
           onAsk={onAsk}
-          page={{
-            chrome,
-            openUrl,
-            reachable,
-            onReopen,
-            busy: false,
-            last: null,
-            earlier: 0,
-          }}
+          page={{ bar, openUrl, reachable, onReopen }}
         />
         {!returnVisit.deployed && (
           <section className="hv-overview-resume" aria-label="Continue setup">
@@ -284,7 +277,7 @@ export function OverviewPage({
   return (
     <div className="hv-section-page hv-section-overview hv-overview-unmapped">
       <PageHead
-        bar={chrome.bar}
+        bar={bar}
         title={application.name}
         name={application.name}
         openUrl={openUrl}

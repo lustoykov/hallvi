@@ -14,13 +14,11 @@
 
 import { useMemo } from "react";
 
-import type { SavedInformation } from "@/server/operator-data";
-
 import type { ApplicationSection } from "./application-sections";
 import type { Vol } from "./backups/protect-story";
 import { protectionFromRecords, protectionVerdict } from "./backups-records";
-import type { PageChrome } from "./page/page-head";
-import { PageHead, type Reachability } from "./page/page-head";
+import type { Destination } from "./page/page-head";
+import { PageHead } from "./page/page-head";
 import { EmptySketch } from "./empty-sketch";
 import { ProtectionLine } from "./protection-line";
 import { ago } from "./format";
@@ -54,21 +52,11 @@ export function StoragePage({
   now,
   reachable = "checking",
   onReopen,
-  chrome,
+  bar,
   onOpenDestination,
   onAsk,
-}: {
-  records: SavedInformation[];
-  applicationId: string;
-  applicationName: string;
-  now: number;
-  /** Whether a private way in still answers; see PageHead. */
-  reachable?: Reachability;
-  /** Asks Pi to reopen private access when it is closed. */
-  onReopen?: () => void;
-  chrome: PageChrome;
+}: Destination & {
   onOpenDestination: (destination: ApplicationSection) => void;
-  onAsk: (draft: string) => void;
 }) {
   const story = useMemo(
     () => storageFromRecords({ records, applicationId, now }),
@@ -85,7 +73,7 @@ export function StoragePage({
 
   const head = (
     <PageHead
-      bar={chrome.bar}
+      bar={bar}
       title="Storage"
       name={applicationName}
       openUrl={null}

@@ -39,7 +39,6 @@ const questions = [
 export function OriginDirection({
   story,
   head,
-  activity,
   onAsk,
   onOpenDestination,
 }: SupplyProps) {
@@ -52,7 +51,6 @@ export function OriginDirection({
   return (
     <section className="axog" aria-label="CDN">
       {head}
-      {activity}
       <div className="axog-lede">
         <div>
           <h2>

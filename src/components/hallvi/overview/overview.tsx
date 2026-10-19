@@ -62,7 +62,7 @@ export function OverviewDirection({
   return (
     <section className="ax-root axo" aria-label="Overview">
       <PageHead
-        bar={page.chrome.bar}
+        bar={page.bar}
         title={record.application.name}
         name={record.application.name}
         openUrl={planned ? null : page.openUrl}

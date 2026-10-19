@@ -36,7 +36,7 @@ function answering(status: "passed" | "failed" | "info", at?: string) {
       applicationId={APP}
       applicationName="Shop"
       now={NOW}
-      chrome={{ bar: null, header: null, activity: null }}
+      bar={null}
       onOpenDestination={() => undefined}
       onAsk={() => undefined}
     />,

@@ -24,7 +24,7 @@ import {
 } from "@/server/record-projection";
 
 import type { Check, Dated } from "./backups/protect-story";
-import { ago } from "./format";
+import { ago, listed } from "./format";
 
 /**
  * One copy, with the two things that are true of it and of nothing else:
@@ -209,12 +209,6 @@ function idList(value: string | undefined | null) {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
-}
-
-/** "a", "a and b", "a, b and c". A sentence, not a join. */
-function list(items: string[]) {
-  if (items.length <= 1) return items[0] ?? "";
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 /** A relative time for prose. The facts row uses LocalTime instead. */
@@ -771,7 +765,7 @@ export function protectionVerdict(
    * into an archive that was written before it.
    */
   const coverage = protection.newestCopyCoverage;
-  const names = list(coverage.missing.map((item) => item.label));
+  const names = listed(coverage.missing.map((item) => item.label));
   /**
    * What to say about what the newest copy holds.
    *
@@ -951,7 +945,7 @@ export function protectionVerdict(
       limit:
         "A schedule is not a copy. Nothing has been written anywhere." +
         (protection.uncovered.length
-          ? ` The plan does not say it copies ${list(protection.uncovered.map((item) => item.label))}.`
+          ? ` The plan does not say it copies ${listed(protection.uncovered.map((item) => item.label))}.`
           : ""),
       next: {
         label: "Back up now",

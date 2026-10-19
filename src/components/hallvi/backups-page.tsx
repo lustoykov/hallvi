@@ -19,14 +19,13 @@
 import { useMemo } from "react";
 
 import type { ControllerProtectionFacts } from "@/server/application-facts";
-import type { SavedInformation } from "@/server/operator-data";
 import {
   currentFacts,
   subjectsOfKind,
   topologyOf,
 } from "@/server/record-projection";
 
-import type { PageChrome } from "./page/page-head";
+import type { Destination } from "./page/page-head";
 import {
   inNewestCopy,
   protectionFromRecords,
@@ -34,7 +33,7 @@ import {
 } from "./backups-records";
 import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";
-import { PageHead, type Reachability } from "./page/page-head";
+import { PageHead } from "./page/page-head";
 import { ago } from "./format";
 import { Figure, Lede, Strip } from "./register";
 import { storageFromRecords } from "./storage-records";
@@ -46,25 +45,15 @@ export function BackupsPage({
   now,
   reachable = "checking",
   onReopen,
-  chrome,
+  bar,
   controller,
   onRefresh,
   onAsk,
-}: {
-  records: SavedInformation[];
-  applicationId: string;
-  applicationName: string;
-  now: number;
-  /** Whether a private way in still answers; see PageHead. */
-  reachable?: Reachability;
-  /** Asks Pi to reopen private access when it is closed. */
-  onReopen?: () => void;
-  chrome: PageChrome;
+}: Destination & {
   /** Hallvi's own protection, which no application record establishes. */
   controller?: ControllerProtectionFacts;
   /** Re-reads the view after the owner confirms the recovery kit. */
   onRefresh?: () => Promise<void>;
-  onAsk: (draft: string) => void;
 }) {
   const story = useMemo(
     () => storageFromRecords({ records, applicationId, now }),
@@ -114,7 +103,7 @@ export function BackupsPage({
 
   const head = (
     <PageHead
-      bar={chrome.bar}
+      bar={bar}
       title="Backups"
       name={applicationName}
       openUrl={null}

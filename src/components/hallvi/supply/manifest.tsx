@@ -20,9 +20,9 @@ import { Mascot } from "../mascot";
 import type { SupplyProps, Value } from "./supply-story";
 import { RevealSecret } from "../reveal-secret";
 import { revealKeyboardControl } from "../reveal-keyboard-control";
-import { ago } from "../format";
+import { ago, listed } from "../format";
 import { when } from "../processes/stack-model";
-import { listed, sizeWords } from "./supply-model";
+import { sizeWords } from "./supply-model";
 import "./manifest.css";
 
 const deciders = [
@@ -57,7 +57,6 @@ export function ManifestDirection({
   now,
   applicationId,
   head,
-  activity,
   onAsk,
   onOpenDestination,
 }: SupplyProps) {
@@ -89,7 +88,6 @@ export function ManifestDirection({
   return (
     <section className="axma" aria-label="Environment variables">
       {head}
-      {activity}
       <div className="axma-lede">
         <div>
           <h2>{say}</h2>

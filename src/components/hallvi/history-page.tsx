@@ -6,13 +6,12 @@
 // design's and they work on what the projection produces: changes against
 // inspections, work no conversation started, and anything still waiting.
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ChatSummary } from "@/server/types";
 
-import type { PageChrome } from "./page/page-head";
 import type { ApplicationSection } from "./application-sections";
 import { PageHead } from "./page/page-head";
 import { historyFromRecords } from "./history-records";
@@ -26,7 +25,7 @@ export function HistoryPage({
   chats,
   applicationName,
   now,
-  chrome,
+  bar,
   onOpenConversation,
   onOpenDestination,
 }: {
@@ -35,7 +34,8 @@ export function HistoryPage({
   chats: ChatSummary[];
   applicationName: string;
   now: number;
-  chrome: PageChrome;
+  /** The way back to the conversation. */
+  bar: ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
 }) {
@@ -61,7 +61,7 @@ export function HistoryPage({
         now={now}
         head={
           <PageHead
-            bar={chrome.bar}
+            bar={bar}
             title="History"
             name={applicationName}
             openUrl={null}

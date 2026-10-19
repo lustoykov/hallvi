@@ -81,3 +81,10 @@ export function clockTime(at: string | number) {
     hour12: false,
   });
 }
+
+/** "a", "a and b", "a, b and c": a sentence, not a join. */
+export function listed(words: string[]) {
+  return words.length > 1
+    ? `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`
+    : (words[0] ?? "");
+}

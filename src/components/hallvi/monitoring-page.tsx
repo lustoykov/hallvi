@@ -9,10 +9,8 @@
 
 import { useMemo } from "react";
 
-import type { SavedInformation } from "@/server/operator-data";
-
-import type { PageChrome } from "./page/page-head";
-import { PageHead, type Reachability } from "./page/page-head";
+import type { Destination } from "./page/page-head";
+import { PageHead } from "./page/page-head";
 import {
   monitoringFromRecords,
   usageFromRecords,
@@ -31,20 +29,9 @@ export function MonitoringPage({
   now,
   reachable = "checking",
   onReopen,
-  chrome,
+  bar,
   onAsk,
-}: {
-  records: SavedInformation[];
-  applicationId: string;
-  applicationName: string;
-  now: number;
-  /** Whether a private way in still answers; see PageHead. */
-  reachable?: Reachability;
-  /** Asks Pi to reopen private access when it is closed. */
-  onReopen?: () => void;
-  chrome: PageChrome;
-  onAsk: (draft: string) => void;
-}) {
+}: Destination) {
   const story = useMemo(
     () =>
       monitoringFromRecords({ records, applicationId, applicationName, now }),
@@ -76,7 +63,7 @@ export function MonitoringPage({
     <div className="ax-root">
       <section className="axmw-page" aria-label="Monitoring">
         <PageHead
-          bar={chrome.bar}
+          bar={bar}
           title="Monitoring"
           name={applicationName}
           openUrl={null}

@@ -14,10 +14,8 @@
 import { useMemo, type ReactNode } from "react";
 import { CheckCircle, Circle, LockSimple } from "@phosphor-icons/react";
 
-import type { SavedInformation } from "@/server/operator-data";
-
-import type { PageChrome } from "./page/page-head";
-import { PageHead, type Reachability } from "./page/page-head";
+import type { Destination } from "./page/page-head";
+import { PageHead } from "./page/page-head";
 import { EmptySketch } from "./empty-sketch";
 import {
   basisOf,
@@ -293,20 +291,9 @@ export function AccessPage({
   now,
   reachable = "checking",
   onReopen,
-  chrome,
+  bar,
   onAsk,
-}: {
-  records: SavedInformation[];
-  applicationId: string;
-  applicationName: string;
-  now: number;
-  /** Whether a private way in still answers; see PageHead. */
-  reachable?: Reachability;
-  /** Asks Pi to reopen private access when it is closed. */
-  onReopen?: () => void;
-  chrome: PageChrome;
-  onAsk: (draft: string) => void;
-}) {
+}: Destination) {
   const story = useMemo(
     () => reachFromRecords({ records, applicationId, applicationName, now }),
     [records, applicationId, applicationName, now],
@@ -324,7 +311,7 @@ export function AccessPage({
   // Its own offer only where the page has something to offer it beside.
   const head = (actions?: ReactNode) => (
     <PageHead
-      bar={chrome.bar}
+      bar={bar}
       title="Access"
       name={applicationName}
       openUrl={story.address}

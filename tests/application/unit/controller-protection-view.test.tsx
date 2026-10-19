@@ -55,7 +55,7 @@ const draw = (
       applicationId={APP}
       applicationName="Notes"
       now={NOW}
-      chrome={{ bar: null, header: null, activity: null }}
+      bar={null}
       controller={facts}
       onAsk={() => {}}
     />,

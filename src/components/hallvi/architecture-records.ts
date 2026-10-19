@@ -38,7 +38,7 @@ import {
 
 import { protectionFromRecords } from "./backups-records";
 
-import { ago } from "./format";
+import { ago, listed } from "./format";
 import type { ApplicationSection } from "./application-sections";
 import type {
   ArchitectureModel,
@@ -306,11 +306,6 @@ function slotFor(part: { id: string; kind: Part["kind"] }, sshLike: boolean) {
       // keep the reference Pi gave them.
       return part.id;
   }
-}
-
-function list(names: string[]) {
-  if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 type MapPart = Topology["parts"][number];
@@ -752,8 +747,8 @@ export function architectureFromRecords({
               // at the same destination may since have failed, and Backups is
               // where that verdict is read. The map says where, in the tense
               // the evidence supports.
-              `${list(volumes.map((part) => part.name))} live on the server, and a copy of them reached ${list(offsite.map((part) => part.name))}.`
-            : `${list(volumes.map((part) => part.name))} live on the server. ${offServer(records)}`
+              `${listed(volumes.map((part) => part.name))} live on the server, and a copy of them reached ${listed(offsite.map((part) => part.name))}.`
+            : `${listed(volumes.map((part) => part.name))} live on the server. ${offServer(records)}`
           : "No stored data is on record for this application.",
       },
       {

@@ -28,7 +28,7 @@ const page = {
   applicationId: APP,
   applicationName: "Shop",
   now: NOW,
-  chrome: { bar: null, header: null, activity: null },
+  bar: null,
   onAsk: () => undefined,
   onOpenDestination: () => undefined,
 };

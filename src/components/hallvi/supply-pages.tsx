@@ -10,11 +10,9 @@
 
 import { useMemo, type ReactNode } from "react";
 
-import type { SavedInformation } from "@/server/operator-data";
-
-import type { PageChrome } from "./page/page-head";
+import type { Destination } from "./page/page-head";
 import type { ApplicationSection } from "./application-sections";
-import { PageHead, type Reachability } from "./page/page-head";
+import { PageHead } from "./page/page-head";
 import type { SecretRequest } from "./secret-request";
 import { supplyFromRecords } from "./supply-records";
 import { ManifestDirection } from "./supply/manifest";
@@ -44,23 +42,13 @@ export function SupplyPageView({
   now,
   reachable = "checking",
   onReopen,
-  chrome,
+  bar,
   onOpenDestination,
   onAsk,
-}: {
+}: Destination & {
   page: SupplyPage;
-  records: SavedInformation[];
-  applicationId: string;
-  applicationName: string;
   secrets: SecretRequest[];
-  now: number;
-  /** Whether a private way in still answers; see PageHead. */
-  reachable?: Reachability;
-  /** Asks Pi to reopen private access when it is closed. */
-  onReopen?: () => void;
-  chrome: PageChrome;
   onOpenDestination: (destination: ApplicationSection) => void;
-  onAsk: (draft: string) => void;
 }) {
   const story = useMemo(
     () =>
@@ -76,7 +64,7 @@ export function SupplyPageView({
 
   const head = (
     <PageHead
-      bar={chrome.bar}
+      bar={bar}
       title={titles[page]}
       name={applicationName}
       openUrl={null}
@@ -90,7 +78,6 @@ export function SupplyPageView({
     now,
     applicationId,
     head,
-    activity: null,
     onAsk,
     onOpenDestination,
   };

@@ -14,14 +14,13 @@ import { currentAccessRecord } from "@/server/access-record";
 // four states are all still reachable in the list: nothing deployed, a
 // decision waiting, work running, and a release that either holds or failed.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { DeploymentStatus } from "@/server/deployment-automation";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { ApplicationSection } from "./application-sections";
-import type { PageChrome } from "./page/page-head";
 import { PageHead, type Reachability } from "./page/page-head";
 import { DeploymentSource } from "./deployment-source";
 import { releasesFromRecords } from "./release-records";
@@ -37,7 +36,7 @@ export function DeploymentPage({
   now,
   reachable = "checking",
   onReopen,
-  chrome,
+  bar,
   panel,
   onAsk,
   onOpenDestination,
@@ -63,7 +62,8 @@ export function DeploymentPage({
   reachable?: Reachability;
   /** Asks Pi to reopen private access when it is closed. */
   onReopen?: () => void;
-  chrome: PageChrome;
+  /** The way back to the conversation. */
+  bar: ReactNode;
   panel?: React.ReactNode;
   onAsk: (draft: string) => void;
   onOpenDestination?: (destination: ApplicationSection) => void;
@@ -123,7 +123,7 @@ export function DeploymentPage({
     <div className="ax-root" data-variant="register">
       <section className="hv-deployment" aria-label="Deployment">
         <PageHead
-          bar={chrome.bar}
+          bar={bar}
           title="Deployment"
           name={applicationName}
           // The band an inch below owns the way in on this page: the state,
@@ -155,7 +155,6 @@ export function DeploymentPage({
         {/* Work in progress, where the shell has any. A release that is still
             running is a row in the list; this is the conversation's own view
             of what it is doing right now. */}
-        {waiting && chrome.activity}
         {/* How it deploys, under what it deployed. It is a setting, read
             and changed now and then; what is running is what the page is
             for. Before the first release it appears only once the owner has

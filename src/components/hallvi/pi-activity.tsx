@@ -52,6 +52,7 @@ import {
   placeOf as placeOfTool,
   plainText,
 } from "./execution-text";
+import { listed } from "./format";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
@@ -203,10 +204,7 @@ function summarise(records: ActivityRecord[]) {
   const said = counts.map(
     ({ kind, n }) => `${n} ${words[kind][n === 1 ? 0 : 1]}`,
   );
-  const phrase =
-    said.length === 1
-      ? said[0]
-      : `${said.slice(0, -1).join(", ")} and ${said.at(-1)}`;
+  const phrase = listed(said);
   return phrase[0].toUpperCase() + phrase.slice(1);
 }
 

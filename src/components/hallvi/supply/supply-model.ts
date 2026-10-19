@@ -5,8 +5,3 @@ export const sizeWords = (bytes: number) =>
   bytes < 1024 ? `${bytes} bytes` : `${(bytes / 1024).toFixed(1)} kB`;
 export const waitWords = (seconds: number) =>
   seconds < 90 ? `${Math.round(seconds)} s` : `${Math.round(seconds / 60)} min`;
-/** "a, b and c". */
-export const listed = (words: string[]) =>
-  words.length > 1
-    ? `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`
-    : (words[0] ?? "");

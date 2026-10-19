@@ -82,7 +82,7 @@ const render = (records: SavedInformation[], reachable?: "open" | "closed") =>
       applicationName="Paper"
       now={NOW}
       reachable={reachable}
-      chrome={{ bar: null, header: null, activity: null }}
+      bar={null}
       onAsk={() => {}}
     />,
   );

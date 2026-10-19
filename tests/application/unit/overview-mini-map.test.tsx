@@ -51,7 +51,7 @@ it("server-renders the mapped Overview before a verified deployment", () => {
       executions={[]}
       chats={[]}
       now={Date.parse(at)}
-      chrome={{ bar: null, header: null, activity: null }}
+      bar={null}
       reduced
       onOpenConversation={() => undefined}
       onOpenDestination={() => undefined}

@@ -20,11 +20,9 @@ import { currentAccessRecord } from "@/server/access-record";
 
 import { useMemo } from "react";
 
-import type { SavedInformation } from "@/server/operator-data";
-
 import type { ApplicationSection } from "./application-sections";
-import type { PageChrome } from "./page/page-head";
-import { PageHead, type Reachability } from "./page/page-head";
+import type { Destination } from "./page/page-head";
+import { PageHead } from "./page/page-head";
 import { EmptySketch } from "./empty-sketch";
 import {
   FactCell,
@@ -85,22 +83,12 @@ export function ProcessesPage({
   now,
   reachable = "checking",
   onReopen,
-  chrome,
+  bar,
   onOpenDestination,
   onAsk,
-}: {
-  records: SavedInformation[];
-  applicationId: string;
-  applicationName: string;
-  now: number;
-  /** Whether a private way in still answers; see PageHead. */
-  reachable?: Reachability;
-  /** Asks Pi to reopen private access when it is closed. */
-  onReopen?: () => void;
-  chrome: PageChrome;
+}: Destination & {
   onOpenConversation?: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
-  onAsk: (draft: string) => void;
 }) {
   const story = useMemo(
     () => processesFromRecords({ records, applicationId, now }),
@@ -116,7 +104,7 @@ export function ProcessesPage({
 
   const head = (
     <PageHead
-      bar={chrome.bar}
+      bar={bar}
       title="Processes"
       name={applicationName}
       openUrl={

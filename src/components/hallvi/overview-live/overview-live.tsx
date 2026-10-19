@@ -19,12 +19,7 @@ import type { Collection } from "@/server/traffic/contract";
 
 import type { ApplicationSection } from "../application-sections";
 import { ago } from "../format";
-import {
-  PageHead,
-  isTunnel,
-  type PageChrome,
-  type Reachability,
-} from "../page/page-head";
+import { PageHead, isTunnel, type Reachability } from "../page/page-head";
 import type { Usage } from "../monitoring-records";
 import type { NeedItem, Overview } from "../overview/overview-model";
 import { Tag, UnresolvedMarks, unresolvedWords } from "../presentation";
@@ -332,7 +327,7 @@ export function OverviewLive({
   usage,
   releases,
   now,
-  chrome,
+  bar,
   openUrl,
   restricted,
   reachable,
@@ -349,7 +344,8 @@ export function OverviewLive({
   /** Which release is running, and the ones before it. */
   releases: Pick<ReleaseView, "running" | "latest" | "all">;
   now: number;
-  chrome: PageChrome;
+  /** The way back to the conversation. */
+  bar: ReactNode;
   openUrl: string | null;
   restricted: boolean;
   reachable: Reachability;
@@ -399,7 +395,7 @@ export function OverviewLive({
   return (
     <div className="hv-section-page hv-section-overview ovl">
       <PageHead
-        bar={chrome.bar}
+        bar={bar}
         title={name}
         name={name}
         openUrl={openUrl}

@@ -7,6 +7,7 @@
 // Server's moments has earned a visit. docs/design/traffic.md owns the
 // design; src/server/traffic/contract.ts owns the shapes.
 
+import { listed } from "../format";
 import {
   DIRECT,
   OTHER,
@@ -282,11 +283,6 @@ export function quietLine(history: TrafficHistory) {
   return `${plural(views, "page view")} ${span}, ${daily}.`;
 }
 
-const list = (items: string[]) =>
-  items.length < 2
-    ? (items[0] ?? "")
-    : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
-
 /** Where a quiet range's few visits went and came from, in one sentence. */
 export function quietWhere(history: TrafficHistory) {
   const pages = history.pages
@@ -302,8 +298,8 @@ export function quietWhere(history: TrafficHistory) {
   );
   if (!pages.length) return null;
   return [
-    `They opened ${list(pages)}`,
-    places.length ? `, from ${list(places)}` : "",
+    `They opened ${listed(pages)}`,
+    places.length ? `, from ${listed(places)}` : "",
     source
       ? source.key === DIRECT
         ? ", most of them directly"
