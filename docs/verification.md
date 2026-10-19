@@ -15,7 +15,8 @@ existing tools; there is no development-verification command in the public CLI.
 
 ## 1. Choose the smallest useful environment
 
-Use an isolated worktree and Node 22 (`node --version`), then `npm ci`.
+Use the current project checkout unless the owner explicitly requests a worktree.
+Use Node 22 (`node --version`), then `npm ci`.
 Record `git rev-parse HEAD` and any uncommitted changes being tested.
 Keep temporary source archives for before/after comparisons under `work/`.
 TypeScript, ESLint and Prettier exclude that ignored scratch directory; source
