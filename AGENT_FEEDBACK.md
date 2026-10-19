@@ -42,7 +42,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 3 | Initial handoff in #337; page and reconnect bytes remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 1 | Fix in review |
-| [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | New |
+| [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
 | [AF-073 — Say exactly when a request ended](#af-073--say-exactly-when-a-request-ended) | 1 | New |
 | [AF-074 — Let the model look before Continue finishes an interrupted step](#af-074--let-the-model-look-before-continue-finishes-an-interrupted-step) | 1 | New |
@@ -326,6 +326,14 @@ In a disposable Chromium fixture, moving the browser clock from 1 October
 the same check on the base revision changed it to `1 Oct, 12:00`. Reproduced
 on `db6b9aa4`, passing on `cac3e2f5`. Give the timestamp its own day-change
 update while keeping the rest of the message memoized.
+
+**Resolved 2026-10-19:** `LocalTime` now subscribes to one shared local-day
+clock. The same disposable Chromium check in Europe/Sofia changed `12:00` to
+`1 Oct, 12:00` at midnight without typing; transcript-row render counts stayed
+unchanged through the clock change and subsequent typing. Server-rendered UTC
+and browser-local hydration are preserved. Visibility and focus also refresh
+the day after sleep; a browser wall-clock jump across midnight confirmed this
+without advancing timers or redrawing the rows.
 
 **+1:** 2026-10-01 — review of [PR #325](https://github.com/lustoykov/hallvi/pull/325), `codex/review-325-feedback`.
 
