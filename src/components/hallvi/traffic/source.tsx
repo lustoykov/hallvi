@@ -1,13 +1,9 @@
 "use client";
 
-// Where the traffic pages get their numbers.
-//
-// The pages read stored totals and the live stream through one small source,
-// so a development preview can hand them invented numbers without the pages
-// knowing (`src/app/prototype/traffic`). In the product it is always the
-// controller's own routes.
+// Where the traffic pages get their numbers: the controller's own routes,
+// for stored totals and the live stream.
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type {
   Collection,
@@ -22,40 +18,18 @@ import { trafficListed } from "./model";
 
 export type CollectionAction = "keep" | "stop" | "forget";
 
-/** What the live stream sends. */
-export type StreamEvent = LiveEvent;
-
-export interface TrafficSource {
-  history(applicationId: string, range: TrafficRange): Promise<TrafficHistory>;
-  collection(applicationId: string): Promise<Collection>;
-  act(applicationId: string, action: CollectionAction): Promise<Collection>;
-  impact(applicationId: string, at: string[]): Promise<ReleaseImpact[]>;
-  /** Opens the live stream, and returns what closes it. */
-  live(
-    applicationId: string,
-    on: { event: (event: StreamEvent) => void; error: () => void },
-  ): () => void;
+/** Opens the live stream, and returns what closes it. */
+export function liveTraffic(
+  applicationId: string,
+  on: { event: (event: LiveEvent) => void; error: () => void },
+) {
+  const stream = new EventSource(`/api/applications/${applicationId}/traffic`);
+  stream.onmessage = (message) =>
+    on.event(JSON.parse(message.data) as LiveEvent);
+  // EventSource reconnects by itself; until it does, the page says so.
+  stream.onerror = on.error;
+  return () => stream.close();
 }
-
-const controller: TrafficSource = {
-  history: api.trafficHistory,
-  collection: api.trafficCollection,
-  act: api.setTrafficCollection,
-  impact: api.releaseImpact,
-  live(applicationId, on) {
-    const stream = new EventSource(
-      `/api/applications/${applicationId}/traffic`,
-    );
-    stream.onmessage = (message) =>
-      on.event(JSON.parse(message.data) as StreamEvent);
-    // EventSource reconnects by itself; until it does, the page says so.
-    stream.onerror = on.error;
-    return () => stream.close();
-  },
-};
-
-export const TrafficSourceContext = createContext<TrafficSource>(controller);
-export const useTrafficSource = () => useContext(TrafficSourceContext);
 
 // A choice made on the Traffic page has to reach the sidebar at once, and
 // the sidebar is not inside the page. One event, keyed by application.
@@ -66,7 +40,6 @@ const CHANGED = "hv-traffic-collection";
  * has been read, which is never the same as off.
  */
 export function useCollection(applicationId: string | null | undefined) {
-  const source = useTrafficSource();
   const [collection, setCollection] = useState<Collection | null>(null);
   const [read, setRead] = useState<string | null>(null);
   // A different application is a different answer: forget the old one while
@@ -79,8 +52,8 @@ export function useCollection(applicationId: string | null | undefined) {
     if (!applicationId) return;
     let live = true;
     const load = () =>
-      source
-        .collection(applicationId)
+      api
+        .trafficCollection(applicationId)
         .then((next) => live && setCollection(next))
         // Unread stays unread: no route, no claim.
         .catch(() => {});
@@ -102,11 +75,11 @@ export function useCollection(applicationId: string | null | undefined) {
       window.removeEventListener(CHANGED, changed);
       window.clearInterval(timer);
     };
-  }, [applicationId, source]);
+  }, [applicationId]);
 
   const act = async (action: CollectionAction) => {
     if (!applicationId) return;
-    const next = await source.act(applicationId, action);
+    const next = await api.setTrafficCollection(applicationId, action);
     window.dispatchEvent(
       new CustomEvent(CHANGED, {
         detail: { applicationId, collection: next },
@@ -131,7 +104,6 @@ export function useHistory(
   /** False skips the read, for an application that keeps no history. */
   wanted = true,
 ) {
-  const source = useTrafficSource();
   const [state, setState] = useState<{
     key: string;
     history: TrafficHistory | null;
@@ -146,8 +118,8 @@ export function useHistory(
     if (!applicationId || !wanted) return;
     let live = true;
     const load = () =>
-      source
-        .history(applicationId, range)
+      api
+        .trafficHistory(applicationId, range)
         .then((history) => live && setState({ key, history, error: null }))
         .catch(
           (error: unknown) =>
@@ -164,7 +136,7 @@ export function useHistory(
       live = false;
       window.clearInterval(timer);
     };
-  }, [applicationId, range, wanted, key, source]);
+  }, [applicationId, range, wanted, key]);
   return {
     // The previous range stays drawn while the next one is read, so the
     // switch does not flash an empty page.
@@ -176,7 +148,6 @@ export function useHistory(
 
 /** What followed each release, by release time. Quiet releases are absent. */
 export function useImpacts(applicationId: string | null, at: string[]) {
-  const source = useTrafficSource();
   const [impacts, setImpacts] = useState<Map<string, ReleaseImpact>>(
     () => new Map(),
   );
@@ -184,8 +155,8 @@ export function useImpacts(applicationId: string | null, at: string[]) {
   useEffect(() => {
     if (!applicationId || !key) return;
     let live = true;
-    source
-      .impact(applicationId, key.split("|"))
+    api
+      .releaseImpact(applicationId, key.split("|"))
       .then((answers) => {
         if (!live) return;
         setImpacts(
@@ -196,6 +167,6 @@ export function useImpacts(applicationId: string | null, at: string[]) {
     return () => {
       live = false;
     };
-  }, [applicationId, key, source]);
+  }, [applicationId, key]);
   return impacts;
 }

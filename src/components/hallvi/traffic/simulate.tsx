@@ -35,8 +35,7 @@ async function ask(url: string) {
 
 export function SimulateTraffic({ applicationId }: { applicationId: string }) {
   const url = `/api/applications/${applicationId}/traffic/simulate`;
-  // Undefined until asked; a prototype page with invented numbers has no
-  // route behind it, and then the control stays away.
+  // Undefined until asked; without a route behind it the control stays away.
   const [run, setRun] = useState<Simulation | null | undefined>(undefined);
   const [shape, setShape] = useState<SimulatedShape>("busy");
   const [rate, setRate] = useState(10);

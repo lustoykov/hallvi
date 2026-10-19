@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Arrival } from "@/server/traffic/contract";
 
-import { useTrafficSource } from "../traffic/source";
+import { liveTraffic } from "../traffic/source";
 
 export type TrafficState =
   "connecting" | "live" | "lost" | "no-log" | "no-server";
@@ -60,7 +60,6 @@ export function summarise(lines: SeenLine[], now: number) {
 }
 
 export function useTraffic(applicationId: string): Traffic {
-  const source = useTrafficSource();
   const lines = useRef<SeenLine[]>([]);
   const counter = useRef(0);
   const listeners = useRef(new Set<(line: SeenLine) => void>());
@@ -95,7 +94,7 @@ export function useTraffic(applicationId: string): Traffic {
       }
       refresh();
     };
-    const close = source.live(applicationId, {
+    const close = liveTraffic(applicationId, {
       event(event) {
         if (event.type === "state") {
           setState(event.state);
@@ -135,7 +134,7 @@ export function useTraffic(applicationId: string): Traffic {
       close();
       window.clearInterval(ageing);
     };
-  }, [applicationId, source]);
+  }, [applicationId]);
 
   return {
     state,
