@@ -23,6 +23,7 @@ import { GithubConnect } from "./onboarding/github-connect";
 import { ProviderTokenForm } from "./provider-token-form";
 import type { SetupReturn } from "@/server/setup-return";
 import { BackupStorageForm } from "./backup-storage-form";
+import { readRecoveryKit } from "./recovery-kit";
 import { SettingsShell } from "./settings-shell";
 import h from "./pi-setup-screen.module.css";
 import s from "./settings.module.css";
@@ -108,13 +109,7 @@ function RecoveryKit({
                 onClick={async () => {
                   setError("");
                   try {
-                    const response = await fetch(
-                      "/api/controller-protection/kit",
-                    );
-                    const value = await response.json();
-                    if (!response.ok || !value?.passphrase)
-                      throw new Error("The recovery kit could not be read.");
-                    setShown(value);
+                    setShown(await readRecoveryKit());
                   } catch (caught) {
                     setError(
                       caught instanceof Error

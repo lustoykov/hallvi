@@ -7,15 +7,8 @@ import type { ControllerProtectionFacts } from "@/server/application-facts";
 
 import { ago } from "./architecture-prototype/model";
 import { BackupStorageForm } from "./backup-storage-form";
+import { readRecoveryKit, type RecoveryKit } from "./recovery-kit";
 import "./controller-protection.css";
-
-interface Kit {
-  passphrase: string;
-  bucket: string;
-  endpoint: string;
-  prefix: string;
-  keep: number;
-}
 
 /** One sentence for the page's summary: would Hallvi itself survive? */
 export function controllerSentence(
@@ -47,7 +40,8 @@ export function ControllerProtectionBand({
   onRefresh?: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [kit, setKit] = useState<Kit | null>(null);
+  const [kit, setKit] = useState<RecoveryKit | null>(null);
+  const [readAttempt, setReadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const unconfirmed = facts.kitReady && !facts.kitConfirmedAt;
@@ -58,23 +52,32 @@ export function ControllerProtectionBand({
     let live = true;
     // The passphrase only travels when the owner opens this section. It is
     // not part of the page's ordinary refresh data.
-    fetch("/api/controller-protection/kit")
-      .then((response) => (response.ok ? response.json() : null))
+    readRecoveryKit()
       .then((value) => {
-        if (live && value?.passphrase) setKit(value as Kit);
+        if (live) setKit(value);
       })
-      .catch(() => undefined);
+      .catch((caught) => {
+        if (live)
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "The recovery kit could not be read.",
+          );
+      });
     return () => {
       live = false;
     };
-  }, [kit, open, unconfirmed]);
+  }, [kit, open, unconfirmed, readAttempt]);
 
   return (
     <details
       className="cpb"
       aria-label="Hallvi on this PC"
       open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        setOpen(event.currentTarget.open);
+        if (event.currentTarget.open) setError("");
+      }}
     >
       <summary>
         {/* Never set up is not a warning, it is an offer. Amber is for a copy
@@ -176,17 +179,29 @@ export function ControllerProtectionBand({
                   </dd>
                 </div>
               </dl>
-            ) : (
+            ) : !error ? (
               <p>
                 {open
                   ? "Reading the kit…"
                   : "Open this section to read the kit."}
               </p>
-            )}
+            ) : null}
             {error && (
               <p role="alert" className="cpb-error">
                 {error}
               </p>
+            )}
+            {!kit && error && (
+              <button
+                type="button"
+                className="ax-button cpb-saved"
+                onClick={() => {
+                  setError("");
+                  setReadAttempt((attempt) => attempt + 1);
+                }}
+              >
+                Retry
+              </button>
             )}
             <button
               type="button"

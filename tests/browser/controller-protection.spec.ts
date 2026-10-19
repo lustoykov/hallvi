@@ -13,7 +13,7 @@ import { journey } from "./journeys";
 test(
   "Backups states Hallvi's own protection in every state",
   journey("controller-protection"),
-  async ({ page, fixture }) => {
+  async ({ page, fixture }, testInfo) => {
     test.setTimeout(180_000);
     await page.goto("/applications/new");
     await page
@@ -135,11 +135,34 @@ test(
     await expect(
       panel.getByText(/^Copied .*; recovery kit still needs saving$/),
     ).toBeVisible({ timeout: 30_000 });
+    let failKitRead = true;
+    await page.route("**/api/controller-protection/kit", (route) =>
+      route.request().method() === "GET" && failKitRead
+        ? route.fulfill({
+            status: 503,
+            contentType: "text/html",
+            body: "<h1>Unavailable</h1>",
+          })
+        : route.continue(),
+    );
     await openBand();
     await expect(
       page.getByRole("form", { name: "Connect backup storage" }),
     ).toHaveCount(0);
     const kit = panel.getByLabel("Recovery kit");
+    await kit.scrollIntoViewIfNeeded();
+    await expect(kit.getByRole("alert")).toHaveText(
+      "The recovery kit could not be read.",
+    );
+    await expect(kit.getByText("Reading the kit…")).toHaveCount(0);
+    await expect(
+      kit.getByRole("button", { name: "I saved it" }),
+    ).toBeDisabled();
+    await kit.screenshot({
+      path: testInfo.outputPath("recovery-kit-read-error.png"),
+    });
+    failKitRead = false;
+    await kit.getByRole("button", { name: "Retry", exact: true }).click();
     await expect(kit.locator("[data-recovery-passphrase]")).toHaveText(
       passphrase,
       { timeout: 15_000 },
@@ -169,6 +192,12 @@ test(
     });
     await expect(settings).toContainText("saved outside this machine");
     await expect(settings.locator("[data-recovery-passphrase]")).toHaveCount(0);
+    failKitRead = true;
+    await settings.getByRole("button", { name: "Show recovery kit" }).click();
+    await expect(settings.getByRole("alert")).toHaveText(
+      "The recovery kit could not be read.",
+    );
+    failKitRead = false;
     await settings.getByRole("button", { name: "Show recovery kit" }).click();
     await expect(settings.locator("[data-recovery-passphrase]")).toHaveText(
       passphrase,

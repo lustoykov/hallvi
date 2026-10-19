@@ -36,7 +36,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 | [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 2 | Guidance added |
-| [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 1 | New |
+| [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 2 | Fixed locally |
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | New |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | New |
@@ -474,6 +474,14 @@ Settings already reports the error and leaves Show recovery kit available.
 This is a source-review observation in `controller-protection.tsx`, not a
 reproduced browser blocker in this task. Give the disclosure an explicit error
 and retry when improving this recovery path.
+
+**Resolved 2026-10-19:** Forcing the GET to return HTTP 503 reproduced the
+endless reading state. Backups now reports the error and offers Retry, using
+the same recovery-kit reader as Settings. The browser journey recovers from
+the failed read, saves the kit confirmation, and verifies Settings can also
+report a failed read and reveal the kit on retry.
+
+**+1:** 2026-10-19 — AF-065 reproduction and fix, `bugs`.
 
 **+1:** 2026-10-01 — application QA and release,
 `codex/application-qa-release`.
