@@ -33,8 +33,8 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-050 — Keep Pi's replies from summoning the owner](#af-050--keep-pis-replies-from-summoning-the-owner) | 1 | New |
 | [AF-051 — Retire or rewrite the conversation-first capture](#af-051--retire-or-rewrite-the-conversation-first-capture) | 1 | New |
 | [AF-056 — Check the port before rebuilding the scenario database](#af-056--check-the-port-before-rebuilding-the-scenario-database) | 1 | New |
-| [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 1 | New |
-| [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | New |
+| [AF-057 — Say which Node a checkout runs under](#af-057--say-which-node-a-checkout-runs-under) | 2 | New |
+| [AF-058 — Give the Overview before a verified deployment the same plain labels](#af-058--give-the-overview-before-a-verified-deployment-the-same-plain-labels) | 1 | Fixed locally |
 | [AF-059 — Remove the red a closed head never shows](#af-059--remove-the-red-a-closed-head-never-shows) | 1 | New |
 | [AF-063 — Stagger browser fixtures on a shared development machine](#af-063--stagger-browser-fixtures-on-a-shared-development-machine) | 2 | Guidance added |
 | [AF-065 — Show a failed recovery-kit read](#af-065--show-a-failed-recovery-kit-read) | 2 | Fixed locally |
@@ -59,7 +59,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-085 — Render reply tables in the plugin panel](#af-085--render-reply-tables-in-the-plugin-panel) | 1 | New |
 | [AF-086 — Keep expanded Terminal focus visible](#af-086--keep-expanded-terminal-focus-visible) | 1 | New |
 | [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | New |
-| [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | New |
+| [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | Fixed locally |
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
 | [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; final-frame gap unconfirmed |
 | [AF-091 — Share the initial clock when Overview hydrates](#af-091--share-the-initial-clock-when-overview-hydrates) | 1 | Fix in review |
@@ -171,6 +171,11 @@ footer loses their place. Decide how much space the initial loading state
 should reserve; this needs a loading-layout choice rather than a small CSS fix.
 
 **+1:** 2026-10-02 — cross-browser UI audit, `codex/ui-evidence-audit`.
+
+**Resolved 2026-10-19:** the loading chart is an empty frame of the drawn
+chart's height, the countries row is always one line, and the footer and
+breakdowns are drawn only once the totals have settled. In a held-read fixture
+at 768px, with and without countries, nothing above them moved.
 
 ### AF-087 — Keep plugin overlay focus visible
 
@@ -578,6 +583,10 @@ under the other. An `.nvmrc` or an `engines` field would say so first.
 
 **+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
 
+**+1:** 2026-10-19 — UI polish on `main`: Playwright fixtures started under
+Node 26 fail warm-up with a 500 from the terminal route, because `node-pty`
+was built for Node 22; it reads like a broken fixture.
+
 ### AF-058 — Give the Overview before a verified deployment the same plain labels
 
 The deployed Overview now says "Recent" and "Checked by Hallvi", and its head
@@ -588,6 +597,10 @@ the deployed page. Overview's title is also the web part's name, so a static
 site behind Caddy is titled "Caddy".
 
 **+1:** 2026-10-01 — Overview leads with visitors, `claude/overview-visitors-first`
+
+**Resolved 2026-10-19:** every Overview composition uses the shared head,
+titled with the application's name, and the ones before a deployment use
+"Checked by Hallvi", "Recent" and the plain lane names.
 
 ### AF-059 — Remove the red a closed head never shows
 
