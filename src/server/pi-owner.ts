@@ -15,12 +15,14 @@ import {
   openConversation,
   removeNativeSessions,
   type StoredConversation,
+  type OpenConversation,
 } from "./pi-sessions";
 import {
   holds,
   imageOf,
   ORIGIN_TAG,
   projectTranscript,
+  projectCall,
   requestIdFor,
   SENT_AT_TAG,
   unfinished,
@@ -343,6 +345,55 @@ export function sessionOwner(
   }
 
   const actions = {
+    /** Read the delivered call's two immutable entries, without a scan. */
+    async call(scope: Scope, message: unknown) {
+      const { id, entryId, resultEntryId } = message as {
+        id: string;
+        entryId: number;
+        resultEntryId?: number;
+      };
+      if (
+        typeof id !== "string" ||
+        !Number.isSafeInteger(entryId) ||
+        entryId < 1 ||
+        (resultEntryId !== undefined &&
+          (!Number.isSafeInteger(resultEntryId) || resultEntryId < 1))
+      )
+        throw new WorkerRefusal("This call reference is invalid.", "missing");
+      const read = async (
+        session: OpenConversation,
+        previews?: Map<string, string>,
+      ) => {
+        const { entry, result } = await session.readCall(
+          entryId,
+          resultEntryId,
+        );
+        const call =
+          resultEntryId !== undefined && !result
+            ? undefined
+            : projectCall(id, entry, result);
+        return {
+          call: call ? { ...call, preview: previews?.get(id) } : undefined,
+        };
+      };
+      const running = working.get(scope.chatId);
+      const current =
+        running &&
+        (await read(running.session, running.previews).catch(() => undefined));
+      if (current) return current;
+      if (!hasConversation(scope)) return {};
+      return inLine(scope.chatId, async () => {
+        const now = working.get(scope.chatId);
+        if (now) return read(now.session, now.previews);
+        assertOpen();
+        const session = await openConversation(scope);
+        try {
+          return await read(session);
+        } finally {
+          await session.close();
+        }
+      });
+    },
     async transcript(scope: Scope): Promise<Transcript> {
       const running = working.get(scope.chatId);
       // Read without waiting in line. One that is being closed as it is read

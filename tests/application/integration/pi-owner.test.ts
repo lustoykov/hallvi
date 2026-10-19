@@ -99,6 +99,7 @@ import { NotFoundError } from "../../../src/server/applications";
 import {
   chatImage,
   chatSnapshot,
+  readCallDetail,
   continueConversation,
   sendChatMessage,
   stopConversation,
@@ -708,6 +709,15 @@ it("asks before it executes, places the evidence in Pi's transcript, and runs tw
     [reply.id, 3, "message", "finished"],
   ]);
   expect(await listExecutions(b.id)).toEqual([]);
+  const call = snapshot.piActivity!.find((record) => record.kind === "tool")!;
+  expect(call.entryId).toBeGreaterThan(0);
+  expect(call.resultEntryId).toBeGreaterThan(call.entryId!);
+  const exact = await readCallDetail(a.id, a.chat, call.id, call);
+  expect(exact.activity?.id).toBe(call.id);
+  expect(exact.activity?.args).toContain("Restart the service");
+  await expect(
+    readCallDetail(a.id, a.chat, "another-call", call),
+  ).rejects.toBeInstanceOf(NotFoundError);
 });
 
 it("delivers a steer at Pi's next step and follow-ups after, in Pi's order", async () => {
@@ -1408,7 +1418,9 @@ it("a call the worker never finished reads as interrupted, from Pi's own history
   const working = (await a.snapshot()).piActivity!.at(-1)!;
   expect(working).toMatchObject({ tool: "check_domain", status: "running" });
   // Pi kept the arguments the model sent; a reader is never handed them.
-  expect(working.args).toContain("[REDACTED]");
+  expect(
+    (await readCallDetail(a.id, a.chat, working.id, working)).activity?.args,
+  ).toContain("[REDACTED]");
   expect(JSON.stringify(await a.snapshot())).not.toContain("ghp_live");
 
   // The worker dies with the call still in flight. Pi is told nothing, and
@@ -1423,6 +1435,9 @@ it("a call the worker never finished reads as interrupted, from Pi's own history
     result: "",
   });
   expect(after.messages.at(-1)).toMatchObject({ status: "interrupted" });
+  expect(
+    (await readCallDetail(a.id, a.chat, working.id, working)).activity?.args,
+  ).toContain("[REDACTED]");
 });
 
 it("reads a conversation nobody is running without asking the model provider", async () => {
@@ -1437,6 +1452,10 @@ it("reads a conversation nobody is running without asking the model provider", a
   synthetic.authFails = true;
   const snapshot = await a.snapshot();
   expect(snapshot.status).toBe("idle");
+  const call = snapshot.piActivity!.find((record) => record.kind === "tool")!;
+  expect(
+    (await readCallDetail(a.id, a.chat, call.id, call)).activity?.result,
+  ).toBeTruthy();
   expect(snapshot.messages.at(-1)).toMatchObject({ status: "completed" });
   expect(
     snapshot.piActivity!.map((record) => [record.tool, record.status]),

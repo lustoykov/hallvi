@@ -105,6 +105,14 @@ export interface OpenConversation {
   conversation: Conversation;
   /** Read what Pi holds. Starts nothing: a read never resumes work. */
   read(): Promise<StoredConversation>;
+  /** Exact immutable entry reads on Pi's commit line; no history scan. */
+  readCall(
+    entryId: number,
+    resultEntryId?: number,
+  ): Promise<{
+    entry?: EntryRecord;
+    result?: EntryRecord;
+  }>;
   close(): Promise<void>;
 }
 
@@ -185,6 +193,26 @@ export async function openConversation(
       return {
         harness,
         conversation,
+        readCall(entryId, resultEntryId) {
+          return harness.commit(
+            async () => ({
+              entry: (
+                await storage.entry(id, entryId as EntryRecord["id"], ctx)
+              )?.entry,
+              result:
+                resultEntryId === undefined
+                  ? undefined
+                  : (
+                      await storage.entry(
+                        id,
+                        resultEntryId as EntryRecord["id"],
+                        ctx,
+                      )
+                    )?.entry,
+            }),
+            ctx,
+          );
+        },
         async read() {
           const { tasks } = await harness.inspect(ctx);
           // One reading, on Pi's own line of commits: a reply and the record

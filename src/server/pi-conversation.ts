@@ -2,16 +2,21 @@
 // sessions, and this asks the worker: for the transcript, to send, to
 // continue, to stop. Hallvi's execution evidence is placed into what comes
 // back by the id Pi gave each tool call.
-import { activityFromTranscript } from "./pi-activity";
+import { activityFromTranscript, callDetail } from "./pi-activity";
 import { activitySummary, executionSummary } from "./chat-evidence";
-import type { CallDetail } from "@/lib/call-detail";
-import { listExecutions, type ExecutionRecord } from "./operator-execution";
+import type { CallDetail, CallReference } from "@/lib/call-detail";
+import {
+  listExecutions,
+  readExecution,
+  type ExecutionRecord,
+} from "./operator-execution";
+import { z } from "zod";
 import { assertChatWritable, loadChat, NotFoundError } from "./applications";
 import { touchChat } from "./db";
 import { sendChatMessageRequestSchema } from "./schemas";
 import { listInformation } from "./saved-information";
 import type { MessageBlock } from "./operator-data";
-import type { Transcript } from "./pi-transcript";
+import type { Transcript, TranscriptCall } from "./pi-transcript";
 import type { ChatMessage, ChatSnapshot } from "./types";
 import {
   askWorker,
@@ -111,7 +116,42 @@ export async function readCallDetail(
   applicationId: string,
   chatId: string,
   callId: string,
+  reference: CallReference = {},
 ): Promise<CallDetail> {
+  await loadChat(applicationId, chatId);
+  if (z.uuid().safeParse(callId).success) {
+    const execution = await readExecution(applicationId, callId);
+    if (execution) {
+      if (execution.chatId !== chatId)
+        throw new NotFoundError("This call is not in the conversation.");
+      return { execution };
+    }
+  }
+  if (reference.entryId !== undefined) {
+    const { call } = await askWorker<{
+      call?: Pick<TranscriptCall, "args" | "result" | "preview">;
+    }>("call", {
+      scope: { applicationId, chatId },
+      message: {
+        id: callId,
+        entryId: reference.entryId,
+        resultEntryId: reference.resultEntryId,
+      },
+    });
+    if (!call) throw new NotFoundError("This call is not in the conversation.");
+    const execution = reference.executionId
+      ? await readExecution(applicationId, reference.executionId)
+      : undefined;
+    if (
+      execution &&
+      (execution.chatId !== chatId || execution.toolCallId !== callId)
+    )
+      throw new NotFoundError(
+        "This execution is not this conversation's call.",
+      );
+    return { activity: callDetail(callId, call), execution };
+  }
+  // Already-open older pages have no immutable entry references.
   const { piActivity, executions } = await readConversation(
     applicationId,
     chatId,

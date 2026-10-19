@@ -116,6 +116,10 @@ reads, notices during the initial read, latest-state reconnect acknowledgements,
 missed changes and full reconnects for older clients.
 `unit/chat-evidence.test.ts` checks compact rows, fingerprints changing when
 only omitted text changes, and the single-call read's conversation boundary.
+Current call rows carry immutable Pi entry addresses: the same check covers
+exact call reads and direct execution UUID reads without a full transcript or
+execution scan. The native Pi owner/session checks exercise those addresses,
+redaction, restart and read-only storage through the real worker/socket.
 `long-history-responses.spec.ts` verifies that unchanged page collections are
 acknowledged, then keeps old evidence disclosures and live output usable through updates and
 reconnect. A disposable proxy ends the actual SSE response; the journey checks
@@ -154,12 +158,18 @@ the same warmed server:
 It writes `disclosure-profile.json`: decoded document bytes from Navigation
 Timing (large bodies can be evicted from Chromium's inspector buffer), the
 first SSE frame's UTF-8 bytes including its ID, navigation-to-latest-reply
-visibility and disclosure-click-to-detail visibility. Compare the base and
-change on the same machine in coordinated quiet windows; this synthetic
-production fixture makes no model calls and establishes no deployment.
+visibility, disclosure-click-to-detail visibility, transcript reads during the
+disclosure, and the disposable fixture's snapshot projection/transport counters.
+Compare the base and change on the same machine in coordinated quiet windows;
+this synthetic production fixture makes no model calls and establishes no deployment.
 Keep that task-owned output directory when working concurrently: a new
 Playwright run empties its output directory, including another run's evidence
 if both use the default.
+For shared-machine measurements, set `HALLVI_DISCLOSURE_GATE` to a fresh
+task-owned path under `work/`. After warming, the case writes `<path>.ready`
+and waits up to three minutes for you to create `<path>`. Agree a quiet window
+at that point, then create the file to measure only the three browser contexts; build and warmup
+do not reserve the machine. Remove only those task-owned markers afterward.
 
 The same journey checks where a long conversation opens: on its latest
 message, and on the linked message when the address names one, without being

@@ -51,6 +51,8 @@ export function longHistory(
       ) +
       `END-${i}`;
     transcript.calls[toolCallId] = {
+      entryId: i * 2 + 1,
+      resultEntryId: i * 2 + 2,
       replyId,
       sequence: i % 3,
       tool: i % 3 === 0 ? "read" : "server_bash",

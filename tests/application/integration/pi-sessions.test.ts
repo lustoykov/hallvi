@@ -116,6 +116,8 @@ it("reads what Pi holds without writing anything or setting anything going", asy
   const open = await openConversation(scope());
   try {
     const read = await open.read();
+    const exact = await open.readCall(read.entries[0].id);
+    expect(exact).toEqual({ entry: read.entries[0], result: undefined });
     expect(read).toMatchObject({ live: {}, inbox: { items: [] }, tasks: 0 });
     expect((await open.harness.inspect(ctx)).scheduling).toBe("paused");
   } finally {

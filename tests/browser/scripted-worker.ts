@@ -58,10 +58,25 @@ export async function scriptWorker(
     incoming.on("end", () => {
       if (incoming.url === "/send") onSend?.(JSON.parse(body));
       if (incoming.url === "/transcript") transcriptReads++;
+      let result: unknown = {};
+      if (incoming.url === "/transcript") result = transcript();
+      if (incoming.url === "/call") {
+        const { id, entryId, resultEntryId } = JSON.parse(body).message;
+        const call = transcript().calls[id];
+        if (
+          call?.entryId === entryId &&
+          (resultEntryId === undefined || call.resultEntryId === resultEntryId)
+        )
+          result = {
+            call: {
+              args: call.args,
+              preview: call.preview,
+              result: resultEntryId === undefined ? undefined : call.result,
+            },
+          };
+      }
       outgoing.writeHead(200, { "Content-Type": "application/json" });
-      outgoing.end(
-        JSON.stringify(incoming.url === "/transcript" ? transcript() : {}),
-      );
+      outgoing.end(JSON.stringify(result));
     });
   });
   for (let attempt = 0; ; attempt++) {

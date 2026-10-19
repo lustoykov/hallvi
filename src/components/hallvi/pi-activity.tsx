@@ -495,6 +495,7 @@ function Row({ record, chatId }: { record: ActivityRecord; chatId?: string }) {
     record.id,
     record.detailVersion,
     open,
+    record,
   );
   const detailRecord = loaded?.activity ?? record;
   const { kind, verb } = describe(record);
@@ -510,6 +511,7 @@ function Row({ record, chatId }: { record: ActivityRecord; chatId?: string }) {
         type="button"
         className="hv-did-row"
         aria-expanded={open}
+        aria-busy={loading || undefined}
         onClick={() => setOpen(!open)}
       >
         <Icon weight="regular" aria-hidden="true" />
@@ -520,22 +522,24 @@ function Row({ record, chatId }: { record: ActivityRecord; chatId?: string }) {
         </span>
         {detail && <span className="hv-did-subject">{detail}</span>}
         <span className="hv-did-state">
-          {record.status === "running"
-            ? ""
-            : record.status === "declined"
-              ? "not run"
-              : record.status === "interrupted"
-                ? "stopped"
-                : record.status === "failed"
-                  ? "failed"
-                  : (took ?? "")}
+          {loading ? (
+            <span role="status">Loading…</span>
+          ) : record.status === "running" ? (
+            ""
+          ) : record.status === "declined" ? (
+            "not run"
+          ) : record.status === "interrupted" ? (
+            "stopped"
+          ) : record.status === "failed" ? (
+            "failed"
+          ) : (
+            (took ?? "")
+          )}
         </span>
       </button>
-      {open && (
+      {open && !loading && (
         <div className="hv-did-detail">
-          {loading ? (
-            <p role="status">Loading call details…</p>
-          ) : error ? (
+          {error ? (
             <p role="alert">
               {error}{" "}
               <button type="button" onClick={retry}>

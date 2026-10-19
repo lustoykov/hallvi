@@ -75,7 +75,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const { detail, error, loading, retry } = useCallDetail(
     item.applicationId,
     item.chatId,
-    item.toolCallId ?? item.id,
+    item.id,
     item.detailVersion,
     open,
   );

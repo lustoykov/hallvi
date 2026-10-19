@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { projectTranscript } from "@/server/pi-transcript";
+import { projectCall, projectTranscript } from "@/server/pi-transcript";
 
 // What Pi holds of a conversation, written out by hand in the shapes its
 // durable runtime stores: entries with the message inside, and its record of
@@ -47,6 +47,34 @@ const result = (toolCallId: string, at: number) => ({
       timestamp: at,
     },
   ],
+});
+
+it("addresses immutable tool entries and rejects results belonging to another call", () => {
+  const asked = assistant("toolUse", [calls("exact")], 1);
+  const answered = result("exact", 2);
+  const detail = projectCall("exact", asked as never, answered as never);
+  expect(detail).toMatchObject({
+    args: {},
+    result: { text: "ok", at: new Date(2).toISOString() },
+  });
+  expect(
+    projectCall("other", asked as never, answered as never),
+  ).toBeUndefined();
+  expect(
+    projectCall("exact", asked as never, result("other", 2) as never),
+  ).toBeUndefined();
+  expect(
+    projectCall(
+      "exact",
+      assistant("aborted", [calls("exact")], 1) as never,
+      undefined,
+    ),
+  ).toBeUndefined();
+  const transcript = read({ entries: [asked, answered] });
+  expect(transcript.calls.exact).toMatchObject({
+    entryId: asked.id,
+    resultEntryId: answered.id,
+  });
 });
 const record = (requestId: string, entry: { id: number }, rest: object) => ({
   id: next++,

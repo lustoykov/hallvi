@@ -12,7 +12,17 @@ export type ActivitySummary = ActivityRecord & {
   hasResult?: boolean;
 };
 
+/** Addresses carried by a call row, checked again against Pi's own entries. */
+export interface CallReference {
+  entryId?: number;
+  resultEntryId?: number;
+  executionId?: string;
+}
+
 export interface CallDetail {
-  activity?: ActivityRecord;
+  activity?: Pick<
+    ActivityRecord,
+    "id" | "args" | "preview" | "result" | "truncated"
+  >;
   execution?: ExecutionRecord;
 }

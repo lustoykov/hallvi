@@ -44,7 +44,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | Fixed locally |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | Fixed locally |
-| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 5 | Handoff and lazy output implemented; full worker reads remain |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 6 | Exact call reads implemented; full snapshots remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 2 | Development replay fixed locally |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
@@ -517,8 +517,19 @@ fixture (2,000 synthetic calls) reduced decoded document bytes from 19,897,262 t
 2,925,568 and median navigation-to-content readiness from 618.9 to 294.8 ms.
 The first SSE frame stayed 335 bytes; opening a historical disclosure rose from
 14.3 to 121.5 ms median. These are local synthetic measurements, without model
-calls or network/CPU throttling. The worker still reads the full transcript,
-including on each detail request; there is no new client output cache.
+calls or network/CPU throttling; there is no new client output cache.
+Call rows now carry immutable Pi entry addresses: opening one reads only its
+assistant/result entries, validates the call IDs and applies the same redaction.
+Execution disclosures read their one retained UUID directly. Older pages without
+addresses retain the scan fallback. In a quiet production-fixture comparison,
+the historical disclosure fell from 121.5 to 35.7 ms median (three fresh contexts);
+its HTTP request took 4.7 ms and made zero transcript reads. The roughly 15 ms
+browser target remains unmet. A separate real Pi SQLite benchmark (2,000 calls,
+15 samples after five warmups) measured exact entry reads at 0.095 ms versus
+17.48 ms for full history, before projection. Full snapshots still scan/project:
+the fixture's worker transport/parse took 51.44 ms and app activity projection
+12.05 ms median per read; its full worker response was 11,590,360 bytes. Removing
+that snapshot work needs a separate change; no cache was added.
 
 **+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
 **+1:** 2026-10-02 — native production speed/snappiness audit,
@@ -528,6 +539,8 @@ including on each detail request; there is no new client output cache.
 **+1:** 2026-10-19 — latest-state reconnect handoff and synthetic measurements,
 `perf`.
 **+1:** 2026-10-19 — disclosure output on demand and production-fixture comparison,
+`perf`.
+**+1:** 2026-10-19 — exact call reads and remaining snapshot/render measurements,
 `perf`.
 
 ### AF-068 — Remove the mascot placements nothing draws

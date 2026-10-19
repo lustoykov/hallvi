@@ -18,7 +18,7 @@
 // actually sent, secrets and all; nothing leaves this file unredacted.
 
 import type { ExecutionRecord } from "./operator-execution";
-import type { Transcript } from "./pi-transcript";
+import type { Transcript, TranscriptCall } from "./pi-transcript";
 import { redactSecrets } from "./secrets";
 
 /** How much of a tool's argument or result is worth keeping for a reader. */
@@ -64,6 +64,8 @@ export interface ActivityRecord {
    * instead of a second row for the same work.
    */
   executionId?: string;
+  entryId?: number;
+  resultEntryId?: number;
   /** True when the stored text was cut to its limit. */
   truncated: boolean;
   startedAt: string;
@@ -126,6 +128,23 @@ function safeStringify(value: unknown) {
   }
 }
 
+/** The same redaction and bounds for a full transcript or one exact call. */
+export function callDetail(
+  id: string,
+  call: Pick<TranscriptCall, "args" | "result" | "preview">,
+) {
+  const args = keep(call.args, ARGUMENT_LIMIT);
+  const result = keep(call.result?.text, RESULT_LIMIT);
+  const preview = keep(call.preview, PREVIEW_LIMIT);
+  return {
+    id,
+    args: args.text,
+    preview: preview.text,
+    result: result.text,
+    truncated: args.truncated || result.truncated || preview.truncated,
+  };
+}
+
 /**
  * Pi's calls and its own words, in the order Pi recorded them.
  *
@@ -162,19 +181,13 @@ export function activityFromTranscript(input: {
   const tools: ActivityRecord[] = Object.entries(transcript.calls).map(
     ([id, call]) => {
       const execution = executionOf.get(id);
-      const args = keep(call.args, ARGUMENT_LIMIT);
-      const result = keep(call.result?.text, RESULT_LIMIT);
-      const preview = keep(call.preview, PREVIEW_LIMIT);
       return {
+        ...callDetail(id, call),
         kind: "tool" as const,
-        id,
         applicationId,
         runId: call.replyId,
         sequence: call.sequence,
         tool: call.tool,
-        args: args.text,
-        preview: preview.text,
-        result: result.text,
         status: execution
           ? fromExecution[execution.status]
           : call.result
@@ -185,7 +198,8 @@ export function activityFromTranscript(input: {
               ? "running"
               : "interrupted",
         executionId: execution?.id,
-        truncated: args.truncated || result.truncated || preview.truncated,
+        entryId: call.entryId,
+        resultEntryId: call.resultEntryId,
         startedAt: call.at,
         finishedAt: call.result?.at,
       };

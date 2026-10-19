@@ -48,6 +48,9 @@ export type MessageOrigin = (typeof MESSAGE_ORIGINS)[number];
  * history keeps what the model actually sent.
  */
 export interface TranscriptCall {
+  /** Pi's immutable entry addresses, for a read of just this call. */
+  entryId?: number;
+  resultEntryId?: number;
   replyId: string;
   sequence: number;
   tool: string;
@@ -149,6 +152,42 @@ const at = (timestamp: number | undefined) =>
 
 const messageOf = (entry: EntryRecord) =>
   entry.model?.[0] as Stored | undefined;
+
+/** Validate exact entry reads before handing any call content to a reader. */
+export function projectCall(
+  id: string,
+  entry: EntryRecord | undefined,
+  result: EntryRecord | undefined,
+): Pick<TranscriptCall, "args" | "result" | "preview"> | undefined {
+  const asked = entry && messageOf(entry);
+  const part =
+    entry?.kind === "pi.assistant" &&
+    asked?.stopReason === "toolUse" &&
+    Array.isArray(asked.content)
+      ? (asked.content as Part[]).find(
+          (part) => part.type === "toolCall" && part.id === id,
+        )
+      : undefined;
+  if (!part) return;
+  const answered = result && messageOf(result);
+  if (
+    result &&
+    (result.kind !== "pi.tool-result" || answered?.toolCallId !== id)
+  )
+    return;
+  return {
+    args: part.arguments,
+    ...(answered
+      ? {
+          result: {
+            text: toolText(answered.content),
+            failed: Boolean(answered.isError),
+            at: at(answered.timestamp),
+          },
+        }
+      : {}),
+  };
+}
 
 /**
  * The sender's id of a message, from Pi's record of it. See `requestIdFor`.
@@ -327,6 +366,7 @@ export function projectTranscript(
             });
         } else if (part.type === "toolCall" && part.id && ran) {
           calls[part.id] = {
+            entryId: entry.id,
             replyId: to.id,
             sequence: ++sequence,
             tool: part.name ?? "",
@@ -355,6 +395,7 @@ export function projectTranscript(
     } else if (entry.kind === "pi.tool-result") {
       const call = message.toolCallId ? calls[message.toolCallId] : undefined;
       if (call) {
+        call.resultEntryId = entry.id;
         call.result = {
           text: toolText(message.content),
           failed: Boolean(message.isError),

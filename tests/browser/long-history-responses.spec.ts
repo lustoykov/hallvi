@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
-import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
   createServer,
@@ -40,6 +46,7 @@ async function setup(page: Page, fixture: { state: string }, calls?: number) {
   delete transcript.messages.at(-1)!.finishedAt;
   const call = transcript.calls[last.toolCallId!];
   delete call.result;
+  delete call.resultEntryId;
   call.preview = last.output;
   const directory = join(fixture.state, "operator", app, "executions");
   mkdirSync(directory, { recursive: true });
@@ -138,7 +145,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
             }
           ).qaInitialFrames,
       );
-    await page.route(/\/calls\/call(?::|%3A)3$/i, (route) => {
+    await page.route(/\/calls\/call(?::|%3A)3(?:\?.*)?$/i, (route) => {
       fileReads++;
       return fileReads === 1
         ? route.fulfill({
@@ -163,6 +170,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
     await page.locator(".hv-conversation").hover({ position: { x: 8, y: 8 } });
     await page.mouse.wheel(0, -200);
     const old = page.locator('[id="hv-message-reply:1"]');
+    const readsBeforeDisclosure = worker.reads();
     await old.getByRole("button", { name: /1 file read/ }).click();
     const row = old.locator(".hv-did-row").first();
     await row.click();
@@ -171,6 +179,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
     );
     await old.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(old.locator(".hv-did-detail")).toContainText("END-3");
+    expect(worker.reads()).toBe(readsBeforeDisclosure);
     const card = page.locator(`#execution-${last.id}`);
     const output = card.getByRole("region", { name: "Command output" });
     await expect(output).toContainText("END-239");
@@ -197,6 +206,7 @@ test("older evidence and open disclosures survive changes, completion, view swit
     transcript.messages.at(-1)!.status = "completed";
     transcript.messages.at(-1)!.finishedAt = last.finishedAt;
     call.result = { text: last.output, failed: false, at: last.finishedAt };
+    call.resultEntryId = 480;
     call.preview = "";
     store();
     worker.changed({ kind: "execution", applicationId: app });
@@ -827,12 +837,23 @@ test("profile disclosure loading with 2000 calls", async ({
     await page.goto(`/applications/${app}?chat=${chat}`);
     await expect(page.locator('[id="hv-message-reply:666"]')).toBeInViewport();
     await page.goto("/applications");
+    // Warm/build first, then reserve only the actual stopwatch interval.
+    const gate = process.env.HALLVI_DISCLOSURE_GATE;
+    if (gate) {
+      writeFileSync(`${gate}.ready`, "ready");
+      await expect
+        .poll(() => existsSync(gate), { timeout: 180_000 })
+        .toBe(true);
+    }
     for (let round = 0; round < 3; round++) {
       const context = await browser.newContext({
         viewport: { width: 1440, height: 1000 },
       });
       const reader = await context.newPage();
       try {
+        await reader.request.get(
+          `${fixture.url}/api/qa-notification-metrics?responses=1&reset=1`,
+        );
         await reader.addInitScript(() => {
           const marks: Record<string, number> = {};
           Object.assign(window, { qaDisclosure: marks });
@@ -899,6 +920,7 @@ test("profile disclosure loading with 2000 calls", async ({
         const old = reader.locator('[id="hv-message-reply:1"]');
         await old.getByRole("button", { name: /1 file read/ }).click();
         const row = old.locator(".hv-did-row").first();
+        const readsBeforeDisclosure = worker.reads();
         await row.evaluate((element) =>
           element.addEventListener(
             "click",
@@ -924,6 +946,40 @@ test("profile disclosure loading with 2000 calls", async ({
         runs.push({
           round,
           documentBytes,
+          disclosureTranscriptReads: worker.reads() - readsBeforeDisclosure,
+          callRequests: await reader.evaluate(() =>
+            performance
+              .getEntriesByType("resource")
+              .filter((entry) => entry.name.includes("/calls/"))
+              .map((entry) => {
+                const resource = entry as PerformanceResourceTiming;
+                return {
+                  url: resource.name.split("/calls/")[1],
+                  startAfterOpenMs:
+                    resource.startTime -
+                    (
+                      window as unknown as {
+                        qaDisclosure: Record<string, number>;
+                      }
+                    ).qaDisclosure.openAt,
+                  endAfterOpenMs:
+                    resource.responseEnd -
+                    (
+                      window as unknown as {
+                        qaDisclosure: Record<string, number>;
+                      }
+                    ).qaDisclosure.openAt,
+                  durationMs: resource.duration,
+                  ttfbMs: resource.responseStart - resource.startTime,
+                  downloadMs: resource.responseEnd - resource.responseStart,
+                };
+              }),
+          ),
+          snapshotMetrics: await (
+            await reader.request.get(
+              `${fixture.url}/api/qa-notification-metrics?responses=1`,
+            )
+          ).json(),
           ...(await reader.evaluate(
             () =>
               (window as unknown as { qaDisclosure: Record<string, number> })

@@ -247,7 +247,7 @@ function stepOf(execution: ExecutionRecord): ReleaseStep {
           detail: {
             applicationId: execution.applicationId,
             chatId: execution.chatId,
-            callId: execution.toolCallId ?? execution.id,
+            callId: execution.id,
             version: execution.detailVersion,
           },
         }

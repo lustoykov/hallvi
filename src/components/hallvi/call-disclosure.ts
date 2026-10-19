@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { CallDetail } from "@/lib/call-detail";
+import type { CallDetail, CallReference } from "@/lib/call-detail";
 
 /** A parked conversation retains its UI state, but reads no hidden output. */
 export const CallDetailsVisible = createContext(true);
@@ -77,13 +77,21 @@ export function useCallDetail(
   id: string,
   version: string | undefined,
   open: boolean,
+  reference?: CallReference,
 ) {
   const visible = useContext(CallDetailsVisible);
   const [attempt, setAttempt] = useState(0);
   const source = JSON.stringify([app, chat, id]);
+  const query = new URLSearchParams();
+  for (const name of ["entryId", "resultEntryId", "executionId"] as const) {
+    const value = reference?.[name];
+    if (value !== undefined) query.set(name, String(value));
+  }
+  const encoded = query.toString();
+  const parameters = encoded ? `?${encoded}` : "";
   const key =
     visible && open && version && chat
-      ? JSON.stringify([app, chat, id, version, attempt])
+      ? JSON.stringify([app, chat, id, version, parameters, attempt])
       : "";
   const [state, setState] = useState<{
     key: string;
@@ -102,7 +110,7 @@ export function useCallDetail(
     if (!key) return;
     const controller = new AbortController();
     void fetch(
-      `/api/applications/${app}/chats/${chat}/calls/${encodeURIComponent(id)}`,
+      `/api/applications/${app}/chats/${chat}/calls/${encodeURIComponent(id)}${parameters}`,
       {
         cache: "no-store",
         signal: controller.signal,
@@ -125,7 +133,7 @@ export function useCallDetail(
           }));
       });
     return () => controller.abort();
-  }, [app, chat, id, key, source]);
+  }, [app, chat, id, key, source, parameters]);
   return {
     detail: state.detail,
     error: state.error,
