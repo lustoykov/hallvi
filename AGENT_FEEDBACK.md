@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-096 — Discover existing provider access before asking for tokens](#af-096--discover-existing-provider-access-before-asking-for-tokens) | 1 | New |
 | [AF-054 — Check traffic assets after installation](#af-054--check-traffic-assets-after-installation) | 1 | Fix in review |
 | [AF-013 — Investigate the first-navigation event-loop pause](#af-013--investigate-the-first-navigation-event-loop-pause) | 5 | Partially improved; pause remains |
 | [AF-002 — Record a workspace command's exit code](#af-002--record-a-workspace-commands-exit-code) | 2 | New |
@@ -66,6 +67,19 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-095 — Keep an early Home jump while a conversation opens](#af-095--keep-an-early-home-jump-while-a-conversation-opens) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-096 — Discover existing provider access before asking for tokens
+
+During local worker setup, a valid Cloudflare token was already in the ignored
+checkout environment, but ordinary contributor shells had no provider variables.
+Hetzner's shared account connection also worked, while its CLI was absent.
+Discover and verify existing machine access before asking the owner to create
+more tokens; make the development-versus-production project explicit. A working
+management API token does not establish S3 object access. This task configured
+the machine's existing access and local worker instructions, without creating
+provider tokens.
+
+**+1:** 2026-10-19 — local development worker access setup, `main`.
 
 ### AF-095 — Keep an early Home jump while a conversation opens
 
