@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-098 — Recognize continued work in older conversations](#af-098--recognize-continued-work-in-older-conversations) | 1 | Fixed locally |
 | [AF-097 — Keep snapshot previews free of contributor credentials](#af-097--keep-snapshot-previews-free-of-contributor-credentials) | 1 | Fixed locally |
 | [AF-096 — Discover existing provider access before asking for tokens](#af-096--discover-existing-provider-access-before-asking-for-tokens) | 1 | New |
 | [AF-054 — Check traffic assets after installation](#af-054--check-traffic-assets-after-installation) | 1 | Fix in review |
@@ -68,6 +69,19 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-095 — Keep an early Home jump while a conversation opens](#af-095--keep-an-early-home-jump-while-a-conversation-opens) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-098 — Recognize continued work in older conversations
+
+The retained uptime-kuma Overview said work stopped on a failed command from
+18 September, although that conversation later continued successfully. The
+shared Overview/History test for continued work compared run IDs; older retained
+executions have different run IDs per turn, while their conversation ID stays
+the same. It now compares conversation IDs, preserving the existing rule that
+later work in the same conversation clears a command's unresolved flag without
+claiming that work fixed the failure. A regression covers both old and current
+run IDs; the stale warning disappears on reload.
+
+**+1:** 2026-10-19 — normal-usage snapshot sweep, `bugs`.
 
 ### AF-097 — Keep snapshot previews free of contributor credentials
 

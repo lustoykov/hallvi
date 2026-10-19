@@ -184,17 +184,23 @@ describe("what earns a row in a history", () => {
 });
 
 describe("what needs the owner", () => {
-  it("keeps a failed probe Hallvi carried on past, without asking for anyone", () => {
-    const operations = historyFromRecords({
-      records: [],
-      executions: [
-        execution("probe", "failed", "2026-09-15T12:00:00.000Z"),
-        execution("next", "succeeded", "2026-09-15T12:01:00.000Z"),
-      ],
-    });
-    expect(operations.map((one) => one.id)).toContain("execution:probe");
-    expect(attentionItems(operations)).toEqual([]);
-  });
+  it.each(["r", "later-turn"])(
+    "keeps a failed probe Hallvi carried on past in the same conversation (%s)",
+    (runId) => {
+      const operations = historyFromRecords({
+        records: [],
+        executions: [
+          execution("probe", "failed", "2026-09-15T12:00:00.000Z"),
+          {
+            ...execution("next", "succeeded", "2026-09-15T12:01:00.000Z"),
+            runId,
+          },
+        ],
+      });
+      expect(operations.map((one) => one.id)).toContain("execution:probe");
+      expect(attentionItems(operations)).toEqual([]);
+    },
+  );
 
   it("asks for the owner when the work stopped on the failure", () => {
     const operations = historyFromRecords({

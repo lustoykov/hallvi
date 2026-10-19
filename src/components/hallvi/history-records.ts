@@ -69,7 +69,7 @@ const executionState: Record<
  * conversation. A probe that failed and was followed by more work is Hallvi
  * finding its way, not something waiting for the owner; work that stopped on
  * the failure is. This says nothing about which later step fixed it.
- * (`runId` is the conversation: the executor records the chat as the run.)
+ * Use the conversation id: older executions have a different run id per turn.
  */
 export function carriedOnAfter(
   execution: ExecutionRecord,
@@ -78,7 +78,7 @@ export function carriedOnAfter(
   return executions.some(
     (other) =>
       other.id !== execution.id &&
-      other.runId === execution.runId &&
+      other.chatId === execution.chatId &&
       other.createdAt > execution.createdAt,
   );
 }
