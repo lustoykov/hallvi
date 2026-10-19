@@ -84,6 +84,26 @@ default. Tests use disposable databases and synthetic provider/model responses.
 The shared-information browser case covers rich cards in chat and Deployment
 after refresh. `npx tsc --noEmit` and `npm run build` check the application bundle.
 
+The full browser command also selects four files that use servers already
+running: `destinations`, `interactions`, `record-journeys` and `secrets`.
+They use `SG_ACCEPTANCE_URL` (default `http://127.0.0.1:3410`) and
+`SG_SCENARIO_URL` (default `http://127.0.0.1:3411`); the latter can be started
+with `npm run scenarios -- 3411`. The acceptance controller must be a prepared,
+task-owned disposable fixture: the secret cases can replace fixture values.
+Do not point those cases at the owner's retained controller. Missing servers
+skip some cases but currently fail others with a connection error.
+
+When those external fixtures are unavailable, run every self-contained browser
+case with the existing journey tag excluded:
+
+```sh
+npm run test:e2e -- --grep-invert @journey-record-destinations
+```
+
+Report that scope separately from the full suite and list the external cases as
+unrun. The smoke subset already uses disposable fixtures and needs neither
+external server.
+
 `integration/database-worker.test.ts` uses a real temporary SQLite file and a competing writer to compare timer delay with direct synchronous access, checks an unrelated HTTP request while a write waits, and verifies transaction rollback, concurrent creation keys, close/reopen, worker loss and retained ownership. This proves responsiveness under a forced lock, not production throughput. [29 September evidence](https://github.com/lustoykov/hallvi/blob/74b54efe8e12e14bbbf59e6edb2522bbcadeeb7d/docs/testing/2026-09-29-async-sqlite.md) records the runtime and package checks.
 
 `integration/traffic-store.test.ts` holds an external write lock on the real

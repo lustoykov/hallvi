@@ -23,7 +23,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-024 — Explain local leftovers after Forget](#af-024--explain-local-leftovers-after-forget) | 1 | New |
 | [AF-025 — Distinguish a saved-route HTTP check from browser usability](#af-025--distinguish-a-saved-route-http-check-from-browser-usability) | 2 | New |
 | [AF-027 — Let a checkout show the installed-only update states](#af-027--let-a-checkout-show-the-installed-only-update-states) | 2 | New |
-| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 10 | Partially fixed |
+| [AF-028 — Notice browser journeys that stop passing while checks are off](#af-028--notice-browser-journeys-that-stop-passing-while-checks-are-off) | 11 | Partially fixed |
 | [AF-033 — Refuse a second preview before attaching retained state](#af-033--refuse-a-second-preview-before-attaching-retained-state) | 1 | New |
 | [AF-034 — Native host checks must exercise link and clipboard failures](#af-034--native-host-checks-must-exercise-link-and-clipboard-failures) | 5 | New |
 | [AF-035 — Say "awaiting approval" while request_approval waits](#af-035--say-awaiting-approval-while-request_approval-waits) | 1 | New |
@@ -1164,6 +1164,14 @@ failed since #179 reworded the Storage & privacy popover on 20 September
 workflow was switched off, and it surfaced only because a later step of the same
 test changed. A cheap way to see which journeys currently fail on main would
 separate old breakage from a new change's.
+
+**+1:** 2026-10-19 — pre-release gate, `main`: the full browser command still
+selects four legacy files whose external servers are not started by the suite.
+With port 3410 stopped, the sidebar interaction case failed at navigation with
+`ERR_CONNECTION_REFUSED`; other external cases skip when their server is absent.
+The test guide now names both server URLs, the disposable-state requirement and
+the existing tag that selects self-contained cases. External coverage remains
+separate from a passing disposable-fixture run.
 
 **+1:** 2026-10-07 — Overview as the default view,
 `codex/overview-default-release`: the application-workspace smoke journey only
