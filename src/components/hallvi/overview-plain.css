@@ -3,6 +3,16 @@
    the app's plain voice, so an application nobody has looked at is still a
    page rather than a shrug. */
 
+/* The deployed Overview's head, on the same gutter as the content under it. */
+.hv-overview-unmapped > .axj3-head {
+  max-width: 1080px;
+  padding: 4px 36px 0;
+}
+@media (max-width: 640px) {
+  .hv-overview-unmapped > .axj3-head {
+    padding: 4px 16px 0;
+  }
+}
 .hv-overview-plain {
   display: grid;
   gap: 26px;

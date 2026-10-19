@@ -56,24 +56,15 @@ import {
 import { Mascot, useHallvi } from "./use-hallvi";
 import "./timeline.css";
 import { LaneRails } from "../lane-rails";
-/** Each lane as the question an owner would ask, and what it covers. */
-const laneWords: Record<Lane["id"], [question: string, plain: string]> = {
-  checks: [
-    "Is the app working?",
+/** What each lane covers, in one plain sentence under its name. */
+const laneWords: Record<Lane["id"], string> = {
+  checks:
     "Hallvi opens the app the way a visitor would and confirms it responds.",
-  ],
-  backups: [
-    "Is the data safe if the server dies?",
-    "Copies of the app's data, kept somewhere other than the server.",
-  ],
-  server: [
-    "Is the server up?",
+  backups: "Copies of the app's data, kept somewhere other than the server.",
+  server:
     "The rented machine everything runs on. Hallvi logs in to confirm it is there.",
-  ],
-  access: [
-    "Is the way in working?",
+  access:
     "How you reach the app: your private connection, the web address and the firewall.",
-  ],
 };
 import { TerminalBar } from "../terminal-lights";
 
@@ -616,6 +607,7 @@ export function TimelineHero({
         </div>
       )}
 
+      <h2 className="axt-lanes-head">Checked by Hallvi</h2>
       <LaneRails
         now={now}
         mascot={
@@ -635,8 +627,7 @@ export function TimelineHero({
               id: lane.id,
               icon: vitalIcon[lane.id],
               name: vital.label,
-              question: laneWords[lane.id][0],
-              plain: laneWords[lane.id][1],
+              plain: laneWords[lane.id],
               status: vital.status.text,
               tone:
                 certainty === "verified" ||

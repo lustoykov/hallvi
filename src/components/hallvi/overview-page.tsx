@@ -16,10 +16,13 @@ import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationRecord, ChatSummary } from "@/server/types";
 
 import { architectureFromRecords } from "./architecture-records";
-import type { PageChrome } from "./deployment-prototype/page-head";
+import {
+  PageHead,
+  type PageChrome,
+  type Reachability,
+} from "./deployment-prototype/page-head";
 import type { LiveRecord } from "./architecture-prototype/model";
 import type { ApplicationSection } from "./application-sections";
-import type { Reachability } from "./deployment-prototype/page-head";
 import {
   applicationCondition,
   logFromRecords,
@@ -224,7 +227,6 @@ export function OverviewPage({
       <OverviewLive
         applicationId={application.id}
         name={application.name}
-        title={model?.headline ?? application.name}
         mapped={Boolean(model)}
         built={built}
         usage={usage}
@@ -284,9 +286,17 @@ export function OverviewPage({
 
   // No map on record. Everything else still reads, so it is drawn.
   return (
-    <div className="hv-section-page hv-section-overview">
-      {chrome.bar}
-      {chrome.header}
+    <div className="hv-section-page hv-section-overview hv-overview-unmapped">
+      <PageHead
+        bar={chrome.bar}
+        title={application.name}
+        name={application.name}
+        openUrl={openUrl}
+        restricted={false}
+        reachable={reachable}
+        onReopen={onReopen}
+        reading
+      />
       <div className="hv-section-content">
         <div className="hv-overview-plain">
           <section
@@ -351,7 +361,7 @@ export function OverviewPage({
               (vital) => vital.status.certainty !== "unknown",
             )) && (
             <section>
-              <h2>What has been assessed</h2>
+              <h2>Checked by Hallvi</h2>
               <ul className="hv-overview-vitals">
                 {built.vitals
                   .filter(
@@ -399,7 +409,7 @@ export function OverviewPage({
 
           {built.recent.length > 0 && (
             <section>
-              <h2>What happened</h2>
+              <h2>Recent</h2>
               <ul className="hv-overview-recent">
                 {built.recent.map((item) => (
                   <li key={item.id}>

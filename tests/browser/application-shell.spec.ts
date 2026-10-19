@@ -22,9 +22,10 @@ test(
     });
     const nav = page.getByRole("navigation", { name: "Application workspace" });
     const composer = page.getByRole("textbox", { name: "Message Hallvi" });
+    // Overview is titled with the application, as its head says nothing else.
     const overview = page.getByRole("heading", {
-      name: "Overview",
-      exact: true,
+      level: 1,
+      name: "application-shell",
     });
     await expect(overview).toBeVisible();
     await expect(
@@ -115,9 +116,7 @@ test(
       }),
     ).toBeVisible();
     await nav.getByRole("button", { name: "Overview", exact: true }).click();
-    await expect(
-      page.getByRole("heading", { name: "Overview", exact: true }),
-    ).toBeVisible();
+    await expect(overview).toBeVisible();
     await expect(
       page.getByText("Production", { exact: true }),
     ).not.toBeVisible();
@@ -327,7 +326,7 @@ test(
       }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Overview", exact: true }),
+      page.getByRole("heading", { level: 1, name: "My app", exact: true }),
     ).toBeVisible();
     await openConversation(page);
     await expect(composer).toHaveValue("");

@@ -15,7 +15,7 @@ import type {
   ArchitectureModel,
   LiveRecord,
 } from "../architecture-prototype/model";
-import { AccessLink } from "../deployment-prototype/page-head";
+import { PageHead } from "../deployment-prototype/page-head";
 import { MiniMap } from "./mini-map";
 import type { Overview } from "./overview-model";
 import { IdeaCard, OpChip } from "./shared";
@@ -64,21 +64,16 @@ export function OverviewDirection({
 
   return (
     <section className="ax-root axo" aria-label="Overview">
-      <header className="axj3-head">
-        {page.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
-        <div className="axj3-title">
-          <h1>Overview</h1>
-          {!planned && (
-            <AccessLink
-              openUrl={page.openUrl}
-              name={model.headline}
-              restricted={model.restricted}
-              reachable={page.reachable}
-              onReopen={page.onReopen}
-            />
-          )}
-        </div>
-      </header>
+      <PageHead
+        bar={page.chrome.bar}
+        title={record.application.name}
+        name={record.application.name}
+        openUrl={planned ? null : page.openUrl}
+        restricted={model.restricted}
+        reachable={page.reachable}
+        onReopen={page.onReopen}
+        reading
+      />
 
       <TimelineHero
         model={model}
@@ -101,7 +96,7 @@ export function OverviewDirection({
           onOpen={openArchitecture}
         />
         <div className="axo-recent">
-          <h2>Recent work</h2>
+          <h2>Recent</h2>
           {overview.recent.length === 0 && (
             <p className="axo-recent-empty">
               {planned ? "Nothing has run yet." : "No work recorded yet."}

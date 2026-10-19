@@ -148,18 +148,7 @@ export function ApplicationSectionView({
         reduced={false}
         reachable={reachable}
         onReopen={onReopen}
-        chrome={{
-          bar,
-          header: (
-            <header className="hv-section-header">
-              <div>
-                <h1>Overview</h1>
-                <p>{descriptions.overview}</p>
-              </div>
-            </header>
-          ),
-          activity: null,
-        }}
+        chrome={{ bar, header: null, activity: null }}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
         onAsk={(draft) => onAsk(null, draft)}

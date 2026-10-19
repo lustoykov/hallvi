@@ -327,7 +327,6 @@ function Fact({
 export function OverviewLive({
   applicationId,
   name,
-  title,
   mapped,
   built,
   usage,
@@ -343,7 +342,6 @@ export function OverviewLive({
 }: {
   applicationId: string;
   name: string;
-  title: string;
   /** Whether Pi has recorded how the application is put together. */
   mapped: boolean;
   built: Overview;
@@ -402,7 +400,7 @@ export function OverviewLive({
     <div className="hv-section-page hv-section-overview ovl">
       <PageHead
         bar={chrome.bar}
-        title={title}
+        title={name}
         name={name}
         openUrl={openUrl}
         restricted={restricted}

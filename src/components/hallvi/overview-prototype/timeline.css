@@ -38,6 +38,13 @@
   text-wrap: pretty;
   animation: axj2-fade 520ms var(--ax-ease-out);
 }
+/* The deployed Overview's own words for the same four lanes. */
+.axt-lanes-head {
+  margin: 22px 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
 .axt-say .hv-marks {
   margin-right: 10px;
 }

@@ -9,8 +9,8 @@
 // one worded as something that happened, with the quiet between them written
 // on the line. Only the stretch from the last stop to now wears the lane's
 // state, because a lane that is failing now did not fail at every stop. Each
-// lane opens with the question it answers, the answer, and one plain
-// sentence about what it covers. "Earlier" walks back through its history.
+// lane opens with its name, the answer, and one plain sentence about what it
+// covers. "Earlier" walks back through its history.
 
 import {
   ArrowRight,
@@ -36,8 +36,6 @@ export interface RailLane {
   id: string;
   icon: ReactNode;
   name: string;
-  /** The lane as the question an owner would ask. */
-  question: string;
   /** One plain sentence about what it covers. */
   plain: string;
   status: string;
@@ -161,10 +159,7 @@ function Rail({
           <span className="axlr-icon" aria-hidden="true">
             {lane.icon}
           </span>
-          <span>
-            <small>{lane.name}</small>
-            <b>{lane.question}</b>
-          </span>
+          <b>{lane.name}</b>
         </button>
         <p className="axlr-answer">
           <em>{answerOf(lane)}</em>

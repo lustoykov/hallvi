@@ -44,7 +44,6 @@ function overview(props: Partial<ComponentProps<typeof OverviewLive>> = {}) {
     <OverviewLive
       applicationId="app"
       name="Example"
-      title="Example"
       mapped
       built={{ headline: "", ideas: [], vitals: [], recent: [], needs: [] }}
       usage={null}

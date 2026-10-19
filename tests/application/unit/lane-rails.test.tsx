@@ -22,7 +22,6 @@ it("calls only passed timeline groups passed, including a mixed failed rehearsal
       id: "checks",
       icon: null,
       name: "Checks",
-      question: "Is the app working?",
       plain: "Recorded application checks",
       status: "",
       tone: "failed",
