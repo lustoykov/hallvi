@@ -4,6 +4,19 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.20 — 19 October 2026
+
+Long conversations open much faster, Hallvi works properly on a phone, and a round of fixes makes pages say one thing at a time.
+
+- **Long conversations open faster.** Command output and call results load when you open them instead of with the page, so a long conversation's page is about 85% smaller and appears in about half the time. Opening an old call's output reads just that call.
+- **Reconnecting sends only what changed.** When the connection to Hallvi drops and comes back, an unchanged conversation is no longer sent again in full.
+- **Quieter in the background.** A page you are not looking at stops checking for changes and reads afresh when you return, and each page reads what it needs once when it opens.
+- **Hallvi on a phone.** The top of an application is one compact row, with Hallvi's menu and Settings in reach from every page. Deployment, Processes and Database lists stack each row instead of scrolling sideways, and a release's steps fit the screen.
+- **One way of saying when.** Times read "just now", "5 min ago", "3 h ago" or "2 days ago" everywhere, and a reading nobody took says "not recorded". Message times change to the date after midnight.
+- **Pages that agree with themselves.** Access no longer shows a working tunnel under a head that says it is closed, has its title like every other page, and keeps its publish offer on the title row. Overview is titled with the application's name and uses the same plain labels before and after deployment. A stopped reply shows its text once, Backups says once that it has no copy, and Deployment hides Took when nothing was timed.
+- **Clearer failures and links.** Reading a recovery kit that fails shows the error with Retry instead of waiting forever. Logs offers History only for commands that have an entry there, and finished commands in older conversations no longer look unfinished.
+- **Smaller fixes.** Buttons draw at their intended size and weight, Traffic's chart stays in place while its first totals arrive, keyboard focus stays out of what an expanded Terminal or the plugin's sheet covers, and the Codex plugin panel draws tables in replies.
+
 ## 0.1.1-alpha.19 — 8 October 2026
 
 Read Architecture diagrams more comfortably and open Overview reliably while setup is unfinished.
