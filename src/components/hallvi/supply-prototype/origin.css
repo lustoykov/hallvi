@@ -228,9 +228,6 @@
   color: var(--ax-ink-2);
   font-weight: 620;
 }
-.axog > .ax-invented {
-  align-self: flex-start;
-}
 
 /* The cache's origin is not always this application's machine, and the card
    above this line names the machine. Saying so beats letting them merge. */

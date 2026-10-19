@@ -18,7 +18,8 @@ import { Tag } from "./deployment-prototype/tag";
 import { EmptySketch } from "./empty-sketch";
 import type { Usage } from "./monitoring-records";
 import { AskButton, toneOf } from "./monitoring-watching";
-import { ago, clock } from "./stack-prototype/stack-model";
+import { ago } from "./architecture-prototype/model";
+import { clock } from "./stack-prototype/stack-model";
 import { hasTotals } from "./traffic/model";
 import "./monitoring-usage.css";
 

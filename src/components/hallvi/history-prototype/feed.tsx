@@ -8,10 +8,7 @@
 import { ArrowRight, CaretDown, ChatCircleText } from "@phosphor-icons/react";
 import { useCallback, useState } from "react";
 
-import type {
-  ApplicationOperation,
-  OperationStep,
-} from "@/server/operation-record";
+import type { OperationStep } from "@/server/operation-record";
 
 import type { ApplicationSection } from "../application-sections";
 import { labelOf } from "../operation-model";

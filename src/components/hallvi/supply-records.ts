@@ -341,6 +341,5 @@ export function supplyFromRecords({
     jobs,
     runs: runs.sort((a, b) => b.at.localeCompare(a.at)),
     recurring,
-    invented: null,
   };
 }

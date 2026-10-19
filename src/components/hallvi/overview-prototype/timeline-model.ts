@@ -16,7 +16,6 @@ export interface TimeEvent {
   title: string;
   /** The recorded lines behind it, for its console. */
   lines: LogLine[];
-  invented: boolean;
 }
 
 export interface Lane {

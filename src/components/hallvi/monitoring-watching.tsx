@@ -25,9 +25,8 @@ import {
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 
-import { FRESH_MS } from "./architecture-prototype/model";
-import type { Tone } from "./deployment-prototype/deployment-model";
-import { Tag } from "./deployment-prototype/tag";
+import { FRESH_MS, ago } from "./architecture-prototype/model";
+import { Tag, type Tone } from "./deployment-prototype/tag";
 import { Mascot } from "./mascot";
 import type {
   MonitoringStory,
@@ -35,7 +34,7 @@ import type {
   WatchedPart,
   Watching,
 } from "./monitoring-records";
-import { ago, when } from "./stack-prototype/stack-model";
+import { when } from "./stack-prototype/stack-model";
 import "./monitoring-watching.css";
 
 /** Verified green needs evidence under a day old. */

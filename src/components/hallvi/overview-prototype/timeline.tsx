@@ -29,10 +29,16 @@ import {
 
 import { labelOf } from "../operation-model";
 import { UnresolvedMarks } from "../presentation";
-import { ago, type LogLine } from "../architecture-prototype/model";
+import type { ApplicationSection } from "../application-sections";
+import type { PageContext } from "../deployment-prototype/page-head";
+import {
+  ago,
+  type ArchitectureModel,
+  type LiveRecord,
+  type LogLine,
+} from "../architecture-prototype/model";
 import { reducedMotion } from "../architecture-prototype/motion";
-import type { HeroProps } from "./hero";
-import type { Vital } from "./overview-model";
+import type { Overview, Vital } from "./overview-model";
 import {
   NeedCard,
   span,
@@ -77,6 +83,21 @@ const glyph = { pass: "✓", fail: "✗", work: "›", info: "·" } as const;
 // The four-point sparkle Little Server's checks burst into (motion.ts).
 const STAR =
   "M5 0C5.5 3.3 6.7 4.5 10 5 6.7 5.5 5.5 6.7 5 10 4.5 6.7 3.3 5.5 0 5 3.3 4.5 4.5 3.3 5 0Z";
+
+/** What the Timeline receives from the page around it. */
+interface HeroProps {
+  model: ArchitectureModel;
+  record: LiveRecord;
+  overview: Overview;
+  page: PageContext;
+  /** The part being pointed at anywhere on the page. */
+  pointed: string | null;
+  onPoint: (partId: string | null) => void;
+  /** Opens Architecture with that part's details open. */
+  onShow: (partId: string) => void;
+  onAsk: (draft: string) => void;
+  onOpenDestination: (destination: ApplicationSection) => void;
+}
 
 const clock = (at: number | string) =>
   new Date(at).toLocaleTimeString(undefined, {
@@ -251,14 +272,7 @@ function EventPop({
           <div key={line.id} className="axt-console-line" data-tone={line.tone}>
             <time>{clock(line.at)}</time>
             <b aria-hidden="true">{glyph[line.tone]}</b>
-            <span>
-              {line.text}
-              {line.invented && (
-                <em>
-                  {line.id.startsWith("live:") ? "simulated" : "invented"}
-                </em>
-              )}
-            </span>
+            <span>{line.text}</span>
           </div>
         ))}
       </div>
@@ -288,7 +302,6 @@ export function TimelineHero({
   model,
   record,
   overview,
-  offset,
   pointed,
   onPoint,
   onShow,
@@ -346,7 +359,7 @@ export function TimelineHero({
     overview.vitals.map((vital) => [vital.id, vital]),
   ) as Record<Vital["id"], Vital>;
   const { now } = timeline;
-  const nextIn = useCountdown(vitals.backups?.countdownTo, offset);
+  const nextIn = useCountdown(vitals.backups?.countdownTo);
   const pointedLane = pointed ? laneOf(pointed) : null;
 
   // Attention first. The condition sentence is scoped to the application's
@@ -359,9 +372,8 @@ export function TimelineHero({
   const showLog = !planned && logOpen;
   const lines = guy.lines.slice(-6);
   const newest = lines.at(-1);
-  // Only recorded work is news: invented lines never are, and a first visit
-  // has none.
-  const recorded = model.log.filter((line) => !line.invented);
+  // Only recorded work is news, and a first visit has none.
+  const recorded = model.log;
   const newestRecorded = recorded.at(-1)?.at;
   const seenAt = visit?.seenAt ?? null;
   const fresh =
@@ -383,7 +395,6 @@ export function TimelineHero({
   // At rest the label keeps quiet about time: the log has its own clock, and
   // the lanes may have seen the server more recently than the log records.
   const meta = state === "new" ? `${fresh.length} new` : null;
-  const tag = state === "rest" && newest?.invented ? "invented" : null;
 
   // The label answers: its star flares and one light crosses the words.
   // With the log open, the lines that landed while you were away warm once.
@@ -694,7 +705,6 @@ export function TimelineHero({
               What I did last
             </span>
             {meta && <span className="axt-log-meta">· {meta}</span>}
-            {tag && <em className="axt-tag">{tag}</em>}
             <CaretDown weight="bold" className="axt-log-caret" />
           </button>
         )}
@@ -745,10 +755,7 @@ export function TimelineHero({
                     >
                       <time>{clock(line.at)}</time>
                       <b aria-hidden="true">{glyph[line.tone]}</b>
-                      <span>
-                        {line.text}
-                        {line.invented && <em>invented</em>}
-                      </span>
+                      <span>{line.text}</span>
                     </div>
                   </Fragment>
                 );

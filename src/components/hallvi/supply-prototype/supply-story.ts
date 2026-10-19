@@ -1,5 +1,4 @@
 // What the Manifest, Origin, Queue and Rota designs draw, and nothing else.
-// SupplyStory satisfies it structurally, so the visual reference is untouched.
 
 /** Who decided a value: the release plan, the owner, us, or a connection. */
 export type Decider = "plan" | "you" | "generated" | "connection";
@@ -123,8 +122,6 @@ export interface SupplyView {
   jobs: JobLine[];
   runs: { id: string; jobName: string; outcome: string; at: string }[];
   recurring: Recurring[];
-  /** Set only in the isolated visual reference; always null on records. */
-  invented: string | null;
 }
 
 export interface SupplyProps {
@@ -132,8 +129,8 @@ export interface SupplyProps {
   now: number;
   /**
    * Needed only so a generated credential can be revealed to the owner from
-   * the panel that describes it. The visual reference has no such control,
-   * and every other surface here works without knowing the id.
+   * the panel that describes it. Every other surface here works without
+   * knowing the id.
    */
   applicationId?: string;
   head: import("react").ReactNode;

@@ -15,7 +15,6 @@ export interface NeedItem {
   tone: "failed" | "waiting";
   title: string;
   detail: string;
-  invented?: boolean;
   primary: { label: string; draft?: string; open?: () => void };
   secondary?: { label: string; destination: ApplicationSection };
 }

@@ -16,12 +16,13 @@ import {
 import { useState } from "react";
 
 import { Tag } from "../deployment-prototype/tag";
-import { listed } from "../backup-prototype/model";
 import { Mascot } from "../mascot";
-import type { SupplyProps } from "./supply-story";
+import type { SupplyProps, Value } from "./supply-story";
 import { RevealSecret } from "../reveal-secret";
 import { revealKeyboardControl } from "../reveal-keyboard-control";
-import { ago, sizeWords, when, type Value } from "./supply-model";
+import { ago } from "../architecture-prototype/model";
+import { when } from "../stack-prototype/stack-model";
+import { listed, sizeWords } from "./supply-model";
 import "./manifest.css";
 
 const deciders = [
@@ -277,7 +278,6 @@ export function ManifestDirection({
           </button>
         </div>
       </footer>
-      {story.invented && <p className="ax-invented">{story.invented}</p>}
     </section>
   );
 }

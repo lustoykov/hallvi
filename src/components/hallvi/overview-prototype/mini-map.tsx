@@ -254,7 +254,7 @@ export function MiniMap({
               key={id}
               data-part={id}
               data-c={part.evidence.certainty}
-              className={`axo-map-card${part.checking ? " is-checking" : ""}${highlight === id ? " is-highlight" : ""}`}
+              className={`axo-map-card${highlight === id ? " is-highlight" : ""}`}
             >
               {failed && (
                 <rect

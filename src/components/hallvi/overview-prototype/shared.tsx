@@ -36,7 +36,7 @@ export const vitalIcon: Record<Vital["id"], ReactNode> = {
 };
 
 /** How long until a moment, counted down while you watch. */
-export function useCountdown(to: string | null | undefined, offset: number) {
+export function useCountdown(to: string | null | undefined) {
   const [clock, setClock] = useState(0);
   useEffect(() => {
     if (!to) return;
@@ -49,16 +49,12 @@ export function useCountdown(to: string | null | undefined, offset: number) {
     };
   }, [to]);
   if (!to || !clock) return null;
-  const left = Date.parse(to) - (clock + offset);
+  const left = Date.parse(to) - clock;
   if (left <= 0) return "due now";
   const hours = Math.floor(left / 3_600_000);
   const minutes = Math.floor((left % 3_600_000) / 60_000);
   const seconds = Math.floor((left % 60_000) / 1000);
   return hours > 0 ? `${hours} h ${minutes} m` : `${minutes} m ${seconds} s`;
-}
-
-export function Countdown({ to, offset }: { to: string; offset: number }) {
-  return <b className="axo-count">{useCountdown(to, offset)}</b>;
 }
 
 /**
@@ -142,10 +138,7 @@ export function NeedCard({
       </span>
       <div>
         <b>{need.title}</b>
-        <p>
-          {need.detail}
-          {need.invented && <span className="ax-invented">invented</span>}
-        </p>
+        <p>{need.detail}</p>
       </div>
       <div className="axo-need-actions">
         {need.partId ? (

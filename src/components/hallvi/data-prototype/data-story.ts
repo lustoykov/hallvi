@@ -1,5 +1,4 @@
 // What the Timeline design draws, and nothing else.
-// DataStory satisfies it structurally, so the visual reference is untouched.
 
 export type Lane = "health" | "copies" | "restores";
 
@@ -40,16 +39,4 @@ export interface DataView {
     restore: { at: string; detail: string } | null;
     keep: number | null;
   };
-}
-
-export interface DataProps {
-  story: DataView;
-  now: number;
-  head: import("react").ReactNode;
-  /** Work in progress on this destination, as the shell shows it. */
-  activity: import("react").ReactNode;
-  onAsk: (draft: string) => void;
-  onOpenDestination: (
-    destination: import("../application-sections").ApplicationSection,
-  ) => void;
 }

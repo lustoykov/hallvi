@@ -13,7 +13,6 @@ import { currentAccessRecord } from "@/server/access-record";
 // newest release now opens on, in a second shape on the same screen. Its
 // four states are all still reachable in the list: nothing deployed, a
 // decision waiting, work running, and a release that either holds or failed.
-// The design is kept at deployment-prototype/transit.tsx.
 
 import { useMemo } from "react";
 

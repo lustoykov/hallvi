@@ -14,21 +14,6 @@
   display: grid;
   gap: 10px;
 }
-
-.axj2-condition {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.axj2-condition p {
-  margin: 0;
-  max-width: 78ch;
-  font-size: 16px;
-  line-height: 1.5;
-  letter-spacing: -0.006em;
-  text-wrap: pretty;
-  animation: axj2-fade 520ms var(--ax-ease-out);
-}
 .axj2-controls {
   display: flex;
   flex-wrap: wrap;
@@ -445,35 +430,6 @@
   }
 }
 
-/* Scanning border while the re-check looks at a part. */
-.axj2-card.is-checking::after,
-.axj2-server-head.is-checking::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  padding: 2px;
-  background: conic-gradient(
-    from var(--axj2-angle),
-    transparent 0 62%,
-    #9fb4f5 74%,
-    #285ad8 86%,
-    transparent 100%
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: axj2-orbit 1s linear infinite;
-  pointer-events: none;
-}
-@keyframes axj2-orbit {
-  to {
-    --axj2-angle: 360deg;
-  }
-}
-
 .axj2-icon {
   display: grid;
   place-items: center;
@@ -617,68 +573,6 @@
   background: transparent;
   border: 1.5px dashed #9aa6ba;
 }
-.is-checking .axj2-status {
-  color: var(--ax-working-text);
-}
-.is-checking .axj2-status i {
-  background: var(--ax-blue);
-  animation: axj2-breathe 900ms ease-in-out infinite;
-}
-@keyframes axj2-breathe {
-  50% {
-    box-shadow: 0 0 0 5px rgb(40 90 216 / 18%);
-  }
-}
-
-/* Ports: small shields on the firewall edge. */
-/* A port that refuses: its number struck through, and the wall behind it is
-   solid. It is on the map because the map is the overview — leaving it off
-   had the firewall's own count referring to something nobody could see. */
-
-/* Ghosts: what is not there, drawn where it would be. */
-.axj2-ghost {
-  position: absolute;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 9px;
-  height: 22px;
-  border: 1px dashed #c3ccda;
-  border-radius: 999px;
-  background: #fbfcfe;
-  color: var(--ax-faint);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 560;
-  white-space: nowrap;
-  transition: opacity 480ms;
-}
-.axj2-ghost svg {
-  width: 12px;
-  height: 12px;
-}
-.axj2-ghost-tls {
-  cursor: pointer;
-}
-.axj2-ghost-tls:hover,
-.axj2-ghost-tls.is-selected {
-  border-color: #9aa6ba;
-  color: var(--ax-muted);
-}
-.axj2-ghost.is-dim {
-  opacity: 0.5;
-}
-.axj2-ghost-refused {
-  transform: translate(-50%, -50%);
-  color: #9a6b68;
-  border-color: #e7cfcc;
-  background: #fdf6f5;
-}
-.axj2-stage:not([data-journey="visit"]) .axj2-ghost-refused {
-  opacity: 0;
-}
 
 /* Little Server: on the roof of its server, or walking the terminal. */
 .axj2-mascot {
@@ -808,9 +702,6 @@
   color: var(--ax-ink-2);
   overflow-wrap: anywhere;
 }
-.axj2-pop-evidence .ax-invented {
-  margin-left: 6px;
-}
 .axj2-pop dl {
   display: grid;
   gap: 6px;
@@ -840,182 +731,18 @@
 
 /* ---------- Not set up yet ---------- */
 
-.axj2-gaps {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 22px;
-}
-.axj2-gap {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px dashed #cfd6e2;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 60%);
-}
-.axj2-gap-icon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: var(--ax-nav);
-  color: var(--ax-muted);
-}
-.axj2-gap b {
-  font-size: 13.5px;
-  font-weight: 600;
-}
-.axj2-gap p {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ax-muted);
-}
-.axj2-gap .ax-textlink {
-  grid-column: 2;
-  justify-self: start;
-  margin-top: 4px;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .axj2-card[data-c="failed"] .axj2-icon,
-  .axj2-card.is-checking::after,
-  .axj2-server-head.is-checking::after {
+  .axj2-card[data-c="failed"] .axj2-icon {
     animation: none !important;
   }
-}
-:root[data-ax-motion="reduced"] .axj2-card[data-c="failed"] .axj2-icon {
-  animation: none !important;
 }
 
 /* ---------- The agent's terminal ---------- */
 
-.axj2-term {
-  position: relative;
-  margin-top: 0;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
-  border: 1px solid #263149;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 4%),
-    0 24px 48px -32px rgb(10 16 30 / 55%);
-  color: #d9e1f2;
-  font-family: var(--ax-mono);
-  overflow: hidden;
-}
-.axj2-term header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 18px;
-  border-bottom: 1px solid #243047;
-  font-size: 11.5px;
-  color: #7f8ba6;
-}
-.axj2-term header em {
-  font-style: normal;
-  color: #7f8ba6;
-  transition: color var(--ax-base);
-}
-.axj2-term header em.is-simulated {
-  color: #f4c98f;
-}
-.axj2-term-lines {
-  display: grid;
-  padding: 10px 10px 14px;
-  min-height: 236px;
-  align-content: end;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 36px);
-  mask-image: linear-gradient(180deg, transparent 0, #000 36px);
-}
-.axj2-term-day {
-  padding: 6px 8px 2px 86px;
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #56627a;
-}
-.axj2-term-line {
-  display: grid;
-  grid-template-columns: 72px 16px minmax(0, 1fr);
-  gap: 0 6px;
-  align-items: baseline;
-  padding: 3px 8px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  animation: axj2-line-in 420ms var(--ax-ease-out);
-}
 @keyframes axj2-line-in {
   from {
     opacity: 0;
     transform: translateY(6px);
-  }
-}
-.axj2-term-line time {
-  color: #56627a;
-  font-variant-numeric: tabular-nums;
-}
-.axj2-term-line b {
-  font-weight: 600;
-  text-align: center;
-  color: #7d8aa5;
-}
-.axj2-term-line span {
-  justify-self: start;
-  overflow-wrap: anywhere;
-}
-.axj2-term-line[data-tone="pass"] b {
-  color: #3fbf86;
-}
-.axj2-term-line[data-tone="pass"] span {
-  color: #b9e8d0;
-}
-.axj2-term-line[data-tone="fail"] b,
-.axj2-term-line[data-tone="fail"] span {
-  color: #ef8d86;
-}
-.axj2-term-line[data-tone="work"] b,
-.axj2-term-line[data-tone="work"] span {
-  color: #9fb4f5;
-}
-.axj2-term-line.is-newest {
-  background: #222c42;
-}
-.axj2-term-line.is-invented span::after {
-  content: attr(data-tag);
-  margin-left: 8px;
-  padding: 0 5px;
-  border-radius: 4px;
-  font-size: 9.5px;
-  letter-spacing: 0.04em;
-  vertical-align: 1px;
-  color: #f4c98f;
-  background: rgb(244 201 143 / 12%);
-}
-.axj2-caret {
-  display: inline-block;
-  width: 7px;
-  height: 14px;
-  margin-left: 6px;
-  vertical-align: -2px;
-  background: #9fb4f5;
-  animation: axj2-caret 1s steps(1) infinite;
-}
-@keyframes axj2-caret {
-  50% {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .axj2-term-line,
-  .axj2-caret {
-    animation: none !important;
   }
 }
 
@@ -1147,253 +874,11 @@
   width: 14px;
   height: 14px;
 }
-.axj3-verdict p {
-  font-size: 16px;
-  line-height: 1.5;
-  max-width: 72ch;
-  color: var(--ax-ink);
-}
-.ax-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 
 /* ---------- The console: folded to its latest line ---------- */
 
-.axj2-term-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px 6px 6px;
-}
-.axj2-term-toggle {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 40px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--ax-base);
-}
-.axj2-term-toggle:hover {
-  background: rgb(255 255 255 / 4%);
-}
-.axj2-term-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: #8a96b0;
-}
-.axj2-term-ticker {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 12.5px;
-  white-space: nowrap;
-}
-.axj2-term-ticker b {
-  flex: none;
-  font-weight: 600;
-  color: #7d8aa5;
-}
-.axj2-term-ticker > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #d9e1f2;
-}
-.axj2-term-ticker[data-tone="pass"] b {
-  color: #3fbf86;
-}
-.axj2-term-ticker[data-tone="pass"] > span {
-  color: #b9e8d0;
-}
-.axj2-term-ticker[data-tone="fail"] b,
-.axj2-term-ticker[data-tone="fail"] > span {
-  color: #ef8d86;
-}
-.axj2-term-ticker[data-tone="work"] b,
-.axj2-term-ticker[data-tone="work"] > span {
-  color: #9fb4f5;
-}
-.axj2-term-ticker > span[data-tag]::after {
-  content: attr(data-tag);
-  margin-left: 8px;
-  padding: 0 5px;
-  border-radius: 4px;
-  font-size: 9.5px;
-  color: #f4c98f;
-  background: rgb(244 201 143 / 12%);
-}
-.axj2-term-toggle em {
-  flex: none;
-  font-style: normal;
-  font-size: 11.5px;
-  color: #7f8ba6;
-}
-.axj2-term-toggle em.is-simulated {
-  color: #f4c98f;
-}
-.axj2-term-caret {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  color: #7f8ba6;
-  transition: transform var(--ax-base) var(--ax-ease-out);
-}
-.axj2-term.is-open .axj2-term-caret {
-  transform: rotate(180deg);
-}
-.axj2-term-action {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 6px 0 12px;
-  border: 1px solid #33456b;
-  border-radius: 999px;
-  background: #222c42;
-  color: #d9e1f2;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 560;
-  cursor: pointer;
-  transition:
-    background-color var(--ax-base),
-    border-color var(--ax-base),
-    transform var(--ax-fast) var(--ax-ease-out);
-}
-.axj2-term-action:hover:not(:disabled) {
-  background: #2a3654;
-  border-color: #4a64a0;
-}
-.axj2-term-action:active:not(:disabled) {
-  transform: scale(0.97);
-}
-.axj2-term-action:disabled {
-  opacity: 0.8;
-  cursor: default;
-}
-.axj2-term-action svg {
-  width: 14px;
-  height: 14px;
-}
-.axj2-term .ax-invented {
-  border-color: transparent;
-  color: #f4c98f;
-  background: rgb(244 201 143 / 14%);
-}
-.axj2-term-body {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 420ms var(--ax-ease-out);
-}
-.axj2-term.is-open .axj2-term-body {
-  grid-template-rows: 1fr;
-}
-.axj2-term-body > div {
-  min-height: 0;
-  overflow: hidden;
-  border-top: 1px solid transparent;
-  transition: border-color var(--ax-base);
-}
-.axj2-term.is-open .axj2-term-body > div {
-  border-top-color: #243047;
-}
-.axj2-term-origin {
-  margin: 0;
-  padding: 12px 18px 0 104px;
-  font-size: 11.5px;
-  color: #6f7c96;
-}
-.axj2-term-origin button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #9fb4f5;
-  font: inherit;
-  text-decoration: underline;
-  text-decoration-color: rgb(159 180 245 / 40%);
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-@media (prefers-reduced-motion: reduce) {
-  .axj2-term-body,
-  .axj2-term-caret,
-  .axj3-gap-pop {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-:root[data-ax-motion="reduced"] .axj2-term-body,
-:root[data-ax-motion="reduced"] .axj2-term-caret,
-:root[data-ax-motion="reduced"] .axj3-gap-pop {
-  transition: none !important;
-  animation: none !important;
-}
-
 /* ---------- The report: Hallvi's verdict over its evidence ---------- */
 
-.axj3-report {
-  margin-top: 8px;
-  border: 1px solid var(--ax-line);
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow:
-    0 1px 2px rgb(23 34 56 / 4%),
-    0 24px 48px -36px rgb(23 34 56 / 32%);
-  transition:
-    border-color var(--ax-base),
-    box-shadow var(--ax-base);
-}
-
-.axj3-report-head {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr) auto;
-  align-items: end;
-  column-gap: 16px;
-  padding: 6px 18px 0 16px;
-}
-.axj3-report .axj2-mascot {
-  position: relative;
-  left: auto;
-  top: auto;
-  z-index: 2;
-  width: 92px;
-  height: 92px;
-  margin-bottom: -14px;
-}
-.axj3-verdict {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: baseline;
-  column-gap: 10px;
-  padding: 18px 0 20px;
-}
-.axj3-report .axj2-term {
-  margin: 0;
-  border: 0;
-  border-radius: 0 0 17px 17px;
-  box-shadow: none;
-}
 .axj2-card.is-ghost {
   border-style: dashed;
   border-color: #c3ccda;
@@ -1413,29 +898,6 @@
   stroke-width: 1.5;
   stroke-dasharray: 3 5;
   stroke-linecap: round;
-}
-
-/* The report's headline, above the verdict. */
-.axj3-report-say {
-  display: grid;
-  gap: 5px;
-  padding: 18px 0 20px;
-}
-.axj3-report-say .axj3-verdict {
-  padding: 0;
-}
-.axj3-headline {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-  color: var(--ax-ink);
-  animation: axj2-fade 520ms var(--ax-ease-out);
-}
-.axj3-report-say .axj3-verdict p {
-  font-size: 15px;
-  color: var(--ax-ink-2);
 }
 
 /* A card the layout had to make short: the name, and a dot for the reading.

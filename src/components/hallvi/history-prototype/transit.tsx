@@ -10,8 +10,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import type { ApplicationOperation } from "@/server/operation-record";
-
 import type { ApplicationSection } from "../application-sections";
 
 import { reducedMotion } from "../architecture-prototype/motion";

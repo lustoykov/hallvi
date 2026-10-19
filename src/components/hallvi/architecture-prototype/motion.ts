@@ -12,10 +12,7 @@ const QUERY = "(prefers-reduced-motion: reduce)";
 
 export function reducedMotion() {
   if (typeof window === "undefined") return true;
-  return (
-    window.matchMedia(QUERY).matches ||
-    document.documentElement.dataset.axMotion === "reduced"
-  );
+  return window.matchMedia(QUERY).matches;
 }
 
 export function useReducedMotion() {
@@ -25,20 +22,9 @@ export function useReducedMotion() {
     const update = () => setReduced(reducedMotion());
     update();
     query.addEventListener("change", update);
-    window.addEventListener("ax-motion", update);
-    return () => {
-      query.removeEventListener("change", update);
-      window.removeEventListener("ax-motion", update);
-    };
+    return () => query.removeEventListener("change", update);
   }, []);
   return reduced;
-}
-
-/** The prototype bar's "Reduced motion" preview, for judging the fallback. */
-export function setMotionPreview(reduced: boolean) {
-  if (reduced) document.documentElement.dataset.axMotion = "reduced";
-  else delete document.documentElement.dataset.axMotion;
-  window.dispatchEvent(new Event("ax-motion"));
 }
 
 export const sparklePalettes = {
@@ -60,7 +46,7 @@ function sparkleLayer() {
 const STAR =
   '<svg viewBox="0 0 10 10"><path d="M5 0C5.5 3.3 6.7 4.5 10 5 6.7 5.5 5.5 6.7 5 10 4.5 6.7 3.3 5.5 0 5 3.3 4.5 4.5 3.3 5 0Z" fill="currentColor"/></svg>';
 
-export interface BurstOptions {
+interface BurstOptions {
   count?: number;
   palette?: string[];
   spread?: number;
@@ -124,12 +110,6 @@ export function burst(
     );
     animation.onfinish = () => el.remove();
   }
-}
-
-export function burstAt(element: Element | null, options?: BurstOptions) {
-  if (!element) return;
-  const r = element.getBoundingClientRect();
-  burst(r.left + r.width / 2, r.top + r.height / 2, options);
 }
 
 export interface Spring {

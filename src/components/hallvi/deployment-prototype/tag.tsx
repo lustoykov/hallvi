@@ -13,7 +13,12 @@ import {
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
-import type { Tone } from "./deployment-model";
+/**
+ * `stale` is a pass that has aged, and draws calmly. `attention` is amber,
+ * and is for what needs the owner: Pi's own warning, a decision waiting.
+ */
+export type Tone =
+  "verified" | "stale" | "attention" | "failed" | "planned" | "checking";
 
 const tagIcon: Record<Tone, ReactNode> = {
   verified: <Check weight="bold" />,

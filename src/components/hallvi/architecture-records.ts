@@ -797,8 +797,6 @@ export function architectureFromRecords({
             };
 
   return {
-    scenario: "live",
-    invented: false,
     now,
     status: planned ? "planned" : "live",
     applicationName,

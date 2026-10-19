@@ -173,15 +173,9 @@
   line-height: 1.6;
   max-width: 84ch;
 }
-.axqu > .ax-invented {
-  align-self: flex-start;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .axqu-slots i {
     transition: none;
   }
-}
-:root[data-ax-motion="reduced"] .axqu-slots i {
-  transition: none;
 }

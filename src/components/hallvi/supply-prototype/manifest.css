@@ -347,9 +347,6 @@
   line-height: 1.6;
   max-width: 84ch;
 }
-.axma > .ax-invented {
-  align-self: flex-start;
-}
 
 @media (max-width: 760px) {
   .axma-file {
@@ -360,7 +357,4 @@
   .axma-card {
     transition: none;
   }
-}
-:root[data-ax-motion="reduced"] .axma-card {
-  transition: none;
 }

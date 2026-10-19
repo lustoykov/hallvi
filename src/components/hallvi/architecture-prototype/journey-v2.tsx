@@ -67,7 +67,6 @@ const W = 1120;
  * The map is drawn from y = 0; the view starts at TOP, just above the server.
  */
 const TOP = 60;
-const H = 500;
 type Rect = { x: number; y: number; w: number; h: number };
 
 const pct = (value: number, total: number) => `${(value / total) * 100}%`;
@@ -556,7 +555,7 @@ function Card({
   return (
     <button
       type="button"
-      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${tight ? " is-tight" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${part.checking ? " is-checking" : ""}`}
+      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${tight ? " is-tight" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}`}
       data-c={certainty}
       style={{ ...placeAt(rect), ["--i" as string]: index }}
       onClick={(event) => {
@@ -564,7 +563,7 @@ function Card({
         onSelect(part.id);
       }}
       aria-expanded={selected}
-      aria-label={`${part.name}, ${part.role}.${part.quiet ? "" : ` ${part.checking ? "Checking" : part.evidence.short}.`}`}
+      aria-label={`${part.name}, ${part.role}.${part.quiet ? "" : ` ${part.evidence.short}.`}`}
     >
       <span className="axj2-icon" aria-hidden="true">
         {iconFor(part, model.openness)}
@@ -588,10 +587,10 @@ function Card({
           <span
             className="axj2-status"
             data-tight={tight || undefined}
-            title={part.checking ? "Checking…" : part.evidence.short}
+            title={part.evidence.short}
           >
             <i aria-hidden="true" />
-            {tight ? null : part.checking ? "Checking…" : part.evidence.short}
+            {tight ? null : part.evidence.short}
           </span>
         )}
       </span>
@@ -681,12 +680,7 @@ function Popover({
       {!part.quiet && (
         <div className="axj2-pop-evidence">
           <CertaintyTag part={part} />
-          <p>
-            {part.evidence.detail}
-            {part.evidence.invented && (
-              <span className="ax-invented">invented</span>
-            )}
-          </p>
+          <p>{part.evidence.detail}</p>
         </div>
       )}
       {part.facts.length > 0 && (
@@ -1086,7 +1080,7 @@ export function JourneyDirection({
           >
             <button
               type="button"
-              className={`axj2-server-head${selected === "host" ? " is-selected" : ""}${host?.checking ? " is-checking" : ""}`}
+              className={`axj2-server-head${selected === "host" ? " is-selected" : ""}`}
               data-c={host?.evidence.certainty ?? "unknown"}
               onClick={(event) => {
                 event.stopPropagation();
@@ -1111,9 +1105,7 @@ export function JourneyDirection({
               <small>{model.region}</small>
               <span className="axj2-status">
                 <i aria-hidden="true" />
-                {host?.checking
-                  ? "Checking…"
-                  : (host?.evidence.short ?? "Not assessed")}
+                {host?.evidence.short ?? "Not assessed"}
               </span>
             </button>
           </div>
@@ -1405,4 +1397,4 @@ export function JourneyDirection({
   );
 }
 
-export { BOX, layoutFor, W as MAP_W, TOP as MAP_TOP, H as MAP_H };
+export { BOX, layoutFor, W as MAP_W, TOP as MAP_TOP };

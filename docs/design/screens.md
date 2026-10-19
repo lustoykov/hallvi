@@ -29,4 +29,4 @@ From the repository, run the documented [development setup](../development.md#ru
 
 The reference shell that replayed invented scenario state has been retired: a state that renders only in a layout the product does not ship proves nothing about the page an owner opens. Scenario records are the replacement, and they are read by the same components a real application uses. Keep synthetic records out of a real application's database — the scenarios command builds its own.
 
-The [browser capture script](../../tests/browser/reference.capture.mjs) accepts a base URL and writes screenshots under ignored test results. Use fresh browser verification for UI changes; old screenshots and capture counts are not current acceptance evidence.
+Use fresh browser verification for UI changes; old screenshots and capture counts are not current acceptance evidence.

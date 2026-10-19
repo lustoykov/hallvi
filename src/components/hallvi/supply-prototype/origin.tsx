@@ -169,7 +169,6 @@ export function OriginDirection({
           The name and certificate in front of it
         </button>
       </footer>
-      {story.invented && <p className="ax-invented">{story.invented}</p>}
     </section>
   );
 }

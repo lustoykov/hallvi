@@ -316,9 +316,6 @@
     transition: none;
   }
 }
-:root[data-ax-motion="reduced"] .axh-row.is-flash {
-  animation: none;
-}
 
 /* Evidence, not events.
    A History page is roughly two-thirds individual commands and one-third the

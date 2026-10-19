@@ -49,8 +49,6 @@ export function OverviewDirection({
   const [pointed, setPointed] = useState<string | null>(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
   const planned = model.status !== "live";
-  // The "3 days later" scenario runs three days ahead of the clock.
-  const offset = model.scenario === "later" ? 3 * 86_400_000 : 0;
 
   // Architecture opens with a part's details open when there is one in mind.
   const openArchitecture = useCallback(
@@ -87,7 +85,6 @@ export function OverviewDirection({
         record={record}
         overview={overview}
         page={page}
-        offset={offset}
         pointed={pointed}
         onPoint={setPointed}
         onShow={openArchitecture}

@@ -1,13 +1,6 @@
-// What the Line design draws, and nothing else.
-//
-// The prototype's StackStory carries Processes, Database, Storage and
-// Backups in one object because one builder produced all four from the old
-// deployment model. The records path does not work that way: each
-// destination has its own projection, so each needs to say what it actually
-// needs. This is that list for Processes.
-//
-// StackStory still satisfies it structurally, so the isolated visual
-// reference keeps working untouched.
+// What the Line design draws, and nothing else. Each destination has its
+// own projection from the records, so each says what it actually needs; this
+// is that list for Processes.
 
 export interface Probe {
   name: string;
@@ -98,16 +91,4 @@ export interface LineStory {
   host?: { name: string; memory: string | null } | null;
   processChanges: Change[];
   processGaps: Gap[];
-}
-
-export interface LineProps {
-  story: LineStory;
-  head: import("react").ReactNode;
-  /** Work in progress on this destination, as the shell shows it. */
-  activity: import("react").ReactNode;
-  onAsk: (draft: string) => void;
-  onOpenConversation: (chatId: string, messageId: string | null) => void;
-  onOpenDestination: (
-    destination: import("../application-sections").ApplicationSection,
-  ) => void;
 }

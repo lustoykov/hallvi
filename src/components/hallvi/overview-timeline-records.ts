@@ -102,7 +102,6 @@ export function timelineFromRecords({
         tone: moment.tone,
         title: moment.line.text,
         lines: [moment.line],
-        invented: false,
       });
     }
     return {

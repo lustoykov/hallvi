@@ -89,93 +89,6 @@
   border-radius: 12px 4px 12px 12px;
 }
 
-/* Moments: one dot each, a number when several came together. */
-.axt-ev {
-  position: absolute;
-  top: 50%;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: #8b95a5;
-  box-shadow: 0 0 0 3px #ffffff;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  transition:
-    transform 260ms var(--ax-spring),
-    box-shadow 260ms;
-}
-.axt-ev b {
-  position: absolute;
-  left: 13px;
-  top: -11px;
-  min-width: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 0 0 1px var(--ax-line-2);
-  font-size: 10px;
-  font-weight: 650;
-  line-height: 15px;
-  color: var(--ax-ink-2);
-  font-variant-numeric: tabular-nums;
-}
-.axt-ev:hover,
-.axt-ev.is-open {
-  transform: translate(-50%, -50%) scale(1.25);
-}
-.axt-ev.is-open {
-  box-shadow:
-    0 0 0 3px #ffffff,
-    0 0 0 6px rgb(40 90 216 / 22%);
-}
-.axt-ev[data-tone="pass"] {
-  background: var(--ax-verified);
-}
-.axt-ev[data-tone="fail"] {
-  background: var(--ax-failed);
-}
-.axt-ev[data-tone="fail"]::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: inherit;
-  border: 2px solid var(--ax-failed);
-  animation: axt-ping 1.8s ease-out infinite;
-}
-.axt-ev[data-tone="planned"] {
-  background: #ffffff;
-  box-shadow:
-    0 0 0 3px #ffffff,
-    inset 0 0 0 2px #9aa6ba;
-}
-.axt-ev[data-tone="checking"] {
-  background: var(--ax-blue);
-  animation: axj2-breathe 900ms ease-in-out infinite;
-}
-/* A moment that lands while you watch pops in; the rest are simply there. */
-.axt-ev.is-new {
-  animation: axt-ev-in 520ms var(--ax-spring) both;
-}
-@keyframes axt-ev-in {
-  from {
-    transform: translate(-50%, -50%) scale(0);
-  }
-}
-@keyframes axt-ping {
-  from {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(2.2);
-  }
-}
 .axt-console > .hv-term-bar {
   margin: -2px 0 6px;
   padding: 6px 8px 10px;
@@ -359,18 +272,6 @@
   color: var(--ax-working-text);
   font-weight: 620;
 }
-
-.axt-tag {
-  padding: 0 5px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 600;
-  line-height: 16px;
-  color: var(--ax-waiting-text);
-  background: var(--ax-waiting-bg);
-  box-shadow: inset 0 0 0 1px var(--ax-waiting-line);
-}
 .axt-log-ghost {
   display: inline-flex;
   align-items: center;
@@ -516,29 +417,11 @@
   background: rgb(244 201 143 / 12%);
 }
 
-/* A line pointed at in the log lights its moment on the lanes. */
-.axt-ev.is-lit {
-  transform: translate(-50%, -50%) scale(1.3);
-  box-shadow:
-    0 0 0 3px #ffffff,
-    0 0 0 7px rgb(40 90 216 / 24%);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .axt-log,
-  .axt-log-line,
-  .axt-gap,
-  .axt-ev,
-  .axt-ev::after {
+  .axt-log-line {
     animation: none !important;
   }
-}
-:root[data-ax-motion="reduced"] .axt-log,
-:root[data-ax-motion="reduced"] .axt-log-line,
-:root[data-ax-motion="reduced"] .axt-gap,
-:root[data-ax-motion="reduced"] .axt-ev,
-:root[data-ax-motion="reduced"] .axt-ev::after {
-  animation: none !important;
 }
 
 @media (max-width: 640px) {

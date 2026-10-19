@@ -35,13 +35,11 @@ export function TactileSlider<T extends string>({
   options,
   value,
   onChange,
-  size = "md",
 }: {
   label: string;
   options: SliderOption<T>[];
   value: T;
   onChange: (value: T) => void;
-  size?: "sm" | "md";
 }) {
   const track = useRef<HTMLDivElement>(null);
   const thumb = useRef<HTMLSpanElement>(null);
@@ -234,11 +232,7 @@ export function TactileSlider<T extends string>({
   }
 
   return (
-    <div
-      className={`ax-slider ax-slider-${size}`}
-      role="radiogroup"
-      aria-label={label}
-    >
+    <div className="ax-slider" role="radiogroup" aria-label={label}>
       <div
         ref={track}
         className={`ax-slider-track${pressed ? " is-pressed" : ""}`}

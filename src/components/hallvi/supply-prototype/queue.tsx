@@ -11,11 +11,11 @@
 import { ChatCircleText, Lightning } from "@phosphor-icons/react";
 
 import { Tag } from "../deployment-prototype/tag";
-import { listed } from "../backup-prototype/model";
 import { Mascot } from "../mascot";
 import { countWord } from "../stack-prototype/stack-model";
 import type { SupplyProps } from "./supply-story";
-import { ago, waitWords } from "./supply-model";
+import { ago } from "../architecture-prototype/model";
+import { listed, waitWords } from "./supply-model";
 import "./queue.css";
 
 const SLOTS = 14;
@@ -204,7 +204,6 @@ export function QueueDirection({
           </button>
         </div>
       </footer>
-      {story.invented && <p className="ax-invented">{story.invented}</p>}
     </section>
   );
 }
