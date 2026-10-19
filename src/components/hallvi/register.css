@@ -242,7 +242,7 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-@container (max-width: 719px) {
+@container (min-width: 600px) and (max-width: 719px) {
   .hv-rg-scroll-hint {
     display: flex;
   }
@@ -387,6 +387,94 @@
   font-size: 13px;
   line-height: 1.7;
 }
+/* Narrower than a table can be read, each row stacks: its name and the
+   control that opens it on the first line, then every other column as a
+   named value. An opened row still opens under it, at the full width.
+   Child combinators keep the tables inside an opened row as they are. */
+@container (max-width: 599px) {
+  .hv-rg-panel {
+    overflow: visible;
+  }
+  .hv-rg-panel > .hv-rg-table,
+  .hv-rg-panel > .hv-rg-table > tbody {
+    display: block;
+    min-width: 0;
+  }
+  .hv-rg-panel > .hv-rg-table > colgroup,
+  .hv-rg-panel > .hv-rg-table > thead {
+    display: none;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > tr {
+    display: block;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > tr > td {
+    display: block;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line-2);
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row > td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    text-align: right;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row > td::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row > td:first-child {
+    display: block;
+    text-align: left;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row > td:first-child::before,
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row > .hv-rg-open::before {
+    content: none;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row > td:not(:first-child) {
+    grid-column: 1 / -1;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row > td.hv-rg-open {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-click="true"]:hover,
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-click="true"]:hover td {
+    background: var(--panel);
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-open="true"],
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-open="true"] td {
+    background: var(--blue-soft);
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-tone="bad"] {
+    box-shadow: inset 3px 0 0 var(--red);
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-tone="warn"] {
+    box-shadow: inset 3px 0 0 var(--amber);
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-tone="working"] {
+    box-shadow: inset 3px 0 0 var(--blue);
+  }
+  .hv-rg-panel > .hv-rg-table > tbody > .hv-rg-row[data-tone="idle"] {
+    box-shadow: inset 3px 0 0 #ccd4e2;
+  }
+  .hv-rg-panel > .hv-rg-table > tbody:last-child > .hv-rg-row:last-child {
+    border-bottom: 0;
+  }
+}
+
 /* ---------------------------------------------------------- opened row */
 .hv-rg-detail > td {
   padding: 0;

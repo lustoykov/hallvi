@@ -589,6 +589,8 @@ export function Register<R extends { id: string }>({
                             className={
                               column.align === "end" ? "hv-rg-end" : undefined
                             }
+                            // A phone stacks the row and names each value.
+                            data-label={column.head}
                           >
                             {column.cell(row)}
                           </td>
