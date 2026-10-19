@@ -449,9 +449,9 @@ and recover after reload/reconnect. Command output loads its visible full captur
 when opened, and Deployment reads the selected step through the same call path.
 On the laptop, three fresh Chromium contexts against each warmed production
 fixture (2,000 synthetic calls) reduced decoded document bytes from 19,897,262 to
-2,926,536 and median navigation-to-content readiness from 618.9 to 286.4 ms.
+2,925,568 and median navigation-to-content readiness from 618.9 to 294.8 ms.
 The first SSE frame stayed 335 bytes; opening a historical disclosure rose from
-14.3 to 113.7 ms median. These are local synthetic measurements, without model
+14.3 to 121.5 ms median. These are local synthetic measurements, without model
 calls or network/CPU throttling. The worker still reads the full transcript,
 including on each detail request; there is no new client output cache.
 
