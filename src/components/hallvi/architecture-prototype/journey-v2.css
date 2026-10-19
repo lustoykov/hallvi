@@ -768,6 +768,16 @@
   min-height: var(--button-height);
   margin-top: 6px;
 }
+/* A page's own offer sits at the end of the row, before the way in. */
+.axj3-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.axj3-actions + .axj3-open {
+  margin-left: 0;
+}
 .axj3-title h1 {
   margin: 0;
   font-size: 24px;

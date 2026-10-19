@@ -95,6 +95,7 @@ export function PageHead({
   reachable = "checking",
   onReopen,
   reading,
+  actions,
 }: {
   bar: ReactNode;
   title: string;
@@ -106,12 +107,15 @@ export function PageHead({
   onReopen?: () => void;
   /** Overview's head also says how the address reads; see AccessLink. */
   reading?: boolean;
+  /** The page's own offer, on the title's row beside the way in. */
+  actions?: ReactNode;
 }) {
   return (
     <header className="axj3-head">
       {bar && <div className="axj3-bar">{bar}</div>}
       <div className="axj3-title">
         <h1>{title}</h1>
+        {actions && <div className="axj3-actions">{actions}</div>}
         <AccessLink
           openUrl={openUrl}
           name={name}

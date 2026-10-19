@@ -2,14 +2,9 @@
    It sits on the register (`hv-rg-*`) and the shell's own tokens. No new
    colours, no dark surfaces: a browser window, a signal meter and a path. */
 
-/* The Open button is taller than a heading; give its row room to breathe. */
-.hv-ac .hv-rg-board-head:has(.hv-rg-board-tools) {
-  align-items: center;
-  margin-bottom: 16px;
-}
-/* The offer beside it is that button's height, so the row is one line of
-   controls. */
-.hv-ac .hv-rg-board-tools .hv-rg-ask {
+/* The offer on the title's row is the height of the way in beside it, so the
+   row is one line of controls. */
+.ax-root[data-variant="access"] .axj3-actions .hv-rg-ask {
   height: var(--button-height);
   padding: 0 14px;
 }

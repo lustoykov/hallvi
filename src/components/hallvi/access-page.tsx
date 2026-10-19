@@ -11,7 +11,7 @@
 // controller finds it now. There is no verdict line under it: the first board
 // is the answer, and a page that grades itself above it says it twice.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { CheckCircle, Circle, LockSimple } from "@phosphor-icons/react";
 
 import type { SavedInformation } from "@/server/operator-data";
@@ -312,7 +312,17 @@ export function AccessPage({
     [records, applicationId, applicationName, now],
   );
 
-  const head = (
+  // Publishing is the one thing this board can offer to change, and it drafts
+  // the request rather than starting a form: there are decisions in it, and
+  // the decisions belong in the conversation. It sits quietly beside the Open
+  // link, except on an application a record says only this computer reaches,
+  // where it is what the board is for. Silence about access is not that
+  // application, so it keeps the quiet control.
+  const offer = publishOffer(story);
+  const unpublished = story.audience === "private" && !story.domain;
+
+  // Its own offer only where the page has something to offer it beside.
+  const head = (actions?: ReactNode) => (
     <PageHead
       bar={chrome.bar}
       title="Access"
@@ -321,6 +331,7 @@ export function AccessPage({
       restricted={story.audience === "private"}
       reachable={reachable}
       onReopen={onReopen}
+      actions={actions}
     />
   );
 
@@ -348,7 +359,7 @@ export function AccessPage({
   )
     return (
       <div className="ax-root" data-variant="access">
-        {head}
+        {head()}
         <div className="hv-deploy-none">
           <h2>Nothing here has been looked at yet.</h2>
           <p>
@@ -379,29 +390,17 @@ export function AccessPage({
   const address =
     story.domain?.name ?? (answering[0] ? hostOf(answering[0].typed) : null);
 
-  // Publishing is the one thing this board can offer to change, and it drafts
-  // the request rather than starting a form: there are decisions in it, and
-  // the decisions belong in the conversation. It sits quietly beside the Open
-  // link, except on an application a record says only this computer reaches,
-  // where it is what the board is for. Silence about access is not that
-  // application, so it keeps the quiet control.
-  const offer = publishOffer(story);
-  const unpublished = story.audience === "private" && !story.domain;
-
   return (
     <div className="ax-root" data-variant="access">
-      {head}
+      {head(
+        !unpublished && (
+          <Ask onAsk={onAsk} prompt={offer.draft}>
+            {offer.label}
+          </Ask>
+        ),
+      )}
       <div className="hv-rg-sheet hv-ac">
-        <Board
-          title="What a visitor sees"
-          tools={
-            !unpublished && (
-              <Ask onAsk={onAsk} prompt={offer.draft}>
-                {offer.label}
-              </Ask>
-            )
-          }
-        >
+        <Board title="What a visitor sees">
           {visitors.length ? (
             <div className="hv-ac-visits">
               {visitors.map((caller) => (
