@@ -60,11 +60,24 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-087 — Keep plugin overlay focus visible](#af-087--keep-plugin-overlay-focus-visible) | 1 | New |
 | [AF-088 — Keep Traffic steady while its first totals arrive](#af-088--keep-traffic-steady-while-its-first-totals-arrive) | 1 | New |
 | [AF-089 — Size a narrow-layout fix by the space it has](#af-089--size-a-narrow-layout-fix-by-the-space-it-has) | 1 | Fixed for History in #335 |
-| [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; product gap open |
+| [AF-090 — Notice a reader who jumps up as the last earlier messages are drawn](#af-090--notice-a-reader-who-jumps-up-as-the-last-earlier-messages-are-drawn) | 1 | Journey corrected in #336; final-frame gap unconfirmed |
 | [AF-091 — Share the initial clock when Overview hydrates](#af-091--share-the-initial-clock-when-overview-hydrates) | 1 | Fix in review |
 | [AF-094 — Distinguish exhausted API quota from release publication](#af-094--distinguish-exhausted-api-quota-from-release-publication) | 1 | Guidance corrected |
+| [AF-095 — Keep an early Home jump while a conversation opens](#af-095--keep-an-early-home-jump-while-a-conversation-opens) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-095 — Keep an early Home jump while a conversation opens
+
+During the AF-090 hand check on `f323c096`, reloading a synthetic 600-message
+conversation, clicking its transcript and immediately pressing native Home
+moved to the top with 24 rows drawn. The next observation had 120
+rows and was back on the latest message; the fully drawn conversation stayed
+there through live growth. Home after browser-local timestamps appeared kept
+the reader's position. This is a separate opening observation, not proof of
+AF-090's final-stretch race. No product fix was attempted.
+
+**+1:** 2026-10-19 — AF-090 manual Chrome investigation, `bugs`.
 
 ### AF-094 — Distinguish exhausted API quota from release publication
 
@@ -108,8 +121,17 @@ while earlier messages remain to be drawn, and the library ignores scroll
 events for a frame after a resize, so a single jump in the frame the last
 stretch is drawn is noticed by neither. The journey now leaves the latest
 message with the wheel first, as a reader does, and passed four runs of four.
-A reader's own single jump in that frame (Home, a scrollbar click) would be
+A reader's own single jump in that frame (Home, a scrollbar click) could be
 carried back down by the next growth; that was not reproduced by hand.
+
+**Hand check 2026-10-19:** On `f323c096`, native Chrome Home and scrollbar
+track clicks (including Option-click) during the filling of synthetic 600-
+and 1,334-message histories left the reader above the latest message through
+the remaining fill and subsequent live text growth, emitted every 1.5 seconds.
+The specific final-frame race was not reproduced within this bounded manual
+check; no frame timing was forced and no scroll hardening was added. The
+separate opening case where an early Home jump is undone is recorded in
+[AF-095](#af-095--keep-an-early-home-jump-while-a-conversation-opens).
 
 **+1:** 2026-10-04 — review of #336, `codex/speed-snappiness`.
 
