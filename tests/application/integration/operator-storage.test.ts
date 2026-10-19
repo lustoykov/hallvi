@@ -178,6 +178,42 @@ it("shares one outcome between views while keeping working knowledge unsurfaced"
     (await getOperatorView(app, chat)).information?.[0].retiredAt,
   ).toBeTruthy();
 });
+it("shows Pi the process names already in use when it names a new one", async () => {
+  const record = (title: string, id: string) => ({
+    title,
+    body: "On loopback.",
+    establishedAt: "2026-10-19T21:25:00.000Z",
+    presentation: {
+      views: ["processes"],
+      role: "status",
+      status: "verified",
+      about: [{ kind: "process", id }],
+      states: { ref: { kind: "process", id }, presence: "present" },
+    },
+  });
+  const first = await saveInformation(app, record("Web serves", "web"));
+  expect(first).not.toHaveProperty("warning");
+  // Renaming the only record's process leaves no other name to match.
+  const moved = await saveInformation(
+    app,
+    record("Nginx serves the site", "nginx-web"),
+    first.id,
+  );
+  expect(moved).not.toHaveProperty("warning");
+  const again = await saveInformation(
+    app,
+    record("Nginx still serves the site", "nginx-web"),
+  );
+  expect(again).not.toHaveProperty("warning");
+  const renamed = await saveInformation(
+    app,
+    record("nginx is running", "lustoykov-web"),
+  );
+  expect(renamed).toMatchObject({
+    warning: expect.stringMatching(/process "lustoykov-web".*"nginx-web"/),
+  });
+});
+
 it("tells an author who invented an ID what to do instead, and never touches another application's record", async () => {
   // Pi supplied IDs of its own when creating records, and the refusal said
   // only that they were not found. Record IDs are unique across every

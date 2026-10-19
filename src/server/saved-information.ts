@@ -1,7 +1,8 @@
 import { readExecution } from "./operator-execution";
 import { getApplication, listInformation, saveInformationRow } from "./db";
-import { informationInputSchema } from "./operator-data";
+import { informationInputSchema, type SavedInformation } from "./operator-data";
 import { requireReadableRecord } from "./record-contract";
+import { subjectsMentioned } from "./record-projection";
 import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
 export { listInformation, retireInformation } from "./db";
@@ -38,19 +39,35 @@ export async function saveInformation(
   }
   // An update replaces the whole record, so a fact left out is erased. Say
   // which, with what it held, so Pi can put back one it meant to keep.
-  const before = id
-    ? (await listInformation(applicationId, "", true)).find(
-        (record) => record.id === id,
-      )
-    : undefined;
+  const records = await listInformation(applicationId, "", true);
+  const before = id ? records.find((record) => record.id === id) : undefined;
+  // Pi does not read conversations from before Pi 1.0, so it named running
+  // processes afresh and Processes listed each web server twice. A name the
+  // application has never used is shown the names it has. The record being
+  // replaced is not a peer, and a retired one lists nothing.
+  const known = subjectsMentioned(
+    records.filter((record) => record.id !== id),
+    "process",
+  ).map((ref) => ref.id);
+  const named = subjectsMentioned(
+    [{ presentation: value.presentation } as SavedInformation],
+    "process",
+  ).map((ref) => ref.id);
+  const fresh =
+    known.length && !before?.retiredAt
+      ? named.filter((name) => !known.includes(name))
+      : [];
   const saved = await saveInformationRow(applicationId, value, id);
   const kept = new Set(value.presentation?.facts?.map((fact) => fact.key));
   const dropped = (before?.presentation?.facts ?? []).filter(
     (fact) => fact.key && !kept.has(fact.key),
   );
-  if (!dropped.length) return saved;
-  return {
-    ...saved,
-    warning: `This update removed ${dropped.map((fact) => `${fact.key} ("${fact.value}")`).join(", ")}, which the record had. An update replaces the whole record; if a fact still holds, save again with it.`,
-  };
+  const warnings = [
+    dropped.length &&
+      `This update removed ${dropped.map((fact) => `${fact.key} ("${fact.value}")`).join(", ")}, which the record had. An update replaces the whole record; if a fact still holds, save again with it.`,
+    fresh.length &&
+      `This record names ${fresh.map((name) => `process "${name}"`).join(", ")}, which no earlier record uses. The application's records already name ${known.map((name) => `"${name}"`).join(", ")}. If it is one of those under another name, update this record with that id; a second name lists the same process twice.`,
+  ].filter(Boolean);
+  if (!warnings.length) return saved;
+  return { ...saved, warning: warnings.join(" ") };
 }
