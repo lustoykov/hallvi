@@ -23,17 +23,6 @@
 .hv-adaptive-shell .hv-chat-column {
   grid-template-rows: auto minmax(0, 1fr);
 }
-.hv-adaptive-shell button,
-.hv-adaptive-shell input {
-  font: inherit;
-}
-/* The reset above also takes the buttons' own size and weight; these keep
-   the ones they wear outside an application. */
-.hv-adaptive-shell
-  :is(.hv-primary-button, .hv-secondary-button, .hv-send, .bs-primary) {
-  font-size: 13px;
-  font-weight: 560;
-}
 .hv-adaptive-shell button:focus-visible,
 .hv-adaptive-shell a:focus-visible {
   outline: 2px solid #315bc6;

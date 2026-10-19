@@ -12,8 +12,8 @@
   gap: 0;
 }
 
-.bs button,
-.bs select,
+/* Buttons and selects inherit from the global reset, below their own
+   rules; a scoped one here outranked every class that sets a weight. */
 .bs summary {
   font: inherit;
 }
@@ -421,6 +421,7 @@
   scroll-margin-block: 8px;
   min-height: var(--button-height);
   padding: 0 14px;
+  font-size: 13px;
   align-items: center;
   box-shadow: var(--button-shadow);
   border-color: var(--ax-blue);
