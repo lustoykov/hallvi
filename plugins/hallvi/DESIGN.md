@@ -191,8 +191,10 @@ reduced-motion answer.
 
 Tab reaches the switcher, the address, **Hallvi ↗**, `⋯`, the views, then the
 open view. Arrow keys, Home and End move between the views; Enter sends and
-Shift+Enter adds a line. Escape closes the menu or the address popover. Redraws
-keep a focused control focused.
+Shift+Enter adds a line. Escape closes the menu or the address popover. The menu
+also closes when focus leaves it and its button; while the address popover is
+open, what it covers is inert, and closing it returns focus to what opened it.
+Redraws keep a focused control focused.
 
 ## Don't
 

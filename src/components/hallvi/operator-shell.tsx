@@ -11,7 +11,14 @@ import {
 import { ArrowLeft, TerminalWindow } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { currentAccessRecord } from "@/server/access-record";
 import {
@@ -98,6 +105,20 @@ export function mergeOperatorMetadata(
   return changed.length
     ? { ...current, ...Object.fromEntries(changed) }
     : current;
+}
+
+/** The width at which the expanded terminal covers the whole screen. */
+const PHONE = "(max-width: 640px)";
+function usePhone() {
+  return useSyncExternalStore(
+    (change) => {
+      const query = window.matchMedia(PHONE);
+      query.addEventListener("change", change);
+      return () => query.removeEventListener("change", change);
+    },
+    () => window.matchMedia(PHONE).matches,
+    () => false,
+  );
 }
 
 export function OperatorShell({
@@ -277,6 +298,10 @@ export function OperatorShell({
     expanded: false,
     minimized: false,
   });
+  // Expanded, the terminal covers the workspace, and on a phone everything:
+  // what it covers takes no focus, so Shift+Tab cannot land behind it.
+  const phone = usePhone();
+  const covered = terminal.open && terminal.expanded && !terminal.minimized;
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1037,7 +1062,7 @@ export function OperatorShell({
           className="hv-shell hv-adaptive-shell"
           data-terminal={terminal.open ? "open" : undefined}
         >
-          <header className="hv-topbar">
+          <header className="hv-topbar" inert={covered && phone}>
             {identityVariant !== "navigation" && identity}
             <div className="hv-topbar-where">
               <strong>{where.title}</strong>
@@ -1092,6 +1117,7 @@ export function OperatorShell({
           </header>
 
           <ApplicationNavigation
+            inert={covered && phone}
             head={identityVariant === "navigation" ? identity : undefined}
             chats={view.chats}
             selectedChatId={view.selectedChatId}
@@ -1113,6 +1139,7 @@ export function OperatorShell({
           />
           <section
             className={`hv-workspace${recordVisible ? " hv-dashboard-open" : ""}`}
+            inert={covered}
           >
             {activeSection && (progress || unknownReconnect || error) && (
               <div className="hv-reconnect-notice" role="status">

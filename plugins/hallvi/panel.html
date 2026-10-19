@@ -611,10 +611,19 @@ function showAddress(address, help, what) {
   );
   // Under the header and views when they show, else at the top of a blank panel.
   panel.style.top = `${$("views").hidden ? 12 : $("views").offsetTop}px`;
+  // What the sheet covers cannot take focus; closing returns it to the opener.
+  if (panel.hidden) addressOpener = document.activeElement;
+  for (const id of ["views", "blank"]) $(id).inert = true;
   panel.hidden = false;
   copy.focus();
 }
-function closeAddress() { $("link-help").hidden = true; }
+let addressOpener = null;
+function closeAddress() {
+  $("link-help").hidden = true;
+  for (const id of ["views", "blank"]) $(id).inert = false;
+  if (addressOpener?.isConnected) addressOpener.focus();
+  addressOpener = null;
+}
 async function copyText(text, button) {
   const was = button.textContent;
   try { await navigator.clipboard.writeText(text); button.textContent = "Copied"; }
@@ -1437,6 +1446,10 @@ $("more").addEventListener("click", () => {
   const open = $("menu").hidden;
   $("menu").hidden = !open; $("more").setAttribute("aria-expanded", String(open));
   if (open) $("menu").querySelector("button").focus();
+});
+// A menu is open only while focus is in it or on its button.
+$("menu").addEventListener("focusout", (event) => {
+  if (!event.relatedTarget?.closest?.("#menu, #more")) closeMenu();
 });
 $("menu").addEventListener("keydown", (event) => {
   const items = [...$("menu").querySelectorAll("button")];

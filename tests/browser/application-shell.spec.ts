@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
 import { openConversation } from "./workspace-helpers";
@@ -347,3 +349,49 @@ test(
     );
   },
 );
+
+test("an expanded Terminal keeps focus out of what it covers", async ({
+  page,
+}) => {
+  const created = await (
+    await page.request.post("/api/applications", {
+      data: {
+        requestKey: randomUUID(),
+        repositoryUrl: "https://github.com/qa/terminal-focus",
+      },
+    })
+  ).json();
+  await page.goto(`/applications/${created.application?.id ?? created.id}`);
+  const inert = (selector: string) =>
+    page.locator(selector).evaluate((node: HTMLElement) => node.inert);
+  await page.getByRole("button", { name: "Terminal", exact: true }).click();
+  const terminal = page.getByRole("region", {
+    name: "Application server terminal",
+  });
+  await terminal.getByRole("button", { name: "Expand", exact: true }).click();
+  // Beside a column, it covers the workspace and nothing else.
+  expect(await inert(".hv-workspace")).toBe(true);
+  expect(await inert(".hv-application-navigation")).toBe(false);
+  expect(await inert(".hv-topbar")).toBe(false);
+  // On a phone it covers everything, so Shift+Tab stays in the terminal.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => inert(".hv-application-navigation")).toBe(true);
+  expect(await inert(".hv-topbar")).toBe(true);
+  const restore = terminal.getByRole("button", { name: "Restore" });
+  await restore.focus();
+  // Past its first control focus may leave the page; it never lands behind.
+  for (let step = 0; step < 8; step++) {
+    await page.keyboard.press("Shift+Tab");
+    expect(
+      await page.evaluate(() => {
+        const at = document.activeElement;
+        return (
+          !at || at === document.body || Boolean(at.closest(".hv-terminal"))
+        );
+      }),
+    ).toBe(true);
+  }
+  await restore.click();
+  expect(await inert(".hv-workspace")).toBe(false);
+  expect(await inert(".hv-application-navigation")).toBe(false);
+});

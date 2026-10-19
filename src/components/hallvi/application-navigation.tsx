@@ -156,9 +156,12 @@ export function ApplicationNavigation({
   revealed = false,
   onReveal,
   head,
+  inert,
 }: {
   /** The application identity, when it sits here rather than in the top bar. */
   head?: ReactNode;
+  /** Covered, by the expanded terminal on a phone. */
+  inert?: boolean;
   /**
    * The destinations to list; defaults to every one. A listed row with a
    * `note` is one that has nothing to show yet and says so.
@@ -205,6 +208,7 @@ export function ApplicationNavigation({
     <aside
       className="hv-application-navigation"
       aria-label="Application navigation"
+      inert={inert}
     >
       {head ? (
         <div className="hv-navigation-head">

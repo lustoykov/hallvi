@@ -4,7 +4,6 @@
   --line: #e7e9ee;
   min-width: 0;
   height: 100dvh;
-  grid-template-columns: 224px minmax(0, 1fr);
   grid-template-rows: 56px minmax(0, 1fr);
   /* What is selected in the column is lifted off it. */
   --raise:

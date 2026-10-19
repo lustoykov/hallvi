@@ -511,3 +511,35 @@ test("the overview comes first; the operator's work and a draft outlast switchin
   await expect(draft).toHaveValue("Half-written request");
   expect(p.sends).toHaveLength(0);
 });
+
+test("the address sheet and the menu keep focus on what can be seen", async ({
+  page,
+}) => {
+  const p = await panel(page);
+  const views = p.frame.locator("#views");
+  const open = p.frame.getByRole("button", {
+    name: "Open the overview in Hallvi",
+  });
+  await open.click();
+  const sheet = p.frame.getByRole("dialog", { name: "Address" });
+  await expect(sheet).toBeVisible();
+  // What the sheet covers is out of reach until it closes.
+  await expect(views).toHaveJSProperty("inert", true);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(views).toHaveJSProperty("inert", false);
+  await expect(open).toBeFocused();
+
+  // A menu is open only while focus is in it or on its button.
+  await p.frame.getByRole("button", { name: "More", exact: true }).click();
+  const menu = p.frame.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Shift+Tab");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Tab");
+  await p.frame
+    .getByRole("menuitem", { name: "Check for a panel update" })
+    .focus();
+  await page.keyboard.press("Tab");
+  await expect(menu).toBeHidden();
+});
