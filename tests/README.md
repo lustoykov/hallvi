@@ -194,10 +194,9 @@ never reads `HALLVI_DB_PATH`, and carries no credentials. It prints one
 address per scenario; each destination is a fragment on that address. Add a
 state to the fixture file rather than starting a second scenario system.
 
-The `/prototype/app` reference shell, and the `views/*-view.tsx` layouts that
-only it renders, carry no tests. A real application's destinations are the
-`*-page.tsx` components, and what they may claim is settled by the record
-projections behind them; that is where this coverage lives.
+A real application's destinations are the `*-page.tsx` components, and what
+they may claim is settled by the record projections behind them; that is where
+this coverage lives.
 
 The live model evals are gone. Their runner was retired with the workflow it tested and had been a stub that printed an error for some time; its saved answers could only be judged by a second command whose results live in `tests/results/`, which is local and never committed, so on any fresh checkout there was nothing to run and nothing to judge. `eval:pi`, `eval:judge` and `tests/evals/` are removed, and the test runners make no model calls. Learn Hallvi displays content maintained by a separate scheduled Codex task, described below.
 
