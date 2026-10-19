@@ -36,6 +36,14 @@ export interface Vol {
   pieces: Piece[];
 }
 
+/** The copy schedule, the newest copy and restore, and how many are kept. */
+export interface ProtectionSummary {
+  schedule: { words: string; at: string } | null;
+  backup: { at: string; detail: string } | null;
+  restore: { at: string; detail: string } | null;
+  keep: number | null;
+}
+
 export interface Dated {
   id: string;
   at: string;
@@ -64,10 +72,5 @@ export interface ProtectView {
   schedules: Dated[];
   restores: Dated[];
   checks: Check[];
-  protection: {
-    schedule: { words: string; at: string } | null;
-    backup: { at: string; detail: string } | null;
-    restore: { at: string; detail: string } | null;
-    keep: number | null;
-  };
+  protection: ProtectionSummary;
 }

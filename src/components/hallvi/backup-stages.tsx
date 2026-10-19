@@ -21,18 +21,13 @@ import {
   type Protection,
   type ProtectionVerdict,
 } from "./backups-records";
-import { ago } from "./format";
+import { ago, listed } from "./format";
 import { LocalTime } from "./local-time";
 import { revealKeyboardControl } from "./reveal-keyboard-control";
 
 import "./backup-stages.css";
 
 type ItemTone = "included" | "planned" | "gap" | "unknown";
-
-function list(items: string[]) {
-  if (items.length <= 1) return items[0] ?? "";
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-}
 
 function Copyable({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -414,7 +409,9 @@ function LatestCopy({
             <dt>Contents</dt>
             <dd>
               {copy.covers.length
-                ? list(copy.covers.map((id) => protection.names.get(id) ?? id))
+                ? listed(
+                    copy.covers.map((id) => protection.names.get(id) ?? id),
+                  )
                 : "The copy does not list its contents"}
             </dd>
           </div>
@@ -509,7 +506,7 @@ function HowToRestore({
           <dt>Data</dt>
           <dd>
             {contents.length
-              ? list(contents.map((id) => protection.names.get(id) ?? id))
+              ? listed(contents.map((id) => protection.names.get(id) ?? id))
               : "The copy does not list its contents"}
             <small>
               {proved

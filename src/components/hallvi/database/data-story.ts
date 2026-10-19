@@ -1,5 +1,7 @@
 // What the Timeline design draws, and nothing else.
 
+import type { ProtectionSummary } from "../backups/protect-story";
+
 export type Lane = "health" | "copies" | "restores";
 
 export interface Mark {
@@ -33,10 +35,5 @@ export interface DataView {
   database: DataStore | null;
   marks: Mark[];
   newestCopyAt: string | null;
-  protection: {
-    schedule: { words: string; at: string } | null;
-    backup: { at: string; detail: string } | null;
-    restore: { at: string; detail: string } | null;
-    keep: number | null;
-  };
+  protection: ProtectionSummary;
 }

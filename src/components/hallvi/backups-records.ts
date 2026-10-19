@@ -23,7 +23,7 @@ import {
   topologyOf,
 } from "@/server/record-projection";
 
-import type { Check, Dated } from "./backups/protect-story";
+import type { Check, Dated, ProtectionSummary } from "./backups/protect-story";
 import { ago, listed } from "./format";
 
 /**
@@ -52,12 +52,7 @@ export interface Protection {
   checks: Check[];
   /** Volume id → how the plan copies it. Only a plan puts anything here. */
   covers: Map<string, string>;
-  summary: {
-    schedule: { words: string; at: string } | null;
-    backup: { at: string; detail: string } | null;
-    restore: { at: string; detail: string } | null;
-    keep: number | null;
-  };
+  summary: ProtectionSummary;
   /** Whether anything at all has been established, for the empty state. */
   assessed: boolean;
   /** A record states there is no plan — different from nobody having looked. */
