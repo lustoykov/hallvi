@@ -49,11 +49,11 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-075 — Keep a worktree from borrowing the main checkout's packages](#af-075--keep-a-worktree-from-borrowing-the-main-checkouts-packages) | 1 | New |
 | [AF-076 — Raise the proof of fit's findings with Pi upstream](#af-076--raise-the-proof-of-fits-findings-with-pi-upstream) | 1 | New |
 | [AF-077 — Give the scenarios a conversation](#af-077--give-the-scenarios-a-conversation) | 3 | New |
-| [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | New |
+| [AF-078 — Say what Deployment's Took column means when nothing was timed](#af-078--say-what-deployments-took-column-means-when-nothing-was-timed) | 1 | Fixed locally |
 | [AF-079 — Decide the shell's button font reset](#af-079--decide-the-shells-button-font-reset) | 1 | New |
 | [AF-080 — Give the registers a phone layout](#af-080--give-the-registers-a-phone-layout) | 2 | Scroll hint in review; stacked layout open |
 | [AF-081 — Let the keyboard-ring check fail](#af-081--let-the-keyboard-ring-check-fail) | 2 | Fix in review |
-| [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | New |
+| [AF-082 — Show a stopped reply's text once](#af-082--show-a-stopped-replys-text-once) | 1 | Fixed locally |
 | [AF-083 — Let the checks notice runtime advisories and lockfile drift](#af-083--let-the-checks-notice-runtime-advisories-and-lockfile-drift) | 1 | New |
 | [AF-085 — Render reply tables in the plugin panel](#af-085--render-reply-tables-in-the-plugin-panel) | 1 | New |
 | [AF-086 — Keep expanded Terminal focus visible](#af-086--keep-expanded-terminal-focus-visible) | 1 | New |
@@ -189,6 +189,11 @@ such a reply, so it wants a decision rather than a polish fix.
 
 **+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
 
+**Resolved 2026-10-19:** the disclosure is left out when the reply's last
+transcript message is its text; a reply stopped mid-sentence keeps it, as the
+only copy. The browser case stays as it was: that fixture's cancelled reply has
+no transcript after reload, so its draft is not a repeat.
+
 ### AF-081 — Let the keyboard-ring check fail
 
 `tests/browser/interactions.spec.ts:209` reads
@@ -239,6 +244,10 @@ words do not fit the 84px column, and widening it squeezes "What shipped" at
 the table's floor. It needs a wording or a column decision.
 
 **+1:** 2026-10-02 — interface polish pass, `claude/ui-polish-pass`.
+
+**Resolved 2026-10-19:** Took appears only when some release has a reading,
+since a column of "not timed" beside "none linked" says one gap twice; beside
+a timed release, an untimed one reads "not timed" in grey.
 
 ### AF-077 — Give the scenarios a conversation
 

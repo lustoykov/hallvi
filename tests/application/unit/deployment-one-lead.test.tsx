@@ -193,3 +193,43 @@ describe("deployment evidence and active work", () => {
     expect(html).not.toContain("Ask Hallvi to deploy");
   });
 });
+
+describe("a release with no timed steps", () => {
+  const timed = {
+    ...call("e1", "/servers"),
+    finishedAt: "2026-09-15T10:01:30.000Z",
+  };
+  const records = [
+    { id: "r1", evidence: [{ type: "execution" as const, id: "e1" }] },
+  ] as unknown as Parameters<typeof ReleasesPanel>[0]["records"];
+
+  it("drops Took when no release has a reading", () => {
+    const only = release("r1", "9cea081");
+    const html = renderToStaticMarkup(
+      <ReleasesPanel
+        view={view(only, only)}
+        now={NOW}
+        onAsk={() => undefined}
+      />,
+    );
+    // A column of "not timed" beside "none linked" says one gap twice.
+    expect(text(html)).not.toContain("Took");
+    expect(text(html)).not.toContain("not timed");
+  });
+
+  it("says not timed beside a release that was", () => {
+    const html = renderToStaticMarkup(
+      <ReleasesPanel
+        view={view(release("r1", "9cea081"), release("r2", "ffffff0"))}
+        records={records}
+        executions={[timed]}
+        now={NOW}
+        onAsk={() => undefined}
+      />,
+    );
+    expect(text(html)).toContain("Took");
+    expect(text(html)).toContain("1m 30s");
+    expect(text(html)).toContain("not timed");
+    expect(text(html)).not.toContain("—");
+  });
+});

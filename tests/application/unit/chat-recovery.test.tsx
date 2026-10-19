@@ -313,6 +313,29 @@ it("renders streaming text once after earlier tool calls, including before the f
     });
     expect(html.split(body)).toHaveLength(2);
   }
+  // A stopped reply whose words the transcript holds has no draft to show;
+  // one Pi stopped mid-sentence keeps the draft, the only place it is.
+  for (const status of ["cancelled", "failed", "interrupted"] as const) {
+    const said = {
+      ...record,
+      id: "said",
+      kind: "message" as const,
+      sequence: 2,
+    };
+    const drawn = render({
+      status,
+      body,
+      piActivity: [record, { ...said, text: body }],
+    });
+    expect(drawn.split(body)).toHaveLength(2);
+    expect(drawn).not.toContain("Show unfinished draft");
+    const cut = render({
+      status,
+      body,
+      piActivity: [record, { ...said, text: "Checking the build." }],
+    });
+    expect(cut).toContain("Show unfinished draft");
+  }
 });
 
 it("opens a long conversation on its latest messages, with the earlier ones to follow", () => {

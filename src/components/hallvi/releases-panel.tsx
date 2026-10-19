@@ -308,6 +308,10 @@ export function ReleasesPanel({
   const words = [...new Set(rows.map((row) => row.word))];
   const shown = rows.filter((row) => filter === "all" || row.word === filter);
 
+  // Took earns its column only when some release has a reading: a column of
+  // "not timed" beside "none linked" says the same gap twice on every row.
+  const timed = (row: Row) => row.steps.filter((step) => step.seconds !== null);
+  const anyTimed = rows.some((row) => row.flight || timed(row).length);
   const columns: Column<Row>[] = [
     {
       key: "release",
@@ -374,13 +378,13 @@ export function ReleasesPanel({
               )}
             </Num>
           );
-        const timed = row.steps.filter((step) => step.seconds !== null);
-        return timed.length ? (
+        const steps = timed(row);
+        return steps.length ? (
           <Num>
-            {duration(timed.reduce((sum, step) => sum + step.seconds!, 0))}
+            {duration(steps.reduce((sum, step) => sum + step.seconds!, 0))}
           </Num>
         ) : (
-          <None>—</None>
+          <None>not timed</None>
         );
       },
     },
@@ -531,7 +535,9 @@ export function ReleasesPanel({
       >
         <Register
           rows={shown}
-          columns={columns}
+          columns={columns.filter(
+            (column) => anyTimed || column.key !== "took",
+          )}
           label={(row) =>
             [row.short, row.changes[0]].filter(Boolean).join(" · ")
           }

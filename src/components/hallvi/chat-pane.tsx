@@ -431,6 +431,13 @@ const TranscriptMessage = memo(
       failure: message.failure,
       executions,
     });
+    // The transcript already draws the reply's last words where Pi said
+    // them; the draft beneath Try again would say them a second time.
+    const draftShown =
+      activity
+        ?.filter((record) => record.kind === "message")
+        .at(-1)
+        ?.text?.trim() === message.body.trim();
     const historyUnavailable =
       message.status === "failed" &&
       message.error?.startsWith("Conversation history unavailable.");
@@ -517,7 +524,7 @@ const TranscriptMessage = memo(
                         : failure.says}
                 </p>
               )}
-              {message.body && !inProgress && (
+              {message.body && !inProgress && !draftShown && (
                 <details className="hv-run-draft">
                   <summary>Show unfinished draft</summary>
                   <MessageResponse>
