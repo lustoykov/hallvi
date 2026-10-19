@@ -1,6 +1,9 @@
+import { build } from "esbuild";
+import { readFileSync } from "node:fs";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createServer, type Server } from "node:http";
@@ -12,6 +15,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import {
   startHttp,
   createHallviServer,
+  panelResource,
+  panelSource,
 } from "../../../plugins/hallvi/server.mjs";
 import { projectConversation } from "../../../plugins/hallvi/conversation.mjs";
 import { projectRecords } from "../../../plugins/hallvi/overview.mjs";
@@ -688,3 +693,34 @@ it("keeps older turns' steps as titles and only recent ones in detail", () => {
     output: "web Up",
   });
 });
+
+// The built panel has the parser written in from source, so a bundled server,
+// whose own copy of the function reads differently, serves the same panel
+// under the same version the build prints and the updater expects.
+it("a built panel has one version, from the checkout or the bundled server", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "hallvi-plugin-bundle-"));
+  try {
+    await build({
+      entryPoints: ["plugins/hallvi/server.mjs"],
+      outfile: join(dir, "server.mjs"),
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node22",
+      logLevel: "silent",
+      banner: {
+        js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+      },
+    });
+    const bundled = await import(pathToFileURL(join(dir, "server.mjs")).href);
+    const built = panelSource(
+      readFileSync("plugins/hallvi/panel.html", "utf8"),
+    );
+    expect(built).not.toContain("__HALLVI_MARKDOWN_BLOCKS__");
+    expect(bundled.panelResource(built).version).toBe(
+      panelResource(built).version,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 60_000);

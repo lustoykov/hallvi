@@ -1,13 +1,22 @@
 import { test, expect, type FrameLocator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
+import { panelSource } from "../../plugins/hallvi/server.mjs";
+
 const first = "3ee7c9a7-5da8-434a-8222-cccac5089141";
 const second = "3ee7c9a7-5da8-434a-8222-cccac5089142";
 const origin = "http://127.0.0.1:3978";
 
 // Actual panel, synthetic MCP host. No controller, model or account access.
-async function panel(page: Page, empty = false, firstName = "First app") {
-  const html = (await readFile("plugins/hallvi/panel.html", "utf8")).replaceAll(
+async function panel(
+  page: Page,
+  empty = false,
+  firstName = "First app",
+  // As an adapter older than the panel serves it: nothing written in.
+  raw = false,
+) {
+  const file = await readFile("plugins/hallvi/panel.html", "utf8");
+  const html = (raw ? file : panelSource(file)).replaceAll(
     "__HALLVI_UI_VERSION__",
     "1111111111111111",
   );
@@ -24,6 +33,7 @@ async function panel(page: Page, empty = false, firstName = "First app") {
       page: string;
     }[],
     working: false,
+    turns: [] as unknown[],
     condition: "Initial condition",
     hold: false,
     accepted: null as boolean | null,
@@ -87,15 +97,19 @@ async function panel(page: Page, empty = false, firstName = "First app") {
           saved: { release: null, access: state.access, checkedAt: null },
           attention: state.attention,
         };
-      else
+      else {
+        const revision = state.working
+          ? "working"
+          : `same:${state.turns.length}`;
         data = {
-          revision: state.working ? "working" : "same",
-          unchanged: args.known === (state.working ? "working" : "same"),
+          revision,
+          unchanged: args.known === revision,
           status: state.working ? "working" : "idle",
           worker: { alive: true },
           readAt: new Date().toISOString(),
-          turns: [],
+          turns: state.turns,
         };
+      }
       return route.fulfill({ json: { structuredContent: data } });
     }
     return route.fulfill({
@@ -543,3 +557,41 @@ test("the address sheet and the menu keep focus on what can be seen", async ({
   await page.keyboard.press("Tab");
   await expect(menu).toBeHidden();
 });
+
+for (const raw of [false, true])
+  test(`a reply's Markdown table is a table, as it is in Hallvi${raw ? ", or plain text from an older adapter" : ""}`, async ({
+    page,
+  }) => {
+    const p = await panel(page, false, "First app", raw);
+    p.state.turns = [
+      {
+        request: null,
+        reply: {
+          id: "reply-table",
+          status: "completed",
+          steps: [],
+          records: [],
+          body: "Two processes:\n\n| Process | State |\n| --- | --- |\n| web | **up** |\n| worker | stopped |",
+        },
+      },
+    ];
+    await operator(p.frame);
+    await p.frame.getByRole("button", { name: "More", exact: true }).click();
+    await p.frame
+      .getByRole("menuitem", { name: "Refresh", exact: true })
+      .click();
+    if (raw) {
+      // No parser, and the reply still reads: what Pi wrote, as text.
+      await expect(p.frame.getByText("Two processes:")).toBeVisible();
+      await expect(p.frame.getByRole("table")).toHaveCount(0);
+      return;
+    }
+    const table = p.frame.getByRole("table");
+    await expect(table.getByRole("columnheader")).toHaveText([
+      "Process",
+      "State",
+    ]);
+    await expect(table.getByRole("row")).toHaveCount(3);
+    await expect(table.locator("strong")).toHaveText("up");
+    await expect(p.frame.getByText("| Process |")).toHaveCount(0);
+  });

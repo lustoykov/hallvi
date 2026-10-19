@@ -1,157 +1,19 @@
 import { Fragment, type ReactNode } from "react";
 
+import { markdownBlocks, type MarkdownBlock } from "@/lib/markdown-blocks.mjs";
+
 /**
  * Renders the Markdown subset Pi writes in chat: paragraphs, headings, bullet
  * and numbered lists, fenced code, quotes, tables, emphasis, inline code, and
  * links.
  * Everything becomes React elements, so the text can never carry HTML through.
+ * The blocks are read by the parser the plugin panel shares.
  */
 export function Markdown({ source }: { source: string }) {
-  return <>{parseBlocks(source).map(renderBlock)}</>;
+  return <>{markdownBlocks(source).map(renderBlock)}</>;
 }
 
-type Block =
-  | { type: "paragraph"; lines: string[] }
-  | { type: "heading"; text: string }
-  | { type: "list"; ordered: boolean; items: string[] }
-  | { type: "code"; text: string }
-  | { type: "quote"; lines: string[] }
-  | { type: "table"; head: string[]; rows: string[][] };
-
-const FENCE = /^\s*```/;
-const HEADING = /^#{1,6}\s+(.*)$/;
-const LIST_ITEM = /^\s{0,3}(?:[-*+]|\d{1,3}[.)])\s+(.*)$/;
-const ORDERED_ITEM = /^\s{0,3}\d{1,3}[.)]\s/;
-const QUOTE = /^\s{0,3}>\s?(.*)$/;
-const TABLE_ROW = /^\s*\|.*\|\s*$/;
-const TABLE_RULE = /^\s*\|(?:\s*:?-+:?\s*\|)+\s*$/;
-
-/** A header row with its rule under it; pipes alone are just text. */
-const startsTable = (lines: string[], index: number) =>
-  TABLE_ROW.test(lines[index]) && TABLE_RULE.test(lines[index + 1] ?? "");
-/**
- * A row's cells. The closing pipe may still be on its way while a reply
- * streams, and `\|` is a pipe inside a cell rather than the end of one.
- */
-const cells = (line: string) =>
-  line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/(?<!\\)\|$/, "")
-    .split(/(?<!\\)\|/)
-    .map((cell) => cell.trim().replaceAll("\\|", "|"));
-
-function parseBlocks(source: string): Block[] {
-  const lines = source.replace(/\r\n?/g, "\n").split("\n");
-  const blocks: Block[] = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-
-    if (!line.trim()) {
-      index++;
-      continue;
-    }
-
-    if (FENCE.test(line)) {
-      const code: string[] = [];
-      index++;
-      while (index < lines.length && !FENCE.test(lines[index])) {
-        code.push(lines[index]);
-        index++;
-      }
-      index++;
-      blocks.push({ type: "code", text: code.join("\n") });
-      continue;
-    }
-
-    const heading = HEADING.exec(line);
-    if (heading) {
-      blocks.push({ type: "heading", text: heading[1].trim() });
-      index++;
-      continue;
-    }
-
-    if (LIST_ITEM.test(line)) {
-      const ordered = ORDERED_ITEM.test(line);
-      const items: string[] = [];
-      while (index < lines.length) {
-        const item = LIST_ITEM.exec(lines[index]);
-        if (item && ORDERED_ITEM.test(lines[index]) === ordered) {
-          items.push(item[1]);
-          index++;
-          // Wrapped item text continues until a blank line or the next item.
-          while (
-            index < lines.length &&
-            lines[index].trim() &&
-            !LIST_ITEM.test(lines[index]) &&
-            !FENCE.test(lines[index]) &&
-            !HEADING.test(lines[index])
-          ) {
-            items[items.length - 1] += ` ${lines[index].trim()}`;
-            index++;
-          }
-          // A single blank line between items keeps the list together.
-          if (
-            index < lines.length - 1 &&
-            !lines[index].trim() &&
-            LIST_ITEM.test(lines[index + 1]) &&
-            ORDERED_ITEM.test(lines[index + 1]) === ordered
-          )
-            index++;
-        } else break;
-      }
-      blocks.push({ type: "list", ordered, items });
-      continue;
-    }
-
-    if (QUOTE.test(line)) {
-      const quoted: string[] = [];
-      while (index < lines.length && QUOTE.test(lines[index])) {
-        quoted.push(QUOTE.exec(lines[index])![1]);
-        index++;
-      }
-      blocks.push({ type: "quote", lines: quoted });
-      continue;
-    }
-
-    if (startsTable(lines, index)) {
-      const head = cells(line);
-      const rows: string[][] = [];
-      index += 2;
-      // Once the table has begun, a line that opens with a pipe is a row,
-      // drawn as wide as the header, so a row does not flip between text and
-      // table while it is being written.
-      while (index < lines.length && /^\s*\|/.test(lines[index])) {
-        const row = cells(lines[index]);
-        rows.push(head.map((_, column) => row[column] ?? ""));
-        index++;
-      }
-      blocks.push({ type: "table", head, rows });
-      continue;
-    }
-
-    const paragraph: string[] = [];
-    while (
-      index < lines.length &&
-      lines[index].trim() &&
-      !FENCE.test(lines[index]) &&
-      !HEADING.test(lines[index]) &&
-      !LIST_ITEM.test(lines[index]) &&
-      !QUOTE.test(lines[index]) &&
-      !startsTable(lines, index)
-    ) {
-      paragraph.push(lines[index]);
-      index++;
-    }
-    blocks.push({ type: "paragraph", lines: paragraph });
-  }
-
-  return blocks;
-}
-
-function renderBlock(block: Block, key: number): ReactNode {
+function renderBlock(block: MarkdownBlock, key: number): ReactNode {
   switch (block.type) {
     case "code":
       return (

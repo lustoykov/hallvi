@@ -18,10 +18,24 @@ import {
 } from "../../scripts/controller-client.mjs";
 import { projectConversation, projectTraffic } from "./conversation.mjs";
 import { projectRecords } from "./overview.mjs";
+import { markdownBlocks } from "../../src/lib/markdown-blocks.mjs";
 
 export const PLUGIN_VERSION = "0.3.0";
 
-export function panelResource(html) {
+/**
+ * The panel as served. It is one file with no bundler, so the application's
+ * own Markdown parser is written into it: here, for the checkout's panel, and
+ * once by the plugin build for a built one, which then has no placeholder.
+ */
+export function panelSource(file) {
+  return file.replace("/*__HALLVI_MARKDOWN_BLOCKS__*/ null", () =>
+    markdownBlocks.toString(),
+  );
+}
+
+export function panelResource(file) {
+  // The version covers the parser written into it, too.
+  const html = panelSource(file);
   const version = createHash("sha256").update(html).digest("hex").slice(0, 16);
   return {
     version,

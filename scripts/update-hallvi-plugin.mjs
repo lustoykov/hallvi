@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { basename, dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { panelResource } from "../plugins/hallvi/server.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -207,7 +208,8 @@ async function main() {
   const expected = Object.fromEntries(
     Object.entries(files).map(([name, bytes]) => [name, hash(bytes)]),
   );
-  const version = expected["panel.html"].slice(0, 16);
+  // The version the panel shows, which covers what the server writes into it.
+  const version = panelResource(files["panel.html"].toString("utf8")).version;
   console.log(
     `Hallvi ${manifest.version}; UI ${version}; ${target.ssh ? "SSH" : "local"} adapter. Connection settings preserved.`,
   );

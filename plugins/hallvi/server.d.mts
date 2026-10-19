@@ -1,6 +1,7 @@
 import type { Server } from "node:http";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 export const PLUGIN_VERSION: string;
+export function panelSource(file: string): string;
 export function panelResource(html: string): {
   version: string;
   uri: string;

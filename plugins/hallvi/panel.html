@@ -174,6 +174,12 @@
   .body pre { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--sunken); overflow-x: auto; font: 12px/1.5 var(--mono); white-space: pre; }
   .body pre code { padding: 0; background: none; }
   .body h4 { margin: 10px 0 4px; font-size: 13.5px; }
+  .body blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--muted); }
+  /* As the application draws a reply's table: a quiet grid that scrolls sideways when it must. */
+  .body .table { margin: 0 0 8px; overflow-x: auto; overflow-wrap: normal; }
+  .body table { border-collapse: collapse; font-size: 12.5px; }
+  .body th, .body td { padding: 4px 12px 4px 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .body th { color: var(--muted); font-size: 11.5px; font-weight: 600; }
   .body.folded { max-height: 15.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
   .text-button { border: 0; padding: 0; background: none; color: var(--blue); font-size: 12px; }
   .text-button:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -527,34 +533,26 @@ function inline(text, into) {
   if (last < text.length) into.append(text.slice(last));
   return into;
 }
+/**
+ * The application's own Markdown parser, written in by the plugin server. An
+ * adapter older than this panel writes nothing, and the reply reads as plain
+ * paragraphs rather than not at all.
+ */
+const markdownBlocks = /*__HALLVI_MARKDOWN_BLOCKS__*/ null;
+const plainBlocks = (source) =>
+  source.split(/\n\s*\n/).map((part) => ({ type: "paragraph", lines: part.split("\n") }));
 function markdown(source) {
   const root = el("div", { class: "body" });
-  const lines = source.replace(/\r/g, "").split("\n");
-  let list = null;
-  let paragraph = [];
-  const flush = () => { if (paragraph.length) { root.append(inline(paragraph.join(" "), el("p"))); paragraph = []; } };
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^```/.test(line.trim())) {
-      flush(); list = null;
-      const code = [];
-      for (i++; i < lines.length && !/^```/.test(lines[i].trim()); i++) code.push(lines[i]);
-      root.append(el("pre", {}, el("code", {}, code.join("\n"))));
-      continue;
-    }
-    const heading = /^#{1,6}\s+(.*)$/.exec(line);
-    const item = /^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/.exec(line);
-    if (heading) { flush(); list = null; root.append(inline(heading[1], el("h4"))); }
-    else if (item) {
-      flush();
-      const kind = item[1] ? "ol" : "ul";
-      if (!list || list.tagName.toLowerCase() !== kind) { list = el(kind); root.append(list); }
-      list.append(inline(item[2], el("li")));
-    } else if (!line.trim()) { flush(); list = null; }
-    else if (list && /^\s{2,}\S/.test(line)) list.lastChild.append(" ", inline(line.trim(), document.createDocumentFragment()));
-    else { list = null; paragraph.push(line.trim()); }
+  for (const block of (markdownBlocks ?? plainBlocks)(source)) {
+    if (block.type === "code") root.append(el("pre", {}, el("code", {}, block.text)));
+    else if (block.type === "heading") root.append(inline(block.text, el("h4")));
+    else if (block.type === "list") root.append(el(block.ordered ? "ol" : "ul", {}, block.items.map((item) => inline(item, el("li")))));
+    else if (block.type === "quote") root.append(inline(block.lines.join(" "), el("blockquote")));
+    else if (block.type === "table") root.append(el("div", { class: "table" }, el("table", {},
+      el("thead", {}, el("tr", {}, block.head.map((cell) => inline(cell, el("th"))))),
+      el("tbody", {}, block.rows.map((row) => el("tr", {}, row.map((cell) => inline(cell, el("td")))))))));
+    else root.append(inline(block.lines.map((line) => line.trim()).join(" "), el("p")));
   }
-  flush();
   return root;
 }
 

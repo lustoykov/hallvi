@@ -8,6 +8,7 @@ import {
   uiOrigin,
   PLUGIN_VERSION,
   panelResource,
+  panelSource,
 } from "../plugins/hallvi/server.mjs";
 
 const { values } = parseArgs({
@@ -31,7 +32,13 @@ await build({
     js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
   },
 });
-await cp("plugins/hallvi/panel.html", `${root}/panel.html`);
+// The parser is written into the built panel here, from source: a bundled
+// server's own copy of it reads differently, and would version the panel
+// differently from what this prints and the updater expects.
+await writeFile(
+  `${root}/panel.html`,
+  panelSource(await readFile("plugins/hallvi/panel.html", "utf8")),
+);
 await cp("plugins/hallvi/skills", `${root}/skills`, { recursive: true });
 // The small mascot of the browser tab, which still reads at an icon's size.
 const icon = await readFile("src/app/icon.svg", "utf8");
