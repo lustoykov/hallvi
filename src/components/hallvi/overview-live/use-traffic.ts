@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Arrival } from "@/server/traffic/contract";
 
 import { liveTraffic } from "../traffic/source";
+import { usePageVisible } from "../use-page-visible";
 
 export type TrafficState =
   "connecting" | "live" | "lost" | "no-log" | "no-server";
@@ -60,6 +61,7 @@ export function summarise(lines: SeenLine[], now: number) {
 }
 
 export function useTraffic(applicationId: string): Traffic {
+  const pageVisible = usePageVisible();
   const lines = useRef<SeenLine[]>([]);
   const counter = useRef(0);
   const listeners = useRef(new Set<(line: SeenLine) => void>());
@@ -79,6 +81,7 @@ export function useTraffic(applicationId: string): Traffic {
   }, []);
 
   useEffect(() => {
+    if (!pageVisible) return;
     const refresh = () => {
       const next = summarise(lines.current, Date.now());
       lines.current = next.seen;
@@ -134,7 +137,7 @@ export function useTraffic(applicationId: string): Traffic {
       close();
       window.clearInterval(ageing);
     };
-  }, [applicationId]);
+  }, [applicationId, pageVisible]);
 
   return {
     state,

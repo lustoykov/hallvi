@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-100 — Stop observations while their page is hidden](#af-100--stop-observations-while-their-page-is-hidden) | 1 | Fixed locally |
 | [AF-099 — Link captured output to a History event that exists](#af-099--link-captured-output-to-a-history-event-that-exists) | 1 | Fixed locally |
 | [AF-098 — Recognize continued work in older conversations](#af-098--recognize-continued-work-in-older-conversations) | 1 | Fixed locally |
 | [AF-097 — Keep snapshot previews free of contributor credentials](#af-097--keep-snapshot-previews-free-of-contributor-credentials) | 1 | Fixed locally |
@@ -44,7 +45,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-066 — Agree the navigation column's width with the design document](#af-066--agree-the-navigation-columns-width-with-the-design-document) | 1 | Fixed locally |
 | [AF-067 — Give the scenarios a new application and a one-application home](#af-067--give-the-scenarios-a-new-application-and-a-one-application-home) | 2 | New |
 | [AF-068 — Remove the mascot placements nothing draws](#af-068--remove-the-mascot-placements-nothing-draws) | 1 | Fixed locally |
-| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 7 | Lean worker responses implemented; durable scans remain |
+| [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 8 | Lean worker responses implemented; durable scans remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 2 | Development replay fixed locally |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
 | [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
@@ -70,6 +71,21 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-095 — Keep an early Home jump while a conversation opens](#af-095--keep-an-early-home-jump-while-a-conversation-opens) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-100 — Stop observations while their page is hidden
+
+A credential-free retained uptime-kuma snapshot made 16 application requests
+in 65 seconds with its page hidden: six permission polls from the parked
+conversation, four traffic stream reconnects, two access checks, two traffic
+collection reads and two history reads. Access/traffic observations now pause
+while the page is hidden and read afresh on return; permission polling also
+pauses when the conversation is parked behind a destination. The same hidden
+run then made zero requests. Existing answers remain drawn, and the conversation
+stream keeps its recovery behavior. No cache was added. A browser regression
+dispatches visibility changes and advances polling timers; the snapshot count
+uses 65 real seconds with visibility overridden, not native tab throttling.
+
+**+1:** 2026-10-19 — ordinary retained-snapshot performance profile, `perf`.
 
 ### AF-099 — Link captured output to a History event that exists
 
@@ -570,6 +586,12 @@ scans its durable history; no cache was added. A separate real Pi SQLite/owner/
 socket comparison (15 samples after five warmups, same-process endpoints) cut
 11,236,136 to 1,369,521 bytes but increased raw worker round-trip from 70.83 to
 77.45 ms; that comparison excludes the full reader's additional app projection.
+The later three-context disclosure increase was not reproduced with a larger
+sample. Alternating full and lean worker responses on the same 2,000-call
+production fixture and client bundle (20 fresh contexts each) measured 50.6
+versus 45.1 ms median. A paired bootstrap interval for the median difference
+spanned zero (-15.7 to +5.4 ms, 95%; outliers retained). This does not establish
+a rendering regression or a speedup; no rendering change followed it.
 
 **+1:** 2026-10-01 — opening a long conversation, `claude/app-open-performance`.
 **+1:** 2026-10-02 — native production speed/snappiness audit,
@@ -583,6 +605,8 @@ socket comparison (15 samples after five warmups, same-process endpoints) cut
 **+1:** 2026-10-19 — exact call reads and remaining snapshot/render measurements,
 `perf`.
 **+1:** 2026-10-19 — lean worker snapshots and fresh-read gap verification,
+`perf`.
+**+1:** 2026-10-19 — larger disclosure sample alongside ordinary-size profiling,
 `perf`.
 
 ### AF-068 — Remove the mascot placements nothing draws

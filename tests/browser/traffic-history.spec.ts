@@ -7,6 +7,115 @@ import type { TrafficLine } from "../../src/server/traffic/contract";
 import { dayBounds, dayOf } from "../../src/server/traffic/days";
 import { test, expect } from "./fixtures";
 
+test("hidden pages pause observations and parked conversations stop permission polling", async ({
+  page,
+}) => {
+  const response = await page.request.post("/api/applications", {
+    data: {
+      requestKey: randomUUID(),
+      repositoryUrl: "https://github.com/qa/background-observations",
+    },
+  });
+  expect(response.ok()).toBe(true);
+  const created = await response.json();
+  const appId = created.application?.id ?? created.id;
+  const prefix = `/api/applications/${appId}`;
+  expect(
+    (
+      await page.request.post(`${prefix}/traffic/collection`, {
+        data: { action: "keep" },
+      })
+    ).ok(),
+  ).toBe(true);
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith(prefix))
+      requests.push(url.pathname + url.search);
+  });
+  await page.addInitScript(() => {
+    const native = window.EventSource;
+    const connections = { opened: 0, closed: 0 };
+    Object.assign(window, { trafficConnections: connections });
+    window.EventSource = class extends native {
+      traffic: boolean;
+      constructor(url: string | URL, options?: EventSourceInit) {
+        super(url, options);
+        this.traffic = String(url).endsWith("/traffic");
+        if (this.traffic) connections.opened++;
+      }
+      close() {
+        if (this.traffic) connections.closed++;
+        super.close();
+      }
+    };
+  });
+  await page.clock.install();
+  await page.goto(`/applications/${appId}#traffic`);
+  await expect(
+    page.getByRole("heading", { name: "Traffic", exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(
+      () => requests.filter((path) => path.includes("/traffic/history")).length,
+    )
+    .toBeGreaterThan(0);
+  const connections = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            trafficConnections: { opened: number; closed: number };
+          }
+        ).trafficConnections,
+    );
+  const before = await connections();
+  const visibility = async (visible: boolean) =>
+    page.evaluate((visible) => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => (visible ? "visible" : "hidden"),
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, visible);
+  await visibility(false);
+  await expect
+    .poll(async () => (await connections()).closed)
+    .toBeGreaterThan(before.closed);
+  requests.length = 0;
+  await page.clock.fastForward(65_000);
+  expect(requests).toEqual([]);
+  await visibility(true);
+  await expect
+    .poll(async () => (await connections()).opened)
+    .toBeGreaterThan(before.opened);
+  await expect
+    .poll(
+      () => requests.filter((path) => path.includes("/traffic/history")).length,
+    )
+    .toBeGreaterThan(0);
+
+  // The settings control lives in a parked ChatPane on every destination.
+  const navigation = page.getByRole("complementary", {
+    name: "Application navigation",
+  });
+  await navigation.locator(".hv-chat-nav-row button").first().click();
+  await expect
+    .poll(() =>
+      requests.some((path) => path.endsWith("/operator?settingsOnly=1")),
+    )
+    .toBe(true);
+  await navigation
+    .getByRole("button", { name: "Overview", exact: true })
+    .click();
+  await expect(page.locator(".hv-chat-column")).toHaveClass(/hv-chat-parked/);
+  requests.length = 0;
+  await page.clock.fastForward(30_000);
+  expect(
+    requests.filter((path) => path.includes("/operator?settingsOnly=1")),
+  ).toEqual([]);
+});
+
 test("stopping keeps traffic totals; forgetting and keeping again cannot restore deleted figures", async ({
   page,
   fixture,

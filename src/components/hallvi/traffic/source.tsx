@@ -15,6 +15,7 @@ import type {
 
 import { api } from "../api";
 import { trafficListed } from "./model";
+import { usePageVisible } from "../use-page-visible";
 
 export type CollectionAction = "keep" | "stop" | "forget";
 
@@ -40,6 +41,7 @@ const CHANGED = "hv-traffic-collection";
  * has been read, which is never the same as off.
  */
 export function useCollection(applicationId: string | null | undefined) {
+  const pageVisible = usePageVisible();
   const [collection, setCollection] = useState<Collection | null>(null);
   const [read, setRead] = useState<string | null>(null);
   // A different application is a different answer: forget the old one while
@@ -49,7 +51,7 @@ export function useCollection(applicationId: string | null | undefined) {
     setCollection(null);
   }
   useEffect(() => {
-    if (!applicationId) return;
+    if (!applicationId || !pageVisible) return;
     let live = true;
     const load = () =>
       api
@@ -75,7 +77,7 @@ export function useCollection(applicationId: string | null | undefined) {
       window.removeEventListener(CHANGED, changed);
       window.clearInterval(timer);
     };
-  }, [applicationId]);
+  }, [applicationId, pageVisible]);
 
   const act = async (action: CollectionAction) => {
     if (!applicationId) return;
@@ -104,6 +106,7 @@ export function useHistory(
   /** False skips the read, for an application that keeps no history. */
   wanted = true,
 ) {
+  const pageVisible = usePageVisible();
   const [state, setState] = useState<{
     key: string;
     history: TrafficHistory | null;
@@ -115,7 +118,7 @@ export function useHistory(
   if ((!applicationId || !wanted) && state.key)
     setState({ key: "", history: null, error: null });
   useEffect(() => {
-    if (!applicationId || !wanted) return;
+    if (!applicationId || !wanted || !pageVisible) return;
     let live = true;
     const load = () =>
       api
@@ -136,7 +139,7 @@ export function useHistory(
       live = false;
       window.clearInterval(timer);
     };
-  }, [applicationId, range, wanted, key]);
+  }, [applicationId, range, wanted, key, pageVisible]);
   return {
     // The previous range stays drawn while the next one is read, so the
     // switch does not flash an empty page.

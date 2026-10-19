@@ -1,10 +1,16 @@
 "use client";
 import { CaretUpDown, ShieldCheck, Warning } from "@phosphor-icons/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { intentOf, plainText, whereItRan } from "./execution-text";
 import type { OperatorSettings } from "@/server/operator-execution";
 import type { ExecutionSummary as ExecutionRecord } from "@/lib/call-detail";
-import { disclosureKey, useCallDetail, useDisclosure } from "./call-disclosure";
+import {
+  CallDetailsVisible,
+  disclosureKey,
+  useCallDetail,
+  useDisclosure,
+} from "./call-disclosure";
+import { usePageVisible } from "./use-page-visible";
 import { LocalTime } from "./local-time";
 import "./operator-console.css";
 import { Tag, Working, type Tone } from "./presentation";
@@ -86,6 +92,8 @@ export function OperatorConsole({
   records?: ExecutionRecord[];
 }) {
   const url = `/api/applications/${applicationId}/operator`;
+  const pageVisible = usePageVisible();
+  const conversationVisible = useContext(CallDetailsVisible);
   const suppliedRecords = records !== undefined;
   const excluded = new Set(excludeIds);
   const readUrl =
@@ -110,7 +118,12 @@ export function OperatorConsole({
     }
   }, [readUrl]);
   useEffect(() => {
-    if (suppliedRecords && !settingsOnly) return;
+    if (
+      !pageVisible ||
+      !conversationVisible ||
+      (suppliedRecords && !settingsOnly)
+    )
+      return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
@@ -148,7 +161,13 @@ export function OperatorConsole({
       alive = false;
       clearTimeout(timer);
     };
-  }, [readUrl, suppliedRecords, settingsOnly]);
+  }, [
+    readUrl,
+    suppliedRecords,
+    settingsOnly,
+    pageVisible,
+    conversationVisible,
+  ]);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("execution");
     if (!id) return;

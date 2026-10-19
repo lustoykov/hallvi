@@ -830,6 +830,9 @@ test("profile disclosure loading with 2000 calls", async ({
     "Opt-in before/after profile.",
   );
   test.setTimeout(240_000);
+  const rounds = Number(process.env.HALLVI_DISCLOSURE_ROUNDS ?? 3);
+  if (!Number.isSafeInteger(rounds) || rounds < 1 || rounds > 100)
+    throw new Error("Choose 1–100 disclosure profile rounds.");
   const { app, chat, worker } = await setup(page, fixture, 2000);
   const runs: object[] = [];
   try {
@@ -845,7 +848,10 @@ test("profile disclosure loading with 2000 calls", async ({
         .poll(() => existsSync(gate), { timeout: 180_000 })
         .toBe(true);
     }
-    for (let round = 0; round < 3; round++) {
+    for (let round = 0; round < rounds; round++) {
+      const summaries =
+        process.env.HALLVI_DISCLOSURE_COMPARE !== "1" || round % 2 === 1;
+      worker.summaries(summaries);
       const context = await browser.newContext({
         viewport: { width: 1440, height: 1000 },
       });
@@ -945,6 +951,7 @@ test("profile disclosure loading with 2000 calls", async ({
           .toBeGreaterThan(0);
         runs.push({
           round,
+          summaries,
           documentBytes,
           disclosureTranscriptReads: worker.reads() - readsBeforeDisclosure,
           callRequests: await reader.evaluate(() =>

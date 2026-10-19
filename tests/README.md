@@ -168,6 +168,11 @@ Timing (large bodies can be evicted from Chromium's inspector buffer), the
 first SSE frame's UTF-8 bytes including its ID, navigation-to-latest-reply
 visibility, disclosure-click-to-detail visibility, transcript reads during the
 disclosure, and the disposable fixture's snapshot projection/transport counters.
+Set `HALLVI_DISCLOSURE_ROUNDS=40` for a larger sample (1–100; default three).
+With `HALLVI_DISCLOSURE_COMPARE=1`, successive fresh contexts alternate full
+worker transcripts and compact summaries, starting with full; the client bundle
+and exact-call read path stay the same. Each result records `summaries` so these
+two conditions can be compared without treating them as different client builds.
 Compare the base and change on the same machine in coordinated quiet windows;
 this synthetic production fixture makes no model calls and establishes no deployment.
 Keep that task-owned output directory when working concurrently: a new
@@ -176,8 +181,14 @@ if both use the default.
 For shared-machine measurements, set `HALLVI_DISCLOSURE_GATE` to a fresh
 task-owned path under `work/`. After warming, the case writes `<path>.ready`
 and waits up to three minutes for you to create `<path>`. Agree a quiet window
-at that point, then create the file to measure only the three browser contexts; build and warmup
+at that point, then create the file to measure only the browser contexts; build and warmup
 do not reserve the machine. Remove only those task-owned markers afterward.
+
+`traffic-history.spec.ts` checks that hidden pages stop their access/traffic
+observations and permission polling, refresh on return, and stop permission
+polling when the conversation is parked behind another destination. It dispatches
+visibility changes without freezing browser execution, then advances the browser
+clock past the polling intervals; it does not measure native tab throttling.
 
 The same journey checks where a long conversation opens: on its latest
 message, and on the linked message when the address names one, without being

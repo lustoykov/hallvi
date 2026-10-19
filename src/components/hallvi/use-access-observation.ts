@@ -5,6 +5,7 @@ import type { SavedInformation } from "@/server/operator-data";
 import { accessRouteIdentity } from "@/server/access-record";
 import type { Reachability } from "./page/page-head";
 import { QUIET_PULSE, type Pulse } from "./pulse";
+import { usePageVisible } from "./use-page-visible";
 
 interface Answer {
   applicationId: string;
@@ -19,12 +20,13 @@ export function useAccessObservation(
   applicationId: string | undefined,
   record: SavedInformation | undefined,
 ) {
+  const pageVisible = usePageVisible();
   const routeIdentity = accessRouteIdentity(record);
   const [answered, setAnswered] = useState<Answer | null>(null);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
   useEffect(() => {
-    if (!applicationId) return;
+    if (!applicationId || !pageVisible) return;
     let cancelled = false;
     let latestRead = 0;
     const unknown = (state: "unknown" | "unavailable", readId: number) => {
@@ -89,7 +91,7 @@ export function useAccessObservation(
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [applicationId, routeIdentity, revision]);
+  }, [applicationId, routeIdentity, revision, pageVisible]);
   const current =
     answered?.applicationId === applicationId &&
     answered?.routeIdentity === routeIdentity

@@ -1,10 +1,4 @@
-import {
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 
@@ -41,6 +35,7 @@ export async function scriptWorker(
     config: fixture.state,
   });
   let transcriptReads = 0;
+  let compactSnapshots = true;
   let subscriptions = 0;
   let activeSubscriptions = 0;
   let relays = 0;
@@ -62,9 +57,10 @@ export async function scriptWorker(
       let result: unknown = {};
       if (incoming.url === "/transcript") {
         const { scope, message } = JSON.parse(body);
-        result = message?.compact
-          ? summarizeTranscript(scope.applicationId, transcript())
-          : transcript();
+        result =
+          message?.compact && compactSnapshots
+            ? summarizeTranscript(scope.applicationId, transcript())
+            : transcript();
       }
       if (incoming.url === "/call") {
         const { id, entryId, resultEntryId } = JSON.parse(body).message;
@@ -108,6 +104,9 @@ export async function scriptWorker(
     {
       changed: changes.notify,
       reads: () => transcriptReads,
+      summaries: (enabled: boolean) => {
+        compactSnapshots = enabled;
+      },
       connections: () => subscriptions,
       subscribers: () => activeSubscriptions,
       relays: () => relays,
