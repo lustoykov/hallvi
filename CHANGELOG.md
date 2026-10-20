@@ -4,6 +4,12 @@ What changed in each Hallvi release, newest first. An installed Hallvi shows thi
 
 A release's notes are written in the pull request that raises its version, as a `## <version> — <date>` section at the top. [Publishing a Hallvi release](docs/releases.md) describes the rest.
 
+## 0.1.1-alpha.23 — 20 October 2026
+
+One web server where one is enough.
+
+- **No second web server in front of the first.** Hallvi's operator was told to put a proxy in front of every application and to use Caddy when there was none, so a static site whose files nginx already served got Caddy in front of it as well. It now picks the web server that answers HTTPS itself and says which and why; on a fresh server it gave the existing nginx a certificate instead of adding another server.
+
 ## 0.1.1-alpha.22 — 20 October 2026
 
 One name for each process.
