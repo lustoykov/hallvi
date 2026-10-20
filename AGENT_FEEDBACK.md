@@ -48,7 +48,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-069 — Carry a long conversation to the page once, and less of it](#af-069--carry-a-long-conversation-to-the-page-once-and-less-of-it) | 8 | Lean worker responses implemented; durable scans remain |
 | [AF-070 — Land a message link in a long conversation](#af-070--land-a-message-link-in-a-long-conversation) | 2 | Development replay fixed locally |
 | [AF-071 — Refresh compact message dates after midnight](#af-071--refresh-compact-message-dates-after-midnight) | 1 | Fixed locally |
-| [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 1 | New |
+| [AF-072 — Give the release's upgrade journey a real conversation](#af-072--give-the-releases-upgrade-journey-a-real-conversation) | 2 | New |
 | [AF-073 — Say exactly when a request ended](#af-073--say-exactly-when-a-request-ended) | 1 | New |
 | [AF-074 — Let the model look before Continue finishes an interrupted step](#af-074--let-the-model-look-before-continue-finishes-an-interrupted-step) | 1 | New |
 | [AF-075 — Keep a worktree from borrowing the main checkout's packages](#af-075--keep-a-worktree-from-borrowing-the-main-checkouts-packages) | 1 | New |
@@ -485,6 +485,10 @@ retained application instead. I would like the upgrade jobs to carry one
 conversation Pi really wrote.
 
 **+1:** 2026-10-02 — Pi 1.0 move, `claude/pi-1.0`
+**+1:** 2026-10-20 — alpha.21 and alpha.22 fixed two bugs only an
+application older than Pi 1.0 showed (122 old call cards under the latest
+reply; every process listed under a second name). Both passed all four release
+jobs and reached the owner first.
 
 ### AF-071 — Refresh compact message dates after midnight
 
