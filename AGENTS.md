@@ -50,5 +50,9 @@ automation prompts into product sessions.
   are no longer needed.
 - Never commit `.hallvi/`, `.next/` or `tests/results/`. Never print
   credentials or copy them into code, artifacts, commits or pull requests.
-- Clean up what your task created and nothing else, as
-  [development resources](docs/development-resources.md) describes.
+- Clean up temporary resources your task created before finishing. Remove exact
+  owned containers, test-only volumes and images, previews, scratch files and
+  rebuildable build outputs once safe, and verify they are gone. Do not leave
+  disposable resources for the owner or a future storage audit. Preserve shared
+  resources, retained data and required evidence; name anything kept and why.
+  [Development resources](docs/development-resources.md) owns the boundaries.

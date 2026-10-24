@@ -5,6 +5,7 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 
 | Request ID / title | +1 | Status |
 | --- | --- | --- |
+| [AF-101 — Finish development tasks with scoped resource cleanup](#af-101--finish-development-tasks-with-scoped-resource-cleanup) | 1 | Contributor guidance strengthened |
 | [AF-100 — Stop observations while their page is hidden](#af-100--stop-observations-while-their-page-is-hidden) | 2 | Hidden and repeated reads fixed; hash mount remains |
 | [AF-099 — Link captured output to a History event that exists](#af-099--link-captured-output-to-a-history-event-that-exists) | 1 | Fixed locally |
 | [AF-098 — Recognize continued work in older conversations](#af-098--recognize-continued-work-in-older-conversations) | 1 | Fixed locally |
@@ -71,6 +72,17 @@ product proposals live separately in [AGENT_FEATURES.md](AGENT_FEATURES.md).
 | [AF-095 — Keep an early Home jump while a conversation opens](#af-095--keep-an-early-home-jump-while-a-conversation-opens) | 1 | New |
 
 [Archive](#archive) keeps resolved and declined requests out of the active list.
+
+### AF-101 — Finish development tasks with scoped resource cleanup
+
+An owner-requested local storage check found old stopped development containers
+and roughly 8.2 GB of `sg-rig-*` Docker/containerd volumes. Removing containers
+alone would have left their nested runtime storage behind. The owner requested
+stronger Hallvi contributor instructions: clean up task-created temporary
+resources when safe before finishing, verify removal and report retained data.
+The existing product and retained-development-state boundaries still apply.
+
+**+1:** 2026-10-24 — owner-requested local Docker cleanup.
 
 ### AF-100 — Stop observations while their page is hidden
 
