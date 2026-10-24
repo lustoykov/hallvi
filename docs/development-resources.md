@@ -1,9 +1,12 @@
 # Development resources
 
-A development task cleans up what it created, and nothing else: cloud fixtures,
-containers, previews and test data. Worktrees are not on the list. Claude Code
-and Codex remove a worktree when its session is archived, so never remove one
-by hand.
+A development task is not complete until it has cleaned up the temporary
+resources it created that are safe to remove: cloud fixtures, containers,
+test-only volumes and images, previews, scratch files and rebuildable build
+outputs. Do this before the handoff; do not leave disposable resources for the
+owner or a future storage audit. Worktrees are not on the list. Claude Code and
+Codex remove a worktree when its session is archived, so never remove one by
+hand.
 
 ## Scope: development resources, not user systems
 
@@ -19,6 +22,20 @@ temporary and cache directories for things to remove, and never prune Docker
 in bulk. Preserve user files, product databases, backups, credentials,
 conversation history and evidence. If you are not sure a resource is yours and
 disposable, leave it and say so in the handoff.
+
+## Cleanup is part of completion
+
+Track exact paths, resource IDs and process identities as you create them.
+Separate temporary outputs from retained data so cleanup does not require
+guessing later. Once verification or review no longer needs an owned temporary
+resource, remove it during the task rather than only suggesting its removal.
+
+Before the final handoff, re-list owned resources and verify removals. For
+material local disk cleanup, compare allocated size or free space before and
+after; logical sizes and shared image layers do not prove physical savings.
+Name any resource kept, its purpose and why it is still needed. Preserve unique
+test evidence and signed/release artifacts instead of treating every build or
+output directory as disposable.
 
 ## Discarding development data
 
@@ -88,9 +105,14 @@ confirm their ports closed. The check only reports PIDs; match each to its
 command and port before stopping it. Leave intentional tunnels and installed
 Hallvi services running.
 
-Remove the containers, networks and images your task created once nothing
-depends on them. A volume is persistent data: remove it only when your task
-created it and it holds nothing but test data.
+Give owned Docker containers and test-only volumes task-specific names or
+ownership labels, and record created image IDs. Remove those exact containers,
+networks and images once nothing depends on them. A volume is persistent data:
+remove it only when your task created it and it holds nothing but test data.
+Check separately for volumes holding a test container's nested Docker or
+containerd storage; removing its container does not remove those volumes.
+Re-list the exact IDs to verify cleanup. Never substitute a blanket prune for
+ownership and dependency checks.
 
 ## Provider audit on request
 
